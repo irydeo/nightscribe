@@ -1,0 +1,98 @@
+############################################################
+# -*- coding: utf-8 -*-
+#
+# NightScribe - Unit tests: orbital explorer
+# Python  v3.12
+#
+# Francisco José Calvo Fernández
+# (c) 2026
+#
+# Licence GPL v3
+#
+############################################################
+
+from nightscribe.core import orbits
+
+
+def test_classify_families():
+    # canonical examples per family
+    assert orbits.classify({"a": 0.92, "q": 0.746, "Q": 1.099, "e": 0.19}) == "Aten"
+    assert orbits.classify({"a": 1.5, "q": 1.01, "e": 0.33}) == "Apollo"
+    assert orbits.classify({"a": 1.9, "q": 1.08, "e": 0.43}) == "Amor"
+    assert orbits.classify({"a": 0.7, "q": 0.3, "Q": 0.97, "e": 0.4}) == "Atira"
+    assert orbits.classify({"a": 2.5, "q": 2.0, "e": 0.2}) == "Main Belt"
+    assert orbits.classify({"a": 5.2, "q": 4.9, "e": 0.05}) == "Trojan"
+    assert orbits.classify({"a": 15.0, "q": 8.0, "e": 0.3}) == "Centaur"
+    assert orbits.classify({"a": 40.0, "q": 35.0, "e": 0.1}) == "TNO"
+    assert orbits.classify({"a": 3.45, "q": 5.78, "e": 0.04}, "JFc") == "JFc"
+
+
+def test_diameter_from_h():
+    # H=19.09 with albedo 0.35 (Apophis-like) -> ~0.34 km
+    d = orbits.diameter_from_h(19.09, 0.35)
+    assert 0.3 < d < 0.4
+    # darker means bigger for the same H
+    assert orbits.diameter_from_h(19.09, 0.057) > d
+
+
+def test_size_comparison_bilingual():
+    for km in (0.01, 0.1, 0.34, 1.0, 10.0, 100.0):
+        cmp_txt = orbits.size_comparison(km)
+        assert "es" in cmp_txt and "en" in cmp_txt
+        assert cmp_txt["es"] and cmp_txt["en"]
+
+
+def test_comet_mag():
+    # 29P at r~7.2, delta~7.2: should sit around mag 18 (matches live check)
+    m = orbits.comet_expected_mag(10.1, 4.5, 7.18, 7.18)
+    assert 17 < m < 19
+
+
+def test_visual_mag_guard():
+    assert orbits.visual_mag(None, 1, 1) is None
+    assert orbits.visual_mag(19.09, 0.99, 1.74) > 15
+
+
+def test_explain_elements():
+    # Apophis-like elements must yield interpreted rows, both languages,
+    # with basic/deep levels and bilingual parameter names
+    els = {"a": 0.9224, "e": 0.1912, "i": 3.33, "q": 0.746, "Q": 1.099,
+           "per": 324.0}
+    phys = {"H": 19.09, "rot_per": 30.56}
+    rows = orbits.explain_elements(els, phys, "Aten", moid=0.000254)
+    assert rows
+    for r in rows:
+        assert r["es"] and r["en"] and r["value"]
+        assert r.get("level") in ("basic", "deep")
+        assert isinstance(r["param"], dict) and r["param"]["es"]
+    basic = [r for r in rows if r["level"] == "basic"]
+    assert basic and basic[0]["param"]["es"] == "Familia"
+    moid_row = next(r for r in rows if "MOID" in r["param"]["es"])
+    # the intuitive metaphor must be there, no dry jargon
+    assert "carreteras" in moid_row["es"]
+    assert "roads" in moid_row["en"]
+    assert "PHA" in moid_row["es"]
+
+
+def test_explain_neofixer():
+    t = {"nf_score": 5.4, "nf_priority": "medium", "nf_cost_min": 12.0,
+         "nobs": 14, "arc_days": "0.09", "moid": 0.01}
+    rows = orbits.explain_neofixer(t)
+    assert len(rows) >= 5
+    assert all(r["es"] and r["en"] and isinstance(r["param"], dict)
+               for r in rows)
+
+
+def test_pick_language():
+    pair = {"es": "hola", "en": "hello"}
+    assert orbits.pick(pair, "es") == "hola"
+    assert orbits.pick(pair, "en") == "hello"
+    assert orbits.pick(pair, "fr") == "hello"  # falls back to English
+    assert orbits.pick("plain", "es") == "plain"
+
+
+def test_distance_text_units():
+    near = orbits.distance_text(384400 * 5)
+    assert "lunares" in near["es"] and "lunar" in near["en"]
+    far = orbits.distance_text(150e6)
+    assert "millones" in far["es"] and "million" in far["en"]

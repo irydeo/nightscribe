@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ExploreTab</class>
+ <widget class="QWidget" name="ExploreTab">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout" name="searchLayout">
+     <item><widget class="QLabel" name="lbl_explore"><property name="text"><string>Object:</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_explore"><property name="placeholderText"><string>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_explore"><property name="text"><string>Explore</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_hook">
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="text"><string></string></property>
+     <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTabWidget" name="tabs_explore">
+     <widget class="QWidget" name="tab_params">
+      <attribute name="title"><string>Parameters</string></attribute>
+      <layout class="QVBoxLayout">
+       <item>
+        <layout class="QHBoxLayout">
+         <item><widget class="QCheckBox" name="chk_deep"><property name="text"><string>In depth</string></property><property name="toolTip"><string>Show every parameter we can explain</string></property></widget></item>
+         <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         <item><widget class="QPushButton" name="btn_mkpost"><property name="text"><string>Create post</string></property></widget></item>
+         <item><widget class="QCheckBox" name="chk_explore_obs"><property name="text"><string>Observed</string></property></widget></item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QTableWidget" name="tbl_params">
+         <property name="sortingEnabled"><bool>false</bool></property>
+         <column><property name="text"><string>Parameter</string></property></column>
+         <column><property name="text"><string>Value</string></property></column>
+         <column><property name="text"><string>What it means</string></property></column>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_orbit">
+      <attribute name="title"><string>Orbit</string></attribute>
+      <layout class="QVBoxLayout">
+       <item><widget class="QLabel" name="lbl_orbit"><property name="alignment"><enum>Qt::AlignCenter</enum></property><property name="text"><string>—</string></property></widget></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_sky">
+      <attribute name="title"><string>Sky tonight</string></attribute>
+      <layout class="QVBoxLayout">
+       <item><widget class="QLabel" name="lbl_sky"><property name="alignment"><enum>Qt::AlignCenter</enum></property><property name="text"><string>—</string></property></widget></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_families">
+      <attribute name="title"><string>Families</string></attribute>
+      <layout class="QVBoxLayout">
+       <item><widget class="QLabel" name="lbl_families"><property name="alignment"><enum>Qt::AlignCenter</enum></property><property name="text"><string>—</string></property></widget></item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="tab_field">
+      <attribute name="title"><string>Field</string></attribute>
+      <layout class="QVBoxLayout">
+       <item><widget class="QLabel" name="lbl_field"><property name="alignment"><enum>Qt::AlignCenter</enum></property><property name="text"><string>—</string></property></widget></item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

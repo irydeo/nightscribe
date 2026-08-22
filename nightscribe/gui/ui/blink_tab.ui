@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>BlinkTab</class>
+ <widget class="QWidget" name="BlinkTab">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout">
+     <item><widget class="QLabel" name="lbl_sn"><property name="text"><string>Supernova:</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_sn_name"><property name="placeholderText"><string>2026ziz, SN2023ixf…</string></property><property name="maximumWidth"><number>160</number></property></widget></item>
+     <item><widget class="QLabel" name="lbl_fits"><property name="text"><string>FITS image:</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_fits"><property name="placeholderText"><string>Plate-solved FITS (with WCS)…</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_browse"><property name="text"><string>Browse…</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_prepare"><property name="text"><string>Prepare pair</string></property><property name="default"><bool>true</bool></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout">
+     <item><widget class="QCheckBox" name="chk_manual"><property name="text"><string>Manual coordinates:</string></property></widget></item>
+     <item><widget class="QLabel" name="lbl_ra"><property name="text"><string>RA (deg):</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_ra"><property name="placeholderText"><string>301.1436</string></property><property name="maximumWidth"><number>110</number></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <item><widget class="QLabel" name="lbl_dec"><property name="text"><string>Dec (deg):</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_dec"><property name="placeholderText"><string>+62.6441</string></property><property name="maximumWidth"><number>110</number></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="blinkMain">
+     <item>
+      <widget class="QLabel" name="lbl_blink">
+       <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+       <property name="minimumSize"><size><width>640</width><height>480</height></size></property>
+       <property name="styleSheet"><string notr="true">background-color: #0b0d17; color: #8a90a6;</string></property>
+       <property name="text"><string>Load a plate-solved FITS and press "Prepare pair" — the survey reference (PanSTARRS DR1 g) will be matched automatically.</string></property>
+       <property name="wordWrap"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="blinkControls">
+       <item>
+        <widget class="QGroupBox" name="grp_stretch">
+         <property name="title"><string>Stretch</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QLabel" name="lbl_black"><property name="text"><string>Black point</string></property></widget></item>
+          <item><widget class="QSlider" name="sld_black"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>200</number></property><property name="value"><number>10</number></property></widget></item>
+          <item><widget class="QLabel" name="lbl_white"><property name="text"><string>White point</string></property></widget></item>
+          <item><widget class="QSlider" name="sld_white"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>800</number></property><property name="maximum"><number>1000</number></property><property name="value"><number>995</number></property></widget></item>
+          <item><widget class="QLabel" name="lbl_gamma"><property name="text"><string>Gamma</string></property></widget></item>
+          <item><widget class="QSlider" name="sld_gamma"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>20</number></property><property name="maximum"><number>200</number></property><property name="value"><number>100</number></property></widget></item>
+          <item><widget class="QPushButton" name="btn_auto_stretch"><property name="text"><string>Auto stretch</string></property></widget></item>
+          <item><widget class="QLabel" name="lbl_balance"><property name="text"><string>Brightness balance (survey)</string></property></widget></item>
+          <item><widget class="QSlider" name="sld_balance"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>25</number></property><property name="maximum"><number>400</number></property><property name="value"><number>100</number></property><property name="toolTip"><string>Gain applied to the survey so both backgrounds match (100 = no change)</string></property></widget></item>
+          <item><widget class="QPushButton" name="btn_balance_auto"><property name="text"><string>Auto balance</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_view">
+         <property name="title"><string>View</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QCheckBox" name="chk_blink_live"><property name="text"><string>Live blink</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout">
+            <item><widget class="QLabel" name="lbl_interval"><property name="text"><string>Blink every (ms):</string></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_interval"><property name="minimum"><number>100</number></property><property name="maximum"><number>3000</number></property><property name="singleStep"><number>50</number></property><property name="value"><number>500</number></property></widget></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lbl_fade"><property name="text"><string>Fade (survey ↔ yours)</string></property></widget></item>
+          <item><widget class="QSlider" name="sld_fade"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>50</number></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout">
+            <item><widget class="QLabel" name="lbl_zoom"><property name="text"><string>Zoom on the SN:</string></property></widget></item>
+            <item><widget class="QComboBox" name="cmb_zoom">
+             <item><property name="text"><string>×1</string></property></item>
+             <item><property name="text"><string>×2</string></property></item>
+             <item><property name="text"><string>×4</string></property></item>
+            </widget></item>
+           </layout>
+          </item>
+          <item><widget class="QCheckBox" name="chk_marker"><property name="text"><string>Mark the supernova</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QLabel" name="lbl_marker_size"><property name="text"><string>Marker size</string></property></widget></item>
+          <item><widget class="QSlider" name="sld_marker"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>5</number></property><property name="maximum"><number>40</number></property><property name="value"><number>10</number></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_nudge">
+         <property name="title"><string>Fine alignment (survey)</string></property>
+         <layout class="QGridLayout">
+          <item row="0" column="1"><widget class="QPushButton" name="btn_up"><property name="text"><string>↑</string></property></widget></item>
+          <item row="1" column="0"><widget class="QPushButton" name="btn_left"><property name="text"><string>←</string></property></widget></item>
+          <item row="1" column="1"><widget class="QLabel" name="lbl_nudge"><property name="text"><string>(0.0, 0.0)</string></property><property name="alignment"><enum>Qt::AlignCenter</enum></property></widget></item>
+          <item row="1" column="2"><widget class="QPushButton" name="btn_right"><property name="text"><string>→</string></property></widget></item>
+          <item row="2" column="1"><widget class="QPushButton" name="btn_down"><property name="text"><string>↓</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_export">
+         <property name="title"><string>Export</string></property>
+         <layout class="QVBoxLayout">
+          <item><widget class="QRadioButton" name="rdo_blink"><property name="text"><string>Blink GIF</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QRadioButton" name="rdo_fade"><property name="text"><string>Fade GIF</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_gif"><property name="text"><string>Export GIF…</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_video"><property name="text"><string>Export video (MP4)…</string></property><property name="toolTip"><string>Same animation as the GIF, encoded as H.264 MP4 for sites that reject GIFs</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_png"><property name="text"><string>Export side-by-side PNG…</string></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+      </layout>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_blink_status"><property name="wordWrap"><bool>true</bool></property><property name="text"><string/></property></widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

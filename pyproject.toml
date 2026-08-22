@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nightscribe"
+version = "0.1.0"
+description = "Plan your night, understand every object, tell your science. NEOs, comets, supernovae, exoplanet transits and the Sun for amateur observatories."
+readme = "README.md"
+license = {text = "GPL-3.0-only"}
+authors = [
+    {name = "Francisco José Calvo Fernández", email = "irydeo@irydeo.com"},
+]
+keywords = ["astronomy", "NEO", "comets", "supernovae", "exoplanets", "observatory", "MPC"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "lxml>=4.9",
+    "PySide6>=6.6",
+    "matplotlib>=3.8",
+    "numpy>=1.26",
+    "platformdirs>=4.0",
+    "Pillow>=10.0",
+    "imageio-ffmpeg>=0.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+nightscribe = "nightscribe.__main__:main"
+
+[project.urls]
+Homepage = "https://www.irydeo.com"
+Repository = "https://github.com/<pending>/nightscribe"
+
+[tool.setuptools.packages.find]
+include = ["nightscribe*"]
+
+[tool.setuptools.package-data]
+"nightscribe.gui" = ["ui/*.ui", "i18n/*.qm"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: tests that hit live external services",
+]

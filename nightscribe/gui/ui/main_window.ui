@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect><x>0</x><y>0</y><width>1200</width><height>800</height></rect>
+  </property>
+  <property name="windowTitle">
+   <string>NightScribe</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QTabWidget" name="tabs">
+      <property name="currentIndex"><number>0</number></property>
+      <widget class="QWidget" name="tab_tonight">
+       <attribute name="title"><string>Tonight</string></attribute>
+      </widget>
+      <widget class="QWidget" name="tab_explore">
+       <attribute name="title"><string>Explore</string></attribute>
+      </widget>
+      <widget class="QWidget" name="tab_post">
+       <attribute name="title"><string>Post</string></attribute>
+      </widget>
+      <widget class="QWidget" name="tab_solar">
+       <attribute name="title"><string>Solar system</string></attribute>
+      </widget>
+       <widget class="QWidget" name="tab_history">
+        <attribute name="title"><string>History</string></attribute>
+       </widget>
+       <widget class="QWidget" name="tab_blink">
+        <attribute name="title"><string>Blink</string></attribute>
+       </widget>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect><x>0</x><y>0</y><width>1200</width><height>25</height></rect>
+   </property>
+   <widget class="QMenu" name="menu_file">
+    <property name="title"><string>File</string></property>
+    <addaction name="action_quit"/>
+   </widget>
+   <widget class="QMenu" name="menu_view">
+    <property name="title"><string>View</string></property>
+    <widget class="QMenu" name="menu_language">
+     <property name="title"><string>Language</string></property>
+     <addaction name="action_lang_system"/>
+     <addaction name="action_lang_es"/>
+     <addaction name="action_lang_en"/>
+    </widget>
+    <addaction name="menu_language"/>
+   </widget>
+   <widget class="QMenu" name="menu_tools">
+    <property name="title"><string>Tools</string></property>
+    <addaction name="action_settings"/>
+   </widget>
+   <widget class="QMenu" name="menu_help">
+    <property name="title"><string>Help</string></property>
+    <addaction name="action_about"/>
+    <addaction name="action_sources"/>
+   </widget>
+   <addaction name="menu_file"/>
+   <addaction name="menu_view"/>
+   <addaction name="menu_tools"/>
+   <addaction name="menu_help"/>
+  </widget>
+  <action name="action_quit">
+   <property name="text"><string>Quit</string></property>
+  </action>
+  <action name="action_lang_system">
+   <property name="text"><string>System</string></property>
+  </action>
+  <action name="action_lang_es">
+   <property name="text"><string>Español</string></property>
+  </action>
+  <action name="action_lang_en">
+   <property name="text"><string>English</string></property>
+  </action>
+  <action name="action_settings">
+   <property name="text"><string>Settings…</string></property>
+  </action>
+  <action name="action_about">
+   <property name="text"><string>About NightScribe</string></property>
+  </action>
+  <action name="action_sources">
+   <property name="text"><string>Data sources</string></property>
+  </action>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

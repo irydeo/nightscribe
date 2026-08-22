@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>HistoryTab</class>
+ <widget class="QWidget" name="HistoryTab">
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout">
+     <item><widget class="QPushButton" name="btn_refresh_hist"><property name="text"><string>Refresh</string></property></widget></item>
+     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="tbl_history">
+     <property name="sortingEnabled"><bool>true</bool></property>
+     <column><property name="text"><string>Date</string></property></column>
+     <column><property name="text"><string>Object</string></property></column>
+     <column><property name="text"><string>Type</string></property></column>
+     <column><property name="text"><string>Post generated</string></property></column>
+     <column><property name="text"><string>Notes</string></property></column>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

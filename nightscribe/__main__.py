@@ -174,6 +174,46 @@ def cmd_gui(args):
     return app.run()
 
 
+def cmd_project(args):
+    # Minimal project management from the CLI (ADR-019, GUI-first).
+    from .core import project as proj_mod
+    if args.action == "list":
+        projects = proj_mod.list_projects(db, args.status)
+        if not projects:
+            print("No projects / Sin proyectos")
+            return
+        for p in projects:
+            cur = proj_mod.current_step(db, p["id"])
+            step = cur or "done"
+            print(f"  [{p['id']:3d}] [{p['kind']:7s}] {p['object_name']:<24s} "
+                  f"{p['status']:8s} step={step}")
+    elif args.action == "create":
+        p = proj_mod.create(db, args.kind, args.name)
+        if p:
+            print(f"Created project {p['id']}: [{p['kind']}] {p['object_name']}")
+        else:
+            print(f"Bad kind '{args.kind}' (valid: {', '.join(proj_mod.VALID_KINDS)})")
+            return 1
+    elif args.action == "advance":
+        p = proj_mod.advance(db, args.id)
+        if p:
+            cur = proj_mod.current_step(db, p["id"]) or "done"
+            print(f"Project {p['id']} -> step={cur}, status={p['status']}")
+        else:
+            print(f"Project {args.id} not found")
+            return 1
+    elif args.action == "show":
+        p = proj_mod.get(db, args.id)
+        if not p:
+            print(f"Project {args.id} not found")
+            return 1
+        print(f"== [{p['kind']}] {p['object_name']} — {p['status']} ==")
+        for s in p["steps"]:
+            print(f"  {s['status']:8s} {s['step']}")
+        for f in p["files"]:
+            print(f"  file: {f['kind']:10s} {f['path']}")
+
+
 def main(argv=None):
     # CLI entry point.
     # @args: argv - optional argument list (tests)
@@ -223,6 +263,21 @@ def main(argv=None):
 
     p = sub.add_parser("gui", help="aplicación de escritorio")
     p.set_defaults(func=cmd_gui)
+
+    p = sub.add_parser("project", help="gestión de proyectos (CLI mínimo)")
+    p_sub = p.add_subparsers(dest="action", required=True)
+    p_list = p_sub.add_parser("list", help="listar proyectos")
+    p_list.add_argument("--status", choices=["active", "done", "archived"],
+                        default=None)
+    p_create = p_sub.add_parser("create", help="crear un proyecto")
+    p_create.add_argument("--kind", required=True,
+                          help="sn|neo|comet|pccp|transit")
+    p_create.add_argument("--name", required=True, help="object name")
+    p_advance = p_sub.add_parser("advance", help="avanzar un paso")
+    p_advance.add_argument("id", type=int, help="project id")
+    p_show = p_sub.add_parser("show", help="mostrar un proyecto")
+    p_show.add_argument("id", type=int, help="project id")
+    p.set_defaults(func=cmd_project)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

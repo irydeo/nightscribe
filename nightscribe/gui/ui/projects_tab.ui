@@ -94,6 +94,38 @@
           <layout class="QHBoxLayout">
            <item><widget class="QPushButton" name="btn_export_seq"><property name="text"><string>Export sequence…</string></property></widget></item>
            <item><widget class="QPushButton" name="btn_export_ephem"><property name="text"><string>Export ephemeris…</string></property><property name="toolTip"><string>For NEOs: export RA/Dec table for TheSkyX / Cartes du Ciel</string></property></widget></item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_mpc">
+        <property name="title"><string>MPC report (NEO astrometry)</string></property>
+        <layout class="QVBoxLayout">
+         <item>
+          <widget class="QLabel" name="lbl_mpc_hint">
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="text"><string>Paste measurements from your astrometry software (MPC 80-col or ADES). NightScribe validates and packages the file; you send it to the MPC.</string></property>
+           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QTextEdit" name="txt_mpc">
+           <property name="maximumHeight"><number>160</number></property>
+           <property name="acceptRichText"><bool>false</bool></property>
+           <property name="placeholderText"><string>Paste MPC 80-column or ADES PSV lines here…</string></property>
+           <property name="font"><font><family>Monospace</family></font></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_mpc_status"><property name="text"><string>—</string></property><property name="wordWrap"><bool>true</bool></property></widget>
+         </item>
+         <item>
+          <layout class="QHBoxLayout">
+           <item><widget class="QPushButton" name="btn_mpc_validate"><property name="text"><string>Validate</string></property></widget></item>
+           <item><widget class="QPushButton" name="btn_mpc_save"><property name="text"><string>Save report…</string></property></widget></item>
+           <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
           </layout>
          </item>
         </layout>

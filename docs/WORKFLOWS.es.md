@@ -77,7 +77,7 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 | 3 | Modelo de proyecto: migración db (`user_version` 0→1), `core/project.py`, máquina de pasos, tests | **Hecho (2026-08-24)** |
 | 4 | GUI v3: 4 pestañas, hub Proyectos con stepper por tipo, blink contextual, tarjetas de Esta noche con «Crear proyecto» e «inicio seguro», Settings (Cámara/Horizonte/Sesión/Luna), i18n | **Hecho (2026-08-24)** |
 | 5 | Exportadores: `core/sequence.py` (NINA/CCDciel/CSV) + efemérides (CSV + TheSkyX + CdC validados en importación real), tests | **Hecho (2026-08-24)** |
-| 6 | `core/mpc_report.py` + paso en flujo NEO + subcomando CLI `project` mínimo + polish, i18n y docs finales | Pendiente ← **punto de entrada** |
+| 6 | `core/mpc_report.py` + paso en flujo NEO + subcomando CLI `project` mínimo + polish, i18n y docs finales | **Hecho (2026-08-24)** |
 
 **PUNTO DE ENTRADA (para cualquier IA o humano que retome el trabajo)**:
 
@@ -102,11 +102,21 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
      en el hub de Proyectos con campos frames/exposición/filtro y botones de exportación.
      Los formatos nativos de NINA/CCDciel/TheSkyX/CdC son puntos de partida que requieren
      validación contra las versiones del usuario en importación real.
+   - Fase 6: `core/mpc_report.py` (validador de medidas pegadas en MPC 80-col o ADES
+     PSV: formato, código de observatorio, designación; empaquetado del fichero para
+     envío al MPC). Panel «MPC report» en el hub de Proyectos. Subcomando CLI
+     `nightscribe project list|create|advance|show`. i18n completo (208 cadenas ES/EN).
+     **Todas las fases completas.**
    El **horizonte TheSkyX real** sigue mockeado: cuando el usuario comparta su fichero,
    sustituir el parser/fixture de `core/horizon.py` validando contra ese fichero (ADR-020).
-3. Continuar por la **fase 6**: `core/mpc_report.py` (validador de medidas pegadas
-   en formato MPC 80-col o ADES, empaquetado del fichero para envío), paso en el flujo
-   NEO, subcomando CLI `project` mínimo y polish final.
+   Los **formatos nativos de NINA/CCDciel/TheSkyX/CdC** son puntos de partida que requieren
+   validación contra las versiones del usuario en importación real (ADR-021).
+
+**Próximos pasos sugeridos** (fuera del rediseño inicial):
+- Sustituir el mock del horizonte por el fichero TheSkyX real del usuario.
+- Validar los formatos de exportación de secuencias y efemérides contra software real.
+- Añadir flujos para cometas y tránsitos en el mismo esqueleto de 5 pasos.
+- Probar la GUI a fondo y refinar la UX del stepper y los diálogos contextuales.
 4. Reglas vigentes: código en inglés con cabecera GPL y comentarios `# @args:`,
    cadenas de GUI por `self.tr()`, red solo desde `core/sources/` vía `core/db.py`,
    documentación bilingüe (ADR-013), tests unitarios por módulo + funcionales de flujo.

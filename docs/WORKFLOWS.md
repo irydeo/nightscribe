@@ -77,7 +77,7 @@ are settled. Out of this initial redesign.
 | 3 | Project model: db migration (`user_version` 0→1), `core/project.py`, step machine, tests | **Done (2026-08-24)** |
 | 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | **Done (2026-08-24)** |
 | 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | **Done (2026-08-24)** |
-| 6 | `core/mpc_report.py` + step in the NEO flow + minimal CLI `project` subcommand + polish, i18n and final docs | Pending ← **entry point** |
+| 6 | `core/mpc_report.py` + step in the NEO flow + minimal CLI `project` subcommand + polish, i18n and final docs | **Done (2026-08-24)** |
 
 **ENTRY POINT (for any AI or human resuming the work)**:
 
@@ -101,11 +101,21 @@ are settled. Out of this initial redesign.
      hub with frames/exposure/filter fields and export buttons. The native NINA/CCDciel/
      TheSkyX/CdC formats are starting points that require validation against the user's
      software versions via real import.
+   - Phase 6: `core/mpc_report.py` (validator for pasted measurements in MPC 80-col or
+     ADES PSV: format, observatory code, designation; file packaging for MPC submission).
+     "MPC report" panel in the Projects hub. CLI subcommand
+     `nightscribe project list|create|advance|show`. Full i18n (208 strings ES/EN).
+     **All phases complete.**
    The **real TheSkyX horizon** is still mocked: when the user shares their file,
    replace the parser/fixture in `core/horizon.py` validating against that file (ADR-020).
-3. Continue at **phase 6**: `core/mpc_report.py` (validator for pasted measurements
-   in MPC 80-col or ADES format, file packaging for submission), step in the NEO flow,
-   minimal CLI `project` subcommand and final polish.
+   The **native NINA/CCDciel/TheSkyX/CdC formats** are starting points that require
+   validation against the user's software versions via real import (ADR-021).
+
+**Suggested next steps** (beyond the initial redesign):
+- Replace the mocked horizon with the user's real TheSkyX file.
+- Validate the sequence and ephemeris export formats against real software.
+- Add flows for comets and exoplanet transits in the same 5-step skeleton.
+- Test the GUI thoroughly and refine the stepper and contextual dialog UX.
 4. Standing rules: English code with GPL header and `# @args:` comments, GUI strings
    via `self.tr()`, network only from `core/sources/` through `core/db.py`, bilingual
    documentation (ADR-013), unit tests per module + end-to-end functional tests.

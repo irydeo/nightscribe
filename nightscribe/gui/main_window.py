@@ -23,7 +23,8 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox,
 
 from .. import paths
 from ..config import config
-from ..core import ephemeris, horizon, orbits, project, sequence, suggest
+from ..core import (ephemeris, horizon, mpc_report, orbits, project,
+                    sequence, suggest)
 from ..core.db import db
 from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
                       MpcResolveWorker, PostWorker, SunWorker, TonightWorker)
@@ -208,6 +209,8 @@ class MainWindow(QMainWindow):
         p.btn_delete.clicked.connect(self._project_delete)
         p.btn_export_seq.clicked.connect(self._project_export_sequence)
         p.btn_export_ephem.clicked.connect(self._project_export_ephem)
+        p.btn_mpc_validate.clicked.connect(self._project_mpc_validate)
+        p.btn_mpc_save.clicked.connect(self._project_mpc_save)
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(
@@ -844,6 +847,71 @@ class MainWindow(QMainWindow):
         except OSError as err:
             self.statusBar().showMessage(
                 self.tr("Export failed: %1").replace("%1", str(err)), 8000)
+
+    def _project_mpc_validate(self):
+        # Validates the pasted measurements without saving.
+        if not self._current_project:
+            return
+        text = self.projects.txt_mpc.toPlainText()
+        if not text.strip():
+            self.projects.lbl_mpc_status.setText(
+                self.tr("Paste your measurements first."))
+            return
+        obs_code = config.get("mpc_code", "")
+        obj = self._current_project["object_name"]
+        result = mpc_report.validate(text, obs_code=obs_code,
+                                     expected_obj=obj)
+        if result["valid"]:
+            status = (self.tr("Valid: %1 lines, format %2, designation(s) %3")
+                      .replace("%1", str(result["n_lines"]))
+                      .replace("%2", result["format"])
+                      .replace("%3", ", ".join(result["designations"])))
+            if result["warnings"]:
+                status += " ⚠ " + "; ".join(result["warnings"])
+            self.projects.lbl_mpc_status.setText(status)
+        else:
+            self.projects.lbl_mpc_status.setText(
+                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
+                + ("…" if len(result["errors"]) > 4 else ""))
+
+    def _project_mpc_save(self):
+        # Validates and packages the measurements into a file.
+        if not self._current_project:
+            return
+        text = self.projects.txt_mpc.toPlainText()
+        if not text.strip():
+            self.projects.lbl_mpc_status.setText(
+                self.tr("Paste your measurements first."))
+            return
+        obs_code = config.get("mpc_code", "")
+        obj = self._current_project["object_name"]
+        outdir = paths.data_dir() / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        from PySide6.QtWidgets import QFileDialog
+        default = outdir / f"{obj}_mpc_report.txt"
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Save MPC report"), str(default),
+            "Text files (*.txt);;All files (*)")
+        if not out:
+            return
+        path, result = mpc_report.package(text, out, obs_code=obs_code,
+                                          expected_obj=obj)
+        if path:
+            project.add_file(db, self._current_project["id"], path, "report")
+            # persist the measurements in the project's process step
+            project.update_step_data(
+                db, self._current_project["id"], "process",
+                {"mpc_report": path})
+            self.projects.lbl_mpc_status.setText(
+                self.tr("Report saved: %1 (%2 lines)")
+                .replace("%1", path)
+                .replace("%2", str(result["n_lines"])))
+            self.statusBar().showMessage(
+                self.tr("MPC report ready to email to the MPC"), 8000)
+        else:
+            self.projects.lbl_mpc_status.setText(
+                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
+                + ("…" if len(result["errors"]) > 4 else ""))
 
     def _create_project(self, target):
         # @args: target - dict from the planner/tonight list

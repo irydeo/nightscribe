@@ -328,7 +328,7 @@ class MainWindow(QMainWindow):
     _KIND_LABELS = {"neo": "NEO", "sn": "SN", "comet": "CMT",
                     "pccp": "PCCP", "transit": "TRN", "alert": "ALT"}
 
-    def _type_pixmap(self, kind, size=32):
+    def _type_pixmap(self, kind, size=28):
         # Draws a small geometric icon per object type with QPainter.
         # Fast (no matplotlib), guaranteed to render on any platform.
         # @args: kind - object kind string, size - icon px
@@ -416,11 +416,11 @@ class MainWindow(QMainWindow):
             container.setLayout(QGridLayout(container))
         grid = container.layout()
         for i in range(8):
-            placeholder = QLabel(self.tr("Loading…"))
+            placeholder = QLabel(self.tr("Loading..."))
             placeholder.setAlignment(Qt.AlignCenter)
             placeholder.setStyleSheet(
                 "color: #555; background: #12141f; border-radius: 6px;"
-                " padding: 20px;")
+                " padding: 16px;")
             grid.addWidget(placeholder, i // 4, i % 4)
 
     def _tonight_done(self, top, all_scored, error=""):
@@ -452,13 +452,10 @@ class MainWindow(QMainWindow):
         else:
             container.setLayout(QVBoxLayout(container))
         layout = container.layout()
-        lbl = QLabel(
-            f"<div style='text-align: center; color: #555;'>"
-            f"<br><b>{self.tr('No targets found')}</b><br><br>"
-            f"{msg}<br><br>"
-            f"<small>{self.tr('Check your network and try again.')}</small>"
-            f"</div>")
+        lbl = QLabel(self.tr("No targets found") + "\n\n" + msg + "\n\n"
+                       + self.tr("Check your network and try again."))
         lbl.setAlignment(Qt.AlignCenter)
+        lbl.setStyleSheet("color: #666; font-size: 14px;")
         layout.addWidget(lbl)
         layout.addStretch()
         self.tonight.lbl_context.setText(self.tr("No data"))
@@ -502,10 +499,12 @@ class MainWindow(QMainWindow):
             grid.addWidget(card, i // 4, i % 4)
 
     def _make_card(self, t, score, phrase, medal, idx):
-        # @return: a compact card — visual icon + 3 text rows + button.
+        # @return: a compact card — icon+type, name, stats, status, button.
+        # All text is plain (no HTML in QLabel); colors via setStyleSheet.
         # Why-tonight phrase and full window live in the tooltip.
         kind = t.get("kind", "")
         kind_color = self._KIND_COLORS.get(kind, "#888888")
+        kind_label = self._KIND_LABELS.get(kind, kind)
         card = QFrame()
         card.setFrameShape(QFrame.StyledPanel)
         card.setStyleSheet(
@@ -514,50 +513,51 @@ class MainWindow(QMainWindow):
             f"QFrame:hover {{ background: #1a1f30; }}")
         layout = QVBoxLayout(card)
         layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(2)
-        # row 0: type icon (visual anchor, 32px) + medal + name on the right
+        layout.setSpacing(3)
+        # row 0: type icon + type label (colored) + medal
         top_row = QHBoxLayout()
-        top_row.setSpacing(6)
+        top_row.setSpacing(4)
         lbl_icon = QLabel()
         lbl_icon.setPixmap(self._type_pixmap(kind))
         top_row.addWidget(lbl_icon)
+        lbl_type = QLabel(kind_label)
+        lbl_type.setStyleSheet(
+            f"color: {kind_color}; font-size: 11px; font-weight: bold;")
+        top_row.addWidget(lbl_type)
         top_row.addStretch()
         if medal:
-            lbl_medal = QLabel(f"<b style='font-size:15px'>{medal}</b>")
+            lbl_medal = QLabel(medal)
+            lbl_medal.setStyleSheet("font-size: 15px;")
             top_row.addWidget(lbl_medal)
         layout.addLayout(top_row)
-        # row 1: object name (bold, clear white)
-        lbl_name = QLabel(f"<b>{t['name']}</b>")
-        lbl_name.setStyleSheet("font-size: 13px; color: #e8eaf2;")
+        # row 1: object name (bold, white)
+        lbl_name = QLabel(t['name'])
+        lbl_name.setStyleSheet("font-size: 13px; font-weight: bold; color: #e8eaf2;")
         layout.addWidget(lbl_name)
-        # row 2: mag + alt + score in one compact line
-        mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
-        alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
-        # score text colored by range (no emoji dots — guaranteed render)
+        # row 2: mag + alt + score — plain text, score colored
+        mag = f"{t['mag']:.1f}" if t.get("mag") else "--"
+        alt = f"{t['max_alt']:.0f}" if t.get("max_alt") else "--"
         sc = int(score)
-        sc_color = "#55bb66" if sc >= 70 else "#ddbb44" if sc >= 40 else "#dd8844"
-        lbl_stats = QLabel(
-            f"<span style='color:#b0b8d0'>mag {mag} · alt {alt}</span>"
-            f"  <b style='color:{sc_color}'>{sc}</b>")
-        lbl_stats.setStyleSheet("font-size: 12px;")
+        lbl_stats = QLabel(f"mag {mag}  alt {alt}  score {sc}")
+        lbl_stats.setStyleSheet("font-size: 12px; color: #b0b8d0;")
         layout.addWidget(lbl_stats)
-        # row 3: status badge (compact) + moon icon if needed
+        # row 3: status badge + moon (compact, plain text)
         status_row = QHBoxLayout()
-        status_row.setSpacing(4)
+        status_row.setSpacing(6)
         badge = self._now_badge(t)
         if badge:
             is_now = "▲" in badge
             lbl_badge = QLabel(badge)
             lbl_badge.setStyleSheet(
-                f"color: {'#55bb88' if is_now else '#88aadd'};"
+                f"color: {'#66cc99' if is_now else '#99bbdd'};"
                 f" font-size: 11px; font-weight: bold;")
             status_row.addWidget(lbl_badge)
         moon = self._moon_text(t)
         if moon:
-            lbl_moon = QLabel("🌙")
+            lbl_moon = QLabel("Moon warn")
             lbl_moon.setToolTip(
                 f"{self.tr('Moon')}: {moon}")
-            lbl_moon.setStyleSheet("font-size: 11px;")
+            lbl_moon.setStyleSheet("font-size: 11px; color: #cc8844;")
             status_row.addWidget(lbl_moon)
         status_row.addStretch()
         layout.addLayout(status_row)

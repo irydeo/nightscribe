@@ -74,8 +74,8 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 |---|---|---|
 | 1 | ADR-019…022 + este documento + DESIGN actualizado | **Hecho (2026-08-24)** |
 | 2 | Fundación de restricciones: `core/horizon.py`, Luna, `core/exposure.py`, perfil de cámara en config, integración en planner/suggest, silueta en `sky_view`, tests | **Hecho (2026-08-24)** |
-| 3 | Modelo de proyecto: migración db (`user_version` 0→1), `core/project.py`, máquina de pasos, tests | Pendiente ← **punto de entrada** |
-| 4 | GUI v3: 4 pestañas, hub Proyectos con stepper por tipo, blink contextual, tarjetas de Esta noche con «Crear proyecto» e «inicio seguro», Settings (Cámara/Horizonte/Sesión/Luna), i18n | Pendiente |
+| 3 | Modelo de proyecto: migración db (`user_version` 0→1), `core/project.py`, máquina de pasos, tests | **Hecho (2026-08-24)** |
+| 4 | GUI v3: 4 pestañas, hub Proyectos con stepper por tipo, blink contextual, tarjetas de Esta noche con «Crear proyecto» e «inicio seguro», Settings (Cámara/Horizonte/Sesión/Luna), i18n | Pendiente ← **punto de entrada** |
 | 5 | Exportadores: `core/sequence.py` (NINA/CCDciel/CSV) + efemérides (CSV + TheSkyX + CdC validados en importación real), tests | Pendiente |
 | 6 | `core/mpc_report.py` + paso en flujo NEO + subcomando CLI `project` mínimo + polish, i18n y docs finales | Pendiente |
 
@@ -83,17 +83,21 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 
 1. Leer, en este orden: `docs/adr/ADR-019`, `ADR-020`, `ADR-021`, `ADR-022` y este
    documento completo.
-2. La fase 2 ya está implementada en la rama `feature/ux-v3-projects`
-   (`core/horizon.py`, `core/exposure.py`, helpers `window_above`/`hours_above_h` en
-   `coords.py`, penalización Luna en `suggest.py`, integración en `planner.py`, silueta
-   en `viz/sky_view.py`, config ampliada, mock `tests/fixtures/horizon_sample.txt` +
-   tests). El **horizonte TheSkyX real** sigue mockeado: cuando el usuario comparta su
-   fichero, sustituir el parser/fixture de `core/horizon.py` validando contra ese fichero
-   (ADR-020).
-3. Continuar por la **fase 3**: migración de `core/db.py` (`user_version` 0→1: tablas
-   `projects`, `project_steps`, `project_files`; `observations` += `project_id`) y
-   `core/project.py` (modelo + máquina de pasos Plan→Captura→Procesado→Análisis→Publicar
-   por tipo). Sin tocar la GUI todavía (es fase 4).
+2. Las fases 2 y 3 ya están implementadas en la rama `feature/ux-v3-projects`:
+   - Fase 2: `core/horizon.py`, `core/exposure.py`, helpers en `coords.py`, penalización
+     Luna en `suggest.py`, integración en `planner.py`, silueta en `viz/sky_view.py`,
+     config ampliada, mock `tests/fixtures/horizon_sample.txt` + tests.
+   - Fase 3: migración `core/db.py` (`user_version` 0→1: tablas `projects`,
+     `project_steps`, `project_files`; `observations` += `project_id`), `core/project.py`
+     (modelo + máquina de pasos Plan→Captura→Procesado→Análisis→Publicar), tests.
+   El **horizonte TheSkyX real** sigue mockeado: cuando el usuario comparta su fichero,
+   sustituir el parser/fixture de `core/horizon.py` validando contra ese fichero (ADR-020).
+3. Continuar por la **fase 4**: rediseño de la GUI. La navegación pasa a 4 pestañas
+   (Esta noche · Proyectos · Solar · Historial); crear el hub de Proyectos con un
+   stepper por tipo; hacer que Explore/Post/Blink sean contextuales (pre-rellenados
+   desde el proyecto); añadir «Crear proyecto» e «inicio seguro» en las tarjetas de
+   Esta noche; ampliar Settings con los grupos Cámara/Horizonte/Sesión/Luna; actualizar
+   i18n (.ts/.qm).
 4. Reglas vigentes: código en inglés con cabecera GPL y comentarios `# @args:`,
    cadenas de GUI por `self.tr()`, red solo desde `core/sources/` vía `core/db.py`,
    documentación bilingüe (ADR-013), tests unitarios por módulo + funcionales de flujo.

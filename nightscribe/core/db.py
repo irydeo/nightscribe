@@ -67,6 +67,48 @@ CREATE TABLE IF NOT EXISTS observations (
 CREATE INDEX IF NOT EXISTS idx_observations_object ON observations(object);
 """
 
+# Phase 3 (ADR-019): project tables + observations.project_id link.
+_V1 = """
+CREATE TABLE IF NOT EXISTS projects (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    kind        TEXT NOT NULL,
+    object_name TEXT NOT NULL,
+    status      TEXT NOT NULL DEFAULT 'active',
+    created     REAL NOT NULL,
+    updated     REAL NOT NULL,
+    context     TEXT DEFAULT '{}'
+);
+CREATE TABLE IF NOT EXISTS project_steps (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    step       TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'pending',
+    data       TEXT DEFAULT '{}',
+    updated    REAL NOT NULL,
+    UNIQUE(project_id, step)
+);
+CREATE TABLE IF NOT EXISTS project_files (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    path       TEXT NOT NULL,
+    kind       TEXT NOT NULL,
+    created    REAL NOT NULL
+);
+"""
+
+
+def _migrate(conn):
+    # Idempotent base schema, then versioned migrations (ADR-002).
+    conn.executescript(_SCHEMA)
+    v = conn.execute("PRAGMA user_version").fetchone()[0]
+    if v < 1:
+        conn.executescript(_V1)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(observations)")}
+        if "project_id" not in cols:
+            conn.execute("ALTER TABLE observations ADD COLUMN project_id INTEGER")
+        conn.execute("PRAGMA user_version = 1")
+    conn.commit()
+
 
 class Database:
     # Single SQLite access point: HTTP cache plus the observatory's own
@@ -75,12 +117,23 @@ class Database:
     def __init__(self, db_file=None):
         self._file = str(db_file or paths.db_path())
         self._conn = sqlite3.connect(self._file, check_same_thread=False)
-        self._conn.executescript(_SCHEMA)
-        self._conn.commit()
+        self._conn.execute("PRAGMA foreign_keys = ON")
+        _migrate(self._conn)
 
     def close(self):
         # Closes the database connection
         self._conn.close()
+
+    def execute(self, sql, params=()):
+        # Public SQL helper for domain modules (e.g. core/project.py).
+        # Does NOT auto-commit: call commit() when your operation is done.
+        # @args: sql - SQL string with placeholders, params - tuple/list
+        # @return: sqlite3 cursor (caller may fetchone/fetchall)
+        return self._conn.execute(sql, params)
+
+    def commit(self):
+        # Commits the current transaction
+        self._conn.commit()
 
     # ---------------- HTTP cache ----------------
 
@@ -127,15 +180,18 @@ class Database:
 
     # ---------------- Observations ----------------
 
-    def mark_observed(self, obj, obj_type="", obs_date=None, notes=""):
+    def mark_observed(self, obj, obj_type="", obs_date=None, notes="",
+                      project_id=None):
         # Marks an object as observed (tonight by default).
         # @args: obj - object name, obj_type - neo|comet|pccp|sn|transit|sun,
-        #        obs_date - ISO date string, notes - free text
+        #        obs_date - ISO date string, notes - free text,
+        #        project_id - optional link to a project (ADR-019)
         obs_date = obs_date or time.strftime("%Y-%m-%d")
         self._conn.execute(
-            "INSERT INTO observations (object, type, obs_date, notes, created)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (obj, obj_type, obs_date, notes, time.time()),
+            "INSERT INTO observations"
+            " (object, type, obs_date, notes, created, project_id)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            (obj, obj_type, obs_date, notes, time.time(), project_id),
         )
         self._conn.commit()
 

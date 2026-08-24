@@ -74,8 +74,8 @@ are settled. Out of this initial redesign.
 |---|---|---|
 | 1 | ADR-019…022 + this document + updated DESIGN | **Done (2026-08-24)** |
 | 2 | Constraint foundation: `core/horizon.py`, Moon, `core/exposure.py`, camera profile in config, planner/suggest integration, horizon silhouette in `sky_view`, tests | **Done (2026-08-24)** |
-| 3 | Project model: db migration (`user_version` 0→1), `core/project.py`, step machine, tests | Pending ← **entry point** |
-| 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | Pending |
+| 3 | Project model: db migration (`user_version` 0→1), `core/project.py`, step machine, tests | **Done (2026-08-24)** |
+| 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | Pending ← **entry point** |
 | 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | Pending |
 | 6 | `core/mpc_report.py` + step in the NEO flow + minimal CLI `project` subcommand + polish, i18n and final docs | Pending |
 
@@ -83,17 +83,20 @@ are settled. Out of this initial redesign.
 
 1. Read, in this order: `docs/adr/ADR-019`, `ADR-020`, `ADR-021`, `ADR-022` and this
    full document.
-2. Phase 2 is already implemented on branch `feature/ux-v3-projects`
-   (`core/horizon.py`, `core/exposure.py`, `window_above`/`hours_above_h` helpers in
-   `coords.py`, Moon penalty in `suggest.py`, planner integration in `planner.py`,
-   silhouette in `viz/sky_view.py`, extended config, mock
-   `tests/fixtures/horizon_sample.txt` + tests). The **real TheSkyX horizon** is still
-   mocked: when the user shares their file, replace the parser/fixture in
-   `core/horizon.py` validating against that file (ADR-020).
-3. Continue at **phase 3**: migrate `core/db.py` (`user_version` 0→1: tables
-   `projects`, `project_steps`, `project_files`; `observations` += `project_id`) and
-   `core/project.py` (model + step machine Plan→Capture→Process→Analyse→Publish per
-   kind). Do not touch the GUI yet (that is phase 4).
+2. Phases 2 and 3 are already implemented on branch `feature/ux-v3-projects`:
+   - Phase 2: `core/horizon.py`, `core/exposure.py`, helpers in `coords.py`, Moon
+     penalty in `suggest.py`, planner integration in `planner.py`, silhouette in
+     `viz/sky_view.py`, extended config, mock `tests/fixtures/horizon_sample.txt` + tests.
+   - Phase 3: `core/db.py` migration (`user_version` 0→1: tables `projects`,
+     `project_steps`, `project_files`; `observations` += `project_id`), `core/project.py`
+     (model + step machine Plan→Capture→Process→Analyse→Publish), tests.
+   The **real TheSkyX horizon** is still mocked: when the user shares their file,
+   replace the parser/fixture in `core/horizon.py` validating against that file (ADR-020).
+3. Continue at **phase 4**: GUI redesign. Navigation becomes 4 tabs (Tonight · Projects
+   · Solar · History); build the Projects hub with a per-kind stepper; make
+   Explore/Post/Blink contextual (pre-filled from the project); add "Create project" and
+   "safe start" to Tonight cards; extend Settings with Camera/Horizon/Session/Moon
+   groups; update i18n (.ts/.qm).
 4. Standing rules: English code with GPL header and `# @args:` comments, GUI strings
    via `self.tr()`, network only from `core/sources/` through `core/db.py`, bilingual
    documentation (ADR-013), unit tests per module + end-to-end functional tests.

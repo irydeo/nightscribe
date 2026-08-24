@@ -75,8 +75,8 @@ are settled. Out of this initial redesign.
 | 1 | ADR-019…022 + this document + updated DESIGN | **Done (2026-08-24)** |
 | 2 | Constraint foundation: `core/horizon.py`, Moon, `core/exposure.py`, camera profile in config, planner/suggest integration, horizon silhouette in `sky_view`, tests | **Done (2026-08-24)** |
 | 3 | Project model: db migration (`user_version` 0→1), `core/project.py`, step machine, tests | **Done (2026-08-24)** |
-| 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | Pending ← **entry point** |
-| 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | Pending |
+| 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | **Done (2026-08-24)** |
+| 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | Pending ← **entry point** |
 | 6 | `core/mpc_report.py` + step in the NEO flow + minimal CLI `project` subcommand + polish, i18n and final docs | Pending |
 
 **ENTRY POINT (for any AI or human resuming the work)**:
@@ -90,13 +90,16 @@ are settled. Out of this initial redesign.
    - Phase 3: `core/db.py` migration (`user_version` 0→1: tables `projects`,
      `project_steps`, `project_files`; `observations` += `project_id`), `core/project.py`
      (model + step machine Plan→Capture→Process→Analyse→Publish), tests.
+   - Phase 4: GUI v3 — 4 tabs (Tonight · Projects · Solar · History),
+     `projects_tab.ui` with list + stepper, Explore/Post/Blink as contextual modal
+     dialogs (pre-filled from project), ad-hoc access from the Tools menu, Tonight cards
+     with "Create project" + window + Moon, Settings extended with Camera/Horizon/
+     Session/Moon groups, `sky_view` with real horizon, i18n (.ts/.qm) updated.
    The **real TheSkyX horizon** is still mocked: when the user shares their file,
    replace the parser/fixture in `core/horizon.py` validating against that file (ADR-020).
-3. Continue at **phase 4**: GUI redesign. Navigation becomes 4 tabs (Tonight · Projects
-   · Solar · History); build the Projects hub with a per-kind stepper; make
-   Explore/Post/Blink contextual (pre-filled from the project); add "Create project" and
-   "safe start" to Tonight cards; extend Settings with Camera/Horizon/Session/Moon
-   groups; update i18n (.ts/.qm).
+3. Continue at **phase 5**: exporters — `core/sequence.py` (NINA JSON, CCDciel plan,
+   generic CSV) and ephemerides (CSV + TheSkyX + Cartes du Ciel). The exact TheSkyX/CdC
+   formats are fixed against a real import in the user's installations.
 4. Standing rules: English code with GPL header and `# @args:` comments, GUI strings
    via `self.tr()`, network only from `core/sources/` through `core/db.py`, bilingual
    documentation (ADR-013), unit tests per module + end-to-end functional tests.

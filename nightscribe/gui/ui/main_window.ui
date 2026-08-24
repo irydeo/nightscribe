@@ -16,21 +16,15 @@
       <widget class="QWidget" name="tab_tonight">
        <attribute name="title"><string>Tonight</string></attribute>
       </widget>
-      <widget class="QWidget" name="tab_explore">
-       <attribute name="title"><string>Explore</string></attribute>
-      </widget>
-      <widget class="QWidget" name="tab_post">
-       <attribute name="title"><string>Post</string></attribute>
+      <widget class="QWidget" name="tab_projects">
+       <attribute name="title"><string>Projects</string></attribute>
       </widget>
       <widget class="QWidget" name="tab_solar">
        <attribute name="title"><string>Solar system</string></attribute>
       </widget>
-       <widget class="QWidget" name="tab_history">
-        <attribute name="title"><string>History</string></attribute>
-       </widget>
-       <widget class="QWidget" name="tab_blink">
-        <attribute name="title"><string>Blink</string></attribute>
-       </widget>
+      <widget class="QWidget" name="tab_history">
+       <attribute name="title"><string>History</string></attribute>
+      </widget>
      </widget>
     </item>
    </layout>
@@ -57,6 +51,9 @@
    <widget class="QMenu" name="menu_tools">
     <property name="title"><string>Tools</string></property>
     <addaction name="action_settings"/>
+    <addaction name="separator"/>
+    <addaction name="action_explore"/>
+    <addaction name="action_blink"/>
    </widget>
    <widget class="QMenu" name="menu_help">
     <property name="title"><string>Help</string></property>
@@ -82,6 +79,12 @@
   </action>
   <action name="action_settings">
    <property name="text"><string>Settings…</string></property>
+  </action>
+  <action name="action_explore">
+   <property name="text"><string>Explore object…</string></property>
+  </action>
+  <action name="action_blink">
+   <property name="text"><string>Blink (ad-hoc)…</string></property>
   </action>
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>

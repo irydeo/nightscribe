@@ -367,16 +367,17 @@ def test_gui_boots_offscreen():
     from nightscribe.gui.main_window import MainWindow
     w = MainWindow()
     tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 6  # settings in the menu bar (ADR-017); +Blink (ADR-018)
-    assert tabs.tabText(5) == "Blink"
-    assert w.blink.btn_prepare is not None
-    # menu bar with the settings dialog action
+    assert tabs.count() == 4  # UX v3: Tonight · Projects · Solar · History (ADR-019)
+    assert tabs.tabText(0) == "Tonight"
+    assert tabs.tabText(1) == "Projects"
+    assert w.projects.lst_projects is not None
+    # ad-hoc tools actions in the menu bar
     menu_texts = [a.text() for a in w.menuBar().actions()]
     assert "File" in menu_texts and "Tools" in menu_texts
     # tables must be sortable by clicking their headers
     assert w.tonight.tbl_targets.isSortingEnabled()
     assert w.history.tbl_history.isSortingEnabled()
-    # "right now" band and explore sub-tabs exist
+    # "right now" band and projects stepper exist
     assert w.tonight.lbl_now is not None
-    assert w.explore.tabs_explore.count() == 5
+    assert w.projects.lst_steps is not None
     w.close()

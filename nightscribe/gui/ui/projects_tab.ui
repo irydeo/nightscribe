@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ProjectsTab</class>
+ <widget class="QWidget" name="ProjectsTab">
+  <layout class="QHBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="grp_list">
+     <property name="title"><string>Projects</string></property>
+     <property name="maximumWidth"><number>340</number></property>
+     <layout class="QVBoxLayout" name="listLayout">
+      <item>
+       <layout class="QHBoxLayout" name="filterLayout">
+        <item><widget class="QLabel" name="lbl_filter"><property name="text"><string>Show:</string></property></widget></item>
+        <item>
+         <widget class="QComboBox" name="cmb_filter">
+          <item><property name="text"><string>Active</string></property></item>
+          <item><property name="text"><string>All</string></property></item>
+          <item><property name="text"><string>Done</string></property></item>
+          <item><property name="text"><string>Archived</string></property></item>
+         </widget>
+        </item>
+        <item><widget class="QPushButton" name="btn_refresh"><property name="text"><string>Refresh</string></property></widget></item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QListWidget" name="lst_projects">
+        <property name="toolTip"><string>Select a project to see its guided steps</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_detail">
+     <property name="title"><string>Project details</string></property>
+     <layout class="QVBoxLayout" name="detailLayout">
+      <item>
+       <widget class="QLabel" name="lbl_header">
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="text"><string>Select a project or create one from Tonight.</string></property>
+        <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_context">
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="text"><string>—</string></property>
+        <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_steps_title"><property name="text"><string>Steps</string></property></widget>
+      </item>
+      <item>
+       <widget class="QListWidget" name="lst_steps">
+        <property name="toolTip"><string>Plan → Capture → Process → Analyse → Publish</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_step_info">
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="text"><string>—</string></property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="stepBtns">
+        <item><widget class="QPushButton" name="btn_advance"><property name="text"><string>Next step →</string></property><property name="toolTip"><string>Mark the current step done and move on</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_skip"><property name="text"><string>Skip step</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_explore"><property name="text"><string>Explore</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_post"><property name="text"><string>Post</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_blink"><property name="text"><string>Blink</string></property></widget></item>
+        <item><spacer name="stepSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+        <item><widget class="QPushButton" name="btn_archive"><property name="text"><string>Archive</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_delete"><property name="text"><string>Delete</string></property></widget></item>
+       </layout>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

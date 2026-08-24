@@ -62,8 +62,9 @@
          <item><widget class="QLabel" name="card0_text"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
          <item>
           <layout class="QHBoxLayout" name="card0Btns">
-           <item><widget class="QCheckBox" name="card0_obs"><property name="text"><string>Observed</string></property></widget></item>
-           <item><widget class="QPushButton" name="card0_post"><property name="text"><string>Post</string></property></widget></item>
+            <item><widget class="QCheckBox" name="card0_obs"><property name="text"><string>Observed</string></property></widget></item>
+            <item><widget class="QPushButton" name="card0_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
+            <item><widget class="QPushButton" name="card0_post"><property name="text"><string>Post</string></property></widget></item>
           </layout>
          </item>
         </layout>
@@ -76,8 +77,9 @@
          <item><widget class="QLabel" name="card1_text"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
          <item>
           <layout class="QHBoxLayout" name="card1Btns">
-           <item><widget class="QCheckBox" name="card1_obs"><property name="text"><string>Observed</string></property></widget></item>
-           <item><widget class="QPushButton" name="card1_post"><property name="text"><string>Post</string></property></widget></item>
+            <item><widget class="QCheckBox" name="card1_obs"><property name="text"><string>Observed</string></property></widget></item>
+            <item><widget class="QPushButton" name="card1_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
+            <item><widget class="QPushButton" name="card1_post"><property name="text"><string>Post</string></property></widget></item>
           </layout>
          </item>
         </layout>
@@ -90,8 +92,9 @@
          <item><widget class="QLabel" name="card2_text"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
          <item>
           <layout class="QHBoxLayout" name="card2Btns">
-           <item><widget class="QCheckBox" name="card2_obs"><property name="text"><string>Observed</string></property></widget></item>
-           <item><widget class="QPushButton" name="card2_post"><property name="text"><string>Post</string></property></widget></item>
+            <item><widget class="QCheckBox" name="card2_obs"><property name="text"><string>Observed</string></property></widget></item>
+            <item><widget class="QPushButton" name="card2_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
+            <item><widget class="QPushButton" name="card2_post"><property name="text"><string>Post</string></property></widget></item>
           </layout>
          </item>
         </layout>
@@ -140,9 +143,10 @@
          </item>
          <item>
           <layout class="QHBoxLayout" name="detailBtns">
-           <item><widget class="QPushButton" name="btn_detail_explore"><property name="text"><string>Explore</string></property></widget></item>
-           <item><widget class="QPushButton" name="btn_detail_post"><property name="text"><string>Post</string></property></widget></item>
-           <item><widget class="QCheckBox" name="chk_detail_obs"><property name="text"><string>Observed</string></property></widget></item>
+            <item><widget class="QPushButton" name="btn_detail_explore"><property name="text"><string>Explore</string></property></widget></item>
+            <item><widget class="QPushButton" name="btn_detail_post"><property name="text"><string>Post</string></property></widget></item>
+            <item><widget class="QPushButton" name="btn_detail_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_detail_obs"><property name="text"><string>Observed</string></property></widget></item>
            <item><spacer name="detailSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
           </layout>
          </item>

@@ -4,7 +4,7 @@
  <widget class="QDialog" name="SettingsDialog">
   <property name="windowTitle"><string>Settings</string></property>
   <property name="modal"><bool>true</bool></property>
-  <property name="minimumSize"><size><width>560</width><height>520</height></size></property>
+   <property name="minimumSize"><size><width>560</width><height>720</height></size></property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QGroupBox" name="grp_site">
@@ -39,10 +39,58 @@
       <item row="2" column="0"><widget class="QLabel" name="lbl_minalt"><property name="text"><string>Minimum altitude (°):</string></property></widget></item>
       <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_min_alt"><property name="maximum"><double>89.0</double></property></widget></item>
      </layout>
-    </widget>
-   </item>
-   <item>
-     <widget class="QGroupBox" name="grp_misc">
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_camera">
+      <property name="title"><string>Camera (plate scale)</string></property>
+      <layout class="QFormLayout">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_pixel"><property name="text"><string>Pixel size (µm):</string></property></widget></item>
+       <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_pixel_um"><property name="decimals"><number>2</number></property><property name="minimum"><double>1.0</double></property><property name="maximum"><double>30.0</double></property><property name="toolTip"><string>Camera pixel size in microns (e.g. 3.76 for a QHY600)</string></property></widget></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_focal"><property name="text"><string>Focal length (mm):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property><property name="toolTip"><string>Telescope focal length in mm (e.g. 2000 for a 8&quot; f/10 SCT)</string></property></widget></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_horizon">
+      <property name="title"><string>Local horizon</string></property>
+      <layout class="QFormLayout">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_hfile"><property name="text"><string>Horizon file:</string></property></widget></item>
+       <item row="0" column="1">
+        <layout class="QHBoxLayout">
+         <item><widget class="QLineEdit" name="edt_horizon_file"><property name="toolTip"><string>TheSkyX-style az/alt text file; leave empty for a flat minimum altitude</string></property></widget></item>
+         <item><widget class="QPushButton" name="btn_horizon_browse"><property name="text"><string>Browse…</string></property></widget></item>
+        </layout>
+       </item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_hmargin"><property name="text"><string>Safety margin (°):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_horizon_margin"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>20.0</double></property><property name="toolTip"><string>Extra clearance added on top of the horizon for safety</string></property></widget></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_moon">
+      <property name="title"><string>Moon constraint</string></property>
+      <layout class="QFormLayout">
+       <item row="0" column="0"><widget class="QCheckBox" name="chk_moon_enabled"><property name="text"><string>Warn when Moon interferes</string></property></widget></item>
+       <item row="1" column="0"><widget class="QLabel" name="lbl_moonsep"><property name="text"><string>Min separation (°):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_moon_sep"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+       <item row="2" column="0"><widget class="QLabel" name="lbl_moonillum"><property name="text"><string>Max illumination:</string></property></widget></item>
+       <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_moon_illum"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property></widget></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_session">
+      <property name="title"><string>Session defaults</string></property>
+      <layout class="QFormLayout">
+       <item row="0" column="0"><widget class="QLabel" name="lbl_overhead"><property name="text"><string>Per-frame overhead (s):</string></property></widget></item>
+       <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_overhead"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>120.0</double></property><property name="toolTip"><string>Readout/slew overhead added to every exposure frame</string></property></widget></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+      <widget class="QGroupBox" name="grp_misc">
       <property name="title"><string>Integrations</string></property>
       <layout class="QFormLayout">
        <item row="0" column="0"><widget class="QLabel" name="lbl_nfkey"><property name="text"><string>NEOfixer API key:</string></property></widget></item>

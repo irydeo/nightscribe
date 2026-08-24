@@ -76,8 +76,8 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 | 2 | Fundación de restricciones: `core/horizon.py`, Luna, `core/exposure.py`, perfil de cámara en config, integración en planner/suggest, silueta en `sky_view`, tests | **Hecho (2026-08-24)** |
 | 3 | Modelo de proyecto: migración db (`user_version` 0→1), `core/project.py`, máquina de pasos, tests | **Hecho (2026-08-24)** |
 | 4 | GUI v3: 4 pestañas, hub Proyectos con stepper por tipo, blink contextual, tarjetas de Esta noche con «Crear proyecto» e «inicio seguro», Settings (Cámara/Horizonte/Sesión/Luna), i18n | **Hecho (2026-08-24)** |
-| 5 | Exportadores: `core/sequence.py` (NINA/CCDciel/CSV) + efemérides (CSV + TheSkyX + CdC validados en importación real), tests | Pendiente ← **punto de entrada** |
-| 6 | `core/mpc_report.py` + paso en flujo NEO + subcomando CLI `project` mínimo + polish, i18n y docs finales | Pendiente |
+| 5 | Exportadores: `core/sequence.py` (NINA/CCDciel/CSV) + efemérides (CSV + TheSkyX + CdC validados en importación real), tests | **Hecho (2026-08-24)** |
+| 6 | `core/mpc_report.py` + paso en flujo NEO + subcomando CLI `project` mínimo + polish, i18n y docs finales | Pendiente ← **punto de entrada** |
 
 **PUNTO DE ENTRADA (para cualquier IA o humano que retome el trabajo)**:
 
@@ -96,11 +96,17 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
      tarjetas de Esta noche con «Crear proyecto» + ventana + Luna, Settings ampliada
      con grupos Cámara/Horizonte/Sesión/Luna, `sky_view` con horizonte real, i18n
      (.ts/.qm) actualizado.
+   - Fase 5: `core/sequence.py` (exportadores NINA JSON / CCDciel XML / CSV genérico
+     para secuencias de captura) y `core/ephemeris.py` (generación vía Horizons +
+     exportadores CSV / TheSkyX / Cartes du Ciel para efemérides). Panel «Capture plan»
+     en el hub de Proyectos con campos frames/exposición/filtro y botones de exportación.
+     Los formatos nativos de NINA/CCDciel/TheSkyX/CdC son puntos de partida que requieren
+     validación contra las versiones del usuario en importación real.
    El **horizonte TheSkyX real** sigue mockeado: cuando el usuario comparta su fichero,
    sustituir el parser/fixture de `core/horizon.py` validando contra ese fichero (ADR-020).
-3. Continuar por la **fase 5**: exportadores — `core/sequence.py` (NINA JSON, CCDciel
-   plan, CSV genérico) y efemérides (CSV + TheSkyX + Cartes du Ciel). Los formatos exactos
-   de TheSkyX/CdC se fijan contra una importación real en las instalaciones del usuario.
+3. Continuar por la **fase 6**: `core/mpc_report.py` (validador de medidas pegadas
+   en formato MPC 80-col o ADES, empaquetado del fichero para envío), paso en el flujo
+   NEO, subcomando CLI `project` mínimo y polish final.
 4. Reglas vigentes: código en inglés con cabecera GPL y comentarios `# @args:`,
    cadenas de GUI por `self.tr()`, red solo desde `core/sources/` vía `core/db.py`,
    documentación bilingüe (ADR-013), tests unitarios por módulo + funcionales de flujo.

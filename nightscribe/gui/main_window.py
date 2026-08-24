@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox,
 
 from .. import paths
 from ..config import config
-from ..core import horizon, orbits, project, suggest
+from ..core import ephemeris, horizon, orbits, project, sequence, suggest
 from ..core.db import db
 from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
                       MpcResolveWorker, PostWorker, SunWorker, TonightWorker)
@@ -206,6 +206,8 @@ class MainWindow(QMainWindow):
         p.btn_blink.clicked.connect(self._project_blink)
         p.btn_archive.clicked.connect(self._project_archive)
         p.btn_delete.clicked.connect(self._project_delete)
+        p.btn_export_seq.clicked.connect(self._project_export_sequence)
+        p.btn_export_ephem.clicked.connect(self._project_export_ephem)
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(
@@ -688,6 +690,17 @@ class MainWindow(QMainWindow):
         if n_files:
             info += f" · {n_files} {self.tr('file(s)')}"
         self.projects.lbl_step_info.setText(info)
+        # restore the capture plan from the plan step data, if any
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        if plan_data.get("n_frames"):
+            self.projects.spn_nframes.setValue(int(plan_data["n_frames"]))
+        if plan_data.get("exp_s"):
+            self.projects.spn_exps.setValue(float(plan_data["exp_s"]))
+        if plan_data.get("filter"):
+            idx = self.projects.cmb_filter.findText(plan_data["filter"])
+            if idx >= 0:
+                self.projects.cmb_filter.setCurrentIndex(idx)
 
     def _project_advance(self):
         if not self._current_project:
@@ -741,6 +754,96 @@ class MainWindow(QMainWindow):
         project.delete(db, pid)
         self._current_project = None
         self.on_refresh_projects()
+
+    def _project_plan(self):
+        # @return: make_plan dict from the capture plan form, or None
+        if not self._current_project:
+            return None
+        p = self.projects
+        plan = sequence.make_plan(
+            p.spn_nframes.value(), p.spn_exps.value(),
+            p.cmb_filter.currentText(),
+            overhead_s=float(config.get("overhead_s", 15.0)),
+            cfg=config)
+        # persist the plan into the project's plan step data
+        project.update_step_data(db, self._current_project["id"], "plan",
+                                 {"n_frames": plan["n_frames"],
+                                  "exp_s": plan["exp_s"],
+                                  "filter": plan["filter"]})
+        return plan
+
+    def _project_export_sequence(self):
+        # Exports a capture sequence file for the current project.
+        if not self._current_project:
+            return
+        plan = self._project_plan()
+        if not plan:
+            return
+        ctx = self._current_project["context"]
+        target = {"name": self._current_project["object_name"],
+                  "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg")}
+        fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
+        fmt = fmt_map[self.projects.cmb_seqfmt.currentIndex()]
+        ext = {"nina": ".json", "ccdciel": ".xml", "csv": ".csv"}[fmt]
+        outdir = paths.data_dir() / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        default = outdir / f"{target['name']}_sequence{ext}"
+        from PySide6.QtWidgets import QFileDialog
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export capture sequence"), str(default),
+            f"*{ext};;All files (*)")
+        if not out:
+            return
+        try:
+            path = sequence.export(target, plan, out, fmt=fmt)
+            project.add_file(db, self._current_project["id"], path, "sequence")
+            self.statusBar().showMessage(
+                self.tr("Sequence written to %1").replace("%1", path), 8000)
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("Export failed: %1").replace("%1", str(err)), 8000)
+
+    def _project_export_ephem(self):
+        # Exports an ephemeris table for the current project (NEOs/PCCP).
+        if not self._current_project:
+            return
+        ctx = self._current_project["context"]
+        obj_id = ctx.get("id") or self._current_project["object_name"]
+        site = config.get("mpc_code", "Z41")
+        from PySide6.QtWidgets import QInputDialog
+        items = [self.tr("CSV (generic)"), "TheSkyX", "Cartes du Ciel"]
+        choice, ok = QInputDialog.getItem(
+            self, self.tr("Ephemeris format"),
+            self.tr("Format:"), items, 0, False)
+        if not ok:
+            return
+        fmt = {0: "csv", 1: "skyx", 2: "cdc"}[items.index(choice)]
+        ext = ".csv" if fmt == "csv" else ".txt"
+        outdir = paths.data_dir() / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        default = outdir / f"{obj_id}_ephemeris{ext}"
+        from PySide6.QtWidgets import QFileDialog
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export ephemeris"), str(default),
+            f"*{ext};;All files (*)")
+        if not out:
+            return
+        self.statusBar().showMessage(self.tr("Querying Horizons…"))
+        rows = ephemeris.generate(obj_id, site, step="30m")
+        if not rows:
+            self.statusBar().showMessage(
+                self.tr("No ephemeris available for %1").replace("%1", obj_id),
+                8000)
+            return
+        try:
+            path = ephemeris.export(rows, out, fmt=fmt,
+                                    obj_name=self._current_project["object_name"])
+            project.add_file(db, self._current_project["id"], path, "ephemeris")
+            self.statusBar().showMessage(
+                self.tr("Ephemeris written to %1").replace("%1", path), 8000)
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("Export failed: %1").replace("%1", str(err)), 8000)
 
     def _create_project(self, target):
         # @args: target - dict from the planner/tonight list

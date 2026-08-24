@@ -373,9 +373,13 @@
         <translation>History</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="987"/>
+        <location filename="../main_window.py" line="1090"/>
         <source>Blink</source>
         <translation>Blink</translation>
+    </message>
+    <message>
+        <source></source>
+        <translation type="vanished">Projects</translation>
     </message>
     <message>
         <location filename="../ui/main_window.ui" line="20"/>
@@ -454,253 +458,291 @@
         <translation>Ready — press &apos;Compute tonight&apos;</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="231"/>
+        <location filename="../main_window.py" line="233"/>
         <source>Language saved — restart the app to apply it</source>
         <translation>Language saved — restart the app to apply it</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="282"/>
+        <location filename="../main_window.py" line="284"/>
         <source>Settings saved</source>
         <translation>Settings saved</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="316"/>
+        <location filename="../main_window.py" line="318"/>
         <source>Plan your night, understand every object, tell your science.</source>
         <translation>Plan your night, understand every object, tell your science.</translation>
     </message>
     <message>
         <location filename="../ui/main_window.ui" line="93"/>
-        <location filename="../main_window.py" line="323"/>
+        <location filename="../main_window.py" line="325"/>
         <source>Data sources</source>
         <translation>Data sources</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="324"/>
+        <location filename="../main_window.py" line="326"/>
         <source>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</source>
         <translation>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="334"/>
-        <location filename="../main_window.py" line="335"/>
+        <location filename="../main_window.py" line="336"/>
+        <location filename="../main_window.py" line="337"/>
         <source>Computing tonight…</source>
         <translation>Computing tonight…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="345"/>
+        <location filename="../main_window.py" line="347"/>
         <source>no sources answered</source>
         <translation>no sources answered</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="347"/>
+        <location filename="../main_window.py" line="349"/>
         <source>Could not compute tonight: %1 — check your network and try &apos;Compute tonight&apos;.</source>
         <translation>Could not compute tonight: %1 — check your network and try &apos;Compute tonight&apos;.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="350"/>
+        <location filename="../main_window.py" line="352"/>
         <source>Error computing tonight: %1</source>
         <translation>Error computing tonight: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="376"/>
+        <location filename="../main_window.py" line="378"/>
         <source>%1 targets evaluated</source>
         <translation>%1 targets evaluated</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="428"/>
+        <location filename="../main_window.py" line="430"/>
         <source>Nothing from the list is above the horizon right now.</source>
         <translation>Nothing from the list is above the horizon right now.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="430"/>
+        <location filename="../main_window.py" line="432"/>
         <source>now</source>
         <translation>now</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="431"/>
+        <location filename="../main_window.py" line="433"/>
         <source>max</source>
         <translation>max</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="432"/>
+        <location filename="../main_window.py" line="434"/>
         <source>at</source>
         <translation>at</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="452"/>
+        <location filename="../main_window.py" line="454"/>
         <source>Supernova</source>
         <translation>Supernova</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="453"/>
-        <location filename="../main_window.py" line="628"/>
+        <location filename="../main_window.py" line="455"/>
+        <location filename="../main_window.py" line="630"/>
         <source>Comet</source>
         <translation>Comet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="454"/>
+        <location filename="../main_window.py" line="456"/>
         <source>Possible comet</source>
         <translation>Possible comet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="455"/>
-        <location filename="../main_window.py" line="629"/>
+        <location filename="../main_window.py" line="457"/>
+        <location filename="../main_window.py" line="631"/>
         <source>Transit</source>
         <translation>Transit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="456"/>
+        <location filename="../main_window.py" line="458"/>
         <source>Close approach</source>
         <translation>Close approach</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="636"/>
+        <location filename="../main_window.py" line="638"/>
         <translation>No projects yet. Create one from Tonight.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="676"/>
+        <location filename="../main_window.py" line="678"/>
         <translation>Plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="676"/>
+        <location filename="../main_window.py" line="678"/>
         <translation>Capture</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="677"/>
+        <location filename="../main_window.py" line="679"/>
         <translation>Process</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="678"/>
+        <location filename="../main_window.py" line="680"/>
         <translation>Analyse</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="679"/>
+        <location filename="../main_window.py" line="681"/>
         <translation>Publish</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="685"/>
+        <location filename="../main_window.py" line="687"/>
         <translation>Current step: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="686"/>
+        <location filename="../main_window.py" line="688"/>
         <translation>All steps done</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="699"/>
+        <location filename="../main_window.py" line="712"/>
         <translation>Step completed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="737"/>
+        <location filename="../main_window.py" line="750"/>
         <translation>Delete project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="738"/>
+        <location filename="../main_window.py" line="751"/>
         <translation>Delete this project permanently?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="751"/>
+        <location filename="../main_window.py" line="793"/>
+        <translation>Export capture sequence</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="801"/>
+        <translation>Sequence written to %1</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="814"/>
+        <translation>CSV (generic)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="816"/>
+        <translation>Ephemeris format</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="817"/>
+        <translation>Format:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="827"/>
+        <translation>Export ephemeris</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="831"/>
+        <translation>Querying Horizons…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="835"/>
+        <translation>No ephemeris available for %1</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="843"/>
+        <translation>Ephemeris written to %1</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="854"/>
         <translation>Cannot create a project for this target</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="772"/>
+        <location filename="../main_window.py" line="875"/>
         <translation>Project created: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="779"/>
+        <location filename="../main_window.py" line="882"/>
         <translation>Explore object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="780"/>
+        <location filename="../main_window.py" line="883"/>
         <translation>Object:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="791"/>
+        <location filename="../main_window.py" line="894"/>
         <translation>Explore — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="813"/>
+        <location filename="../main_window.py" line="916"/>
         <source>Loading…</source>
         <translation>Loading…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="932"/>
+        <location filename="../main_window.py" line="1035"/>
         <translation>Post — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1355"/>
+        <location filename="../main_window.py" line="1458"/>
         <source>(cycle 25)</source>
         <translation>(cycle 25)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1360"/>
+        <location filename="../main_window.py" line="1463"/>
         <source>Strongest flare this week: </source>
         <translation>Strongest flare this week: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1369"/>
+        <location filename="../main_window.py" line="1472"/>
         <source>Numbered active regions: </source>
         <translation>Numbered active regions: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1404"/>
+        <location filename="../main_window.py" line="1507"/>
         <source>Moon: %1% lit · %2 km away · %3 days old</source>
         <translation>Moon: %1% lit · %2 km away · %3 days old</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1421"/>
+        <location filename="../main_window.py" line="1524"/>
         <source>Planets at dusk: </source>
         <translation>Planets at dusk: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1422"/>
+        <location filename="../main_window.py" line="1525"/>
         <source>none above 15°</source>
         <translation>none above 15°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1044"/>
+        <location filename="../main_window.py" line="1147"/>
         <source>Choose the plate-solved FITS image</source>
         <translation>Choose the plate-solved FITS image</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="287"/>
+        <location filename="../main_window.py" line="289"/>
         <translation>Choose the horizon file</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1069"/>
+        <location filename="../main_window.py" line="1172"/>
         <source>Choose a FITS image first.</source>
         <translation>Choose a FITS image first.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1077"/>
+        <location filename="../main_window.py" line="1180"/>
         <source>Manual coordinates invalid — use degrees, e.g. 187.7050 and +12.3910</source>
         <translation>Manual coordinates invalid — use degrees, e.g. 187.7050 and +12.3910</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1083"/>
+        <location filename="../main_window.py" line="1186"/>
         <source>Type the supernova name (e.g. 2026ziz) or tick &apos;Manual coordinates&apos;.</source>
         <translation>Type the supernova name (e.g. 2026ziz) or tick &apos;Manual coordinates&apos;.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1087"/>
+        <location filename="../main_window.py" line="1190"/>
         <source>Reading the FITS image…</source>
         <translation>Reading the FITS image…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1121"/>
+        <location filename="../main_window.py" line="1224"/>
         <source>mirrored image: flipped horizontally to align</source>
         <translation>mirrored image: flipped horizontally to align</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1226"/>
+        <location filename="../main_window.py" line="1329"/>
         <source>Rendering %1…</source>
         <translation>Rendering %1…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1237"/>
+        <location filename="../main_window.py" line="804"/>
+        <location filename="../main_window.py" line="846"/>
+        <location filename="../main_window.py" line="1340"/>
         <source>Export failed: %1</source>
         <translation>Export failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1236"/>
+        <location filename="../main_window.py" line="1339"/>
         <source>Written to %1</source>
         <translation>Written to %1</translation>
     </message>
@@ -709,12 +751,12 @@
         <translation type="vanished">Resolving the supernova and downloading the survey reference…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1114"/>
+        <location filename="../main_window.py" line="1217"/>
         <source>%1 @ (%2, %3) — %4 · %5×%6 px</source>
         <translation>%1 @ (%2, %3) — %4 · %5×%6 px</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1209"/>
+        <location filename="../main_window.py" line="1312"/>
         <source>Export blink GIF</source>
         <translation>Export blink GIF</translation>
     </message>
@@ -723,12 +765,12 @@
         <translation type="vanished">GIF written to %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1213"/>
+        <location filename="../main_window.py" line="1316"/>
         <source>Export blink video</source>
         <translation>Export blink video</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1218"/>
+        <location filename="../main_window.py" line="1321"/>
         <source>Export side-by-side PNG</source>
         <translation>Export side-by-side PNG</translation>
     </message>
@@ -761,8 +803,8 @@
         <translation type="vanished">Cargando…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="825"/>
-        <location filename="../main_window.py" line="968"/>
+        <location filename="../main_window.py" line="928"/>
+        <location filename="../main_window.py" line="1071"/>
         <source>Not found: </source>
         <translation>Not found: </translation>
     </message>
@@ -771,22 +813,22 @@
         <translation type="vanished">Entendiendo sus parámetros / Understanding its parameters</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="956"/>
+        <location filename="../main_window.py" line="1059"/>
         <source>Building drafts…</source>
         <translation>Building drafts…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="969"/>
+        <location filename="../main_window.py" line="1072"/>
         <source>try an MPC designation (2021EQ3), a comet (29P), SN/AT (SN2023ixf), a planet (HD 209458 b) or &apos;sun&apos;</source>
         <translation>try an MPC designation (2021EQ3), a comet (29P), SN/AT (SN2023ixf), a planet (HD 209458 b) or &apos;sun&apos;</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="980"/>
+        <location filename="../main_window.py" line="1083"/>
         <source>Saved to: </source>
         <translation>Saved to: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="981"/>
+        <location filename="../main_window.py" line="1084"/>
         <source>Drafts ready</source>
         <translation>Drafts ready</translation>
     </message>
@@ -811,12 +853,12 @@
         <translation type="vanished">Resolving MPC code…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="305"/>
+        <location filename="../main_window.py" line="307"/>
         <source>Unknown code or offline</source>
         <translation>Unknown code or offline</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="311"/>
+        <location filename="../main_window.py" line="313"/>
         <source>Found: %1</source>
         <translation>Found: %1</translation>
     </message>
@@ -874,6 +916,10 @@
 <context>
     <name>ProjectsTab</name>
     <message>
+        <source></source>
+        <translation type="vanished">Projects</translation>
+    </message>
+    <message>
         <location filename="../ui/projects_tab.ui" line="8"/>
         <translation>Projects</translation>
     </message>
@@ -928,34 +974,106 @@
     </message>
     <message>
         <location filename="../ui/projects_tab.ui" line="67"/>
-        <translation>Next step →</translation>
-    </message>
-    <message>
-        <location filename="../ui/projects_tab.ui" line="67"/>
-        <translation>Mark the current step done and move on</translation>
-    </message>
-    <message>
-        <location filename="../ui/projects_tab.ui" line="68"/>
-        <translation>Skip step</translation>
+        <translation>Capture plan</translation>
     </message>
     <message>
         <location filename="../ui/projects_tab.ui" line="69"/>
-        <translation>Explore</translation>
-    </message>
-    <message>
-        <location filename="../ui/projects_tab.ui" line="70"/>
-        <translation>Post</translation>
+        <translation>Frames:</translation>
     </message>
     <message>
         <location filename="../ui/projects_tab.ui" line="71"/>
-        <translation>Blink</translation>
+        <translation>Exposure (s):</translation>
     </message>
     <message>
         <location filename="../ui/projects_tab.ui" line="73"/>
+        <translation>Filter:</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="76"/>
+        <translation>L</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="77"/>
+        <translation>R</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="78"/>
+        <translation>G</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="79"/>
+        <translation>B</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="80"/>
+        <translation>Ha</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="81"/>
+        <translation>OIII</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="82"/>
+        <translation>SII</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="85"/>
+        <translation>Sequence format:</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="88"/>
+        <translation>NINA (JSON)</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="89"/>
+        <translation>CCDciel (XML)</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="90"/>
+        <translation>CSV (generic)</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="95"/>
+        <translation>Export sequence…</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="96"/>
+        <translation>Export ephemeris…</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="96"/>
+        <translation>For NEOs: export RA/Dec table for TheSkyX / Cartes du Ciel</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="104"/>
+        <translation>Next step →</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="104"/>
+        <translation>Mark the current step done and move on</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="105"/>
+        <translation>Skip step</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="106"/>
+        <translation>Explore</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="107"/>
+        <translation>Post</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="108"/>
+        <translation>Blink</translation>
+    </message>
+    <message>
+        <location filename="../ui/projects_tab.ui" line="110"/>
         <translation>Archive</translation>
     </message>
     <message>
-        <location filename="../ui/projects_tab.ui" line="74"/>
+        <location filename="../ui/projects_tab.ui" line="111"/>
         <translation>Delete</translation>
     </message>
 </context>
@@ -1097,6 +1215,10 @@
     <message>
         <location filename="../ui/settings_dialog.ui" line="88"/>
         <translation>Readout/slew overhead added to every exposure frame</translation>
+    </message>
+    <message>
+        <source></source>
+        <translation type="vanished">Camera (plate scale)</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="94"/>
@@ -1347,6 +1469,10 @@
         <location filename="../ui/tonight_tab.ui" line="149"/>
         <source>Observed</source>
         <translation>Observed</translation>
+    </message>
+    <message>
+        <source></source>
+        <translation type="vanished">Project</translation>
     </message>
     <message>
         <location filename="../ui/tonight_tab.ui" line="66"/>

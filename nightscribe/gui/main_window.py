@@ -1806,6 +1806,9 @@ class MainWindow(QMainWindow):
 
     _SDO_CHANNELS = ["0193", "0304", "0171", "HMII", "HMIB"]
 
+    # both sun pictures share one display size so they compare side by side
+    _SUN_IMG_PX = 400
+
     def on_refresh_sun(self):
         self.solar.btn_refresh_sun.setEnabled(False)
         channel = self._SDO_CHANNELS[self.solar.cmb_channel.currentIndex()]
@@ -1850,8 +1853,9 @@ class MainWindow(QMainWindow):
     def _set_sun_image(self, img_path):
         from PySide6.QtGui import QPixmap
         pix = QPixmap(img_path)
+        s = self._SUN_IMG_PX
         self.solar.lbl_sun_image.setPixmap(
-            pix.scaled(420, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            pix.scaled(s, s, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     def _draw_sun_map(self, regions, hmi_path=""):
         import matplotlib
@@ -1870,7 +1874,10 @@ class MainWindow(QMainWindow):
             sun_panel._draw_region_map(ax, regions)
             style.save(fig, str(p))
             plt.close(fig)
-        self.solar.lbl_sun_map.setPixmap(QPixmap(str(p)))
+        s = self._SUN_IMG_PX
+        self.solar.lbl_sun_map.setPixmap(
+            QPixmap(str(p)).scaled(s, s, Qt.KeepAspectRatio,
+                                  Qt.SmoothTransformation))
 
     def _fill_almanac(self):
         from ..core import coords, ephem_minor

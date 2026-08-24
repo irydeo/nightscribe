@@ -74,3 +74,33 @@ def test_hours_above_never_up():
     h = coords.hours_above(ra_deg=0, dec_deg=-80, lat_deg=40.5, lon_deg=-3.37,
                            min_alt=30, date=datetime.date(2026, 8, 21))
     assert h == 0.0
+
+
+def test_window_above_flat():
+    # a meridian object clears a flat 30 deg horizon; a far-south one never
+    date = datetime.date(2026, 8, 21)
+    up = coords.window_above(100.0, 40.5, 40.55, -3.37,
+                             lambda az: 30.0, date)
+    assert up is not None
+    start, end = up
+    assert end >= start
+    never = coords.window_above(100.0, -80.0, 40.55, -3.37,
+                                lambda az: 30.0, date)
+    assert never is None
+
+
+def test_hours_above_h_matches_scalar():
+    # the horizon-aware helper must equal the scalar one for a flat floor
+    date = datetime.date(2026, 8, 21)
+    flat = lambda az: 30.0
+    h1 = coords.hours_above(100.0, 40.5, 40.55, -3.37, 30, date)
+    h2 = coords.hours_above_h(100.0, 40.5, 40.55, -3.37, flat, date)
+    assert abs(h1 - h2) < 1e-6
+
+
+def test_angular_separation():
+    # opposite points on the equator are 180 deg apart
+    sep = coords.angular_separation(0.0, 0.0, 180.0, 0.0)
+    assert abs(sep - 180.0) < 1e-6
+    # same point -> 0
+    assert abs(coords.angular_separation(100.0, 40.0, 100.0, 40.0)) < 1e-6

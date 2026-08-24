@@ -24,3 +24,7 @@
 | [016](ADR-016-sn-images.md) | Imágenes de SN propias / Own SN images |
 | [017](ADR-017-ux-v2.md) | UX v2: menú, «ahora», columnas dinámicas / menu, "now", dynamic columns |
 | [018](ADR-018-sn-blink-wcs.md) | Blink SN: FITS/WCS propio + cutouts casados / own FITS/WCS + matched cutouts |
+| [019](ADR-019-projects-ux-v3.md) | UX v3: flujo centrado en proyectos / project-centric workflow |
+| [020](ADR-020-local-horizon.md) | Horizonte local y restricciones / local horizon & observing constraints |
+| [021](ADR-021-capture-exports.md) | Exportar secuencias y efemérides / capture & ephemeris exports |
+| [022](ADR-022-mpc-report.md) | Reporte MPC: pegar y validar / MPC report: paste & validate |

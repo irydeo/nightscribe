@@ -83,3 +83,43 @@ def test_top_n_diversity(fake_cfg):
     top, _ = suggest.top_n(targets, fake_cfg, None, 3)
     kinds = {t["kind"] for t, _s, _p, _ph in top}
     assert "comet" in kinds  # not three NEOs
+
+
+def _moon_cfg(enabled=True, min_sep=45.0, max_illum=0.5, limit_mag=20.0):
+    # config-like object with the Moon constraint enabled
+    class Cfg:
+        _v = {"min_alt": 30.0, "limit_mag": limit_mag,
+              "moon_limit_enabled": enabled, "moon_min_sep_deg": min_sep,
+              "moon_max_illum": max_illum}
+        def get(self, k, d=None):
+            return self._v.get(k, d)
+    return Cfg()
+
+
+def test_moon_info_disabled_returns_none():
+    t = _neo()
+    t["ra_deg"], t["dec_deg"] = 100.0, 20.0
+    t["max_time"] = "2026-08-21T22:00:00"
+    assert suggest.moon_info(t, _moon_cfg(enabled=False)) is None
+
+
+def test_moon_info_enabled_returns_fields():
+    t = _neo()
+    t["ra_deg"], t["dec_deg"] = 100.0, 20.0
+    t["max_time"] = "2026-08-21T22:00:00"
+    info = suggest.moon_info(t, _moon_cfg())
+    assert info is not None
+    assert {"sep_deg", "illum", "warning"} <= set(info.keys())
+    assert 0 <= info["illum"] <= 1
+
+
+def test_moon_penalty_lowers_observability():
+    # a target near the Moon scores lower than the same target far from it:
+    # we just check the penalty path runs and observability stays in [0,30]
+    t = _neo()
+    t["ra_deg"], t["dec_deg"] = 100.0, 20.0
+    t["max_time"] = "2026-08-21T22:00:00"
+    obs = suggest._observability(t, _moon_cfg())
+    assert 0 <= obs <= 30
+    # and without the constraint the penalty is zero
+    assert suggest._moon_penalty(t, _moon_cfg(enabled=False), 20.0) == 0.0

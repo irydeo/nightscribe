@@ -14,6 +14,8 @@
 import datetime
 import logging
 
+from . import coords, ephem_minor
+
 logger = logging.getLogger(__name__)
 
 # Rule-based scoring, see docs/SCORING.md. Four weighted families:
@@ -59,7 +61,8 @@ def _freshness_days(t):
 
 
 def _observability(t, cfg):
-    # 0-30: altitude, hours up, brightness vs. the user's limits.
+    # 0-30: altitude, hours up, brightness vs. the user's limits, plus a soft
+    # Moon penalty (ADR-020): warning, never a hard filter.
     score = 0.0
     max_alt = t.get("max_alt")
     if max_alt is not None:
@@ -71,7 +74,60 @@ def _observability(t, cfg):
     limit = float(cfg.get("limit_mag", 20.0)) if cfg else 20.0
     if mag is not None:
         score += _clamp((limit - mag) / 4.0 * 6, 0, 6)
+    score -= _moon_penalty(t, cfg, limit)
     return _clamp(score, 0, 30)
+
+
+def _moon_jd(t):
+    # Julian date for the Moon evaluation: the target's best instant, else now.
+    mt = t.get("max_time")
+    try:
+        dt = datetime.datetime.fromisoformat(mt)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return coords.jd_from_datetime(dt)
+    except (TypeError, ValueError):
+        return coords.jd_from_datetime(
+            datetime.datetime.now(datetime.timezone.utc))
+
+
+def moon_info(t, cfg=None):
+    # Moon context for a target, for display in Tonight cards.
+    # @args: t - target dict, cfg - Config (None disables the constraint)
+    # @return: {"sep_deg", "illum", "warning"} or None when unknown/disabled
+    if cfg is None or not cfg.get("moon_limit_enabled", False):
+        return None
+    ra, dec = t.get("ra_deg"), t.get("dec_deg")
+    if ra is None or dec is None:
+        return None
+    m = ephem_minor.moon(_moon_jd(t))
+    sep = coords.angular_separation(ra, dec, m["ra"], m["dec"])
+    illum = m["illum"]
+    min_sep = float(cfg.get("moon_min_sep_deg", 45.0))
+    max_illum = float(cfg.get("moon_max_illum", 0.5))
+    warning = sep < min_sep or illum > max_illum
+    return {"sep_deg": round(sep, 1), "illum": round(illum, 2),
+            "warning": warning}
+
+
+def _moon_penalty(t, cfg, limit_mag):
+    # Soft observability penalty (capped) from Moon proximity/illumination.
+    # @return: penalty points (float) to subtract from observability
+    if cfg is None or not cfg.get("moon_limit_enabled", False):
+        return 0.0
+    info = moon_info(t, cfg)
+    if info is None:
+        return 0.0
+    pen = 0.0
+    min_sep = float(cfg.get("moon_min_sep_deg", 45.0))
+    if info["sep_deg"] < min_sep:
+        pen += (min_sep - info["sep_deg"]) / min_sep * 4.0
+    max_illum = float(cfg.get("moon_max_illum", 0.5))
+    mag = t.get("mag")
+    if (info["illum"] > max_illum and mag is not None
+            and mag > limit_mag - 3.0):
+        pen += (info["illum"] - max_illum) / (1.0 - max_illum) * 3.0
+    return _clamp(pen, 0, 7.0)
 
 
 def _urgency(t):

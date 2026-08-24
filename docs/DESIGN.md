@@ -23,11 +23,15 @@ The differentiator: existing tools show raw tables or dated charts. NightScribe
 Default configuration ships with MPC station **Z41** (Irydeo Observatory) as an example;
 everything is configurable so any observatory can adopt it.
 
-## The five views
+## The views
+
+*(UX v3, ADR-019: the app reorganises around **Projects**; tabs: Tonight · Projects ·
+Solar system · History. Explore/Post/Blink become contextual panels opened from a
+project, with ad-hoc access under Tools. Guided per-kind flows in WORKFLOWS.md.)*
 
 ### 1. Tonight — the home view
 
-Not a table: a **recommendation** (see ADR-017 for the v2 redesign).
+Not a table: a **recommendation** (see ADR-017 for the v2 redesign, ADR-019 for v3).
 
 - **"Right now" band**: targets currently above the horizon, with live altitude
   and azimuth, ordered by score.
@@ -38,17 +42,28 @@ Not a table: a **recommendation** (see ADR-017 for the v2 redesign).
   **dynamic columns per type filter** (NEOs show NObs/MOID/NEOfixer priority;
   supernovae show type/host/discovery date...) plus a detail panel with
   per-target actions (Explore / Post / Observed).
-- Buttons per target: *Mark observed* (optionally reports to NEOfixer) and *Post*.
+- Buttons per target: *Mark observed* (optionally reports to NEOfixer), *Post* and
+  **Create project** (UX v3).
 
 ### Interface shell
 
 Menu bar (File / View / Tools / Help); **Settings live in a modal dialog**
-(Tools → Settings…); language switch under View. Tabs: Tonight · Explore ·
-Post · Solar system · History. The UI shows a single language at a time; only
+(Tools → Settings…); language switch under View. Tabs (UX v3, ADR-019): Tonight ·
+Projects · Solar system · History. The UI shows a single language at a time; only
 generated posts are bilingual.
 - Header with night context: sunset, end of twilight, Moon phase/illumination.
 
-### 2. Explore ("Explora")
+### 2. Projects — the guided flow (UX v3, ADR-019)
+
+Every target can become a **project**: a persistent, guided flow per object kind
+(Plan → Capture → Process → Analyse → Publish) that carries the full context — no
+re-asking for names, coordinates or images. Capture sequences and ephemerides are
+exported as files for external software (NINA, CCDciel, TheSkyX, Cartes du Ciel —
+ADR-021); astrometry measured elsewhere is pasted back, validated and packaged for the
+MPC report (ADR-022). Constraints honoured by the planner: real local horizon, Moon,
+session feasibility and camera plate scale (ADR-020).
+
+### 3. Explore ("Explora")
 
 Type any identifier (`2021EQ3`, `29P`, `SN2023ixf`, `HD 209458 b`, `sol`) and get the
 **explained object card**:
@@ -62,7 +77,7 @@ Type any identifier (`2021EQ3`, `29P`, `SN2023ixf`, `HD 209458 b`, `sol`) and ge
   reference field cutout with crosshair.
 - For exoplanets: planet type, "its year lasts X days", equilibrium temperature, host star.
 
-### 3. Post
+### 4. Post
 
 - Drafts in **Spanish and English** plus a 280-character tweet, always both languages
   regardless of UI language (the audience is bilingual).
@@ -72,7 +87,7 @@ Type any identifier (`2021EQ3`, `29P`, `SN2023ixf`, `HD 209458 b`, `sol`) and ge
 - Optional user observation image → side-by-side or animated blink GIF
   (reference survey vs. observatory image).
 
-### 4. Solar system now ("Sistema solar ahora")
+### 5. Solar system now ("Sistema solar ahora")
 
 - **Sun**: latest SDO image (public domain) in several wavelengths, own active-region map
   built from NOAA coordinates, sunspot number and trend (NOAA + SILSO), GOES flares,
@@ -82,7 +97,7 @@ Type any identifier (`2021EQ3`, `29P`, `SN2023ixf`, `HD 209458 b`, `sol`) and ge
 - External resources as links (Raben maps, SolarMonitor, SIDC, universemonitor) — never
   embedded, for copyright reasons.
 
-### 5. Settings ("Configuración")
+### 6. Settings ("Configuración")
 
 - First-run wizard: enter your **MPC observatory code** → coordinates resolved
   automatically (MPC ObsCodes) — or full manual location (lat/lon/height).
@@ -109,8 +124,11 @@ Type any identifier (`2021EQ3`, `29P`, `SN2023ixf`, `HD 209458 b`, `sol`) and ge
 | Exoplanet transit | ExoClock, NASA Exoplanet Archive | "tonight a planet eclipses its star by 1.5% for 3 h; your light curve helps ESA's Ariel" |
 | Sun | SDO, NOAA/GOES/DSCOVR, SILSO | solar cycle state, active regions, flares, aurora chances |
 
-## Out of scope (v1)
+## Out of scope
 
-- Telescope control (the sibling project `saas` does that).
-- Automatic publishing to Meta/X APIs (copy & paste by design decision).
+- Telescope control (the sibling project `saas` does that). **Exporting capture
+  sequences and ephemerides as files** for external software (NINA, CCDciel,
+  planetariums) **is in scope** — it is file generation, not control (ADR-021).
+- Automatic publishing to Meta/X APIs (copy & paste by design decision; the MPC report
+  is also packaged for the user to send, ADR-022).
 - 3D orbit visualization (2D top-down by design; maybe later).

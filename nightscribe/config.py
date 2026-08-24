@@ -33,6 +33,15 @@ DEFAULTS = {
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
+    # UX v3 observing constraints (ADR-020 / ADR-021)
+    "horizon_file": "",         # TheSkyX-style az/alt file; empty -> flat min_alt
+    "horizon_margin_deg": 0.0,  # safety margin added on top of the horizon
+    "pixel_um": 3.76,           # camera pixel size in microns
+    "focal_mm": 2000.0,         # telescope focal length in mm
+    "overhead_s": 15.0,         # per-frame readout/slew overhead in seconds
+    "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
+    "moon_max_illum": 0.5,        # above this, faint targets get penalized
+    "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
 }
 
 

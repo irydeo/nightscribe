@@ -93,8 +93,13 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-018, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-022, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
+
+**Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
+(UX v3: ADR-019 a ADR-022). El documento maestro con los flujos, las fases y el
+**punto de entrada del próximo trabajo** es `docs/WORKFLOWS.es.md` — léelo antes de
+escribir código nuevo.
 
 ---
 
@@ -120,5 +125,10 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-018, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-022, bilingual). Read the ADR before
 changing a decision; update it if you do.
+
+**Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow
+(UX v3: ADR-019 to ADR-022). The master document with flows, phases and the **entry
+point for the next chunk of work** is `docs/WORKFLOWS.md` — read it before writing
+new code.

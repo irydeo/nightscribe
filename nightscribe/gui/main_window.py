@@ -319,21 +319,48 @@ class MainWindow(QMainWindow):
 
     # ---------------- Tonight: suggestion grid ----------------
 
+    # Type badge colors per kind (dark theme)
+    _KIND_COLORS = {
+        "sn": "#a33", "neo": "#36a", "comet": "#396", "pccp": "#a73",
+        "transit": "#93a", "alert": "#aa3",
+    }
+    _KIND_LABELS = {"neo": "NEO", "sn": "SN", "comet": "☄", "pccp": "PCCP",
+                    "transit": "Tr", "alert": "⚠"}
+
     def on_compute_tonight(self):
         self.tonight.btn_compute.setEnabled(False)
-        self.tonight.lbl_context.setText(self.tr("Computing tonight…"))
+        self._show_loading_state()
         self.statusBar().showMessage(self.tr("Computing tonight…"))
         w = TonightWorker(config, db)
         w.finished.connect(self._tonight_done)
         self._keep(w)
         w.start()
 
+    def _show_loading_state(self):
+        # Placeholder cards while the worker runs
+        container = self.tonight.scroll_suggestions.findChild(
+            QWidget, "suggestions_container")
+        if container.layout():
+            while container.layout().count():
+                item = container.layout().takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        else:
+            container.setLayout(QGridLayout(container))
+        grid = container.layout()
+        for i in range(8):
+            placeholder = QLabel(self.tr("Loading…"))
+            placeholder.setAlignment(Qt.AlignCenter)
+            placeholder.setStyleSheet(
+                "color: #555; background: #12141f; border-radius: 6px;"
+                " padding: 20px;")
+            grid.addWidget(placeholder, i // 4, i % 4)
+
     def _tonight_done(self, top, all_scored, error=""):
         self.tonight.btn_compute.setEnabled(True)
         if error or not all_scored:
             msg = error or self.tr("no sources answered")
-            self.tonight.lbl_context.setText(
-                self.tr("Could not compute tonight: %1").replace("%1", msg))
+            self._show_empty_state(msg)
             self.statusBar().showMessage(
                 self.tr("Error: %1").replace("%1", msg), 15000)
             return
@@ -346,8 +373,30 @@ class MainWindow(QMainWindow):
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
 
+    def _show_empty_state(self, msg):
+        # Single helpful message when no targets are available
+        container = self.tonight.scroll_suggestions.findChild(
+            QWidget, "suggestions_container")
+        if container.layout():
+            while container.layout().count():
+                item = container.layout().takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        else:
+            container.setLayout(QVBoxLayout(container))
+        layout = container.layout()
+        lbl = QLabel(
+            f"<div style='text-align: center; color: #555;'>"
+            f"<br><b>{self.tr('No targets found')}</b><br><br>"
+            f"{msg}<br><br>"
+            f"<small>{self.tr('Check your network and try again.')}</small>"
+            f"</div>")
+        lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(lbl)
+        layout.addStretch()
+        self.tonight.lbl_context.setText(self.tr("No data"))
+
     def _update_night_header(self):
-        # Compact night context: date, twilight, Moon phase
         from ..core import coords, ephem_minor
         jd = coords.jd_from_datetime(
             datetime.datetime.now(datetime.timezone.utc))
@@ -359,9 +408,11 @@ class MainWindow(QMainWindow):
         else:
             dusk = dawn = "—"
         date = datetime.date.today().isoformat()
+        moon_icon = "🌑" if m["illum"] < 0.1 else "🌒" if m["illum"] < 0.3 \
+            else "🌓" if m["illum"] < 0.5 else "🌕" if m["illum"] > 0.9 \
+            else "🌖" if m["illum"] > 0.7 else "🌔"
         self.tonight.lbl_context.setText(
-            f"{date} · {self.tr('darkness')} {dusk}–{dawn} · "
-            f"🌙 {m['illum']*100:.0f}%")
+            f"📅 {date}  🌑→🌑 {dusk}–{dawn}  {moon_icon} {m['illum']*100:.0f}%")
 
     def _build_suggestion_grid(self):
         # Builds up to 8 suggestion cards in a 4-column grid inside the
@@ -386,41 +437,74 @@ class MainWindow(QMainWindow):
             grid.addWidget(card, i // 4, i % 4)
 
     def _make_card(self, t, score, phrase, medal, idx):
-        # @return: a QFrame card with key info + single action button
+        # @return: a compact card — 4 visual rows, scannable in 2 seconds.
+        # Why-tonight phrase lives in the tooltip, NOT in the card body.
         card = QFrame()
         card.setFrameShape(QFrame.StyledPanel)
+        card.setStyleSheet(
+            "QFrame { background: #12141f; border-radius: 8px; }"
+            "QFrame:hover { border: 1px solid #2a3a5a; }")
         layout = QVBoxLayout(card)
-        # rank + name + type
-        kind_label = {"neo": "NEO", "sn": "SN", "comet": "☀",
-                      "pccp": "PCCP", "transit": "Tr",
-                      "alert": "⚠"}.get(t["kind"], t["kind"])
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(4)
+        # row 1: medal + name (bold) + type badge (colored background)
+        kind = t.get("kind", "")
+        kind_label = self._KIND_LABELS.get(kind, kind)
+        kind_color = self._KIND_COLORS.get(kind, "#555")
         name = f"{medal} <b>{t['name']}</b>" if medal else f"<b>{t['name']}</b>"
-        lbl_name = QLabel(f"{name} <small>[{kind_label}]</small>")
-        layout.addWidget(lbl_name)
-        # mag + score
+        top_row = QHBoxLayout()
+        lbl_name = QLabel(name)
+        lbl_name.setStyleSheet("font-size: 13px;")
+        top_row.addWidget(lbl_name)
+        top_row.addStretch()
+        lbl_type = QLabel(f" {kind_label} ")
+        lbl_type.setStyleSheet(
+            f"background: {kind_color}; color: white; border-radius: 3px;"
+            f" font-size: 10px; font-weight: bold; padding: 1px 4px;")
+        top_row.addWidget(lbl_type)
+        layout.addLayout(top_row)
+        # row 2: mag + max alt — one line, key numbers
         mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
-        lbl_info = QLabel(f"mag {mag} · score {score}")
-        layout.addWidget(lbl_info)
-        # "now" badge or rise time
+        alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
+        lbl_stats = QLabel(f"⭐ mag {mag}  📐 alt {alt}")
+        lbl_stats.setStyleSheet("font-size: 12px; color: #c0c5d8;")
+        layout.addWidget(lbl_stats)
+        # row 3: status badge (left) + score dot (right)
+        status_row = QHBoxLayout()
         badge = self._now_badge(t)
         if badge:
-            lbl_badge = QLabel(badge)
-            lbl_badge.setStyleSheet("color: #6ab0ff; font-weight: bold;")
-            layout.addWidget(lbl_badge)
-        # window
-        win_txt = self._window_text(t)
-        if win_txt:
-            layout.addWidget(QLabel(f"<small>{win_txt}</small>"))
-        # moon warning
+            lbl_badge = QLabel(f" {badge} ")
+            is_now = "▲" in badge
+            bg = "#1a4a2a" if is_now else "#1a2a4a"
+            lbl_badge.setStyleSheet(
+                f"background: {bg}; color: #6ab0ff; border-radius: 3px;"
+                f" font-size: 11px; font-weight: bold; padding: 1px 6px;")
+            status_row.addWidget(lbl_badge)
+        status_row.addStretch()
+        # score as colored dot + number
+        dot = "🟢" if score >= 70 else "🟡" if score >= 40 else "🟠"
+        lbl_score = QLabel(f"{dot} {score:.0f}")
+        lbl_score.setStyleSheet("font-size: 12px;")
+        status_row.addWidget(lbl_score)
+        layout.addLayout(status_row)
+        # row 3.5: moon warning icon (compact, only if needed)
         moon = self._moon_text(t)
         if moon:
-            layout.addWidget(QLabel(f"<small>🌙 {moon}</small>"))
-        # why-tonight phrase
-        layout.addWidget(QLabel(f"<small><i>{self._txt(phrase)}</i></small>"))
-        # single button: start or continue
+            lbl_moon = QLabel("🌙⚠")
+            lbl_moon.setToolTip(
+                f"{self.tr('Moon')}: {self.tr('sep')} {moon}")
+            lbl_moon.setStyleSheet("font-size: 11px;")
+            layout.addWidget(lbl_moon)
+        # row 4: single full-width button
         btn = self._card_button(t)
         layout.addWidget(btn)
         layout.addStretch()
+        # tooltip with the why-tonight phrase + full window
+        tips = [self._txt(phrase)]
+        win = self._window_text(t)
+        if win:
+            tips.append(win)
+        card.setToolTip("\n".join(tips))
         return card
 
     def _now_badge(self, t):
@@ -452,15 +536,26 @@ class MainWindow(QMainWindow):
         return f"{info['sep_deg']:.0f}° · {info['illum']*100:.0f}%"
 
     def _card_button(self, t):
-        # @return: "Iniciar" or "Continuar" depending on whether a project exists
+        # @return: full-width color-coded button — orange for Start,
+        # green for Continue
         existing = project.list_projects(db, "active")
         has_proj = any(p["object_name"] == t.get("name")
                        or p["object_name"] == t.get("id")
                        for p in existing)
         if has_proj:
-            btn = QPushButton(self.tr("Continue"))
+            btn = QPushButton(f"▶ {self.tr('Continue')}")
+            btn.setStyleSheet(
+                "QPushButton { background: #1a5a2a; color: #e8eaf2;"
+                " border: none; border-radius: 4px; padding: 6px;"
+                " font-weight: bold; }"
+                "QPushButton:hover { background: #2a7a3a; }")
         else:
-            btn = QPushButton(self.tr("Start"))
+            btn = QPushButton(f"▶ {self.tr('Start')}")
+            btn.setStyleSheet(
+                "QPushButton { background: #b3591e; color: #e8eaf2;"
+                " border: none; border-radius: 4px; padding: 6px;"
+                " font-weight: bold; }"
+                "QPushButton:hover { background: #d3692e; }")
         btn.clicked.connect(lambda _=False, t=t: self._start_or_continue(t))
         return btn
 
@@ -488,11 +583,11 @@ class MainWindow(QMainWindow):
         self.tonight.grp_list.setVisible(visible)
         if visible:
             self.tonight.btn_show_all.setText(
-                self.tr("Hide full list"))
+                "▴ " + self.tr("Hide full list"))
         else:
             n = len(self._tonight_all) if self._tonight_all else 0
             self.tonight.btn_show_all.setText(
-                self.tr("Show all targets (%1)").replace("%1", str(n)))
+                "▾ " + self.tr("Show all targets (%1)").replace("%1", str(n)))
 
     # ---- table (collapsed by default) ----
 
@@ -596,10 +691,9 @@ class MainWindow(QMainWindow):
         tbl.setSortingEnabled(True)
         tbl.sortItems(1 if want else 2, Qt.DescendingOrder)
         tbl.resizeColumnsToContents()
-        # update toggle label
         if not self.tonight.btn_show_all.isChecked():
             self.tonight.btn_show_all.setText(
-                self.tr("Show all targets (%1)").replace(
+                "▾ " + self.tr("Show all targets (%1)").replace(
                     "%1", str(len(self._tonight_all))))
 
     def _table_start_project(self, row, _col):

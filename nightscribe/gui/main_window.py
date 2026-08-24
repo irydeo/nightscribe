@@ -1,7 +1,7 @@
 ############################################################
 # -*- coding: utf-8 -*-
 #
-# NightScribe - Main window module (UX v3, ADR-019)
+# NightScribe - Main window module (UX v3.1, ADR-019)
 # Python  v3.12
 #
 # Francisco José Calvo Fernández
@@ -17,9 +17,12 @@ from pathlib import Path
 
 from PySide6.QtCore import QFile, Qt
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox,
-                               QFileDialog, QListWidgetItem, QMainWindow,
-                               QMessageBox, QTableWidgetItem)
+from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
+                               QGridLayout, QGroupBox, QHBoxLayout,
+                               QInputDialog, QLabel, QLineEdit, QListWidgetItem,
+                               QMainWindow, QMessageBox, QPushButton,
+                               QSpinBox, QDoubleSpinBox, QComboBox,
+                               QTextEdit, QVBoxLayout, QWidget, QTableWidgetItem)
 
 from .. import paths
 from ..config import config
@@ -33,6 +36,16 @@ logger = logging.getLogger(__name__)
 
 UI_DIR = Path(__file__).parent / "ui"
 
+_STEP_NAMES = ("plan", "tab_plan", "capture", "tab_capture", "process",
+               "tab_process", "analyse", "tab_analyse", "publish", "tab_publish")
+_STEP_KEYS = ("plan", "capture", "process", "analyse", "publish")
+_STEP_TABS = {0: "tab_plan", 1: "tab_capture", 2: "tab_process",
+              3: "tab_analyse", 4: "tab_publish"}
+_STEP_LABELS_ES = {"plan": "Plan", "capture": "Captura", "process": "Procesado",
+                   "analyse": "Análisis", "publish": "Publicar"}
+_STEP_LABELS_EN = {"plan": "Plan", "capture": "Capture", "process": "Process",
+                   "analyse": "Analyse", "publish": "Publish"}
+
 
 def _load_ui(name, parent=None):
     # @args: name - .ui file name without extension, parent - widget
@@ -44,8 +57,7 @@ def _load_ui(name, parent=None):
     return widget
 
 
-# Per-kind table columns: (header translation key, value getter). Dynamic
-# columns per type filter (ADR-017).
+# Per-kind table columns for the full (collapsed) table
 TABLE_COLS = {
     "neo": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
             ("Max alt", "max_alt"), ("Best time (UTC)", "max_time"),
@@ -77,25 +89,22 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
 
 
 class MainWindow(QMainWindow):
-    # UX v3: four tabs (Tonight · Projects · Solar · History) with
-    # contextual Explore/Post/Blink dialogs (ADR-019).
+    # UX v3.1: four tabs — Tonight (suggestion grid) · Projects (step tabs)
+    # · Solar · History. Contextual dialogs for Explore/Post/Blink.
 
     def __init__(self):
         super().__init__()
         self._tonight_top = []
         self._tonight_all = []
-        self._tonight_now = []
         self._workers = []
         self._explored = None
-        self._selected_row = None
-        # blink state (ADR-018)
         self._blink_pair = None
         self._blink_ref8 = None
         self._blink_obs8 = None
         self._blink_nudge = [0.0, 0.0]
         self._blink_phase = False
-        # projects hub state
         self._current_project = None
+        self._project_widgets = {}
 
         win = _load_ui("main_window")
         self.setWindowTitle(win.windowTitle())
@@ -116,7 +125,7 @@ class MainWindow(QMainWindow):
         if config.is_configured():
             QTimer.singleShot(400, self.on_compute_tonight)
         self._now_timer = QTimer(self)
-        self._now_timer.timeout.connect(self._fill_now)
+        self._now_timer.timeout.connect(self._refresh_now_badges)
         self._now_timer.start(5 * 60 * 1000)
         self._blink_timer = QTimer(self)
         self._blink_timer.timeout.connect(self._blink_tick)
@@ -128,7 +137,6 @@ class MainWindow(QMainWindow):
     # ---------------- helpers ----------------
 
     def _lang(self):
-        # @return: effective UI language ("es" | "en")
         from PySide6.QtCore import QLocale
         lang = config.get("language", "system")
         if lang == "system":
@@ -136,20 +144,19 @@ class MainWindow(QMainWindow):
         return lang if lang in ("es", "en") else "en"
 
     def _txt(self, pair):
-        # @args: pair - {"es","en"} dict
-        # @return: single-language string for the UI
         return orbits.pick(pair, self._lang())
 
+    def _step_label(self, key):
+        labels = _STEP_LABELS_ES if self._lang() == "es" else _STEP_LABELS_EN
+        return labels.get(key, key)
+
     def _goto_tab(self, index):
-        # @args: index - tab index in the main tab widget
         from PySide6.QtWidgets import QTabWidget
         self.centralWidget().findChild(QTabWidget, "tabs").setCurrentIndex(index)
 
     # ---------------- tab construction ----------------
 
     def _build_tabs(self):
-        # Loads each tab widget into the tab container, keeping the
-        # placeholder tab titles from main_window.ui.
         from PySide6.QtWidgets import QTabWidget
         tabs = self.centralWidget().findChild(QTabWidget, "tabs")
         widgets = (self.tonight, self.projects, self.solar,
@@ -161,9 +168,10 @@ class MainWindow(QMainWindow):
             tabs.removeTab(i)
             tabs.insertTab(i, w, title)
         tabs.setCurrentIndex(0)
+        # table starts collapsed
+        self.tonight.grp_list.setVisible(False)
 
     def _connect_menu(self):
-        # Menu bar actions.
         self._menus.action_quit.triggered.connect(self.close)
         self._menus.action_settings.triggered.connect(self.on_open_settings)
         self._menus.action_about.triggered.connect(self.on_about)
@@ -178,39 +186,23 @@ class MainWindow(QMainWindow):
             lambda: self._set_language("en"))
 
     def _connect(self):
-        # Wires every button to its action.
         t = self.tonight
         t.btn_compute.clicked.connect(self.on_compute_tonight)
-        t.btn_now_refresh.clicked.connect(self._fill_now)
+        t.btn_show_all.toggled.connect(self._toggle_table)
         t.cmb_filter.currentIndexChanged.connect(self._fill_table)
         t.chk_show_observed.stateChanged.connect(self._fill_table)
-        t.tbl_targets.cellDoubleClicked.connect(self._explore_row)
-        t.tbl_targets.itemSelectionChanged.connect(self._row_selected)
-        t.btn_detail_explore.clicked.connect(self._detail_explore)
-        t.btn_detail_post.clicked.connect(self._detail_post)
-        t.btn_detail_project.clicked.connect(self._detail_project)
-        t.chk_detail_obs.stateChanged.connect(self._detail_observed)
-        for i in range(3):
-            getattr(t, f"card{i}_post").clicked.connect(
-                lambda _=False, i=i: self._post_from_card(i))
-            getattr(t, f"card{i}_project").clicked.connect(
-                lambda _=False, i=i: self._project_from_card(i))
-        # projects hub
+        t.tbl_targets.cellDoubleClicked.connect(self._table_start_project)
         p = self.projects
         p.btn_refresh.clicked.connect(self.on_refresh_projects)
         p.cmb_filter.currentIndexChanged.connect(self.on_refresh_projects)
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
-        p.btn_advance.clicked.connect(self._project_advance)
+        p.tabs_steps.currentChanged.connect(self._project_step_changed)
+        p.btn_prev.clicked.connect(self._project_prev)
+        p.btn_next.clicked.connect(self._project_next)
         p.btn_skip.clicked.connect(self._project_skip)
-        p.btn_explore.clicked.connect(self._project_explore)
-        p.btn_post.clicked.connect(self._project_post)
-        p.btn_blink.clicked.connect(self._project_blink)
+        p.btn_mark_done.clicked.connect(self._project_mark_done)
         p.btn_archive.clicked.connect(self._project_archive)
         p.btn_delete.clicked.connect(self._project_delete)
-        p.btn_export_seq.clicked.connect(self._project_export_sequence)
-        p.btn_export_ephem.clicked.connect(self._project_export_ephem)
-        p.btn_mpc_validate.clicked.connect(self._project_mpc_validate)
-        p.btn_mpc_save.clicked.connect(self._project_mpc_save)
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(
@@ -222,7 +214,6 @@ class MainWindow(QMainWindow):
         self.history.btn_refresh_hist.clicked.connect(self.on_refresh_history)
 
     def _open_url(self, url):
-        # @args: url - external resource to open in the browser
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
         QDesktopServices.openUrl(QUrl(url))
@@ -230,13 +221,11 @@ class MainWindow(QMainWindow):
     # ---------------- menu: language / settings / help ----------------
 
     def _set_language(self, lang):
-        # Stores the language choice; a restart applies it fully (ADR-014).
         config.set("language", lang)
         self.statusBar().showMessage(
             self.tr("Language saved — restart the app to apply it"), 8000)
 
     def on_open_settings(self):
-        # Settings as a modal dialog (from the Tools menu).
         dlg = _load_ui("settings_dialog")
         dlg.edt_mpc_code.setText(config.get("mpc_code", ""))
         dlg.edt_obs_name.setText(config.get("observatory_name", ""))
@@ -248,7 +237,6 @@ class MainWindow(QMainWindow):
         dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
         dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
-        # UX v3 groups (ADR-020 / ADR-021)
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
@@ -287,7 +275,6 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(self.tr("Settings saved"), 6000)
 
     def _horizon_browse_into(self, dlg):
-        # Lets the user pick a TheSkyX-style horizon text file.
         path, _ = QFileDialog.getOpenFileName(
             dlg, self.tr("Choose the horizon file"), "",
             "Text files (*.txt);;All files (*)")
@@ -295,7 +282,6 @@ class MainWindow(QMainWindow):
             dlg.edt_horizon_file.setText(path)
 
     def _resolve_into(self, dlg):
-        # Resolves the MPC code into the dialog fields.
         code = dlg.edt_mpc_code.text().strip().upper()
         if not code:
             return
@@ -331,12 +317,11 @@ class MainWindow(QMainWindow):
                     "Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI "
                     "Legacy Survey · CDS hips2fits"))
 
-    # ---------------- Tonight ----------------
+    # ---------------- Tonight: suggestion grid ----------------
 
     def on_compute_tonight(self):
-        # Starts the background worker for tonight's list.
         self.tonight.btn_compute.setEnabled(False)
-        self.tonight.lbl_now.setText(self.tr("Computing tonight…"))
+        self.tonight.lbl_context.setText(self.tr("Computing tonight…"))
         self.statusBar().showMessage(self.tr("Computing tonight…"))
         w = TonightWorker(config, db)
         w.finished.connect(self._tonight_done)
@@ -344,113 +329,174 @@ class MainWindow(QMainWindow):
         w.start()
 
     def _tonight_done(self, top, all_scored, error=""):
-        # Fills cards, the now-section and the table when the worker ends.
         self.tonight.btn_compute.setEnabled(True)
         if error or not all_scored:
             msg = error or self.tr("no sources answered")
-            self.tonight.lbl_now.setText(
-                self.tr("Could not compute tonight: %1 — check your network "
-                        "and try 'Compute tonight'.").replace("%1", msg))
+            self.tonight.lbl_context.setText(
+                self.tr("Could not compute tonight: %1").replace("%1", msg))
             self.statusBar().showMessage(
-                self.tr("Error computing tonight: %1").replace("%1", msg),
-                15000)
+                self.tr("Error: %1").replace("%1", msg), 15000)
             return
         self._tonight_top = top
         self._tonight_all = all_scored
-        self._tonight_now = [t for t, _s, _p, _ph in all_scored]
-        medals = ["🥇", "🥈", "🥉"]
-        for i in range(3):
-            label = getattr(self.tonight, f"card{i}_text")
-            obs_chk = getattr(self.tonight, f"card{i}_obs")
-            if i < len(top):
-                t, score, parts, phrase = top[i]
-                label.setText(self._card_text(t, score, phrase))
-                try:
-                    obs_chk.stateChanged.disconnect()
-                except (RuntimeError, TypeError):
-                    pass
-                obs_chk.setChecked(db.is_observed(t["id"]))
-                obs_chk.stateChanged.connect(
-                    lambda _s, tid=t["id"], kind=t["kind"]:
-                    self._toggle_observed(tid, kind, _s))
-            else:
-                label.setText("—")
-        self._fill_now()
+        self._update_night_header()
+        self._build_suggestion_grid()
         self._fill_table()
         self.statusBar().showMessage(
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
 
-    def _card_text(self, t, score, phrase):
-        # @args: t - target dict, score - float, phrase - {"es","en"} dict
-        # @return: the HTML card body with window and Moon/safe-start hints
+    def _update_night_header(self):
+        # Compact night context: date, twilight, Moon phase
+        from ..core import coords, ephem_minor
+        jd = coords.jd_from_datetime(
+            datetime.datetime.now(datetime.timezone.utc))
+        m = ephem_minor.moon(jd)
+        window = coords.tonight_window(config.get("lat"), config.get("lon"))
+        if window:
+            dusk = window[0].strftime("%H:%M")
+            dawn = window[1].strftime("%H:%M")
+        else:
+            dusk = dawn = "—"
+        date = datetime.date.today().isoformat()
+        self.tonight.lbl_context.setText(
+            f"{date} · {self.tr('darkness')} {dusk}–{dawn} · "
+            f"🌙 {m['illum']*100:.0f}%")
+
+    def _build_suggestion_grid(self):
+        # Builds up to 8 suggestion cards in a 4-column grid inside the
+        # scroll area. Each card has one primary action: start/continue project.
+        container = self.tonight.scroll_suggestions.findChild(
+            QWidget, "suggestions_container")
+        # clear previous content
+        if container.layout():
+            while container.layout().count():
+                item = container.layout().takeAt(0)
+                if item.widget():
+                    item.widget().deleteLater()
+        else:
+            grid = QGridLayout(container)
+            container.setLayout(grid)
+        grid = container.layout()
+        # use up to 8 suggestions
+        suggestions = self._tonight_all[:8]
+        medals = ["🥇", "🥈", "🥉"] + [""] * 5
+        for i, (t, score, parts, phrase) in enumerate(suggestions):
+            card = self._make_card(t, score, phrase, medals[i], i)
+            grid.addWidget(card, i // 4, i % 4)
+
+    def _make_card(self, t, score, phrase, medal, idx):
+        # @return: a QFrame card with key info + single action button
+        card = QFrame()
+        card.setFrameShape(QFrame.StyledPanel)
+        layout = QVBoxLayout(card)
+        # rank + name + type
+        kind_label = {"neo": "NEO", "sn": "SN", "comet": "☀",
+                      "pccp": "PCCP", "transit": "Tr",
+                      "alert": "⚠"}.get(t["kind"], t["kind"])
+        name = f"{medal} <b>{t['name']}</b>" if medal else f"<b>{t['name']}</b>"
+        lbl_name = QLabel(f"{name} <small>[{kind_label}]</small>")
+        layout.addWidget(lbl_name)
+        # mag + score
         mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
-        alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
-        extra = ""
-        if t.get("nobs"):
-            extra += f" · NObs {t['nobs']}"
-        if t.get("disc_date"):
-            extra += f" · {self.tr('discovered')} {t['disc_date'].split('.')[0]}"
-        nf = t.get("nf_priority")
-        if nf:
-            extra += f" · NEOfixer: {str(nf).capitalize()}"
-        # UX v3: observing window against the real horizon (ADR-020)
+        lbl_info = QLabel(f"mag {mag} · score {score}")
+        layout.addWidget(lbl_info)
+        # "now" badge or rise time
+        badge = self._now_badge(t)
+        if badge:
+            lbl_badge = QLabel(badge)
+            lbl_badge.setStyleSheet("color: #6ab0ff; font-weight: bold;")
+            layout.addWidget(lbl_badge)
+        # window
         win_txt = self._window_text(t)
-        # Moon hint (ADR-020)
-        moon_txt = self._moon_text(t)
-        return (f"<b>{t['name']}</b> [{t['kind']}] "
-                f"· score {score}<br>mag {mag} · alt {alt}{extra}"
-                f"{win_txt}{moon_txt}"
-                f"<br><i>{self._txt(phrase)}</i>")
+        if win_txt:
+            layout.addWidget(QLabel(f"<small>{win_txt}</small>"))
+        # moon warning
+        moon = self._moon_text(t)
+        if moon:
+            layout.addWidget(QLabel(f"<small>🌙 {moon}</small>"))
+        # why-tonight phrase
+        layout.addWidget(QLabel(f"<small><i>{self._txt(phrase)}</i></small>"))
+        # single button: start or continue
+        btn = self._card_button(t)
+        layout.addWidget(btn)
+        layout.addStretch()
+        return card
+
+    def _now_badge(self, t):
+        # @return: "▲ ahora" if up now, or "HH:MM↑" rise time, or ""
+        from ..core import planner
+        if not self._tonight_all:
+            return ""
+        targets = [x for x, _s, _p, _ph in self._tonight_all]
+        now = planner.visible_now(targets, config)
+        up_ids = {t2["id"] for t2, _a, _z in now}
+        if t["id"] in up_ids:
+            return "▲ " + self.tr("now")
+        ws = (t.get("window_start") or "")[11:16]
+        if ws:
+            return f"{ws}↑"
+        return ""
 
     def _window_text(self, t):
-        # @return: short HTML snippet with the safe observing window, or ""
         ws = (t.get("window_start") or "")[11:16]
         we = (t.get("window_end") or "")[11:16]
         if not ws or not we:
             return ""
-        return (f"<br><small>{self.tr('window')} {ws}–{we} UTC · "
-                f"{self.tr('safe start until')} {we}</small>")
+        return f"{self.tr('window')} {ws}–{we}"
 
     def _moon_text(self, t):
-        # @return: short HTML moon warning snippet, or ""
         info = suggest.moon_info(t, config)
         if not info or not info.get("warning"):
             return ""
-        return (f"<br><small>🌙 {self.tr('Moon')}: "
-                f"{info['sep_deg']:.0f}° · {info['illum']*100:.0f}%</small>")
+        return f"{info['sep_deg']:.0f}° · {info['illum']*100:.0f}%"
 
-    def _fill_now(self):
-        # The "right now" band: targets currently above the horizon.
-        if not self._tonight_now:
-            return
-        from ..core import planner
-        now = planner.visible_now(self._tonight_now, config)
-        rank = {id(t): s for t, s, _p, _ph in self._tonight_all}
-        now.sort(key=lambda x: -rank.get(id(x[0]), 0))
-        if not now:
-            self.tonight.lbl_now.setText(
-                self.tr("Nothing from the list is above the horizon right now."))
-            return
-        now_txt = self.tr("now")
-        max_txt = self.tr("max")
-        at_txt = self.tr("at")
-        lines = []
-        for t, alt, az in now[:3]:
-            mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
-            best = (t.get("max_time") or "")[11:16]
-            best_txt = ""
-            if best and t.get("max_alt"):
-                best_txt = (f" · {max_txt} {t['max_alt']:.0f}° "
-                            f"{at_txt} {best} UTC")
-            lines.append(f"▸ <b>{t['name']}</b> [{t['kind']}] — "
-                         f"{now_txt} alt {alt:.0f}°, az {az:.0f}°, "
-                         f"mag {mag}{best_txt}")
-        self.tonight.lbl_now.setText("<br>".join(lines))
+    def _card_button(self, t):
+        # @return: "Iniciar" or "Continuar" depending on whether a project exists
+        existing = project.list_projects(db, "active")
+        has_proj = any(p["object_name"] == t.get("name")
+                       or p["object_name"] == t.get("id")
+                       for p in existing)
+        if has_proj:
+            btn = QPushButton(self.tr("Continue"))
+        else:
+            btn = QPushButton(self.tr("Start"))
+        btn.clicked.connect(lambda _=False, t=t: self._start_or_continue(t))
+        return btn
+
+    def _start_or_continue(self, t):
+        # Start a new project or jump to the existing one
+        existing = project.list_projects(db, "active")
+        match = next((p for p in existing
+                      if p["object_name"] == t.get("name")
+                      or p["object_name"] == t.get("id")), None)
+        if match:
+            self._goto_tab(1)
+            for i in range(self.projects.lst_projects.count()):
+                if self.projects.lst_projects.item(i).data(Qt.UserRole) == match["id"]:
+                    self.projects.lst_projects.setCurrentRow(i)
+                    break
+        else:
+            self._create_project(t)
+
+    def _refresh_now_badges(self):
+        # Refresh the "now" badges on existing cards (timer tick)
+        if self._tonight_all:
+            self._build_suggestion_grid()
+
+    def _toggle_table(self, visible):
+        self.tonight.grp_list.setVisible(visible)
+        if visible:
+            self.tonight.btn_show_all.setText(
+                self.tr("Hide full list"))
+        else:
+            n = len(self._tonight_all) if self._tonight_all else 0
+            self.tonight.btn_show_all.setText(
+                self.tr("Show all targets (%1)").replace("%1", str(n)))
+
+    # ---- table (collapsed by default) ----
 
     def _table_value(self, t, score, key):
-        # @args: t - target, score - its score, key - column value getter name
-        # @return: cell value (str/float/None)
         if key == "name":
             return t["name"]
         if key == "kind":
@@ -519,7 +565,6 @@ class MainWindow(QMainWindow):
         return "—"
 
     def _fill_table(self):
-        # Refills the table with dynamic columns per selected type filter.
         kind_filter = self.tonight.cmb_filter.currentIndex()
         kinds = [None, "neo", "sn", "comet", "pccp", "transit", "alert"]
         want = kinds[kind_filter] if kind_filter < len(kinds) else None
@@ -546,83 +591,27 @@ class MainWindow(QMainWindow):
                     item = QTableWidgetItem(val if val is not None else "—")
                 if col == 0:
                     item.setToolTip(self._txt(phrase))
-                    item.setData(Qt.UserRole, t["id"])
+                    item.setData(Qt.UserRole, t)
                 tbl.setItem(row, col, item)
         tbl.setSortingEnabled(True)
         tbl.sortItems(1 if want else 2, Qt.DescendingOrder)
         tbl.resizeColumnsToContents()
+        # update toggle label
+        if not self.tonight.btn_show_all.isChecked():
+            self.tonight.btn_show_all.setText(
+                self.tr("Show all targets (%1)").replace(
+                    "%1", str(len(self._tonight_all))))
 
-    def _row_selected(self):
-        # Shows the selected target's "why" and wires the detail buttons.
-        items = self.tonight.tbl_targets.selectedItems()
-        if not items:
-            return
-        row = items[0].row()
-        id_item = self.tonight.tbl_targets.item(row, 0)
-        if not id_item:
-            return
-        obj_id = id_item.data(Qt.UserRole)
-        found = next((x for x in self._tonight_all if x[0]["id"] == obj_id),
-                     None)
-        if not found:
-            return
-        t, score, parts, phrase = found
-        self._selected_row = t
-        self.tonight.lbl_detail.setText(
-            f"<b>{t['name']}</b> — {self._txt(phrase)}")
-        try:
-            self.tonight.chk_detail_obs.stateChanged.disconnect()
-        except RuntimeError:
-            pass
-        self.tonight.chk_detail_obs.setChecked(db.is_observed(t["id"]))
-        self.tonight.chk_detail_obs.stateChanged.connect(
-            lambda s, tid=t["id"], kind=t["kind"]: self._toggle_observed(
-                tid, kind, s))
-
-    def _detail_explore(self):
-        if self._selected_row:
-            self._open_explore_dialog(self._selected_row["id"])
-
-    def _detail_post(self):
-        if self._selected_row:
-            self._open_post_dialog(self._selected_row["id"])
-
-    def _detail_project(self):
-        if self._selected_row:
-            self._create_project(self._selected_row)
-
-    def _detail_observed(self, state):
-        pass  # handled by the connection in _row_selected
-
-    def _toggle_observed(self, obj_id, kind, state):
-        # Marks/unmarks an object as observed (and reports to NEOfixer if set).
-        if state:
-            db.mark_observed(obj_id, kind)
-            key = config.get("neofixer_key", "")
-            if key and kind == "neo":
-                from ..core.sources import neofixer
-                neofixer.report(key, config.get("mpc_code"), obj_id, "observed")
-        else:
-            db.unmark_observed(obj_id)
-        self._fill_table()
-
-    def _explore_row(self, row, _col):
+    def _table_start_project(self, row, _col):
         item = self.tonight.tbl_targets.item(row, 0)
         if item:
-            self._open_explore_dialog(item.data(Qt.UserRole) or item.text())
+            t = item.data(Qt.UserRole)
+            if t:
+                self._start_or_continue(t)
 
-    def _post_from_card(self, i):
-        if i < len(self._tonight_top):
-            self._open_post_dialog(self._tonight_top[i][0]["id"])
-
-    def _project_from_card(self, i):
-        if i < len(self._tonight_top):
-            self._create_project(self._tonight_top[i][0])
-
-    # ---------------- Projects (ADR-019) ----------------
+    # ---------------- Projects (ADR-019 v3.1) ----------------
 
     def on_refresh_projects(self):
-        # Refills the project list from the database.
         idx = self.projects.cmb_filter.currentIndex()
         statuses = ("active", None, "done", "archived")
         status = statuses[idx] if idx < len(statuses) else None
@@ -633,19 +622,19 @@ class MainWindow(QMainWindow):
             kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
                           "pccp": "PCCP", "transit": self.tr("Transit")}.get(
                           p["kind"], p["kind"])
-            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}")
+            cur = project.current_step(db, p["id"]) or "done"
+            step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 5
+            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/5")
             item.setData(Qt.UserRole, p["id"])
             lst.addItem(item)
         if not projects:
             self.projects.lbl_header.setText(
                 self.tr("No projects yet. Create one from Tonight."))
             self.projects.lbl_context.setText("—")
-            self.projects.lst_steps.clear()
-            self.projects.lbl_step_info.setText("—")
+            self._clear_step_tabs()
             self._current_project = None
 
     def _project_selected(self):
-        # Loads the selected project's detail into the stepper panel.
         items = self.projects.lst_projects.selectedItems()
         if not items:
             return
@@ -654,74 +643,431 @@ class MainWindow(QMainWindow):
         if not p:
             return
         self._current_project = p
-        self._render_project(p)
+        self._render_project_header(p)
+        self._build_step_tabs(p)
 
-    def _render_project(self, p):
-        # @args: p - full project dict (with steps and files)
+    def _render_project_header(self, p):
         kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",
                       "pccp": "Possible comet",
                       "transit": "Exoplanet transit"}.get(p["kind"], p["kind"])
-        self.projects.lbl_header.setText(
-            f"<b>[{kind_label}] {p['object_name']}</b> — {p['status']}")
-        ctx = p["context"]
-        ctx_parts = []
-        if ctx.get("mag") is not None:
-            ctx_parts.append(f"mag {ctx['mag']}")
-        if ctx.get("ra_deg") is not None:
-            ctx_parts.append(f"RA {ctx['ra_deg']:.2f}°")
-        if ctx.get("dec_deg") is not None:
-            ctx_parts.append(f"Dec {ctx['dec_deg']:+.2f}°")
-        if ctx.get("rate_arcsec_min"):
-            ctx_parts.append(f"{ctx['rate_arcsec_min']:.1f}″/min")
-        self.projects.lbl_context.setText(" · ".join(ctx_parts) or "—")
-        lst = self.projects.lst_steps
-        lst.clear()
-        icons = {"done": "✔", "current": "▶", "pending": "○",
-                 "skipped": "–"}
-        step_labels = {"plan": self.tr("Plan"), "capture": self.tr("Capture"),
-                       "process": self.tr("Process"),
-                       "analyse": self.tr("Analyse"),
-                       "publish": self.tr("Publish")}
         cur = project.current_step(db, p["id"])
-        for s in p["steps"]:
-            icon = icons.get(s["status"], "○")
-            label = step_labels.get(s["step"], s["step"])
-            lst.addItem(f"{icon} {label}")
-        info = (self.tr("Current step: ") + step_labels.get(cur, "—")
-                if cur else self.tr("All steps done"))
-        n_files = len(p["files"])
-        if n_files:
-            info += f" · {n_files} {self.tr('file(s)')}"
-        self.projects.lbl_step_info.setText(info)
-        # restore the capture plan from the plan step data, if any
+        step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 5
+        self.projects.lbl_header.setText(
+            f"<b>[{kind_label}] {p['object_name']}</b> — "
+            f"{self.tr('step')} {step_n}/5")
+        ctx = p["context"]
+        parts = []
+        if ctx.get("mag") is not None:
+            parts.append(f"mag {ctx['mag']}")
+        if ctx.get("ra_deg") is not None:
+            parts.append(f"RA {ctx['ra_deg']:.2f}°")
+        if ctx.get("dec_deg") is not None:
+            parts.append(f"Dec {ctx['dec_deg']:+.2f}°")
+        if ctx.get("rate_arcsec_min"):
+            parts.append(f"{ctx['rate_arcsec_min']:.1f}″/min")
+        self.projects.lbl_context.setText(" · ".join(parts) or "—")
+
+    def _clear_step_tabs(self):
+        # Remove all dynamic content from step tabs
+        for tab_name in ("tab_plan", "tab_capture", "tab_process",
+                         "tab_analyse", "tab_publish"):
+            tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
+            if tab and tab.layout():
+                while tab.layout().count():
+                    item = tab.layout().takeAt(0)
+                    if item.widget():
+                        item.widget().deleteLater()
+        self.projects.lbl_step_status.setText("—")
+        self._project_widgets = {}
+
+    def _build_step_tabs(self, p):
+        # Populate each step tab with only the content relevant to the
+        # project kind. Steps are clickable (the QTabWidget handles that).
+        self._clear_step_tabs()
+        kind = p["kind"]
+        ctx = p["context"]
+        # update tab labels with status icons
+        for i, key in enumerate(_STEP_KEYS):
+            step = next((s for s in p["steps"] if s["step"] == key), None)
+            icon = {"done": "✔", "current": "●", "pending": "○",
+                    "skipped": "–"}.get(step["status"] if step else "○", "○")
+            label = self._step_label(key)
+            self.projects.tabs_steps.setTabText(i, f"{icon} {label}")
+        # build content per step
+        self._build_plan_tab(p, kind, ctx)
+        self._build_capture_tab(p, kind, ctx)
+        self._build_process_tab(p, kind, ctx)
+        self._build_analyse_tab(p, kind, ctx)
+        self._build_publish_tab(p, kind, ctx)
+        # jump to the current step
+        cur = project.current_step(db, p["id"])
+        if cur and cur in _STEP_KEYS:
+            self.projects.tabs_steps.setCurrentIndex(_STEP_KEYS.index(cur))
+        self._update_step_status(p)
+
+    def _build_plan_tab(self, p, kind, ctx):
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_plan")
+        layout = tab.layout()
+        # common: capture plan inputs
+        layout.addWidget(QLabel(self.tr("Capture plan")))
+        form = QFrame()
+        form_layout = QVBoxLayout(form)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Frames:")))
+        spn = QSpinBox(); spn.setMinimum(1); spn.setMaximum(999); spn.setValue(30)
+        row.addWidget(spn)
+        row.addWidget(QLabel(self.tr("Exposure (s):")))
+        spn_exp = QDoubleSpinBox(); spn_exp.setMinimum(0.1)
+        spn_exp.setMaximum(3600.0); spn_exp.setValue(60.0)
+        row.addWidget(spn_exp)
+        row.addWidget(QLabel(self.tr("Filter:")))
+        cmb_f = QComboBox()
+        for f in ("L", "R", "G", "B", "Ha", "OIII", "SII"):
+            cmb_f.addItem(f)
+        row.addWidget(cmb_f)
+        form_layout.addLayout(row)
+        layout.addWidget(form)
+        # NEO: exposure calculator
+        if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
+            from ..core import exposure
+            scale = exposure.plate_scale(config.get("pixel_um"),
+                                          config.get("focal_mm"))
+            t_max = exposure.max_exposure_no_trail(ctx["rate_arcsec_min"], scale)
+            if t_max:
+                layout.addWidget(QLabel(
+                    f"<small>{self.tr('Max exposure (no trail)')}: "
+                    f"{t_max:.0f}s · {self.tr('plate scale')}: "
+                    f"{scale:.2f}″/px · {self.tr('rate')}: "
+                    f"{ctx['rate_arcsec_min']:.1f}″/min</small>"))
+                spn_exp.setValue(min(t_max, 60.0))
+        # restore saved plan data
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
         if plan_data.get("n_frames"):
-            self.projects.spn_nframes.setValue(int(plan_data["n_frames"]))
+            spn.setValue(int(plan_data["n_frames"]))
         if plan_data.get("exp_s"):
-            self.projects.spn_exps.setValue(float(plan_data["exp_s"]))
+            spn_exp.setValue(float(plan_data["exp_s"]))
         if plan_data.get("filter"):
-            idx = self.projects.cmb_filter.findText(plan_data["filter"])
+            idx = cmb_f.findText(plan_data["filter"])
             if idx >= 0:
-                self.projects.cmb_filter.setCurrentIndex(idx)
+                cmb_f.setCurrentIndex(idx)
+        self._project_widgets["spn_nframes"] = spn
+        self._project_widgets["spn_exps"] = spn_exp
+        self._project_widgets["cmb_filter"] = cmb_f
+        # save plan button
+        btn_save = QPushButton(self.tr("Save plan"))
+        btn_save.clicked.connect(self._project_save_plan)
+        layout.addWidget(btn_save)
+        layout.addStretch()
 
-    def _project_advance(self):
+    def _project_save_plan(self):
         if not self._current_project:
             return
-        p = project.advance(db, self._current_project["id"])
-        if p:
-            self._current_project = p
-            self._render_project(p)
-            self.statusBar().showMessage(self.tr("Step completed"), 5000)
+        spn = self._project_widgets.get("spn_nframes")
+        spn_exp = self._project_widgets.get("spn_exps")
+        cmb_f = self._project_widgets.get("cmb_filter")
+        if spn and spn_exp and cmb_f:
+            project.update_step_data(
+                db, self._current_project["id"], "plan",
+                {"n_frames": spn.value(), "exp_s": spn_exp.value(),
+                 "filter": cmb_f.currentText()})
+            self.statusBar().showMessage(self.tr("Plan saved"), 5000)
+
+    def _build_capture_tab(self, p, kind, ctx):
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_capture")
+        layout = tab.layout()
+        # sequence export (all kinds)
+        layout.addWidget(QLabel(self.tr("Export capture sequence")))
+        cmb_fmt = QComboBox()
+        cmb_fmt.addItem("NINA (JSON)")
+        cmb_fmt.addItem("CCDciel (XML)")
+        cmb_fmt.addItem("CSV (generic)")
+        layout.addWidget(cmb_fmt)
+        btn_seq = QPushButton(self.tr("Export sequence…"))
+        btn_seq.clicked.connect(self._project_export_sequence)
+        layout.addWidget(btn_seq)
+        # NEO: also ephemeris export
+        if kind in ("neo", "pccp"):
+            layout.addWidget(QLabel(""))
+            layout.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
+            btn_eph = QPushButton(self.tr("Export ephemeris…"))
+            btn_eph.clicked.connect(self._project_export_ephem)
+            layout.addWidget(btn_eph)
+        self._project_widgets["cmb_seqfmt"] = cmb_fmt
+        layout.addStretch()
+
+    def _build_process_tab(self, p, kind, ctx):
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_process")
+        layout = tab.layout()
+        if kind in ("neo", "pccp"):
+            # MPC report: paste + validate + save
+            layout.addWidget(QLabel(
+                self.tr("Paste astrometric measurements (MPC 80-col or ADES)")))
+            txt = QTextEdit()
+            txt.setMaximumHeight(140)
+            txt.setAcceptRichText(False)
+            txt.setPlaceholderText(
+                self.tr("Paste MPC 80-column or ADES PSV lines here…"))
+            font = txt.font(); font.setFamily("Monospace"); txt.setFont(font)
+            layout.addWidget(txt)
+            btn_val = QPushButton(self.tr("Validate"))
+            btn_val.clicked.connect(self._project_mpc_validate)
+            layout.addWidget(btn_val)
+            btn_save = QPushButton(self.tr("Save report…"))
+            btn_save.clicked.connect(self._project_mpc_save)
+            layout.addWidget(btn_save)
+            lbl_status = QLabel("—"); lbl_status.setWordWrap(True)
+            layout.addWidget(lbl_status)
+            self._project_widgets["txt_mpc"] = txt
+            self._project_widgets["lbl_mpc_status"] = lbl_status
+        elif kind == "sn":
+            # SN: import result FITS
+            layout.addWidget(QLabel(self.tr("Import your processed FITS image")))
+            edt = QLineEdit()
+            edt.setPlaceholderText(self.tr("Path to plate-solved FITS…"))
+            layout.addWidget(edt)
+            btn_browse = QPushButton(self.tr("Browse…"))
+            btn_browse.clicked.connect(self._project_process_browse)
+            layout.addWidget(btn_browse)
+            lbl_path = QLabel("—")
+            layout.addWidget(lbl_path)
+            self._project_widgets["edt_fits"] = edt
+            self._project_widgets["lbl_fits_path"] = lbl_path
+        else:
+            layout.addWidget(QLabel(
+                self.tr("Process your images with your usual software.")))
+        layout.addStretch()
+
+    def _build_analyse_tab(self, p, kind, ctx):
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_analyse")
+        layout = tab.layout()
+        if kind == "sn":
+            btn = QPushButton(self.tr("Open blink…"))
+            btn.clicked.connect(self._project_blink)
+            layout.addWidget(btn)
+            layout.addWidget(QLabel(
+                f"<small>{self.tr('Pre-filled with')} {p['object_name']} "
+                f"@ {ctx.get('ra_deg', 0):.4f}, {ctx.get('dec_deg', 0):+.4f}"
+                f"</small>"))
+        else:
+            btn = QPushButton(self.tr("Explore object…"))
+            btn.clicked.connect(self._project_explore)
+            layout.addWidget(btn)
+        layout.addStretch()
+
+    def _build_publish_tab(self, p, kind, ctx):
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_publish")
+        layout = tab.layout()
+        btn = QPushButton(self.tr("Generate post…"))
+        btn.clicked.connect(self._project_post)
+        layout.addWidget(btn)
+        layout.addWidget(QLabel(
+            f"<small>{self.tr('Opens the post dialog for')} "
+            f"{p['object_name']}</small>"))
+        layout.addStretch()
+
+    def _project_step_changed(self, idx):
+        # Update the status label when the user clicks a step tab
+        if not self._current_project:
+            return
+        self._update_step_status(self._current_project)
+
+    def _update_step_status(self, p):
+        idx = self.projects.tabs_steps.currentIndex()
+        key = _STEP_KEYS[idx] if idx < len(_STEP_KEYS) else "plan"
+        step = next((s for s in p["steps"] if s["step"] == key), None)
+        status = step["status"] if step else "—"
+        status_txt = {"done": self.tr("done"), "current": self.tr("current"),
+                      "pending": self.tr("pending"),
+                      "skipped": self.tr("skipped")}.get(status, status)
+        self.projects.lbl_step_status.setText(
+            f"{self._step_label(key)} — {status_txt}")
+
+    def _project_prev(self):
+        idx = self.projects.tabs_steps.currentIndex()
+        if idx > 0:
+            self.projects.tabs_steps.setCurrentIndex(idx - 1)
+
+    def _project_next(self):
+        idx = self.projects.tabs_steps.currentIndex()
+        if idx < self.projects.tabs_steps.count() - 1:
+            self.projects.tabs_steps.setCurrentIndex(idx + 1)
 
     def _project_skip(self):
         if not self._current_project:
             return
-        cur = project.current_step(db, self._current_project["id"])
-        if cur:
-            project.set_step_status(db, self._current_project["id"], cur,
+        idx = self.projects.tabs_steps.currentIndex()
+        key = _STEP_KEYS[idx] if idx < len(_STEP_KEYS) else None
+        if key:
+            project.set_step_status(db, self._current_project["id"], key,
                                     project.STEP_SKIPPED)
-            self._project_advance()
+            self._project_next()
+            self._refresh_current_project()
+
+    def _project_mark_done(self):
+        if not self._current_project:
+            return
+        idx = self.projects.tabs_steps.currentIndex()
+        key = _STEP_KEYS[idx] if idx < len(_STEP_KEYS) else None
+        if key:
+            project.set_step_status(db, self._current_project["id"], key,
+                                    project.STEP_DONE)
+            self._project_next()
+            self._refresh_current_project()
+
+    def _refresh_current_project(self):
+        if not self._current_project:
+            return
+        p = project.get(db, self._current_project["id"])
+        if p:
+            self._current_project = p
+            self._render_project_header(p)
+            self._build_step_tabs(p)
+
+    def _project_export_sequence(self):
+        if not self._current_project:
+            return
+        spn = self._project_widgets.get("spn_nframes")
+        spn_exp = self._project_widgets.get("spn_exps")
+        cmb_f = self._project_widgets.get("cmb_filter")
+        if not (spn and spn_exp and cmb_f):
+            return
+        plan = sequence.make_plan(spn.value(), spn_exp.value(),
+                                  cmb_f.currentText(), cfg=config)
+        ctx = self._current_project["context"]
+        target = {"name": self._current_project["object_name"],
+                  "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg")}
+        fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
+        fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
+        ext = {"nina": ".json", "ccdciel": ".xml", "csv": ".csv"}[fmt]
+        outdir = paths.data_dir() / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        default = outdir / f"{target['name']}_sequence{ext}"
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export capture sequence"), str(default),
+            f"*{ext};;All files (*)")
+        if not out:
+            return
+        try:
+            path = sequence.export(target, plan, out, fmt=fmt)
+            project.add_file(db, self._current_project["id"], path, "sequence")
+            self.statusBar().showMessage(
+                self.tr("Written to %1").replace("%1", path), 8000)
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("Export failed: %1").replace("%1", str(err)), 8000)
+
+    def _project_export_ephem(self):
+        if not self._current_project:
+            return
+        ctx = self._current_project["context"]
+        obj_id = ctx.get("id") or self._current_project["object_name"]
+        site = config.get("mpc_code", "Z41")
+        items = [self.tr("CSV (generic)"), "TheSkyX", "Cartes du Ciel"]
+        choice, ok = QInputDialog.getItem(
+            self, self.tr("Ephemeris format"), self.tr("Format:"),
+            items, 0, False)
+        if not ok:
+            return
+        fmt = {0: "csv", 1: "skyx", 2: "cdc"}[items.index(choice)]
+        ext = ".csv" if fmt == "csv" else ".txt"
+        outdir = paths.data_dir() / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        default = outdir / f"{obj_id}_ephemeris{ext}"
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export ephemeris"), str(default),
+            f"*{ext};;All files (*)")
+        if not out:
+            return
+        self.statusBar().showMessage(self.tr("Querying Horizons…"))
+        rows = ephemeris.generate(obj_id, site, step="30m")
+        if not rows:
+            self.statusBar().showMessage(
+                self.tr("No ephemeris for %1").replace("%1", obj_id), 8000)
+            return
+        try:
+            path = ephemeris.export(rows, out, fmt=fmt,
+                                    obj_name=self._current_project["object_name"])
+            project.add_file(db, self._current_project["id"], path, "ephemeris")
+            self.statusBar().showMessage(
+                self.tr("Written to %1").replace("%1", path), 8000)
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("Export failed: %1").replace("%1", str(err)), 8000)
+
+    def _project_process_browse(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("Choose FITS image"), "",
+            "FITS (*.fits *.fit *.fts);;All files (*)")
+        if path:
+            edt = self._project_widgets.get("edt_fits")
+            lbl = self._project_widgets.get("lbl_fits_path")
+            if edt:
+                edt.setText(path)
+            if lbl:
+                lbl.setText(path)
+
+    def _project_mpc_validate(self):
+        if not self._current_project:
+            return
+        txt = self._project_widgets.get("txt_mpc")
+        if not txt:
+            return
+        text = txt.toPlainText()
+        if not text.strip():
+            self._project_widgets["lbl_mpc_status"].setText(
+                self.tr("Paste your measurements first."))
+            return
+        obs_code = config.get("mpc_code", "")
+        obj = self._current_project["object_name"]
+        result = mpc_report.validate(text, obs_code=obs_code,
+                                     expected_obj=obj)
+        lbl = self._project_widgets.get("lbl_mpc_status")
+        if result["valid"]:
+            status = (self.tr("Valid: %1 lines, %2").replace("%1", str(result["n_lines"]))
+                      .replace("%2", result["format"]))
+            if result["warnings"]:
+                status += " ⚠ " + "; ".join(result["warnings"])
+            lbl.setText(status)
+        else:
+            lbl.setText(self.tr("Invalid: ") + "; ".join(result["errors"][:4])
+                        + ("…" if len(result["errors"]) > 4 else ""))
+
+    def _project_mpc_save(self):
+        if not self._current_project:
+            return
+        txt = self._project_widgets.get("txt_mpc")
+        if not txt:
+            return
+        text = txt.toPlainText()
+        if not text.strip():
+            self._project_widgets["lbl_mpc_status"].setText(
+                self.tr("Paste your measurements first."))
+            return
+        obs_code = config.get("mpc_code", "")
+        obj = self._current_project["object_name"]
+        outdir = paths.data_dir() / "exports"
+        outdir.mkdir(parents=True, exist_ok=True)
+        default = outdir / f"{obj}_mpc_report.txt"
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Save MPC report"), str(default),
+            "Text files (*.txt);;All files (*)")
+        if not out:
+            return
+        path, result = mpc_report.package(text, out, obs_code=obs_code,
+                                          expected_obj=obj)
+        lbl = self._project_widgets.get("lbl_mpc_status")
+        if path:
+            project.add_file(db, self._current_project["id"], path, "report")
+            project.update_step_data(db, self._current_project["id"],
+                                     "process", {"mpc_report": path})
+            lbl.setText(self.tr("Saved: %1 (%2 lines)")
+                        .replace("%1", path).replace("%2", str(result["n_lines"])))
+            self.statusBar().showMessage(
+                self.tr("MPC report ready to email"), 8000)
+        else:
+            lbl.setText(self.tr("Invalid: ") + "; ".join(result["errors"][:4])
+                        + ("…" if len(result["errors"]) > 4 else ""))
 
     def _project_explore(self):
         if self._current_project:
@@ -734,9 +1080,13 @@ class MainWindow(QMainWindow):
     def _project_blink(self):
         if self._current_project:
             ctx = self._current_project["context"]
-            self._open_blink_dialog(sn_name=self._current_project["object_name"],
-                                    ra=ctx.get("ra_deg"),
-                                    dec=ctx.get("dec_deg"))
+            # use the FITS from the process tab if available
+            edt = self._project_widgets.get("edt_fits")
+            fits_path = edt.text().strip() if edt else ""
+            self._open_blink_dialog(
+                sn_name=self._current_project["object_name"],
+                ra=ctx.get("ra_deg"), dec=ctx.get("dec_deg"),
+                fits_path=fits_path or None)
 
     def _project_archive(self):
         if not self._current_project:
@@ -758,170 +1108,13 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self.on_refresh_projects()
 
-    def _project_plan(self):
-        # @return: make_plan dict from the capture plan form, or None
-        if not self._current_project:
-            return None
-        p = self.projects
-        plan = sequence.make_plan(
-            p.spn_nframes.value(), p.spn_exps.value(),
-            p.cmb_filter.currentText(),
-            overhead_s=float(config.get("overhead_s", 15.0)),
-            cfg=config)
-        # persist the plan into the project's plan step data
-        project.update_step_data(db, self._current_project["id"], "plan",
-                                 {"n_frames": plan["n_frames"],
-                                  "exp_s": plan["exp_s"],
-                                  "filter": plan["filter"]})
-        return plan
-
-    def _project_export_sequence(self):
-        # Exports a capture sequence file for the current project.
-        if not self._current_project:
-            return
-        plan = self._project_plan()
-        if not plan:
-            return
-        ctx = self._current_project["context"]
-        target = {"name": self._current_project["object_name"],
-                  "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg")}
-        fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
-        fmt = fmt_map[self.projects.cmb_seqfmt.currentIndex()]
-        ext = {"nina": ".json", "ccdciel": ".xml", "csv": ".csv"}[fmt]
-        outdir = paths.data_dir() / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
-        default = outdir / f"{target['name']}_sequence{ext}"
-        from PySide6.QtWidgets import QFileDialog
-        out, _ = QFileDialog.getSaveFileName(
-            self, self.tr("Export capture sequence"), str(default),
-            f"*{ext};;All files (*)")
-        if not out:
-            return
-        try:
-            path = sequence.export(target, plan, out, fmt=fmt)
-            project.add_file(db, self._current_project["id"], path, "sequence")
-            self.statusBar().showMessage(
-                self.tr("Sequence written to %1").replace("%1", path), 8000)
-        except OSError as err:
-            self.statusBar().showMessage(
-                self.tr("Export failed: %1").replace("%1", str(err)), 8000)
-
-    def _project_export_ephem(self):
-        # Exports an ephemeris table for the current project (NEOs/PCCP).
-        if not self._current_project:
-            return
-        ctx = self._current_project["context"]
-        obj_id = ctx.get("id") or self._current_project["object_name"]
-        site = config.get("mpc_code", "Z41")
-        from PySide6.QtWidgets import QInputDialog
-        items = [self.tr("CSV (generic)"), "TheSkyX", "Cartes du Ciel"]
-        choice, ok = QInputDialog.getItem(
-            self, self.tr("Ephemeris format"),
-            self.tr("Format:"), items, 0, False)
-        if not ok:
-            return
-        fmt = {0: "csv", 1: "skyx", 2: "cdc"}[items.index(choice)]
-        ext = ".csv" if fmt == "csv" else ".txt"
-        outdir = paths.data_dir() / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
-        default = outdir / f"{obj_id}_ephemeris{ext}"
-        from PySide6.QtWidgets import QFileDialog
-        out, _ = QFileDialog.getSaveFileName(
-            self, self.tr("Export ephemeris"), str(default),
-            f"*{ext};;All files (*)")
-        if not out:
-            return
-        self.statusBar().showMessage(self.tr("Querying Horizons…"))
-        rows = ephemeris.generate(obj_id, site, step="30m")
-        if not rows:
-            self.statusBar().showMessage(
-                self.tr("No ephemeris available for %1").replace("%1", obj_id),
-                8000)
-            return
-        try:
-            path = ephemeris.export(rows, out, fmt=fmt,
-                                    obj_name=self._current_project["object_name"])
-            project.add_file(db, self._current_project["id"], path, "ephemeris")
-            self.statusBar().showMessage(
-                self.tr("Ephemeris written to %1").replace("%1", path), 8000)
-        except OSError as err:
-            self.statusBar().showMessage(
-                self.tr("Export failed: %1").replace("%1", str(err)), 8000)
-
-    def _project_mpc_validate(self):
-        # Validates the pasted measurements without saving.
-        if not self._current_project:
-            return
-        text = self.projects.txt_mpc.toPlainText()
-        if not text.strip():
-            self.projects.lbl_mpc_status.setText(
-                self.tr("Paste your measurements first."))
-            return
-        obs_code = config.get("mpc_code", "")
-        obj = self._current_project["object_name"]
-        result = mpc_report.validate(text, obs_code=obs_code,
-                                     expected_obj=obj)
-        if result["valid"]:
-            status = (self.tr("Valid: %1 lines, format %2, designation(s) %3")
-                      .replace("%1", str(result["n_lines"]))
-                      .replace("%2", result["format"])
-                      .replace("%3", ", ".join(result["designations"])))
-            if result["warnings"]:
-                status += " ⚠ " + "; ".join(result["warnings"])
-            self.projects.lbl_mpc_status.setText(status)
-        else:
-            self.projects.lbl_mpc_status.setText(
-                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                + ("…" if len(result["errors"]) > 4 else ""))
-
-    def _project_mpc_save(self):
-        # Validates and packages the measurements into a file.
-        if not self._current_project:
-            return
-        text = self.projects.txt_mpc.toPlainText()
-        if not text.strip():
-            self.projects.lbl_mpc_status.setText(
-                self.tr("Paste your measurements first."))
-            return
-        obs_code = config.get("mpc_code", "")
-        obj = self._current_project["object_name"]
-        outdir = paths.data_dir() / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
-        from PySide6.QtWidgets import QFileDialog
-        default = outdir / f"{obj}_mpc_report.txt"
-        out, _ = QFileDialog.getSaveFileName(
-            self, self.tr("Save MPC report"), str(default),
-            "Text files (*.txt);;All files (*)")
-        if not out:
-            return
-        path, result = mpc_report.package(text, out, obs_code=obs_code,
-                                          expected_obj=obj)
-        if path:
-            project.add_file(db, self._current_project["id"], path, "report")
-            # persist the measurements in the project's process step
-            project.update_step_data(
-                db, self._current_project["id"], "process",
-                {"mpc_report": path})
-            self.projects.lbl_mpc_status.setText(
-                self.tr("Report saved: %1 (%2 lines)")
-                .replace("%1", path)
-                .replace("%2", str(result["n_lines"])))
-            self.statusBar().showMessage(
-                self.tr("MPC report ready to email to the MPC"), 8000)
-        else:
-            self.projects.lbl_mpc_status.setText(
-                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                + ("…" if len(result["errors"]) > 4 else ""))
-
     def _create_project(self, target):
-        # @args: target - dict from the planner/tonight list
         kind = target.get("kind")
         name = target.get("name") or target.get("id")
         if kind not in project.VALID_KINDS or not name:
             self.statusBar().showMessage(
                 self.tr("Cannot create a project for this target"), 6000)
             return
-        # snapshot the relevant context
         ctx = {k: target.get(k) for k in
                ("id", "name", "kind", "mag", "ra_deg", "dec_deg",
                 "max_alt", "max_time", "window_start", "window_end",
@@ -933,8 +1126,7 @@ class MainWindow(QMainWindow):
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
-            self._goto_tab(1)  # Projects tab
-            # select the new project
+            self._goto_tab(1)
             for i in range(self.projects.lst_projects.count()):
                 if self.projects.lst_projects.item(i).data(Qt.UserRole) == p["id"]:
                     self.projects.lst_projects.setCurrentRow(i)
@@ -945,41 +1137,32 @@ class MainWindow(QMainWindow):
     # ---------------- Contextual dialogs (Explore / Post / Blink) --------
 
     def _tools_explore(self):
-        # Ad-hoc Explore from the Tools menu (asks for the object name).
-        from PySide6.QtWidgets import QInputDialog
         name, ok = QInputDialog.getText(self, self.tr("Explore object"),
                                         self.tr("Object:"))
         if ok and name.strip():
             self._open_explore_dialog(name.strip())
 
     def _tools_blink(self):
-        # Ad-hoc Blink from the Tools menu.
         self._open_blink_dialog()
 
     def _open_explore_dialog(self, name):
-        # Opens the Explore widget inside a modal dialog, pre-filled.
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Explore — %1").replace("%1", name))
         dlg.resize(900, 640)
-        from PySide6.QtWidgets import QVBoxLayout
         layout = QVBoxLayout(dlg)
         explore = _load_ui("explore_tab")
         layout.addWidget(explore)
         explore.edt_explore.setText(name)
-        # wire the explore widget to a local handler
         explore.btn_explore.clicked.connect(
             lambda: self._dialog_explore(explore, name))
         explore.chk_deep.stateChanged.connect(
             lambda: self._dialog_explore_params(explore))
         explore.btn_mkpost.clicked.connect(
             lambda: (self._open_post_dialog(name), dlg.accept()))
-        # kick off the enrichment immediately
         self._dialog_explore(explore, name)
         dlg.exec()
 
     def _dialog_explore(self, explore, name):
-        # Runs the ExploreWorker and fills the dialog widget (reuses the
-        # same logic as the old Explore tab, but local to the dialog).
         explore.btn_explore.setEnabled(False)
         explore.lbl_hook.setText(self.tr("Loading…"))
         fallback = next((t for t, _s, _p, _ph in self._tonight_all
@@ -1001,7 +1184,6 @@ class MainWindow(QMainWindow):
         self._dialog_explore_charts(explore, e)
 
     def _dialog_explore_params(self, explore):
-        # Parameters table in one language, basic or in-depth.
         e = self._explored
         if not e:
             return
@@ -1023,7 +1205,6 @@ class MainWindow(QMainWindow):
         tbl.setColumnWidth(2, 520)
 
     def _dialog_explore_charts(self, explore, e):
-        # 2D charts inside the Explore dialog (orbit / sky / families / field).
         import matplotlib
         matplotlib.use("Agg")
         from PySide6.QtGui import QPixmap
@@ -1080,8 +1261,6 @@ class MainWindow(QMainWindow):
                 explore.lbl_field.setPixmap(QPixmap(str(p4)))
 
     def _orbit_rows(self, e):
-        # @args: e - enriched dict
-        # @return: list of interpreted parameter rows
         d = e.get("data") or {}
         sb = d.get("sbdb")
         if sb:
@@ -1098,11 +1277,9 @@ class MainWindow(QMainWindow):
         return []
 
     def _open_post_dialog(self, name):
-        # Opens the Post widget inside a modal dialog, pre-filled.
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Post — %1").replace("%1", name))
         dlg.resize(700, 560)
-        from PySide6.QtWidgets import QVBoxLayout
         layout = QVBoxLayout(dlg)
         post_w = _load_ui("post_tab")
         layout.addWidget(post_w)
@@ -1118,7 +1295,6 @@ class MainWindow(QMainWindow):
         post_w.btn_copy_tweet.clicked.connect(
             lambda: QApplication.clipboard().setText(
                 post_w.txt_tweet.toPlainText()))
-        # kick off generation immediately
         self._dialog_generate_post(post_w, name)
         dlg.exec()
 
@@ -1135,10 +1311,7 @@ class MainWindow(QMainWindow):
     def _dialog_post_done(self, post_w, name, e, rendered):
         post_w.btn_generate.setEnabled(True)
         if not rendered:
-            post_w.lbl_files.setText(
-                self.tr("Not found: ") + name + " — " +
-                self.tr("try an MPC designation (2021EQ3), a comet (29P), "
-                        "SN/AT (SN2023ixf), a planet (HD 209458 b) or 'sun'"))
+            post_w.lbl_files.setText(self.tr("Not found: ") + name)
             return
         post_w.txt_es.setPlainText(rendered.get("es", ""))
         post_w.txt_en.setPlainText(rendered.get("en", ""))
@@ -1151,13 +1324,11 @@ class MainWindow(QMainWindow):
             self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
         self.statusBar().showMessage(self.tr("Drafts ready"), 5000)
 
-    def _open_blink_dialog(self, sn_name=None, ra=None, dec=None):
-        # Opens the Blink widget inside a modal dialog, pre-filled when the
-        # context provides the SN name/coordinates (ADR-019).
+    def _open_blink_dialog(self, sn_name=None, ra=None, dec=None,
+                            fits_path=None):
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Blink"))
         dlg.resize(1100, 640)
-        from PySide6.QtWidgets import QVBoxLayout
         layout = QVBoxLayout(dlg)
         blink_w = _load_ui("blink_tab")
         layout.addWidget(blink_w)
@@ -1169,8 +1340,8 @@ class MainWindow(QMainWindow):
             blink_w.edt_dec.setEnabled(True)
             blink_w.edt_ra.setText(f"{ra:.5f}")
             blink_w.edt_dec.setText(f"{dec:+.5f}")
-        # wire the blink widget to local handlers (reuse the same methods,
-        # but pointed at the dialog's widget)
+        if fits_path:
+            blink_w.edt_fits.setText(fits_path)
         blink_w.btn_browse.clicked.connect(
             lambda: self._dialog_blink_browse(blink_w))
         blink_w.btn_prepare.clicked.connect(
@@ -1205,14 +1376,13 @@ class MainWindow(QMainWindow):
             lambda: self._dialog_blink_export(blink_w, "png"))
         self._blink_dialog_widget = blink_w
         dlg.exec()
-        # stop timers when the dialog closes
         self._blink_timer.stop()
 
-    # ---- blink dialog helpers (operate on the dialog's widget) ----
+    # ---- blink dialog helpers ----
 
     def _dialog_blink_browse(self, b):
         path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("Choose the plate-solved FITS image"), "",
+            self, self.tr("Choose FITS"), "",
             "FITS (*.fits *.fit *.fts);;All files (*)")
         if path:
             b.edt_fits.setText(path)
@@ -1222,7 +1392,6 @@ class MainWindow(QMainWindow):
         b.edt_dec.setEnabled(bool(state))
 
     def _dialog_blink_manual_coords(self, b):
-        # @return: (ra, dec) in degrees, or None if unchecked/invalid
         if not b.chk_manual.isChecked():
             return None
         try:
@@ -1245,14 +1414,12 @@ class MainWindow(QMainWindow):
             manual = self._dialog_blink_manual_coords(b)
             if manual is None:
                 b.lbl_blink_status.setText(
-                    self.tr("Manual coordinates invalid — use degrees, e.g. "
-                            "187.7050 and +12.3910"))
+                    self.tr("Manual coordinates invalid"))
                 return
             ra, dec = manual
         elif not name:
             b.lbl_blink_status.setText(
-                self.tr("Type the supernova name (e.g. 2026ziz) or tick "
-                        "'Manual coordinates'."))
+                self.tr("Type the supernova name or tick 'Manual coordinates'."))
             return
         b.btn_prepare.setEnabled(False)
         b.lbl_blink_status.setText(self.tr("Reading the FITS image…"))
@@ -1282,16 +1449,12 @@ class MainWindow(QMainWindow):
                 wgt.setCurrentIndex(val)
             wgt.blockSignals(False)
         h, w = pair["obs"].shape
-        status = (self.tr("%1 @ (%2, %3) — %4 · %5×%6 px")
-                  .replace("%1", pair["name"])
-                  .replace("%2", f"{pair['ra']:.5f}")
-                  .replace("%3", f"{pair['dec']:+.5f}")
-                  .replace("%4", pair["ref_label"])
-                  .replace("%5", str(w)).replace("%6", str(h)))
+        b.lbl_blink_status.setText(
+            f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:+.5f}) — "
+            f"{pair['ref_label']} · {w}×{h}px")
         if pair.get("flipped"):
-            status += " · " + self.tr("mirrored image: flipped horizontally "
-                                      "to align")
-        b.lbl_blink_status.setText(status)
+            b.lbl_blink_status.setText(
+                b.lbl_blink_status.text() + " · " + self.tr("mirrored"))
         self._blink_dialog_widget = b
         self._dialog_blink_render(b)
         if b.chk_blink_live.isChecked():
@@ -1304,7 +1467,6 @@ class MainWindow(QMainWindow):
         self._dialog_blink_render(b)
 
     def _dialog_blink_render_soon(self, b):
-        # Debounced render for slider drags (reuse the main render timer).
         self._blink_dialog_widget = b
         self._blink_render_timer.start()
 
@@ -1377,24 +1539,23 @@ class MainWindow(QMainWindow):
         outdir.mkdir(parents=True, exist_ok=True)
         if kind == "gif":
             out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export blink GIF"),
+                self, self.tr("Export GIF"),
                 str(outdir / f"{pair['name']}_blink.gif"), "GIF (*.gif)")
         elif kind == "video":
             out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export blink video"),
+                self, self.tr("Export video"),
                 str(outdir / f"{pair['name']}_blink.mp4"),
                 "MP4 video (*.mp4)")
         else:
             out, _ = QFileDialog.getSaveFileName(
-                self, self.tr("Export side-by-side PNG"),
+                self, self.tr("Export PNG"),
                 str(outdir / f"{pair['name']}_before_after.png"),
                 "PNG (*.png)")
         if not out:
             return
         effect = "blink" if b.rdo_blink.isChecked() else "fade"
         sn = pair["sn_xy"] if b.chk_marker.isChecked() else None
-        b.lbl_blink_status.setText(
-            self.tr("Rendering %1…").replace("%1", kind.upper()))
+        b.lbl_blink_status.setText(self.tr("Rendering…"))
         w = BlinkExportWorker(
             kind, self._blink_ref8, self._blink_obs8, sn, out, effect=effect,
             name=pair["name"], ref_label=pair["ref_label"],
@@ -1409,8 +1570,6 @@ class MainWindow(QMainWindow):
         self._keep(w)
         w.start()
 
-    # ---- live blink tick works for whichever blink widget is active ----
-
     def _blink_tick(self):
         if not self._blink_pair or not hasattr(self, "_blink_pix"):
             self._blink_timer.stop()
@@ -1420,19 +1579,13 @@ class MainWindow(QMainWindow):
         b = getattr(self, "_blink_dialog_widget", None)
         if b is not None:
             self._blink_show_dlg(b, pix)
-        else:
-            self._blink_show(pix)
 
     def _blink_render(self, *_args):
-        # When the debounce timer fires, render the active blink widget.
         b = getattr(self, "_blink_dialog_widget", None)
         if b is not None and self._blink_pair:
             self._dialog_blink_render(b)
 
-    # ---------------- shared blink helpers (unchanged from v2) -----------
-
     def _blink_shift_ref(self, ref8):
-        # Applies the manual nudge to the survey frame only (PIL affine).
         dx, dy = self._blink_nudge
         if dx == 0.0 and dy == 0.0:
             return ref8
@@ -1444,8 +1597,6 @@ class MainWindow(QMainWindow):
         return np.asarray(im)
 
     def _blink_display_frames(self, zoom):
-        # @args: zoom - 1, 2 or 4
-        # @return: (disp_ref, disp_obs, sn_display_xy or None)
         import numpy as np
         from ..viz import blink_view
         disp_ref = np.ascontiguousarray(np.flipud(self._blink_ref8))
@@ -1492,11 +1643,6 @@ class MainWindow(QMainWindow):
         p.end()
         return pix
 
-    def _blink_show(self, pix):
-        b = getattr(self, "_blink_dialog_widget", None)
-        if b is not None:
-            self._blink_show_dlg(b, pix)
-
     # ---------------- Solar ----------------
 
     _SDO_CHANNELS = ["0193", "0304", "0171", "HMII", "HMIB"]
@@ -1517,7 +1663,6 @@ class MainWindow(QMainWindow):
         if img_path:
             self._set_sun_image(img_path)
         lines = []
-        lang = self._lang()
         if data.get("ssn") is not None:
             ssn = data["ssn"]
             mood = {"es": "actividad moderada" if ssn < 100 else "actividad alta",
@@ -1572,7 +1717,7 @@ class MainWindow(QMainWindow):
         phase_icons = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"]
         icon = phase_icons[int(m["phase_age_days"] / 29.53 * 8) % 8]
         self.solar.lbl_moon.setText(
-            f"{icon} " + self.tr("Moon: %1% lit · %2 km away · %3 days old")
+            f"{icon} " + self.tr("Moon: %1% lit · %2 km · %3 days")
             .replace("%1", f"{m['illum'] * 100:.0f}")
             .replace("%2", f"{m['dist_km']:,.0f}")
             .replace("%3", f"{m['phase_age_days']:.0f}"))

@@ -4,34 +4,6 @@
  <widget class="QWidget" name="TonightTab">
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <widget class="QGroupBox" name="grp_now">
-     <property name="title"><string>Right now</string></property>
-     <layout class="QVBoxLayout" name="nowLayout">
-      <item>
-       <widget class="QLabel" name="lbl_now">
-        <property name="wordWrap"><bool>true</bool></property>
-        <property name="text"><string>Compute tonight to see what is above the horizon right now.</string></property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="nowBtns">
-        <item>
-         <widget class="QPushButton" name="btn_now_refresh">
-          <property name="text"><string>Refresh</string></property>
-          <property name="toolTip"><string>Recompute current altitudes</string></property>
-         </widget>
-        </item>
-        <item>
-         <spacer name="nowSpacer">
-          <property name="orientation"><enum>Qt::Horizontal</enum></property>
-         </spacer>
-        </item>
-       </layout>
-      </item>
-     </layout>
-    </widget>
-   </item>
-   <item>
     <layout class="QHBoxLayout" name="headerLayout">
      <item>
       <widget class="QLabel" name="lbl_context">
@@ -52,55 +24,23 @@
     </layout>
    </item>
    <item>
-    <widget class="QGroupBox" name="grp_top">
-     <property name="title"><string>Best of tonight</string></property>
-     <layout class="QHBoxLayout" name="topLayout">
-      <item>
-       <widget class="QFrame" name="card0">
-        <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
-        <layout class="QVBoxLayout" name="card0Layout">
-         <item><widget class="QLabel" name="card0_text"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
-         <item>
-          <layout class="QHBoxLayout" name="card0Btns">
-            <item><widget class="QCheckBox" name="card0_obs"><property name="text"><string>Observed</string></property></widget></item>
-            <item><widget class="QPushButton" name="card0_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
-            <item><widget class="QPushButton" name="card0_post"><property name="text"><string>Post</string></property></widget></item>
-          </layout>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QFrame" name="card1">
-        <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
-        <layout class="QVBoxLayout" name="card1Layout">
-         <item><widget class="QLabel" name="card1_text"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
-         <item>
-          <layout class="QHBoxLayout" name="card1Btns">
-            <item><widget class="QCheckBox" name="card1_obs"><property name="text"><string>Observed</string></property></widget></item>
-            <item><widget class="QPushButton" name="card1_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
-            <item><widget class="QPushButton" name="card1_post"><property name="text"><string>Post</string></property></widget></item>
-          </layout>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QFrame" name="card2">
-        <property name="frameShape"><enum>QFrame::StyledPanel</enum></property>
-        <layout class="QVBoxLayout" name="card2Layout">
-         <item><widget class="QLabel" name="card2_text"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
-         <item>
-          <layout class="QHBoxLayout" name="card2Btns">
-            <item><widget class="QCheckBox" name="card2_obs"><property name="text"><string>Observed</string></property></widget></item>
-            <item><widget class="QPushButton" name="card2_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
-            <item><widget class="QPushButton" name="card2_post"><property name="text"><string>Post</string></property></widget></item>
-          </layout>
-         </item>
-        </layout>
-       </widget>
-      </item>
-     </layout>
+    <widget class="QLabel" name="lbl_suggestions_title">
+     <property name="text"><string>Suggestions</string></property>
+     <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QScrollArea" name="scroll_suggestions">
+     <property name="widgetResizable"><bool>true</bool></property>
+     <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+     <widget class="QWidget" name="suggestions_container"/>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="btn_show_all">
+     <property name="text"><string>Show all targets</string></property>
+     <property name="checkable"><bool>true</bool></property>
+     <property name="toolTip"><string>Expand the full sortable table</string></property>
     </widget>
    </item>
    <item>
@@ -128,29 +68,7 @@
       <item>
        <widget class="QTableWidget" name="tbl_targets">
         <property name="sortingEnabled"><bool>true</bool></property>
-        <property name="toolTip"><string>Click a header to sort. Columns adapt to the selected type filter.</string></property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QGroupBox" name="grp_detail">
-        <property name="title"><string>Selected target</string></property>
-        <layout class="QVBoxLayout" name="detailLayout">
-         <item>
-          <widget class="QLabel" name="lbl_detail">
-           <property name="wordWrap"><bool>true</bool></property>
-           <property name="text"><string>—</string></property>
-          </widget>
-         </item>
-         <item>
-          <layout class="QHBoxLayout" name="detailBtns">
-            <item><widget class="QPushButton" name="btn_detail_explore"><property name="text"><string>Explore</string></property></widget></item>
-            <item><widget class="QPushButton" name="btn_detail_post"><property name="text"><string>Post</string></property></widget></item>
-            <item><widget class="QPushButton" name="btn_detail_project"><property name="text"><string>Project</string></property><property name="toolTip"><string>Create a guided project for this target</string></property></widget></item>
-            <item><widget class="QCheckBox" name="chk_detail_obs"><property name="text"><string>Observed</string></property></widget></item>
-           <item><spacer name="detailSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-          </layout>
-         </item>
-        </layout>
+        <property name="toolTip"><string>Double-click a row to start a project</string></property>
        </widget>
       </item>
      </layout>

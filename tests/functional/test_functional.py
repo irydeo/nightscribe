@@ -370,14 +370,16 @@ def test_gui_boots_offscreen():
     assert tabs.count() == 4  # UX v3: Tonight · Projects · Solar · History (ADR-019)
     assert tabs.tabText(0) == "Tonight"
     assert tabs.tabText(1) == "Projects"
-    assert w.projects.lst_projects is not None
-    # ad-hoc tools actions in the menu bar
+    # suggestion grid container exists
+    assert w.tonight.scroll_suggestions is not None
+    # table starts collapsed (progressive disclosure)
+    assert not w.tonight.grp_list.isVisible()
+    # projects step tabs exist (5 clickable tabs)
+    assert w.projects.tabs_steps.count() == 5
+    # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]
     assert "File" in menu_texts and "Tools" in menu_texts
-    # tables must be sortable by clicking their headers
+    # tables must be sortable
     assert w.tonight.tbl_targets.isSortingEnabled()
     assert w.history.tbl_history.isSortingEnabled()
-    # "right now" band and projects stepper exist
-    assert w.tonight.lbl_now is not None
-    assert w.projects.lst_steps is not None
     w.close()

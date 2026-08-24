@@ -92,8 +92,9 @@ class PostWorker(QThread):
 
 
 class SunWorker(QThread):
-    # Fetches the Sun state and the latest SDO image in the background.
-    finished = Signal(dict, str)    # sun data, local image path
+    # Fetches the Sun state, the latest SDO image (selected channel) and
+    # the HMI continuum image (for the annotated region map) in the background.
+    finished = Signal(dict, str, str)    # sun data, channel image, HMII image
 
     def __init__(self, channel="0193"):
         super().__init__()
@@ -105,10 +106,13 @@ class SunWorker(QThread):
         try:
             data = solar.solar_now()
             img = sdo.latest_image(self._channel, 1024)
-            self.finished.emit(data, str(img) if img else "")
+            # always grab the visible-light continuum for the region map
+            hmi_img = img if self._channel == "HMII" else sdo.latest_image("HMII", 1024)
+            self.finished.emit(data, str(img) if img else "",
+                               str(hmi_img) if hmi_img else "")
         except Exception as err:
             logger.exception("sun worker failed: %s", err)
-            self.finished.emit({}, "")
+            self.finished.emit({}, "", "")
 
 
 class MpcResolveWorker(QThread):

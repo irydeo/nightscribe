@@ -1817,7 +1817,7 @@ class MainWindow(QMainWindow):
     def _channel_changed(self):
         self.on_refresh_sun()
 
-    def _sun_done(self, data, img_path):
+    def _sun_done(self, data, img_path, hmi_path):
         self.solar.btn_refresh_sun.setEnabled(True)
         if img_path:
             self._set_sun_image(img_path)
@@ -1845,7 +1845,7 @@ class MainWindow(QMainWindow):
                      + str(data.get("n_regions")))
         self.solar.txt_sun_data.setPlainText("\n".join(lines))
         self._fill_almanac()
-        self._draw_sun_map(data.get("regions") or [])
+        self._draw_sun_map(data.get("regions") or [], hmi_path)
 
     def _set_sun_image(self, img_path):
         from PySide6.QtGui import QPixmap
@@ -1853,19 +1853,23 @@ class MainWindow(QMainWindow):
         self.solar.lbl_sun_image.setPixmap(
             pix.scaled(420, 420, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
-    def _draw_sun_map(self, regions):
+    def _draw_sun_map(self, regions, hmi_path=""):
         import matplotlib
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         from PySide6.QtGui import QPixmap
         from ..viz import style, sun_panel
-        fig = plt.figure(figsize=(3.4, 3.4), dpi=100)
-        style.apply_style()
-        ax = fig.add_axes([0.02, 0.02, 0.96, 0.96])
-        sun_panel._draw_region_map(ax, regions)
         p = paths.data_dir() / "posts" / "_sun_map.png"
-        style.save(fig, str(p))
-        plt.close(fig)
+        if hmi_path:
+            sun_panel.draw_annotated_sun(hmi_path, regions, out=str(p))
+            plt.close("all")
+        else:
+            fig = plt.figure(figsize=(3.4, 3.4), dpi=100)
+            style.apply_style()
+            ax = fig.add_axes([0.02, 0.02, 0.96, 0.96])
+            sun_panel._draw_region_map(ax, regions)
+            style.save(fig, str(p))
+            plt.close(fig)
         self.solar.lbl_sun_map.setPixmap(QPixmap(str(p)))
 
     def _fill_almanac(self):

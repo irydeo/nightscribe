@@ -97,6 +97,8 @@ def cmd_solar(args):
         from .core.sources import sdo
         from .viz import sun_panel
         img = sdo.latest_image("0193", 1024)
+        hmi = sdo.latest_image("HMII", 1024)
+        s["hmi_img"] = str(hmi) if hmi else None
         out = paths.data_dir() / "posts" / "sun.png"
         sun_panel.draw_sun(img, s, out=out)
         print(f"PNG -> {out}")

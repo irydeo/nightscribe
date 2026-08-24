@@ -319,13 +319,80 @@ class MainWindow(QMainWindow):
 
     # ---------------- Tonight: suggestion grid ----------------
 
-    # Type badge colors per kind (dark theme)
+    # Type accent colors per kind — used for the left border and icon.
+    # Brighter than before for readable contrast on the dark card.
     _KIND_COLORS = {
-        "sn": "#a33", "neo": "#36a", "comet": "#396", "pccp": "#a73",
-        "transit": "#93a", "alert": "#aa3",
+        "sn": "#e05555", "neo": "#5588dd", "comet": "#55bb66",
+        "pccp": "#dd9944", "transit": "#aa77cc", "alert": "#ddaa44",
     }
-    _KIND_LABELS = {"neo": "NEO", "sn": "SN", "comet": "☄", "pccp": "PCCP",
-                    "transit": "Tr", "alert": "⚠"}
+    _KIND_LABELS = {"neo": "NEO", "sn": "SN", "comet": "CMT",
+                    "pccp": "PCCP", "transit": "TRN", "alert": "ALT"}
+
+    def _type_pixmap(self, kind, size=32):
+        # Draws a small geometric icon per object type with QPainter.
+        # Fast (no matplotlib), guaranteed to render on any platform.
+        # @args: kind - object kind string, size - icon px
+        # @return: QPixmap with a transparent background
+        from PySide6.QtCore import QPointF, QRectF
+        from PySide6.QtGui import (QBrush, QColor, QPainter,
+                                    QPainterPath, QPen, QPixmap)
+        pix = QPixmap(size, size)
+        pix.fill(Qt.transparent)
+        p = QPainter(pix)
+        p.setRenderHint(QPainter.Antialiasing)
+        color = QColor(self._KIND_COLORS.get(kind, "#888888"))
+        cx = cy = size / 2.0
+        if kind == "sn":
+            # 4-point star (spark burst)
+            p.setBrush(QBrush(color))
+            path = QPainterPath()
+            path.moveTo(QPointF(cx, 2))
+            path.lineTo(QPointF(cx + 4, cy - 4))
+            path.lineTo(QPointF(size - 2, cy))
+            path.lineTo(QPointF(cx + 4, cy + 4))
+            path.lineTo(QPointF(cx, size - 2))
+            path.lineTo(QPointF(cx - 4, cy + 4))
+            path.lineTo(QPointF(2, cy))
+            path.lineTo(QPointF(cx - 4, cy - 4))
+            path.closeSubpath()
+            p.drawPath(path)
+        elif kind == "neo":
+            # small ellipse (asteroid body)
+            p.setBrush(QBrush(color))
+            p.drawEllipse(QRectF(cx - 7, cy - 4, 14, 8))
+        elif kind == "comet":
+            # nucleus + tail
+            p.setBrush(QBrush(color))
+            p.drawEllipse(QRectF(cx - 4, cy - 4, 8, 8))
+            p.setPen(QPen(color, 1.5))
+            p.drawLine(QPointF(cx + 3, cy), QPointF(size - 2, cy + 4))
+            p.drawLine(QPointF(cx + 3, cy + 1), QPointF(size - 3, cy + 5))
+        elif kind == "pccp":
+            # dashed circle (uncertain identity)
+            pen = QPen(color, 2)
+            pen.setStyle(Qt.DashLine)
+            p.setPen(pen)
+            p.setBrush(Qt.NoBrush)
+            p.drawEllipse(QRectF(cx - 8, cy - 8, 16, 16))
+        elif kind == "transit":
+            # light curve with a dip
+            p.setPen(QPen(color, 2))
+            p.drawLine(QPointF(2, cy), QPointF(cx - 6, cy))
+            p.drawArc(QRectF(cx - 6, cy - 6, 12, 12), 0, -180 * 16)
+            p.drawLine(QPointF(cx + 6, cy), QPointF(size - 2, cy))
+        elif kind == "alert":
+            # warning triangle
+            p.setBrush(QBrush(color))
+            path = QPainterPath()
+            path.moveTo(QPointF(cx, 3))
+            path.lineTo(QPointF(size - 2, size - 3))
+            path.lineTo(QPointF(2, size - 3))
+            path.closeSubpath()
+            p.drawPath(path)
+            p.setPen(QPen(QColor("#e8eaf2"), 1.5))
+            p.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, "!")
+        p.end()
+        return pix
 
     def on_compute_tonight(self):
         self.tonight.btn_compute.setEnabled(False)
@@ -408,11 +475,9 @@ class MainWindow(QMainWindow):
         else:
             dusk = dawn = "—"
         date = datetime.date.today().isoformat()
-        moon_icon = "🌑" if m["illum"] < 0.1 else "🌒" if m["illum"] < 0.3 \
-            else "🌓" if m["illum"] < 0.5 else "🌕" if m["illum"] > 0.9 \
-            else "🌖" if m["illum"] > 0.7 else "🌔"
+        moon_pct = m["illum"] * 100
         self.tonight.lbl_context.setText(
-            f"📅 {date}  🌑→🌑 {dusk}–{dawn}  {moon_icon} {m['illum']*100:.0f}%")
+            f"{date}  ·  {dusk}–{dawn}  ·  Moon {moon_pct:.0f}%")
 
     def _build_suggestion_grid(self):
         # Builds up to 8 suggestion cards in a 4-column grid inside the
@@ -437,69 +502,69 @@ class MainWindow(QMainWindow):
             grid.addWidget(card, i // 4, i % 4)
 
     def _make_card(self, t, score, phrase, medal, idx):
-        # @return: a compact card — 4 visual rows, scannable in 2 seconds.
-        # Why-tonight phrase lives in the tooltip, NOT in the card body.
+        # @return: a compact card — visual icon + 3 text rows + button.
+        # Why-tonight phrase and full window live in the tooltip.
+        kind = t.get("kind", "")
+        kind_color = self._KIND_COLORS.get(kind, "#888888")
         card = QFrame()
         card.setFrameShape(QFrame.StyledPanel)
         card.setStyleSheet(
-            "QFrame { background: #12141f; border-radius: 8px; }"
-            "QFrame:hover { border: 1px solid #2a3a5a; }")
+            f"QFrame {{ background: #12141f; border-radius: 6px;"
+            f" border-left: 3px solid {kind_color}; }}"
+            f"QFrame:hover {{ background: #1a1f30; }}")
         layout = QVBoxLayout(card)
-        layout.setContentsMargins(10, 8, 10, 8)
-        layout.setSpacing(4)
-        # row 1: medal + name (bold) + type badge (colored background)
-        kind = t.get("kind", "")
-        kind_label = self._KIND_LABELS.get(kind, kind)
-        kind_color = self._KIND_COLORS.get(kind, "#555")
-        name = f"{medal} <b>{t['name']}</b>" if medal else f"<b>{t['name']}</b>"
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(2)
+        # row 0: type icon (visual anchor, 32px) + medal + name on the right
         top_row = QHBoxLayout()
-        lbl_name = QLabel(name)
-        lbl_name.setStyleSheet("font-size: 13px;")
-        top_row.addWidget(lbl_name)
+        top_row.setSpacing(6)
+        lbl_icon = QLabel()
+        lbl_icon.setPixmap(self._type_pixmap(kind))
+        top_row.addWidget(lbl_icon)
         top_row.addStretch()
-        lbl_type = QLabel(f" {kind_label} ")
-        lbl_type.setStyleSheet(
-            f"background: {kind_color}; color: white; border-radius: 3px;"
-            f" font-size: 10px; font-weight: bold; padding: 1px 4px;")
-        top_row.addWidget(lbl_type)
+        if medal:
+            lbl_medal = QLabel(f"<b style='font-size:15px'>{medal}</b>")
+            top_row.addWidget(lbl_medal)
         layout.addLayout(top_row)
-        # row 2: mag + max alt — one line, key numbers
+        # row 1: object name (bold, clear white)
+        lbl_name = QLabel(f"<b>{t['name']}</b>")
+        lbl_name.setStyleSheet("font-size: 13px; color: #e8eaf2;")
+        layout.addWidget(lbl_name)
+        # row 2: mag + alt + score in one compact line
         mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
         alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
-        lbl_stats = QLabel(f"⭐ mag {mag}  📐 alt {alt}")
-        lbl_stats.setStyleSheet("font-size: 12px; color: #c0c5d8;")
+        # score text colored by range (no emoji dots — guaranteed render)
+        sc = int(score)
+        sc_color = "#55bb66" if sc >= 70 else "#ddbb44" if sc >= 40 else "#dd8844"
+        lbl_stats = QLabel(
+            f"<span style='color:#b0b8d0'>mag {mag} · alt {alt}</span>"
+            f"  <b style='color:{sc_color}'>{sc}</b>")
+        lbl_stats.setStyleSheet("font-size: 12px;")
         layout.addWidget(lbl_stats)
-        # row 3: status badge (left) + score dot (right)
+        # row 3: status badge (compact) + moon icon if needed
         status_row = QHBoxLayout()
+        status_row.setSpacing(4)
         badge = self._now_badge(t)
         if badge:
-            lbl_badge = QLabel(f" {badge} ")
             is_now = "▲" in badge
-            bg = "#1a4a2a" if is_now else "#1a2a4a"
+            lbl_badge = QLabel(badge)
             lbl_badge.setStyleSheet(
-                f"background: {bg}; color: #6ab0ff; border-radius: 3px;"
-                f" font-size: 11px; font-weight: bold; padding: 1px 6px;")
+                f"color: {'#55bb88' if is_now else '#88aadd'};"
+                f" font-size: 11px; font-weight: bold;")
             status_row.addWidget(lbl_badge)
-        status_row.addStretch()
-        # score as colored dot + number
-        dot = "🟢" if score >= 70 else "🟡" if score >= 40 else "🟠"
-        lbl_score = QLabel(f"{dot} {score:.0f}")
-        lbl_score.setStyleSheet("font-size: 12px;")
-        status_row.addWidget(lbl_score)
-        layout.addLayout(status_row)
-        # row 3.5: moon warning icon (compact, only if needed)
         moon = self._moon_text(t)
         if moon:
-            lbl_moon = QLabel("🌙⚠")
+            lbl_moon = QLabel("🌙")
             lbl_moon.setToolTip(
-                f"{self.tr('Moon')}: {self.tr('sep')} {moon}")
+                f"{self.tr('Moon')}: {moon}")
             lbl_moon.setStyleSheet("font-size: 11px;")
-            layout.addWidget(lbl_moon)
+            status_row.addWidget(lbl_moon)
+        status_row.addStretch()
+        layout.addLayout(status_row)
         # row 4: single full-width button
         btn = self._card_button(t)
         layout.addWidget(btn)
-        layout.addStretch()
-        # tooltip with the why-tonight phrase + full window
+        # tooltip with why-tonight phrase + window details
         tips = [self._txt(phrase)]
         win = self._window_text(t)
         if win:
@@ -545,17 +610,17 @@ class MainWindow(QMainWindow):
         if has_proj:
             btn = QPushButton(f"▶ {self.tr('Continue')}")
             btn.setStyleSheet(
-                "QPushButton { background: #1a5a2a; color: #e8eaf2;"
-                " border: none; border-radius: 4px; padding: 6px;"
+                "QPushButton { background: #2a7a3a; color: #e8eaf2;"
+                " border: none; border-radius: 4px; padding: 5px;"
                 " font-weight: bold; }"
-                "QPushButton:hover { background: #2a7a3a; }")
+                "QPushButton:hover { background: #3a9a4a; }")
         else:
             btn = QPushButton(f"▶ {self.tr('Start')}")
             btn.setStyleSheet(
-                "QPushButton { background: #b3591e; color: #e8eaf2;"
-                " border: none; border-radius: 4px; padding: 6px;"
+                "QPushButton { background: #c46922; color: #e8eaf2;"
+                " border: none; border-radius: 4px; padding: 5px;"
                 " font-weight: bold; }"
-                "QPushButton:hover { background: #d3692e; }")
+                "QPushButton:hover { background: #e47932; }")
         btn.clicked.connect(lambda _=False, t=t: self._start_or_continue(t))
         return btn
 

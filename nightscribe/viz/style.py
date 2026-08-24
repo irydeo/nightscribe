@@ -11,7 +11,12 @@
 #
 ############################################################
 
+import logging
+from pathlib import Path
+
 import matplotlib
+
+logger = logging.getLogger(__name__)
 
 # One style for every chart, used by the GUI canvas and the PNG exports
 # alike (see ADR-010). Dark space theme, consistent accents.
@@ -67,5 +72,9 @@ def watermark(fig, text):
 
 def save(fig, path):
     # @args: fig - matplotlib figure, path - output PNG path
-    fig.savefig(path, dpi=fig.dpi, facecolor=fig.get_facecolor(),
+    p = Path(path)
+    # Output folders are created on demand: a fresh install has none of them
+    # yet and savefig() would raise if the parent dir is missing.
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(p, dpi=fig.dpi, facecolor=fig.get_facecolor(),
                 bbox_inches="tight")

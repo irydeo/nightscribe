@@ -29,14 +29,56 @@ def _rev(x):
 
 
 def _kepler_e(m_deg, e):
-    # Solves Kepler's equation by simple iteration (e < 0.8 always here).
+    # Solves Kepler's equation by Newton's method (works up to e < 1).
     # @args: m_deg - mean anomaly (degrees), e - eccentricity
     # @return: eccentric anomaly in degrees
     m = math.radians(m_deg)
-    ea = m + e * math.sin(m) * (1.0 + e * math.cos(m))
-    for _ in range(10):
-        ea = m + e * math.sin(ea)
+    ea = m if e < 0.8 else m + e * math.sin(m)
+    for _ in range(30):
+        f = ea - e * math.sin(ea) - m
+        fp = 1.0 - e * math.cos(ea)
+        delta = f / fp
+        ea -= delta
+        if abs(delta) < 1e-12:
+            break
     return math.degrees(ea)
+
+
+def _open_orbit_ecliptic(n, i, w, q, e, nu_deg):
+    # Open orbit (parabolic e=1 / hyperbolic e>1) position from true anomaly.
+    # r = q(1+e) / (1 + e*cos(nu))
+    # @args: n - node, i - inclination, w - arg perihelion,
+    #        q - perihelion distance (AU), e - eccentricity (>=1),
+    #        nu_deg - true anomaly (degrees)
+    # @return: (x, y, z, r) in AU
+    nu = math.radians(nu_deg)
+    r = q * (1 + e) / (1 + e * math.cos(nu))
+    ns, iw = math.radians(n), math.radians(i)
+    ww = math.radians(w)
+    x = r * (math.cos(ns) * math.cos(nu + ww)
+             - math.sin(ns) * math.sin(nu + ww) * math.cos(iw))
+    y = r * (math.sin(ns) * math.cos(nu + ww)
+             + math.cos(ns) * math.sin(nu + ww) * math.cos(iw))
+    z = r * math.sin(nu + ww) * math.sin(iw)
+    return x, y, z, r
+
+
+def _barker_true_anomaly(q, dt_days):
+    # Barker's equation for parabolic orbits: D + D³/3 = B*(t-T),
+    # D = tan(nu/2), B = k / (2*q^1.5), k = 0.01720209895
+    # @args: q - perihelion distance (AU), dt_days - days since perihelion
+    # @return: true anomaly in degrees
+    B = 0.01720209895 / (2 * q ** 1.5)
+    M = B * dt_days
+    D = M if abs(M) < 1 else math.copysign(1.0, M)
+    for _ in range(20):
+        f = D + D ** 3 / 3 - M
+        fp = 1 + D ** 2
+        delta = f / fp
+        D -= delta
+        if abs(delta) < 1e-12:
+            break
+    return 2 * math.degrees(math.atan(D))
 
 
 def _elements_to_ecliptic(n, i, w, a, e, m_deg):
@@ -217,7 +259,7 @@ def planet(name, jd):
     xh, yh, zh, r = _elements_to_ecliptic(n, i, w, a, e, m)
 
     xe, ye, ze = earth_ecliptic_xyz(jd)
-    xg, yg, zg = xh + xe, yh + ye, zh + ze
+    xg, yg, zg = xh - xe, yh - ye, zh - ze
     dist = math.sqrt(xg * xg + yg * yg + zg * zg)
     ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
     mag = _PLANET_MAG0[name.lower()] + 5 * math.log10(max(r * dist, 1e-9))
@@ -231,10 +273,28 @@ def kepler_ra_dec(elements, jd):
     # @args: elements - dict with a (AU), e, i, om (node), w (arg. peri.),
     #        ma (mean anomaly at epoch), epoch (JD); or tp instead of ma,
     #        jd - Julian date of interest
-    # @return: (ra_deg, dec_deg, r_au, delta_au) or None if hyperbolic/invalid
-    a = elements.get("a")
+    # @return: (ra_deg, dec_deg, r_au, delta_au) or None if invalid
     e = elements.get("e")
-    if a is None or e is None or e >= 0.99:
+    if e is None:
+        return None
+    # parabolic orbit (e = 1.0): use Barker's equation
+    if e >= 1.0:
+        q = elements.get("q")
+        tp = elements.get("tp")
+        if q is None or tp is None or q <= 0:
+            return None
+        nu = _barker_true_anomaly(q, jd - tp)
+        xo, yo, zo, r = _open_orbit_ecliptic(
+            elements.get("om", 0.0), elements.get("i", 0.0),
+            elements.get("w", 0.0), q, e, nu)
+        xe, ye, ze = earth_ecliptic_xyz(jd)
+        xg, yg, zg = xo - xe, yo - ye, zo - ze
+        delta = math.sqrt(xg * xg + yg * yg + zg * zg)
+        ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
+        return ra, dec, r, delta
+    # bound orbit: Kepler
+    a = elements.get("a")
+    if a is None or a <= 0:
         return None
     epoch = elements.get("epoch", jd)
     if elements.get("ma") is not None:
@@ -251,7 +311,7 @@ def kepler_ra_dec(elements, jd):
         elements.get("om", 0.0), elements.get("i", 0.0), elements.get("w", 0.0),
         a, e, m)
     xe, ye, ze = earth_ecliptic_xyz(jd)
-    xg, yg, zg = xo + xe, yo + ye, zo + ze
+    xg, yg, zg = xo - xe, yo - ye, zo - ze
     delta = math.sqrt(xg * xg + yg * yg + zg * zg)
     ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
     return ra, dec, r, delta

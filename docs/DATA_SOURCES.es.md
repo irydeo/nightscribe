@@ -16,10 +16,18 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
   impacto/radar/NHATS/Yarkovsky.
 - `GET .../ephem/?site=<código>&object=<packed>` — pública. Efeméride por sitio
   (alt, az, mag, movimiento) precalculada por NEOfixer (find_orb de Bill Gray).
+- `GET .../orbit/?object=<packed>` — pública. **Elementos orbitales preliminares**
+  de objetos sin confirmar (NEOCP), calculados con Find_Orb desde la astrometría del
+  MPC: elementos keplerianos completos (`a, e, q, Q, i, asc_node, arg_per, M, Tp,
+  epoch`) con sigma por elemento, MOIDs por planeta, `p_NEO`, nº de residuos y arco
+  observado. `parse_neofixer_orbit()` los normaliza a la forma SBDB (ADR-023);
+  alimentan el dibujo de órbita, la tabla de parámetros (con sigmas) y la efeméride
+  local de `core/ephemeris.py`.
 - `GET .../report/?key=<api key>&site=<código>&object=<id>&status=<s>` — **requiere
   la clave API del usuario** (Configuración). Reporta `will_observe`/`observed`/...
   para coordinación comunitaria. Opcional.
-- TTL: 12 h. Ojo: `object` debe ser designación *empaquetada* (packed).
+- TTL: 12 h (`targets`, `ephem`); 1.5 h (`orbit` — las órbitas preliminares cambian
+  rápido). Ojo: `object` debe ser designación *empaquetada* (packed).
 
 ### Rochester Astronomy (David Bishop) — `rochester.py` — supernovas recientes
 

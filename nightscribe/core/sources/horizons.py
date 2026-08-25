@@ -13,6 +13,7 @@
 
 import json
 import logging
+import re
 
 import requests
 
@@ -22,10 +23,25 @@ logger = logging.getLogger(__name__)
 
 URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 
+# One ephemeris line, with or without the solar/lunar presence markers
+# Horizons inserts between the time and the RA ("*" daylight, "C/N/A"
+# twilights, "m" moonlight — glued or as separate columns).
+_EPHEM_RE = re.compile(
+    r"^\s*"
+    r"(\d{4}-\w{3}-\d{2}\s+\d{2}:\d{2})"              # date + time (UTC)
+    r"[\s*]*(?:[A-Za-z]+\s+)*"                        # optional markers
+    r"(\d{1,2})\s+(\d{2})\s+(\d{2}(?:\.\d+)?)"        # RA h m s
+    r"\s+([+-]?\d{1,2})\s+(\d{2})\s+(\d{2}(?:\.\d+)?)"  # Dec d m s
+    r"\s+(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)"          # r (AU)
+    r"\s+(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)"          # rdot
+    r"\s+(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)"          # delta (AU)
+    r"\s+(-?\d+(?:\.\d+)?(?:[Ee][+-]?\d+)?)")         # delta-dot
+
 
 def parse_ephemeris(result_text):
     # Parses the table between $$SOE / $$EOE of a Horizons OBSERVER reply
     # with QUANTITIES '1,19,20' (RA/Dec, heliocentric range, observer range).
+    # Marker columns (daylight/twilight/moonlight flags) are skipped.
     # @args: result_text - the "result" field of the Horizons JSON
     # @return: list of dicts with time, ra, dec, r, delta
     rows = []
@@ -38,19 +54,16 @@ def parse_ephemeris(result_text):
             break
         if not in_table:
             continue
-        parts = line.split()
-        if len(parts) < 7:
+        m = _EPHEM_RE.match(line)
+        if not m:
             continue
-        try:
-            rows.append({
-                "time": parts[0] + " " + parts[1],
-                "ra": parts[2] + " " + parts[3] + " " + parts[4],
-                "dec": parts[5] + " " + parts[6] + " " + parts[7],
-                "r": float(parts[8]),
-                "delta": float(parts[10]),
-            })
-        except (ValueError, IndexError):
-            continue
+        rows.append({
+            "time": m.group(1),
+            "ra": f"{m.group(2)} {m.group(3)} {m.group(4)}",
+            "dec": f"{m.group(5)} {m.group(6)} {m.group(7)}",
+            "r": float(m.group(8)),
+            "delta": float(m.group(10)),
+        })
     return rows
 
 

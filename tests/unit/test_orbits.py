@@ -83,6 +83,28 @@ def test_explain_neofixer():
                for r in rows)
 
 
+def test_explain_elements_preliminary_sigmas():
+    # A preliminary (NEOfixer) orbit must add three rows: the preliminary
+    # banner, the per-element sigmas and the arc/observations summary.
+    els = {"a": 2.056, "e": 0.515, "i": 9.65, "q": 0.997, "Q": 3.114,
+           "om": 328.5, "w": 341.6}
+    sigmas = {"a": 0.0131, "e": 0.00308, "i": 0.025}
+    rows = orbits.explain_elements(els, {"H": 26.7}, "Apollo", moid=0.0023,
+                                   sigmas=sigmas, n_resids=9, arc_days=0.47)
+    texts = [r["param"]["es"] for r in rows]
+    assert "Órbita preliminar" in texts
+    assert any("σ" in (r["param"]["es"]) for r in rows)
+    assert "Arco y observaciones" in texts
+    banner = next(r for r in rows if r["param"]["es"] == "Órbita preliminar")
+    assert banner["level"] == "basic"
+    assert "NEOfixer" in banner["es"] and "NEOfixer" in banner["en"]
+    arc = next(r for r in rows if r["param"]["es"] == "Arco y observaciones")
+    assert "0.47" in arc["value"] and "9" in arc["value"]
+    # without sigmas nothing changes (confirmed objects keep the old output)
+    rows2 = orbits.explain_elements(els, {"H": 26.7}, "Apollo", moid=0.0023)
+    assert "Órbita preliminar" not in [r["param"]["es"] for r in rows2]
+
+
 def test_pick_language():
     pair = {"es": "hola", "en": "hello"}
     assert orbits.pick(pair, "es") == "hola"

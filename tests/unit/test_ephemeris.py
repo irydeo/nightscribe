@@ -71,3 +71,47 @@ def test_export_dispatcher(tmp_path):
     assert out.endswith(".txt")
     out = ephemeris.export(rows, tmp_path / "eph", fmt="cdc", obj_name="X")
     assert out.endswith(".txt")
+
+
+def test_parse_step_days():
+    assert ephemeris._parse_step_days("30m") == 30 / 1440
+    assert ephemeris._parse_step_days("1h") == 1 / 24
+    assert ephemeris._parse_step_days("2 h") == 2 / 24
+    assert ephemeris._parse_step_days("1 d") == 1.0
+    assert ephemeris._parse_step_days("garbage") > 0  # safe default
+
+
+def test_fmt_time_locale_proof():
+    # Horizons-style English month regardless of the OS locale
+    from nightscribe.core import coords
+    jd = coords.jd_from_datetime(
+        __import__("datetime").datetime(2026, 8, 24, 22, 30,
+                                        tzinfo=__import__("datetime").timezone.utc))
+    assert ephemeris._fmt_time(jd) == "2026-Aug-24 22:30"
+
+
+def test_preliminary_rows_and_banner(tmp_path):
+    # A preliminary orbit must produce well-formed rows, flagged, and the
+    # CSV header must carry the bilingual preliminary banner.
+    els = {"a": 2.056, "e": 0.515, "i": 9.65, "om": 328.48, "w": 341.63,
+           "ma": 5.985, "tp": 2461259.604, "epoch": 2461277.5,
+           "q": 0.9968, "Q": 3.114}
+    # stub the NEOfixer call so the test runs offline
+    import nightscribe.core.ephemeris as eph_mod
+    import nightscribe.core.sources.neofixer as nf
+    orig = nf.orbit
+    nf.orbit = lambda packed: {"elements": els}
+    try:
+        rows = eph_mod._preliminary_rows("TESTOBJ", "2026-08-24",
+                                         "2026-08-25", "6h")
+    finally:
+        nf.orbit = orig
+    assert rows and len(rows) == 5  # 0, 6, 12, 18, 24h
+    assert all(r["preliminary"] for r in rows)
+    assert all(r["r"] > 0 and r["delta"] > 0 for r in rows)
+    assert rows[0]["time"].startswith("2026-Aug-24")
+    out = ephemeris.export_csv(rows, tmp_path / "eph.csv", "TESTOBJ")
+    first = open(out, encoding="utf-8").readline()
+    assert "PRELIMINARY" in first and "PRELIMINAR" in first
+    # and without the flag there is no banner
+    assert ephemeris._preliminary_banner(_mock_rows()) is None

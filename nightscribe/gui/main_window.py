@@ -15,7 +15,7 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QFile, Qt
+from PySide6.QtCore import QFile, QObject, Qt, QEvent
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                QGridLayout, QGroupBox, QHBoxLayout,
@@ -55,6 +55,36 @@ def _load_ui(name, parent=None):
     widget = QUiLoader().load(file, parent)
     file.close()
     return widget
+
+
+def _set_scaled_pixmap(label, pix, max_w=860, max_h=520):
+    # Fits a pixmap into a QLabel preserving aspect ratio. Uses fixed
+    # bounds because labels in inactive tabs report a tiny default size.
+    # @args: label - QLabel, pix - QPixmap, max_w/max_h - target bounds
+    if pix.isNull():
+        return
+    label.setPixmap(pix.scaled(max_w, max_h, Qt.KeepAspectRatio,
+                               Qt.SmoothTransformation))
+
+
+class _ChartClickFilter(QObject):
+    # Opens the chart viewer when a chart label is clicked. The label
+    # carries the chart file in its "chart_png" dynamic property.
+    # @args: window - MainWindow (opens the viewer as its child)
+
+    def __init__(self, window):
+        super().__init__(window)
+        self._window = window
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.MouseButtonRelease:
+            path = obj.property("chart_png")
+            if path:
+                from .chart_viewer import open_chart
+                open_chart(self._window, path,
+                           title=obj.property("chart_title") or "")
+                return True
+        return False
 
 
 # Per-kind table columns for the full (collapsed) table
@@ -1307,7 +1337,7 @@ class MainWindow(QMainWindow):
     def _open_explore_dialog(self, name):
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Explore — %1").replace("%1", name))
-        dlg.resize(900, 640)
+        dlg.resize(1100, 780)
         layout = QVBoxLayout(dlg)
         explore = _load_ui("explore_tab")
         layout.addWidget(explore)
@@ -1318,6 +1348,15 @@ class MainWindow(QMainWindow):
             lambda: self._dialog_explore_params(explore))
         explore.btn_mkpost.clicked.connect(
             lambda: (self._open_post_dialog(name), dlg.accept()))
+        # charts open the zoom/export viewer on click
+        click_filter = _ChartClickFilter(dlg)
+        for attr, title in (("lbl_orbit", "Orbit"), ("lbl_sky", "Sky tonight"),
+                            ("lbl_families", "Families"), ("lbl_field", "Field")):
+            lbl = getattr(explore, attr)
+            lbl.setProperty("chart_title", title)
+            lbl.setCursor(Qt.PointingHandCursor)
+            lbl.setToolTip(self.tr("Click to zoom / export"))
+            lbl.installEventFilter(click_filter)
         self._dialog_explore(explore, name)
         dlg.exec()
 
@@ -1363,31 +1402,41 @@ class MainWindow(QMainWindow):
         tbl.resizeColumnsToContents()
         tbl.setColumnWidth(2, 520)
 
-    def _dialog_explore_charts(self, explore, e):
+    def _render_object_charts(self, e, prefix):
+        # Renders every chart the enriched object supports into the posts
+        # directory. Shared by the Explore dialog and the post/publish flow.
+        # @args: e - enriched dict, prefix - file name prefix (per-flow)
+        # @return: dict {chart_key: Path} for the charts actually produced
         import matplotlib
         matplotlib.use("Agg")
-        from PySide6.QtGui import QPixmap
+        import matplotlib.pyplot as plt
         from ..core import coords
         from ..viz import families_view, orbit_view, sky_view, sn_view
         d = e.get("data") or {}
         outdir = paths.data_dir() / "posts"
+        outdir.mkdir(parents=True, exist_ok=True)
         jd = coords.jd_from_datetime(
             datetime.datetime.now(datetime.timezone.utc))
         sb = d.get("sbdb")
-        if sb and sb.get("elements") and sb["elements"].get("a") \
-                and sb["elements"].get("e", 1) < 0.99:
-            p = outdir / "_explore_orbit.png"
-            orbit_view.draw_orbit(dict(sb["elements"]), jd=jd,
+        els = sb.get("elements") if sb else None
+        unc = d.get("unconfirmed")
+        charts = {}
+        # orbit chart: bound (e<1) and parabolic (e=1) orbits
+        if els and els.get("q") and els.get("e", 1) <= 1.0:
+            p = outdir / f"{prefix}orbit.png"
+            orbit_view.draw_orbit(dict(els), jd=jd,
                                   obj_name=e["name"],
                                   approach=d.get("next_approach"), out=str(p))
-            explore.lbl_orbit.setPixmap(QPixmap(str(p)))
-            fam = d.get("family")
-            a = sb["elements"].get("a")
-            if fam:
-                p2 = outdir / "_explore_families.png"
-                families_view.draw_families(fam, obj_name=e["name"], a=a,
-                                            out=str(p2))
-                explore.lbl_families.setPixmap(QPixmap(str(p2)))
+            charts["orbit"] = p
+        # families chart (independent of orbit guard)
+        fam = d.get("family")
+        if fam and els and (els.get("a", 0) or 0) > 0:
+            p = outdir / f"{prefix}families.png"
+            families_view.draw_families(fam, obj_name=e["name"],
+                                        a=els.get("a") or els.get("q"),
+                                        out=str(p))
+            charts["families"] = p
+        # sky position: ephemeris, then SIMBAD, then the unconfirmed dict
         ra_deg = dec_deg = None
         eph = d.get("ephem")
         if eph:
@@ -1403,21 +1452,55 @@ class MainWindow(QMainWindow):
                 dec_deg = coords.dec_dms_to_deg(sim["dec"])
             except (ValueError, AttributeError):
                 pass
+        if ra_deg is None and unc and unc.get("ra_deg") is not None:
+            ra_deg = float(unc["ra_deg"])
+            dec_deg = float(unc.get("dec_deg", 0.0))
         if ra_deg is not None:
-            p3 = outdir / "_explore_sky.png"
+            p = outdir / f"{prefix}sky.png"
             hor = horizon.from_config(config)
             sky_view.draw_sky(ra_deg, dec_deg, config.get("lat"),
                               config.get("lon"), obj_name=e["name"],
-                              out=str(p3), horizon=hor.alt_at,
+                              out=str(p), horizon=hor.alt_at,
                               margin=float(config.get("horizon_margin_deg", 0)))
-            explore.lbl_sky.setPixmap(QPixmap(str(p3)))
+            charts["sky"] = p
         if sim:
             from ..core.sources import cutouts
             img = cutouts.reference_cutout(ra_deg, dec_deg)
             if img:
-                p4 = outdir / "_explore_field.png"
-                sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p4))
-                explore.lbl_field.setPixmap(QPixmap(str(p4)))
+                p = outdir / f"{prefix}field.png"
+                sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p))
+                charts["field"] = p
+        plt.close("all")
+        return charts
+
+    def _dialog_explore_charts(self, explore, e):
+        from PySide6.QtGui import QPixmap
+        d = e.get("data") or {}
+        sb = d.get("sbdb")
+        els = sb.get("elements") if sb else None
+        unc = d.get("unconfirmed")
+        charts = self._render_object_charts(e, "_explore_")
+        for key, attr in (("orbit", "lbl_orbit"), ("sky", "lbl_sky"),
+                          ("families", "lbl_families"),
+                          ("field", "lbl_field")):
+            lbl = getattr(explore, attr)
+            p = charts.get(key)
+            if p:
+                lbl.setProperty("chart_png", str(p))
+                _set_scaled_pixmap(lbl, QPixmap(str(p)))
+        # when there is no orbit chart, explain why instead of leaving "—"
+        if "orbit" not in charts:
+            if els and els.get("e", 0) > 1.0:
+                explore.lbl_orbit.setText(self.tr(
+                    "Órbita hiperbólica — no dibujable\n"
+                    "Hyperbolic orbit — not plottable"))
+            elif unc:
+                explore.lbl_orbit.setText(self.tr(
+                    "Objeto no confirmado — sin elementos orbitales\n"
+                    "Unconfirmed object — no orbital elements"))
+            elif not sb:
+                explore.lbl_orbit.setText(self.tr(
+                    "Sin elementos orbitales / No orbital elements"))
 
     def _orbit_rows(self, e):
         d = e.get("data") or {}
@@ -1430,7 +1513,10 @@ class MainWindow(QMainWindow):
                 moid = None
             return orbits.explain_elements(sb.get("elements") or {},
                                            sb.get("phys") or {},
-                                           d.get("family"), moid)
+                                           d.get("family"), moid,
+                                           sigmas=sb.get("sigmas"),
+                                           n_resids=sb.get("n_resids"),
+                                           arc_days=sb.get("arc_days"))
         if d.get("unconfirmed"):
             return orbits.explain_neofixer(d["unconfirmed"])
         return []
@@ -1479,6 +1565,20 @@ class MainWindow(QMainWindow):
         written = post_mod.save_outputs(rendered, paths.data_dir() / "posts",
                                         name)
         db.mark_posted(name)
+        # charts for the post/report: render with a stable per-object name
+        # and attach them to the current project when it is about this object
+        try:
+            safe = "".join(c if c.isalnum() or c in "-_" else "_"
+                           for c in name)
+            charts = self._render_object_charts(e, f"{safe}_")
+            written.update({f"chart_{k}": str(p) for k, p in charts.items()})
+            if charts and self._current_project \
+                    and self._current_project["object_name"] == name:
+                pid = self._current_project["id"]
+                for p in charts.values():
+                    project.add_file(db, pid, str(p), "chart")
+        except Exception as err:  # charts must never break the post flow
+            logger.warning("post charts failed for %s: %s", name, err)
         post_w.lbl_files.setText(
             self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
         self.statusBar().showMessage(self.tr("Drafts ready"), 5000)

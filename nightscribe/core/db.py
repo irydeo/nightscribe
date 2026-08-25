@@ -29,6 +29,7 @@ SOURCE_TTL = {
     "noaa": 1 * HOUR,
     "sdo": 1 * HOUR,
     "neofixer": 12 * HOUR,
+    "neofixer-orbit": 1.5 * HOUR,
     "horizons": 12 * HOUR,
     "rochester": 6 * HOUR,
     "cobs": 6 * HOUR,

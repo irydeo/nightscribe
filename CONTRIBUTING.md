@@ -20,7 +20,9 @@ Thanks for your interest! These rules keep the project maintainable by humans.
 ## Translations (GUI)
 
 ```bash
-pyside6-lupdate nightscribe/gui -ts nightscribe/gui/i18n/nightscribe_es.ts \
+# note: list sources explicitly — scanning the directory silently skips .py files
+pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/ui/*.ui \
+    -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # translate
 pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts     # compile .qm

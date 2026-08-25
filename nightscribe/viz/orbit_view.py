@@ -34,14 +34,43 @@ def _orbit_xy(elements, n=360):
     # Samples a full orbit in heliocentric ecliptic coordinates.
     # @args: elements - dict with a, e, i, om, w; n - samples
     # @return: (xs, ys) lists in AU
+    e = elements.get("e", 0)
+    # open orbit (parabolic/hyperbolic): sample true anomaly directly
+    if e >= 1.0:
+        q = elements.get("q")
+        if q is None or q <= 0:
+            return [], []
+        # avoid the asymptote where 1 + e*cos(nu) -> 0
+        nu_max = min(150.0, math.degrees(math.acos(-1.0 / e)) - 5.0)
+        xs, ys = [], []
+        for k in range(n + 1):
+            nu = -nu_max + 2 * nu_max * k / n
+            try:
+                x, y, z, _r = ephem_minor._open_orbit_ecliptic(
+                    elements.get("om", 0.0), elements.get("i", 0.0),
+                    elements.get("w", 0.0), q, e, nu)
+                xs.append(x)
+                ys.append(y)
+            except (KeyError, ZeroDivisionError, ValueError):
+                continue
+        return xs, ys
+    # bound orbit: sample via Kepler
+    a = elements.get("a")
+    if a is None:
+        q = elements.get("q")
+        if q is not None:
+            a = q / (1.0 - e)
+        else:
+            return [], []
     xs, ys = [], []
     for k in range(n + 1):
         els = dict(elements)
+        els["a"] = a
         els["ma"] = 360.0 * k / n
         try:
             x, y, z, _r = ephem_minor._elements_to_ecliptic(
                 els.get("om", 0.0), els.get("i", 0.0), els.get("w", 0.0),
-                els["a"], els["e"], els["ma"])
+                a, els.get("e", 0.0), els["ma"])
             xs.append(x)
             ys.append(y)
         except (KeyError, ZeroDivisionError, ValueError):
@@ -64,14 +93,27 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
     fig, ax = style.new_fig(fmt)
     ax.set_aspect("equal")
 
-    # planets and their orbits for scale
-    span = 2.0
-    q = elements.get("q", 1.0)
-    Q = elements.get("Q") or elements.get("a", 1.0) * 2
-    if Q and Q > 6:
-        span = min(Q * 1.15, 32)
+    # ensure a is available (compute from q when SBDB omits it for high-e)
+    e = elements.get("e", 0)
+    a = elements.get("a")
+    if (a is None or a <= 0) and e < 1.0:
+        q = elements.get("q")
+        if q is not None:
+            a = q / (1.0 - e)
+            elements = dict(elements, a=a)
+
+    # span: for open orbits use q; for bound orbits use aphelion distance
+    if e >= 1.0:
+        q = elements.get("q", 1.0)
+        span = max(2.0, min(q * 6, 15))
     else:
-        span = max(2.0, Q * 1.25)
+        span = 2.0
+        Q = elements.get("Q") or elements.get("ad") \
+            or elements.get("a", 1.0) * (1 + elements.get("e", 0))
+        if Q and Q > 6:
+            span = min(Q * 1.15, 32)
+        else:
+            span = max(2.0, Q * 1.25)
     planets = ["mercury", "venus", "earth", "mars"]
     if span > 6:
         planets.append("jupiter")
@@ -108,27 +150,40 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
     # the object's orbit and current position
     xs, ys = _orbit_xy(elements)
     ax.plot(xs, ys, color=style.ACCENT, lw=1.6, zorder=4)
-    pos = ephem_minor.kepler_ra_dec(elements, jd)
-    if pos:
-        # position on the ecliptic plane: recompute rectangular for the plot
-        d = jd - 2451543.5
-        a = elements.get("a")
-        if a and elements.get("ma") is not None:
-            n_day = 0.9856076686 / (a ** 1.5)
-            m_now = (elements["ma"] + n_day * (jd - elements.get("epoch", jd))) % 360
-        elif a and elements.get("tp") is not None:
-            n_day = 0.9856076686 / (a ** 1.5)
-            m_now = (n_day * (jd - elements["tp"])) % 360
-        else:
-            m_now = None
-        if m_now is not None:
-            x, y, z, _r = ephem_minor._elements_to_ecliptic(
+    # current heliocentric position for the marker
+    if e >= 1.0:
+        # open orbit: use Barker's equation to get true anomaly, then position
+        q = elements.get("q")
+        tp = elements.get("tp")
+        if q and tp:
+            nu = ephem_minor._barker_true_anomaly(q, jd - tp)
+            x, y, z, _r = ephem_minor._open_orbit_ecliptic(
                 elements.get("om", 0.0), elements.get("i", 0.0),
-                elements.get("w", 0.0), a, elements.get("e", 0.0), m_now)
+                elements.get("w", 0.0), q, e, nu)
             ax.plot(x, y, "o", color=style.ACCENT, ms=10, zorder=7)
             ax.annotate(obj_name or "?", (x, y), textcoords="offset points",
                         xytext=(8, 8), color=style.ACCENT, fontsize=10,
                         fontweight="bold")
+    else:
+        pos = ephem_minor.kepler_ra_dec(elements, jd)
+        if pos:
+            a_el = elements.get("a")
+            if a_el and a_el > 0 and elements.get("ma") is not None:
+                n_day = 0.9856076686 / (a_el ** 1.5)
+                m_now = (elements["ma"] + n_day * (jd - elements.get("epoch", jd))) % 360
+            elif a_el and a_el > 0 and elements.get("tp") is not None:
+                n_day = 0.9856076686 / (a_el ** 1.5)
+                m_now = (n_day * (jd - elements["tp"])) % 360
+            else:
+                m_now = None
+            if m_now is not None:
+                x, y, z, _r = ephem_minor._elements_to_ecliptic(
+                    elements.get("om", 0.0), elements.get("i", 0.0),
+                    elements.get("w", 0.0), a_el, elements.get("e", 0.0), m_now)
+                ax.plot(x, y, "o", color=style.ACCENT, ms=10, zorder=7)
+                ax.annotate(obj_name or "?", (x, y), textcoords="offset points",
+                            xytext=(8, 8), color=style.ACCENT, fontsize=10,
+                            fontweight="bold")
 
     ax.set_xlim(-span, span)
     ax.set_ylim(-span, span)

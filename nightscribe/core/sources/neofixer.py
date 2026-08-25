@@ -83,6 +83,74 @@ def best_window(entries, min_alt=30.0):
     }
 
 
+def orbit(packed):
+    # Preliminary orbital elements for an (often unconfirmed) object,
+    # computed by NEOfixer with Bill Gray's Find_Orb from MPC astrometry.
+    # @args: packed - packed MPC designation (e.g. "6HJ1A21")
+    # @return: normalised dict shaped like sbdb.parse_sbdb, or None
+    import json
+
+    def fetch():
+        return requests.get(f"{BASE}/orbit/", params={"object": packed},
+                            timeout=40).content, "application/json"
+    try:
+        body, _ = db.http_get(f"neofixer:orbit:{packed}", "neofixer-orbit",
+                              fetch)
+        data = json.loads(body.decode("utf-8", "replace"))
+        return parse_neofixer_orbit(data, packed)
+    except (requests.RequestException, ValueError) as err:
+        logger.warning("NEOfixer orbit failed for %s: %s", packed, err)
+        return None
+
+
+def parse_neofixer_orbit(data, packed):
+    # Normalises a raw /orbit/ reply into the same shape as sbdb.parse_sbdb,
+    # so every downstream consumer (orbit chart, families, ephemeris, post)
+    # works unchanged. Element naming follows SBDB: M->ma, arg_per->w,
+    # asc_node->om, Tp->tp. Per-element sigmas are kept under "sigmas".
+    # @args: data - decoded NEOfixer JSON, packed - designation requested
+    # @return: dict or None if the object has no orbit
+    objects = (data.get("result") or {}).get("objects") or {}
+    obj = objects.get(packed)
+    if not obj:
+        return None
+    raw = obj.get("elements") or {}
+    if not raw.get("a") or raw.get("e") is None:
+        return None
+    elements = {
+        "a": raw["a"], "e": raw["e"], "i": raw.get("i", 0.0),
+        "om": raw.get("asc_node", 0.0), "w": raw.get("arg_per", 0.0),
+        "ma": raw.get("M"), "tp": raw.get("Tp"), "epoch": raw.get("epoch"),
+        "q": raw.get("q"), "Q": raw.get("Q"),
+    }
+    elements = {k: v for k, v in elements.items() if v is not None}
+    sigmas = {k[:-6]: v for k, v in raw.items()
+              if k.endswith(" sigma") and v is not None}
+    moids = raw.get("MOIDs") or {}
+    moid_earth = moids.get("Earth")
+    obs = obj.get("observations") or {}
+    arc_days = None
+    if obs.get("earliest") and obs.get("latest"):
+        arc_days = round(obs["latest"] - obs["earliest"], 2)
+    return {
+        "fullname": packed,
+        "des": packed,
+        "kind": None,                   # unknown until MPC confirms
+        "neo": (raw.get("p_NEO") or 0) >= 50,
+        "pha": moid_earth is not None and moid_earth < 0.05,
+        "orbit_class": None,
+        "orbit_code": None,
+        "elements": elements,
+        "sigmas": sigmas,
+        "moid": moid_earth,
+        "phys": {"H": raw.get("H"), "G": raw.get("G")},
+        "rms_residual": raw.get("rms_residual"),
+        "n_resids": raw.get("n_resids"),
+        "arc_days": arc_days,
+        "preliminary": True,            # flag for narrative/UI wording
+    }
+
+
 def report(key, site, packed, status):
     # Reports an observing status to NEOfixer (community coordination).
     # @args: key - user API key, site - MPC code, packed - object,

@@ -117,6 +117,28 @@ def dec_dms_to_deg(dec_dms):
     return sign * (d + m / 60.0 + s / 3600.0)
 
 
+def ra_deg_to_hms(ra_deg):
+    # @args: ra_deg - right ascension in degrees
+    # @return: "hh mm ss.s" string (inverse of ra_hms_to_deg)
+    ra_deg = ra_deg % 360.0
+    total_s = ra_deg / 15.0 * 3600.0
+    h = int(total_s // 3600)
+    m = int((total_s - h * 3600) // 60)
+    s = total_s - h * 3600 - m * 60
+    return f"{h:02d} {m:02d} {s:04.1f}"
+
+
+def dec_deg_to_dms(dec_deg):
+    # @args: dec_deg - declination in degrees
+    # @return: "+dd mm ss.s" string (inverse of dec_dms_to_deg)
+    sign = "-" if dec_deg < 0 else "+"
+    total_s = abs(dec_deg) * 3600.0
+    d = int(total_s // 3600)
+    m = int((total_s - d * 3600) // 60)
+    s = total_s - d * 3600 - m * 60
+    return f"{sign}{d:02d} {m:02d} {s:04.1f}"
+
+
 def tonight_window(lat_deg, lon_deg, date=None, sun_alt_limit=-18.0):
     # Start and end of the astronomical night for a site.
     # Samples the Sun altitude every 10 minutes; arcminute ephemeris is fine here.

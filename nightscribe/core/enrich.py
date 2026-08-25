@@ -11,11 +11,12 @@
 #
 ############################################################
 
+import datetime
 import logging
 import re
 
-from . import ephem_minor, orbits
-from .sources import cad, exoplanet_archive, horizons, sbdb, simbad
+from . import coords, ephem_minor, orbits
+from .sources import cad, exoplanet_archive, horizons, neofixer, sbdb, simbad
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,12 @@ def enrich(name, date=None, site="Z41", fallback_target=None):
                 "data": exoplanet_archive.planet(name)}
     data = _enrich_small_body(name, date, site)
     if not data and fallback_target is not None:
-        # unconfirmed object (packed designation): tell its story with
-        # whatever the planner already knows (NEOfixer/PCCP fields)
+        # unconfirmed object: NEOfixer may still know a preliminary
+        # Find_Orb solution for it (NEOCP) — use it as sbdb-shaped data
+        data = _enrich_preliminary_orbit(fallback_target, date, site)
+    if not data and fallback_target is not None:
+        # no orbit anywhere: tell its story with whatever the planner
+        # already knows (NEOfixer/PCCP fields)
         data = {"unconfirmed": fallback_target}
         return {"type": fallback_target.get("kind", "neo"), "name": name,
                 "data": data}
@@ -75,6 +80,41 @@ def _enrich_transient(name):
         # light travel time from the host redshift (small z approximation)
         d_mpc = host["z"] * 299792.458 / 70.0
         out["dist_mly"] = round(d_mpc * 3.26156, 1)
+    return out
+
+
+def _enrich_preliminary_orbit(target, date, site):
+    # Builds the same data shape as _enrich_small_body from a preliminary
+    # NEOfixer orbit (unconfirmed NEOCP objects SBDB does not know yet).
+    # The ephemeris is computed locally with our Kepler propagator, since
+    # Horizons has no orbit for these objects. "preliminary" flags the
+    # whole dict so narrative/UI can word the uncertainty.
+    # @args: target - planner fallback dict, date - datetime (today),
+    #        site - MPC code
+    # @return: dict or None if NEOfixer has no orbit either
+    packed = target.get("packed") or target.get("id") or target.get("name")
+    if not packed:
+        return None
+    body = neofixer.orbit(packed)
+    if not body:
+        return None
+    out = {"sbdb": body, "preliminary": True, "unconfirmed": target}
+    elements = body.get("elements") or {}
+    jd = coords.jd_from_datetime(
+        date if isinstance(date, datetime.datetime)
+        else datetime.datetime.now(datetime.timezone.utc))
+    pos = ephem_minor.kepler_ra_dec(elements, jd)
+    if pos:
+        ra_deg, dec_deg, r, delta = pos
+        out["ephem"] = {"ra": coords.ra_deg_to_hms(ra_deg),
+                        "dec": coords.dec_deg_to_dms(dec_deg),
+                        "r": r, "delta": delta}
+        h = (body.get("phys") or {}).get("H")
+        out["mag_now"] = orbits.visual_mag(h, r, delta)
+        out["dist_now_km"] = delta * orbits.AU_KM
+    # CAD only tracks confirmed objects: skip it for preliminary orbits
+    out["next_approach"] = None
+    out["family"] = orbits.classify(elements, body.get("orbit_code"))
     return out
 
 

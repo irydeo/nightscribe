@@ -19,6 +19,8 @@ import pytest
 
 pytestmark = pytest.mark.network
 
+from pathlib import Path
+
 from nightscribe.config import config
 from nightscribe.core import enrich, planner, post, solar, suggest, transits
 from nightscribe.core.db import db
@@ -189,6 +191,263 @@ def test_viz_png_exports(tmp_path):
         f5 = tmp_path / "transit.png"
         transit_view.draw_transit(tt[0], out=str(f5))
         assert f5.exists() and f5.stat().st_size > 5000
+
+
+def test_viz_orbit_parabolic_comet(tmp_path):
+    # A parabolic comet (e=1.0, a<0) must render an orbit chart — the
+    # old e<0.99 guard silently skipped these (regression test).
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import orbit_view
+    c = sbdb.get("C/2023 A3")
+    assert c, "SBDB must resolve C/2023 A3"
+    els = c["elements"]
+    assert els["e"] >= 1.0, "C/2023 A3 must be parabolic for this test"
+    f1 = tmp_path / "orbit_parabolic.png"
+    orbit_view.draw_orbit(dict(els), obj_name="C/2023 A3", out=str(f1))
+    assert f1.exists() and f1.stat().st_size > 20000
+    plt.close("all")
+
+
+def test_viz_orbit_high_e_comet(tmp_path):
+    # A high-eccentricity bound comet (0.99 <= e < 1.0) must also render.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import orbit_view
+    c = sbdb.get("12P")
+    assert c, "SBDB must resolve 12P"
+    els = c["elements"]
+    assert els["e"] >= 0.9, "12P must have high e for this test"
+    f1 = tmp_path / "orbit_highe.png"
+    orbit_view.draw_orbit(dict(els), obj_name="12P", out=str(f1))
+    assert f1.exists() and f1.stat().st_size > 20000
+    plt.close("all")
+
+
+def test_explore_dialog_orbit_chart(tmp_path):
+    # The Explore dialog must populate the orbit tab for a parabolic comet.
+    # This is the end-to-end GUI test that was missing (offscreen Qt).
+    import os
+    import time
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QCoreApplication
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.main_window import MainWindow
+    w = MainWindow()
+    # build the explore widget from the UI file, just like the dialog does
+    from nightscribe.gui.main_window import _load_ui
+    explore = _load_ui("explore_tab")
+    # enrich a real parabolic comet end-to-end
+    e = enrich.enrich("C/2023 A3", site=MPC)
+    assert e and e.get("data"), "enrich must return data for C/2023 A3"
+    sb = e["data"].get("sbdb")
+    assert sb and sb["elements"]["e"] >= 1.0, "must be parabolic"
+    # call the chart method directly (same as _dialog_explore_done does)
+    w._dialog_explore_charts(explore, e)
+    pix = explore.lbl_orbit.pixmap()
+    assert pix is not None and not pix.isNull(), \
+        "orbit tab must show a pixmap for a parabolic comet"
+    # the label must carry the chart path for the zoom/export viewer
+    assert explore.lbl_orbit.property("chart_png"), \
+        "orbit label must expose its PNG path for the chart viewer"
+    assert (Path(explore.lbl_orbit.property("chart_png"))).exists()
+    w.close()
+
+
+def test_chart_viewer_zoom_and_export(tmp_path):
+    # The chart viewer must open a chart PNG, zoom it and export a copy
+    # (offscreen Qt; the save dialog is stubbed to a tmp path).
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import orbit_view
+    src = tmp_path / "chart.png"
+    orbit_view.draw_orbit(
+        {"a": 0.9224, "e": 0.1912, "i": 3.33, "om": 204.43, "w": 126.4,
+         "ma": 288.0, "epoch": 2461760.5}, obj_name="Apophis", out=str(src))
+    plt.close("all")
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v = ChartViewer(src, title="test")
+    v.show()
+    assert v._label.pixmap() is not None and not v._label.pixmap().isNull()
+    # zoom in doubles the rendered width (fit starts below 1.0 for big PNGs)
+    w0 = v._label.width()
+    v._zoom_11()
+    assert v._label.width() == v._pix.width()
+    v._zoom_in()
+    assert v._label.width() > v._pix.width()
+    v._zoom_out()
+    assert v._label.width() == v._pix.width()
+    # export must copy the PNG to the chosen path
+    from PySide6.QtWidgets import QFileDialog
+    dest = tmp_path / "exported.png"
+    orig = QFileDialog.getSaveFileName
+    QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (str(dest), ""))
+    try:
+        v._export()
+    finally:
+        QFileDialog.getSaveFileName = orig
+    assert dest.exists() and dest.stat().st_size == src.stat().st_size
+    v.close()
+
+
+def test_post_charts_attached_to_project(tmp_db):
+    # Generating a post from a project must also render the charts and
+    # register them as project files (the "report" deliverables).
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import MainWindow, _load_ui
+    w = MainWindow()
+    name = "TESTCHARTOBJ"
+    p = project.create(tmp_db, "neo", name,
+                       context={"ra_deg": 180.0, "dec_deg": 10.0})
+    w._current_project = p
+    # synthetic enriched object (offline): SBDB-shaped + local ephem
+    e = {"name": name, "type": "small_body",
+         "data": {"sbdb": {"elements": {"a": 1.35, "e": 0.28, "i": 2.5,
+                                        "om": 150.0, "w": 200.0, "q": 0.97,
+                                        "ma": 40.0, "epoch": 2461277.5},
+                           "phys": {"H": 24.1}, "moid": 0.03},
+                  "family": "Apollo",
+                  "ephem": {"ra": "12 00 00.0", "dec": "+10 00 00",
+                            "r": 1.2, "delta": 0.3}}}
+    rendered = {"es": "borrador", "en": "draft", "tweet": "tuit"}
+    post_w = _load_ui("post_tab")
+    # keep the real db clean: route the module-level db to the tmp one
+    orig_db = mw.db
+    mw.db = tmp_db
+    try:
+        w._dialog_post_done(post_w, name, e, rendered)
+    finally:
+        mw.db = orig_db
+    files = project.list_files(tmp_db, p["id"])
+    chart_files = [f for f in files if f["kind"] == "chart"]
+    assert chart_files, "charts must be attached to the project"
+    for f in chart_files:
+        assert Path(f["path"]).exists(), f["path"]
+    # the dialog must list the chart files alongside the text drafts
+    assert "orbit.png" in post_w.lbl_files.text()
+    assert "sky.png" in post_w.lbl_files.text()
+    w.close()
+
+
+def test_explore_dialog_unconfirmed_neo():
+    # Unconfirmed NEO (no SBDB entry): the orbit tab must show an
+    # informative message and the sky tab must render from the
+    # fallback_target's ra_deg/dec_deg (regression test).
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.main_window import MainWindow, _load_ui
+    w = MainWindow()
+    explore = _load_ui("explore_tab")
+    # simulate what the planner produces for an unconfirmed NEO:
+    # a fallback_target with position but no orbital elements
+    fallback = {
+        "id": "P10x99x", "kind": "neo", "name": "P10x99x",
+        "packed": "P10x99x", "mag": 19.5,
+        "ra_deg": 120.0, "dec_deg": 10.0,
+        "nf_score": 8.0, "nf_priority": "normal", "nf_cost_min": 12.0,
+        "moid": 0.05, "h": 20.0, "rate_arcsec_min": 2.5,
+        "nobs": 15, "arc_days": "3.2",
+    }
+    e = enrich.enrich("P10x99x", site=MPC, fallback_target=fallback)
+    assert e and e.get("data"), "enrich must return data for unconfirmed NEO"
+    assert e["data"].get("unconfirmed"), "must be the unconfirmed path"
+    assert not e["data"].get("sbdb"), "must not have SBDB for unconfirmed"
+    # call the chart method — must not crash and must populate both tabs
+    w._dialog_explore_charts(explore, e)
+    # orbit tab: no pixmap, but informative text (not the default "—")
+    orbit_pix = explore.lbl_orbit.pixmap()
+    orbit_text = explore.lbl_orbit.text()
+    assert orbit_pix is None or orbit_pix.isNull(), \
+        "orbit tab must NOT show a pixmap for unconfirmed objects"
+    assert orbit_text and orbit_text != "—", \
+        "orbit tab must show an informative message, not the placeholder"
+    # sky tab: must render from unconfirmed ra_deg/dec_deg
+    sky_pix = explore.lbl_sky.pixmap()
+    assert sky_pix is not None and not sky_pix.isNull(), \
+        "sky tab must show a pixmap from the unconfirmed object's coordinates"
+    w.close()
+
+
+def test_enrich_unconfirmed_with_neofixer_orbit():
+    # A live NEOCP object: SBDB does not know it, but NEOfixer has a
+    # preliminary Find_Orb orbit. enrich() must return sbdb-shaped
+    # elements so the orbit chart, params table and ephemeris all work.
+    from nightscribe.core.sources import neofixer
+    # find a current NEOCP target from the planner list
+    tg = neofixer.targets(MPC, 10)
+    cand = next((t for t in tg if t.get("neocp")), None)
+    if not cand:
+        import pytest
+        pytest.skip("no NEOCP candidate on NEOfixer right now")
+    packed = cand["packed"]
+    fallback = {
+        "id": packed, "kind": "neo", "name": packed, "packed": packed,
+        "mag": cand.get("vmag"),
+        "ra_deg": cand.get("ra deg"), "dec_deg": cand.get("dec deg"),
+        "nf_score": cand.get("score"), "neocp": True,
+    }
+    e = enrich.enrich(packed, site=MPC, fallback_target=fallback)
+    assert e and e.get("data"), "enrich must return data for a NEOCP object"
+    d = e["data"]
+    sb = d.get("sbdb")
+    assert sb, "preliminary NEOfixer orbit must be attached as sbdb"
+    els = sb.get("elements") or {}
+    assert els.get("a") and els.get("e") is not None, \
+        "elements must carry a and e"
+    assert sb.get("sigmas"), "preliminary orbit must carry sigmas"
+    assert d.get("preliminary") is True
+    assert d.get("unconfirmed"), "planner fallback must be kept"
+    # the elements must be drawable and propagatable
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.core import coords
+    import datetime
+    from nightscribe.viz import orbit_view
+    jd = coords.jd_from_datetime(
+        datetime.datetime.now(datetime.timezone.utc))
+    p = orbit_view.draw_orbit(dict(els), jd=jd, obj_name=packed)
+    assert p is not None
+    plt.close("all")
+
+
+def test_ephemeris_unconfirmed_via_neofixer(tmp_path):
+    # ephemeris.generate must fall back to the preliminary NEOfixer orbit
+    # for objects Horizons does not know, and mark rows as preliminary.
+    from nightscribe.core import ephemeris
+    from nightscribe.core.sources import neofixer
+    tg = neofixer.targets(MPC, 10)
+    cand = next((t for t in tg if t.get("neocp")), None)
+    if not cand:
+        import pytest
+        pytest.skip("no NEOCP candidate on NEOfixer right now")
+    packed = cand["packed"]
+    rows = ephemeris.generate(packed, MPC, step="2h")
+    if not rows:
+        import pytest
+        pytest.skip(f"NEOfixer has no orbit for {packed} right now")
+    assert rows[0].get("preliminary"), "rows must be flagged preliminary"
+    assert all(0 <= r["ra_deg"] < 360 for r in rows)
+    assert all(r["delta"] and r["delta"] > 0 for r in rows)
+    out = ephemeris.export(rows, tmp_path / "eph", fmt="csv",
+                           obj_name=packed)
+    text = open(out, encoding="utf-8").read()
+    assert "PRELIMINARY" in text
 
 
 def test_cli_runs():

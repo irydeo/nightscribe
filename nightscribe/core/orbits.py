@@ -200,12 +200,15 @@ def _crossing_text(q, Q):
             "en": f"crosses the orbit of {names_en}"}
 
 
-def explain_elements(elements, phys=None, family=None, moid=None):
+def explain_elements(elements, phys=None, family=None, moid=None,
+                     sigmas=None, n_resids=None, arc_days=None):
     # Translates each orbital/physical parameter into *intuitive* language.
     # Every row has a "level": "basic" rows are the handful everyone should
     # see; "deep" rows appear under the "in depth" toggle (see ADR-017).
     # @args: elements - SBDB elements dict, phys - SBDB phys dict,
-    #        family - key from classify(), moid - MOID in AU if known
+    #        family - key from classify(), moid - MOID in AU if known,
+    #        sigmas - per-element uncertainties (preliminary NEOfixer orbits),
+    #        n_resids - number of astrometric residuals, arc_days - observed arc
     # @return: list of dicts: {"param", "value", "level", "es", "en"}
     phys = phys or {}
     out = []
@@ -217,6 +220,18 @@ def explain_elements(elements, phys=None, family=None, moid=None):
     Q = elements.get("Q") or (a * (1 + e) if a and e is not None else None)
     per = elements.get("per")
 
+    if sigmas:
+        out.append({
+            "param": {"es": "Órbita preliminar", "en": "Preliminary orbit"},
+            "value": "NEOfixer / Find_Orb", "level": "basic",
+            "es": "Este objeto aún no está confirmado por el MPC: la órbita es una "
+                  "solución preliminar calculada por NEOfixer (Find_Orb) con las pocas "
+                  "observaciones disponibles. Puede cambiar — tu medida de esta noche "
+                  "es justo lo que la mejora.",
+            "en": "This object is not yet MPC-confirmed: the orbit is a preliminary "
+                  "solution computed by NEOfixer (Find_Orb) from the few available "
+                  "observations. It can change — tonight's measurement is exactly "
+                  "what improves it."})
     if family and family_text(family):
         out.append({"param": {"es": "Familia", "en": "Family"},
                     "value": family, "level": "basic",
@@ -359,6 +374,37 @@ def explain_elements(elements, phys=None, family=None, moid=None):
             "en": f"From 0 (perfectly known) to 9 (almost lost): this one has {u}. "
                   + ("Tonight's observation helps bring it down." if u >= 5 else
                      "Its orbit is fairly well measured.")})
+    if sigmas:
+        bits = []
+        if a and sigmas.get("a") is not None:
+            bits.append(f"a ± {sigmas['a']:.4g} UA")
+        if e is not None and sigmas.get("e") is not None:
+            bits.append(f"e ± {sigmas['e']:.3g}")
+        if i is not None and sigmas.get("i") is not None:
+            bits.append(f"i ± {sigmas['i']:.3g}°")
+        if bits:
+            out.append({
+                "param": {"es": "Incertidumbre de los elementos (σ)",
+                          "en": "Element uncertainties (σ)"},
+                "value": ", ".join(bits), "level": "deep",
+                "es": "Cada elemento lleva su σ (desviación típica): cuánto puede "
+                      "moverse el valor real respecto al calculado. σ pequeñas = "
+                      "órbita sólida; σ grandes = aún se está perfilando.",
+                "en": "Each element carries its σ (standard deviation): how far the "
+                      "true value may stray from the fitted one. Small σ = solid "
+                      "orbit; large σ = still being pinned down."})
+    if n_resids is not None or arc_days is not None:
+        val = " · ".join(str(v) for v in
+                         (f"{arc_days} días" if arc_days is not None else None,
+                          f"{n_resids} obs." if n_resids is not None else None)
+                         if v)
+        out.append({
+            "param": {"es": "Arco y observaciones", "en": "Arc and observations"},
+            "value": val, "level": "deep",
+            "es": "La órbita se ajusta a esas medidas repartidas en ese arco de "
+                  "tiempo. Con arcos cortos, volverlo a medir esta noche vale oro.",
+            "en": "The orbit is fitted to those measurements spread over that time "
+                  "arc. With short arcs, measuring it again tonight is worth gold."})
     return out
 
 

@@ -1,0 +1,8 @@
+{
+    "jsonrpc": "2.0",
+    "error": {
+        "code": -32602,
+        "message": "Unknown object specified."
+    },
+    "id": null
+}

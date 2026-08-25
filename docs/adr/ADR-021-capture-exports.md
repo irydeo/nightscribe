@@ -26,8 +26,11 @@ drivers, ni slew, ni comunicación en tiempo real (eso sigue siendo del proyecto
 4. **Efemérides NEO para planetario**: CSV a paso configurable como base + formatos
    **TheSkyX** y **Cartes du Ciel**. Los formatos exactos se fijan **contra una
    importación real** en las instalaciones del usuario durante la fase 5 (no se
-   especifican a ciegas). Para objetos sin confirmar (sin elementos orbitales) la
-   efeméride NEOfixer/Horizons es la única vía — se exporta la tabla, no elementos.
+   especifican a ciegas). ~~Para objetos sin confirmar (sin elementos orbitales) la
+   efeméride NEOfixer/Horizons es la única vía — se exporta la tabla, no elementos.~~
+   **Actualizado por ADR-023**: desde 2026-08-25 los objetos NEOCP usan la órbita
+   preliminar de NEOfixer `/orbit/` propagada localmente — se exportan efemérides
+   completas marcadas como preliminares.
 5. Los ficheros generados se registran en `project_files` (ADR-019).
 
 **Consecuencias**: DESIGN.md actualiza su «fuera de alcance»: control de telescopios
@@ -57,9 +60,11 @@ drivers, no slewing, no real-time communication (that remains the sibling projec
    Contents: name, J2000 coords, N frames × exposure, filter, times.
 4. **NEO ephemerides for planetariums**: configurable-step CSV as the base +
    **TheSkyX** and **Cartes du Ciel** formats. Exact formats are fixed **against a real
-   import** in the user's installations during phase 5 (not specified blindly). For
-   unconfirmed objects (no orbital elements) the NEOfixer/Horizons ephemeris is the
-   only route — the table is exported, not elements.
+   import** in the user's installations during phase 5 (not specified blindly).
+   ~~For unconfirmed objects (no orbital elements) the NEOfixer/Horizons ephemeris is
+   the only route — the table is exported, not elements.~~ **Updated by ADR-023**:
+   since 2026-08-25 NEOCP objects use the preliminary NEOfixer `/orbit/` solution
+   propagated locally — full ephemerides are exported, flagged as preliminary.
 5. Generated files are registered in `project_files` (ADR-019).
 
 **Consequences**: DESIGN.md updates its "out of scope": telescope control stays out;

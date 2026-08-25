@@ -83,6 +83,63 @@ def test_post_save_outputs(tmp_path, fake_cfg):
         assert written[k].read_text(encoding="utf-8")
 
 
+def test_post_markdown_references_charts(tmp_path, fake_cfg):
+    # the ES/EN drafts must reference every chart with a relative
+    # markdown link, so the file is ready to publish on a web page
+    e = _fake_enriched()
+    p = post.render_post(e, fake_cfg)
+    charts = {"orbit": tmp_path / "TEST1_orbit.png",
+              "sky": tmp_path / "TEST1_sky.png"}
+    written = post.save_outputs(p, tmp_path, "TEST1", e=e, charts=charts)
+    es = written["es"].read_text(encoding="utf-8")
+    en = written["en"].read_text(encoding="utf-8")
+    assert "## Galería" in es and "## Gallery" in en
+    assert "TEST1_orbit.png" in es and "TEST1_orbit.png" in en
+    assert "TEST1_sky.png" in es and "TEST1_sky.png" in en
+    assert "![Órbita" in es and "![Orbit" in en
+
+
+def test_post_markdown_references_resources(tmp_path, fake_cfg):
+    # extra blink resources (gif/mp4/before-after) get their own section
+    e = _fake_enriched()
+    p = post.render_post(e, fake_cfg)
+    res = {"gif": tmp_path / "TEST1_blink.gif",
+           "mp4": tmp_path / "TEST1_blink.mp4",
+           "pair": tmp_path / "TEST1_before_after.png"}
+    written = post.save_outputs(p, tmp_path, "TEST1", e=e, resources=res)
+    es = written["es"].read_text(encoding="utf-8")
+    en = written["en"].read_text(encoding="utf-8")
+    assert "## Recursos" in es and "## Resources" in en
+    assert "TEST1_blink.gif" in es and "TEST1_blink.gif" in en
+    assert "TEST1_blink.mp4" in es and "TEST1_blink.mp4" in en
+    assert "TEST1_before_after.png" in es
+
+
+def test_post_charts_plus_resources(tmp_path, fake_cfg):
+    # charts and extra resources together, without colliding
+    e = _fake_enriched()
+    p = post.render_post(e, fake_cfg)
+    charts = {"orbit": tmp_path / "TEST1_orbit.png"}
+    res = {"gif": tmp_path / "TEST1_blink.gif"}
+    written = post.save_outputs(p, tmp_path, "TEST1", e=e,
+                                charts=charts, resources=res)
+    es = written["es"].read_text(encoding="utf-8")
+    assert "## Galería" in es and "## Recursos" in es
+    assert es.index("## Galería") < es.index("## Recursos")
+    assert "TEST1_orbit.png" in es and "TEST1_blink.gif" in es
+
+
+def test_attach_charts_idempotent(fake_cfg):
+    # attaching twice must replace the old block, not stack two sections
+    e = _fake_enriched()
+    p = post.render_post(e, fake_cfg)
+    charts = {"orbit": "x_orbit.png"}
+    post.attach_charts(p, charts)
+    post.attach_charts(p, charts)
+    assert p["es"].count("## Galería") == 1
+    assert p["en"].count("## Gallery") == 1
+
+
 def test_visible_now(fake_cfg):
     # "right now" filter: only objects currently above min altitude
     import datetime as dt

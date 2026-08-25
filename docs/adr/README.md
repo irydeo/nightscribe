@@ -29,3 +29,4 @@
 | [021](ADR-021-capture-exports.md) | Exportar secuencias y efemérides / capture & ephemeris exports |
 | [022](ADR-022-mpc-report.md) | Reporte MPC: pegar y validar / MPC report: paste & validate |
 | [023](ADR-023-neocp-preliminary-orbits.md) | Órbitas preliminares NEOCP vía NEOfixer /orbit/ / NEOCP preliminary orbits via NEOfixer |
+| [024](ADR-024-post-references-resources.md) | Post autocontenido: el markdown referencia gráficos y blink / self-contained post: markdown references charts & blink |

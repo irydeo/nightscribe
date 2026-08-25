@@ -69,7 +69,9 @@ def cmd_explore(args):
 
 
 def cmd_post(args):
-    # Bilingual post drafts + tweet (+ PNGs in --png mode).
+    # Bilingual post drafts + tweet + PNG charts, and the ES/EN markdown
+    # always references every generated image (ready for a web page).
+    import re
     from .core import enrich, post
     e = enrich.enrich(args.objeto, site=cfg.get("mpc_code"))
     if not e or not e.get("data"):
@@ -77,7 +79,14 @@ def cmd_post(args):
         return 1
     rendered = post.render_post(e, cfg)
     outdir = args.salida or (paths.data_dir() / "posts")
-    written = post.save_outputs(rendered, outdir, args.objeto)
+    if args.png:
+        # build the charts and have the markdown reference them
+        safe = re.sub(r"[^\w.-]+", "_", args.objeto)
+        charts = post.build_charts(e, outdir, safe + "_", cfg=cfg)
+        written = post.save_outputs(rendered, outdir, args.objeto, e=e,
+                                    charts=charts, cfg=cfg)
+    else:
+        written = post.save_outputs(rendered, outdir, args.objeto)
     for k, p in written.items():
         print(f"[{k}] -> {p}")
     db.mark_posted(args.objeto)
@@ -154,6 +163,7 @@ def cmd_blink(args):
                          ref_label=pair["ref_label"], out=png,
                          watermark=f"NightScribe · {pair['ref_label']}",
                          lang=lang, observatory=observatory, zoom=args.zoom)
+    mp4 = None
     print(f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:.5f}) "
           f"— {pair['ref_label']}")
     print(f"GIF -> {gif}")
@@ -168,6 +178,22 @@ def cmd_blink(args):
             lang=lang, observatory=observatory, zoom=args.zoom,
             interval_ms=args.intervalo)
         print(f"MP4 -> {mp4}")
+    if args.post:
+        # bilingual draft that references the blink resources, ready for a
+        # web page: the ES/EN markdown links the GIF/MP4/before-after PNG
+        from .core import enrich, post
+        en = enrich.enrich(pair["name"], site=cfg.get("mpc_code"))
+        if not en:
+            en = {"type": "transient", "name": pair["name"], "data": {}}
+        rendered = post.render_post(en, cfg)
+        resources = {"gif": gif, "pair": png}
+        if mp4:
+            resources["mp4"] = mp4
+        written = post.save_outputs(rendered, outdir, pair["name"], e=en,
+                                    resources=resources)
+        for k, p in written.items():
+            print(f"[{k}] -> {p}")
+        db.mark_posted(pair["name"])
 
 
 def cmd_gui(args):
@@ -258,6 +284,8 @@ def main(argv=None):
                    help="duración de cada frame del blink (ms)")
     p.add_argument("--video", action="store_true",
                    help="exportar también el blink como vídeo MP4 (H.264)")
+    p.add_argument("--post", action="store_true",
+                   help="generar borrador ES/EN + tuit que referencia el blink")
     p.set_defaults(func=cmd_blink)
 
     p = sub.add_parser("history", help="historial de observaciones")

@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 
 from .. import paths
 from ..config import config
-from ..core import (ephemeris, horizon, mpc_report, orbits, project,
+from ..core import (ephemeris, mpc_report, orbits, project,
                     sequence, suggest)
 from ..core.db import db
 from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
@@ -1402,75 +1402,20 @@ class MainWindow(QMainWindow):
         tbl.resizeColumnsToContents()
         tbl.setColumnWidth(2, 520)
 
-    def _render_object_charts(self, e, prefix):
+    def _render_object_charts(self, e, prefix, outdir=None):
         # Renders every chart the enriched object supports into the posts
         # directory. Shared by the Explore dialog and the post/publish flow.
-        # @args: e - enriched dict, prefix - file name prefix (per-flow)
+        # Thin wrapper over core.post.build_charts (single source of truth).
+        # @args: e - enriched dict, prefix - file name prefix (per-flow),
+        #         outdir - save folder (defaults to the data dir's posts)
         # @return: dict {chart_key: Path} for the charts actually produced
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from ..core import coords
-        from ..viz import families_view, orbit_view, sky_view, sn_view
-        d = e.get("data") or {}
-        outdir = paths.data_dir() / "posts"
+        from ..core import post
+        outdir = Path(outdir) if outdir else paths.data_dir() / "posts"
         outdir.mkdir(parents=True, exist_ok=True)
-        jd = coords.jd_from_datetime(
-            datetime.datetime.now(datetime.timezone.utc))
-        sb = d.get("sbdb")
-        els = sb.get("elements") if sb else None
-        unc = d.get("unconfirmed")
-        charts = {}
-        # orbit chart: bound (e<1) and parabolic (e=1) orbits
-        if els and els.get("q") and els.get("e", 1) <= 1.0:
-            p = outdir / f"{prefix}orbit.png"
-            orbit_view.draw_orbit(dict(els), jd=jd,
-                                  obj_name=e["name"],
-                                  approach=d.get("next_approach"), out=str(p))
-            charts["orbit"] = p
-        # families chart (independent of orbit guard)
-        fam = d.get("family")
-        if fam and els and (els.get("a", 0) or 0) > 0:
-            p = outdir / f"{prefix}families.png"
-            families_view.draw_families(fam, obj_name=e["name"],
-                                        a=els.get("a") or els.get("q"),
-                                        out=str(p))
-            charts["families"] = p
-        # sky position: ephemeris, then SIMBAD, then the unconfirmed dict
-        ra_deg = dec_deg = None
-        eph = d.get("ephem")
-        if eph:
-            try:
-                ra_deg = coords.ra_hms_to_deg(eph["ra"])
-                dec_deg = coords.dec_dms_to_deg(eph["dec"])
-            except (ValueError, AttributeError):
-                pass
-        sim = d.get("simbad")
-        if sim and ra_deg is None:
-            try:
-                ra_deg = coords.ra_hms_to_deg(sim["ra"])
-                dec_deg = coords.dec_dms_to_deg(sim["dec"])
-            except (ValueError, AttributeError):
-                pass
-        if ra_deg is None and unc and unc.get("ra_deg") is not None:
-            ra_deg = float(unc["ra_deg"])
-            dec_deg = float(unc.get("dec_deg", 0.0))
-        if ra_deg is not None:
-            p = outdir / f"{prefix}sky.png"
-            hor = horizon.from_config(config)
-            sky_view.draw_sky(ra_deg, dec_deg, config.get("lat"),
-                              config.get("lon"), obj_name=e["name"],
-                              out=str(p), horizon=hor.alt_at,
-                              margin=float(config.get("horizon_margin_deg", 0)))
-            charts["sky"] = p
-        if sim:
-            from ..core.sources import cutouts
-            img = cutouts.reference_cutout(ra_deg, dec_deg)
-            if img:
-                p = outdir / f"{prefix}field.png"
-                sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p))
-                charts["field"] = p
-        plt.close("all")
+        charts = post.build_charts(e, outdir, prefix, cfg=config)
+        if charts:
+            import matplotlib.pyplot as plt
+            plt.close("all")
         return charts
 
     def _dialog_explore_charts(self, explore, e):
@@ -1529,6 +1474,10 @@ class MainWindow(QMainWindow):
         post_w = _load_ui("post_tab")
         layout.addWidget(post_w)
         post_w.edt_object.setText(name)
+        # default save folder: the data dir's posts directory
+        post_w.edt_folder.setText(str(paths.data_dir() / "posts"))
+        post_w.btn_folder_browse.clicked.connect(
+            lambda: self._dialog_post_browse_folder(post_w))
         post_w.btn_generate.clicked.connect(
             lambda: self._dialog_generate_post(post_w, name))
         post_w.btn_copy_es.clicked.connect(
@@ -1542,6 +1491,23 @@ class MainWindow(QMainWindow):
                 post_w.txt_tweet.toPlainText()))
         self._dialog_generate_post(post_w, name)
         dlg.exec()
+
+    def _dialog_post_browse_folder(self, post_w):
+        # @args: post_w - the post tab widget
+        # @return: None; asks for a folder and fills edt_folder
+        start = post_w.edt_folder.text().strip() or str(paths.data_dir())
+        folder = QFileDialog.getExistingDirectory(
+            self, self.tr("Choose the folder for the post files"), start)
+        if folder:
+            post_w.edt_folder.setText(folder)
+
+    def _dialog_post_folder(self, post_w):
+        # @args: post_w - the post tab widget
+        # @return: Path of the chosen folder (created if missing)
+        folder = post_w.edt_folder.text().strip() or str(paths.data_dir())
+        p = Path(folder)
+        p.mkdir(parents=True, exist_ok=True)
+        return p
 
     def _dialog_generate_post(self, post_w, name):
         post_w.btn_generate.setEnabled(False)
@@ -1558,27 +1524,44 @@ class MainWindow(QMainWindow):
         if not rendered:
             post_w.lbl_files.setText(self.tr("Not found: ") + name)
             return
+        from ..core import post as post_mod
+        outdir = self._dialog_post_folder(post_w)
+        safe = "".join(c if c.isalnum() or c in "-_" else "_"
+                        for c in name)
+        charts, resources = {}, {}
+        # charts for the post/report, drawn with a stable per-object name so
+        # the markdown can reference them (they end up next to the .md)
+        try:
+            charts = self._render_object_charts(e, f"{safe}_", outdir=outdir)
+        except Exception as err:  # charts must never break the post flow
+            logger.warning("post charts failed for %s: %s", name, err)
+        # previous blink resources for this object already in the folder
+        try:
+            for f in sorted(outdir.iterdir()):
+                n = f.name.lower()
+                if not n.startswith(safe.lower() + "_"):
+                    continue
+                if n.endswith(".gif"):
+                    resources.setdefault("gif", f)
+                elif n.endswith(".mp4"):
+                    resources.setdefault("mp4", f)
+                elif n.endswith("_before_after.png"):
+                    resources.setdefault("pair", f)
+        except OSError:
+            pass
+        written = post_mod.save_outputs(rendered, outdir, name, e=e,
+                                        charts=charts or None, cfg=config,
+                                        resources=resources or None)
+        # show the final drafts (with the gallery/resources links) in the tab
         post_w.txt_es.setPlainText(rendered.get("es", ""))
         post_w.txt_en.setPlainText(rendered.get("en", ""))
         post_w.txt_tweet.setPlainText(rendered.get("tweet", ""))
-        from ..core import post as post_mod
-        written = post_mod.save_outputs(rendered, paths.data_dir() / "posts",
-                                        name)
         db.mark_posted(name)
-        # charts for the post/report: render with a stable per-object name
-        # and attach them to the current project when it is about this object
-        try:
-            safe = "".join(c if c.isalnum() or c in "-_" else "_"
-                           for c in name)
-            charts = self._render_object_charts(e, f"{safe}_")
-            written.update({f"chart_{k}": str(p) for k, p in charts.items()})
-            if charts and self._current_project \
-                    and self._current_project["object_name"] == name:
-                pid = self._current_project["id"]
-                for p in charts.values():
-                    project.add_file(db, pid, str(p), "chart")
-        except Exception as err:  # charts must never break the post flow
-            logger.warning("post charts failed for %s: %s", name, err)
+        if charts and self._current_project \
+                and self._current_project["object_name"] == name:
+            pid = self._current_project["id"]
+            for p in charts.values():
+                project.add_file(db, pid, str(p), "chart")
         post_w.lbl_files.setText(
             self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
         self.statusBar().showMessage(self.tr("Drafts ready"), 5000)

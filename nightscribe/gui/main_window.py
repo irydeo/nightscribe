@@ -552,16 +552,24 @@ class MainWindow(QMainWindow):
         jd = coords.jd_from_datetime(
             datetime.datetime.now(datetime.timezone.utc))
         m = ephem_minor.moon(jd)
+        # the bare time range was the only unexplained piece of this row:
+        # it is the astronomical night (sun below -18 deg), in UTC, the
+        # same clock as the "Best time (UTC)" column — labeled and
+        # translatable now (ADR-014: visible strings through tr())
         window = coords.tonight_window(config.get("lat"), config.get("lon"))
+        date = datetime.date.today().isoformat()
+        moon_pct = m["illum"] * 100
         if window:
             dusk = window[0].strftime("%H:%M")
             dawn = window[1].strftime("%H:%M")
+            self.tonight.lbl_context.setText(
+                self.tr("%1  ·  Night %2–%3 (UTC)  ·  Moon %4")
+                .replace("%1", date).replace("%2", dusk)
+                .replace("%3", dawn).replace("%4", f"{moon_pct:.0f}%"))
         else:
-            dusk = dawn = "—"
-        date = datetime.date.today().isoformat()
-        moon_pct = m["illum"] * 100
-        self.tonight.lbl_context.setText(
-            f"{date}  ·  {dusk}–{dawn}  ·  Moon {moon_pct:.0f}%")
+            self.tonight.lbl_context.setText(
+                self.tr("%1  ·  no astronomical night tonight  ·  Moon %2")
+                .replace("%1", date).replace("%2", f"{moon_pct:.0f}%"))
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and

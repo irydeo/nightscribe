@@ -582,3 +582,72 @@ def test_post_button_reset_on_cancel(qapp, tmp_path):
         assert p.name() is None
     finally:
         p.deleteLater()
+
+
+# ---------------- i18n (D6) ----------------
+
+def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
+    # the compiled .qm (nightscribe_es.qm) must carry every string the
+    # panel shows: install it, check the labels, remove it after.
+    # ADR-014: base language in code is English; Spanish is a translation.
+    from pathlib import Path
+    from PySide6.QtCore import QTranslator
+    from PySide6.QtWidgets import QLabel
+
+    qm = (Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
+          / "nightscribe_es.qm")
+    tr = QTranslator(qapp)
+    assert tr.load(str(qm)), "nightscribe_es.qm must load"
+    qapp.installTranslator(tr)
+    try:
+        from nightscribe.gui.overview import ObjectPanel
+        p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+        assert p.btn_post.text() == "Crear post"
+        assert p.btn_post.toolTip() == (
+            "Genera los borradores bilingües + los gráficos de este objeto")
+        assert p.grp_params.title() == "Parámetros"
+        assert p.chk_deep.text() == "A fondo"
+        assert p.grp_charts.title() == "Gráficos"
+        tbl = p.tbl_params
+        assert tbl.horizontalHeaderItem(0).text() == "Parámetro"
+        assert tbl.horizontalHeaderItem(1).text() == "Valor"
+        assert tbl.horizontalHeaderItem(2).text() == "Qué significa"
+        # capture chips (D3) come from the context; show() paints them
+        p.show(FAKE_ELEMENT, {"kind": "neo", "mag": 20.1,
+                              "rate_arcsec_min": 12.4,
+                              "window_start": "2026-11-04T18:20:00+00:00",
+                              "window_end": "2026-11-04T21:10:00+00:00",
+                              "hours_up": 2.8})
+        tips = " ".join(c.toolTip()
+                        for c in p.findChildren(QLabel) if c.toolTip())
+        assert "Magnitud aparente prevista para esta noche" in tips
+        assert "Tasa en el cielo esta noche" in tips
+        assert "por encima del horizonte" in tips
+        p.lbl_state.setText(p.tr("Not found: %1").replace(
+            "%1", p.tr("the requested object")))
+        assert p.lbl_state.text() == "No encontrado: el objeto solicitado"
+        p.deleteLater()
+    finally:
+        qapp.removeTranslator(tr)
+
+
+def test_panel_strings_resolve_in_english(qapp, tmp_path):
+    # same smoke in English: the passthrough .qm must render the base
+    # strings, so the ES and EN .qm never drift apart silently.
+    from pathlib import Path
+    from PySide6.QtCore import QTranslator
+
+    qm = (Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
+          / "nightscribe_en.qm")
+    tr = QTranslator(qapp)
+    assert tr.load(str(qm)), "nightscribe_en.qm must load"
+    qapp.installTranslator(tr)
+    try:
+        from nightscribe.gui.overview import ObjectPanel
+        p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+        assert p.btn_post.text() == "Create post"
+        assert p.grp_params.title() == "Parameters"
+        assert p.grp_charts.title() == "Charts"
+        p.deleteLater()
+    finally:
+        qapp.removeTranslator(tr)

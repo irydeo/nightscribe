@@ -266,92 +266,6 @@
     </message>
 </context>
 <context>
-    <name>ExploreTab</name>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="8"/>
-        <source>Object:</source>
-        <translation>Objeto:</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="9"/>
-        <source>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</source>
-        <translation>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="10"/>
-        <source>Explore</source>
-        <translation>Explora</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="23"/>
-        <source>Parameters</source>
-        <translation>Parámetros</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="27"/>
-        <source>In depth</source>
-        <translation>A fondo</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="27"/>
-        <source>Show every parameter we can explain</source>
-        <translation>Muestra todos los parámetros que sabemos explicar</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="29"/>
-        <source>Create post</source>
-        <translation>Crear post</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="30"/>
-        <source>Observed</source>
-        <translation>Observado</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="36"/>
-        <source>Parameter</source>
-        <translation>Parámetro</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="37"/>
-        <source>Value</source>
-        <translation>Valor</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="38"/>
-        <source>What it means</source>
-        <translation>Qué significa</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="44"/>
-        <source>Orbit</source>
-        <translation>Órbita</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="46"/>
-        <location filename="../ui/explore_tab.ui" line="52"/>
-        <location filename="../ui/explore_tab.ui" line="58"/>
-        <location filename="../ui/explore_tab.ui" line="64"/>
-        <source>—</source>
-        <translation>—</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="50"/>
-        <source>Sky tonight</source>
-        <translation>Cielo esta noche</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="56"/>
-        <source>Families</source>
-        <translation>Familias</translation>
-    </message>
-    <message>
-        <location filename="../ui/explore_tab.ui" line="62"/>
-        <source>Field</source>
-        <translation>Campo</translation>
-    </message>
-</context>
-<context>
     <name>HistoryTab</name>
     <message>
         <location filename="../ui/history_tab.ui" line="8"/>
@@ -397,14 +311,6 @@
         <translation>Esta noche</translation>
     </message>
     <message>
-        <source>Explore</source>
-        <translation type="vanished">Explora</translation>
-    </message>
-    <message>
-        <source>Post</source>
-        <translation type="vanished">Post</translation>
-    </message>
-    <message>
         <location filename="../ui/main_window.ui" line="23"/>
         <source>Solar system</source>
         <translation>Sistema solar</translation>
@@ -415,13 +321,9 @@
         <translation>Historial</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1739"/>
+        <location filename="../main_window.py" line="1694"/>
         <source>Blink</source>
         <translation>Blink</translation>
-    </message>
-    <message>
-        <source></source>
-        <translation type="vanished">Proyectos</translation>
     </message>
     <message>
         <location filename="../ui/main_window.ui" line="20"/>
@@ -484,7 +386,7 @@
         <translation>Documentación técnica</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1209"/>
+        <location filename="../main_window.py" line="1224"/>
         <location filename="../ui/main_window.ui" line="86"/>
         <source>Explore object…</source>
         <translation>Explorar objeto…</translation>
@@ -500,664 +402,590 @@
         <translation>Acerca de NightScribe</translation>
     </message>
     <message>
-        <source>Settings</source>
-        <translation type="vanished">Configuración</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="211"/>
+        <location filename="../main_window.py" line="183"/>
         <source>Ready — press &apos;Compute tonight&apos;</source>
         <translation>Listo — pulsa «Calcular noche»</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="328"/>
+        <location filename="../main_window.py" line="300"/>
         <source>Language saved — restart the app to apply it</source>
         <translation>Idioma guardado — reinicia la app para aplicarlo</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="377"/>
+        <location filename="../main_window.py" line="349"/>
         <source>Settings saved</source>
         <translation>Configuración guardada</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="381"/>
+        <location filename="../main_window.py" line="353"/>
         <source>Choose the horizon file</source>
         <translation>Elige el fichero de horizonte</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="412"/>
+        <location filename="../main_window.py" line="384"/>
         <source>Plan your night, understand every object, tell your science.</source>
         <translation>Planifica tu noche, entiende cada objeto, cuenta tu ciencia.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="419"/>
+        <location filename="../main_window.py" line="391"/>
         <location filename="../ui/main_window.ui" line="95"/>
         <source>Data sources</source>
         <translation>Fuentes de datos</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="420"/>
+        <location filename="../main_window.py" line="392"/>
         <source>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</source>
         <translation>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="433"/>
+        <location filename="../main_window.py" line="405"/>
         <source>Documentation not found at %1</source>
         <translation>Documentación no encontrada en %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="516"/>
-        <location filename="../main_window.py" line="543"/>
+        <location filename="../main_window.py" line="488"/>
+        <location filename="../main_window.py" line="515"/>
         <source>Computing tonight…</source>
         <translation>Calculando la noche…</translation>
     </message>
     <message>
-        <source>Loading...</source>
-        <translation type="vanished">Cargando...</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="548"/>
+        <location filename="../main_window.py" line="520"/>
         <source>no sources answered</source>
         <translation>ninguna fuente respondió</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="551"/>
+        <location filename="../main_window.py" line="523"/>
         <source>Error: %1</source>
         <translation>Error: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="566"/>
+        <location filename="../main_window.py" line="538"/>
         <source>No targets found</source>
         <translation>No se encontraron objetivos</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="567"/>
+        <location filename="../main_window.py" line="539"/>
         <source>Check your network and try again.</source>
         <translation>Comprueba la red y prueba de nuevo.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="576"/>
+        <location filename="../main_window.py" line="548"/>
         <source>No data</source>
         <translation>Sin datos</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="689"/>
+        <location filename="../main_window.py" line="661"/>
         <source>Moon: sep %1°, illum %2%</source>
         <translation>Luna: sep %1°, ilum %2%</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="699"/>
+        <location filename="../main_window.py" line="671"/>
         <source>mag &gt;%1</source>
         <translation>mag &gt;%1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="701"/>
+        <location filename="../main_window.py" line="673"/>
         <source>Predicted magnitude beyond your limiting magnitude by %1 mags. Still scored for its scientific priority, but it will need a longer exposure.</source>
         <translation>Magnitud prevista por encima de tu magnitud límite en %1. Sigue puntuada por su prioridad científica, pero necesita más exposición que un objetivo brillante.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="820"/>
+        <location filename="../main_window.py" line="792"/>
         <source>Hide full list</source>
         <translation>Ocultar lista completa</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="824"/>
-        <location filename="../main_window.py" line="954"/>
+        <location filename="../main_window.py" line="796"/>
+        <location filename="../main_window.py" line="926"/>
         <source>Show all targets (%1)</source>
         <translation>Mostrar todos los objetivos (%1)</translation>
     </message>
     <message>
-        <source>Could not compute tonight: %1 — check your network and try &apos;Compute tonight&apos;.</source>
-        <translation type="vanished">No se pudo calcular la noche: %1 — revisa la red y prueba «Calcular noche».</translation>
-    </message>
-    <message>
-        <source>Error computing tonight: %1</source>
-        <translation type="vanished">Error al calcular la noche: %1</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="559"/>
+        <location filename="../main_window.py" line="531"/>
         <source>%1 targets evaluated</source>
         <translation>%1 objetivos evaluados</translation>
     </message>
     <message>
-        <source>Nothing from the list is above the horizon right now.</source>
-        <translation type="vanished">Nada de la lista está sobre el horizonte ahora mismo.</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="681"/>
-        <location filename="../main_window.py" line="753"/>
+        <location filename="../main_window.py" line="653"/>
+        <location filename="../main_window.py" line="725"/>
         <source>now</source>
         <translation>ahora</translation>
     </message>
     <message>
-        <source>max</source>
-        <translation type="vanished">máx</translation>
-    </message>
-    <message>
-        <source>at</source>
-        <translation type="vanished">a las</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="832"/>
+        <location filename="../main_window.py" line="804"/>
         <source>Supernova</source>
         <translation>Supernova</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="833"/>
-        <location filename="../main_window.py" line="978"/>
+        <location filename="../main_window.py" line="805"/>
+        <location filename="../main_window.py" line="950"/>
         <source>Comet</source>
         <translation>Cometa</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="834"/>
+        <location filename="../main_window.py" line="806"/>
         <source>Possible comet</source>
         <translation>Posible cometa</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="835"/>
-        <location filename="../main_window.py" line="979"/>
+        <location filename="../main_window.py" line="807"/>
+        <location filename="../main_window.py" line="951"/>
         <source>Transit</source>
         <translation>Tránsito</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="836"/>
+        <location filename="../main_window.py" line="808"/>
         <source>Close approach</source>
         <translation>Aproximación</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="988"/>
+        <location filename="../main_window.py" line="960"/>
         <source>No projects yet. Create one from Tonight.</source>
         <translation>Aún no hay proyectos. Crea uno desde «Esta noche».</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1068"/>
+        <location filename="../main_window.py" line="1083"/>
         <source>Capture plan</source>
         <translation>Plan de captura</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1072"/>
+        <location filename="../main_window.py" line="1087"/>
         <source>Frames:</source>
         <translation>Tomas:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1075"/>
+        <location filename="../main_window.py" line="1090"/>
         <source>Exposure (s):</source>
         <translation>Exposición (s):</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1079"/>
+        <location filename="../main_window.py" line="1094"/>
         <source>Filter:</source>
         <translation>Filtro:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1114"/>
+        <location filename="../main_window.py" line="1129"/>
         <source>Save plan</source>
         <translation>Guardar plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1130"/>
+        <location filename="../main_window.py" line="1145"/>
         <source>Plan saved</source>
         <translation>Plan guardado</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1136"/>
-        <location filename="../main_window.py" line="1303"/>
+        <location filename="../main_window.py" line="1151"/>
+        <location filename="../main_window.py" line="1318"/>
         <source>Export capture sequence</source>
         <translation>Exportar secuencia de captura</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1142"/>
+        <location filename="../main_window.py" line="1157"/>
         <source>Export sequence…</source>
         <translation>Exportar secuencia…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1148"/>
+        <location filename="../main_window.py" line="1163"/>
         <source>Export ephemeris for planetarium</source>
         <translation>Exportar efeméride para planetario</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1149"/>
+        <location filename="../main_window.py" line="1164"/>
         <source>Export ephemeris…</source>
         <translation>Exportar efeméride…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1161"/>
+        <location filename="../main_window.py" line="1176"/>
         <source>Paste astrometric measurements (MPC 80-col or ADES)</source>
         <translation>Pega las medidas astrométricas (MPC 80 col. o ADES)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1166"/>
+        <location filename="../main_window.py" line="1181"/>
         <source>Paste MPC 80-column or ADES PSV lines here…</source>
         <translation>Pega aquí líneas MPC de 80 columnas o ADES PSV…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1169"/>
+        <location filename="../main_window.py" line="1184"/>
         <source>Validate</source>
         <translation>Validar</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1172"/>
+        <location filename="../main_window.py" line="1187"/>
         <source>Save report…</source>
         <translation>Guardar reporte…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1181"/>
+        <location filename="../main_window.py" line="1196"/>
         <source>Import your processed FITS image</source>
         <translation>Importa tu imagen FITS procesada</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1183"/>
+        <location filename="../main_window.py" line="1198"/>
         <source>Path to plate-solved FITS…</source>
         <translation>Ruta al FITS con astrometría…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1185"/>
+        <location filename="../main_window.py" line="1200"/>
         <source>Browse…</source>
         <translation>Examinar…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1194"/>
+        <location filename="../main_window.py" line="1209"/>
         <source>Process your images with your usual software.</source>
         <translation>Procesa tus imágenes con tu software habitual.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1201"/>
+        <location filename="../main_window.py" line="1216"/>
         <source>Open blink…</source>
         <translation>Abrir blink…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1217"/>
+        <location filename="../main_window.py" line="1232"/>
         <source>Generate post…</source>
         <translation>Generar publicación…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1236"/>
+        <location filename="../main_window.py" line="1251"/>
         <source>done</source>
         <translation>hecho</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1236"/>
+        <location filename="../main_window.py" line="1251"/>
         <source>current</source>
         <translation>en curso</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1237"/>
+        <location filename="../main_window.py" line="1252"/>
         <source>pending</source>
         <translation>pendiente</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1238"/>
+        <location filename="../main_window.py" line="1253"/>
         <source>skipped</source>
         <translation>saltado</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1322"/>
+        <location filename="../main_window.py" line="1337"/>
         <source>CSV (generic)</source>
         <translation>CSV (genérico)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1324"/>
+        <location filename="../main_window.py" line="1339"/>
         <source>Ephemeris format</source>
         <translation>Formato de efeméride</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1324"/>
+        <location filename="../main_window.py" line="1339"/>
         <source>Format:</source>
         <translation>Formato:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1334"/>
+        <location filename="../main_window.py" line="1349"/>
         <source>Export ephemeris</source>
         <translation>Exportar efeméride</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1338"/>
+        <location filename="../main_window.py" line="1353"/>
         <source>Querying Horizons…</source>
         <translation>Consultando Horizons…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1342"/>
+        <location filename="../main_window.py" line="1357"/>
         <source>No ephemeris for %1</source>
         <translation>Sin efeméride para %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1356"/>
+        <location filename="../main_window.py" line="1371"/>
         <source>Choose FITS image</source>
         <translation>Elige la imagen FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1375"/>
-        <location filename="../main_window.py" line="1401"/>
+        <location filename="../main_window.py" line="1390"/>
+        <location filename="../main_window.py" line="1416"/>
         <source>Paste your measurements first.</source>
         <translation>Pega primero tus medidas.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1383"/>
+        <location filename="../main_window.py" line="1398"/>
         <source>Valid: %1 lines, %2</source>
         <translation>Válido: %1 líneas, %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1389"/>
-        <location filename="../main_window.py" line="1425"/>
+        <location filename="../main_window.py" line="1404"/>
+        <location filename="../main_window.py" line="1440"/>
         <source>Invalid: </source>
         <translation>Inválido: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1409"/>
+        <location filename="../main_window.py" line="1424"/>
         <source>Save MPC report</source>
         <translation>Guardar reporte MPC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1420"/>
+        <location filename="../main_window.py" line="1435"/>
         <source>Saved: %1 (%2 lines)</source>
         <translation>Guardado: %1 (%2 líneas)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1423"/>
+        <location filename="../main_window.py" line="1438"/>
         <source>MPC report ready to email</source>
         <translation>Reporte MPC listo para enviar</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1459"/>
+        <location filename="../main_window.py" line="1474"/>
         <source>Delete project</source>
         <translation>Borrar proyecto</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1460"/>
+        <location filename="../main_window.py" line="1475"/>
         <source>Delete this project permanently?</source>
         <translation>¿Borrar este proyecto permanentemente?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1472"/>
+        <location filename="../main_window.py" line="1487"/>
         <source>Cannot create a project for this target</source>
         <translation>No se puede crear un proyecto para este objetivo</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1491"/>
+        <location filename="../main_window.py" line="1506"/>
         <source>Project created: %1</source>
         <translation>Proyecto creado: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1496"/>
+        <location filename="../main_window.py" line="1511"/>
         <source>Explore object</source>
         <translation>Explorar objeto</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1497"/>
+        <location filename="../main_window.py" line="1512"/>
         <source>Object:</source>
         <translation>Objeto:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1506"/>
+        <location filename="../main_window.py" line="1525"/>
         <source>Explore — %1</source>
         <translation>Explorar — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1525"/>
-        <source>Click to zoom / export</source>
-        <translation>Clic para ampliar / exportar</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1532"/>
-        <source>Loading…</source>
-        <translation>Cargando…</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1607"/>
-        <source>Órbita hiperbólica — no dibujable
-Hyperbolic orbit — not plottable</source>
-        <translation>Órbita hiperbólica — no dibujable
-Hyperbolic orbit — not plottable</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1611"/>
-        <source>Objeto no confirmado — sin elementos orbitales
-Unconfirmed object — no orbital elements</source>
-        <translation>Objeto no confirmado — sin elementos orbitales
-Unconfirmed object — no orbital elements</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1615"/>
-        <source>Sin elementos orbitales / No orbital elements</source>
-        <translation>Sin elementos orbitales / No orbital elements</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1638"/>
+        <location filename="../main_window.py" line="1593"/>
         <source>Post — %1</source>
         <translation>Publicación — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1667"/>
+        <location filename="../main_window.py" line="1622"/>
         <source>Choose the folder for the post files</source>
         <translation>Elige la carpeta de los ficheros del post</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1794"/>
+        <location filename="../main_window.py" line="1749"/>
         <source>Choose FITS</source>
         <translation>Elige FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1826"/>
+        <location filename="../main_window.py" line="1781"/>
         <source>Manual coordinates invalid</source>
         <translation>Coordenadas manuales inválidas</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1831"/>
+        <location filename="../main_window.py" line="1786"/>
         <source>Type the supernova name or tick &apos;Manual coordinates&apos;.</source>
         <translation>Escribe el nombre de la supernova o marca «Coordenadas manuales».</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1866"/>
+        <location filename="../main_window.py" line="1821"/>
         <source>mirrored</source>
         <translation>especular</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1951"/>
+        <location filename="../main_window.py" line="1906"/>
         <source>Export GIF</source>
         <translation>Exportar GIF</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1955"/>
+        <location filename="../main_window.py" line="1910"/>
         <source>Export video</source>
         <translation>Exportar vídeo</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1960"/>
+        <location filename="../main_window.py" line="1915"/>
         <source>Export PNG</source>
         <translation>Exportar PNG</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1967"/>
+        <location filename="../main_window.py" line="1922"/>
         <source>Rendering…</source>
         <translation>Renderizando…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2083"/>
+        <location filename="../main_window.py" line="2038"/>
         <source>(cycle 25)</source>
         <translation>(ciclo 25)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2088"/>
+        <location filename="../main_window.py" line="2043"/>
         <source>Strongest flare this week: </source>
         <translation>Fulguración más intensa de la semana: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2097"/>
+        <location filename="../main_window.py" line="2052"/>
         <source>Numbered active regions: </source>
         <translation>Regiones activas numeradas: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2140"/>
+        <location filename="../main_window.py" line="2095"/>
         <source>Moon: %1% lit · %2 km · %3 days</source>
         <translation>Luna: %1% iluminada · %2 km · %3 días</translation>
     </message>
     <message>
-        <source>Moon: %1% lit · %2 km away · %3 days old</source>
-        <translation type="vanished">Luna: %1% iluminada · a %2 km · %3 días de edad</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="2157"/>
+        <location filename="../main_window.py" line="2112"/>
         <source>Planets at dusk: </source>
         <translation>Planetas al ocaso: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2158"/>
+        <location filename="../main_window.py" line="2113"/>
         <source>none above 15°</source>
         <translation>ninguno sobre 15°</translation>
     </message>
     <message>
-        <source>Choose the plate-solved FITS image</source>
-        <translation type="vanished">Elige la imagen FITS con astrometría</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1818"/>
+        <location filename="../main_window.py" line="1773"/>
         <source>Choose a FITS image first.</source>
         <translation>Elige primero una imagen FITS.</translation>
     </message>
     <message>
-        <source>Manual coordinates invalid — use degrees, e.g. 187.7050 and +12.3910</source>
-        <translation type="vanished">Coordenadas manuales no válidas — usa grados, p. ej. 187.7050 y +12.3910</translation>
-    </message>
-    <message>
-        <source>Type the supernova name (e.g. 2026ziz) or tick &apos;Manual coordinates&apos;.</source>
-        <translation type="vanished">Escribe el nombre de la supernova (p. ej. 2026ziz) o marca «Coordenadas manuales».</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1834"/>
+        <location filename="../main_window.py" line="1789"/>
         <source>Reading the FITS image…</source>
         <translation>Leyendo la imagen FITS…</translation>
     </message>
     <message>
-        <source>mirrored image: flipped horizontally to align</source>
-        <translation type="vanished">imagen espejada: volteada horizontalmente para alinear</translation>
-    </message>
-    <message>
-        <source>Rendering %1…</source>
-        <translation type="vanished">Renderizando %1…</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1314"/>
-        <location filename="../main_window.py" line="1352"/>
-        <location filename="../main_window.py" line="1978"/>
+        <location filename="../main_window.py" line="1329"/>
+        <location filename="../main_window.py" line="1367"/>
+        <location filename="../main_window.py" line="1933"/>
         <source>Export failed: %1</source>
         <translation>Fallo al exportar: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1311"/>
-        <location filename="../main_window.py" line="1349"/>
-        <location filename="../main_window.py" line="1977"/>
+        <location filename="../main_window.py" line="1326"/>
+        <location filename="../main_window.py" line="1364"/>
+        <location filename="../main_window.py" line="1932"/>
         <source>Written to %1</source>
         <translation>Escrito en %1</translation>
     </message>
     <message>
-        <source>Resolving the supernova and downloading the survey reference…</source>
-        <translation type="vanished">Resolviendo la supernova y descargando la referencia del survey…</translation>
-    </message>
-    <message>
-        <source>%1 @ (%2, %3) — %4 · %5×%6 px</source>
-        <translation type="vanished">%1 @ (%2, %3) — %4 · %5×%6 px</translation>
-    </message>
-    <message>
-        <source>Export blink GIF</source>
-        <translation type="vanished">Exportar GIF blink</translation>
-    </message>
-    <message>
-        <source>GIF written to %1</source>
-        <translation type="vanished">GIF escrito en %1</translation>
-    </message>
-    <message>
-        <source>Export blink video</source>
-        <translation type="vanished">Exportar vídeo blink</translation>
-    </message>
-    <message>
-        <source>Export side-by-side PNG</source>
-        <translation type="vanished">Exportar PNG lado a lado</translation>
-    </message>
-    <message>
-        <source>PNG written to %1</source>
-        <translation type="vanished">PNG escrito en %1</translation>
-    </message>
-    <message>
-        <source>Critical</source>
-        <translation type="vanished">Crítica</translation>
-    </message>
-    <message>
-        <source>High</source>
-        <translation type="vanished">Alta</translation>
-    </message>
-    <message>
-        <source>Medium</source>
-        <translation type="vanished">Media</translation>
-    </message>
-    <message>
-        <source>Med-low</source>
-        <translation type="vanished">Media-baja</translation>
-    </message>
-    <message>
-        <source>Low</source>
-        <translation type="vanished">Baja</translation>
-    </message>
-    <message>
-        <source>Cargando…</source>
-        <translation type="vanished">Cargando…</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1544"/>
-        <location filename="../main_window.py" line="1692"/>
+        <location filename="../main_window.py" line="1647"/>
         <source>Not found: </source>
         <translation>No encontrado: </translation>
     </message>
     <message>
-        <source>Entendiendo sus parámetros / Understanding its parameters</source>
-        <translation type="vanished">Entendiendo sus parámetros / Understanding its parameters</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1681"/>
+        <location filename="../main_window.py" line="1636"/>
         <source>Building drafts…</source>
         <translation>Generando borradores…</translation>
     </message>
     <message>
-        <source>try an MPC designation (2021EQ3), a comet (29P), SN/AT (SN2023ixf), a planet (HD 209458 b) or &apos;sun&apos;</source>
-        <translation type="vanished">prueba con la designación MPC (2021EQ3), un cometa (29P), SN/AT (SN2023ixf), un planeta (HD 209458 b) o «sol»</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="1733"/>
+        <location filename="../main_window.py" line="1688"/>
         <source>Saved to: </source>
         <translation>Guardado en: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1734"/>
+        <location filename="../main_window.py" line="1689"/>
         <source>Drafts ready</source>
         <translation>Borradores listos</translation>
     </message>
     <message>
-        <source>Weekly flare: </source>
-        <translation type="vanished">Fulguración semanal: </translation>
-    </message>
-    <message>
-        <source>Active regions: </source>
-        <translation type="vanished">Regiones activas: </translation>
-    </message>
-    <message>
-        <source>Moon: %1% lit · %2 km</source>
-        <translation type="vanished">Luna: %1% iluminada · %2 km</translation>
-    </message>
-    <message>
-        <source>Settings saved (restart to apply the language)</source>
-        <translation type="vanished">Configuración guardada (reinicia para aplicar el idioma)</translation>
-    </message>
-    <message>
-        <source>Resolving MPC code…</source>
-        <translation type="vanished">Resolviendo código MPC…</translation>
-    </message>
-    <message>
-        <location filename="../main_window.py" line="398"/>
+        <location filename="../main_window.py" line="370"/>
         <source>Unknown code or offline</source>
         <translation>Código desconocido o sin red</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="404"/>
+        <location filename="../main_window.py" line="376"/>
         <source>Found: %1</source>
         <translation>Encontrado: %1</translation>
+    </message>
+</context>
+<context>
+    <name>ObjectPanel</name>
+    <message>
+        <location filename="../overview.py" line="158"/>
+        <source>Create post</source>
+        <translation>Crear post</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="160"/>
+        <source>Build the bilingual drafts + charts for this object</source>
+        <translation>Genera los borradores bilingües + los gráficos de este objeto</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="200"/>
+        <source>Parameters</source>
+        <translation>Parámetros</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="203"/>
+        <source>In depth</source>
+        <translation>A fondo</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="212"/>
+        <source>Parameter</source>
+        <translation>Parámetro</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="212"/>
+        <source>Value</source>
+        <translation>Valor</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="212"/>
+        <source>What it means</source>
+        <translation>Qué significa</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="229"/>
+        <source>Charts</source>
+        <translation>Gráficos</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="240"/>
+        <source>Click to zoom / export</source>
+        <translation>Clic para ampliar / exportar</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="258"/>
+        <source>Loading…</source>
+        <translation>Cargando…</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="272"/>
+        <source>Not found: %1</source>
+        <translation>No encontrado: %1</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="273"/>
+        <source>the requested object</source>
+        <translation>el objeto solicitado</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="549"/>
+        <source>Predicted apparent magnitude tonight</source>
+        <translation>Magnitud aparente prevista para esta noche</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="561"/>
+        <source>Sky rate tonight — it must outrun the stars</source>
+        <translation>Tasa en el cielo esta noche — debe superar al desplazamiento de las estrellas</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="571"/>
+        <source>Longest single exposure before the target trails more than a pixel</source>
+        <translation>Mayor exposición simple antes de que el objetivo tire más de un píxel</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="584"/>
+        <source>Times the object is safely above the horizon</source>
+        <translation>Horas en las que el objeto está con seguridad por encima del horizonte</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="594"/>
+        <source>How long it stays a valid target</source>
+        <translation>Cómo de largo sigue siendo un objetivo válido</translation>
     </message>
 </context>
 <context>
@@ -1227,10 +1055,6 @@ Unconfirmed object — no orbital elements</translation>
 </context>
 <context>
     <name>ProjectsTab</name>
-    <message>
-        <source></source>
-        <translation type="vanished">Proyectos</translation>
-    </message>
     <message>
         <location filename="../ui/projects_tab.ui" line="8"/>
         <source>Projects</source>
@@ -1496,10 +1320,6 @@ Unconfirmed object — no orbital elements</translation>
         <translation>Tiempo de lectura/movimiento añadido a cada toma</translation>
     </message>
     <message>
-        <source></source>
-        <translation type="vanished">Cámara (escala de placa)</translation>
-    </message>
-    <message>
         <location filename="../ui/settings_dialog.ui" line="98"/>
         <source>Integrations</source>
         <translation>Integraciones</translation>
@@ -1523,89 +1343,6 @@ Unconfirmed object — no orbital elements</translation>
         <location filename="../ui/settings_dialog.ui" line="103"/>
         <source>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</source>
         <translation>Opcional: resuelve FITS sin WCS en la pestaña Blink (clave gratuita en nova.astrometry.net)</translation>
-    </message>
-</context>
-<context>
-    <name>SettingsTab</name>
-    <message>
-        <source>Observatory</source>
-        <translation type="vanished">Observatorio</translation>
-    </message>
-    <message>
-        <source>MPC code:</source>
-        <translation type="vanished">Código MPC:</translation>
-    </message>
-    <message>
-        <source>Your MPC observatory code (e.g. Z41). Coordinates resolve automatically.</source>
-        <translation type="vanished">Tu código de observatorio MPC (p. ej. Z41). Las coordenadas se resuelven solas.</translation>
-    </message>
-    <message>
-        <source>Resolve coordinates</source>
-        <translation type="vanished">Resolver coordenadas</translation>
-    </message>
-    <message>
-        <source>Name:</source>
-        <translation type="vanished">Nombre:</translation>
-    </message>
-    <message>
-        <source>Latitude (°):</source>
-        <translation type="vanished">Latitud (°):</translation>
-    </message>
-    <message>
-        <source>Longitude (°, east):</source>
-        <translation type="vanished">Longitud (°, este):</translation>
-    </message>
-    <message>
-        <source>Height (m):</source>
-        <translation type="vanished">Altitud (m):</translation>
-    </message>
-    <message>
-        <source>Equipment and limits</source>
-        <translation type="vanished">Equipo y límites</translation>
-    </message>
-    <message>
-        <source>Aperture (inches):</source>
-        <translation type="vanished">Apertura (pulgadas):</translation>
-    </message>
-    <message>
-        <source>Limiting magnitude:</source>
-        <translation type="vanished">Magnitud límite:</translation>
-    </message>
-    <message>
-        <source>Minimum altitude (°):</source>
-        <translation type="vanished">Altitud mínima (°):</translation>
-    </message>
-    <message>
-        <source>General</source>
-        <translation type="vanished">General</translation>
-    </message>
-    <message>
-        <source>Language:</source>
-        <translation type="vanished">Idioma:</translation>
-    </message>
-    <message>
-        <source>System</source>
-        <translation type="vanished">Sistema</translation>
-    </message>
-    <message>
-        <source>Español</source>
-        <translation type="vanished">Español</translation>
-    </message>
-    <message>
-        <source>English</source>
-        <translation type="vanished">English</translation>
-    </message>
-    <message>
-        <source>NEOfixer API key:</source>
-        <translation type="vanished">Clave API NEOfixer:</translation>
-    </message>
-    <message>
-        <source>Optional: report your observing status to NEOfixer</source>
-        <translation type="vanished">Opcional: reporta tus estados de observación a NEOfixer</translation>
-    </message>
-    <message>
-        <source>Save</source>
-        <translation type="vanished">Guardar</translation>
     </message>
 </context>
 <context>
@@ -1694,53 +1431,9 @@ Unconfirmed object — no orbital elements</translation>
 <context>
     <name>TonightTab</name>
     <message>
-        <source>Right now</source>
-        <translation type="vanished">Ahora mismo</translation>
-    </message>
-    <message>
-        <source>Compute tonight to see what is above the horizon right now.</source>
-        <translation type="vanished">Pulsa «Calcular noche» para ver qué está sobre el horizonte ahora mismo.</translation>
-    </message>
-    <message>
-        <source>Refresh</source>
-        <translation type="vanished">Actualizar</translation>
-    </message>
-    <message>
-        <source>Recompute current altitudes</source>
-        <translation type="vanished">Recalcula las altitudes actuales</translation>
-    </message>
-    <message>
         <location filename="../ui/tonight_tab.ui" line="10"/>
         <source>Night: —</source>
         <translation>Noche: —</translation>
-    </message>
-    <message>
-        <source>Compute tonight</source>
-        <translation type="vanished">Calcular noche</translation>
-    </message>
-    <message>
-        <source>Fetch and score tonight&apos;s targets</source>
-        <translation type="vanished">Descarga y puntúa los objetivos de esta noche</translation>
-    </message>
-    <message>
-        <source>Best of tonight</source>
-        <translation type="vanished">Lo mejor de esta noche</translation>
-    </message>
-    <message>
-        <source>—</source>
-        <translation type="vanished">—</translation>
-    </message>
-    <message>
-        <source>Observed</source>
-        <translation type="vanished">Observado</translation>
-    </message>
-    <message>
-        <source></source>
-        <translation type="vanished">Proyecto</translation>
-    </message>
-    <message>
-        <source>Post</source>
-        <translation type="vanished">Post</translation>
     </message>
     <message>
         <location filename="../ui/tonight_tab.ui" line="21"/>
@@ -1751,10 +1444,6 @@ Unconfirmed object — no orbital elements</translation>
         <location filename="../ui/tonight_tab.ui" line="22"/>
         <source>Recompute tonight&apos;s targets</source>
         <translation>Recalcular los objetivos de esta noche</translation>
-    </message>
-    <message>
-        <source>Suggestions</source>
-        <translation type="vanished">Sugerencias</translation>
     </message>
     <message>
         <location filename="../ui/tonight_tab.ui" line="31"/>
@@ -1822,81 +1511,9 @@ Unconfirmed object — no orbital elements</translation>
         <translation>Doble clic en una fila para crear o continuar su proyecto</translation>
     </message>
     <message>
-        <source>Double-click a row to start a project</source>
-        <translation type="vanished">Doble clic en una fila para crear un proyecto</translation>
-    </message>
-    <message>
-        <source>Click a header to sort. Columns adapt to the selected type filter.</source>
-        <translation type="vanished">Pulsa una cabecera para ordenar. Las columnas se adaptan al filtro de tipo.</translation>
-    </message>
-    <message>
-        <source>Selected target</source>
-        <translation type="vanished">Objetivo seleccionado</translation>
-    </message>
-    <message>
-        <source>Explore</source>
-        <translation type="vanished">Explora</translation>
-    </message>
-    <message>
-        <source>Score: 0-100 priority (scientific + observability + urgency + outreach hook). Mag: apparent brightness. Max alt/Best time: tonight&apos;s best altitude and its UTC time. NObs: accumulated observations (more = more reliable orbit). Discovered: discovery date. Click a header to sort.</source>
-        <translation type="vanished">Score: prioridad 0-100 (científica + observabilidad + urgencia + gancho divulgativo). Mag: brillo aparente. Max alt/Best time: mejor altitud de esta noche y su hora UTC. NObs: observaciones acumuladas (más = órbita más fiable). Discovered: fecha de descubrimiento. Pulsa una cabecera para ordenar.</translation>
-    </message>
-    <message>
-        <source>Score: prioridad 0-100 (científica + observabilidad + urgencia + gancho divulgativo). Mag: brillo aparente. Max alt/Best time: mejor altitud de esta noche y su hora UTC. NObs: observaciones acumuladas (más = órbita más fiable). Discovered: fecha de descubrimiento. Pulsa una cabecera para ordenar.</source>
-        <translation type="vanished">Score: prioridad 0-100 (científica + observabilidad + urgencia + gancho divulgativo). Mag: brillo aparente. Max alt/Best time: mejor altitud de esta noche y su hora UTC. NObs: observaciones acumuladas (más = órbita más fiable). Discovered: fecha de descubrimiento. Pulsa una cabecera para ordenar.</translation>
-    </message>
-    <message>
-        <source>Best time (UTC)</source>
-        <translation type="vanished">Hora óptima (UTC)</translation>
-    </message>
-    <message>
-        <source>NEOfixer</source>
-        <translation type="vanished">NEOfixer</translation>
-    </message>
-    <message>
-        <source>NObs</source>
-        <translation type="vanished">NObs</translation>
-    </message>
-    <message>
-        <source>Discovered</source>
-        <translation type="vanished">Descubrimiento</translation>
-    </message>
-    <message>
-        <source>Alerts</source>
-        <translation type="vanished">Alertas</translation>
-    </message>
-    <message>
         <location filename="../ui/tonight_tab.ui" line="69"/>
         <source>Show observed</source>
         <translation>Mostrar observados</translation>
-    </message>
-    <message>
-        <source>Score: prioridad 0-100 (científica + observabilidad + urgencia + gancho divulgativo). Mag: brillo aparente. Max alt/Best time: mejor altitud de esta noche y su hora UTC. NObs: observaciones acumuladas (más = órbita más fiable). Discovered: fecha de descubrimiento.</source>
-        <translation type="vanished">Score: prioridad 0-100 (científica + observabilidad + urgencia + gancho divulgativo). Mag: brillo aparente. Max alt/Best time: mejor altitud de esta noche y su hora UTC. NObs: observaciones acumuladas (más = órbita más fiable). Discovered: fecha de descubrimiento.</translation>
-    </message>
-    <message>
-        <source>Object</source>
-        <translation type="vanished">Objeto</translation>
-    </message>
-    <message>
-        <source>Type</source>
-        <translation type="vanished">Tipo</translation>
-    </message>
-    <message>
-        <source>Score</source>
-        <translation type="vanished">Score</translation>
-    </message>
-    <message>
-        <source>Mag</source>
-        <translation type="vanished">Mag</translation>
-    </message>
-    <message>
-        <source>Max alt</source>
-        <translation type="vanished">Alt. máx</translation>
-    </message>
-    <message>
-        <source>Best time</source>
-        <translation type="vanished">Hora óptima</translation>
     </message>
 </context>
 <context>

@@ -17,7 +17,7 @@ elección nace un **proyecto** que guía todo lo demás sin volver a preguntar n
 
 | Restricción | Origen | Efecto |
 |---|---|---|
-| Magnitud límite | `limit_mag` en config (equipo) | Filtra familias y puntúa observability; consistente en todas (sin 14.0 fijo en tránsitos) |
+| Magnitud límite | `limit_mag` en config (equipo) | **Híbrida (ADR-025)**: duro en SN/cometas/exoplanetas, aviso `⚠ mag>N` en NEO/PCCP sin descartar |
 | Horizonte local | Fichero TheSkyX del usuario (ADR-020) | Altura mínima por azimut + margen de seguridad; fallback a `min_alt` plano |
 | Luna | `ephem_minor` (ADR-009) | Aviso + penalización de score por separación/iluminación; **no** filtro duro |
 | Viabilidad de sesión | `core/exposure.py` + horizonte | La ventana debe cubrir la duración de la sesión; se muestra «inicio seguro hasta HH:MM» |
@@ -78,6 +78,37 @@ flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 | 4 | GUI v3: 4 pestañas, hub Proyectos con stepper por tipo, blink contextual, tarjetas de Esta noche con «Crear proyecto» e «inicio seguro», Settings (Cámara/Horizonte/Sesión/Luna), i18n | **Hecho (2026-08-24)** |
 | 5 | Exportadores: `core/sequence.py` (NINA/CCDciel/CSV) + efemérides (CSV + TheSkyX + CdC validados en importación real), tests | **Hecho (2026-08-24)** |
 | 6 | `core/mpc_report.py` + paso en flujo NEO + subcomando CLI `project` mínimo + polish, i18n y docs finales | **Hecho (2026-08-24)** |
+
+### 7bis. Rediseño de la pantalla de inicio (2026-08-25)
+
+Motivación: la pantalla «Esta noche» no reflejaba la estética de la app, no
+explicaba **por qué** se sugiere cada objeto (la frase «¿por qué esta noche?»
+solo vivía en el tooltip) y el layout de mini-tarjetas en 4×2 se leía apretado.
+Además la app no tenía tema global: tarjetas oscuras flotando sobre cromo
+nativo claro.
+
+| Fase | Entregable | Estado |
+|---|---|---|
+| A | Tema global oscuro: `gui/theme.py` (paleta + QSS cromo + `KIND_COLORS`), `apply_theme(app)` en `app.py`, ADR-026, `tests/unit/test_theme.py` | **Hecho (2026-08-25)** |
+| B | «Esta noche» como **lista vertical de filas amplias**: nombre, «¿por qué?» visible, chips (mag/alt/ventana/luna/⚠), mini-barra de 4 segmentos del score, score 0-100, botón Start/Continue, podio metálico top-3, click-fila→Explorar, estados loading/vacío | **Hecho (2026-08-25)** |
+| C | Tabla «Lista completa» rediseñada sobre el tema, doble-click→proyecto, regeneración i18n ES/EN de las cadenas nuevas, tests de humo | **Pendiente ← punto de entrada** |
+
+**PUNTO DE ENTRADA para quien retome el rediseño (fase C)**:
+
+1. Leer `docs/adr/ADR-026-dark-global-theme.md` (decisión vigente:
+   `gui/theme.py` es la única fuente de colores base y de `KIND_COLORS`;
+   el cromo —ventanas, tabs, menús, tablas, tooltips, scrollbars— ya está
+   estilizado globalmente; la fase C solo toca la tabla «Lista completa»).
+2. La fase C trabaja en `nightscribe/gui/main_window.py` (tabla de
+   «Lista completa»: construcción de columnas, doble-click→proyecto,
+   estilos de fila) y en `nightscribe/gui/ui/tonight_tab.ui` (la tabla
+   vive debajo de la lista de filas).
+3. Decisiones de UX confirmadas (usuario): la tabla se **conserva** (no se
+   elimina); doble-click en una fila crea/continúa el proyecto; la tabla
+   hereda el tema global (filas, cabecera, selección) y añade las
+   cadenas nuevas por `self.tr(...)`. Al terminar, regenerar `.ts`/`.qm`
+   (ver ADR-014) y añadir tests de humo (patrón
+   `tests/unit/test_tonight_rows.py`).
 
 **PUNTO DE ENTRADA (para cualquier IA o humano que retome el trabajo)**:
 

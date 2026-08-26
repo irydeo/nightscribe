@@ -15,14 +15,15 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QObject, Qt, QEvent
+from PySide6.QtCore import QFile, QObject, Qt, QEvent, Signal
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
-                               QGridLayout, QGroupBox, QHBoxLayout,
+                               QHBoxLayout,
                                QInputDialog, QLabel, QLineEdit, QListWidgetItem,
                                QMainWindow, QMessageBox, QPushButton,
                                QSpinBox, QDoubleSpinBox, QComboBox,
-                               QTextEdit, QVBoxLayout, QWidget, QTableWidgetItem)
+                               QTextEdit, QVBoxLayout, QWidget,
+                               QTableWidgetItem)
 
 from .. import paths
 from ..config import config
@@ -30,6 +31,7 @@ from ..version import full_version
 from ..core import (ephemeris, mpc_report, orbits, project,
                     sequence, suggest)
 from ..core.db import db
+from . import theme
 from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
                       MpcResolveWorker, PostWorker, SunWorker, TonightWorker)
 
@@ -119,6 +121,61 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
                       ("Observed", "obs")]
 
 
+class _ClickableFrame(QFrame):
+    # A frame that re-emits a plain mouse click anywhere over it (the
+    # row's «explore» hook). Child labels without text selection forward
+    # the event here; the action button keeps its own click.
+
+    clicked = Signal()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
+
+
+class _ScoreBar(QFrame):
+    # The 4-segment score meter: scientific / observability / urgency / hook.
+    # Each segment is 25% of the width, filled proportionally to the part
+    # (0-35 / 0-30 / 0-20 / 0-15), painted in the object's kind color.
+
+    def __init__(self, color, parent=None):
+        super().__init__(parent)
+        self._color = color
+        self._parts = (0.0, 0.0, 0.0, 0.0)
+        self._maxes = (35.0, 30.0, 20.0, 15.0)
+        self.setMinimumSize(120, 8)
+        self.setFixedHeight(8)
+
+    def set_parts(self, parts):
+        # @args: parts - dict from suggest.score_target
+        self._parts = (parts.get("scientific", 0.0),
+                       parts.get("observability", 0.0),
+                       parts.get("urgency", 0.0),
+                       parts.get("hook", 0.0))
+        self.update()
+
+    def paintEvent(self, _event):
+        from PySide6.QtGui import QBrush, QColor, QPainter
+        from PySide6.QtCore import QRectF
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        w = self.width()
+        # empty track
+        p.fillRect(self.rect(), QColor(theme.C_LINE))
+        # four segments of w/4 each, with a 2px gap between them
+        gap = 2
+        seg = (w - 3 * gap) / 4.0
+        for i in range(4):
+            frac = self._parts[i] / self._maxes[i]
+            fill = max(0.0, min(seg, frac * seg))
+            x = i * (seg + gap)
+            if fill > 0.5:
+                p.fillRect(QRectF(x, 0, fill, self.height()),
+                           QBrush(QColor(self._color)))
+        p.end()
+
+
 class MainWindow(QMainWindow):
     # UX v3.1: four tabs — Tonight (suggestion grid) · Projects (step tabs)
     # · Solar · History. Contextual dialogs for Explore/Post/Blink.
@@ -206,6 +263,7 @@ class MainWindow(QMainWindow):
         self._menus.action_settings.triggered.connect(self.on_open_settings)
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_sources.triggered.connect(self.on_sources)
+        self._menus.action_docs.triggered.connect(self.on_docs)
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_lang_system.triggered.connect(
@@ -367,14 +425,10 @@ class MainWindow(QMainWindow):
 
     # ---------------- Tonight: suggestion grid ----------------
 
-    # Type accent colors per kind — used for the left border and icon.
-    # Brighter than before for readable contrast on the dark card.
-    _KIND_COLORS = {
-        "sn": "#e05555", "neo": "#5588dd", "comet": "#55bb66",
-        "pccp": "#dd9944", "transit": "#aa77cc", "alert": "#ddaa44",
-    }
-    _KIND_LABELS = {"neo": "NEO", "sn": "SN", "comet": "CMT",
-                    "pccp": "PCCP", "transit": "TRN", "alert": "ALT"}
+    # Type accent colors and short labels — single source of truth lives
+    # in gui/theme.py (ADR-026); these references keep call sites stable.
+    _KIND_COLORS = theme.KIND_COLORS
+    _KIND_LABELS = theme.KIND_LABELS
 
     def _type_pixmap(self, kind, size=28):
         # Draws a small geometric icon per object type with QPainter.
@@ -452,24 +506,27 @@ class MainWindow(QMainWindow):
         w.start()
 
     def _show_loading_state(self):
-        # Placeholder cards while the worker runs
-        container = self.tonight.scroll_suggestions.findChild(
-            QWidget, "suggestions_container")
-        if container.layout():
-            while container.layout().count():
-                item = container.layout().takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-        else:
-            container.setLayout(QGridLayout(container))
-        grid = container.layout()
-        for i in range(8):
-            placeholder = QLabel(self.tr("Loading..."))
-            placeholder.setAlignment(Qt.AlignCenter)
-            placeholder.setStyleSheet(
-                "color: #555; background: #12141f; border-radius: 6px;"
-                " padding: 16px;")
-            grid.addWidget(placeholder, i // 4, i % 4)
+        # Skeleton rows while the worker runs (same shape as the final rows)
+        container = self._clear_suggestions()
+        layout = container.layout()
+        for _i in range(6):
+            skel = QFrame()
+            skel.setMinimumHeight(64)
+            skel.setStyleSheet(
+                f"QFrame#skelrow {{ background: {theme.C_BASE};"
+                " border-radius: 8px; }}")
+            skel.setObjectName("skelrow")
+            sly = QVBoxLayout(skel)
+            sly.setContentsMargins(14, 10, 14, 10)
+            bar1 = QFrame(); bar1.setFixedSize(420, 14)
+            bar2 = QFrame(); bar2.setFixedSize(560, 10)
+            for b in (bar1, bar2):
+                b.setStyleSheet(f"background: {theme.C_LINE}; border-radius: 4px;")
+            sly.addWidget(bar1)
+            sly.addWidget(bar2)
+            layout.addWidget(skel)
+        layout.addStretch()
+        self.tonight.lbl_context.setText(self.tr("Computing tonight…"))
 
     def _tonight_done(self, top, all_scored, error=""):
         self.tonight.btn_compute.setEnabled(True)
@@ -490,20 +547,16 @@ class MainWindow(QMainWindow):
 
     def _show_empty_state(self, msg):
         # Single helpful message when no targets are available
-        container = self.tonight.scroll_suggestions.findChild(
-            QWidget, "suggestions_container")
-        if container.layout():
-            while container.layout().count():
-                item = container.layout().takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
-        else:
-            container.setLayout(QVBoxLayout(container))
+        container = self._clear_suggestions()
         layout = container.layout()
         lbl = QLabel(self.tr("No targets found") + "\n\n" + msg + "\n\n"
-                       + self.tr("Check your network and try again."))
+                        + self.tr("Check your network and try again."))
         lbl.setAlignment(Qt.AlignCenter)
-        lbl.setStyleSheet("color: #666; font-size: 14px;")
+        lbl.setWordWrap(True)
+        lbl.setMinimumHeight(120)
+        lbl.setStyleSheet(
+            f"color: {theme.C_TEXT_DIM}; font-size: 14px;"
+            f" background: {theme.C_BASE}; border-radius: 8px; padding: 24px;")
         layout.addWidget(lbl)
         layout.addStretch()
         self.tonight.lbl_context.setText(self.tr("No data"))
@@ -524,101 +577,155 @@ class MainWindow(QMainWindow):
         self.tonight.lbl_context.setText(
             f"{date}  ·  {dusk}–{dawn}  ·  Moon {moon_pct:.0f}%")
 
-    def _build_suggestion_grid(self):
-        # Builds up to 8 suggestion cards in a 4-column grid inside the
-        # scroll area. Each card has one primary action: start/continue project.
+    def _clear_suggestions(self):
+        # Drops every widget inside the suggestion scroll container and
+        # guarantees it has a single-column vertical layout (one row each).
         container = self.tonight.scroll_suggestions.findChild(
             QWidget, "suggestions_container")
-        # clear previous content
         if container.layout():
             while container.layout().count():
                 item = container.layout().takeAt(0)
                 if item.widget():
                     item.widget().deleteLater()
         else:
-            grid = QGridLayout(container)
-            container.setLayout(grid)
-        grid = container.layout()
-        # use up to 8 suggestions
-        suggestions = self._tonight_all[:8]
-        medals = ["🥇", "🥈", "🥉"] + [""] * 5
-        for i, (t, score, parts, phrase) in enumerate(suggestions):
-            card = self._make_card(t, score, phrase, medals[i], i)
-            grid.addWidget(card, i // 4, i % 4)
+            container.setLayout(QVBoxLayout(container))
+        layout = container.layout()
+        layout.setContentsMargins(0, 2, 0, 2)
+        layout.setSpacing(8)
+        return container
 
-    def _make_card(self, t, score, phrase, medal, idx):
-        # @return: a compact card — icon+type, name, stats, status, button.
-        # All text is plain (no HTML in QLabel); colors via setStyleSheet.
-        # Why-tonight phrase and full window live in the tooltip.
+    def _build_suggestion_grid(self):
+        # One wide row per target, best first. The top 3 wear a subtle
+        # metallic ring — same layout, a quiet podium, no medals (v3 phase B).
+        container = self._clear_suggestions()
+        container.layout().addStretch()
+        for i, (t, score, parts, phrase) in enumerate(self._tonight_all):
+            row = self._make_row(t, score, parts, phrase, top3=i < 3)
+            container.layout().insertWidget(container.layout().count() - 1,
+                                            row)
+
+    def _chip(self, text, color, tip=""):
+        # @return: a small pill label (status / window / moon / warning chip)
+        lbl = QLabel(text)
+        lbl.setStyleSheet(
+            f"color: {color}; font-size: 11px; font-weight: bold;"
+            f" padding: 2px 8px; border-radius: 8px;"
+            f" background: {color}22; border: 1px solid {color}55;")
+        if tip:
+            lbl.setToolTip(tip)
+        return lbl
+
+    def _make_row(self, t, score, parts, phrase, top3=False):
+        # @return: one wide, click-to-explore row:
+        #   [kind icon]  [name .......... status chips]
+        #               [why-tonight phrase, always visible]
+        #               [score bar 4 segments ......... NN  Start/Continue]
         kind = t.get("kind", "")
         kind_color = self._KIND_COLORS.get(kind, "#888888")
         kind_label = self._KIND_LABELS.get(kind, kind)
-        card = QFrame()
-        card.setFrameShape(QFrame.StyledPanel)
-        card.setStyleSheet(
-            f"QFrame {{ background: #12141f; border-radius: 6px;"
-            f" border-left: 3px solid {kind_color}; }}"
-            f"QFrame:hover {{ background: #1a1f30; }}")
-        layout = QVBoxLayout(card)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(3)
-        # row 0: type icon + type label (colored) + medal
-        top_row = QHBoxLayout()
-        top_row.setSpacing(4)
+        row = _ClickableFrame()
+        ring = " border: 1px solid #5a6478;" if top3 else ""
+        row.setStyleSheet(
+            f"QFrame#tonightrow {{ background: {theme.C_BASE}"
+            f" border-radius: 8px;{ring} }}"
+            f"QFrame#tonightrow:hover {{ background: #1a1f30; }}")
+        row.setObjectName("tonightrow")
+        row.setCursor(Qt.PointingHandCursor)
+        row.clicked.connect(lambda t=t: self._open_explore_dialog(
+            t.get("name") or t.get("id")))
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(12)
+        # left: the kind icon, full height, kind-color tint
         lbl_icon = QLabel()
-        lbl_icon.setPixmap(self._type_pixmap(kind))
-        top_row.addWidget(lbl_icon)
-        lbl_type = QLabel(kind_label)
-        lbl_type.setStyleSheet(
-            f"color: {kind_color}; font-size: 11px; font-weight: bold;")
-        top_row.addWidget(lbl_type)
-        top_row.addStretch()
-        if medal:
-            lbl_medal = QLabel(medal)
-            lbl_medal.setStyleSheet("font-size: 15px;")
-            top_row.addWidget(lbl_medal)
-        layout.addLayout(top_row)
-        # row 1: object name (bold, white)
-        lbl_name = QLabel(t['name'])
-        lbl_name.setStyleSheet("font-size: 13px; font-weight: bold; color: #e8eaf2;")
-        layout.addWidget(lbl_name)
-        # row 2: mag + alt + score — plain text, score colored
-        mag = f"{t['mag']:.1f}" if t.get("mag") else "--"
-        alt = f"{t['max_alt']:.0f}" if t.get("max_alt") else "--"
-        sc = int(score)
-        lbl_stats = QLabel(f"mag {mag}  alt {alt}  score {sc}")
-        lbl_stats.setStyleSheet("font-size: 12px; color: #b0b8d0;")
-        layout.addWidget(lbl_stats)
-        # row 3: status badge + moon (compact, plain text)
-        status_row = QHBoxLayout()
-        status_row.setSpacing(6)
+        lbl_icon.setPixmap(self._type_pixmap(kind, size=32))
+        lbl_icon.setStyleSheet(f"background: {kind_color}18; border-radius: 6px;")
+        lbl_icon.setFixedSize(44, 44)
+        layout.addWidget(lbl_icon)
+        # center: the readable content
+        mid = QVBoxLayout()
+        mid.setSpacing(5)
+        # header line: kind chip + name + status chips, one row when it fits
+        head = QHBoxLayout()
+        head.setSpacing(8)
+        lbl_kind = QLabel(kind_label)
+        lbl_kind.setStyleSheet(
+            f"color: {kind_color}; font-size: 12px; font-weight: bold;"
+            f" padding: 2px 8px; border-radius: 8px;"
+            f" background: {kind_color}22; border: 1px solid {kind_color}55;")
+        head.addWidget(lbl_kind)
+        lbl_name = QLabel(t["name"])
+        lbl_name.setStyleSheet(
+            "font-size: 16px; font-weight: bold; color: #e8eaf2;"
+            " background: transparent;")
+        head.addWidget(lbl_name)
+        head.addStretch()
         badge = self._now_badge(t)
         if badge:
-            is_now = "▲" in badge
-            lbl_badge = QLabel(badge)
-            lbl_badge.setStyleSheet(
-                f"color: {'#66cc99' if is_now else '#99bbdd'};"
-                f" font-size: 11px; font-weight: bold;")
-            status_row.addWidget(lbl_badge)
+            now = badge.startswith("▲")
+            head.addWidget(self._chip(
+                self.tr("now") if now else badge,
+                theme.C_GOOD if now else theme.C_OK))
+        if self._window_text(t):
+            ws = (t.get("window_start") or "")[11:16]
+            we = (t.get("window_end") or "")[11:16]
+            head.addWidget(self._chip(f"{ws}–{we}", theme.C_OK))
         moon = self._moon_text(t)
         if moon:
-            lbl_moon = QLabel("Moon warn")
-            lbl_moon.setToolTip(
-                f"{self.tr('Moon')}: {moon}")
-            lbl_moon.setStyleSheet("font-size: 11px; color: #cc8844;")
-            status_row.addWidget(lbl_moon)
-        status_row.addStretch()
-        layout.addLayout(status_row)
-        # row 4: single full-width button
+            tip = self.tr("Moon: sep %1°, illum %2%")
+            tip = tip.replace("%1", f"{moon.split('°')[0]}").replace(
+                "%2", moon.split("·")[-1].strip())
+            lbl = self._chip("Moon " + moon, theme.C_WARN, tip)
+            head.addWidget(lbl)
+        # soft-limit warning (ADR-025): predicted-mag kinds beyond the limit
+        beyond, delta = suggest.beyond_limit(t, config)
+        if beyond:
+            limit = float(config.get("limit_mag", 20.0))
+            head.addWidget(self._chip(
+                "⚠ " + self.tr("mag >%1").replace("%1", f"{limit:.0f}"),
+                theme.C_WARN,
+                self.tr("Predicted magnitude beyond your limiting magnitude "
+                        "by %1 mags. Still scored for its scientific "
+                        "priority, but it will need a longer exposure.")
+                .replace("%1", f"{delta}")))
+        mid.addLayout(head)
+        # the why-tonight phrase, always visible (not a tooltip anymore)
+        lbl_why = QLabel(self._txt(phrase))
+        lbl_why.setWordWrap(True)
+        lbl_why.setStyleSheet("color: #aab0c4; font-size: 13px; background: transparent;")
+        mid.addWidget(lbl_why)
+        # score line: 4-segment meter + total + action button
+        line = QHBoxLayout()
+        line.setSpacing(10)
+        bar = _ScoreBar(kind_color)
+        bar.set_parts(parts or {})
+        bar.setToolTip(self._parts_tooltip(parts))
+        line.addWidget(bar, stretch=1)
+        lbl_score = QLabel(f"{int(round(score))}")
+        lbl_score.setStyleSheet(
+            f"font-size: 20px; font-weight: bold; color: {kind_color};"
+            " background: transparent;")
+        line.addWidget(lbl_score)
+        lbl_of = QLabel("/100")
+        lbl_of.setStyleSheet(f"color: {theme.C_TEXT_DIM}; font-size: 12px;"
+                             " background: transparent;")
+        line.addWidget(lbl_of)
         btn = self._card_button(t)
-        layout.addWidget(btn)
-        # tooltip with why-tonight phrase + window details
-        tips = [self._txt(phrase)]
-        win = self._window_text(t)
-        if win:
-            tips.append(win)
-        card.setToolTip("\n".join(tips))
-        return card
+        btn.setFixedWidth(130)
+        line.addWidget(btn)
+        mid.addLayout(line)
+        layout.addLayout(mid)
+        return row
+
+    def _parts_tooltip(self, parts):
+        # One line per score family, with the part's max, for the meter tip.
+        if not parts:
+            return ""
+        return "\n".join((
+            f"{self.tr('scientific')} {parts.get('scientific', 0):.0f}/35",
+            f"{self.tr('observability')} {parts.get('observability', 0):.0f}/30",
+            f"{self.tr('urgency')} {parts.get('urgency', 0):.0f}/20",
+            f"{self.tr('hook')} {parts.get('hook', 0):.0f}/15"))
 
     def _now_badge(self, t):
         # @return: "▲ ahora" if up now, or "HH:MM↑" rise time, or ""

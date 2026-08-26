@@ -17,7 +17,7 @@ one a **project** is born that guides everything else without re-asking anything
 
 | Constraint | Source | Effect |
 |---|---|---|
-| Limiting magnitude | `limit_mag` in config (equipment) | Filters families and scores observability; consistent across all (no hard-coded 14.0 for transits) |
+| Limiting magnitude | `limit_mag` in config (equipment) | **Hybrid (ADR-025)**: hard cut for SNe/comets/exoplanets, `⚠ mag>N` warning for NEOs/PCCPs — never dropped |
 | Local horizon | User's TheSkyX file (ADR-020) | Minimum altitude per azimuth + safety margin; fallback to flat `min_alt` |
 | Moon | `ephem_minor` (ADR-009) | Warning + score penalty by separation/illumination; **not** a hard filter |
 | Session feasibility | `core/exposure.py` + horizon | The window must cover the session duration; "safe start until HH:MM" is shown |
@@ -78,6 +78,36 @@ are settled. Out of this initial redesign.
 | 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | **Done (2026-08-24)** |
 | 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | **Done (2026-08-24)** |
 | 6 | `core/mpc_report.py` + step in the NEO flow + minimal CLI `project` subcommand + polish, i18n and final docs | **Done (2026-08-24)** |
+
+### 7bis. Home screen redesign (2026-08-25)
+
+Why: the «Tonight» screen did not match the app's look, it never explained
+**why** each target is suggested (the "why tonight" phrase only lived in the
+tooltip) and the 4×2 grid of mini-cards felt cramped. The app also had no
+global theme: dark cards floating over the platform's light chrome.
+
+| Phase | Deliverable | Status |
+|---|---|---|
+| A | Global dark theme: `gui/theme.py` (palette + chrome QSS + `KIND_COLORS`), `apply_theme(app)` in `app.py`, ADR-026, `tests/unit/test_theme.py` | **Done (2026-08-25)** |
+| B | «Tonight» as a **vertical list of wide rows**: name, visible "why tonight" line, chips (mag/alt/window/moon/⚠), 4-segment score mini-bar, 0-100 score, Start/Continue button, subtle metallic top-3 podium, row-click→Explore, loading/empty states | **Done (2026-08-25)** |
+| C | Redesigned «Full target list» table over the theme, double-click→project, ES/EN i18n regeneration of the new strings, smoke tests | **Pending ← entry point** |
+
+**ENTRY POINT for whoever resumes the redesign (phase C)**:
+
+1. Read `docs/adr/ADR-026-dark-global-theme.md` (standing decision:
+   `gui/theme.py` is the single source of base colors and `KIND_COLORS`;
+   the chrome —windows, tabs, menus, tables, tooltips, scrollbars—is
+   already styled globally; phase C only touches the «Full target list»
+   table).
+2. Phase C works in `nightscribe/gui/main_window.py` (the full-list
+   table: column building, double-click→project, row styling) and in
+   `nightscribe/gui/ui/tonight_tab.ui` (the table sits under the row
+   list).
+3. Confirmed UX decisions (user): the table is **kept** (not removed);
+   double-clicking a row starts/continues the project; the table inherits
+   the global theme (rows, header, selection) and adds its new strings
+   via `self.tr(...)`. When done, regenerate `.ts`/`.qm` (see ADR-014) and
+   add smoke tests (pattern in `tests/unit/test_tonight_rows.py`).
 
 **ENTRY POINT (for any AI or human resuming the work)**:
 

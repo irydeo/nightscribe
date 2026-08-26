@@ -28,8 +28,8 @@
    </item>
    <item>
     <widget class="QLabel" name="lbl_suggestions_title">
-     <property name="text"><string>Suggestions</string></property>
-     <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+      <property name="text"><string>Tonight's best targets</string></property>
+      <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
     </widget>
    </item>
    <item>

@@ -19,12 +19,13 @@ from PySide6.QtCore import QFile, QObject, Qt, QEvent, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
-                               QHBoxLayout,
-                               QInputDialog, QLabel, QLineEdit, QListWidgetItem,
-                               QMainWindow, QMessageBox, QPushButton,
-                               QSpinBox, QDoubleSpinBox, QComboBox,
-                               QTextEdit, QVBoxLayout, QWidget,
-                               QTableWidgetItem)
+                                QHBoxLayout,
+                                QInputDialog, QLabel, QLineEdit, QListWidgetItem,
+                                QMainWindow, QMessageBox, QPushButton,
+                                QScrollArea,
+                                QSpinBox, QDoubleSpinBox, QComboBox,
+                                QTextEdit, QVBoxLayout, QWidget,
+                                QTableWidgetItem)
 
 from .. import paths
 from ..config import config
@@ -33,6 +34,7 @@ from ..core import (ephemeris, mpc_report, orbits, project,
                     sequence, suggest)
 from ..core.db import db
 from . import theme
+from .overview import ObjectPanel
 from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
                       MpcResolveWorker, PostWorker, SunWorker, TonightWorker)
 
@@ -194,6 +196,7 @@ class MainWindow(QMainWindow):
         self._blink_phase = False
         self._current_project = None
         self._project_widgets = {}
+        self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
 
         win = _load_ui("main_window")
         self.setWindowTitle(f"{win.windowTitle()} {full_version()}")
@@ -987,20 +990,63 @@ class MainWindow(QMainWindow):
             self.projects.lbl_header.setText(
                 self.tr("No projects yet. Create one from Tonight."))
             self.projects.lbl_context.setText("—")
+            self._reset_proj_panel()
             self._clear_step_tabs()
             self._current_project = None
 
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()
         if not items:
+            self._reset_proj_panel()
             return
         pid = items[0].data(Qt.UserRole)
         p = project.get(db, pid)
         if not p:
+            self._reset_proj_panel()
             return
         self._current_project = p
         self._render_project_header(p)
         self._build_step_tabs(p)
+        panel = self._get_proj_panel()
+        if panel._worker is not None:
+            panel.cancel()   # switching projects: drop the in-flight load
+        ctx = p.get("context") or {}
+        panel.explore(p["object_name"], fallback_target=ctx, ctx=ctx)
+
+    # ---------------- object panel (phase D4) ----------------
+
+    def _proj_panel_loader(self, name, fallback_target=None):
+        # @args: name - object identifier, fallback_target - the project's
+        #         context, so an unconfirmed NEOCP/PCCP still renders
+        # @return: a kept, not-yet-started ExploreWorker (the panel starts it)
+        from .workers import ExploreWorker
+        worker = ExploreWorker(config, name, fallback_target=fallback_target)
+        self._keep(worker)   # the hub owns the worker, even if switched away
+        return worker
+
+    def _get_proj_panel(self):
+        # Builds the reusable panel on first use and slates it between the
+        # context line and the step tabs (keeping the one-line context).
+        if self._proj_panel is None:
+            from .overview import ObjectPanel
+            panel = ObjectPanel(loader=self._proj_panel_loader)
+            area = QScrollArea()
+            area.setWidgetResizable(True)
+            area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            area.setFrameShape(QFrame.Shape.NoFrame)
+            area.setWidget(panel)
+            layout = self.projects.grp_detail.layout()
+            insert_at = layout.indexOf(self.projects.tabs_steps)
+            layout.insertWidget(insert_at, area)
+            self._proj_panel = panel
+            self._proj_panel_area = area
+        return self._proj_panel
+
+    def _reset_proj_panel(self):
+        # Drops any in-flight worker and empties the panel (used when the
+        # selection or the project list goes away).
+        if self._proj_panel is not None:
+            self._proj_panel.cancel()
 
     def _render_project_header(self, p):
         kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",

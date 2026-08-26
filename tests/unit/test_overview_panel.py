@@ -202,6 +202,13 @@ class _Signal:
     def connect(self, cb):
         self._c.append(cb)
 
+    def disconnect(self, cb=None):
+        # the real signal has it; the panel detaches its slot on cancel/done
+        if cb is None:
+            self._c = []
+        elif cb in self._c:
+            self._c.remove(cb)
+
     def deliver(self, payload):
         for cb in self._c:
             cb(payload)

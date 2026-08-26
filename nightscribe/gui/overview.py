@@ -119,6 +119,8 @@ class ObjectPanel(QWidget):
     #   show(e, ctx)      — render an already-enriched dict (hub, tests)
     #   explore(name,...) — ask the injected loader for a worker and
     #                       render its result when it lands
+    #   cancel()          — drop a running worker (the hub calls it when the
+    #                       user switches to another project)
 
     def __init__(self, loader=None, chart_dir=None, parent=None):
         # @args: loader - callable(name, fallback_target) returning a
@@ -133,6 +135,7 @@ class ObjectPanel(QWidget):
         self._loader = loader or self._default_loader
         self._chart_dir = chart_dir
         self._worker = None
+        self._slot = None
         self._ctx = None
         self._rows = []
         self._state = "empty"
@@ -292,21 +295,67 @@ class ObjectPanel(QWidget):
             return
         self._state_ready(e)
 
-    def explore(self, name, fallback_target=None):
+    def explore(self, name, fallback_target=None, ctx=None):
         # Kicks off the injected loader; the panel renders whatever lands.
         # @args: name - object identifier, fallback_target - planner target
-        #         dict (unconfirmed NEOCP/PCCP), like ExploreWorker
+        #         dict (unconfirmed NEOCP/PCCP), like ExploreWorker,
+        #         ctx - project context snapshot, kept for the capture block
+        if self._worker is not None:
+            return  # a worker is still out there; ignore the second ask
+        self._ctx = ctx
         self._state_loading(name)
         worker = self._loader(name, fallback_target)
         self._worker = worker
-        worker.finished.connect(lambda e, w=worker: self._worker_done(w, e))
+        self._slot = lambda e, w=worker: self._worker_done(w, e)
+        worker.finished.connect(self._slot)
         worker.start()
+
+    def cancel(self):
+        # Drops a running worker so its result (if any) can never land on
+        # this panel: the slot disconnects and the reference drops. The hub
+        # owns the worker and deletes it (via _keep); the panel goes blank
+        # so the next project starts from a clean state.
+        worker, slot = self._worker, self._slot
+        self._worker = None
+        self._slot = None
+        if worker is not None and slot is not None:
+            try:
+                worker.finished.disconnect(slot)
+            except RuntimeError:
+                pass  # the worker was already gone — nothing left to detach
+        self._blank()
+
+    def _blank(self):
+        # Puts the panel back to the pre-load state (all parts hidden) — the
+        # hub calls it when the selection moves to another project.
+        self._state = "empty"
+        self._ctx = None
+        self._rows = []
+        self._clear_chips()
+        self.lbl_state.hide()
+        self.lbl_hook.hide()
+        self.lbl_facts.hide()
+        self.row_capture.hide()
+        self.grp_params.hide()
+        self.grp_charts.hide()
+        for lbl in self._labels.values():
+            lbl.hide()
+            lbl.setPixmap(QPixmap())
+            lbl.setProperty("chart_png", None)
 
     def _worker_done(self, w, e):
         # @args: w - the worker that finished, e - its enriched payload
         if w is not self._worker:
-            return  # a newer explore() replaced it; drop the stale result
-        self.show(e)
+            return  # a cancel() dropped it, or it is a stale one
+        slot = self._slot
+        self._worker = None
+        self._slot = None
+        self.show(e, self._ctx)
+        if slot is not None:
+            try:
+                w.finished.disconnect(slot)
+            except (TypeError, RuntimeError):
+                pass
 
     # ---------------- internals ----------------
 

@@ -68,8 +68,15 @@ cost in minutes when known, and action buttons.
 ## Feasibility filtering
 
 User equipment enters through Settings (telescope aperture, limiting magnitude).
-Targets beyond reach are shown dimmed, never hidden: planning is about knowing what
-is up there, even if you cannot take it tonight.
+The policy is **hybrid** (ADR-025):
+
+| Family | Policy | Where |
+|---|---|---|
+| SNe, comets, exoplanets | **Hard cut** — out of reach means out of the list | `sources/rochester.py`, `sources/cobs.py`, `core/transits.py` |
+| NEOs, PCCPs | **Soft warning** — the magnitude is a prediction, so we sink the score and flag the card / CLI row; we never drop the target | `core/suggest.py` → `beyond_limit()` |
+
+Targets beyond reach are shown dimmed, never hidden (in the soft case): planning is
+about knowing what is up there, even if you cannot take it tonight.
 
 ## Testing
 

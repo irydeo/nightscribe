@@ -74,8 +74,29 @@ def _observability(t, cfg):
     limit = float(cfg.get("limit_mag", 20.0)) if cfg else 20.0
     if mag is not None:
         score += _clamp((limit - mag) / 4.0 * 6, 0, 6)
+    # soft beyond-limit penalty (ADR-025): NEO and PCCP brightness is a
+    # prediction, so never drop the target — just sink it below bright
+    # and easy objects
+    if t.get("kind") in ("neo", "pccp") and mag is not None and mag > limit:
+        score -= _clamp((mag - limit) / 2.0 * 3.0, 0, 3.0)
     score -= _moon_penalty(t, cfg, limit)
     return _clamp(score, 0, 30)
+
+
+def beyond_limit(t, cfg=None):
+    # Soft-limit warning for predicted-mag kinds (NEO, PCCP): the brightness
+    # there is a prediction, so we warn instead of cutting (ADR-025).
+    # @args: t - target dict, cfg - Config
+    # @return: (is_beyond, delta_mags); (False, 0.0) outside scope
+    if t.get("kind") not in ("neo", "pccp"):
+        return False, 0.0
+    mag = t.get("mag")
+    if mag is None:
+        return False, 0.0
+    limit = float(cfg.get("limit_mag", 20.0)) if cfg else 20.0
+    if mag > limit:
+        return True, round(mag - limit, 1)
+    return False, 0.0
 
 
 def _moon_jd(t):

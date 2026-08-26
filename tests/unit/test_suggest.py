@@ -85,6 +85,39 @@ def test_top_n_diversity(fake_cfg):
     assert "comet" in kinds  # not three NEOs
 
 
+def test_beyond_limit_helper():
+    # predicted-mag kinds flag the delta; measured-mag kinds never do
+    t = _neo(mag=21.5)
+    assert suggest.beyond_limit(t) == (True, 1.5)
+    assert suggest.beyond_limit(_neo(mag=18.5)) == (False, 0.0)
+    assert suggest.beyond_limit(_neo(mag=None)) == (False, 0.0)
+    sn = {"kind": "sn", "mag": 23.0}
+    assert suggest.beyond_limit(sn) == (False, 0.0)
+    pccp = {"kind": "pccp", "mag": 20.5}
+    assert suggest.beyond_limit(pccp) == (True, 0.5)
+
+
+def test_soft_penalty_lowers_score():
+    # same NEO beyond the limit sinks below the identical one within it
+    bright, _ = suggest.score_target(_neo(mag=18.5))
+    faint, _ = suggest.score_target(_neo(mag=21.5))
+    assert bright > faint
+    # the penalty is bounded: roughly one extra point per mag past the limit
+    within = suggest._observability(_neo(mag=18.5), None)
+    beyond = suggest._observability(_neo(mag=21.5), None)
+    assert within - beyond >= 1.5
+
+
+def test_soft_limit_does_not_drop_neo_beyond_limit():
+    # ADR-025: beyond-limit NEOs/PCCPs are warned, never cut out of Top N
+    a = _neo(mag=21.0)
+    b = _neo(neocp=False, score=3.0, mag=21.5)
+    b["id"], b["name"] = "T2", "T2"
+    top, _scored = suggest.top_n([a, b], None, None, 2)
+    assert len(top) == 2  # both survive even though both are beyond mag 20
+    assert {t["id"] for t, _s, _p, _ph in top} == {"T1", "T2"}
+
+
 def _moon_cfg(enabled=True, min_sep=45.0, max_illum=0.5, limit_mag=20.0):
     # config-like object with the Moon constraint enabled
     class Cfg:

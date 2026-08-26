@@ -68,9 +68,17 @@ coste estimado en minutos si se conoce, y botones de acción.
 
 ## Filtrado de factibilidad
 
-El equipo del usuario entra por Configuración (apertura, magnitud límite). Los
-objetivos fuera de alcance se muestran atenuados, nunca ocultos: planificar es saber
-qué hay ahí arriba, aunque esta noche no puedas con ello.
+El equipo del usuario entra por Configuración (apertura, magnitud límite).
+La política es **híbrida** (ADR-025):
+
+| Familia | Política | Dónde |
+|---|---|---|
+| SN, cometas, exoplanetas | **Duro** — fuera de alcance, fuera de la lista | `sources/rochester.py`, `sources/cobs.py`, `core/transits.py` |
+| NEO, PCCP | **Suave** — la magnitud es una predicción, se hunde el score y se etiqueta; **nunca se descarta** | `core/suggest.py` → `beyond_limit()` |
+
+Los objetivos fuera de alcance (en el caso suave) se muestran atenuados, nunca
+ocultos: planificar es saber qué hay ahí arriba, aunque esta noche no puedas
+con ello.
 
 ## Pruebas
 

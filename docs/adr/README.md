@@ -30,3 +30,4 @@
 | [022](ADR-022-mpc-report.md) | Reporte MPC: pegar y validar / MPC report: paste & validate |
 | [023](ADR-023-neocp-preliminary-orbits.md) | Órbitas preliminares NEOCP vía NEOfixer /orbit/ / NEOCP preliminary orbits via NEOfixer |
 | [024](ADR-024-post-references-resources.md) | Post autocontenido: el markdown referencia gráficos y blink / self-contained post: markdown references charts & blink |
+| [025](ADR-025-mag-limit-hybrid.md) | Magnitud límite híbrida: duro donde se mide, aviso donde se predice / hybrid limiting mag: hard where measured, warned where predicted |

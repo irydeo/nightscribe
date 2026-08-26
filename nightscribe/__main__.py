@@ -43,14 +43,23 @@ def cmd_tonight(args):
     top, all_scored = suggest.top_n(targets, cfg, db, args.top)
     medals = ["🥇", "🥈", "🥉"] + ["•"] * max(args.top - 3, 0)
     print("\n=== LO MEJOR DE ESTA NOCHE / BEST OF TONIGHT ===")
+    n_beyond = 0
+    limit = float(cfg.get("limit_mag", 20.0))
     for i, (t, score, parts, phrase) in enumerate(top):
         mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
         alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
-        print(f"\n{medals[i]} {t['name']}  [{t['kind']}]  score {score}")
+        beyond, _delta = suggest.beyond_limit(t, cfg)
+        if beyond:
+            n_beyond += 1
+        flag = f"  ▲ mag>{limit:.0f}" if beyond else ""
+        print(f"\n{medals[i]} {t['name']}  [{t['kind']}]  score {score}{flag}")
         print(f"   mag {mag} · alt. máx {alt}")
         print(f"   ES: {phrase['es']}")
         print(f"   EN: {phrase['en']}")
     print(f"\n({len(all_scored)} objetivos evaluados / targets evaluated)")
+    if n_beyond:
+        print(f"({n_beyond} objetivos por encima de la magnitud límite "
+              f"{limit:.0f} / targets beyond the mag {limit:.0f} limit)")
 
 
 def cmd_explore(args):

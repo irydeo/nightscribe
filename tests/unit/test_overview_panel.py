@@ -316,3 +316,140 @@ def test_charts_slot_uses_panel_title(panel):
         "orbit slot should record its chart file for click→zoom"
     assert panel._labels["orbit"].property("chart_title"), \
         "orbit slot should carry a title for the chart viewer"
+
+
+# ---------------- D3: capture / window block ----------------
+#
+# The block reads the project context snapshot (the numbers a capture plan
+# actually uses): magnitude, apparent rate (NEO/PCCP only), max no-trail
+# exposure (rate + camera profile) and the hours-above-horizon window. It
+# omits whatever is missing, and hides itself entirely when it has nothing
+# to show. No network: the SN fixture renders hook + bullets + "why not"
+# slot lines entirely offline.
+
+def _chip_texts(panel):
+    # @return: the visible chip labels, in order (skips the trailing stretch)
+    from PySide6.QtWidgets import QLabel
+    return [w.text() for w in panel.row_capture.findChildren(QLabel)
+            if w.text().strip()]
+
+
+def _sn_fixture():
+    # A transient/supernova payload with just enough to render the hook,
+    # the fact bullets and every "why not" slot — nothing needs the network.
+    return {
+        "type": "transient",
+        "name": "2026ziz",
+        "data": {
+            "host": {"name": "NGC 5908"},
+            "dist_mly": 74,
+            "simbad": {},              # an empty simbad: no cutout, no field
+        },
+    }
+
+
+def test_capture_block_sn_no_rate_exposure(panel):
+    # An SN: mag + window apply, but the rate and max-exposure chips are
+    # gated to neo/pccp, so they are omitted — even when a rate is present in
+    # the context (the "con sn: sin tasa/exposición" rule).
+    ctx = {
+        "kind": "sn",
+        "mag": 14.2,
+        "rate_arcsec_min": 9.0,   # sneaked in: must still be hidden (an SN)
+        "window_start": "2026-08-26T21:00:00+02:00",
+        "window_end": "2026-08-26T23:30:00+02:00",
+        "hours_up": 2.5,
+    }
+    panel.show(_sn_fixture(), ctx)
+    assert panel.state() == "ready"
+    assert not panel.row_capture.isHidden()
+    chips = _chip_texts(panel)
+    assert any("14.2" in c for c in chips), f"mag chip missing: {chips!r}"
+    assert any("21:00" in c and "23:30" in c for c in chips), \
+        f"window chip missing: {chips!r}"
+    assert any("2.5 h" in c for c in chips), f"hours chip missing: {chips!r}"
+    assert not any("″/min" in c for c in chips), \
+        f"rate must be omitted for an SN: {chips!r}"
+    assert not any("max" in c.lower() for c in chips), \
+        f"exposure must be omitted for an SN: {chips!r}"
+
+
+def test_capture_block_full_neo_chips(panel):
+    # A NEO context snapshot with everything: mag, rate, window + hours.
+    ctx = {
+        "kind": "neo",
+        "mag": 19.5,
+        "rate_arcsec_min": 12.0,
+        "window_start": "2026-08-26T21:00:00+02:00",
+        "window_end": "2026-08-26T23:30:00+02:00",
+        "hours_up": 2.5,
+    }
+    panel.show(FAKE_ELEMENT, ctx)
+    assert panel.state() == "ready"
+    assert not panel.row_capture.isHidden()
+    chips = _chip_texts(panel)
+    # magnitude
+    assert any("19.5" in c for c in chips), f"mag chip missing: {chips!r}"
+    # rate ″/min
+    assert any("″/min" in c for c in chips), f"rate chip missing: {chips!r}"
+    # window HH:MM–HH:MM
+    assert any("21:00" in c and "23:30" in c for c in chips), \
+        f"window chip missing: {chips!r}"
+    # hours above
+    assert any("2.5 h" in c for c in chips), f"hours chip missing: {chips!r}"
+
+
+def test_capture_block_neo_max_exposure_present(panel):
+    # A NEO with a rate and a complete camera profile gets a max no-trail
+    # exposure chip (the whole point of the camera profile for NEOs).
+    from nightscribe.config import config
+    saved = (config.get("pixel_um"), config.get("focal_mm"))
+    config._data["pixel_um"] = 3.76
+    config._data["focal_mm"] = 2000.0
+    try:
+        panel.show(FAKE_ELEMENT, {"kind": "neo", "mag": 19.5,
+                                  "rate_arcsec_min": 12.0})
+    finally:
+        config._data["pixel_um"], config._data["focal_mm"] = saved
+    chips = _chip_texts(panel)
+    assert any("max" in c.lower() for c in chips), \
+        f"max-exposure chip missing for a NEO with a rate: {chips!r}"
+    # and the rate chip is present alongside it
+    assert any("″/min" in c for c in chips), f"rate chip missing: {chips!r}"
+
+
+def test_capture_block_empty_ctx_does_not_break(panel):
+    # show() with a valid payload and an empty/None context: the block hides
+    # itself instead of raising, and the rest of the panel stays ready.
+    panel.show(FAKE_ELEMENT, {})
+    assert panel.state() == "ready"
+    assert panel.row_capture.isHidden()
+    assert _chip_texts(panel) == []
+    # again with no context at all (the D3 «no rompe con ctx vacío» rule)
+    panel.show(FAKE_ELEMENT, None)
+    assert panel.state() == "ready"
+    assert panel.row_capture.isHidden()
+
+
+def test_capture_block_pccp_omits_rate_when_missing(panel):
+    # A PCCP with a window but no rate: window + hours show, while rate and
+    # exposure are omitted (the «omit what is missing» rule).
+    ctx = {
+        "kind": "pccp",
+        "mag": 20.2,
+        "window_start": "2026-08-26T20:00:00+02:00",
+        "window_end": "2026-08-26T22:00:00+02:00",
+        "hours_up": 2.0,
+    }
+    panel.show(FAKE_UNCONFIRMED, ctx)
+    assert panel.state() == "ready"
+    assert not panel.row_capture.isHidden()
+    chips = _chip_texts(panel)
+    assert any("20.2" in c for c in chips), f"mag chip missing: {chips!r}"
+    assert any("20:00" in c and "22:00" in c for c in chips), \
+        f"window chip missing: {chips!r}"
+    assert any("2.0 h" in c for c in chips), f"hours chip missing: {chips!r}"
+    assert not any("″/min" in c for c in chips), \
+        f"rate must be omitted without a rate: {chips!r}"
+    assert not any("max" in c.lower() for c in chips), \
+        f"exposure must be omitted without a rate: {chips!r}"

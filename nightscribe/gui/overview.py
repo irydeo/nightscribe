@@ -24,12 +24,12 @@
 
 from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QCheckBox, QGridLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QHeaderView, QSizePolicy,
-                               QTableWidget, QTableWidgetItem, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QGroupBox,
+                                QHBoxLayout, QLabel, QHeaderView, QSizePolicy,
+                                QTableWidget, QTableWidgetItem, QVBoxLayout,
+                                QWidget)
 
-from ..core import narrative, orbits
+from ..core import exposure, narrative, orbits
 from .. import paths
 from . import theme
 
@@ -64,6 +64,19 @@ _MSG = {
         "en": "No reference field available"},
     "empty": {"es": "—", "en": "—"},
 }
+
+
+def _chip(text, color, tip=""):
+    # @return: a small pill label, the same idiom the Tonight rows use
+    #          (mag / rate / window chips)
+    lbl = QLabel(text)
+    lbl.setStyleSheet(
+        f"color: {color}; font-size: 11px; font-weight: bold;"
+        f" padding: 2px 8px; border-radius: 8px;"
+        f" background: {color}22; border: 1px solid {color}55;")
+    if tip:
+        lbl.setToolTip(tip)
+    return lbl
 
 
 def _scale_png(label, png_path, max_w=820, max_h=620):
@@ -145,6 +158,22 @@ class ObjectPanel(QWidget):
         self.lbl_facts.hide()
         layout.addWidget(self.lbl_facts)
 
+        # capture/window block (D3): the night facts about this object —
+        # magnitude, apparent rate, max no-trail exposure (NEO/PCCP only),
+        # the window above the horizon and how many hours it stays up.
+        # Each chip is built from the project context snapshot (main_window
+        # _create_project) and omitted when the data is missing.
+        self.row_capture = QFrame()
+        self.row_capture.setStyleSheet(
+            f"background: {theme.C_BASE}; border-radius: 8px;"
+            f" border: 1px solid {theme.C_LINE};")
+        self._chips = QHBoxLayout(self.row_capture)
+        self._chips.setContentsMargins(10, 6, 10, 6)
+        self._chips.setSpacing(8)
+        self._chips.addStretch(1)  # pushed left, rebuilt below
+        self.row_capture.hide()
+        layout.addWidget(self.row_capture)
+
         self.grp_params = QGroupBox(self.tr("Parameters"))
         gl = QVBoxLayout(self.grp_params)
         top = QHBoxLayout()
@@ -208,6 +237,7 @@ class ObjectPanel(QWidget):
         self.lbl_state.show()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
+        self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
 
@@ -222,6 +252,7 @@ class ObjectPanel(QWidget):
         self.lbl_state.show()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
+        self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
 
@@ -244,6 +275,7 @@ class ObjectPanel(QWidget):
         self.grp_params.setVisible(bool(self._rows))
         self._refill_params()
         self._render_charts(e)
+        self._render_capture(e)
         self._state = "ready"
 
     # ---------------- public API ----------------
@@ -390,6 +422,103 @@ class ObjectPanel(QWidget):
         #          (mirrors the Explore dialog's build_charts call)
         from ..config import config
         return config
+
+    # ---------------- capture / window block (D3) ----------------
+
+    def _clear_chips(self):
+        # Drops every chip the block currently shows (kept in one place so
+        # show() can be called again with a different object).
+        lay = self._chips
+        while lay.count():
+            item = lay.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+                w = None
+
+    def _capture_chips(self, e):
+        # Builds the chip definitions for this object, all from the project
+        # context snapshot (the numbers a capture plan actually uses):
+        # magnitude, apparent rate (NEO/PCCP only), max no-trail exposure
+        # (rate + camera profile) and the hours-above-horizon window.
+        # Returns an empty list when nothing applies, which hides the block.
+        # @args: e - enriched dict (only for the object type as a fallback)
+        chips = []
+        ctx = self._ctx or {}
+        kind = ctx.get("kind") or e.get("type")
+
+        # magnitude: the context's live, tonight figure (omitted if absent)
+        mag = ctx.get("mag")
+        if mag is not None:
+            try:
+                mag = float(mag)
+            except (TypeError, ValueError):
+                mag = None
+        if mag is not None:
+            chips.append((
+                f"{self.tr('Mag')} {mag:.1f}", theme.C_OK,
+                self.tr("Predicted apparent magnitude tonight")))
+
+        # apparent rate (arcsec/min): NEO / PCCP only, from context
+        rate = None
+        if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
+            try:
+                rate = float(ctx["rate_arcsec_min"])
+            except (TypeError, ValueError):
+                rate = None
+        if rate:
+            chips.append((
+                f"{rate:.1f}″/min", theme.C_TEXT,
+                self.tr("Sky rate tonight — it must outrun the stars")))
+            # max no-trail exposure: needs the camera profile's plate scale;
+            # omitted when the profile is incomplete (missing is acceptable)
+            from ..config import config
+            scale = exposure.plate_scale(config.get("pixel_um"),
+                                         config.get("focal_mm"))
+            t_max = exposure.max_exposure_no_trail(rate, scale)
+            if t_max:
+                chips.append((
+                    f"⚠ {self.tr('max')} {t_max:.0f}s", theme.C_WARN,
+                    str(self.tr("Longest single exposure before the "
+                                "target trails more than a pixel"))
+                ))
+
+        # window above the horizon: start–end (HH:MM, same as the Tonight
+        # rows; ctx stores ISO strings with a UTC offset, so HH:MM is safe)
+        ws = ctx.get("window_start")
+        we = ctx.get("window_end")
+        if ws and we:
+            ws_hm = ws[11:16]
+            we_hm = we[11:16]
+            chips.append((
+                f"{ws_hm}–{we_hm}", theme.C_OK,
+                self.tr("Times the object is safely above the horizon")))
+            hours = ctx.get("hours_up")
+            if hours:
+                try:
+                    hours = float(hours)
+                except (TypeError, ValueError):
+                    hours = None
+                if hours:
+                    chips.append((
+                        f"{hours:.1f} h", theme.C_TEXT,
+                        self.tr("How long it stays a valid target")))
+        return chips
+
+    def _render_capture(self, e):
+        # Shows the capture/window block when it has at least one chip, keeps
+        # it hidden otherwise (empty context, SN with no window, …). This is
+        # the «omitting what is missing» rule from phase D3.
+        # @args: e - enriched dict
+        self._clear_chips()
+        chips = self._capture_chips(e)
+        if not chips:
+            self.row_capture.hide()
+            return
+        for text, color, tip in chips:
+            self._chips.insertWidget(self._chips.count() - 1,
+                                     _chip(text, color, tip))
+        self.row_capture.show()
 
     def _refill_params(self):
         # Fills the parameters table from the cached rows, honoring the

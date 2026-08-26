@@ -16,6 +16,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QFile, QObject, Qt, QEvent, Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                QHBoxLayout,
@@ -257,6 +258,19 @@ class MainWindow(QMainWindow):
         tabs.setCurrentIndex(0)
         # table starts collapsed
         self.tonight.grp_list.setVisible(False)
+        self._prepare_table()
+
+    def _prepare_table(self):
+        # One-time table setup (UX v3 phase C): the row is the unit, not the
+        # cell — no default 2x2 selection, no row numbers. The per-kind column
+        # set is installed by _fill_table() once targets exist.
+        from PySide6.QtWidgets import QAbstractItemView
+        tbl = self.tonight.tbl_targets
+        tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
+        tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        tbl.verticalHeader().setVisible(False)
+        tbl.setColumnCount(0)
+        tbl.setRowCount(0)
 
     def _connect_menu(self):
         self._menus.action_quit.triggered.connect(self.close)
@@ -880,23 +894,39 @@ class MainWindow(QMainWindow):
         return "—"
 
     def _fill_table(self):
+        # The full list as themed rows (UX v3 phase C): same data as before,
+        # but the row is the unit — kind-tinted, the top 3 wear a stronger
+        # tint (a quiet podium, like the wide rows above), hover and
+        # selection come from the global theme (ADR-026). Double-click a row
+        # to start / continue its project.
         kind_filter = self.tonight.cmb_filter.currentIndex()
         kinds = [None, "neo", "sn", "comet", "pccp", "transit", "alert"]
         want = kinds[kind_filter] if kind_filter < len(kinds) else None
         cols = TABLE_COLS.get(want, TABLE_COLS_DEFAULT)
         show_obs = self.tonight.chk_show_observed.isChecked()
         tbl = self.tonight.tbl_targets
+        score_idx = next((i for i, (_h, k) in enumerate(cols) if k == "score"),
+                         1)
         tbl.setSortingEnabled(False)
         tbl.setRowCount(0)
         tbl.setColumnCount(len(cols))
         tbl.setHorizontalHeaderLabels([self.tr(h) for h, _k in cols])
-        for t, score, parts, phrase in self._tonight_all:
-            if want and t["kind"] != want:
-                continue
-            if db.is_observed(t["id"]) and not show_obs:
-                continue
+        kept = [x for x in self._tonight_all
+                if (not want or x[0]["kind"] == want)
+                and (show_obs or not db.is_observed(x[0]["id"]))]
+        # best first (score desc, name asc) so the podium tints land on the
+        # top 3 of what is actually shown
+        kept.sort(key=lambda x: (-x[1], x[0]["name"]))
+        for i, (t, score, _parts, phrase) in enumerate(kept):
             row = tbl.rowCount()
             tbl.insertRow(row)
+            kind_color = self._KIND_COLORS.get(t.get("kind"), "#888888")
+            # quiet row tint; the top 3 wear a stronger kind-color tinge
+            # (hover and selection come from the global theme, ADR-026)
+            base = QColor(255, 255, 255, 9)
+            if i < 3:
+                base = QColor(kind_color)
+                base.setAlpha(48)
             for col, (_h, key) in enumerate(cols):
                 val = self._table_value(t, score, key)
                 if isinstance(val, float):
@@ -904,12 +934,20 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.DisplayRole, val)
                 else:
                     item = QTableWidgetItem(val if val is not None else "—")
+                bold = key in ("name", "score")
+                if bold:
+                    f = item.font()
+                    f.setBold(True)
+                    item.setFont(f)
+                item.setBackground(QBrush(base))
+                item.setForeground(
+                    QBrush(QColor(kind_color if bold else theme.C_TEXT)))
                 if col == 0:
                     item.setToolTip(self._txt(phrase))
                     item.setData(Qt.UserRole, t)
                 tbl.setItem(row, col, item)
         tbl.setSortingEnabled(True)
-        tbl.sortItems(1 if want else 2, Qt.DescendingOrder)
+        tbl.sortItems(score_idx, Qt.DescendingOrder)
         tbl.resizeColumnsToContents()
         if not self.tonight.btn_show_all.isChecked():
             self.tonight.btn_show_all.setText(
@@ -917,11 +955,15 @@ class MainWindow(QMainWindow):
                     "%1", str(len(self._tonight_all))))
 
     def _table_start_project(self, row, _col):
-        item = self.tonight.tbl_targets.item(row, 0)
-        if item:
+        tbl = self.tonight.tbl_targets
+        for col in range(tbl.columnCount()):
+            item = tbl.item(row, col)
+            if item is None:
+                continue
             t = item.data(Qt.UserRole)
             if t:
                 self._start_or_continue(t)
+                return
 
     # ---------------- Projects (ADR-019 v3.1) ----------------
 

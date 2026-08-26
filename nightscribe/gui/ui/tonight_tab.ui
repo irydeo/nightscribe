@@ -71,10 +71,10 @@
        </layout>
       </item>
       <item>
-       <widget class="QTableWidget" name="tbl_targets">
-        <property name="sortingEnabled"><bool>true</bool></property>
-        <property name="toolTip"><string>Double-click a row to start a project</string></property>
-       </widget>
+        <widget class="QTableWidget" name="tbl_targets">
+         <property name="sortingEnabled"><bool>true</bool></property>
+         <property name="toolTip"><string>Double-click a row to start or continue its project</string></property>
+        </widget>
       </item>
      </layout>
     </widget>

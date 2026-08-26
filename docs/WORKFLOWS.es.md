@@ -91,66 +91,16 @@ nativo claro.
 |---|---|---|
 | A | Tema global oscuro: `gui/theme.py` (paleta + QSS cromo + `KIND_COLORS`), `apply_theme(app)` en `app.py`, ADR-026, `tests/unit/test_theme.py` | **Hecho (2026-08-25)** |
 | B | «Esta noche» como **lista vertical de filas amplias**: nombre, «¿por qué?» visible, chips (mag/alt/ventana/luna/⚠), mini-barra de 4 segmentos del score, score 0-100, botón Start/Continue, podio metálico top-3, click-fila→Explorar, estados loading/vacío | **Hecho (2026-08-25)** |
-| C | Tabla «Lista completa» rediseñada sobre el tema, doble-click→proyecto, regeneración i18n ES/EN de las cadenas nuevas, tests de humo | **Pendiente ← punto de entrada** |
+| C | Tabla «Lista completa» rediseñada sobre el tema, doble-click→proyecto, regeneración i18n ES/EN de las cadenas nuevas, tests de humo | **Hecho (2026-08-26)** |
 
-**PUNTO DE ENTRADA para quien retome el rediseño (fase C)**:
-
-1. Leer `docs/adr/ADR-026-dark-global-theme.md` (decisión vigente:
-   `gui/theme.py` es la única fuente de colores base y de `KIND_COLORS`;
-   el cromo —ventanas, tabs, menús, tablas, tooltips, scrollbars— ya está
-   estilizado globalmente; la fase C solo toca la tabla «Lista completa»).
-2. La fase C trabaja en `nightscribe/gui/main_window.py` (tabla de
-   «Lista completa»: construcción de columnas, doble-click→proyecto,
-   estilos de fila) y en `nightscribe/gui/ui/tonight_tab.ui` (la tabla
-   vive debajo de la lista de filas).
-3. Decisiones de UX confirmadas (usuario): la tabla se **conserva** (no se
-   elimina); doble-click en una fila crea/continúa el proyecto; la tabla
-   hereda el tema global (filas, cabecera, selección) y añade las
-   cadenas nuevas por `self.tr(...)`. Al terminar, regenerar `.ts`/`.qm`
-   (ver ADR-014) y añadir tests de humo (patrón
-   `tests/unit/test_tonight_rows.py`).
-
-**PUNTO DE ENTRADA (para cualquier IA o humano que retome el trabajo)**:
-
-1. Leer, en este orden: `docs/adr/ADR-019`, `ADR-020`, `ADR-021`, `ADR-022` y este
-   documento completo.
-2. Las fases 2 y 3 ya están implementadas en la rama `feature/ux-v3-projects`:
-   - Fase 2: `core/horizon.py`, `core/exposure.py`, helpers en `coords.py`, penalización
-     Luna en `suggest.py`, integración en `planner.py`, silueta en `viz/sky_view.py`,
-     config ampliada, mock `tests/fixtures/horizon_sample.txt` + tests.
-   - Fase 3: migración `core/db.py` (`user_version` 0→1: tablas `projects`,
-     `project_steps`, `project_files`; `observations` += `project_id`), `core/project.py`
-     (modelo + máquina de pasos Plan→Captura→Procesado→Análisis→Publicar), tests.
-   - Fase 4: GUI v3 — 4 pestañas (Esta noche · Proyectos · Solar · Historial),
-     `projects_tab.ui` con lista + stepper, Explore/Post/Blink como diálogos modales
-     contextuales (pre-rellenados desde proyecto), acceso ad-hoc desde menú Herramientas,
-     tarjetas de Esta noche con «Crear proyecto» + ventana + Luna, Settings ampliada
-     con grupos Cámara/Horizonte/Sesión/Luna, `sky_view` con horizonte real, i18n
-     (.ts/.qm) actualizado.
-   - Fase 5: `core/sequence.py` (exportadores NINA JSON / CCDciel XML / CSV genérico
-     para secuencias de captura) y `core/ephemeris.py` (generación vía Horizons +
-     exportadores CSV / TheSkyX / Cartes du Ciel para efemérides). Panel «Capture plan»
-     en el hub de Proyectos con campos frames/exposición/filtro y botones de exportación.
-     Los formatos nativos de NINA/CCDciel/TheSkyX/CdC son puntos de partida que requieren
-     validación contra las versiones del usuario en importación real.
-   - Fase 6: `core/mpc_report.py` (validador de medidas pegadas en MPC 80-col o ADES
-     PSV: formato, código de observatorio, designación; empaquetado del fichero para
-     envío al MPC). Panel «MPC report» en el hub de Proyectos. Subcomando CLI
-     `nightscribe project list|create|advance|show`. i18n completo (208 cadenas ES/EN).
-     **Todas las fases completas.**
-   El **horizonte TheSkyX real** sigue mockeado: cuando el usuario comparta su fichero,
-   sustituir el parser/fixture de `core/horizon.py` validando contra ese fichero (ADR-020).
-   Los **formatos nativos de NINA/CCDciel/TheSkyX/CdC** son puntos de partida que requieren
-   validación contra las versiones del usuario en importación real (ADR-021).
-
-**Próximos pasos sugeridos** (fuera del rediseño inicial):
-- Sustituir el mock del horizonte por el fichero TheSkyX real del usuario.
-- Validar los formatos de exportación de secuencias y efemérides contra software real.
-- Añadir flujos para cometas y tránsitos en el mismo esqueleto de 5 pasos.
-- Probar la GUI a fondo y refinar la UX del stepper y los diálogos contextuales.
-4. Reglas vigentes: código en inglés con cabecera GPL y comentarios `# @args:`,
-   cadenas de GUI por `self.tr()`, red solo desde `core/sources/` vía `core/db.py`,
-   documentación bilingüe (ADR-013), tests unitarios por módulo + funcionales de flujo.
-
-Cada fase deja la app funcional e incluye sus tests. No mezclar fases en un mismo
-commit sin que la anterior esté verificada.
+**Fase C (hecha, 2026-08-26)**: la tabla se conserva y ahora se comporta
+como las filas amplias de encima — selección por fila (sin celdas 2×2, sin
+números de fila), cada fila con un matiz de su tipo de objeto, el top 3
+(orden de score) con el matiz más marcado como un podio discreto, nombre y
+score en negrita con el color del tipo, cabecera/selección/hover del tema
+global (ADR-026). El doble-click desde **cualquier** columna
+crea/continúa el proyecto. Código en `nightscribe/gui/main_window.py`
+(`_prepare_table`, `_fill_table`, `_table_start_project`) +
+`tonight_tab.ui` (tooltip). Cadenas nuevas traducidas ES/EN y
+`.ts`/`.qm` regenerados (ADR-014). Tests de humo en
+`tests/unit/test_tonight_table.py` (patrón de `test_tonight_rows.py`).

@@ -90,65 +90,15 @@ global theme: dark cards floating over the platform's light chrome.
 |---|---|---|
 | A | Global dark theme: `gui/theme.py` (palette + chrome QSS + `KIND_COLORS`), `apply_theme(app)` in `app.py`, ADR-026, `tests/unit/test_theme.py` | **Done (2026-08-25)** |
 | B | «Tonight» as a **vertical list of wide rows**: name, visible "why tonight" line, chips (mag/alt/window/moon/⚠), 4-segment score mini-bar, 0-100 score, Start/Continue button, subtle metallic top-3 podium, row-click→Explore, loading/empty states | **Done (2026-08-25)** |
-| C | Redesigned «Full target list» table over the theme, double-click→project, ES/EN i18n regeneration of the new strings, smoke tests | **Pending ← entry point** |
+| C | Redesigned «Full target list» table over the theme, double-click→project, ES/EN i18n regeneration of the new strings, smoke tests | **Done (2026-08-26)** |
 
-**ENTRY POINT for whoever resumes the redesign (phase C)**:
-
-1. Read `docs/adr/ADR-026-dark-global-theme.md` (standing decision:
-   `gui/theme.py` is the single source of base colors and `KIND_COLORS`;
-   the chrome —windows, tabs, menus, tables, tooltips, scrollbars—is
-   already styled globally; phase C only touches the «Full target list»
-   table).
-2. Phase C works in `nightscribe/gui/main_window.py` (the full-list
-   table: column building, double-click→project, row styling) and in
-   `nightscribe/gui/ui/tonight_tab.ui` (the table sits under the row
-   list).
-3. Confirmed UX decisions (user): the table is **kept** (not removed);
-   double-clicking a row starts/continues the project; the table inherits
-   the global theme (rows, header, selection) and adds its new strings
-   via `self.tr(...)`. When done, regenerate `.ts`/`.qm` (see ADR-014) and
-   add smoke tests (pattern in `tests/unit/test_tonight_rows.py`).
-
-**ENTRY POINT (for any AI or human resuming the work)**:
-
-1. Read, in this order: `docs/adr/ADR-019`, `ADR-020`, `ADR-021`, `ADR-022` and this
-   full document.
-2. Phases 2 and 3 are already implemented on branch `feature/ux-v3-projects`:
-   - Phase 2: `core/horizon.py`, `core/exposure.py`, helpers in `coords.py`, Moon
-     penalty in `suggest.py`, planner integration in `planner.py`, silhouette in
-     `viz/sky_view.py`, extended config, mock `tests/fixtures/horizon_sample.txt` + tests.
-   - Phase 3: `core/db.py` migration (`user_version` 0→1: tables `projects`,
-     `project_steps`, `project_files`; `observations` += `project_id`), `core/project.py`
-     (model + step machine Plan→Capture→Process→Analyse→Publish), tests.
-   - Phase 4: GUI v3 — 4 tabs (Tonight · Projects · Solar · History),
-     `projects_tab.ui` with list + stepper, Explore/Post/Blink as contextual modal
-     dialogs (pre-filled from project), ad-hoc access from the Tools menu, Tonight cards
-     with "Create project" + window + Moon, Settings extended with Camera/Horizon/
-     Session/Moon groups, `sky_view` with real horizon, i18n (.ts/.qm) updated.
-   - Phase 5: `core/sequence.py` (NINA JSON / CCDciel XML / generic CSV capture
-     sequence exporters) and `core/ephemeris.py` (Horizons-based generation + CSV /
-     TheSkyX / Cartes du Ciel ephemeris exporters). "Capture plan" panel in the Projects
-     hub with frames/exposure/filter fields and export buttons. The native NINA/CCDciel/
-     TheSkyX/CdC formats are starting points that require validation against the user's
-     software versions via real import.
-   - Phase 6: `core/mpc_report.py` (validator for pasted measurements in MPC 80-col or
-     ADES PSV: format, observatory code, designation; file packaging for MPC submission).
-     "MPC report" panel in the Projects hub. CLI subcommand
-     `nightscribe project list|create|advance|show`. Full i18n (208 strings ES/EN).
-     **All phases complete.**
-   The **real TheSkyX horizon** is still mocked: when the user shares their file,
-   replace the parser/fixture in `core/horizon.py` validating against that file (ADR-020).
-   The **native NINA/CCDciel/TheSkyX/CdC formats** are starting points that require
-   validation against the user's software versions via real import (ADR-021).
-
-**Suggested next steps** (beyond the initial redesign):
-- Replace the mocked horizon with the user's real TheSkyX file.
-- Validate the sequence and ephemeris export formats against real software.
-- Add flows for comets and exoplanet transits in the same 5-step skeleton.
-- Test the GUI thoroughly and refine the stepper and contextual dialog UX.
-4. Standing rules: English code with GPL header and `# @args:` comments, GUI strings
-   via `self.tr()`, network only from `core/sources/` through `core/db.py`, bilingual
-   documentation (ADR-013), unit tests per module + end-to-end functional tests.
-
-Each phase leaves the app working and ships its own tests. Do not mix phases in one
-commit without the previous one being verified.
+**Phase C (done, 2026-08-26)**: the table is kept and now behaves like the
+wide rows above it — row-level selection (no cell 2×2, no row numbers),
+every row tinted with its kind color, the top 3 (score order) wearing a
+stronger tinge as a quiet podium, bold name + score in the kind color,
+headers/selection/hover from the global theme (ADR-026). Double-click from
+*any* column starts/continues the project. Code in
+`nightscribe/gui/main_window.py` (`_prepare_table`, `_fill_table`,
+`_table_start_project`) + `tonight_tab.ui` (tooltip). New strings
+translanted ES/EN and `.ts`/`.qm` regenerated (ADR-014). Smoke tests in
+`tests/unit/test_tonight_table.py` (pattern of `test_tonight_rows.py`).

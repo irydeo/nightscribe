@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 
 from .. import paths
 from ..config import config
+from ..version import full_version
 from ..core import (ephemeris, mpc_report, orbits, project,
                     sequence, suggest)
 from ..core.db import db
@@ -137,7 +138,7 @@ class MainWindow(QMainWindow):
         self._project_widgets = {}
 
         win = _load_ui("main_window")
-        self.setWindowTitle(win.windowTitle())
+        self.setWindowTitle(f"{win.windowTitle()} {full_version()}")
         self.setCentralWidget(win.centralwidget)
         self.setStatusBar(win.statusbar)
         self.setMenuBar(win.menubar)
@@ -147,9 +148,8 @@ class MainWindow(QMainWindow):
         self._build_tabs()
         self._connect_menu()
         self._connect()
-        from .. import __version__
         self.statusBar().showMessage(
-            f"NightScribe {__version__} — "
+            f"NightScribe {full_version()} — "
             + self.tr("Ready — press 'Compute tonight'"), 8000)
         from PySide6.QtCore import QTimer
         if config.is_configured():
@@ -332,8 +332,11 @@ class MainWindow(QMainWindow):
             self.tr("Found: %1").replace("%1", info["name"]), 8000)
 
     def on_about(self):
+        # Show the exact build so the user can check "is this the right one?"
+        # before reporting an issue (spirit of ADR-013: self-describing app).
+        # @args: none
         QMessageBox.about(self, "NightScribe",
-                          "<b>NightScribe</b> 0.1<br><br>"
+                          f"<b>NightScribe</b> {full_version()}<br><br>"
                           + self.tr("Plan your night, understand every object, "
                                     "tell your science.")
                           + "<br><br>(c) 2026 Francisco José Calvo Fernández<br>"
@@ -346,6 +349,21 @@ class MainWindow(QMainWindow):
                     "COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA "
                     "Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI "
                     "Legacy Survey · CDS hips2fits"))
+
+    def on_docs(self):
+        # Opens the in-GUI documentation browser (Help > Documentation):
+        # file tree on the left, rendered doc on the right. Starts at the
+        # master doc for the current language (WORKFLOWS) when present.
+        from .doc_viewer import open_browser
+        root = paths.docs_dir()
+        if not root.is_dir():
+            self.statusBar().showMessage(
+                self.tr("Documentation not found at %1").replace("%1", root),
+                10000)
+            return
+        name = "WORKFLOWS.es.md" if self._lang() == "es" else "WORKFLOWS.md"
+        start = root / name if (root / name).exists() else None
+        open_browser(root, self, start=start)
 
     # ---------------- Tonight: suggestion grid ----------------
 

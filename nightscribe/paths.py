@@ -11,6 +11,9 @@
 #
 ############################################################
 
+import sys
+from pathlib import Path
+
 import platformdirs
 
 from . import __app_name__
@@ -43,3 +46,11 @@ def image_cache_dir():
     p = data_dir() / "images"
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def docs_dir():
+    # @return: Path to the documentation folder (docs/ bundled by the
+    # PyInstaller spec, or the repository one when running from source)
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "docs"
+    return Path(__file__).resolve().parent.parent / "docs"

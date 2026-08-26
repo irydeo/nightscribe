@@ -55,11 +55,13 @@
     <addaction name="action_explore"/>
     <addaction name="action_blink"/>
    </widget>
-   <widget class="QMenu" name="menu_help">
-    <property name="title"><string>Help</string></property>
-    <addaction name="action_about"/>
-    <addaction name="action_sources"/>
-   </widget>
+    <widget class="QMenu" name="menu_help">
+     <property name="title"><string>Help</string></property>
+     <addaction name="action_docs"/>
+     <addaction name="separator_help"/>
+     <addaction name="action_about"/>
+     <addaction name="action_sources"/>
+    </widget>
    <addaction name="menu_file"/>
    <addaction name="menu_view"/>
    <addaction name="menu_tools"/>
@@ -91,6 +93,9 @@
   </action>
   <action name="action_sources">
    <property name="text"><string>Data sources</string></property>
+  </action>
+  <action name="action_docs">
+    <property name="text"><string>Technical Documentation</string></property>
   </action>
  </widget>
  <resources/>

@@ -22,12 +22,12 @@
 # Projects hub (D4) and the Explore dialog (D5) will both render it —
 # single source of truth for "what do we know about this object".
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QGroupBox,
-                                QHBoxLayout, QLabel, QHeaderView, QSizePolicy,
-                                QTableWidget, QTableWidgetItem, QVBoxLayout,
-                                QWidget)
+                                QHBoxLayout, QLabel, QHeaderView, QPushButton,
+                                QSizePolicy, QTableWidget, QTableWidgetItem,
+                                QVBoxLayout, QWidget)
 
 from ..core import exposure, narrative, orbits
 from .. import paths
@@ -115,6 +115,10 @@ class ObjectPanel(QWidget):
     #   loading — a worker is still out there
     #   missing — the loader came back empty
     #   ready   — hook + bullets + parameters table
+    # post_requested(name, fallback_target) — the optional "Create post"
+    # button fired it (shown only when loaded with for_post, i.e. the
+    # Explore dialog of D5; the Projects hub keeps it hidden).
+    post_requested = Signal(str, object)
     # Entry points:
     #   show(e, ctx)      — render an already-enriched dict (hub, tests)
     #   explore(name,...) — ask the injected loader for a worker and
@@ -122,7 +126,8 @@ class ObjectPanel(QWidget):
     #   cancel()          — drop a running worker (the hub calls it when the
     #                       user switches to another project)
 
-    def __init__(self, loader=None, chart_dir=None, parent=None):
+    def __init__(self, loader=None, chart_dir=None, for_post=False,
+                 parent=None):
         # @args: loader - callable(name, fallback_target) returning a
         #                     QThread-like worker with finished=Signal(dict)
         #                     and start(); None means the ExploreWorker
@@ -130,6 +135,8 @@ class ObjectPanel(QWidget):
         #         chart_dir - directory where the PNG charts are written;
         #                     defaults to the user data dir's "posts".
         #                     Injectable so tests can point at tmp_path.
+        #         for_post - the Explore-dialog flavour (D5): show the
+        #                    "Create post" button next to the panel
         #         parent - parent widget
         super().__init__(parent)
         self._loader = loader or self._default_loader
@@ -139,9 +146,22 @@ class ObjectPanel(QWidget):
         self._ctx = None
         self._rows = []
         self._state = "empty"
+        self._name = None        # identifier currently being shown/fetched
+        self._fallback = None    # planner target (unconfirmed NEOCP/PCCP)
+        self._for_post = False   # the Explore dialog wants the post affordance
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        self._for_post = for_post
+
+        # top row: the "Create post" affordance (D5, Explore dialog only)
+        self.btn_post = QPushButton(self.tr("Create post"))
+        self.btn_post.setToolTip(self.tr(
+            "Build the bilingual drafts + charts for this object"))
+        self.btn_post.clicked.connect(self._ask_post)
+        if not for_post:
+            self.btn_post.hide()
+        layout.addWidget(self.btn_post, 0, Qt.AlignRight)
 
         # state line (loading / not found); hidden when ready
         self.lbl_state = QLabel()
@@ -283,6 +303,20 @@ class ObjectPanel(QWidget):
 
     # ---------------- public API ----------------
 
+    def name(self):
+        # @return: the identifier this panel is showing (or was showing),
+        #          for the Explore dialog's "Create post" flow (D5)
+        return self._name
+
+    def _ask_post(self):
+        # @return: asks the owner (the Explore dialog's window) to build
+        #          post drafts for the object currently on the panel
+        if self._worker is not None:
+            return  # still loading — nothing to build a post from yet
+        if self._name is None:
+            return
+        self.post_requested.emit(self._name, self._fallback)
+
     def show(self, e, ctx=None):
         # Renders the ready state from an enriched dict; an empty dict is
         # the «not found» state (matches ExploreWorker's {} on failure).
@@ -293,6 +327,8 @@ class ObjectPanel(QWidget):
         if not e or not e.get("data"):
             self._state_missing()
             return
+        if self._name is None and e.get("name"):
+            self._name = str(e["name"])
         self._state_ready(e)
 
     def explore(self, name, fallback_target=None, ctx=None):
@@ -302,6 +338,8 @@ class ObjectPanel(QWidget):
         #         ctx - project context snapshot, kept for the capture block
         if self._worker is not None:
             return  # a worker is still out there; ignore the second ask
+        self._name = name
+        self._fallback = fallback_target
         self._ctx = ctx
         self._state_loading(name)
         worker = self._loader(name, fallback_target)
@@ -331,6 +369,8 @@ class ObjectPanel(QWidget):
         self._state = "empty"
         self._ctx = None
         self._rows = []
+        self._name = None
+        self._fallback = None
         self._clear_chips()
         self.lbl_state.hide()
         self.lbl_hook.hide()

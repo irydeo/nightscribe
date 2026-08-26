@@ -235,26 +235,23 @@ def test_explore_dialog_orbit_chart(tmp_path):
     from PySide6.QtCore import QCoreApplication
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    from nightscribe.gui.main_window import MainWindow
-    w = MainWindow()
-    # build the explore widget from the UI file, just like the dialog does
-    from nightscribe.gui.main_window import _load_ui
-    explore = _load_ui("explore_tab")
+    from nightscribe.gui.overview import ObjectPanel
+    # D5: the Explore dialog is the shared panel — drive it straight
+    panel = ObjectPanel(chart_dir=str(tmp_path / "posts"))
     # enrich a real parabolic comet end-to-end
     e = enrich.enrich("C/2023 A3", site=MPC)
     assert e and e.get("data"), "enrich must return data for C/2023 A3"
     sb = e["data"].get("sbdb")
     assert sb and sb["elements"]["e"] >= 1.0, "must be parabolic"
-    # call the chart method directly (same as _dialog_explore_done does)
-    w._dialog_explore_charts(explore, e)
-    pix = explore.lbl_orbit.pixmap()
+    # paint it (same as _dialog_explore_done used to do)
+    panel.show(e)
+    pix = panel._labels["orbit"].pixmap()
     assert pix is not None and not pix.isNull(), \
-        "orbit tab must show a pixmap for a parabolic comet"
+        "orbit slot must show a pixmap for a parabolic comet"
     # the label must carry the chart path for the zoom/export viewer
-    assert explore.lbl_orbit.property("chart_png"), \
+    assert panel._labels["orbit"].property("chart_png"), \
         "orbit label must expose its PNG path for the chart viewer"
-    assert (Path(explore.lbl_orbit.property("chart_png"))).exists()
-    w.close()
+    assert (Path(panel._labels["orbit"].property("chart_png"))).exists()
 
 
 def test_chart_viewer_zoom_and_export(tmp_path):
@@ -350,9 +347,9 @@ def test_explore_dialog_unconfirmed_neo():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    from nightscribe.gui.main_window import MainWindow, _load_ui
-    w = MainWindow()
-    explore = _load_ui("explore_tab")
+    from nightscribe.gui.overview import ObjectPanel
+    # D5: drive the shared panel directly (the Explore dialog's content)
+    panel = ObjectPanel()
     # simulate what the planner produces for an unconfirmed NEO:
     # a fallback_target with position but no orbital elements
     fallback = {
@@ -367,20 +364,19 @@ def test_explore_dialog_unconfirmed_neo():
     assert e and e.get("data"), "enrich must return data for unconfirmed NEO"
     assert e["data"].get("unconfirmed"), "must be the unconfirmed path"
     assert not e["data"].get("sbdb"), "must not have SBDB for unconfirmed"
-    # call the chart method — must not crash and must populate both tabs
-    w._dialog_explore_charts(explore, e)
-    # orbit tab: no pixmap, but informative text (not the default "—")
-    orbit_pix = explore.lbl_orbit.pixmap()
-    orbit_text = explore.lbl_orbit.text()
+    # paint it — must not crash and must populate both slots
+    panel.show(e)
+    # orbit slot: no pixmap, but informative text (not the default "—")
+    orbit_pix = panel._labels["orbit"].pixmap()
+    orbit_text = panel._labels["orbit"].text()
     assert orbit_pix is None or orbit_pix.isNull(), \
-        "orbit tab must NOT show a pixmap for unconfirmed objects"
+        "orbit slot must NOT show a pixmap for unconfirmed objects"
     assert orbit_text and orbit_text != "—", \
-        "orbit tab must show an informative message, not the placeholder"
-    # sky tab: must render from unconfirmed ra_deg/dec_deg
-    sky_pix = explore.lbl_sky.pixmap()
+        "orbit slot must show an informative message, not the placeholder"
+    # sky slot: must render from unconfirmed ra_deg/dec_deg
+    sky_pix = panel._labels["sky"].pixmap()
     assert sky_pix is not None and not sky_pix.isNull(), \
-        "sky tab must show a pixmap from the unconfirmed object's coordinates"
-    w.close()
+        "sky slot must show a pixmap from the unconfirmed object's coordinates"
 
 
 def test_enrich_unconfirmed_with_neofixer_orbit():

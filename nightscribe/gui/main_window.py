@@ -15,7 +15,7 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QFile, QObject, Qt, QEvent, Signal
+from PySide6.QtCore import QFile, Qt, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
@@ -61,36 +61,6 @@ def _load_ui(name, parent=None):
     widget = QUiLoader().load(file, parent)
     file.close()
     return widget
-
-
-def _set_scaled_pixmap(label, pix, max_w=860, max_h=520):
-    # Fits a pixmap into a QLabel preserving aspect ratio. Uses fixed
-    # bounds because labels in inactive tabs report a tiny default size.
-    # @args: label - QLabel, pix - QPixmap, max_w/max_h - target bounds
-    if pix.isNull():
-        return
-    label.setPixmap(pix.scaled(max_w, max_h, Qt.KeepAspectRatio,
-                               Qt.SmoothTransformation))
-
-
-class _ChartClickFilter(QObject):
-    # Opens the chart viewer when a chart label is clicked. The label
-    # carries the chart file in its "chart_png" dynamic property.
-    # @args: window - MainWindow (opens the viewer as its child)
-
-    def __init__(self, window):
-        super().__init__(window)
-        self._window = window
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonRelease:
-            path = obj.property("chart_png")
-            if path:
-                from .chart_viewer import open_chart
-                open_chart(self._window, path,
-                           title=obj.property("chart_title") or "")
-                return True
-        return False
 
 
 # Per-kind table columns for the full (collapsed) table
@@ -188,7 +158,6 @@ class MainWindow(QMainWindow):
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
-        self._explored = None
         self._blink_pair = None
         self._blink_ref8 = None
         self._blink_obs8 = None
@@ -1548,77 +1517,65 @@ class MainWindow(QMainWindow):
         self._open_blink_dialog()
 
     def _open_explore_dialog(self, name):
+        # D5 (docs/WORKFLOWS.es.md): the Explore… dialog is now the shared
+        # ObjectPanel (gui/overview.py) plus its "Create post" button — the
+        # same panel the Projects hub shows, one source of truth.
+        # @args: name - object identifier to explore
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Explore — %1").replace("%1", name))
-        dlg.resize(1100, 780)
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        panel = self._explore_panel(name)
+        area.setWidget(panel)
+        dlg.resize(980, 720)
         layout = QVBoxLayout(dlg)
-        explore = _load_ui("explore_tab")
-        layout.addWidget(explore)
-        explore.edt_explore.setText(name)
-        explore.btn_explore.clicked.connect(
-            lambda: self._dialog_explore(explore, name))
-        explore.chk_deep.stateChanged.connect(
-            lambda: self._dialog_explore_params(explore))
-        explore.btn_mkpost.clicked.connect(
-            lambda: (self._open_post_dialog(name), dlg.accept()))
-        # charts open the zoom/export viewer on click
-        click_filter = _ChartClickFilter(dlg)
-        for attr, title in (("lbl_orbit", "Orbit"), ("lbl_sky", "Sky tonight"),
-                            ("lbl_families", "Families"), ("lbl_field", "Field")):
-            lbl = getattr(explore, attr)
-            lbl.setProperty("chart_title", title)
-            lbl.setCursor(Qt.PointingHandCursor)
-            lbl.setToolTip(self.tr("Click to zoom / export"))
-            lbl.installEventFilter(click_filter)
-        self._dialog_explore(explore, name)
+        layout.addWidget(area)
+
+        def _make_post(sig, nm, fb):
+            # one-shot slot: open the post dialog for the object on the
+            # panel and close the Explore dialog right after
+            try:
+                sig.disconnect(_make_post)
+            except (TypeError, RuntimeError):
+                pass
+            self._open_post_dialog(nm)
+            dlg.accept()
+
+        panel.post_requested.connect(_make_post)
         dlg.exec()
 
-    def _dialog_explore(self, explore, name):
-        explore.btn_explore.setEnabled(False)
-        explore.lbl_hook.setText(self.tr("Loading…"))
+    def _explore_panel(self, name):
+        # Builds the Explore-dialog flavour of the shared panel and starts
+        # loading `name` on it (the window keeps the worker, per D4's rule).
+        # @args: name - object identifier
+        # @return: the ready-to-show ObjectPanel (already loading `name`)
+        panel = ObjectPanel(loader=self._explore_loader,
+                            chart_dir=str(paths.data_dir() / "posts"),
+                            for_post=True, parent=self)
         fallback = next((t for t, _s, _p, _ph in self._tonight_all
                          if t["id"] == name or t["name"] == name), None)
-        w = ExploreWorker(config, name, fallback_target=fallback)
-        w.finished.connect(lambda e: self._dialog_explore_done(explore, name, e))
-        self._keep(w)
-        w.start()
+        panel.explore(name, fallback_target=fallback)
+        return panel
 
-    def _dialog_explore_done(self, explore, name, e):
-        from ..core import narrative
-        explore.btn_explore.setEnabled(True)
-        if not e or not e.get("data"):
-            explore.lbl_hook.setText(self.tr("Not found: ") + name)
-            return
-        explore.lbl_hook.setText(self._txt(narrative.hook(e)))
-        self._explored = e
-        self._dialog_explore_params(explore)
-        self._dialog_explore_charts(explore, e)
+    def _explore_loader(self, name, fallback_target=None):
+        # @args: name - object identifier, fallback_target - planner target
+        # @return: a kept, not-yet-started ExploreWorker
+        worker = ExploreWorker(config, name, fallback_target=fallback_target)
+        self._keep(worker)
+        return worker
 
-    def _dialog_explore_params(self, explore):
-        e = self._explored
-        if not e:
-            return
-        rows = self._orbit_rows(e)
-        deep = explore.chk_deep.isChecked()
-        if not deep:
-            rows = [r for r in rows if r.get("level") == "basic"]
-        tbl = explore.tbl_params
-        tbl.setRowCount(0)
-        for r in rows:
-            row = tbl.rowCount()
-            tbl.insertRow(row)
-            param = self._txt(r["param"]) if isinstance(r["param"], dict) \
-                else str(r["param"])
-            tbl.setItem(row, 0, QTableWidgetItem(param))
-            tbl.setItem(row, 1, QTableWidgetItem(str(r["value"])))
-            tbl.setItem(row, 2, QTableWidgetItem(self._txt(r)))
-        tbl.resizeColumnsToContents()
-        tbl.setColumnWidth(2, 520)
+    def _explore_post(self, name):
+        # The Explore dialog's "Create post": open the post dialog for the
+        # explored object (same flow as the hub's paso 5 button).
+        # @args: name - object identifier
+        self._open_post_dialog(name)
 
     def _render_object_charts(self, e, prefix, outdir=None):
         # Renders every chart the enriched object supports into the posts
-        # directory. Shared by the Explore dialog and the post/publish flow.
-        # Thin wrapper over core.post.build_charts (single source of truth).
+        # directory, for the post/publish flow. Thin wrapper over
+        # core.post.build_charts (single source of truth).
         # @args: e - enriched dict, prefix - file name prefix (per-flow),
         #         outdir - save folder (defaults to the data dir's posts)
         # @return: dict {chart_key: Path} for the charts actually produced
@@ -1630,54 +1587,6 @@ class MainWindow(QMainWindow):
             import matplotlib.pyplot as plt
             plt.close("all")
         return charts
-
-    def _dialog_explore_charts(self, explore, e):
-        from PySide6.QtGui import QPixmap
-        d = e.get("data") or {}
-        sb = d.get("sbdb")
-        els = sb.get("elements") if sb else None
-        unc = d.get("unconfirmed")
-        charts = self._render_object_charts(e, "_explore_")
-        for key, attr in (("orbit", "lbl_orbit"), ("sky", "lbl_sky"),
-                          ("families", "lbl_families"),
-                          ("field", "lbl_field")):
-            lbl = getattr(explore, attr)
-            p = charts.get(key)
-            if p:
-                lbl.setProperty("chart_png", str(p))
-                _set_scaled_pixmap(lbl, QPixmap(str(p)))
-        # when there is no orbit chart, explain why instead of leaving "—"
-        if "orbit" not in charts:
-            if els and els.get("e", 0) > 1.0:
-                explore.lbl_orbit.setText(self.tr(
-                    "Órbita hiperbólica — no dibujable\n"
-                    "Hyperbolic orbit — not plottable"))
-            elif unc:
-                explore.lbl_orbit.setText(self.tr(
-                    "Objeto no confirmado — sin elementos orbitales\n"
-                    "Unconfirmed object — no orbital elements"))
-            elif not sb:
-                explore.lbl_orbit.setText(self.tr(
-                    "Sin elementos orbitales / No orbital elements"))
-
-    def _orbit_rows(self, e):
-        d = e.get("data") or {}
-        sb = d.get("sbdb")
-        if sb:
-            moid = sb.get("moid")
-            try:
-                moid = float(moid) if moid is not None else None
-            except (TypeError, ValueError):
-                moid = None
-            return orbits.explain_elements(sb.get("elements") or {},
-                                           sb.get("phys") or {},
-                                           d.get("family"), moid,
-                                           sigmas=sb.get("sigmas"),
-                                           n_resids=sb.get("n_resids"),
-                                           arc_days=sb.get("arc_days"))
-        if d.get("unconfirmed"):
-            return orbits.explain_neofixer(d["unconfirmed"])
-        return []
 
     def _open_post_dialog(self, name):
         dlg = QDialog(self)

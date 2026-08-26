@@ -314,3 +314,50 @@ def test_no_projects_clears_state(window):
     window.on_refresh_projects()
     assert window._current_project is None
     assert "No projects" in window.projects.lbl_header.text()
+
+
+# ---------------- D5: the Explore dialog over the shared panel -------
+
+def test_explore_panel_is_shared_panel_with_post_button(window, tmp_path):
+    # _explore_panel builds the SAME ObjectPanel class the hub uses, in the
+    # dialog flavour (post button visible), and starts loading at once —
+    # the fake loader answers, so the panel lands on "ready".
+    from nightscribe.gui.overview import ObjectPanel
+    orig_loader = window._explore_loader
+    window._explore_loader = (lambda name, fallback_target=None:
+                              FakeWorker(FAKE_ELEMENT))
+    try:
+        panel = window._explore_panel("2026 QK (443089)")
+        assert isinstance(panel, ObjectPanel)
+        assert not panel.btn_post.isHidden()
+        assert panel._loader == window._explore_loader
+        assert panel.state() == "ready"
+        assert panel.name() == "2026 QK (443089)"
+    finally:
+        window._explore_loader = orig_loader
+        panel.deleteLater()
+
+
+def test_explore_panel_post_signal_carries_name(window, tmp_path):
+    # pressing the button must ask the owner (the dialog's glue) to build
+    # post drafts for exactly the object on the panel, with the fallback
+    # target along — that is the contract the dialog glue listens to.
+    from nightscribe.gui.overview import ObjectPanel
+    window._explore_loader = (lambda name, fallback_target=None:
+                              FakeWorker(FAKE_ELEMENT))
+    try:
+        fake_fallback = {"id": "T41", "name": "443089", "kind": "neo"}
+        window._tonight_all = [(fake_fallback, 80, 0.9, "ph")]
+        panel = window._explore_panel("443089")
+        assert isinstance(panel, ObjectPanel)
+        assert not panel.btn_post.isHidden()
+        assert panel.state() == "ready"
+        assert panel.name() == "443089"
+        got = {}
+        panel.post_requested.connect(lambda n, f: got.update(n=n, f=f))
+        panel.btn_post.clicked.emit()
+        assert got.get("n") == "443089"
+        assert got.get("f") is fake_fallback
+    finally:
+        window._tonight_all = []
+        panel.deleteLater()

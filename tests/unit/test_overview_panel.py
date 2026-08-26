@@ -460,3 +460,125 @@ def test_capture_block_pccp_omits_rate_when_missing(panel):
         f"rate must be omitted without a rate: {chips!r}"
     assert not any("max" in c.lower() for c in chips), \
         f"exposure must be omitted without a rate: {chips!r}"
+
+
+# ---------------- D5: Explore dialog flavour (post button) ----------
+#
+# The Explore dialog is now this same panel with for_post=True: the
+# "Create post" button must appear and fire the owner's flow with the
+# object it is showing. The hub flavour (for_post=False) keeps it hidden.
+
+class _PendingWorker(FakeWorker):
+    """A worker that never delivers until the test releases it."""
+
+    def __init__(self, payload):
+        super().__init__(payload)
+        self._pending = True
+
+    def start(self):
+        self._pending = False
+        # do not deliver yet; release() fires it later
+
+
+def _release(worker):
+    worker._pending = False
+    worker.finished.deliver(worker.payload)
+
+
+def test_post_button_hidden_by_default(qapp, tmp_path):
+    # the Projects hub flavour: no post affordance, nothing to click
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir=tmp_path / "charts")
+    try:
+        assert p.btn_post.isHidden()
+        assert p.name() is None  # ... and no stale object either
+    finally:
+        p.deleteLater()
+
+
+def test_post_button_visible_in_explore_flavour(qapp, tmp_path):
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+    try:
+        assert not p.btn_post.isHidden()
+    finally:
+        p.deleteLater()
+
+
+def test_post_request_emits_object_on_ready(qapp, tmp_path):
+    # ready -> pressing the button asks the owner to build the post for
+    # exactly the object on the panel (name + fallback both travel)
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(loader=lambda n, f=None: FakeWorker(FAKE_ELEMENT),
+                    chart_dir=tmp_path / "charts", for_post=True)
+    try:
+        p.explore("2026 QK (443089)", fallback_target={"id": "neo1"})
+        assert p.state() == "ready"
+        got = {}
+        p.post_requested.connect(lambda n, f: got.update(n=n, f=f))
+        p.btn_post.clicked.emit()
+        assert got.get("n") == "2026 QK (443089)"
+        assert got.get("f") == {"id": "neo1"}
+    finally:
+        p.deleteLater()
+
+
+def test_post_request_emits_object_from_show(qapp, tmp_path):
+    # the hub-style show() path also records the object name: explore
+    # from an already-enriched dict and the post still names it
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+    try:
+        p.show(FAKE_ELEMENT, {"kind": "neo"})
+        assert p.state() == "ready"
+        assert p.name() == "2026 QK (443089)"
+        got = {}
+        p.post_requested.connect(lambda n, f: got.update(n=n))
+        p.btn_post.clicked.emit()
+        assert got.get("n") == "2026 QK (443089)"
+    finally:
+        p.deleteLater()
+
+
+def test_post_button_ignored_while_loading(qapp, tmp_path):
+    # the dialog must not build a post for an object that is still in
+    # flight: the button is there, but a click lands nowhere
+    from nightscribe.gui.overview import ObjectPanel
+    loader = {}
+
+    def slow_loader(name, fallback_target=None):
+        w = _PendingWorker(FAKE_ELEMENT)
+        loader["w"] = w
+        return w
+
+    p = ObjectPanel(loader=slow_loader, chart_dir=tmp_path / "charts",
+                    for_post=True)
+    try:
+        p.explore("2026 QK (443089)")
+        assert p.state() == "loading"
+        got = {}
+        p.post_requested.connect(lambda n, f: got.update(n=n))
+        p.btn_post.clicked.emit()
+        assert got == {}, "no post request while the worker is out there"
+        # release the worker; now the post is allowed
+        _release(loader["w"])
+        p.post_requested.connect(lambda n, f: got.update(n=n))
+        p.btn_post.clicked.emit()
+        assert got.get("n") == "2026 QK (443089)"
+    finally:
+        p.deleteLater()
+
+
+def test_post_button_reset_on_cancel(qapp, tmp_path):
+    # cancel() blanks the panel: the stale name must not leak into the
+    # next object's post flow
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+    try:
+        p.show(FAKE_ELEMENT, None)
+        assert p.name() == "2026 QK (443089)"
+        p.cancel()
+        assert p.state() == "empty"
+        assert p.name() is None
+    finally:
+        p.deleteLater()

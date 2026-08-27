@@ -237,45 +237,124 @@ def score_target(t, cfg=None, db=None):
     return round(total, 1), parts
 
 
-def why_phrase(t):
-    # One-line "why tonight" for a target; first matching rule wins.
+def _fragments(t):
+    # Object-specific reasons, heaviest first, drawn from the same data the
+    # score is built from — so the phrase and the number always agree.
+    # Only fragments with real data are emitted; no trailing period (it is
+    # added once by why_phrase).
     # @args: t - target dict
-    # @return: {"es":..., "en":...}
+    # @return: list of (es, en) fragment pairs
+    frags = []
     kind = t.get("kind")
     if kind == "neo":
         if t.get("neocp"):
-            return {"es": "Está en la página de confirmación del MPC: cada medida cuenta para su órbita.",
-                    "en": "On the MPC confirmation page: every measurement counts for its orbit."}
+            frags.append(("Está en la página de confirmación del MPC: cada medida cuenta para su órbita",
+                          "On the MPC confirmation page: every measurement counts for its orbit"))
         if t.get("impact"):
-            return {"es": "Impactor potencial según JPL Sentry: las medidas de esta noche refinan el riesgo.",
-                    "en": "Potential impactor on JPL Sentry: tonight's measurements refine the risk."}
-        return {"es": "Prioridad de seguimiento para tu sitio según NEOfixer.",
-                "en": "A follow-up priority for your site according to NEOfixer."}
-    if kind == "pccp":
+            frags.append(("Impactor potencial según JPL Sentry: las medidas de esta noche refinan el riesgo",
+                          "Potential impactor on JPL Sentry: tonight's measurements refine the risk"))
+        if t.get("moid") is not None and t["moid"] < 0.05:
+            frags.append(("MOID < 0.05 AU: puede acercarse a la Tierra en algún cruce",
+                          "MOID < 0.05 AU: it can approach Earth in some crossing"))
+        if (t.get("nf_score") or 0) >= 5:
+            frags.append((f"Es el objetivo con mejor puntuación para tu observatorio según NEOfixer (score {t['nf_score']:.1f}/10)",
+                          f"Highest-scoring target for your site according to NEOfixer (score {t['nf_score']:.1f}/10)"))
+        if (t.get("nf_urgency") or 0) >= 60:
+            frags.append((f"Urgencia de seguimiento del {t['nf_urgency']:.0f}% según NEOfixer: cada noche cuenta",
+                          f"NEOfixer follow-up urgency at {t['nf_urgency']:.0f}%: every night counts"))
+        if (t.get("rate_arcsec_min") or 0) >= 0.3:
+            frags.append(("Se mueve rápido por el cielo: cambia de sitio cada minuto",
+                          "Moves fast across the sky: it shifts position every minute"))
+        if (t.get("arc_days") is not None and t["arc_days"] < 30
+                and t.get("nobs") is not None and t["nobs"] <= 6):
+            frags.append((f"Su órbita aún es incierta: solo {t['nobs']} observaciones en {t['arc_days']:.0f} días",
+                          f"Orbit still uncertain: only {t['nobs']} observations over {t['arc_days']:.0f} days"))
+    elif kind == "pccp":
         s = t.get("pccp_score")
-        return {"es": f"Candidato a cometa en el PCCP del MPC (score {s:.0f}/100): tu imagen podría confirmarlo.",
-                "en": f"Possible comet on the MPC's PCCP (score {s:.0f}/100): your image could confirm it."}
-    if kind == "sn":
+        if s is not None:
+            frags.append((f"Candidato a cometa en el PCCP del MPC con score {s:.0f}/100",
+                          f"Possible comet on the MPC's PCCP with a score of {s:.0f}/100"))
+        if (t.get("arc_days") or 0) > 0 and t["arc_days"] < 20:
+            extra = f", {t['nobs']} obs" if t.get("nobs") is not None else ""
+            frags.append((f"Arco corto: {t['arc_days']:.0f} días{extra}",
+                          f"Short arc: {t['arc_days']:.0f} days{extra}"))
+        frags.append(("Tu imagen podría ser la que lo confirme",
+                      "Your image could be the one to confirm it"))
+    elif kind == "sn":
+        if any(h in (t.get("host") or "").upper() for h in
+               ("M51", "M101", "M104", "M87", "M82", "M31", "NGC")):
+            frags.append((f"Está en la galaxia {t['host']}, un nombre que todos conocen",
+                          f"In the galaxy {t['host']}, a name everyone knows"))
         days = _freshness_days(t)
         if days is not None and days <= 14:
-            return {"es": f"Descubierta hace {days} días y aún evolucionando: la fotometría temprana vale oro.",
-                    "en": f"Discovered {days} days ago and still evolving: early photometry is gold."}
-        return {"es": "Supernova activa y al alcance de tu equipo esta noche.",
-                "en": "Active supernova within reach of your setup tonight."}
-    if kind == "comet":
+            typ_es = f", tipo {t['sn_type']}" if t.get("sn_type") else ""
+            typ_en = f", type {t['sn_type']}" if t.get("sn_type") else ""
+            frags.append((f"Descubierta hace {days} días{typ_es}: aún evolucionando",
+                          f"Discovered {days} days ago{typ_en}: still evolving"))
+        if (t.get("mag") or 99) <= 15:
+            frags.append((f"Brilla a magnitud {t['mag']:.1f}: la fotometría temprana vale oro",
+                          f"Shining at magnitude {t['mag']:.1f}: early photometry is gold"))
+    elif kind == "comet":
+        if (t.get("mag") or 99) <= 12:
+            frags.append((f"Brilla a magnitud {t['mag']:.1f}, al alcance de tu equipo",
+                          f"Shining at magnitude {t['mag']:.1f}, within reach of your setup"))
         per = (t.get("perihelion_date") or "")[:10]
-        return {"es": f"Cometa activo con perihelio el {per}: mejor ventana de brillo.",
-                "en": f"Active comet with perihelion on {per}: best brightness window."}
-    if kind == "transit":
+        try:
+            delta = ((datetime.date.fromisoformat(per)
+                      - datetime.date.today()).days)
+            if abs(delta) <= 30:
+                if delta >= 0:
+                    frags.append((f"Perihelio en {delta} días: pico de brillo cerca",
+                                  f"Perihelion in {delta} days: peak brightness is near"))
+                else:
+                    frags.append((f"Perihelio hace {-delta} días: el pico de brillo ya pasó",
+                                  f"Perihelion {-delta} days ago: peak brightness is past"))
+        except ValueError:
+            pass
+        if not frags:
+            frags.append(("Cometa activo visible esta noche",
+                          "Active comet visible tonight"))
+    elif kind == "transit":
         tr = t.get("transit") or {}
+        star = tr.get("star") or ""
+        if star and star != t.get("name") and any(s in star for s in FAMOUS_SYSTEMS):
+            frags.append((f"Su estrella es {star}, un sistema famoso",
+                          f"Host star {star}, a famous system"))
         depth = (tr.get("depth_mmag") or 0) / 10.0  # mmag -> % approx
-        return {"es": f"Esta noche un planeta eclipsa su estrella un {depth:.1f}%: tu curva de luz ayuda a la misión Ariel de la ESA.",
-                "en": f"Tonight a planet eclipses its star by {depth:.1f}%: your light curve helps ESA's Ariel mission."}
-    if kind == "alert":
+        dur = tr.get("duration_h") or 0
+        if depth > 0:
+            mid_es = f", durando {dur:.0f} h" if dur else ""
+            mid_en = f" for {dur:.0f} h" if dur else ""
+            frags.append((f"El planeta oscurece su estrella un {depth:.1f}%{mid_es}: tu curva de luz ayuda a la misión Ariel de la ESA",
+                          f"The planet dims its star by {depth:.1f}%{mid_en}: your light curve helps ESA's Ariel mission"))
+        if (tr.get("priority") or "").lower() == "high":
+            frags.append(("Prioridad alta en la lista de tránsitos",
+                          "High priority on the transit watchlist"))
+    elif kind == "alert":
         a = t.get("approach") or {}
-        return {"es": f"Pasará a {a.get('dist_ld', 0):.1f} distancias lunares el {a.get('date')}: una historia que se cuenta sola.",
-                "en": f"Passing at {a.get('dist_ld', 0):.1f} lunar distances on {a.get('date')}: a story that tells itself."}
-    return {"es": "Buen objetivo esta noche.", "en": "A good target tonight."}
+        ld, adate = a.get("dist_ld"), a.get("date")
+        if ld is not None:
+            es = f"Pasará a {ld:.1f} distancias lunares el {adate}" if adate \
+                else f"Pasará a {ld:.1f} distancias lunares"
+            en = f"Passing at {ld:.1f} lunar distances on {adate}" if adate \
+                else f"Passing at {ld:.1f} lunar distances"
+            frags.append((es, en))
+        if (t.get("mag") or 99) <= 10:
+            frags.append((f"Visible a magnitud {t['mag']:.1f}",
+                          f"Visible at magnitude {t['mag']:.1f}"))
+    return frags
+
+
+def why_phrase(t):
+    # One-line "why here" for a target: up to three object-specific
+    # fragments joined with a middot, in priority order.
+    # @args: t - target dict
+    # @return: {"es":..., "en":...}
+    frags = _fragments(t)[:3]
+    if not frags:
+        return {"es": "Buen objetivo esta noche.", "en": "A good target tonight."}
+    return {"es": "  ·  ".join(f[0] for f in frags) + ".",
+            "en": "  ·  ".join(f[1] for f in frags) + "."}
 
 
 def top_n(targets, cfg=None, db=None, n=3):

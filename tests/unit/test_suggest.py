@@ -68,6 +68,36 @@ def test_why_phrase_bilingual_and_specific():
     assert "85" in ph2["es"]
 
 
+def test_why_phrase_carries_priority_data():
+    # the score's own inputs must surface in the phrase, in both languages
+    t = {"id": "T1", "kind": "neo", "name": "T1", "mag": 18.5,
+         "max_alt": 65, "hours_up": 5, "nf_score": 8.2, "neocp": False,
+         "nf_urgency": 72, "arc_days": 14, "nobs": 6}
+    ph = suggest.why_phrase(t)
+    for lang in ("es", "en"):
+        assert "8.2" in ph[lang]      # NEOfixer score
+        assert "72" in ph[lang]       # urgency
+        assert "14" in ph[lang]       # arc length
+        assert "6" in ph[lang]        # observation count
+
+
+def test_why_phrases_are_object_specific():
+    # two generic NEOs with different follow-up data must read differently
+    a = {"id": "A", "kind": "neo", "name": "A", "mag": 18.5,
+         "nf_score": 3.0, "neocp": False, "nf_urgency": 10}
+    b = {"id": "B", "kind": "neo", "name": "B", "mag": 18.5,
+         "nf_score": 3.0, "neocp": False, "nf_urgency": 90,
+         "rate_arcsec_min": 0.6, "arc_days": 12, "nobs": 4}
+    assert suggest.why_phrase(a)["es"] != suggest.why_phrase(b)["es"]
+    assert "90" in suggest.why_phrase(b)["es"]
+    assert "90" not in suggest.why_phrase(a)["es"]
+
+
+def test_why_phrase_unknown_kind_falls_back():
+    ph = suggest.why_phrase({"kind": "unknown", "id": "X"})
+    assert ph["es"] and ph["en"]
+
+
 def test_top_n_sorted(fake_cfg):
     targets = [_neo(neocp=False, score=2.0, mag=21.0), _neo()]
     top, all_scored = suggest.top_n(targets, fake_cfg, None, 1)

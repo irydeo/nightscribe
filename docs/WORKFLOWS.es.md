@@ -189,11 +189,20 @@ cabecera `lbl_context` de una sola línea truncada (`gui/ui/projects_tab.ui:51`)
    nítidos). Se guarda como `config["chart_zoom"]` (`"scale"` / `"re-render"`)
    y `ObjectPanel` lo lee antes de cada llamada a `build_charts`; cambiar el
    ajustes con un panel en pantalla lo redibuja (`rebuild_charts`).
-5. Tests: `tests/unit/test_overview_panel.py`, `test_projects_hub.py` y el
-   nuevo `test_style.py` (preset panel, override de tamaño, márgenes
-   ajustados) actualizados al contrato nuevo (6 pestañas, panel dentro de la
-   pestaña «Detalles», slots ocultos sin datos, grupo oculto sin gráficos).
-   `pytest tests/unit` verde (243 tests, sin red).
+5. **Visor de gráficos abierto ajustado**: al hacer click sobre un gráfico,
+   `ChartViewer` se abre ajustado a la ventana — el diálogo adopta el
+   aspecto de la imagen para que la vista por defecto la llene sin
+   scrollbars (rueda para zoom / arrastre para desplazar / 1:1 sin
+   cambios). El último tamaño de ventana que dejó el usuario se recuerda
+   por gráfico (`config["chart_viewer_sizes"]`, restaurado en la siguiente
+   apertura).
+6. Tests: `tests/unit/test_overview_panel.py`, `test_projects_hub.py`,
+   `test_style.py` (preset panel, override de tamaño, márgenes ajustados) y
+   el nuevo `test_chart_viewer.py` (ajuste sin scrollbars, ajuste que sigue
+   a la ventana, botones de zoom, memoria de tamaño por gráfico)
+   actualizados al contrato nuevo (6 pestañas, panel dentro de la pestaña
+   «Detalles», slots ocultos sin datos, grupo oculto sin gráficos).
+   `pytest tests/unit` verde (247 tests, sin red).
 
 **Reglas por fase**: una fase = un commit; cada fase deja la app funcional con sus
 tests; no mezclar dos fases sin que la anterior esté verificada (regla de este

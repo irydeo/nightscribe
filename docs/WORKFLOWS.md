@@ -184,11 +184,18 @@ truncated `lbl_context` header (`gui/ui/projects_tab.ui:51`).
    (`"scale"` / `"re-render"`) and read by `ObjectPanel` before every
    `build_charts` call; switching the setting while a panel is on screen
    re-draws it (`rebuild_charts`).
-5. Tests: `tests/unit/test_overview_panel.py`, `test_projects_hub.py` and
-   the new `test_style.py` (panel preset, size override, squeezed margins)
-   updated to the new contract (6 tabs, panel inside the Details tab, hidden
-   slots without data, group hidden without charts). `pytest tests/unit`
-   green (243 tests, no network).
+5. **Chart viewer opens fitted**: clicking a chart opens `ChartViewer`
+   fitted to the window — the dialog is sized to the image's aspect so the
+   default view fills it without scrolling (wheel zoom / drag pan / 1:1
+   unchanged). The last window size the user left is remembered per chart
+   (`config["chart_viewer_sizes"]`, restored on the next open).
+6. Tests: `tests/unit/test_overview_panel.py`, `test_projects_hub.py`,
+   `test_style.py` (panel preset, size override, squeezed margins) and the
+   new `test_chart_viewer.py` (fit without scrollbars, fit follows the
+   window, zoom buttons, per-chart size memory) updated to the new
+   contract (6 tabs, panel inside the Details tab, hidden slots without
+   data, group hidden without charts). `pytest tests/unit` green
+   (247 tests, no network).
 
 **Per-phase rules**: one phase = one commit; each phase leaves the app working
 with its tests; two phases are never mixed before the previous one is verified

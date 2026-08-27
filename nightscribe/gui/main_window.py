@@ -601,10 +601,7 @@ class MainWindow(QMainWindow):
     def _chip(self, text, color, tip=""):
         # @return: a small pill label (status / window / moon / warning chip)
         lbl = QLabel(text)
-        lbl.setStyleSheet(
-            f"color: {color}; font-size: 11px; font-weight: bold;"
-            f" padding: 2px 8px; border-radius: 8px;"
-            f" background: {color}22; border: 1px solid {color}55;")
+        lbl.setStyleSheet(theme.chip_style(color))
         if tip:
             lbl.setToolTip(tip)
         return lbl
@@ -643,10 +640,7 @@ class MainWindow(QMainWindow):
         head = QHBoxLayout()
         head.setSpacing(8)
         lbl_kind = QLabel(kind_label)
-        lbl_kind.setStyleSheet(
-            f"color: {kind_color}; font-size: 12px; font-weight: bold;"
-            f" padding: 2px 8px; border-radius: 8px;"
-            f" background: {kind_color}22; border: 1px solid {kind_color}55;")
+        lbl_kind.setStyleSheet(theme.chip_style(kind_color, font_size=12))
         head.addWidget(lbl_kind)
         lbl_name = QLabel(t["name"])
         lbl_name.setStyleSheet(
@@ -654,23 +648,51 @@ class MainWindow(QMainWindow):
             " background: transparent;")
         head.addWidget(lbl_name)
         head.addStretch()
-        badge = self._now_badge(t)
-        if badge:
-            now = badge.startswith("▲")
-            head.addWidget(self._chip(
-                self.tr("now") if now else badge,
-                theme.C_GOOD if now else theme.C_OK))
+        head_has_window = False
         if self._window_text(t):
             ws = (t.get("window_start") or "")[11:16]
             we = (t.get("window_end") or "")[11:16]
-            head.addWidget(self._chip(f"{ws}–{we}", theme.C_OK))
-        moon = self._moon_text(t)
-        if moon:
-            tip = self.tr("Moon: sep %1°, illum %2%")
-            tip = tip.replace("%1", f"{moon.split('°')[0]}").replace(
-                "%2", moon.split("·")[-1].strip())
-            lbl = self._chip("Moon " + moon, theme.C_WARN, tip)
-            head.addWidget(lbl)
+            head_has_window = True
+            head.addWidget(self._chip(
+                f"{ws}–{we}", theme.C_OK,
+                self.tr("Best time to observe: visible %1–%2 UTC"
+                        " (above the horizon)").replace("%1", ws)
+                .replace("%2", we)))
+        badge = self._now_badge(t)
+        if badge:
+            now = badge.startswith("▲")
+            if now:
+                head.addWidget(self._chip(
+                    self.tr("now"), theme.C_GOOD,
+                    self.tr("Above the horizon right now")))
+            elif not head_has_window:
+                # window chip is absent, so the rise time is all we show
+                head.addWidget(self._chip(
+                    badge, theme.C_OK,
+                    self.tr("Rises above the horizon at %1 UTC")
+                    .replace("%1", badge[:-1])))
+        info = suggest.moon_info(t, config)
+        if info and info.get("warning"):
+            sep = f"{info['sep_deg']:.0f}°"
+            illum = f"{info['illum']*100:.0f}%"
+            reasons = []
+            if info["sep_deg"] < float(config.get("moon_min_sep_deg", 45)):
+                reasons.append(self.tr(
+                    "close to the Moon (%1)")
+                    .replace("%1", sep))
+            if info["illum"] > float(config.get("moon_max_illum", 0.5)):
+                reasons.append(self.tr(
+                    "high illumination (%1)")
+                    .replace("%1", illum))
+            tip = self.tr(
+                "Moon at %1 separation, %2 illuminated — bright night sky, "
+                "faint targets need longer exposures. Reason: %3") \
+                .replace("%1", sep).replace("%2", illum) \
+                .replace("%3", self.tr(" and ").join(reasons))
+            head.addWidget(self._chip(
+                self.tr("Moon %1 · %2").replace("%1", sep)
+                .replace("%2", illum),
+                theme.C_WARN, tip))
         # soft-limit warning (ADR-025): predicted-mag kinds beyond the limit
         beyond, delta = suggest.beyond_limit(t, config)
         if beyond:
@@ -742,12 +764,6 @@ class MainWindow(QMainWindow):
         if not ws or not we:
             return ""
         return f"{self.tr('window')} {ws}–{we}"
-
-    def _moon_text(self, t):
-        info = suggest.moon_info(t, config)
-        if not info or not info.get("warning"):
-            return ""
-        return f"{info['sep_deg']:.0f}° · {info['illum']*100:.0f}%"
 
     def _card_button(self, t):
         # @return: full-width color-coded button — orange for Start,

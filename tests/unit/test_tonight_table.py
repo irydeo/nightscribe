@@ -114,9 +114,9 @@ def test_top3_get_the_podium_tint(window):
     tbl = window.tonight.tbl_targets
     from PySide6.QtGui import QColor
     names = _names(window)
-    order = {"SN 2026abc (NGC 1058)": "#e05555",
-             "2026 QK (443089)": "#5588dd",
-             "C/2024 A1 (ATLAS)": "#55bb66"}
+    order = {"SN 2026abc (NGC 1058)": "#e5484d",
+             "2026 QK (443089)": "#4484ef",
+             "C/2024 A1 (ATLAS)": "#46a758"}
     top3_rows = [r for r in range(tbl.rowCount())
                  if _names_name(tbl, r) in order]
     assert len(top3_rows) == 3
@@ -146,7 +146,7 @@ def test_name_foreground_is_the_kind_color(window):
     name_row = [r for r in range(tbl.rowCount())
                 if tbl.item(r, 0).text() == "SN 2026abc (NGC 1058)"][0]
     fg = tbl.item(name_row, 0).foreground().color()
-    assert fg.rgb() == QColor("#e05555").rgb()
+    assert fg.rgb() == QColor("#e5484d").rgb()
     # the why-tonight phrase lives in the row tooltip, as before
     assert "Descubierta" in tbl.item(name_row, 0).toolTip() or \
            "Discovered" in tbl.item(name_row, 0).toolTip()

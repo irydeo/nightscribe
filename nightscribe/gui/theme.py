@@ -21,15 +21,16 @@
 # own inline styles, which override the global ones — that stays on purpose.
 
 
-# Per-kind accent colors, shared by cards, icons and table tints.
-# Bright enough to read on a #12141f surface (readable-contrast rule).
+# Per-kind accent colors, shared by cards, icons and table names.
+# Six well-separated hues on the wheel (0/28/140/185/218/268°),
+# none in the amber band (40-65°), all saturated, mid-value.
 KIND_COLORS = {
-    "sn": "#e05555",
-    "neo": "#5588dd",
-    "comet": "#55bb66",
-    "pccp": "#dd9944",
-    "transit": "#aa77cc",
-    "alert": "#ddaa44",
+    "sn":      "#e5484d",   # 0°   red
+    "alert":   "#f76808",   # 24°  orange (NOT yellow)
+    "comet":   "#46a758",   # 140° green
+    "pccp":    "#39c5cf",   # 185° cyan (clearly away from green AND blue)
+    "neo":     "#4484ef",   # 216° blue
+    "transit": "#a06ee0",   # 268° purple
 }
 
 # Short chips used next to object names ("NEO", "SN", ...).
@@ -47,9 +48,33 @@ C_SEL = "#2f4d80"       # selection highlight (accent-tinted, white text)
 C_TEXT = "#e8eaf2"      # main text
 C_TEXT_DIM = "#8a90a6"  # secondary text (headers, context lines)
 C_ACCENT = "#6ab0ff"    # links, focus, interactive accents
-C_WARN = "#cc8844"      # warnings (moon, mag-limit)
-C_GOOD = "#66cc99"      # "up now" state
-C_OK = "#99bbdd"        # informative badges (rise times)
+C_WARN = "#f76808"      # warnings (moon, mag-limit) — orange, same as alert
+C_GOOD = "#46a758"      # "up now" state — matches the comet green
+C_OK   = "#4484ef"      # informative (rise times, windows) — matches neo blue
+# Pills are solid badges (no alpha): the hue *is* the surface, and the label
+# is picked per hue for contrast (near-black on bright hues, white on dark).
+# Transparency over the dark card was exactly what made every chip read dim
+# and washed out, no matter how saturated the hue.
+C_CHIP_TEXT_DARK = "#11141d"   # the label color on bright surfaces
+
+
+def _lum(hex_):
+    # @args: a #rrggbb hex string
+    # @return: its relative luminance (0..1), the WCAG definition.
+    h = hex_.lstrip("#")
+    c = [int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)]
+    c = [x / 12.92 if x <= 0.04045 else ((x + 0.055) / 1.055) ** 2.4
+         for x in c]
+    return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+
+
+def chip_text_for(surface):
+    # @args: a hex surface color (what goes behind the pill)
+    # @return: the light or the dark app text — whichever contrasts more.
+    s = _lum(surface)
+    light = (1.005) / (s + 0.05)
+    dark = (s + 0.05) / (_lum(C_CHIP_TEXT_DARK) + 0.05)
+    return C_CHIP_TEXT_DARK if dark > light else C_TEXT
 
 
 def _palette():
@@ -85,6 +110,21 @@ def _c(hex_):
     # Small helper so the palette code stays a flat list.
     from PySide6.QtGui import QColor
     return QColor(hex_)
+
+
+def chip_style(color, font_size=11):
+    # @args: a hex surface color (e.g. KIND_COLORS['comet']), px font size
+    # @return: a stylesheet string for a small pill label.
+    #   A solid badge in that hue with the more legible text color on top:
+    #   the hue identifies the kind, the label is never washed out. Solid
+    #   (no alpha) on purpose — any hue over the dark card at a fraction
+    #   reads dim and muddy no matter how saturated it is. Both the Tonight
+    #   rows and the project overview build their mag / rate / window /
+    #   moon chips through here so they match.
+    return (f"color: {chip_text_for(color)}; "
+            f"font-size: {font_size}px; font-weight: bold;"
+            f" padding: 2px 8px; border-radius: 8px;"
+            f" background: {color};")
 
 
 def apply_theme(app):
@@ -208,9 +248,10 @@ QStatusBar QLabel {{ background: transparent; color: {C_TEXT_DIM}; }}
 QSplitter::handle {{ background: {C_LINE}; width: 1px; }}
 
 /* ---- tooltips ----------------------------------------------------------- */
+/* calm text: bright white (#e8eaf2) reads as a glare box on the dark app */
 QToolTip {{
-    background: {C_PANEL}; color: {C_TEXT};
-    border: 1px solid {C_LINE}; padding: 6px 10px;
+    background: {C_PANEL}; color: {C_TEXT_DIM};
+    border: 1px solid {C_LINE}; border-radius: 4px; padding: 7px 11px;
 }}
 
 /* ---- scrollbars ---------------------------------------------------------- */

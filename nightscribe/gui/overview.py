@@ -70,10 +70,7 @@ def _chip(text, color, tip=""):
     # @return: a small pill label, the same idiom the Tonight rows use
     #          (mag / rate / window chips)
     lbl = QLabel(text)
-    lbl.setStyleSheet(
-        f"color: {color}; font-size: 11px; font-weight: bold;"
-        f" padding: 2px 8px; border-radius: 8px;"
-        f" background: {color}22; border: 1px solid {color}55;")
+    lbl.setStyleSheet(theme.chip_style(color))
     if tip:
         lbl.setToolTip(tip)
     return lbl

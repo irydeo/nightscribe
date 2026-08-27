@@ -237,6 +237,17 @@ def score_target(t, cfg=None, db=None):
     return round(total, 1), parts
 
 
+def _as_float(x, default=None):
+    # Tolerant float: raw source data is not always numeric yet (e.g. the
+    # PCCP page hands us strings for the arc and observation count).
+    # @args: x - value of any type, default - when x is not a number
+    # @return: float or default
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return default
+
+
 def _fragments(t):
     # Object-specific reasons, heaviest first, drawn from the same data the
     # score is built from — so the phrase and the number always agree.
@@ -253,31 +264,38 @@ def _fragments(t):
         if t.get("impact"):
             frags.append(("Impactor potencial según JPL Sentry: las medidas de esta noche refinan el riesgo",
                           "Potential impactor on JPL Sentry: tonight's measurements refine the risk"))
-        if t.get("moid") is not None and t["moid"] < 0.05:
+        moid = _as_float(t.get("moid"))
+        if moid is not None and moid < 0.05:
             frags.append(("MOID < 0.05 AU: puede acercarse a la Tierra en algún cruce",
                           "MOID < 0.05 AU: it can approach Earth in some crossing"))
-        if (t.get("nf_score") or 0) >= 5:
-            frags.append((f"Es el objetivo con mejor puntuación para tu observatorio según NEOfixer (score {t['nf_score']:.1f}/10)",
-                          f"Highest-scoring target for your site according to NEOfixer (score {t['nf_score']:.1f}/10)"))
-        if (t.get("nf_urgency") or 0) >= 60:
-            frags.append((f"Urgencia de seguimiento del {t['nf_urgency']:.0f}% según NEOfixer: cada noche cuenta",
-                          f"NEOfixer follow-up urgency at {t['nf_urgency']:.0f}%: every night counts"))
-        if (t.get("rate_arcsec_min") or 0) >= 0.3:
+        nf_score = _as_float(t.get("nf_score"))
+        if nf_score is not None and nf_score >= 5:
+            frags.append((f"Es el objetivo con mejor puntuación para tu observatorio según NEOfixer (score {nf_score:.1f}/10)",
+                          f"Highest-scoring target for your site according to NEOfixer (score {nf_score:.1f}/10)"))
+        urgency = _as_float(t.get("nf_urgency"))
+        if urgency is not None and urgency >= 60:
+            frags.append((f"Urgencia de seguimiento del {urgency:.0f}% según NEOfixer: cada noche cuenta",
+                          f"NEOfixer follow-up urgency at {urgency:.0f}%: every night counts"))
+        rate = _as_float(t.get("rate_arcsec_min"))
+        if rate is not None and rate >= 0.3:
             frags.append(("Se mueve rápido por el cielo: cambia de sitio cada minuto",
                           "Moves fast across the sky: it shifts position every minute"))
-        if (t.get("arc_days") is not None and t["arc_days"] < 30
-                and t.get("nobs") is not None and t["nobs"] <= 6):
-            frags.append((f"Su órbita aún es incierta: solo {t['nobs']} observaciones en {t['arc_days']:.0f} días",
-                          f"Orbit still uncertain: only {t['nobs']} observations over {t['arc_days']:.0f} days"))
+        arc = _as_float(t.get("arc_days"))
+        nobs = _as_float(t.get("nobs"))
+        if arc is not None and arc < 30 and nobs is not None and nobs <= 6:
+            frags.append((f"Su órbita aún es incierta: solo {nobs:.0f} observaciones en {arc:.0f} días",
+                          f"Orbit still uncertain: only {nobs:.0f} observations over {arc:.0f} days"))
     elif kind == "pccp":
-        s = t.get("pccp_score")
+        s = _as_float(t.get("pccp_score"))
         if s is not None:
             frags.append((f"Candidato a cometa en el PCCP del MPC con score {s:.0f}/100",
                           f"Possible comet on the MPC's PCCP with a score of {s:.0f}/100"))
-        if (t.get("arc_days") or 0) > 0 and t["arc_days"] < 20:
-            extra = f", {t['nobs']} obs" if t.get("nobs") is not None else ""
-            frags.append((f"Arco corto: {t['arc_days']:.0f} días{extra}",
-                          f"Short arc: {t['arc_days']:.0f} days{extra}"))
+        arc = _as_float(t.get("arc_days"))
+        if arc is not None and 0 < arc < 20:
+            nobs = _as_float(t.get("nobs"))
+            extra = f", {nobs:.0f} obs" if nobs is not None else ""
+            frags.append((f"Arco corto: {arc:.0f} días{extra}",
+                          f"Short arc: {arc:.0f} days{extra}"))
         frags.append(("Tu imagen podría ser la que lo confirme",
                       "Your image could be the one to confirm it"))
     elif kind == "sn":
@@ -291,13 +309,15 @@ def _fragments(t):
             typ_en = f", type {t['sn_type']}" if t.get("sn_type") else ""
             frags.append((f"Descubierta hace {days} días{typ_es}: aún evolucionando",
                           f"Discovered {days} days ago{typ_en}: still evolving"))
-        if (t.get("mag") or 99) <= 15:
-            frags.append((f"Brilla a magnitud {t['mag']:.1f}: la fotometría temprana vale oro",
-                          f"Shining at magnitude {t['mag']:.1f}: early photometry is gold"))
+        mag = _as_float(t.get("mag"), default=99.0)
+        if mag <= 15:
+            frags.append((f"Brilla a magnitud {mag:.1f}: la fotometría temprana vale oro",
+                          f"Shining at magnitude {mag:.1f}: early photometry is gold"))
     elif kind == "comet":
-        if (t.get("mag") or 99) <= 12:
-            frags.append((f"Brilla a magnitud {t['mag']:.1f}, al alcance de tu equipo",
-                          f"Shining at magnitude {t['mag']:.1f}, within reach of your setup"))
+        mag = _as_float(t.get("mag"), default=99.0)
+        if mag <= 12:
+            frags.append((f"Brilla a magnitud {mag:.1f}, al alcance de tu equipo",
+                          f"Shining at magnitude {mag:.1f}, within reach of your setup"))
         per = (t.get("perihelion_date") or "")[:10]
         try:
             delta = ((datetime.date.fromisoformat(per)
@@ -320,8 +340,8 @@ def _fragments(t):
         if star and star != t.get("name") and any(s in star for s in FAMOUS_SYSTEMS):
             frags.append((f"Su estrella es {star}, un sistema famoso",
                           f"Host star {star}, a famous system"))
-        depth = (tr.get("depth_mmag") or 0) / 10.0  # mmag -> % approx
-        dur = tr.get("duration_h") or 0
+        depth = (_as_float(tr.get("depth_mmag")) or 0.0) / 10.0  # mmag -> %
+        dur = _as_float(tr.get("duration_h")) or 0.0
         if depth > 0:
             mid_es = f", durando {dur:.0f} h" if dur else ""
             mid_en = f" for {dur:.0f} h" if dur else ""
@@ -339,9 +359,10 @@ def _fragments(t):
             en = f"Passing at {ld:.1f} lunar distances on {adate}" if adate \
                 else f"Passing at {ld:.1f} lunar distances"
             frags.append((es, en))
-        if (t.get("mag") or 99) <= 10:
-            frags.append((f"Visible a magnitud {t['mag']:.1f}",
-                          f"Visible at magnitude {t['mag']:.1f}"))
+        mag = _as_float(t.get("mag"), default=99.0)
+        if mag <= 10:
+            frags.append((f"Visible a magnitud {mag:.1f}",
+                          f"Visible at magnitude {mag:.1f}"))
     return frags
 
 

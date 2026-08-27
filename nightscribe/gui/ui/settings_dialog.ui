@@ -94,6 +94,23 @@
      </widget>
     </item>
     <item>
+     <widget class="QGroupBox" name="grp_charts">
+      <property name="title"><string>Panel charts</string></property>
+      <layout class="QFormLayout">
+       <item>
+        <widget class="QLabel" name="lbl_chart_zoom">
+         <property name="text"><string>On window resize:</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QComboBox" name="cmb_chart_zoom">
+         <property name="toolTip"><string>Fast: the chart is pre-drawn once and re-scaled as you resize (smooth). Sharper: it is re-drawn at 2× resolution so big slots stay crisp (slightly slower).</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
       <widget class="QGroupBox" name="grp_misc">
       <property name="title"><string>Integrations</string></property>
       <layout class="QFormLayout">

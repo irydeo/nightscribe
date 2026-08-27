@@ -105,7 +105,7 @@ def orbit(packed):
 
 def parse_neofixer_orbit(data, packed):
     # Normalises a raw /orbit/ reply into the same shape as sbdb.parse_sbdb,
-    # so every downstream consumer (orbit chart, families, ephemeris, post)
+    # so every downstream consumer (orbit chart, ephemeris, post)
     # works unchanged. Element naming follows SBDB: M->ma, arg_per->w,
     # asc_node->om, Tp->tp. Per-element sigmas are kept under "sigmas".
     # @args: data - decoded NEOfixer JSON, packed - designation requested

@@ -5,7 +5,7 @@
 ## Español
 
 **Contexto**: el borrador ES/EN que genera NightScribe era texto suelto; los
-gráficos (órbita, familias, cielo, campo) y los recursos del blink (GIF, MP4,
+gráficos (órbita, cielo, campo, curva de luz) y los recursos del blink (GIF, MP4,
 PNG antes/después) salían a la carpeta por separado y el usuario tenía que
 montar el post a mano para publicarlo (arrastrar imágenes, escribir enlaces,
 repetir el trabajo en inglés). La misión 3 del proyecto es precisamente
@@ -15,9 +15,9 @@ que no referencia sus propios recursos no está listo.
 **Decisión**:
 
 1. `core/post.py` es la única fuente de verdad para el post completo.
-   - `CHART_LABELS` (orbit, families, sky, field, transit, sun) y el dict
-     `MEDIA` (gif, mp4, pair) llevan el texto alt + encabezado por idioma,
-     con marcador `%s` para el nombre del objeto.
+    - `CHART_LABELS` (orbit, sky, field, transit, sun) y el dict
+      `MEDIA` (gif, mp4, pair) llevan el texto alt + encabezado por idioma,
+      con marcador `%s` para el nombre del objeto.
    - `chart_section()` y `media_section()` construyen los bloques
      `## Galería`/`## Gallery` y `## Recursos`/`## Resources` con enlaces
      markdown **relativos** (`![alt](nombre.png)`): la imagen va junto al
@@ -64,7 +64,7 @@ no reproducen GIFs o viceversa.
 ## English
 
 **Context**: the ES/EN draft NightScribe generated was loose text; the charts
-(orbit, families, sky, field) and the blink resources (GIF, MP4, before/after
+(orbit, sky, field, light curve) and the blink resources (GIF, MP4, before/after
 PNG) landed in the folder separately and the user had to assemble the post by
 hand to publish it (dragging images in, writing the links, redoing it all in
 English). Mission 3 of the project is exactly "report it: bilingual posts +
@@ -74,9 +74,9 @@ its own resources is not ready.
 **Decision**:
 
 1. `core/post.py` is the single source of truth for the full post.
-   - `CHART_LABELS` (orbit, families, sky, field, transit, sun) and the
-     `MEDIA` dict (gif, mp4, pair) carry per-language alt text + section
-     headers, with a `%s` placeholder for the object name.
+    - `CHART_LABELS` (orbit, sky, field, transit, sun) and the
+      `MEDIA` dict (gif, mp4, pair) carry per-language alt text + section
+      headers, with a `%s` placeholder for the object name.
    - `chart_section()` and `media_section()` build the
      `## Galería`/`## Gallery` and `## Recursos`/`## Resources` blocks with
      **relative** markdown links (`![alt](name.png)`): the images sit next

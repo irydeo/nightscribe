@@ -72,7 +72,7 @@ nightscribe/
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
     blink.py         # blink de SN: resuelve nombre->coords, pareja alineada PS1-g
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
-  viz/               # matplotlib: style, orbit_view, families_view, sky_view,
+  viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
   gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer)
 tests/

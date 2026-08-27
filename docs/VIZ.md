@@ -25,11 +25,6 @@ Style is defined once in `viz/style.py`.
   flyby labelled in lunar distances — "to put it in perspective".
 - Comets: anti-sunward tail marker in the zoom inset.
 
-### `families_view.py` — "where it lives"
-
-Radial bands of the solar system families (NEOs, main belt, Trojans, Centaurs, TNOs)
-with a **"you are here"** marker for the object.
-
 ### `sky_view.py` — night altitude curve
 
 Altitude vs. time for the target across the night, twilight phases shaded, Moon

@@ -24,16 +24,17 @@ logger = logging.getLogger(__name__)
 
 
 def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
-             transit=None, out=None, fmt="instagram", watermark="NightScribe",
-             horizon=None, margin=0.0):
+              transit=None, out=None, fmt="instagram", watermark="NightScribe",
+              horizon=None, margin=0.0, size=None):
     # @args: ra_deg, dec_deg - target, lat, lon - site, obj_name - label,
     #        date - datetime.date (tonight), transit - optional dict from
     #        transits.py (shades ingress/egress), out - PNG path,
     #        fmt - size preset, watermark - footer,
     #        horizon - optional horizon.alt_at(az) callable (ADR-020),
-    #        margin - safety margin in degrees
+    #        margin - safety margin in degrees,
+    #        size - (w, h) px override (panel re-render mode)
     # @return: matplotlib figure (and writes PNG if out is given)
-    fig, ax = style.new_fig(fmt)
+    fig, ax = style.new_fig(fmt, size=size)
     window = coords.tonight_window(lat, lon, date)
     if not window:
         ax.text(0.5, 0.5, "Sin noche astronómica / No astronomical night",

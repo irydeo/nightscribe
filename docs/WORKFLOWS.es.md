@@ -116,13 +116,18 @@ colocarla de forma atractiva e intuitiva, sin texto cortado (multilínea, todo v
 
 **Decisiones pactadas (2026-08-26)**:
 
-1. La vista de objeto es un **panel fijo por encima de Plan/Captura/Procesado/
-   Análisis/Publicar** en el hub de Proyectos. No es un paso: no se salta y no se
-   «marca hecho»; no entra en la máquina de 5 pasos.
-2. Incluye (todo ya existe): **frase de enganche** + **bullets divulgativos** +
-   **tabla de parámetros con explicación multilínea ES/EN** + **los 4 gráficos**
-   (órbita, cielo, familias, campo) + **bloques de captura/ventana** (mag, tasa ″/min,
-   exposición máx. sin traza si aplica, ventana inicio–fin, horas arriba).
+ 1. La vista de objeto es un **panel fijo por encima de Plan/Captura/Procesado/
+    Análisis/Publicar** en el hub de Proyectos. No es un paso: no se salta y no se
+    «marca hecho»; no entra en la máquina de 5 pasos.
+    *(Revisión 2026-08-27: en cambio es la **pestaña «Detalles»**, la primera y la
+    que queda abierta al seleccionar el proyecto — misma garantía, el objeto siempre
+    visible, pero ocupando toda la altura del panel.)*
+ 2. Incluye (todo ya existe): **frase de enganche** + **bullets divulgativos** +
+    **tabla de parámetros con explicación multilínea ES/EN** + **los gráficos**
+    (órbita, cielo, campo, curva de luz — se ocultan los que no se pueden
+    generar; si no hay ninguno, desaparece también el grupo) + **bloques de
+    captura/ventana** (mag, tasa ″/min, exposición máx. sin traza si aplica,
+    ventana inicio–fin, horas arriba).
 3. Se **extrae a `gui/overview.py` un panel compartido** (`ObjectPanel`) que usan el
    hub de Proyectos **y** el diálogo *Explore…* del menú Herramientas: una sola
    fuente de verdad.
@@ -136,7 +141,7 @@ colocarla de forma atractiva e intuitiva, sin texto cortado (multilínea, todo v
 | Enrich (red, caché) | `gui/workers.py` `ExploreWorker` → `core/enrich` |
 | Frase de enganche, bullets | `core/narrative.hook`, `core/narrative.fact_bullets` |
 | Parámetros + explicación ES/EN | `core/orbits.explain_elements`, `core/orbits.explain_neofixer` |
-| 4 PNG (órbita/cielo/familias/campo) | `core/post.build_charts` (`core/post.py:172`) |
+ | PNGs (órbita/cielo/campo/curva de luz) | `core/post.build_charts` (`core/post.py:172`) |
 | Exposición máx. sin traza (NEO) | `core/exposure.plate_scale` + `max_exposure_no_trail` |
 | Mag, tasa, ventana, horas | `project.context` (snapshot, `gui/main_window.py:1474`) |
 | Clic en gráfico → zoom/export | `gui/main_window.py:74` `_ChartClickFilter` |
@@ -152,11 +157,43 @@ cabecera `lbl_context` de una sola línea truncada (`gui/ui/projects_tab.ui:51`)
 | Fase | Entregable | Criterio de aceptación | Estado |
 |---|---|---|---|
 | **D1** | `gui/overview.py`: `ObjectPanel` sin gráficos — estados *cargando / no encontrado / listo*, frase de enganche, bullets, tabla de parámetros con columna de explicación amplia (multilínea). `show(e, ctx=None)` + `loader` inyectable (offscreen sin red). Cabecera GPL, pares ES/EN | Panel construido offscreen; con `e` fake: hook visible, filas de parámetros con explicación; con `{}`: estado *no encontrado* | **Hecho (2026-08-26)** — `gui/overview.py` + `tests/unit/test_overview_panel.py` (9 tests offscreen, sin red) |
-| **D2** | `ObjectPanel` con rejilla **2×2 de gráficos** rellenos por `core/post.build_charts`; mensajes «por qué no» (hiperbólica / sin elementos / no confirmado) escalados al widget | Con `e` fake: 4 slots de gráfico o los mensajes de ausencia correctos; sin `e`: vacíos | **Hecho (2026-08-26)** — rejilla `orbit/sky/families/field` en `gui/overview.py` + 5 tests offscreen en `tests/unit/test_overview_panel.py` (14 en total, sin red; solo `field` tocaría red y queda en línea «por qué no») |
+ | **D2** | `ObjectPanel` con rejilla **2×2 de gráficos** rellenos por `core/post.build_charts`; mensajes «por qué no» (hiperbólica / sin elementos / no confirmado) escalados al widget | Con `e` fake: 4 slots de gráfico o los mensajes de ausencia correctos; sin `e`: vacíos | **Hecho (2026-08-26)** — rejilla `orbit/sky/families/field` en `gui/overview.py` + 5 tests offscreen en `tests/unit/test_overview_panel.py` (14 en total, sin red; solo `field` tocaría red y queda en línea «por qué no») → **reviso 2026-08-27** — sin familias (ver abajo), slots `orbit/sky/field/transit`, tamaño `panel` (1200×675); lo que no se genera se omite en vez de línea «por qué no»; sin gráfico, el grupo desaparece |
 | **D3** | `ObjectPanel` con **bloques de captura/ventana** desde `ctx`: mag, tasa ″/min, exposición máx. sin traza (solo neo/pccp con tasa + `pixel_um`/`focal_mm`), ventana inicio–fin + horas arriba; se omite lo que falta | Con `ctx` fake de neo: chips completos; de sn: sin tasa/exposición; no rompe con `ctx` vacío | **Hecho (2026-08-26)** — fila de chips en `gui/overview.py` (mag / tasa / exposición máx. sin traza / ventana / horas, desde `project.context`; tasa y exposición solo neo/pccp) + 5 tests offscreen en `tests/unit/test_overview_panel.py` (19 en total, sin red). Cadenas nuevas por `self.tr()` quedan para i18n de la fase D6 (patrón de D1/D2) |
-| **D4** | **Integración en el hub**: el hub inserta `ObjectPanel` entre `lbl_context` y `tabs_steps` (conservando la cabecera `lbl_context`). Al seleccionar proyecto → `loader` = `ExploreWorker` (mismo `fallback_target` de contexto), worker bajo `_keep`, cancel del worker en vuelo al cambiar de proyecto | Sin red: seleccionar proyecto muestra estado *cargando* y no revienta; la máquina de pasos, plan y botones siguen intactos; tests de humo offscreen | **Hecho (2026-08-26)** — `gui/main_window.py` construye `ObjectPanel` perezosamente en `_get_proj_panel()` (envuelto en `QScrollArea`, insertado antes de `tabs_steps`); `_project_selected` lo carga con `ctx` + `fallback_target` y `cancel()` al cambiar de proyecto (resultado tardío no cae sobre el siguiente) + `tests/unit/test_projects_hub.py` (6 tests offscreen, sin red) |
+ | **D4** | **Integración en el hub**: el hub inserta `ObjectPanel` entre `lbl_context` y `tabs_steps` (conservando la cabecera `lbl_context`). Al seleccionar proyecto → `loader` = `ExploreWorker` (mismo `fallback_target` de contexto), worker bajo `_keep`, cancel del worker en vuelo al cambiar de proyecto | Sin red: seleccionar proyecto muestra estado *cargando* y no revienta; la máquina de pasos, plan y botones siguen intactos; tests de humo offscreen | **Hecho (2026-08-26)** — `gui/main_window.py` construye `ObjectPanel` perezosamente en `_get_proj_panel()` (envuelto en `QScrollArea`, insertado antes de `tabs_steps`); `_project_selected` lo carga con `ctx` + `fallback_target` y `cancel()` al cambiar de proyecto (resultado tardío no cae sobre el siguiente) + `tests/unit/test_projects_hub.py` (6 tests offscreen, sin red) → **reviso 2026-08-27** — el panel vive ahora dentro de la pestaña **Detalles** (índice 0, nueva en `projects_tab.ui`), que es la que queda abierta al seleccionar el proyecto; prev/skip/done se desactivan ahí y next entra al paso 1 |
 | **D5** | **Diálogo *Explore…* sobre el panel compartido**: `main_window.py:1504` pasa a ser `ObjectPanel` + botón *Hacer post*; los `_dialog_explore_*` se delgan al panel; se conserva clic→zoom (el panel expone sus labels de gráfico) y `_project_explore`(paso 4) / `_tools_explore` | El diálogo *Explore…* del menú Herramientas idéntico en contenido; el paso 4 de NEO sigue abriéndolo pre-rellenado | **Hecho (2026-08-26)** — `_open_explore_dialog` ahora construye `ObjectPanel(for_post=True)` en una `QScrollArea` + botón *Create post* (señal `post_requested(name, fallback)` del panel → `_open_post_dialog` + cerrar diálogo); se eliminan `_dialog_explore*`/`_orbit_rows`/`_ChartClickFilter`/`_set_scaled_pixmap` (viven ya en `overview.py`); `_render_object_charts` queda solo para el flujo de post; `explore_tab.ui` huérfano se elimina; tests: 6 nuevos offscreen en `test_overview_panel.py` (botón post visible/oculto, señal `post_requested` con nombre + fallback, ignore en vuelo, cancel limpia) + 2 en `test_projects_hub.py` (integración `_explore_panel`) + 2 tests funcionales re-dirigidos al panel (orbit chart parábola + NEO no confirmado) |
-| **D6** | **i18n + verificación + docs**: `lupdate`/`lrelease` → `nightscribe_{es,en}.ts/.qm` (ADR-014); `pytest tests/unit` verde; esta sección con estados finales | Cadenas nuevas traducidas ES/EN; tests de humo en `tests/unit/test_overview_panel.py` (D1-D3) + humo del hub (D4) en verde | **Hecho (2026-08-26)** — `pyside6-lupdate` (fuentes `*/gui/*.py + */gui/ui/*.ui`) refresca los 2 `.ts` (+17 cadenas `ObjectPanel`, −21 obsoletas `ExploreTab`); 17 cadenas nuevas completadas manualmente ES/EN (EN passthrough, ES traducido); `pyside6-lrelease` → 2 `.qm` (306 strings, 0 unfinished); smoke i18n: `test_panel_strings_resolve_in_{spanish,english}` montan cada `.qm`, verifican `btn_post` / `grp_params` / `grp_charts` / headers de tabla / tooltips de chips → 234 tests en verde (sin red) |
+ | **D6** | **i18n + verificación + docs**: `lupdate`/`lrelease` → `nightscribe_{es,en}.ts/.qm` (ADR-014); `pytest tests/unit` verde; esta sección con estados finales | Cadenas nuevas traducidas ES/EN; tests de humo en `tests/unit/test_overview_panel.py` (D1-D3) + humo del hub (D4) en verde | **Hecho (2026-08-26)** — `pyside6-lupdate` (fuentes `*/gui/*.py + */gui/ui/*.ui`) refresca los 2 `.ts` (+17 cadenas `ObjectPanel`, −21 obsoletas `ExploreTab`); 17 cadenas nuevas completadas manualmente ES/EN (EN passthrough, ES traducido); `pyside6-lrelease` → 2 `.qm` (306 strings, 0 unfinished); smoke i18n: `test_panel_strings_resolve_in_{spanish,english}` montan cada `.qm`, verifican `btn_post` / `grp_params` / `grp_charts` / headers de tabla / tooltips de chips → 234 tests en verde (sin red) |
+
+**Revisión (2026-08-27)** — «Detalles» como protagonista, gráficos más limpios:
+
+1. **Pestaña «Detalles» primero**: nueva en `projects_tab.ui` (índice 0 de
+   `tabs_steps`). La carta de presentación del objeto — `ObjectPanel` — vive
+   dentro de ella (`_get_proj_panel` la dobla allí) y es la pestaña que queda
+   abierta al seleccionar un proyecto: toda la información del objeto a primera
+   vista. El paso actual sigue marcado ● en su pestaña y se llega con *Next →*;
+   *prev / Skip / Mark done* se desactivan sobre «Detalles» (no hay paso que
+   actuar), *Next* sigue permitido (entra en Plan).
+2. **Adiós al gráfico «¿Dónde vive?»**: `viz/families_view.py` eliminado (ya no
+   tenía consumidores); `core/post.build_charts` deja de dibujarlo y
+   `CHART_LABELS` pierde la entrada `families`. En el panel el slot pasa a ser
+   **orbital / cielo / campo / curva de luz** (transitos de exoplanetas, ya
+   cubierto por `transit_view`).
+3. **Se omiten los huecos**: los slots que `build_charts` no puede generar se
+   **ocultan** en vez de mostrar una línea «por qué no»; si no se genera ningún
+   gráfico, el grupo completo desaparece. Los gráficos del panel usan el tamaño
+   `panel` (1200×675, añadido a `style.SIZES`) para menos margen y más
+   legibilidad en la ventana.
+4. **Ajuste de resolución de gráficos**: `Ajustes > Gráficos del panel` añade
+   la opción *Al redimensionar la ventana* — **Rápido** (el gráfico se dibuja
+   una vez al tamaño `panel` y se re-escala, el predeterminado) o **Más
+   nitidez** (se redibuja a 2×, 2400×1350, para que los paneles grandes queden
+   nítidos). Se guarda como `config["chart_zoom"]` (`"scale"` / `"re-render"`)
+   y `ObjectPanel` lo lee antes de cada llamada a `build_charts`; cambiar el
+   ajustes con un panel en pantalla lo redibuja (`rebuild_charts`).
+5. Tests: `tests/unit/test_overview_panel.py`, `test_projects_hub.py` y el
+   nuevo `test_style.py` (preset panel, override de tamaño, márgenes
+   ajustados) actualizados al contrato nuevo (6 pestañas, panel dentro de la
+   pestaña «Detalles», slots ocultos sin datos, grupo oculto sin gráficos).
+   `pytest tests/unit` verde (243 tests, sin red).
 
 **Reglas por fase**: una fase = un commit; cada fase deja la app funcional con sus
 tests; no mezclar dos fases sin que la anterior esté verificada (regla de este

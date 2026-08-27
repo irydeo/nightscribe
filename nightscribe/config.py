@@ -42,6 +42,9 @@ DEFAULTS = {
     "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
     "moon_max_illum": 0.5,        # above this, faint targets get penalized
     "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
+    # panel chart resolution mode: "scale" (fast 1× re-scale) |
+    # "re-render" (charts drawn at 2× for crispness in big slots)
+    "chart_zoom": "scale",
 }
 
 

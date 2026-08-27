@@ -79,18 +79,19 @@ def _orbit_xy(elements, n=360):
 
 
 def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
-               fmt="instagram", watermark="NightScribe"):
+                fmt="instagram", watermark="NightScribe", size=None):
     # Renders the object's orbit among the inner planets.
     # @args: elements - SBDB elements dict, jd - Julian date (today),
     #        obj_name - label, approach - dict from cad.next_approach,
     #        out - output PNG path (returns figure if None),
-    #        fmt - size preset, watermark - footer text
+    #        fmt - size preset, watermark - footer text,
+    #        size - (w, h) px override (panel re-render mode)
     # @return: matplotlib figure (and writes PNG if out is given)
     import matplotlib.pyplot as plt
 
     jd = jd or coords.jd_from_datetime(
         datetime.datetime.now(datetime.timezone.utc))
-    fig, ax = style.new_fig(fmt)
+    fig, ax = style.new_fig(fmt, size=size)
     ax.set_aspect("equal")
 
     # ensure a is available (compute from q when SBDB omits it for high-e)

@@ -266,20 +266,24 @@ def _fragments(t):
                           "Potential impactor on JPL Sentry: tonight's measurements refine the risk"))
         moid = _as_float(t.get("moid"))
         if moid is not None and moid < 0.05:
-            frags.append(("MOID < 0.05 AU: puede acercarse a la Tierra en algún cruce",
-                          "MOID < 0.05 AU: it can approach Earth in some crossing"))
+            frags.append((f"MOID de {moid:.3f} UA: cruce cercano con la órbita terrestre",
+                          f"MOID of {moid:.3f} AU: a close crossing with Earth's orbit"))
         nf_score = _as_float(t.get("nf_score"))
         if nf_score is not None and nf_score >= 5:
-            frags.append((f"Es el objetivo con mejor puntuación para tu observatorio según NEOfixer (score {nf_score:.1f}/10)",
-                          f"Highest-scoring target for your site according to NEOfixer (score {nf_score:.1f}/10)"))
+            frags.append((f"Puntuación NEOfixer {nf_score:.1f}/10 para tu observatorio",
+                          f"NEOfixer score of {nf_score:.1f}/10 for your site"))
+        cost = _as_float(t.get("nf_cost_min"))
+        if cost is not None and cost >= 10:
+            frags.append((f"NEOfixer estima {cost:.0f} min de exposición para tu observatorio",
+                          f"NEOfixer estimates {cost:.0f} minutes of imaging for your site"))
         urgency = _as_float(t.get("nf_urgency"))
         if urgency is not None and urgency >= 60:
-            frags.append((f"Urgencia de seguimiento del {urgency:.0f}% según NEOfixer: cada noche cuenta",
-                          f"NEOfixer follow-up urgency at {urgency:.0f}%: every night counts"))
+            frags.append((f"Urgencia de seguimiento del {urgency:.0f}% según NEOfixer",
+                          f"NEOfixer follow-up urgency of {urgency:.0f}%"))
         rate = _as_float(t.get("rate_arcsec_min"))
         if rate is not None and rate >= 0.3:
-            frags.append(("Se mueve rápido por el cielo: cambia de sitio cada minuto",
-                          "Moves fast across the sky: it shifts position every minute"))
+            frags.append((f"Se desplaza a {rate:.2f}″ por minuto",
+                          f"Moving at {rate:.2f} arcsec per minute"))
         arc = _as_float(t.get("arc_days"))
         nobs = _as_float(t.get("nobs"))
         if arc is not None and arc < 30 and nobs is not None and nobs <= 6:
@@ -296,13 +300,15 @@ def _fragments(t):
             extra = f", {nobs:.0f} obs" if nobs is not None else ""
             frags.append((f"Arco corto: {arc:.0f} días{extra}",
                           f"Short arc: {arc:.0f} days{extra}"))
-        frags.append(("Tu imagen podría ser la que lo confirme",
-                      "Your image could be the one to confirm it"))
+        mag = _as_float(t.get("mag"))
+        if mag is not None:
+            frags.append((f"Magnitud prevista {mag:.1f}",
+                          f"Predicted magnitude {mag:.1f}"))
     elif kind == "sn":
         if any(h in (t.get("host") or "").upper() for h in
                ("M51", "M101", "M104", "M87", "M82", "M31", "NGC")):
-            frags.append((f"Está en la galaxia {t['host']}, un nombre que todos conocen",
-                          f"In the galaxy {t['host']}, a name everyone knows"))
+            frags.append((f"Está en la galaxia {t['host']}",
+                          f"In the galaxy {t['host']}"))
         days = _freshness_days(t)
         if days is not None and days <= 14:
             typ_es = f", tipo {t['sn_type']}" if t.get("sn_type") else ""
@@ -311,13 +317,22 @@ def _fragments(t):
                           f"Discovered {days} days ago{typ_en}: still evolving"))
         mag = _as_float(t.get("mag"), default=99.0)
         if mag <= 15:
-            frags.append((f"Brilla a magnitud {mag:.1f}: la fotometría temprana vale oro",
-                          f"Shining at magnitude {mag:.1f}: early photometry is gold"))
+            frags.append((f"Brilla a magnitud {mag:.1f}, buena para su curva de luz",
+                          f"Shining at magnitude {mag:.1f}, good for its light curve"))
     elif kind == "comet":
         mag = _as_float(t.get("mag"), default=99.0)
         if mag <= 12:
-            frags.append((f"Brilla a magnitud {mag:.1f}, al alcance de tu equipo",
-                          f"Shining at magnitude {mag:.1f}, within reach of your setup"))
+            frags.append((f"Brilla a magnitud {mag:.1f}",
+                          f"Shining at magnitude {mag:.1f}"))
+        dist_earth = _as_float(t.get("delta_au"))
+        dist_sun = _as_float(t.get("r_au"))
+        if dist_earth is not None:
+            if dist_sun is not None:
+                frags.append((f"a {dist_earth:.2f} UA de la Tierra y {dist_sun:.2f} UA del Sol",
+                              f"{dist_earth:.2f} AU from Earth and {dist_sun:.2f} AU from the Sun"))
+            else:
+                frags.append((f"a {dist_earth:.2f} UA de la Tierra",
+                              f"{dist_earth:.2f} AU from Earth"))
         per = (t.get("perihelion_date") or "")[:10]
         try:
             delta = ((datetime.date.fromisoformat(per)
@@ -331,15 +346,12 @@ def _fragments(t):
                                   f"Perihelion {-delta} days ago: peak brightness is past"))
         except ValueError:
             pass
-        if not frags:
-            frags.append(("Cometa activo visible esta noche",
-                          "Active comet visible tonight"))
     elif kind == "transit":
         tr = t.get("transit") or {}
         star = tr.get("star") or ""
         if star and star != t.get("name") and any(s in star for s in FAMOUS_SYSTEMS):
-            frags.append((f"Su estrella es {star}, un sistema famoso",
-                          f"Host star {star}, a famous system"))
+            frags.append((f"Su estrella es {star}",
+                          f"Host star {star}"))
         depth = (_as_float(tr.get("depth_mmag")) or 0.0) / 10.0  # mmag -> %
         dur = _as_float(tr.get("duration_h")) or 0.0
         if depth > 0:
@@ -348,8 +360,13 @@ def _fragments(t):
             frags.append((f"El planeta oscurece su estrella un {depth:.1f}%{mid_es}: tu curva de luz ayuda a la misión Ariel de la ESA",
                           f"The planet dims its star by {depth:.1f}%{mid_en}: your light curve helps ESA's Ariel mission"))
         if (tr.get("priority") or "").lower() == "high":
-            frags.append(("Prioridad alta en la lista de tránsitos",
-                          "High priority on the transit watchlist"))
+            scope = _as_float(tr.get("min_telescope_in"))
+            if scope is not None:
+                frags.append((f"Catálogo ESA: telescopio mínimo de {scope:.0f} pulgadas",
+                              f"ESA catalogue: minimum {scope:.0f}-inch telescope"))
+            else:
+                frags.append(("Prioridad high en el catálogo ExoClock",
+                              "High priority in the ExoClock catalogue"))
     elif kind == "alert":
         a = t.get("approach") or {}
         ld, adate = a.get("dist_ld"), a.get("date")

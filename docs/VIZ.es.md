@@ -26,11 +26,6 @@ posts. El estilo se define una sola vez en `viz/style.py`.
   Luna** dibujada y el paso etiquetado en distancias lunares — «para relativizar».
 - Cometas: marcador de cola antisolar en el recuadro de zoom.
 
-### `families_view.py` — «dónde vive»
-
-Bandas radiales de las familias del sistema solar (NEOs, cinturón principal, troyanos,
-centauros, TNOs) con el marcador **«tú estás aquí»** del objeto.
-
 ### `sky_view.py` — curva de altitud nocturna
 
 Altitud frente a tiempo para el objetivo a lo largo de la noche, fases de crepúsculo

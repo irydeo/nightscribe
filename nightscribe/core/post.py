@@ -80,9 +80,6 @@ def suggest_caption(e):
 CHART_LABELS = {
     "orbit":    {"alt_es": "Órbita de %s", "alt_en": "Orbit of %s",
                  "es": "Órbita", "en": "Orbit"},
-    "families": {"alt_es": "Families orbitales (parámetros a, e, per, node, inc)",
-                 "alt_en": "Orbital families (a, e, per, node, inc)",
-                 "es": "Families orbitales", "en": "Orbital families"},
     "sky":      {"alt_es": "Posición celestial y tiempo óptimo",
                  "alt_en": "Sky position and best time to observe",
                  "es": "Posición en el cielo", "en": "Position on the sky"},
@@ -169,17 +166,21 @@ def attach_charts(post, charts, resources=None):
     return post
 
 
-def build_charts(e, outdir, safe, cfg=None):
+def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None):
     # Renders the object's charts into outdir (one PNG each). The prefix
     # must end in "_" so the file name reads e.g. "4443_Atlas_orbit.png".
     # @args: e - enriched dict, outdir - Path, safe - file name prefix,
-    #        cfg - Config (horizon settings) or None
+    #        cfg - Config (horizon settings) or None,
+    #        fmt - size preset of style.SIZES ("instagram" for posts,
+    #              "panel" for the in-GUI overview),
+    #        size - (w, h) px override of the preset (panel re-render mode)
     # @return: dict {chart_key: Path} of the charts actually produced
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from . import coords
-    from ..viz import families_view, orbit_view, sky_view, sn_view
+    from ..viz import orbit_view, sky_view, sn_view
+    outdir = Path(outdir)  # callers may pass a str (panel chart_dir, CLI)
     d = e.get("data") or {}
     jd = coords.jd_from_datetime(
         datetime.datetime.now(datetime.timezone.utc))
@@ -192,16 +193,9 @@ def build_charts(e, outdir, safe, cfg=None):
         p = outdir / f"{safe}orbit.png"
         orbit_view.draw_orbit(dict(els), jd=jd,
                               obj_name=e["name"],
-                              approach=d.get("next_approach"), out=str(p))
+                              approach=d.get("next_approach"), out=str(p),
+                              fmt=fmt, size=size)
         charts["orbit"] = p
-    # families chart (independent of the orbit guard)
-    fam = d.get("family")
-    if fam and els and (els.get("a", 0) or 0) > 0:
-        p = outdir / f"{safe}families.png"
-        families_view.draw_families(fam, obj_name=e["name"],
-                                    a=els.get("a") or els.get("q"),
-                                    out=str(p))
-        charts["families"] = p
     # sky position: ephemeris, then SIMBAD, then the unconfirmed dict
     ra_deg = dec_deg = None
     eph = d.get("ephem")
@@ -229,24 +223,25 @@ def build_charts(e, outdir, safe, cfg=None):
             hor = _horizon.from_config(cfg)
         sky_view.draw_sky(ra_deg, dec_deg, cfg.get("lat") if cfg else None,
                           cfg.get("lon") if cfg else None,
-                          obj_name=e["name"], out=str(p), horizon=hor.alt_at
-                          if hor else None,
-                          margin=float(cfg.get("horizon_margin_deg", 0))
-                          if cfg else 0.0)
+                           obj_name=e["name"], out=str(p), fmt=fmt,
+                           horizon=hor.alt_at if hor else None,
+                           margin=float(cfg.get("horizon_margin_deg", 0))
+                           if cfg else 0.0, size=size)
         charts["sky"] = p
     if sim and ra_deg is not None:
         from .sources import cutouts
         img = cutouts.reference_cutout(ra_deg, dec_deg)
         if img:
             p = outdir / f"{safe}field.png"
-            sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p))
+            sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p),
+                                  fmt=fmt, size=size)
             charts["field"] = p
     # exoplanet transit: light curve of the event (planner target's dict)
     tr = d.get("transit") or (unc or {}).get("transit")
     if tr and tr.get("mid") and e.get("type") in ("transit", "exoplanet"):
         from ..viz import transit_view
         p = outdir / f"{safe}transit.png"
-        transit_view.draw_transit(tr, out=str(p))
+        transit_view.draw_transit(tr, out=str(p), fmt=fmt, size=size)
         charts["transit"] = p
     plt.close("all")
     return charts

@@ -21,11 +21,13 @@ logger = logging.getLogger(__name__)
 # window (see docs/VIZ).
 
 
-def draw_transit(transit, out=None, fmt="facebook", watermark="NightScribe"):
+def draw_transit(transit, out=None, fmt="facebook", watermark="NightScribe",
+                 size=None):
     # @args: transit - dict from transits.py, out - PNG path,
-    #        fmt - size preset, watermark - footer
+    #        fmt - size preset, watermark - footer text,
+    #        size - (w, h) px override (panel re-render mode)
     # @return: matplotlib figure (and writes PNG if out is given)
-    fig, ax = style.new_fig(fmt)
+    fig, ax = style.new_fig(fmt, size=size)
 
     depth = (transit.get("depth_mmag") or 10.0) / 1000.0  # mmag -> relative flux
     dur_h = transit.get("duration_h") or 2.0

@@ -117,10 +117,14 @@ laid out, with no clipped text (multiline, everything visible).
 1. The object view is a **fixed panel above the Plan/Capture/Process/Analyse/
    Publish tabs** in the Projects hub. It is not a step: it cannot be skipped or
    "marked done"; it stays out of the 5-step machine.
+   *(Revised 2026-08-27: it is now the **"Details" tab** — first and the one that
+   stays open on project selection — same guarantee, the object always visible, but
+   owning the full panel height.)*
 2. It contains (all pre-existing): **hook line** + **outreach bullets** +
-   **parameter table with multiline ES/EN explanations** + **the 4 charts**
-   (orbit, sky, families, field) + **capture/window block** (mag, ″/min rate,
-   max no-trail exposure where applicable, window start–end, hours above).
+   **parameter table with multiline ES/EN explanations** + **the charts**
+   (orbit, sky, field, light curve — the ones build_charts cannot produce are
+   hidden; with none, the group disappears) + **capture/window block** (mag, ″/min
+   rate, max no-trail exposure where applicable, window start–end, hours above).
 3. A **shared panel is extracted to `gui/overview.py`** (`ObjectPanel`) used by
    the Projects hub **and** the ad-hoc *Explore…* dialog: one source of truth.
 4. **Untouched**: all of `core/`, the step machine (`core/project.py`,
@@ -133,7 +137,7 @@ laid out, with no clipped text (multiline, everything visible).
 | Enrich (network, cache) | `gui/workers.py` `ExploreWorker` → `core/enrich` |
 | Hook line, bullets | `core/narrative.hook`, `core/narrative.fact_bullets` |
 | Parameters + ES/EN explanation | `core/orbits.explain_elements`, `core/orbits.explain_neofixer` |
-| 4 PNGs (orbit/sky/families/field) | `core/post.build_charts` (`core/post.py:172`) |
+ | PNGs (orbit/sky/field/light curve) | `core/post.build_charts` (`core/post.py:172`) |
 | Max no-trail exposure (NEO) | `core/exposure.plate_scale` + `max_exposure_no_trail` |
 | Mag, rate, window, hours | `project.context` (snapshot, `gui/main_window.py:1474`) |
 | Chart click → zoom/export | `gui/main_window.py:74` `_ChartClickFilter` |
@@ -149,11 +153,42 @@ truncated `lbl_context` header (`gui/ui/projects_tab.ui:51`).
 | Phase | Deliverable | Acceptance | Status |
 |---|---|---|---|
 | **D1** | `gui/overview.py`: `ObjectPanel` without charts — *loading / not found / ready* states, hook line, bullets, parameter table with a wide (multiline) explanation column. `show(e, ctx=None)` + injectable `loader` (offscreen, no network). GPL header, ES/EN pairs | Panel built offscreen; with fake `e`: hook visible, parameter rows with explanation; with `{}`: *not found* state | **Done (2026-08-26)** — `gui/overview.py` + `tests/unit/test_overview_panel.py` (9 offscreen tests, no network) |
-| **D2** | `ObjectPanel` with a **2×2 chart grid** filled by `core/post.build_charts`; "why not" messages (hyperbolic / no elements / unconfirmed) scaled to the widget | With fake `e`: 4 chart slots or the right absence messages; without `e`: empty | **Done (2026-08-26)** — `orbit/sky/families/field` grid in `gui/overview.py` + 5 offscreen tests in `tests/unit/test_overview_panel.py` (14 total, offline; only `field` would touch the network and stays on a "why not" line) |
+ | **D2** | `ObjectPanel` with a **2×2 chart grid** filled by `core/post.build_charts`; "why not" messages (hyperbolic / no elements / unconfirmed) scaled to the widget | With fake `e`: 4 chart slots or the right absence messages; without `e`: empty | **Done (2026-08-26)** — `orbit/sky/families/field` grid in `gui/overview.py` + 5 offscreen tests in `tests/unit/test_overview_panel.py` (14 total, offline; only `field` would touch the network and stays on a "why not" line) → **revised 2026-08-27** — no families (below), slots `orbit/sky/field/transit`, `panel` size (1200×675); unbuildable slots are hidden instead of a "why not" line; with no chart, the whole group disappears |
 | **D3** | `ObjectPanel` with **capture/window blocks** from `ctx`: mag, ″/min rate, max no-trail exposure (neo/pccp only, with rate + `pixel_um`/`focal_mm`), window start–end + hours above; missing data is omitted | With a fake neo `ctx`: full chips; with an sn `ctx`: no rate/exposure; does not break on empty `ctx` | **Done (2026-08-26)** — chip row in `gui/overview.py` (mag / rate / max no-trail exposure / window / hours, from `project.context`; rate and exposure only for neo/pccp) + 5 offscreen tests in `tests/unit/test_overview_panel.py` (19 total, no network). New `self.tr()` strings pending D6 i18n (D1/D2 pattern) |
-| **D4** | **Integration in the hub**: the hub inserts `ObjectPanel` between `lbl_context` and `tabs_steps` (keeping the `lbl_context` header). On project selection → `loader` = `ExploreWorker` (same `fallback_target` from the context), worker kept via `_keep`, the in-flight worker is cancelled when switching project | Without network: selecting a project shows *loading* state and does not crash; step machine, plan panel and buttons stay intact; offscreen smoke tests | **Done (2026-08-26)** — `gui/main_window.py` builds the `ObjectPanel` lazily in `_get_proj_panel()` (wrapped in a `QScrollArea`, inserted before `tabs_steps`); `_project_selected` loads it with `ctx` + `fallback_target` and `cancel()`s the in-flight worker when switching (a late result never lands on the next) + `tests/unit/test_projects_hub.py` (6 offscreen tests, no network) |
+ | **D4** | **Integration in the hub**: the hub inserts `ObjectPanel` between `lbl_context` and `tabs_steps` (keeping the `lbl_context` header). On project selection → `loader` = `ExploreWorker` (same `fallback_target` from the context), worker kept via `_keep`, the in-flight worker is cancelled when switching project | Without network: selecting a project shows *loading* state and does not crash; step machine, plan panel and buttons stay intact; offscreen smoke tests | **Done (2026-08-26)** — `gui/main_window.py` builds the `ObjectPanel` lazily in `_get_proj_panel()` (wrapped in a `QScrollArea`, inserted before `tabs_steps`); `_project_selected` loads it with `ctx` + `fallback_target` and `cancel()`s the in-flight worker when switching (a late result never lands on the next) + `tests/unit/test_projects_hub.py` (6 offscreen tests, no network) → **revised 2026-08-27** — the panel now lives inside the **Details** tab (index 0, new in `projects_tab.ui`), which is the one left open on project selection; prev/skip/done are disabled on it and next enters step 1 |
 | **D5** | ***Explore…* dialog over the shared panel**: `main_window.py:1504` becomes `ObjectPanel` + a *Make post* button; the `_dialog_explore_*` functions delegate to the panel; chart click→zoom is kept (the panel exposes its chart labels); `_project_explore` (step 4) / `_tools_explore` keep working | The Tools-menu *Explore…* dialog is identical in content; the NEO step 4 still opens it pre-filled | **Done (2026-08-26)** — `_open_explore_dialog` now builds `ObjectPanel(for_post=True)` inside a `QScrollArea` + a *Create post* button (the panel's `post_requested(name, fallback)` signal → `_open_post_dialog` + close); the `_dialog_explore*` / `_orbit_rows` / `_ChartClickFilter` / `_set_scaled_pixmap` helpers are gone (they live in `overview.py` already); `_render_object_charts` stays for the post flow; the orphan `explore_tab.ui` is deleted. Tests: 6 new offscreen in `test_overview_panel.py` (post button visible/hidden, `post_requested` carries name + fallback, in-flight guard, cancel clears) + 2 in `test_projects_hub.py` (integration of `_explore_panel`) + the 2 functional tests now drive the panel (parabolic orbit chart + unconfirmed NEO) |
 | **D6** | **i18n + verification + docs**: `lupdate`/`lrelease` → `nightscribe_{es,en}.ts/.qm` (ADR-014); `pytest tests/unit` green; this section with final statuses | New strings translated ES/EN; smoke tests in `tests/unit/test_overview_panel.py` (D1-D3) + hub smoke (D4) green | **Done (2026-08-26)** — `pyside6-lupdate` (sources `gui/*.py + gui/ui/*.ui`) refreshes both `.ts` (+17 `ObjectPanel` strings, −21 obsolete `ExploreTab`); 17 new strings filled by hand (EN passthrough, ES translated); `pyside6-lrelease` → 2 `.qm` (306 strings, 0 unfinished); i18n smoke: `test_panel_strings_resolve_in_{spanish,english}` loads each `.qm` and verifies `btn_post` / `grp_params` / `grp_charts` / table headers / chip tooltips → 234 tests green (no network) |
+
+**Revision (2026-08-27)** — "Details" up front, cleaner charts:
+
+1. **Details tab first**: new in `projects_tab.ui` (index 0 of `tabs_steps`).
+   The object's calling card — `ObjectPanel` — lives inside it
+   (`_get_proj_panel` docks it there) and it is the tab left open when a
+   project is selected: all the object info at a glance. The current step is
+   still marked ● on its tab and reached with *Next →*; *prev / Skip / Mark
+   done* are disabled on Details (no step to act on), *Next* stays allowed
+   (enters Plan).
+2. **Farewell to "Where does it live?"**: `viz/families_view.py` deleted (it had
+   no more consumers); `core/post.build_charts` stops drawing it and
+   `CHART_LABELS` loses the `families` entry. In the panel the slot becomes
+   **orbit / sky / field / light curve** (exoplanet transits, already covered
+   by `transit_view`).
+3. **Empty slots are hidden**: the slots `build_charts` cannot generate are
+   **hidden** instead of a "why not" line; when no chart is generated at all,
+   the whole group disappears. Panel charts use the `panel` size (1200×675,
+   added to `style.SIZES`) for less margin and more legibility in the window.
+4. **Chart resolution setting**: `Settings > Panel charts` adds a
+   *On window resize* choice — **Fast** (the chart is drawn once at the
+   `panel` size and re-scaled, the default) or **Sharper** (re-drawn at 2×,
+   2400×1350, so big slots stay crisp). Stored as `config["chart_zoom"]`
+   (`"scale"` / `"re-render"`) and read by `ObjectPanel` before every
+   `build_charts` call; switching the setting while a panel is on screen
+   re-draws it (`rebuild_charts`).
+5. Tests: `tests/unit/test_overview_panel.py`, `test_projects_hub.py` and
+   the new `test_style.py` (panel preset, size override, squeezed margins)
+   updated to the new contract (6 tabs, panel inside the Details tab, hidden
+   slots without data, group hidden without charts). `pytest tests/unit`
+   green (243 tests, no network).
 
 **Per-phase rules**: one phase = one commit; each phase leaves the app working
 with its tests; two phases are never mixed before the previous one is verified

@@ -55,12 +55,16 @@
        </widget>
       </item>
       <item>
-       <widget class="QTabWidget" name="tabs_steps">
-        <property name="currentIndex"><number>0</number></property>
-        <widget class="QWidget" name="tab_plan">
-         <attribute name="title"><string>Plan</string></attribute>
-         <layout class="QVBoxLayout" name="planLayout"/>
-        </widget>
+        <widget class="QTabWidget" name="tabs_steps">
+         <property name="currentIndex"><number>0</number></property>
+         <widget class="QWidget" name="tab_details">
+          <attribute name="title"><string>Details</string></attribute>
+          <layout class="QVBoxLayout" name="detailsLayout"/>
+         </widget>
+         <widget class="QWidget" name="tab_plan">
+          <attribute name="title"><string>Plan</string></attribute>
+          <layout class="QVBoxLayout" name="planLayout"/>
+         </widget>
         <widget class="QWidget" name="tab_capture">
          <attribute name="title"><string>Capture</string></attribute>
          <layout class="QVBoxLayout" name="captureLayout"/>

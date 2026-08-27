@@ -29,7 +29,8 @@ MUTED = "#8a90a6"       # labels and grids
 SUN = "#ffd76e"
 DANGER = "#ff6b6b"
 
-SIZES = {"instagram": (1080, 1080), "facebook": (1200, 630)}
+SIZES = {"instagram": (1080, 1080), "facebook": (1200, 630),
+         "panel": (1200, 675)}
 
 
 def apply_style():
@@ -51,13 +52,21 @@ def apply_style():
     })
 
 
-def new_fig(fmt="instagram", dpi=100):
-    # @args: fmt - "instagram" | "facebook", dpi - output dpi
+def new_fig(fmt="instagram", dpi=100, size=None):
+    # @args: fmt - "instagram" | "facebook" | "panel", dpi - output dpi,
+    #        size - (w, h) px overrides for the preset (the panel's
+    #        re-render mode draws 2× for crispness in big slots)
     # @return: (fig, ax) with the NightScribe style applied
     apply_style()
     w, h = SIZES.get(fmt, SIZES["instagram"])
+    if size:
+        w, h = size
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(w / dpi, h / dpi), dpi=dpi)
+    if fmt == "panel":
+        # in-GUI chart: squeeze the default matplotlib margins down so the
+        # plot owns the PNG (the wasted dark border is space for nothing)
+        fig.subplots_adjust(left=0.06, right=0.985, top=0.855, bottom=0.115)
     return fig, ax
 
 

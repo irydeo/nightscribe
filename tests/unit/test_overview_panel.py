@@ -87,8 +87,8 @@ def qapp():
 @pytest.fixture()
 def panel(qapp, tmp_path):
     # chart_dir points at a throwaway dir: the tests write real PNGs
-    # for the pure matplotlib slots (orbit, sky, families) without
-    # touching the user's posts folder.
+    # for the pure matplotlib slots (orbit, sky) without touching the
+    # user's posts folder.
     from nightscribe.gui.overview import ObjectPanel
     p = ObjectPanel(chart_dir=tmp_path / "charts")
     yield p
@@ -260,50 +260,49 @@ def test_explore_not_found_state(panel, qapp):
 
 # ---------------- D2: charts grid ----------------
 #
-# build_charts is allowed to run real here (orbit/families/sky are pure
-# matplotlib; only the "field" slot would call the cutouts source, and
-# that fails offline so the slot shows its "why not" line). This keeps
-# the test self-contained without faking disk output.
+# build_charts is allowed to run real here (orbit/sky are pure
+# matplotlib; the "field" slot calls the cutouts source and that fails
+# offline, so the slot stays hidden — the «omit what is missing» rule).
+# This keeps the test self-contained without faking disk output.
 
 def test_charts_grid_present_when_ready(panel):
     panel.show(FAKE_ELEMENT)
     assert panel.state() == "ready"
-    # the 2×2 group exists and is visible when we have an object
+    # the group exists and the slots build_charts actually produced are
+    # visible, in grid order
     assert not panel.grp_charts.isHidden()
-    assert set(panel._labels) == {"orbit", "sky", "families", "field"}
+    assert set(panel._labels) == {"orbit", "sky", "field", "transit"}
+    assert not panel._labels["orbit"].isHidden()
+    assert not panel._labels["sky"].isHidden()
+    assert panel._labels["field"].isHidden()
+    assert panel._labels["transit"].isHidden()
 
 
-def test_bound_element_orbit_slot_has_pixmap(panel):
-    # FAKE_ELEMENT is a bound orbit with an ephemeris: orbit, sky and
-    # families all render to real PNGs, so those slots carry a pixmap.
+def test_bound_element_slots_have_pixmap(panel):
+    # FAKE_ELEMENT is a bound orbit with an ephemeris: orbit and sky render
+    # to real PNGs, so those slots carry a pixmap.
     panel.show(FAKE_ELEMENT)
     assert not panel._labels["orbit"].pixmap().isNull(), \
         "orbit slot should have rendered a chart"
     assert not panel._labels["sky"].pixmap().isNull(), \
         "sky slot should have rendered a chart"
-    assert not panel._labels["families"].pixmap().isNull(), \
-        "families slot should have rendered a chart"
-    # only "field" needs the network (a reference cutout); it stays a
-    # "why not" line instead of a blank
+    # "field" needs the network (a reference cutout); the slot is hidden,
+    # with no «why not» line instead of a blank
+    assert panel._labels["field"].isHidden()
     assert panel._labels["field"].pixmap().isNull()
     assert panel._labels["field"].property("chart_png") is None
-    assert "campo" in panel._labels["field"].text().lower() or \
-        "field" in panel._labels["field"].text().lower()
+    assert panel._labels["field"].text() == ""
 
 
-def test_ready_scarce_slots_show_why_not(panel):
-    # When build_charts cannot produce a slot, it shows a reason (the
-    # "why not" line) instead of an empty box.
+def test_no_charts_hides_the_whole_group(panel):
+    # FAKE_UNCONFIRMED has no elements, no ephemeris and no simbad:
+    # build_charts produces nothing, so the whole charts group disappears
+    # instead of a grid of «why not» lines.
     panel.show(FAKE_UNCONFIRMED)
-    orbit = panel._labels["orbit"]
-    assert orbit.pixmap().isNull()
-    t = orbit.text().lower()
-    assert "no confirmado" in t or "unconfirmed" in t, \
-        f"unconfirmed orbit message wrong: {t!r}"
-    families = panel._labels["families"]
-    assert families.pixmap().isNull()
-    assert "familia" in families.text().lower() or \
-        "family" in families.text().lower()
+    assert panel.grp_charts.isHidden()
+    for lbl in panel._labels.values():
+        assert lbl.isHidden()
+        assert lbl.pixmap().isNull()
 
 
 def test_missing_state_keeps_charts_hidden(panel):

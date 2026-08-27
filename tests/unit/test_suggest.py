@@ -93,6 +93,33 @@ def test_why_phrases_are_object_specific():
     assert "90" not in suggest.why_phrase(a)["es"]
 
 
+def test_why_phrase_is_data_driven():
+    # every fragment must carry a real number, not a generic claim
+    t = {"kind": "neo", "neocp": False, "nf_score": 3.0,
+         "moid": 0.032, "rate_arcsec_min": 0.60, "nf_cost_min": 14.0}
+    ph = suggest.why_phrase(t)
+    for lang in ("es", "en"):
+        assert "0.032" in ph[lang]  # MOID
+        assert "0.60" in ph[lang]   # proper motion
+        assert "14" in ph[lang]     # imaging cost
+    comet = {"kind": "comet", "mag": 10.8, "delta_au": 0.98, "r_au": 1.42,
+             "perihelion_date": "2030-01-01"}
+    cph = suggest.why_phrase(comet)
+    for lang in ("es", "en"):
+        assert "10.8" in cph[lang]
+        assert "0.98" in cph[lang]
+        assert "1.42" in cph[lang]
+    # arc/nobs/mag arrive as strings from the PCCP page; this is what used
+    # to crash the home screen
+    pcd = {"kind": "pccp", "pccp_score": 87.5, "arc_days": "12",
+           "nobs": "4", "mag": "18.5"}
+    pph = suggest.why_phrase(pcd)
+    for lang in ("es", "en"):
+        assert "88" in pph[lang] or "87" in pph[lang]  # score, rounded
+        assert "18.5" in pph[lang]
+        assert "12" in pph[lang]
+
+
 def test_why_phrase_unknown_kind_falls_back():
     ph = suggest.why_phrase({"kind": "unknown", "id": "X"})
     assert ph["es"] and ph["en"]

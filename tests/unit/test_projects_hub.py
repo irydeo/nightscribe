@@ -34,8 +34,8 @@ import pytest
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
-# A bounded orbit with an ephemeris: orbit / sky / families render to real
-# PNGs offline, only the "field" cutout stays a «why not» line.
+# A bounded orbit with an ephemeris: orbit / sky render to real PNGs
+# offline, and the "field" cutout slot stays hidden.
 FAKE_ELEMENT = {
     "type": "small_body",
     "name": "2026 QK (443089)",
@@ -190,10 +190,16 @@ def test_select_project_drives_panel(window, panel):
     assert window._proj_panel is panel
     assert panel.state() == "ready"
     assert panel.lbl_hook.text()
-    # step machine and buttons stayed intact (the panel is a sibling of the
-    # tabs, not a replacement of them)
-    assert window.projects.tabs_steps.count() == 5
+    # step machine and buttons stayed intact ("Details" tab first, then the
+    # five steps)
+    assert window.projects.tabs_steps.count() == 6
+    # a project opens on "Details": prev has no target there, next enters
+    # step 1
+    assert window.projects.tabs_steps.currentIndex() == 0
+    assert not window.projects.btn_prev.isEnabled()
     assert window.projects.btn_next.isEnabled()
+    assert not window.projects.btn_skip.isEnabled()
+    assert not window.projects.btn_mark_done.isEnabled()
     assert window._current_project is not None
     assert "443089" in window.projects.lbl_header.text()
 
@@ -274,9 +280,10 @@ def test_switch_project_cancels_inflight(window):
 
 def test_lazy_build_panel_on_first_selection(window):
     # No pre-built panel: the hub builds the shared ObjectPanel itself,
-    # wraps it in a scroll area, and inserts it before the step tabs (the
-    # real QScrollArea path — a missing import here used to break it).
-    from PySide6.QtWidgets import QScrollArea
+    # wraps it in a scroll area, and docks it into the "Details" tab (the
+    # first one) — the business card owns the whole tab, the steps keep
+    # their own content (the real QScrollArea path).
+    from PySide6.QtWidgets import QScrollArea, QWidget
     # point the built panel's loader at a fake so no ExploreWorker is made
     orig_loaders = window._proj_panel_loader
     window._proj_panel_loader = (lambda name, fallback_target=None:
@@ -291,11 +298,12 @@ def test_lazy_build_panel_on_first_selection(window):
         # setWidget() re-parents the panel into the scroll area's viewport
         assert (panel.parentWidget()
                 is window._proj_panel_area.viewport())
-        # slotted into the detail layout, immediately before the step tabs
-        lay = window.projects.grp_detail.layout()
+        # docked into the "Details" tab (index 0), not the step tabs
+        tab = window.projects.tabs_steps.findChild(QWidget, "tab_details")
+        assert window.projects.tabs_steps.currentIndex() == 0 or \
+            window.projects.tabs_steps.tabIndex(tab) == 0
+        lay = tab.layout()
         assert lay.indexOf(window._proj_panel_area) >= 0
-        assert (lay.indexOf(window._proj_panel_area)
-                < lay.indexOf(window.projects.tabs_steps))
     finally:
         window._proj_panel_loader = orig_loaders
         window._proj_panel = None

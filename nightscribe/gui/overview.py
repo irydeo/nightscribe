@@ -13,16 +13,17 @@
 
 # The object's «business card» as one reusable panel (phase D,
 # docs/WORKFLOWS.es.md §7ter): hook phrase, fact bullets, the
-# parameters table with a wide, multi-line explanation column and the
-# 2×2 charts grid (D2) rendered by core.post.build_charts. A slot that
-# build_charts cannot produce keeps a «why not» line (hyperbolic,
-# unconfirmed, no orbital elements) instead of a blank.
+# parameters table with a wide, multi-line explanation column and a
+# charts row (D2) rendered by core.post.build_charts. A slot that
+# build_charts cannot produce is hidden (the «omit what is missing»
+# rule); when no chart can be made, the whole charts group disappears
+# instead of leaving a grid of «why not» lines.
 #
 # The capture/window block (D3) will land in this same file. The
 # Projects hub (D4) and the Explore dialog (D5) will both render it —
 # single source of truth for "what do we know about this object".
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QGroupBox,
                                 QHBoxLayout, QLabel, QHeaderView, QPushButton,
@@ -35,35 +36,11 @@ from . import theme
 
 # Viewer / slot titles, translated at the point of use.
 _TITLE = {"orbit": "Orbit", "sky": "Sky tonight",
-          "families": "Families", "field": "Field"}
+          "field": "Reference field", "transit": "Light curve"}
 
-# Grid order: orbit / sky on the first row, families / field on the second.
-_CHART_SLOTS = ("orbit", "sky", "families", "field")
-
-# Reasons a slot stays empty (build_charts left it out). Static pairs,
-# chosen in the active language (orbits.pick). The orbit slot has three
-# of them (hyperbolic / unconfirmed / no elements); the rest are one-liners.
-_MSG = {
-    "hyperbolic": {
-        "es": "Órbita hiperbólica — no dibujable",
-        "en": "Hyperbolic orbit — not plottable"},
-    "unconfirmed": {
-        "es": "Objeto no confirmado — sin elementos orbitales",
-        "en": "Unconfirmed object — no orbital elements"},
-    "no_elements": {
-        "es": "Sin elementos orbitales",
-        "en": "No orbital elements"},
-    "no_family": {
-        "es": "Sin familia orbital asignada",
-        "en": "No orbital family assigned"},
-    "no_position": {
-        "es": "Sin posición celeste conocida",
-        "en": "No known sky position"},
-    "no_field": {
-        "es": "Sin campo de referencia disponible",
-        "en": "No reference field available"},
-    "empty": {"es": "—", "en": "—"},
-}
+# Grid order, left to right; the ones build_charts actually produced are
+# laid out in this order (the rest stay hidden).
+_CHART_SLOTS = ("orbit", "sky", "field", "transit")
 
 
 def _chip(text, color, tip=""):
@@ -76,16 +53,10 @@ def _chip(text, color, tip=""):
     return lbl
 
 
-def _scale_png(label, png_path, max_w=820, max_h=620):
-    # Fits a PNG into a chart slot, preserving the aspect ratio. Fixed
-    # bounds because labels inside a not-yet-shown panel report a tiny
-    # size (same rule as the Explore dialog's helper).
-    pix = QPixmap(str(png_path))
-    if pix.isNull():
-        return False
-    label.setPixmap(pix.scaled(max_w, max_h, Qt.KeepAspectRatio,
-                               Qt.SmoothTransformation))
-    return True
+# The re-render mode (Settings > Charts) draws 2× the panel preset: the
+# PNG keeps its 16:9 shape, so a big slot stays crisp without re-running
+# matplotlib on every resize.
+_RENDER2X = (2400, 1350)
 
 
 class _SlotClick(QObject):
@@ -150,6 +121,8 @@ class ObjectPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._for_post = for_post
+        self._e = None          # last enriched dict (re-render on mode change)
+        self._orig_pngs = {}    # slot key -> chart PNG path, for re-fitting
 
         # top row: the "Create post" affordance (D5, Explore dialog only)
         self.btn_post = QPushButton(self.tr("Create post"))
@@ -222,7 +195,7 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         layout.addWidget(self.grp_params)
 
-        # charts 2×2 (D2): orbit / sky over families / field
+        # charts 2×2 (D2): orbit / sky over field / transit, in grid order
         self.grp_charts = QGroupBox(self.tr("Charts"))
         gl2 = QGridLayout(self.grp_charts)
         gl2.setSpacing(8)
@@ -241,6 +214,30 @@ class ObjectPanel(QWidget):
             gl2.addWidget(lbl, i // 2, i % 2)
         self.grp_charts.hide()
         layout.addWidget(self.grp_charts)
+
+    def resizeEvent(self, event):
+        # The panel resizes with its window: re-fit every chart slot on
+        # top (the pixmap was rendered once, we only re-scale it).
+        super().resizeEvent(event)
+        self._fit_slots()
+
+    def _fit_slots(self):
+        # Fits each placed chart to its slot's own size, keeping the
+        # aspect ratio. Slots that have no chart (hidden slot) are no-ops.
+        for key, lbl in self._labels.items():
+            if lbl.isHidden() or lbl.pixmap().isNull():
+                continue
+            path = self._orig_pngs.get(key)
+            pix = QPixmap(path) if path else lbl.pixmap()
+            if pix.isNull():
+                continue
+            w = max(lbl.width(), 320)
+            h = max(lbl.height(), 240)
+            scaled = pix.scaled(w, h, Qt.KeepAspectRatio,
+                                Qt.SmoothTransformation)
+            if scaled.width() != lbl.pixmap().width() or \
+                    scaled.height() != lbl.pixmap().height():
+                lbl.setPixmap(scaled)
 
     # ---------------- states ----------------
 
@@ -278,6 +275,7 @@ class ObjectPanel(QWidget):
 
     def _state_ready(self, e):
         # @args: e - enriched dict from enrich.enrich()
+        self._e = e
         self.lbl_state.hide()
         hook = self._txt(narrative.hook(e))
         self.lbl_hook.setText(hook)
@@ -365,6 +363,7 @@ class ObjectPanel(QWidget):
         # hub calls it when the selection moves to another project.
         self._state = "empty"
         self._ctx = None
+        self._e = None
         self._rows = []
         self._name = None
         self._fallback = None
@@ -443,65 +442,73 @@ class ObjectPanel(QWidget):
         return []
 
     def _render_charts(self, e):
-        # Paints the 2×2 grid from core.post.build_charts, falling back to
-        # a «why not» line on any slot the builder left empty (D2).
+        # Lays out a row of the charts build_charts could actually produce
+        # (compact "panel" size); the group disappears when there is none.
         # @args: e - enriched dict
         from ..core import post
-        d = e.get("data") or {}
-        sb = d.get("sbdb")
-        els = sb.get("elements") if sb else None
-        unc = d.get("unconfirmed")
         outdir = self._chart_dir or paths.data_dir() / "posts"
+        size = _RENDER2X if self._chart_zoom() == "re-render" else None
         try:
             charts = post.build_charts(e, outdir, "_overview_",
-                                       cfg=self._chart_cfg())
+                                       cfg=self._chart_cfg(), fmt="panel",
+                                       size=size)
         except Exception:
             charts = {}
         for key in _CHART_SLOTS:
-            self._paint_slot(key, charts.get(key), els, unc, d)
-        self.grp_charts.show()
+            self._paint_slot(key, charts.get(key))
+        self.grp_charts.setVisible(bool(charts))
+        if charts:
+            # the slots only reach their final size once the layout is up:
+            # fit them against the real geometry in the next paint round
+            QTimer.singleShot(0, self._fit_slots)
 
-    def _paint_slot(self, key, png, els, unc, d):
-        # A slot shows either the chart (pixmap only; QLabel.setText()
-        # would reset it) or a «why not» line. The slot's title lives in
-        # the chart viewer; the slot itself carries no caption.
-        # @args: key - slot name, png - Path from build_charts (or None),
-        #        els - SBDB elements, unc - unconfirmed dict, d - enrich data
+    def _paint_slot(self, key, png):
+        # A slot shows its chart (pixmap only) and stays hidden when the
+        # builder did not produce one — no «why not» lines, so the grid
+        # never keeps space for a chart that is not there.
+        # @args: key - slot name, png - Path from build_charts (or None)
         lbl = self._labels[key]
         lbl.hide()
         lbl.setText("")
         lbl.setPixmap(QPixmap())
         lbl.setProperty("chart_png", None)
-        if png and _scale_png(lbl, png):
+        if png:
+            self._orig_pngs[key] = str(png)
             lbl.setProperty("chart_png", str(png))
             lbl.setProperty("chart_title", self.tr(_TITLE[key]))
+            self._fit_slot(key)
             lbl.show()
-            return
-        lbl.setText(self._txt(_MSG[self._why_not(key, els, unc, d)]))
-        lbl.show()
+        else:
+            self._orig_pngs.pop(key, None)
 
-    @staticmethod
-    def _why_not(key, els, unc, d):
-        # @args: key - slot, els - elements, unc - unconfirmed dict,
-        #         d - enrich data
-        # @return: a _MSG key explaining why this slot is empty. Mirrors the
-        #          same guards core/post.py:build_charts uses, so the panel
-        #          explains the builder's decision.
-        if key == "orbit":
-            if els and els.get("q") and els.get("e", 1) > 1.0:
-                return "hyperbolic"
-            if unc:
-                return "unconfirmed"
-            return "no_elements"
-        if key == "families":
-            return "no_family"
-        if key == "sky":
-            has = (d.get("ephem") or d.get("simbad")
-                   or (unc and unc.get("ra_deg") is not None))
-            return "no_position" if not has else "empty"
-        if key == "field":
-            return "no_field"
-        return "empty"
+    def _fit_slot(self, key):
+        # Fits one placed chart to its slot's real size (same rule as
+        # _fit_slots, but the label is being placed right now).
+        # @args: key - slot name
+        lbl = self._labels.get(key)
+        if lbl is None:
+            return
+        path = self._orig_pngs.get(key)
+        pix = QPixmap(path) if path else QPixmap()
+        if pix.isNull():
+            return
+        w = max(lbl.width(), 320)
+        h = max(lbl.height(), 240)
+        lbl.setPixmap(pix.scaled(w, h, Qt.KeepAspectRatio,
+                                 Qt.SmoothTransformation))
+
+    def rebuild_charts(self):
+        # Re-draws the current object's charts with the active resolution
+        # mode (Settings > Charts) — called when the panel is already on
+        # screen and the user has just switched modes.
+        if self._e is None:
+            return
+        self._render_charts(self._e)
+
+    def _chart_zoom(self):
+        # @return: "scale" | "re-render" (config, default "scale")
+        from ..config import config
+        return config.get("chart_zoom", "scale")
 
     def _chart_cfg(self):
         # @return: the active Config for the sky chart's site/horizon

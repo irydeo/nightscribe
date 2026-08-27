@@ -9,7 +9,7 @@ that sets NightScribe apart from raw ephemeris tables.
 ## Orbital families
 
 Classification from SBDB elements (a, q, e) and orbit class code. Each family ships
-with a short bilingual explanation and its place in `viz/families_view.py`:
+with a short bilingual explanation (built by `core/orbits.py`):
 
 | Family | Rule of thumb | One-liner |
 |---|---|---|

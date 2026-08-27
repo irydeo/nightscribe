@@ -167,8 +167,7 @@ def test_viz_png_exports(tmp_path):
     # every chart must render to a non-empty PNG (Agg, no display)
     import matplotlib
     matplotlib.use("Agg")
-    from nightscribe.viz import (families_view, orbit_view, sky_view,
-                                 sun_panel, transit_view)
+    from nightscribe.viz import orbit_view, sky_view, sun_panel, transit_view
     b = sbdb.get("Apophis")
     f1 = tmp_path / "orbit.png"
     orbit_view.draw_orbit(dict(b["elements"]), obj_name="Apophis",
@@ -178,9 +177,6 @@ def test_viz_png_exports(tmp_path):
     sky_view.draw_sky(346.7, 16.26, config.get("lat"), config.get("lon"),
                       obj_name="test", out=str(f2))
     assert f2.exists() and f2.stat().st_size > 10000
-    f3 = tmp_path / "families.png"
-    families_view.draw_families("Aten", obj_name="Apophis", a=0.92, out=str(f3))
-    assert f3.exists() and f3.stat().st_size > 10000
     f4 = tmp_path / "sun.png"
     sun_panel.draw_sun(sdo.latest_image("0193", 1024), solar.solar_now(),
                        out=str(f4))
@@ -364,15 +360,13 @@ def test_explore_dialog_unconfirmed_neo():
     assert e and e.get("data"), "enrich must return data for unconfirmed NEO"
     assert e["data"].get("unconfirmed"), "must be the unconfirmed path"
     assert not e["data"].get("sbdb"), "must not have SBDB for unconfirmed"
-    # paint it — must not crash and must populate both slots
+    # paint it — must not crash and must populate the sky slot
     panel.show(e)
-    # orbit slot: no pixmap, but informative text (not the default "—")
-    orbit_pix = panel._labels["orbit"].pixmap()
-    orbit_text = panel._labels["orbit"].text()
-    assert orbit_pix is None or orbit_pix.isNull(), \
-        "orbit slot must NOT show a pixmap for unconfirmed objects"
-    assert orbit_text and orbit_text != "—", \
-        "orbit slot must show an informative message, not the placeholder"
+    # orbit slot: no elements, so the slot is hidden (rev 2026-08-27:
+    # unbuildable slots disappear instead of a "why not" line)
+    orbit_lbl = panel._labels["orbit"]
+    assert orbit_lbl.isHidden(), \
+        "orbit slot must be hidden for unconfirmed objects (no elements)"
     # sky slot: must render from unconfirmed ra_deg/dec_deg
     sky_pix = panel._labels["sky"].pixmap()
     assert sky_pix is not None and not sky_pix.isNull(), \
@@ -633,8 +627,9 @@ def test_gui_boots_offscreen():
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)
     assert not w.tonight.grp_list.isVisible()
-    # projects step tabs exist (5 clickable tabs)
-    assert w.projects.tabs_steps.count() == 5
+    # projects step tabs: Details (the object card) + 5 steps
+    assert w.projects.tabs_steps.count() == 6
+    assert w.projects.tabs_steps.tabText(0) == "Details"
     # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]
     assert "File" in menu_texts and "Tools" in menu_texts

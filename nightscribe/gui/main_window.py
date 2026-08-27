@@ -321,6 +321,13 @@ class MainWindow(QMainWindow):
         dlg.spn_moon_sep.setValue(float(config.get("moon_min_sep_deg", 45)))
         dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
         dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
+        # panel chart resolution mode: populate the options in a stable order
+        dlg.cmb_chart_zoom.addItems([
+            self.tr("Fast: re-scale the pre-drawn chart (default)"),
+            self.tr("Sharper: re-draw the chart at 2× resolution")])
+        zoom = config.get("chart_zoom", "scale")
+        idx = 0 if zoom == "scale" else 1
+        dlg.cmb_chart_zoom.setCurrentIndex(idx)
         dlg.btn_resolve.clicked.connect(lambda: self._resolve_into(dlg))
         dlg.btn_horizon_browse.clicked.connect(
             lambda: self._horizon_browse_into(dlg))
@@ -346,6 +353,12 @@ class MainWindow(QMainWindow):
         config.set("moon_min_sep_deg", dlg.spn_moon_sep.value())
         config.set("moon_max_illum", dlg.spn_moon_illum.value())
         config.set("overhead_s", dlg.spn_overhead.value())
+        # panel chart resolution: "scale" (index 0) | "re-render" (index 1) —
+        # if the hub's panel is already on screen, re-draw it to apply
+        config.set("chart_zoom", "scale"
+                   if dlg.cmb_chart_zoom.currentIndex() == 0 else "re-render")
+        if self._proj_panel is not None and self._proj_panel.state() == "ready":
+            self._proj_panel.rebuild_charts()
         self.statusBar().showMessage(self.tr("Settings saved"), 6000)
 
     def _horizon_browse_into(self, dlg):
@@ -1000,6 +1013,11 @@ class MainWindow(QMainWindow):
         self._current_project = p
         self._render_project_header(p)
         self._build_step_tabs(p)
+        # "Detalles" first: the object's business card is what you open a
+        # project for; the current step is marked ● on its own tab and
+        # reached with Next →
+        self.projects.tabs_steps.setCurrentIndex(0)
+        self._update_step_buttons()
         panel = self._get_proj_panel()
         if panel._worker is not None:
             panel.cancel()   # switching projects: drop the in-flight load
@@ -1018,8 +1036,9 @@ class MainWindow(QMainWindow):
         return worker
 
     def _get_proj_panel(self):
-        # Builds the reusable panel on first use and slates it between the
-        # context line and the step tabs (keeping the one-line context).
+        # Builds the reusable panel on first use and docks it into the
+        # «Detalles» tab (index 0), so the object's business card owns the
+        # whole panel height with the step tabs next to it.
         if self._proj_panel is None:
             from .overview import ObjectPanel
             panel = ObjectPanel(loader=self._proj_panel_loader)
@@ -1028,9 +1047,9 @@ class MainWindow(QMainWindow):
             area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
             area.setFrameShape(QFrame.Shape.NoFrame)
             area.setWidget(panel)
-            layout = self.projects.grp_detail.layout()
-            insert_at = layout.indexOf(self.projects.tabs_steps)
-            layout.insertWidget(insert_at, area)
+            tab = self.projects.tabs_steps.findChild(
+                QWidget, "tab_details")
+            tab.layout().addWidget(area)
             self._proj_panel = panel
             self._proj_panel_area = area
         return self._proj_panel
@@ -1081,24 +1100,24 @@ class MainWindow(QMainWindow):
         self._clear_step_tabs()
         kind = p["kind"]
         ctx = p["context"]
-        # update tab labels with status icons
+        # update tab labels with status icons (steps start at index 1;
+        # index 0 is "Detalles", which keeps its plain title)
         for i, key in enumerate(_STEP_KEYS):
             step = next((s for s in p["steps"] if s["step"] == key), None)
             icon = {"done": "✔", "current": "●", "pending": "○",
                     "skipped": "–"}.get(step["status"] if step else "○", "○")
             label = self._step_label(key)
-            self.projects.tabs_steps.setTabText(i, f"{icon} {label}")
+            self.projects.tabs_steps.setTabText(i + 1, f"{icon} {label}")
         # build content per step
         self._build_plan_tab(p, kind, ctx)
         self._build_capture_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
         self._build_analyse_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
-        # jump to the current step
-        cur = project.current_step(db, p["id"])
-        if cur and cur in _STEP_KEYS:
-            self.projects.tabs_steps.setCurrentIndex(_STEP_KEYS.index(cur))
+        # "Detalles" stays open (set by _project_selected); the current
+        # step is marked ● on its tab and reached with Next →
         self._update_step_status(p)
+        self._update_step_buttons()
 
     def _build_plan_tab(self, p, kind, ctx):
         tab = self.projects.tabs_steps.findChild(QWidget, "tab_plan")
@@ -1261,15 +1280,30 @@ class MainWindow(QMainWindow):
             f"{p['object_name']}</small>"))
         layout.addStretch()
 
+    def _step_key_idx(self, idx):
+        # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
+        # step); steps start at 1. Returns None when there is no step key.
+        # @args: idx - tab index
+        # @return: position in _STEP_KEYS, or None on the details tab
+        if idx <= 0:
+            return None
+        n = idx - 1
+        return n if n < len(_STEP_KEYS) else None
+
     def _project_step_changed(self, idx):
-        # Update the status label when the user clicks a step tab
+        # Update the status label and the step buttons when the tab changes
+        self._update_step_buttons()
         if not self._current_project:
             return
         self._update_step_status(self._current_project)
 
     def _update_step_status(self, p):
         idx = self.projects.tabs_steps.currentIndex()
-        key = _STEP_KEYS[idx] if idx < len(_STEP_KEYS) else "plan"
+        n = self._step_key_idx(idx)
+        if n is None:
+            self.projects.lbl_step_status.setText("—")
+            return
+        key = _STEP_KEYS[n]
         step = next((s for s in p["steps"] if s["step"] == key), None)
         status = step["status"] if step else "—"
         status_txt = {"done": self.tr("done"), "current": self.tr("current"),
@@ -1278,37 +1312,55 @@ class MainWindow(QMainWindow):
         self.projects.lbl_step_status.setText(
             f"{self._step_label(key)} — {status_txt}")
 
+    def _update_step_buttons(self):
+        # The step buttons (prev / skip / done / next) only make sense on the
+        # step tabs, not on "Detalles": prev has no target there, skip / done
+        # have no step to act on, next is allowed (it enters step 1).
+        idx = self.projects.tabs_steps.currentIndex()
+        last = self.projects.tabs_steps.count() - 1
+        on_details = idx == 0
+        self.projects.btn_prev.setEnabled(not on_details)
+        self.projects.btn_next.setEnabled(idx != last)
+        self.projects.btn_skip.setEnabled(not on_details)
+        self.projects.btn_mark_done.setEnabled(not on_details)
+
     def _project_prev(self):
         idx = self.projects.tabs_steps.currentIndex()
-        if idx > 0:
-            self.projects.tabs_steps.setCurrentIndex(idx - 1)
+        if not self.projects.btn_prev.isEnabled():
+            return
+        self.projects.tabs_steps.setCurrentIndex(idx - 1)
 
     def _project_next(self):
         idx = self.projects.tabs_steps.currentIndex()
-        if idx < self.projects.tabs_steps.count() - 1:
-            self.projects.tabs_steps.setCurrentIndex(idx + 1)
+        if not self.projects.btn_next.isEnabled():
+            return
+        self.projects.tabs_steps.setCurrentIndex(idx + 1)
 
     def _project_skip(self):
         if not self._current_project:
             return
-        idx = self.projects.tabs_steps.currentIndex()
-        key = _STEP_KEYS[idx] if idx < len(_STEP_KEYS) else None
-        if key:
-            project.set_step_status(db, self._current_project["id"], key,
-                                    project.STEP_SKIPPED)
-            self._project_next()
-            self._refresh_current_project()
+        if not self.projects.btn_skip.isEnabled():
+            return
+        n = self._step_key_idx(self.projects.tabs_steps.currentIndex())
+        if n is None:
+            return
+        project.set_step_status(db, self._current_project["id"],
+                                _STEP_KEYS[n], project.STEP_SKIPPED)
+        self._project_next()
+        self._refresh_current_project()
 
     def _project_mark_done(self):
         if not self._current_project:
             return
-        idx = self.projects.tabs_steps.currentIndex()
-        key = _STEP_KEYS[idx] if idx < len(_STEP_KEYS) else None
-        if key:
-            project.set_step_status(db, self._current_project["id"], key,
-                                    project.STEP_DONE)
-            self._project_next()
-            self._refresh_current_project()
+        if not self.projects.btn_mark_done.isEnabled():
+            return
+        n = self._step_key_idx(self.projects.tabs_steps.currentIndex())
+        if n is None:
+            return
+        project.set_step_status(db, self._current_project["id"],
+                                _STEP_KEYS[n], project.STEP_DONE)
+        self._project_next()
+        self._refresh_current_project()
 
     def _refresh_current_project(self):
         if not self._current_project:

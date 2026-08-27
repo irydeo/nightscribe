@@ -24,11 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 def draw_sn_field(cutout_path, sn_name="", out=None, fmt="instagram",
-                  watermark="NightScribe"):
+                  watermark="NightScribe", size=None):
     # @args: cutout_path - local JPEG Path (or None), sn_name - label,
-    #        out - PNG path, fmt - size preset, watermark - footer
+    #        out - PNG path, fmt - size preset, watermark - footer text,
+    #        size - (w, h) px override (panel re-render mode)
     # @return: matplotlib figure (and writes PNG if out is given)
-    fig, ax = style.new_fig(fmt)
+    fig, ax = style.new_fig(fmt, size=size)
     if cutout_path:
         img = plt.imread(str(cutout_path))
         ax.imshow(img)

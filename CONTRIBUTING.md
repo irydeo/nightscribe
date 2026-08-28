@@ -34,8 +34,8 @@ string is left `unfinished`.
 ## Tests
 
 ```bash
-.venv/bin/pytest tests/unit          # offline, must always pass
-.venv/bin/pytest tests/functional    # online, end-to-end per feature
+.venv/bin/python -m pytest tests/unit      # offline, must always pass
+.venv/bin/python -m pytest tests/functional  # online, end-to-end per feature
 ```
 
 New features come with unit tests (fixtures from real responses live in

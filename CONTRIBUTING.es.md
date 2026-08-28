@@ -32,8 +32,8 @@ fallan si queda alguna cadena `unfinished`.
 ## Tests
 
 ```bash
-.venv/bin/pytest tests/unit          # sin red, deben pasar siempre
-.venv/bin/pytest tests/functional    # con red, extremo a extremo por funcionalidad
+.venv/bin/python -m pytest tests/unit      # sin red, deben pasar siempre
+.venv/bin/python -m pytest tests/functional  # con red, extremo a extremo por funcionalidad
 ```
 
 Toda funcionalidad nueva llega con tests unitarios (los fixtures con respuestas

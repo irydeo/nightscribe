@@ -1,0 +1,17 @@
+moon_disk.png — full moon surface, used by the phase icon
+(gui/moon_icon.py composes it with the mathematically exact terminator).
+
+Source
+------
+"FullMoon2010.jpg", Wikimedia Commons — https://commons.wikimedia.org/wiki/File:FullMoon2010.jpg
+Photograph by Gregory H. Revera (Madison, Alabama, 22/10/2010; Celestron 9.25,
+Canon EOS Rebel T1i, 1540 mm equivalent on the full moon).
+
+License: CC BY-SA 3.0 (attribution + share-alike).
+NightScribe is GPL-3.0, a compatible superset of CC BY-SA here; the original
+author's name is retained above, as CC BY-SA requires.
+
+Processing
+----------
+Extracted to a 512 px circular crop, transparent background (one-off dev
+script, run on 2026-08-27). No other third-party data in this asset.

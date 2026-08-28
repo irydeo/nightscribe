@@ -53,7 +53,19 @@
     <widget class="QGroupBox" name="grp_almanac">
      <property name="title"><string>Moon and planets tonight</string></property>
      <layout class="QVBoxLayout">
-      <item><widget class="QLabel" name="lbl_moon"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Moon: —</string></property></widget></item>
+      <item>
+       <layout class="QHBoxLayout">
+        <item>
+         <widget class="QLabel" name="lbl_moon_icon">
+          <property name="maximumSize"><size><width>24</width><height>24</height></size></property>
+          <property name="alignment"><set>Qt::AlignVCenter | Qt::AlignLeft</set></property>
+          <property name="text"><string/></property>
+         </widget>
+        </item>
+        <item><widget class="QLabel" name="lbl_moon"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Moon: —</string></property></widget></item>
+        <item><spacer name="moonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+       </layout>
+      </item>
       <item><widget class="QLabel" name="lbl_planets"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Planets: —</string></property></widget></item>
      </layout>
     </widget>

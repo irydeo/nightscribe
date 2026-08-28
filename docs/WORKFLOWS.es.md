@@ -256,8 +256,15 @@ Antes de la Fase D, el **PUNTO DE ENTRADA** histórico (proyecto UX v3, fases 1-
    Los **formatos nativos de NINA/CCDciel/TheSkyX/CdC** son puntos de partida que requieren
    validación contra las versiones del usuario en importación real (ADR-021).
 
-**Próximos pasos sugeridos** (fuera del rediseño inicial):
-- Sustituir el mock del horizonte por el fichero TheSkyX real del usuario.
+ **Próximos pasos sugeridos** (fuera del rediseño inicial):
+ - Sustituir el mock del horizonte por el fichero TheSkyX real del usuario.
+ - **Icono lunar real (2026-08-27)**: `gui/moon_icon.py` compone el disco de
+   la Luna (`assets/moon_disk.png`, foto CC BY-SA 3.0 — `assets/ATTRIBUTION.txt`)
+   con el terminador por geometría exacta (`r·cos E`), creciente a la derecha /
+   menguante a la izquierda, según `ephem_minor.moon["elong_deg"]`. Sustituye el
+   % de la cabecera de *Tonight* (tooltip: % ahora vs. al amanecer + por qué varía
+   en la misma noche) y el emoji del almanac de *Solar*. Fallback a disco plano
+   gris si falta el asset. 8 tests offscreen, sin red.
 - Validar los formatos de exportación de secuencias y efemérides contra software real.
 - Añadir flujos para cometas y tránsitos en el mismo esqueleto de 5 pasos.
 - Probar la GUI a fondo y refinar la UX del stepper y los diálogos contextuales.

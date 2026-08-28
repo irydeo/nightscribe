@@ -164,3 +164,8 @@ NEOfixer web, TNS web. The app opens them in the browser.
 Sun, Moon and planets: Paul Schlyter's low-precision algorithms
 (`core/ephem_minor.py`) — pure math, arcminute accuracy, offline. Minor bodies:
 Kepler propagation from SBDB elements. See ADR-009.
+
+Moon *surface* (the phase icon only, no ephemeris): one bundled photograph,
+`nightscribe/assets/moon_disk.png` — Gregory H. Revera, "FullMoon2010",
+Wikimedia Commons, CC BY-SA 3.0 (full credit in `assets/ATTRIBUTION.txt`).
+Generated once at dev time; the app needs no network for it.

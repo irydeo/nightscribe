@@ -526,6 +526,11 @@ class MainWindow(QMainWindow):
             layout.addWidget(skel)
         layout.addStretch()
         self.tonight.lbl_context.setText(self.tr("Computing tonight…"))
+        # a placeholder phase (first quarter) so the disc is not empty
+        # while computing; the real phase replaces it in _update_night_header
+        from . import moon_icon
+        self.tonight.lbl_moon.setPixmap(moon_icon.moon_pixmap(-90, 30))
+        self.tonight.lbl_moon.setToolTip(self.tr("Computing…"))
 
     def _tonight_done(self, top, all_scored, error=""):
         self.tonight.btn_compute.setEnabled(True)
@@ -562,6 +567,7 @@ class MainWindow(QMainWindow):
 
     def _update_night_header(self):
         from ..core import coords, ephem_minor
+        from . import moon_icon
         jd = coords.jd_from_datetime(
             datetime.datetime.now(datetime.timezone.utc))
         m = ephem_minor.moon(jd)
@@ -571,18 +577,33 @@ class MainWindow(QMainWindow):
         # translatable now (ADR-014: visible strings through tr())
         window = coords.tonight_window(config.get("lat"), config.get("lon"))
         date = datetime.date.today().isoformat()
-        moon_pct = m["illum"] * 100
+        pct_now = m["illum"] * 100
         if window:
             dusk = window[0].strftime("%H:%M")
             dawn = window[1].strftime("%H:%M")
             self.tonight.lbl_context.setText(
-                self.tr("%1  ·  Night %2–%3 (UTC)  ·  Moon %4")
-                .replace("%1", date).replace("%2", dusk)
-                .replace("%3", dawn).replace("%4", f"{moon_pct:.0f}%"))
+                self.tr("%1  ·  Night %2–%3 (UTC)")
+                .replace("%1", date).replace("%2", dusk).replace("%3", dawn))
+            pct_by_dawn = ephem_minor.moon(
+                coords.jd_from_datetime(window[1]))["illum"] * 100
         else:
             self.tonight.lbl_context.setText(
-                self.tr("%1  ·  no astronomical night tonight  ·  Moon %2")
-                .replace("%1", date).replace("%2", f"{moon_pct:.0f}%"))
+                self.tr("%1  ·  no astronomical night tonight")
+                .replace("%1", date))
+            pct_by_dawn = pct_now
+        # the moon icon replaces the old "Moon 79%" text: a real disc at the
+        # exact phase, and the tooltip explains where the number was going
+        label = self.tonight.lbl_moon
+        label.setPixmap(moon_icon.moon_pixmap(m["elong_deg"], 30))
+        why = {"es": "La Luna avanza ~12°/día en su órbita: en la misma noche "
+                     "cambia varios grados su ángulo con el Sol, por eso su "
+                     "iluminación sube o baja de principio a fin de la noche",
+               "en": "The Moon moves ~12°/day along its orbit: over one night "
+                     "its angle to the Sun shifts a few degrees, so its "
+                     "illumination rises or falls from dusk to dawn"}
+        tip = (self.tr("Moon: %1% lit now, %2% by dawn")
+               .replace("%1", f"{pct_now:.0f}").replace("%2", f"{pct_by_dawn:.0f}"))
+        label.setToolTip(tip + "\n" + self._txt(why))
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and
@@ -2165,13 +2186,15 @@ class MainWindow(QMainWindow):
         jd = coords.jd_from_datetime(
             datetime.datetime.now(datetime.timezone.utc))
         m = ephem_minor.moon(jd)
-        phase_icons = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"]
-        icon = phase_icons[int(m["phase_age_days"] / 29.53 * 8) % 8]
+        from . import moon_icon
+        # same real-disc phase icon as the Tonight header (replaces emoji)
         self.solar.lbl_moon.setText(
-            f"{icon} " + self.tr("Moon: %1% lit · %2 km · %3 days")
+            self.tr("Moon: %1% lit · %2 km · %3 days")
             .replace("%1", f"{m['illum'] * 100:.0f}")
             .replace("%2", f"{m['dist_km']:,.0f}")
             .replace("%3", f"{m['phase_age_days']:.0f}"))
+        self.solar.lbl_moon_icon.setPixmap(
+            moon_icon.moon_pixmap(m["elong_deg"], 20))
         window = coords.tonight_window(config.get("lat"), config.get("lon"))
         visible = []
         if window:

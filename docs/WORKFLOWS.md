@@ -251,6 +251,14 @@ Before Phase D, the historical **ENTRY POINT** (UX v3 project, phases 1-6):
 
 **Suggested next steps** (beyond the initial redesign):
 - Replace the mocked horizon with the user's real TheSkyX file.
+- **Real moon icon (2026-08-27)**: `gui/moon_icon.py` composes the lunar
+  surface (`assets/moon_disk.png`, CC BY-SA 3.0 photo — see
+  `assets/ATTRIBUTION.txt`) with the terminator drawn by exact geometry
+  (`r·cos E`), waxing on the right / waning on the left per
+  `ephem_minor.moon["elong_deg"]`. It replaces the % in the *Tonight* header
+  (tooltip: % now vs. by dawn + why it changes within one night) and the
+  emoji in the *Solar* almanac. Flat grey disc fallback if the asset is
+  missing. 8 offscreen tests, no network.
 - Validate the sequence and ephemeris export formats against real software.
 - Add flows for comets and exoplanet transits in the same 5-step skeleton.
 - Test the GUI thoroughly and refine the stepper and contextual dialog UX.

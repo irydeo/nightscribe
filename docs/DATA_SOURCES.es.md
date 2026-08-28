@@ -168,6 +168,12 @@ web de NEOfixer, web de TNS. La app los abre en el navegador.
 
 ## Efemérides locales
 
-Sol, Luna y planetas: algoritmos de baja precisión de Paul Schlyter
-(`core/ephem_minor.py`) — math puro, precisión de arcminutos, offline. Cuerpos
-menores: propagación kepleriana desde elementos SBDB. Ver ADR-009.
+ Sol, Luna y planetas: algoritmos de baja precisión de Paul Schlyter
+ (`core/ephem_minor.py`) — math puro, precisión de arcminutos, offline. Cuerpos
+ menores: propagación kepleriana desde elementos SBDB. Ver ADR-009.
+
+ *Superficie* de la Luna (solo el icono de fase, no efemérides): una fotografía
+ empaquetada, `nightscribe/assets/moon_disk.png` — Gregory H. Revera,
+ "FullMoon2010", Wikimedia Commons, CC BY-SA 3.0 (crédito completo en
+ `assets/ATTRIBUTION.txt`). Generada una vez en desarrollo; la app no necesita
+ red para ella.

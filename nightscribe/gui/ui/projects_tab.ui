@@ -73,10 +73,7 @@
          <attribute name="title"><string>Process</string></attribute>
          <layout class="QVBoxLayout" name="processLayout"/>
         </widget>
-        <widget class="QWidget" name="tab_analyse">
-         <attribute name="title"><string>Analyse</string></attribute>
-         <layout class="QVBoxLayout" name="analyseLayout"/>
-        </widget>
+
         <widget class="QWidget" name="tab_publish">
          <attribute name="title"><string>Publish</string></attribute>
          <layout class="QVBoxLayout" name="publishLayout"/>

@@ -56,7 +56,7 @@ interfaz muestra un solo idioma cada vez; solo los posts generados son bilingüe
 ### 2. Proyectos — el flujo guiado (UX v3, ADR-019)
 
 Cada objetivo puede convertirse en un **proyecto**: un flujo guiado y persistente por
-tipo de objeto (Plan → Captura → Procesado → Análisis → Publicar) que lleva todo el
+ tipo de objeto (Plan → Captura → Procesado → Publicar) que lleva todo el
 contexto — sin volver a preguntar nombres, coordenadas o imágenes. Las secuencias de
 captura y las efemérides se exportan como ficheros para software externo (NINA,
 CCDciel, TheSkyX, Cartes du Ciel — ADR-021); la astrometría medida fuera se pega de

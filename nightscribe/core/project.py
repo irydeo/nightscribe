@@ -20,8 +20,11 @@ logger = logging.getLogger(__name__)
 # A project carries the full context of an observing target through a guided
 # flow. Steps and kinds are fixed strings so the GUI and CLI can switch on
 # them safely. All SQL goes through db.execute (ADR-002).
+# Review (2026-08-28, ADR-019): the old "analyse" step was dropped — its only
+# real content (the SN blink) now lives in "process", and the explore view is
+# already the Details tab. Four steps for every kind.
 
-STEPS = ("plan", "capture", "process", "analyse", "publish")
+STEPS = ("plan", "capture", "process", "publish")
 VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit")
 
 STEP_PENDING = "pending"

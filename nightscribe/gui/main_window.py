@@ -42,15 +42,16 @@ logger = logging.getLogger(__name__)
 
 UI_DIR = Path(__file__).parent / "ui"
 
-_STEP_NAMES = ("plan", "tab_plan", "capture", "tab_capture", "process",
-               "tab_process", "analyse", "tab_analyse", "publish", "tab_publish")
-_STEP_KEYS = ("plan", "capture", "process", "analyse", "publish")
+# Four guided steps for every project kind. The old "analyse" step (ADR-019,
+# review 2026-08-28) was dropped: the explore view already lives in the
+# Details tab and the SN blink now sits in "process".
+_STEP_KEYS = ("plan", "capture", "process", "publish")
 _STEP_TABS = {0: "tab_plan", 1: "tab_capture", 2: "tab_process",
-              3: "tab_analyse", 4: "tab_publish"}
+              3: "tab_publish"}
 _STEP_LABELS_ES = {"plan": "Plan", "capture": "Captura", "process": "Procesado",
-                   "analyse": "Análisis", "publish": "Publicar"}
+                   "publish": "Publicar"}
 _STEP_LABELS_EN = {"plan": "Plan", "capture": "Capture", "process": "Process",
-                   "analyse": "Analyse", "publish": "Publish"}
+                   "publish": "Publish"}
 
 
 def _load_ui(name, parent=None):
@@ -1009,8 +1010,8 @@ class MainWindow(QMainWindow):
                           "pccp": "PCCP", "transit": self.tr("Transit")}.get(
                           p["kind"], p["kind"])
             cur = project.current_step(db, p["id"]) or "done"
-            step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 5
-            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/5")
+            step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 4
+            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/4")
             item.setData(Qt.UserRole, p["id"])
             lst.addItem(item)
         if not projects:
@@ -1086,10 +1087,10 @@ class MainWindow(QMainWindow):
                       "pccp": "Possible comet",
                       "transit": "Exoplanet transit"}.get(p["kind"], p["kind"])
         cur = project.current_step(db, p["id"])
-        step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 5
+        step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 4
         self.projects.lbl_header.setText(
             f"<b>[{kind_label}] {p['object_name']}</b> — "
-            f"{self.tr('step')} {step_n}/5")
+            f"{self.tr('step')} {step_n}/4")
         ctx = p["context"]
         parts = []
         if ctx.get("mag") is not None:
@@ -1105,7 +1106,7 @@ class MainWindow(QMainWindow):
     def _clear_step_tabs(self):
         # Remove all dynamic content from step tabs
         for tab_name in ("tab_plan", "tab_capture", "tab_process",
-                         "tab_analyse", "tab_publish"):
+                         "tab_publish"):
             tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
             if tab and tab.layout():
                 while tab.layout().count():
@@ -1133,7 +1134,6 @@ class MainWindow(QMainWindow):
         self._build_plan_tab(p, kind, ctx)
         self._build_capture_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
-        self._build_analyse_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
         # "Detalles" stays open (set by _project_selected); the current
         # step is marked ● on its tab and reached with Next →
@@ -1268,15 +1268,9 @@ class MainWindow(QMainWindow):
             layout.addWidget(lbl_path)
             self._project_widgets["edt_fits"] = edt
             self._project_widgets["lbl_fits_path"] = lbl_path
-        else:
-            layout.addWidget(QLabel(
-                self.tr("Process your images with your usual software.")))
-        layout.addStretch()
-
-    def _build_analyse_tab(self, p, kind, ctx):
-        tab = self.projects.tabs_steps.findChild(QWidget, "tab_analyse")
-        layout = tab.layout()
-        if kind == "sn":
+            # (ADR-019 review 2026-08-28) the old "Analyse" step lived here;
+            # its only real action — the blink — moved into this step, so the
+            # FITS import and the confirmation are side by side.
             btn = QPushButton(self.tr("Open blink…"))
             btn.clicked.connect(self._project_blink)
             layout.addWidget(btn)
@@ -1285,9 +1279,8 @@ class MainWindow(QMainWindow):
                 f"@ {ctx.get('ra_deg', 0):.4f}, {ctx.get('dec_deg', 0):+.4f}"
                 f"</small>"))
         else:
-            btn = QPushButton(self.tr("Explore object…"))
-            btn.clicked.connect(self._project_explore)
-            layout.addWidget(btn)
+            layout.addWidget(QLabel(
+                self.tr("Process your images with your usual software.")))
         layout.addStretch()
 
     def _build_publish_tab(self, p, kind, ctx):
@@ -1536,10 +1529,6 @@ class MainWindow(QMainWindow):
         else:
             lbl.setText(self.tr("Invalid: ") + "; ".join(result["errors"][:4])
                         + ("…" if len(result["errors"]) > 4 else ""))
-
-    def _project_explore(self):
-        if self._current_project:
-            self._open_explore_dialog(self._current_project["object_name"])
 
     def _project_post(self):
         if self._current_project:

@@ -56,7 +56,7 @@ generated posts are bilingual.
 ### 2. Projects — the guided flow (UX v3, ADR-019)
 
 Every target can become a **project**: a persistent, guided flow per object kind
-(Plan → Capture → Process → Analyse → Publish) that carries the full context — no
+ (Plan → Capture → Process → Publish) that carries the full context — no
 re-asking for names, coordinates or images. Capture sequences and ephemerides are
 exported as files for external software (NINA, CCDciel, TheSkyX, Cartes du Ciel —
 ADR-021); astrometry measured elsewhere is pasted back, validated and packaged for the

@@ -26,11 +26,11 @@ one a **project** is born that guides everything else without re-asking anything
 ## 3. Anatomy of a project
 
 Persistent entity (ADR-019): kind, target, status (`active`/`done`/`archived`), full
-JSON context and five guided steps. Context is captured when the project is created
+JSON context and four guided steps. Context is captured when the project is created
 from Tonight (target snapshot: coords, mag, rate, window…) and enriched at each step
 (exported sequence, imported FITS, measurements, posts).
 
-**Steps**: Plan → Capture → Process → Analyse → Publish.
+**Steps**: Plan → Capture → Process → Publish.
 
 ## 4. Flow — supernova / transient
 
@@ -41,10 +41,10 @@ from Tonight (target snapshot: coords, mag, rate, window…) and enriched at eac
    and times; the file is registered in the project.
 3. **Process** (external): the user calibrates/stacks with their own tools; back in
    NightScribe, "Import result FITS" — **without asking for target or coordinates**
-   (already in context).
-4. **Analyse**: blink with matched PS1-g (pre-filled ADR-018 pipeline), labelling,
-   GIF/MP4/PNG with observatory watermark.
-5. **Publish**: ES/EN story + tweet with the **real session data** (date, N×t, filter)
+   (already in context) — then confirm with the blink, matched against PS1-g
+   (pre-filled ADR-018 pipeline), and export GIF/MP4/PNG with the observatory
+   watermark.
+4. **Publish**: ES/EN story + tweet with the **real session data** (date, N×t, filter)
    + observed/posted marks in history.
 
 ## 5. Flow — NEO / PCCP candidate
@@ -58,14 +58,15 @@ from Tonight (target snapshot: coords, mag, rate, window…) and enriched at eac
 3. **Process**: the user measures externally (Astrometrica or other) and **pastes**
    the measurements into the project → validation (80-col/ADES, MPC code, designation)
    → packaged file ready to email to the MPC (ADR-022). Sending is done by the user.
-4. **Analyse**: orbital interpretation with context — family, MOID, size from H, next
-   close approach (reuses `enrich.py` + `orbits.py`).
-5. **Publish**: ES/EN story + `orbit_view`/`sky_view` + observed/posted marks +
-   NEOfixer report if an API key is configured.
+4. **Publish**: ES/EN story + `orbit_view`/`sky_view` + observed/posted marks +
+   NEOfixer report if an API key is configured. The orbital interpretation itself
+   (family, MOID, size from H, next close approach — reuses `enrich.py` + `orbits.py`)
+   is not a step: it already renders in the *Details* tab the moment the project is
+   opened.
 
 ## 6. Later flows
 
-Comets and exoplanet transits reuse the same 5-step skeleton once the SN and NEO flows
+Comets and exoplanet transits reuse the same 4-step skeleton once the SN and NEO flows
 are settled. Out of this initial redesign.
 
 ## 7. Roadmap and entry point
@@ -114,12 +115,13 @@ laid out, with no clipped text (multiline, everything visible).
 
 **Agreed decisions (2026-08-26)**:
 
-1. The object view is a **fixed panel above the Plan/Capture/Process/Analyse/
-   Publish tabs** in the Projects hub. It is not a step: it cannot be skipped or
-   "marked done"; it stays out of the 5-step machine.
+1. The object view is a **fixed panel above the step tabs** (Plan/Capture/Process/
+   Publish) in the Projects hub. It is not a step: it cannot be skipped or "marked
+   done"; it stays out of the step machine.
    *(Revised 2026-08-27: it is now the **"Details" tab** — first and the one that
    stays open on project selection — same guarantee, the object always visible, but
-   owning the full panel height.)*
+   owning the full panel height. Revised again 2026-08-28 (ADR-019): the step list is
+   now four — see ADR-019 review.)*
 2. It contains (all pre-existing): **hook line** + **outreach bullets** +
    **parameter table with multiline ES/EN explanations** + **the charts**
    (orbit, sky, field, light curve — the ones build_charts cannot produce are
@@ -260,7 +262,7 @@ Before Phase D, the historical **ENTRY POINT** (UX v3 project, phases 1-6):
   emoji in the *Solar* almanac. Flat grey disc fallback if the asset is
   missing. 8 offscreen tests, no network.
 - Validate the sequence and ephemeris export formats against real software.
-- Add flows for comets and exoplanet transits in the same 5-step skeleton.
+- Add flows for comets and exoplanet transits in the same 4-step skeleton.
 - Test the GUI thoroughly and refine the stepper and contextual dialog UX.
 4. Standing rules: English code with GPL header and `# @args:` comments, GUI strings
    via `self.tr()`, network only from `core/sources/` through `core/db.py`, bilingual

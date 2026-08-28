@@ -108,6 +108,23 @@ def _migrate(conn):
         if "project_id" not in cols:
             conn.execute("ALTER TABLE observations ADD COLUMN project_id INTEGER")
         conn.execute("PRAGMA user_version = 1")
+    if v < 2:
+        # ADR-019 review (2026-08-28): the "analyse" step was removed from the
+        # step machine. Drop those rows; if a project was stopped on them,
+        # hand "current" to the next step (publish) so the flow keeps moving.
+        rows = conn.execute(
+            "SELECT project_id, id, status FROM project_steps WHERE step=?",
+            ("analyse",)).fetchall()
+        for pid, sid, status in rows:
+            if status == "current":
+                # the flow was stopped on the analyse step: hand "current" to
+                # the next step (publish)
+                conn.execute(
+                    "UPDATE project_steps SET status=?, updated=? WHERE"
+                    " project_id=? AND step=?",
+                    ("current", time.time(), pid, "publish"))
+            conn.execute("DELETE FROM project_steps WHERE id=?", (sid,))
+        conn.execute("PRAGMA user_version = 2")
     conn.commit()
 
 

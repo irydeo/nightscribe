@@ -191,8 +191,8 @@ def test_select_project_drives_panel(window, panel):
     assert panel.state() == "ready"
     assert panel.lbl_hook.text()
     # step machine and buttons stayed intact ("Details" tab first, then the
-    # five steps)
-    assert window.projects.tabs_steps.count() == 6
+    # four steps)
+    assert window.projects.tabs_steps.count() == 5
     # a project opens on "Details": prev has no target there, next enters
     # step 1
     assert window.projects.tabs_steps.currentIndex() == 0

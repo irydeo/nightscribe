@@ -26,11 +26,11 @@ elección nace un **proyecto** que guía todo lo demás sin volver a preguntar n
 ## 3. Anatomía de un proyecto
 
 Entidad persistente (ADR-019): tipo, objeto, estado (`active`/`done`/`archived`),
-contexto JSON completo y cinco pasos guiados. El contexto se captura al crear el
+contexto JSON completo y cuatro pasos guiados. El contexto se captura al crear el
 proyecto desde Esta noche (snapshot del objetivo: coords, mag, rate, ventana…) y se
 enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
 
-**Pasos**: Plan → Captura → Procesado → Análisis → Publicar.
+**Pasos**: Plan → Captura → Procesado → Publicar.
 
 ## 4. Flujo — supernova / transitorio
 
@@ -41,10 +41,9 @@ enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
    y tiempos; el fichero queda registrado en el proyecto.
 3. **Procesado** (externo): el usuario calibra/apila con sus programas; al volver,
    «Importar FITS resultado» — **sin preguntar objeto ni coordenadas** (ya están en el
-   contexto).
-4. **Análisis**: blink con PS1-g casado (pipeline ADR-018 pre-rellenado), etiquetado,
-   GIF/MP4/PNG con watermark del observatorio.
-5. **Publicar**: historia ES/EN + tuit con los **datos reales de la sesión** (fecha,
+   contexto) — y confirma con el blink, casado con PS1-g (pipeline ADR-018
+   pre-rellenado), y exporta GIF/MP4/PNG con el watermark del observatorio.
+4. **Publicar**: historia ES/EN + tuit con los **datos reales de la sesión** (fecha,
    N×t, filtro) + marca observado/posteado en el historial.
 
 ## 5. Flujo — NEO / candidato PCCP
@@ -58,14 +57,14 @@ enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
 3. **Procesado**: el usuario mide fuera (Astrometrica u otro) y **pega** las medidas en
    el proyecto → validación (80-col/ADES, código MPC, designación) → fichero
    empaquetado listo para enviar al MPC (ADR-022). El envío lo hace el usuario.
-4. **Análisis**: interpretación orbital con contexto — familia, MOID, tamaño desde H,
-   próxima aproximación (reutiliza `enrich.py` + `orbits.py`).
-5. **Publicar**: historia ES/EN + `orbit_view`/`sky_view` + observado/posteado +
-   report a NEOfixer si hay clave configurada.
+4. **Publicar**: historia ES/EN + `orbit_view`/`sky_view` + observado/posteado +
+   report a NEOfixer si hay clave configurada. La interpretación orbital (familia,
+   MOID, tamaño desde H, próxima aproximación — reutiliza `enrich.py` + `orbits.py`)
+   no es un paso: ya se pinta en la pestaña *Detalles* al abrir el proyecto.
 
 ## 6. Flujos posteriores
 
-Cometas y tránsitos de exoplanetas reutilizan el mismo esqueleto de 5 pasos cuando los
+Cometas y tránsitos de exoplanetas reutilizan el mismo esqueleto de 4 pasos cuando los
 flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 
 ## 7. Hoja de ruta y punto de entrada
@@ -116,12 +115,13 @@ colocarla de forma atractiva e intuitiva, sin texto cortado (multilínea, todo v
 
 **Decisiones pactadas (2026-08-26)**:
 
- 1. La vista de objeto es un **panel fijo por encima de Plan/Captura/Procesado/
-    Análisis/Publicar** en el hub de Proyectos. No es un paso: no se salta y no se
-    «marca hecho»; no entra en la máquina de 5 pasos.
-    *(Revisión 2026-08-27: en cambio es la **pestaña «Detalles»**, la primera y la
-    que queda abierta al seleccionar el proyecto — misma garantía, el objeto siempre
-    visible, pero ocupando toda la altura del panel.)*
+1. La vista de objeto es un **panel fijo por encima de las pestañas de pasos**
+   (Plan/Captura/Procesado/Publicar) en el hub de Proyectos. No es un paso: no se
+   salta y no se «marca hecho»; no entra en la máquina de pasos.
+   *(Revisión 2026-08-27: en cambio es la **pestaña «Detalles»**, la primera y la
+   que queda abierta al seleccionar el proyecto — misma garantía, el objeto siempre
+   visible, pero ocupando toda la altura del panel. Revisión de nuevo 2026-08-28
+   (ADR-019): la lista de pasos pasa a ser de 4 — ver revisión de ADR-019.)*
  2. Incluye (todo ya existe): **frase de enganche** + **bullets divulgativos** +
     **tabla de parámetros con explicación multilínea ES/EN** + **los gráficos**
     (órbita, cielo, campo, curva de luz — se ocultan los que no se pueden
@@ -266,7 +266,7 @@ Antes de la Fase D, el **PUNTO DE ENTRADA** histórico (proyecto UX v3, fases 1-
    en la misma noche) y el emoji del almanac de *Solar*. Fallback a disco plano
    gris si falta el asset. 8 tests offscreen, sin red.
 - Validar los formatos de exportación de secuencias y efemérides contra software real.
-- Añadir flujos para cometas y tránsitos en el mismo esqueleto de 5 pasos.
+- Añadir flujos para cometas y tránsitos en el mismo esqueleto de 4 pasos.
 - Probar la GUI a fondo y refinar la UX del stepper y los diálogos contextuales.
 4. Reglas vigentes: código en inglés con cabecera GPL y comentarios `# @args:`,
    cadenas de GUI por `self.tr()`, red solo desde `core/sources/` vía `core/db.py`,

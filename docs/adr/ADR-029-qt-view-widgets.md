@@ -102,12 +102,20 @@ Concretamente:
   complementan: la app usa `gui/theme.py` (el cromo de la aplicación), y los
   charts — tanto el widget GUI como el PNG exportado — usan `viz/palette.py`
   (el color "espacio oscuro" de cada gráfico).
+- Al arrastrar el marco de la ventana, Qt encola docenas de eventos de
+  redimensionado en un solo fotograma; si cada uno forzaba un `fitInView`
+  completo (re-render sincrono de la escena), en un GPU de raster lento
+  saturaba la GUI thread hasta que la app parecía congelarse. `ChartView.resizeEvent`
+  coalesce los resizes a **una** `fit_to_scene()` retardada por vuelta de
+  event-loop (`QTimer.singleShot(0, …)` + guard `_fit_pending`). El resultado
+  visual es idéntico al del resize final; el coste es O(1) por arrastre.
+  La misma estrategia protege `chart_viewer.py`.
 
 **Escopado**: este ADR cubre la arquitectura de la capa interactiva y la
-fuente de colores. La implementación se hace en tres fases autónomas
-(Fase 1: base `ChartView`; Fase 2: `OrbitChart`; Fase 3: `SkyChart`) para
-poder parar, probar y commitar entre cada una; ver
-`docs/PLANS/qt-chart-widgets.md`.
+fuente de colores. La implementación se hace en fases autónomas para poder
+parar, probar y commitar entre cada una (Fase 1: base `ChartView`; Fase 2:
+`OrbitChart`; Fase 3: `SkyChart`; Fase 4: integración GUI + viewer dual-mode;
+Fase 5: fixes de rendimiento y cierres). Ver `docs/PLANS/qt-chart-widgets.md`.
 
 ## English
 
@@ -205,9 +213,18 @@ Specifically:
   the app uses `gui/theme.py` (the application's chrome), and the charts —
   both the GUI widget and the exported PNG — use `viz/palette.py` (the
   "dark space" look of each chart).
+- When the window is being dragged, Qt queues dozens of resize events in a
+  single frame; if each one forced a full `fitInView` (a synchronous
+  scene re-render), on a slow GPU raster path the GUI thread saturates
+  and the app appears frozen. `ChartView.resizeEvent` now coalesces the
+  resize burst to a **single** deferred `fit_to_scene()` per event-loop
+  turn (`QTimer.singleShot(0, …)` + a `_fit_pending` flag). The visual
+  output is identical to the final resize; the cost is O(1) per drag.
+  The same strategy protects `chart_viewer.py`.
 
 **Scope**: this ADR covers the architecture of the interactive layer and the
-colour source of truth. The implementation happens in three autonomous phases
-(phase 1: base `ChartView`; phase 2: `OrbitChart`; phase 3: `SkyChart`) so
-we can stop, test and commit between each one; see
+colour source of truth. The implementation happens in autonomous phases so
+we can stop, test and commit between each one (phase 1: base `ChartView`;
+phase 2: `OrbitChart`; phase 3: `SkyChart`; phase 4: GUI integration +
+dual-mode viewer; phase 5: performance fixes and close-out). See
 `docs/PLANS/qt-chart-widgets.md`.

@@ -74,7 +74,8 @@ nightscribe/
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
-  gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer)
+   gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer)
+                      # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

@@ -477,5 +477,49 @@ preferencia permanente (lista blanca) en Ajustes.
   Los 9 tests de `test_overview_panel.py` (CTA) + los 4 de
   `test_projects_hub.py` + los 2 de `test_tonight_rows.py` pasan.
 
+### 7sex. Fase F — Gráficas vectoriales en la GUI (2026-09-03)
+
+Motivación: los charts del resumen (órbita, cielo, …) eran **PNGs de ratio fijo**
+mostrados en lienzos de otro ratio (letterbox) y no se podían animar, hovernear ni
+exportar "lo que se ve". Ahora son **widgets vectoriales nativos de PySide6**
+(`QGraphicsView`). La **red / post** sigue en matplotlib (ADR-010, intacto para ese
+ámbito); solo la capa de visualización de la GUI cambia. Ver ADR-029 (diseño) y
+`docs/PLANS/qt-chart-widgets.md` (plan fase a fase).
+
+**Decisiones pactadas (2026-09-03)**:
+
+1. **Paquete `gui/widgets/`**: `ChartView` base (zoom bajo el cursor, pan, fit,
+   export PNG, hover) + `OrbitChart` (animación por fecha + hover `r/ν/t`) + `SkyChart`
+   (hover hora/altura/azimut, ventana segura, mejor hora). `core/orbit_math.py` y
+   `core/sky_math.py` guardan la matemática pura **sin matplotlib** (la comparten
+   `viz/*` y `gui/widgets/*`); `gui/widgets/palette.py` aporta las constantes de color.
+2. **`chart_viewer.py` dual-mode**: abre el **widget** (zoom/fit → `widget.view`,
+   export → `widget.export_png()`) o, para los que no tienen widget, el **PNG**
+   (`QLabel+QScrollArea`, con botón 1:1). Fábricas: `open_chart_widget()` / `open_chart()`.
+3. **Slots del panel**: **órbita** y **cielo** → `OrbitChart`/`SkyChart` vivos
+   (zoom/pan/hover/animación). **transit** (curva de luz) y **field** (cutout SN) →
+   `QLabel+QPixmap` (aún sin vectorial). `build_charts` (en `core/post.py`) sigue
+   como "¿se puede?" y sigue produciendo los PNGs de redes.
+4. **Panel vs viewer** (decision abierta cerrada): el **panel retiene** su instancia
+   viva; un **click** reconstruye una **segunda** instancia y abre el viewer (la opción
+   "dos instancias", la más simple). **No** se persiste el estado (zoom/fecha) del
+   widget entre sesiones — se re-deriva de `e` al abrir.
+
+**Estado**: las 5 fases (1 base · 2 órbita · 3 cielo · 4 integración · 5 docs) están
+**hechas** (commits `fa94696`, `bedf0ce`, `f276237`, `6b66bc6`/`797173e`/`ba6d437`).
+Suite verde: unit 389, functional 42 (+1 skip).
+
+**Punto de entrada (para quien retome)**:
+
+1. Leer ADR-029, ADR-010 (sección "Alcance") y `docs/PLANS/qt-chart-widgets.md`.
+2. Los points de contacto: `gui/widgets/{base,orbit,sky}_*.py` (capa nueva),
+   `gui/chart_viewer.py` (dual-mode), `gui/overview.py` (`_render_charts`,
+   `_make_vector`, `_SlotClick`). Los slots **transit/field** siguen en pixmap: un
+   vectorial de curva de luz (o de cutout) sería el siguiente paso.
+3. **No** importar `matplotlib` dentro de `gui/widgets` (regla del plan, probada por
+   test). Las fuentes de datos viven en `core/*.py` (puras) y `core/post.py`
+   (PNGs de redes, intacto).
+4. Cabecera GPL, código inglés, `self.tr()` en la GUI.
+
 Cada fase deja la app funcional e incluye sus tests. No mezclar fases en un mismo
 commit sin que la anterior esté verificada.

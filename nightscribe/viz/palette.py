@@ -29,6 +29,23 @@ MUTED  = "#8a90a6"   # planet rings, the 1 AU ruler, grids, watermarks
 SUN    = "#ffd76e"   # the Sun marker
 DANGER = "#ff6b6b"   # safety warnings (does-not-fit, moon interference)
 
+# Per-planet marker rings (kept distinct from the theme above so a chart
+# can tell Earth / Mercury / Venus / Mars apart at a glance).
+PLANET_COLORS = {
+    "mercury": "#b5a58f",
+    "venus":   "#e8c07d",
+    "earth":   ACCENT2,
+    "mars":    "#d1704f",
+    "jupiter": "#c8a06e",
+}
+
+
+def planet_color(name):
+    # @args: name - one of the "mercury"|"venus"|"earth"|"mars"|"jupiter"
+    # @return: a PySide6 QColor for that planet (falls back to Earth).
+    from PySide6.QtGui import QColor
+    return QColor(PLANET_COLORS.get(name.lower(), PLANET_COLORS["earth"]))
+
 
 def color(name):
     # @args: name - one of the constant names on this module

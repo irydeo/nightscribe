@@ -15,7 +15,7 @@ import datetime
 import logging
 import math
 
-from ..core import coords, ephem_minor
+from ..core import coords, ephem_minor, orbit_math
 from . import style
 
 logger = logging.getLogger(__name__)
@@ -24,58 +24,19 @@ logger = logging.getLogger(__name__)
 # orbit highlighted, its current position, and an Earth-Moon zoom inset when
 # a close approach is given (see docs/VIZ).
 
-_PLANET_COLORS = {"mercury": "#b5a58f", "venus": "#e8c07d", "earth": style.ACCENT2,
-                  "mars": "#d1704f", "jupiter": "#c8a06e"}
+# The pure orbit math (sampling a full orbit, current position, hover) lives
+# in core/orbit_math.py (no matplotlib), shared with the GUI widget layer
+# (ADR-029). `viz/orbit_view.py` only owns the matplotlib rendering; the
+# colours (chart + planet hues) come from viz.palette.
+from . import palette
 _ORBIT_SPAN = {"mercury": 0.47, "venus": 0.73, "earth": 1.0, "mars": 1.67,
                "jupiter": 5.45}
 
 
 def _orbit_xy(elements, n=360):
-    # Samples a full orbit in heliocentric ecliptic coordinates.
-    # @args: elements - dict with a, e, i, om, w; n - samples
-    # @return: (xs, ys) lists in AU
-    e = elements.get("e", 0)
-    # open orbit (parabolic/hyperbolic): sample true anomaly directly
-    if e >= 1.0:
-        q = elements.get("q")
-        if q is None or q <= 0:
-            return [], []
-        # avoid the asymptote where 1 + e*cos(nu) -> 0
-        nu_max = min(150.0, math.degrees(math.acos(-1.0 / e)) - 5.0)
-        xs, ys = [], []
-        for k in range(n + 1):
-            nu = -nu_max + 2 * nu_max * k / n
-            try:
-                x, y, z, _r = ephem_minor._open_orbit_ecliptic(
-                    elements.get("om", 0.0), elements.get("i", 0.0),
-                    elements.get("w", 0.0), q, e, nu)
-                xs.append(x)
-                ys.append(y)
-            except (KeyError, ZeroDivisionError, ValueError):
-                continue
-        return xs, ys
-    # bound orbit: sample via Kepler
-    a = elements.get("a")
-    if a is None:
-        q = elements.get("q")
-        if q is not None:
-            a = q / (1.0 - e)
-        else:
-            return [], []
-    xs, ys = [], []
-    for k in range(n + 1):
-        els = dict(elements)
-        els["a"] = a
-        els["ma"] = 360.0 * k / n
-        try:
-            x, y, z, _r = ephem_minor._elements_to_ecliptic(
-                els.get("om", 0.0), els.get("i", 0.0), els.get("w", 0.0),
-                a, els.get("e", 0.0), els["ma"])
-            xs.append(x)
-            ys.append(y)
-        except (KeyError, ZeroDivisionError, ValueError):
-            continue
-    return xs, ys
+    # @args: elements - dict with a (or q), e, i, om, w; n - samples
+    # @return: (xs, ys) in AU. Delegates to core/orbit_math (ADR-029).
+    return orbit_math.orbit_xy(elements, n)
 
 
 def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
@@ -125,26 +86,13 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
         if span >= r + max(abs(cx), abs(cy)):
             planets.append(pname)
     for pname in planets:
-        pos = ephem_minor.planet(pname, jd) if pname != "earth" else None
         r = _ORBIT_SPAN[pname]
         circle = plt.Circle((0, 0), r, fill=False, color=style.MUTED,
                             alpha=0.35, lw=0.8)
         ax.add_patch(circle)
-        # planet current position (heliocentric)
-        if pname == "earth":
-            xe, ye, _ = ephem_minor.earth_ecliptic_xyz(jd)
-        else:
-            # heliocentric from the planet() geocentric: recompute directly
-            p = ephem_minor._PLANETS[pname]
-            d = jd - 2451543.5
-            els = {"om": (p[0] + p[1] * d) % 360, "i": p[2] + p[3] * d,
-                   "w": (p[4] + p[5] * d) % 360, "a": p[6] + p[7] * d,
-                   "e": p[8] + p[9] * d}
-            x, y, z, _r = ephem_minor._elements_to_ecliptic(
-                els["om"], els["i"], els["w"], els["a"], els["e"],
-                (p[10] + p[11] * d) % 360)
-            xe, ye = x, y
-        ax.plot(xe, ye, "o", color=_PLANET_COLORS[pname], ms=7,
+        # planet current position (heliocentric) — core/orbit_math (ADR-029)
+        xe, ye, _ze, _r = orbit_math.planet_heliocentric(pname, jd)
+        ax.plot(xe, ye, "o", color=palette.PLANET_COLORS[pname], ms=7,
                 zorder=5)
         ax.annotate(pname.capitalize(), (xe, ye), textcoords="offset points",
                     xytext=(6, 6), color=style.MUTED, fontsize=8)
@@ -158,40 +106,14 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
     # the object's orbit and current position
     xs, ys = _orbit_xy(elements)
     ax.plot(xs, ys, color=style.ACCENT, lw=1.6, zorder=4)
-    # current heliocentric position for the marker
-    if e >= 1.0:
-        # open orbit: use Barker's equation to get true anomaly, then position
-        q = elements.get("q")
-        tp = elements.get("tp")
-        if q and tp:
-            nu = ephem_minor._barker_true_anomaly(q, jd - tp)
-            x, y, z, _r = ephem_minor._open_orbit_ecliptic(
-                elements.get("om", 0.0), elements.get("i", 0.0),
-                elements.get("w", 0.0), q, e, nu)
-            ax.plot(x, y, "o", color=style.ACCENT, ms=10, zorder=7)
-            ax.annotate(obj_name or "?", (x, y), textcoords="offset points",
-                        xytext=(8, 8), color=style.ACCENT, fontsize=10,
-                        fontweight="bold")
-    else:
-        pos = ephem_minor.kepler_ra_dec(elements, jd)
-        if pos:
-            a_el = elements.get("a")
-            if a_el and a_el > 0 and elements.get("ma") is not None:
-                n_day = 0.9856076686 / (a_el ** 1.5)
-                m_now = (elements["ma"] + n_day * (jd - elements.get("epoch", jd))) % 360
-            elif a_el and a_el > 0 and elements.get("tp") is not None:
-                n_day = 0.9856076686 / (a_el ** 1.5)
-                m_now = (n_day * (jd - elements["tp"])) % 360
-            else:
-                m_now = None
-            if m_now is not None:
-                x, y, z, _r = ephem_minor._elements_to_ecliptic(
-                    elements.get("om", 0.0), elements.get("i", 0.0),
-                    elements.get("w", 0.0), a_el, elements.get("e", 0.0), m_now)
-                ax.plot(x, y, "o", color=style.ACCENT, ms=10, zorder=7)
-                ax.annotate(obj_name or "?", (x, y), textcoords="offset points",
-                            xytext=(8, 8), color=style.ACCENT, fontsize=10,
-                            fontweight="bold")
+    # current heliocentric position for the marker — core/orbit_math (ADR-029)
+    pos = orbit_math.position_now(elements, jd)
+    if pos is not None:
+        x, y, z, r, nu = pos
+        ax.plot(x, y, "o", color=style.ACCENT, ms=10, zorder=7)
+        ax.annotate(obj_name or "?", (x, y), textcoords="offset points",
+                    xytext=(8, 8), color=style.ACCENT, fontsize=10,
+                    fontweight="bold")
 
     ax.set_xlim(cx - span, cx + span)
     ax.set_ylim(cy - span, cy + span)

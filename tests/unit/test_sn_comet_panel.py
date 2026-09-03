@@ -209,11 +209,12 @@ def test_panel_sn_sky_chart_offline(panel, no_sources):
     # bullets mention host + type
     facts = panel.lbl_facts.text()
     assert "NGC 5128" in facts and "II" in facts
-    # the sky slot rendered a real PNG from the planner's ra/dec
-    sky = panel._labels["sky"]
+    # the sky slot is now a live vector widget (ADR-029) with a non-empty scene
+    from nightscribe.gui.widgets.sky_widget import SkyChart
+    sky = next((item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), SkyChart)), None)
+    assert sky is not None, "no SkyChart widget found in the grid"
     assert not sky.isHidden()
-    assert not sky.pixmap().isNull()
-    assert sky.property("chart_png")
+    assert sky.view.scene().items(), "sky scene is empty"
     # capture chips: magnitude + the safe window the planner computed
     from PySide6.QtWidgets import QLabel
     chips = " ".join(w.text()

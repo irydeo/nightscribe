@@ -19,11 +19,15 @@
 # rule); when no chart can be made, the whole charts group disappears
 # instead of leaving a grid of «why not» lines.
 #
-# The capture/window block (D3) will land in this same file. The
-# Projects hub (D4) and the Explore dialog (D5) will both render it —
-# single source of truth for "what do we know about this object".
+# The orbit and sky slots are live vector widgets (OrbitChart / SkyChart,
+# ADR-029 Fase 2-3) that the user can zoom, pan and hover. The transit
+# (light curve) and field (cutout) slots have no vector widget yet and
+# keep the QLabel+QPixmap route. Clicking any slot opens the same
+# ChartViewer dialog (widget mode or pixmap mode).
 
-from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
+import datetime
+
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QGroupBox,
                                 QHBoxLayout, QLabel, QHeaderView, QPushButton,
@@ -42,10 +46,16 @@ _TITLE = {"orbit": "Orbit", "sky": "Sky tonight",
 # laid out in this order (the rest stay hidden).
 _CHART_SLOTS = ("orbit", "sky", "field", "transit")
 
+# Slots that get a live vector widget (OrbitChart / SkyChart); the rest
+# keep the QLabel+QPixmap route (light curve / cutout have no widget yet).
+_VECTOR_SLOTS = frozenset({"orbit", "sky"})
+
+# The re-render mode (Settings > Charts) draws 2× the panel preset.
+_RENDER2X = (2400, 1350)
+
 
 def _chip(text, color, tip=""):
     # @return: a small pill label, the same idiom the Tonight rows use
-    #          (mag / rate / window chips)
     lbl = QLabel(text)
     lbl.setStyleSheet(theme.chip_style(color))
     if tip:
@@ -53,28 +63,38 @@ def _chip(text, color, tip=""):
     return lbl
 
 
-# The re-render mode (Settings > Charts) draws 2× the panel preset: the
-# PNG keeps its 16:9 shape, so a big slot stays crisp without re-running
-# matplotlib on every resize.
-_RENDER2X = (2400, 1350)
-
-
 class _SlotClick(QObject):
-    # Opens the zoom/export viewer when a chart slot is released. Clicks
-    # on an empty slot (no chart file) are ignored.
+    # Opens the zoom/export viewer when a chart slot is released.
+    # Vector slots rebuild a fresh widget; PNG slots copy the file.
 
-    def __init__(self, parent):
-        super().__init__(parent)
-        self._parent = parent
+    def __init__(self, panel):
+        super().__init__()
+        self._panel = panel
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.MouseButtonRelease:
-            path = obj.property("chart_png")
-            if path:
-                from .chart_viewer import open_chart
-                open_chart(self._parent, path,
-                           title=obj.property("chart_title") or "")
+        if event.type() != QEvent.MouseButtonRelease:
+            return False
+        key = obj.property("chart_key")
+        if not key:
+            return False
+        p = self._panel
+        title = p._slot_titles.get(key, "")
+        if key in _VECTOR_SLOTS:
+            data = p._slot_data.get(key)
+            if data is None:
+                return False
+            rebuilt = p._rebuild_widget(key, data)
+            if rebuilt:
+                from .chart_viewer import open_chart_widget
+                open_chart_widget(p, rebuilt, title=title)
                 return True
+        else:
+            png = obj.property("chart_png")
+            if not png:
+                return False
+            from .chart_viewer import open_chart
+            open_chart(p, png, title=title)
+            return True
         return False
 
 
@@ -84,46 +104,22 @@ class ObjectPanel(QWidget):
     #   missing — the loader came back empty
     #   ready   — hook + bullets + parameters table
     #
-    # Single CTA at the bottom of the panel (Phase E, corrected
-    # 2026-09-02, docs/WORKFLOWS.es.md §7ses): one button, not a row of
-    # three. It reads the _project_lookup (injected callable(name) ->
-    # dict-or-None) and presents either
-    #      project_create(name, fallback_target)     — no active project
-    #      project_continue(name, fallback_target)   — one already exists
-    # so the owner (the Explore dialog's glue in MainWindow) always knows
-    # which intent fired. The "Create post" affordance was dropped (the
-    # Posts dialog lives where it belongs: inside the project on its
-    # *Publish* step, and ad-hoc under Tools).
+    # Charts (D2): orbit and sky are live vector widgets (ADR-029);
+    # transit and field keep QLabel+QPixmap. Clicking any of them opens
+    # ChartViewer in the matching mode.
     #
-    # The CTA stays hidden while the hub is showing (for_post=False),
-    # while the object is still loading, or while no project_lookup was
-    # injected — the panel stays testable and free from the core.db
-    # import.
+    # Single CTA at the bottom of the panel (Phase E, corrected
+    # 2026-09-02, docs/WORKFLOWS.es.md §7ses).
     project_create = Signal(str, object)
     project_continue = Signal(str, object)
-    # Entry points:
-    #   show(e, ctx)      — render an already-enriched dict (hub, tests)
-    #   explore(name,...) — ask the injected loader for a worker and
-    #                       render its result when it lands
-    #   cancel()          — drop a running worker (the hub calls it when the
-    #                       user switches to another project)
 
     def __init__(self, loader=None, chart_dir=None, for_post=False,
                  project_lookup=None, parent=None):
         # @args: loader - callable(name, fallback_target) returning a
         #                     QThread-like worker with finished=Signal(dict)
-        #                     and start(); None means the ExploreWorker
-        #                     over the global config
         #         chart_dir - directory where the PNG charts are written;
-        #                     defaults to the user data dir's "posts".
-        #                     Injectable so tests can point at tmp_path.
-        #         for_post  - the Explore-dialog flavour (Phase E): expose
-        #                     the project CTA; the hub keeps this False
-        #         project_lookup - optional callable(name) -> dict-of-active
-        #                     project or None. When given AND for_post
-        #                     AND the object is loaded, the CTA shows the
-        #                     "Continue project" or "Create project"
-        #                     variant depending on the lookup result.
+        #         for_post  - the Explore-dialog flavour (Phase E)
+        #         project_lookup - optional callable(name) -> dict-or-None
         #        parent - parent widget
         super().__init__(parent)
         self._loader = loader or self._default_loader
@@ -133,15 +129,14 @@ class ObjectPanel(QWidget):
         self._ctx = None
         self._rows = []
         self._state = "empty"
-        self._name = None        # identifier currently being shown/fetched
-        self._fallback = None    # planner target (unconfirmed NEOCP/PCCP)
-        self._for_post = for_post   # the Explore dialog exposes the CTA
+        self._name = None
+        self._fallback = None
+        self._for_post = for_post
         self._project_lookup = project_lookup
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         self._e = None          # last enriched dict (re-render on mode change)
-        self._orig_pngs = {}    # slot key -> chart PNG path, for re-fitting
 
         # state line (loading / not found); hidden when ready
         self.lbl_state = QLabel()
@@ -161,11 +156,7 @@ class ObjectPanel(QWidget):
         self.lbl_facts.hide()
         layout.addWidget(self.lbl_facts)
 
-        # capture/window block (D3): the night facts about this object —
-        # magnitude, apparent rate, max no-trail exposure (NEO/PCCP only),
-        # the window above the horizon and how many hours it stays up.
-        # Each chip is built from the project context snapshot (main_window
-        # _create_project) and omitted when the data is missing.
+        # capture/window block (D3)
         self.row_capture = QFrame()
         self.row_capture.setStyleSheet(
             f"background: {theme.C_BASE}; border-radius: 8px;"
@@ -173,10 +164,11 @@ class ObjectPanel(QWidget):
         self._chips = QHBoxLayout(self.row_capture)
         self._chips.setContentsMargins(10, 6, 10, 6)
         self._chips.setSpacing(8)
-        self._chips.addStretch(1)  # pushed left, rebuilt below
+        self._chips.addStretch(1)
         self.row_capture.hide()
         layout.addWidget(self.row_capture)
 
+        # parameters table
         self.grp_params = QGroupBox(self.tr("Parameters"))
         gl = QVBoxLayout(self.grp_params)
         top = QHBoxLayout()
@@ -197,72 +189,35 @@ class ObjectPanel(QWidget):
         hdr = tbl.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        # the explanation column owns the leftover width, multi-line
         hdr.setSectionResizeMode(2, QHeaderView.Stretch)
         tbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         gl.addWidget(tbl)
-
         self.grp_params.hide()
         layout.addWidget(self.grp_params)
 
-        # charts 2×2 (D2): orbit / sky over field / transit, in grid order
+        # charts 2×2 (D2): orbit/sky are vector widgets; field/transit are
+        # QLabel+QPixmap. The grid is filled in _render_charts and emptied
+        # by _empty_grid (state transitions: ready -> blank -> ready).
         self.grp_charts = QGroupBox(self.tr("Charts"))
-        gl2 = QGridLayout(self.grp_charts)
-        gl2.setSpacing(8)
-        self._labels = {}
+        self._grid = QGridLayout(self.grp_charts)
+        self._grid.setSpacing(8)
+        self._slot_data = {}    # key -> data dict (for rebuild on click)
+        self._slot_titles = {}  # key -> translated title (for the viewer)
         self._slot_click = _SlotClick(self)
-        for i, key in enumerate(_CHART_SLOTS):
-            lbl = QLabel("—")
-            lbl.setAlignment(Qt.AlignCenter)
-            lbl.setMinimumHeight(220)
-            lbl.setProperty("chart_key", key)
-            lbl.setCursor(Qt.PointingHandCursor)
-            lbl.setToolTip(self.tr("Click to zoom / export"))
-            lbl.installEventFilter(self._slot_click)
-            self._labels[key] = lbl
-            lbl.hide()
-            gl2.addWidget(lbl, i // 2, i % 2)
         self.grp_charts.hide()
         layout.addWidget(self.grp_charts)
 
-        # single CTA at the very bottom (phase E): the one action of the
-        # Explore-dialog flavour. Hidden right away; _refresh_cta() gives
-        # it its "Create project" / "Continue project" face (and only then
-        # shows it) once the object is on the panel.
+        # single CTA at the very bottom
         self.btn_project = QPushButton(self.tr("Create project"))
         self.btn_project.setCursor(Qt.PointingHandCursor)
         self.btn_project.setMinimumHeight(46)
         self.btn_project.setSizePolicy(QSizePolicy.Expanding,
                                        QSizePolicy.Fixed)
-        self._action = "create"    # which intent the CTA currently fires
+        self._action = "create"
         self.btn_project.clicked.connect(self._cta_clicked)
         self.btn_project.hide()
         layout.addSpacing(6)
         layout.addWidget(self.btn_project)
-
-    def resizeEvent(self, event):
-        # The panel resizes with its window: re-fit every chart slot on
-        # top (the pixmap was rendered once, we only re-scale it).
-        super().resizeEvent(event)
-        self._fit_slots()
-
-    def _fit_slots(self):
-        # Fits each placed chart to its slot's own size, keeping the
-        # aspect ratio. Slots that have no chart (hidden slot) are no-ops.
-        for key, lbl in self._labels.items():
-            if lbl.isHidden() or lbl.pixmap().isNull():
-                continue
-            path = self._orig_pngs.get(key)
-            pix = QPixmap(path) if path else lbl.pixmap()
-            if pix.isNull():
-                continue
-            w = max(lbl.width(), 320)
-            h = max(lbl.height(), 240)
-            scaled = pix.scaled(w, h, Qt.KeepAspectRatio,
-                                Qt.SmoothTransformation)
-            if scaled.width() != lbl.pixmap().width() or \
-                    scaled.height() != lbl.pixmap().height():
-                lbl.setPixmap(scaled)
 
     # ---------------- states ----------------
 
@@ -271,7 +226,7 @@ class ObjectPanel(QWidget):
         return self._state
 
     def _state_loading(self, name=None):
-        # @args: name - identifier being fetched (keeps the state line honest)
+        # @args: name - identifier being fetched
         self._state = "loading"
         self._name = name
         self.lbl_state.setText(self.tr("Loading…"))
@@ -282,13 +237,10 @@ class ObjectPanel(QWidget):
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
-        # the object is not yet resolved, so the CTA must not be on
-        # screen (it needs a name and a lookup hit/miss to pick a face)
         self.btn_project.hide()
 
     def _state_missing(self, name=None):
-        # @args: name - identifier, shown when given (falls back to the one
-        #        that was being loaded, so the state names the object)
+        # @args: name - identifier, shown when given
         self._state = "missing"
         self._name = name or getattr(self, "_name", None)
         self.lbl_state.setText(self.tr("Not found: %1").replace(
@@ -329,17 +281,13 @@ class ObjectPanel(QWidget):
     # ---------------- public API ----------------
 
     def name(self):
-        # @return: the identifier this panel is showing (or was showing);
-        #          tests and the owner (dialog glue) use it to assert state
+        # @return: the identifier this panel is showing
         return self._name
 
     def _cta_clicked(self):
-        # @return: fires the matching signal. `_action` is the intent the
-        #          CTA is currently presenting ("create" | "continue"),
-        #          decided by _refresh_cta from the lookup result, so the
-        #          owner needs zero bookkeeping to know which one fired.
+        # @return: fires the matching signal.
         if self._worker is not None:
-            return  # still loading — the panel does not yet know the intent
+            return
         if self._name is None or not self._for_post:
             return
         if self._action == "continue":
@@ -348,10 +296,7 @@ class ObjectPanel(QWidget):
             self.project_create.emit(self._name, self._fallback)
 
     def _refresh_cta(self):
-        # Gives the CTA its face — "Create project" or "Continue project"
-        # — or leaves it hidden when the panel is not in the Explore
-        # flavour, no lookup was injected, or the object is not loaded.
-        # Called from _state_ready / _state_loading / _blank / _state_missing.
+        # Gives the CTA its face or leaves it hidden.
         if not self._for_post or self._project_lookup is None \
                 or self._name is None:
             self.btn_project.hide()
@@ -387,11 +332,9 @@ class ObjectPanel(QWidget):
         self.btn_project.show()
 
     def show(self, e, ctx=None):
-        # Renders the ready state from an enriched dict; an empty dict is
-        # the «not found» state (matches ExploreWorker's {} on failure).
+        # Renders the ready state from an enriched dict.
         # @args: e - dict from enrich.enrich() (or {} when nothing was found)
-        #        ctx - project context snapshot, kept for the capture block
-        #              of D3
+        #        ctx - project context snapshot
         self._ctx = ctx
         if not e or not e.get("data"):
             self._state_missing()
@@ -402,11 +345,8 @@ class ObjectPanel(QWidget):
 
     def explore(self, name, fallback_target=None, ctx=None):
         # Kicks off the injected loader; the panel renders whatever lands.
-        # @args: name - object identifier, fallback_target - planner target
-        #         dict (unconfirmed NEOCP/PCCP), like ExploreWorker,
-        #         ctx - project context snapshot, kept for the capture block
         if self._worker is not None:
-            return  # a worker is still out there; ignore the second ask
+            return
         self._name = name
         self._fallback = fallback_target
         self._ctx = ctx
@@ -418,10 +358,7 @@ class ObjectPanel(QWidget):
         worker.start()
 
     def cancel(self):
-        # Drops a running worker so its result (if any) can never land on
-        # this panel: the slot disconnects and the reference drops. The hub
-        # owns the worker and deletes it (via _keep); the panel goes blank
-        # so the next project starts from a clean state.
+        # Drops a running worker so its result can never land on this panel.
         worker, slot = self._worker, self._slot
         self._worker = None
         self._slot = None
@@ -429,12 +366,11 @@ class ObjectPanel(QWidget):
             try:
                 worker.finished.disconnect(slot)
             except RuntimeError:
-                pass  # the worker was already gone — nothing left to detach
+                pass
         self._blank()
 
     def _blank(self):
-        # Puts the panel back to the pre-load state (all parts hidden) — the
-        # hub calls it when the selection moves to another project.
+        # Puts the panel back to the pre-load state.
         self._state = "empty"
         self._ctx = None
         self._e = None
@@ -442,6 +378,7 @@ class ObjectPanel(QWidget):
         self._name = None
         self._fallback = None
         self._clear_chips()
+        self._empty_grid()
         self.lbl_state.hide()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
@@ -449,15 +386,11 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         self.grp_charts.hide()
         self.btn_project.hide()
-        for lbl in self._labels.values():
-            lbl.hide()
-            lbl.setPixmap(QPixmap())
-            lbl.setProperty("chart_png", None)
 
     def _worker_done(self, w, e):
         # @args: w - the worker that finished, e - its enriched payload
         if w is not self._worker:
-            return  # a cancel() dropped it, or it is a stale one
+            return
         slot = self._slot
         self._worker = None
         self._slot = None
@@ -472,7 +405,6 @@ class ObjectPanel(QWidget):
 
     @staticmethod
     def _default_loader(name, fallback_target=None):
-        # The same ExploreWorker the Explore dialog uses today.
         # @args: name - object identifier, fallback_target - planner target
         # @return: a not-yet-started ExploreWorker
         from ..config import config
@@ -480,7 +412,6 @@ class ObjectPanel(QWidget):
         return ExploreWorker(config, name, fallback_target=fallback_target)
 
     def _lang(self):
-        # Active UI language ("es" | "en"), same rule as MainWindow._lang.
         # @return: "es" or "en"
         from PySide6.QtCore import QLocale
         from ..config import config
@@ -495,7 +426,6 @@ class ObjectPanel(QWidget):
         return orbits.pick(pair, self._lang())
 
     def _orbit_rows(self, e):
-        # Same extraction the Explore dialog uses (D5 delegates there).
         # @args: e - enriched dict
         # @return: list of {"param","value","level","es","en"} rows
         d = e.get("data") or {}
@@ -516,9 +446,15 @@ class ObjectPanel(QWidget):
             return orbits.explain_neofixer(d["unconfirmed"])
         return []
 
+    # ---------------- charts (D2, ADR-029) ----------------
+    #
+    # orbit / sky  — live vector widgets (OrbitChart / SkyChart).
+    # field/transit — QLabel+QPixmap (no vector widget for cutout/light curve).
+    # build_charts still runs (core/post.py unchanged); for the vector
+    # slots it only acts as a "can I make this chart?" gate.
+
     def _render_charts(self, e):
-        # Lays out a row of the charts build_charts could actually produce
-        # (compact "panel" size); the group disappears when there is none.
+        # Builds the 2×2 charts grid for this object.
         # @args: e - enriched dict
         from ..core import post
         outdir = self._chart_dir or paths.data_dir() / "posts"
@@ -529,53 +465,204 @@ class ObjectPanel(QWidget):
                                        size=size)
         except Exception:
             charts = {}
+
+        # Start from an empty grid (the panel can re-render on a new
+        # object or after a resolution-mode change).
+        self._empty_grid()
+
         for key in _CHART_SLOTS:
-            self._paint_slot(key, charts.get(key))
+            chart = charts.get(key)
+            if not chart:
+                continue  # omit what is missing
+            self._slot_titles[key] = self.tr(_TITLE[key])
+            if key in _VECTOR_SLOTS:
+                w = self._make_vector(key, e)
+                if w is not None:
+                    row, col = self._slot_rowcol(key)
+                    w.setProperty("chart_key", key)
+                    w.setCursor(Qt.PointingHandCursor)
+                    w.installEventFilter(self._slot_click)
+                    self._slot_data[key] = self._extract(key, e)
+                    self._grid.addWidget(w, row, col)
+            else:
+                self._place_png(key, chart)
+
         self.grp_charts.setVisible(bool(charts))
-        if charts:
-            # the slots only reach their final size once the layout is up:
-            # fit them against the real geometry in the next paint round
-            QTimer.singleShot(0, self._fit_slots)
 
-    def _paint_slot(self, key, png):
-        # A slot shows its chart (pixmap only) and stays hidden when the
-        # builder did not produce one — no «why not» lines, so the grid
-        # never keeps space for a chart that is not there.
-        # @args: key - slot name, png - Path from build_charts (or None)
-        lbl = self._labels[key]
-        lbl.hide()
-        lbl.setText("")
-        lbl.setPixmap(QPixmap())
-        lbl.setProperty("chart_png", None)
-        if png:
-            self._orig_pngs[key] = str(png)
-            lbl.setProperty("chart_png", str(png))
-            lbl.setProperty("chart_title", self.tr(_TITLE[key]))
-            self._fit_slot(key)
-            lbl.show()
-        else:
-            self._orig_pngs.pop(key, None)
+    def _slot_rowcol(self, key):
+        # @return: (row, col) of the slot in the 2×2 grid
+        idx = _CHART_SLOTS.index(key)
+        return (idx // 2, idx % 2)
 
-    def _fit_slot(self, key):
-        # Fits one placed chart to its slot's real size (same rule as
-        # _fit_slots, but the label is being placed right now).
-        # @args: key - slot name
-        lbl = self._labels.get(key)
-        if lbl is None:
-            return
-        path = self._orig_pngs.get(key)
-        pix = QPixmap(path) if path else QPixmap()
-        if pix.isNull():
-            return
-        w = max(lbl.width(), 320)
-        h = max(lbl.height(), 240)
-        lbl.setPixmap(pix.scaled(w, h, Qt.KeepAspectRatio,
-                                 Qt.SmoothTransformation))
+    def _empty_grid(self):
+        # Removes every widget from the 2×2 chart grid and clears slot state.
+        gl = self._grid
+        while gl.count():
+            item = gl.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        self._slot_data.clear()
+        self._slot_titles.clear()
+
+    def _place_png(self, key, png_path):
+        # Loads a chart PNG into a QLabel and places it in the grid.
+        # @args: key - slot name, png_path - Path from build_charts
+        lbl = QLabel()
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setMinimumHeight(220)
+        pix = QPixmap(str(png_path))
+        if not pix.isNull():
+            lbl.setPixmap(pix)
+        lbl.setProperty("chart_key", key)
+        lbl.setProperty("chart_png", str(png_path))
+        lbl.setCursor(Qt.PointingHandCursor)
+        lbl.setToolTip(self.tr("Click to zoom / export"))
+        lbl.installEventFilter(self._slot_click)
+        row, col = self._slot_rowcol(key)
+        self._grid.addWidget(lbl, row, col)
+
+    def _make_vector(self, key, e):
+        # Builds the appropriate live chart widget for this slot.
+        # @args: key - "orbit" | "sky", e - enriched dict
+        # @return: a fully configured widget, or None when not possible
+        if key == "orbit":
+            from ..core import coords
+            d = e.get("data") or {}
+            sb = d.get("sbdb")
+            els = (sb or {}).get("elements")
+            if not els or not els.get("q") or (els.get("e", 1) or 1) > 1.0:
+                return None
+            jd = coords.jd_from_datetime(
+                datetime.datetime.now(datetime.timezone.utc))
+            from .widgets.orbit_widget import OrbitChart
+            w = OrbitChart()
+            w.set_elements(els, jd, e.get("name", ""))
+            return w
+        elif key == "sky":
+            data = self._extract("sky", e)
+            if data is None or data.get("ra") is None \
+                    or data.get("lat") is None:
+                return None
+            from .widgets.sky_widget import SkyChart
+            w = SkyChart()
+            w.set_target(
+                data["ra"], data["dec"], data["lat"], data["lon"],
+                datetime.date.today(),
+                obj_name=data.get("name", ""),
+                safe_window=data.get("safe_window"),
+                best_time=data.get("best_time"),
+                horizon=data.get("horizon"),
+                transit=data.get("transit"),
+                margin=data.get("margin", 0.0))
+            return w
+        return None
+
+    def _extract(self, key, e):
+        # Extracts the data needed to rebuild a fresh widget on click.
+        # @args: key - slot name, e - enriched dict
+        # @return: a dict suitable for _rebuild_widget, or None
+        from ..core import coords
+        d = e.get("data") or {}
+
+        if key == "orbit":
+            sb = d.get("sbdb")
+            els = (sb or {}).get("elements")
+            if not els:
+                return None
+            jd = coords.jd_from_datetime(
+                datetime.datetime.now(datetime.timezone.utc))
+            return {"elements": els, "jd": jd, "name": e.get("name", "")}
+
+        elif key == "sky":
+            ra = dec = None
+            eph = d.get("ephem")
+            if eph:
+                try:
+                    ra = coords.ra_hms_to_deg(eph["ra"])
+                    dec = coords.dec_dms_to_deg(eph["dec"])
+                except (ValueError, AttributeError):
+                    pass
+            sim = d.get("simbad")
+            if sim and ra is None:
+                try:
+                    ra = coords.ra_hms_to_deg(sim["ra"])
+                    dec = coords.dec_dms_to_deg(sim["dec"])
+                except (ValueError, AttributeError):
+                    pass
+            unc = d.get("unconfirmed")
+            if ra is None and unc and unc.get("ra_deg") is not None:
+                ra = float(unc["ra_deg"])
+                dec = float(unc.get("dec_deg", 0.0))
+            if ra is None and d.get("ra_deg") is not None:
+                ra = float(d["ra_deg"])
+                dec = float(d.get("dec_deg", 0.0))
+
+            from ..config import config
+            lat = config.get("lat")
+            lon = config.get("lon")
+
+            # horizon callable (ADR-020)
+            horizon = None
+            try:
+                from ..core import horizon as _hor
+                hor_obj = _hor.from_config(config)
+                horizon = hor_obj.alt_at if hor_obj else None
+            except Exception:
+                horizon = None
+
+            # safe window / best time (same source logic as post.py)
+            src = d if d.get("safe_window") else (unc or {})
+            sw = best = None
+            raw = src.get("safe_window")
+            if raw:
+                s0, s1 = raw.split("|")
+                sw = (datetime.datetime.fromisoformat(s0),
+                      datetime.datetime.fromisoformat(s1))
+            raw = src.get("best_time")
+            if raw:
+                best = datetime.datetime.fromisoformat(raw)
+
+            margin = float(config.get("horizon_margin_deg", 0))
+            tr = d.get("transit") or (unc or {}).get("transit")
+
+            return {
+                "ra": ra, "dec": dec, "lat": lat, "lon": lon,
+                "name": e.get("name", ""),
+                "horizon": horizon,
+                "safe_window": sw, "best_time": best,
+                "margin": margin, "transit": tr,
+            }
+
+        return None
+
+    def _rebuild_widget(self, key, data):
+        # Builds a fresh chart widget for the ChartViewer dialog.
+        # @args: key - slot name, data - dict from _extract
+        # @return: a fully configured widget
+        if key == "orbit":
+            from .widgets.orbit_widget import OrbitChart
+            w = OrbitChart()
+            w.set_elements(data["elements"], data["jd"],
+                           data.get("name", ""))
+            return w
+        elif key == "sky":
+            from .widgets.sky_widget import SkyChart
+            w = SkyChart()
+            w.set_target(
+                data["ra"], data["dec"], data["lat"], data["lon"],
+                datetime.date.today(),
+                obj_name=data.get("name", ""),
+                safe_window=data.get("safe_window"),
+                best_time=data.get("best_time"),
+                horizon=data.get("horizon"),
+                transit=data.get("transit"),
+                margin=data.get("margin", 0.0))
+            return w
+        return None
 
     def rebuild_charts(self):
-        # Re-draws the current object's charts with the active resolution
-        # mode (Settings > Charts) — called when the panel is already on
-        # screen and the user has just switched modes.
+        # Re-draws the charts with the active resolution mode.
         if self._e is None:
             return
         self._render_charts(self._e)
@@ -586,39 +673,28 @@ class ObjectPanel(QWidget):
         return config.get("chart_zoom", "scale")
 
     def _chart_cfg(self):
-        # @return: the active Config for the sky chart's site/horizon
-        #          (mirrors the Explore dialog's build_charts call)
+        # @return: the active Config
         from ..config import config
         return config
 
     # ---------------- capture / window block (D3) ----------------
 
     def _clear_chips(self):
-        # Drops every chip the block currently shows (kept in one place so
-        # show() can be called again with a different object).
+        # Drops every chip the block currently shows.
         lay = self._chips
         while lay.count():
             item = lay.takeAt(0)
             w = item.widget()
             if w is not None:
                 w.deleteLater()
-                w = None
 
     def _capture_chips(self, e):
-        # Builds the chip definitions for this object, all from the project
-        # context snapshot (the numbers a capture plan actually uses):
-        # magnitude, apparent rate (NEO/PCCP only), max no-trail exposure
-        # (rate + camera profile) and the hours-above-horizon window.
-        # Returns an empty list when nothing applies, which hides the block.
-        # ADR-027: prefer the context passed to show() but fall back to the
-        # planner target that the hub / explore-flow gave us, so an SN or
-        # comet explored without a project still shows mag/window chips.
-        # @args: e - enriched dict (only for the object type as a fallback)
+        # Builds the chip definitions for this object.
+        # @args: e - enriched dict
         chips = []
         ctx = self._ctx or self._fallback or {}
         kind = ctx.get("kind") or e.get("type")
 
-        # magnitude: the context's live, tonight figure (omitted if absent)
         mag = ctx.get("mag")
         if mag is not None:
             try:
@@ -630,7 +706,6 @@ class ObjectPanel(QWidget):
                 f"{self.tr('Mag')} {mag:.1f}", theme.C_OK,
                 self.tr("Predicted apparent magnitude tonight")))
 
-        # apparent rate (arcsec/min): NEO / PCCP only, from context
         rate = None
         if kind in ("neo", "pccp") and ctx.get("rate_arcsec_min"):
             try:
@@ -641,8 +716,6 @@ class ObjectPanel(QWidget):
             chips.append((
                 f"{rate:.1f}″/min", theme.C_TEXT,
                 self.tr("Sky rate tonight — it must outrun the stars")))
-            # max no-trail exposure: needs the camera profile's plate scale;
-            # omitted when the profile is incomplete (missing is acceptable)
             from ..config import config
             scale = exposure.plate_scale(config.get("pixel_um"),
                                          config.get("focal_mm"))
@@ -654,8 +727,6 @@ class ObjectPanel(QWidget):
                                 "target trails more than a pixel"))
                 ))
 
-        # window above the horizon: start–end (HH:MM, same as the Tonight
-        # rows; ctx stores ISO strings with a UTC offset, so HH:MM is safe)
         ws = ctx.get("window_start")
         we = ctx.get("window_end")
         if ws and we:
@@ -675,10 +746,6 @@ class ObjectPanel(QWidget):
                         f"{hours:.1f} h", theme.C_TEXT,
                         self.tr("How long it stays a valid target")))
 
-        # safe window (ADR-020): the run of the night where the planned
-        # capture session still clears the local horizon; only set when a
-        # project's capture plan was saved, and always with the latest-safe-
-        # start. The red "does not fit" chip is the one safety warning.
         if ctx.get("safe_window"):
             s0, s1 = ctx["safe_window"].split("|")
             s0h, s1h = s0[11:16], s1[11:16]
@@ -695,7 +762,6 @@ class ObjectPanel(QWidget):
             chips.append((label, theme.C_GOOD, hint))
         elif (ctx.get("duration_s") and ctx.get("window_start")
                 and ctx.get("window_end")):
-            # a session was planned but it does not fit tonight's span
             mins = int(round(int(ctx.get("duration_s", 0)) / 60))
             chips.append((
                 f"⚠ {self.tr('does not fit')} · {mins} min",
@@ -706,9 +772,7 @@ class ObjectPanel(QWidget):
         return chips
 
     def _render_capture(self, e):
-        # Shows the capture/window block when it has at least one chip, keeps
-        # it hidden otherwise (empty context, SN with no window, …). This is
-        # the «omitting what is missing» rule from phase D3.
+        # Shows the block when it has at least one chip.
         # @args: e - enriched dict
         self._clear_chips()
         chips = self._capture_chips(e)
@@ -721,8 +785,7 @@ class ObjectPanel(QWidget):
         self.row_capture.show()
 
     def _refill_params(self):
-        # Fills the parameters table from the cached rows, honoring the
-        # in-depth toggle: without it only the "basic" rows are shown.
+        # Fills the parameters table from the cached rows.
         rows = list(self._rows)
         if not self.chk_deep.isChecked():
             rows = [r for r in rows if r.get("level") == "basic"]

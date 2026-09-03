@@ -258,70 +258,77 @@ def test_explore_not_found_state(panel, qapp):
     p.deleteLater()
 
 
-# ---------------- D2: charts grid ----------------
+# ---------------- D2: charts grid (ADR-029 vector slots) ----------------
 #
-# build_charts is allowed to run real here (orbit/sky are pure
-# matplotlib; the "field" slot calls the cutouts source and that fails
-# offline, so the slot stays hidden — the «omit what is missing» rule).
-# This keeps the test self-contained without faking disk output.
+# orbit / sky are live vector widgets (OrbitChart / SkyChart, ADR-029);
+# field / transit are QLabel+QPixmap. build_charts is still run and acts
+# as a "can I make this chart?" gate. We inspect the grid by counting
+# children and checking _slot_data for the vector ones.
+
+def _grid_widgets(panel):
+    """@return: list of child widgets in the charts grid."""
+    return [panel._grid.itemAt(r * 2 + c).widget()
+            for r in range(2) for c in range(2)
+            if panel._grid.itemAt(r * 2 + c)]
+
 
 def test_charts_grid_present_when_ready(panel):
     panel.show(FAKE_ELEMENT)
     assert panel.state() == "ready"
-    # the group exists and the slots build_charts actually produced are
-    # visible, in grid order
+    # the group is visible and has widgets in it
     assert not panel.grp_charts.isHidden()
-    assert set(panel._labels) == {"orbit", "sky", "field", "transit"}
-    assert not panel._labels["orbit"].isHidden()
-    assert not panel._labels["sky"].isHidden()
-    assert panel._labels["field"].isHidden()
-    assert panel._labels["transit"].isHidden()
+    widgets = _grid_widgets(panel)
+    assert len(widgets) >= 2, \
+        f"expected ≥2 chart slots, got {len(widgets)}"
+    # orbit and sky are vector slots (data extracted for click rebuild)
+    assert "orbit" in panel._slot_data, "orbit slot data missing"
+    assert "sky" in panel._slot_data, "sky slot data missing"
+    # field needs the network (a reference cutout); it is absent offline
+    assert "field" not in panel._slot_data
+    assert "field" not in [w.property("chart_key") for w in widgets]
 
 
-def test_bound_element_slots_have_pixmap(panel):
-    # FAKE_ELEMENT is a bound orbit with an ephemeris: orbit and sky render
-    # to real PNGs, so those slots carry a pixmap.
+def test_vector_slots_are_live_widgets(panel):
+    # FAKE_ELEMENT is a bound orbit with an ephemeris: orbit and sky
+    # become live chart widgets (OrbitChart / SkyChart) with working views.
     panel.show(FAKE_ELEMENT)
-    assert not panel._labels["orbit"].pixmap().isNull(), \
-        "orbit slot should have rendered a chart"
-    assert not panel._labels["sky"].pixmap().isNull(), \
-        "sky slot should have rendered a chart"
-    # "field" needs the network (a reference cutout); the slot is hidden,
-    # with no «why not» line instead of a blank
-    assert panel._labels["field"].isHidden()
-    assert panel._labels["field"].pixmap().isNull()
-    assert panel._labels["field"].property("chart_png") is None
-    assert panel._labels["field"].text() == ""
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    from nightscribe.gui.widgets.sky_widget import SkyChart
+    widgets = _grid_widgets(panel)
+    orbit_w = next((w for w in widgets if isinstance(w, OrbitChart)), None)
+    sky_w = next((w for w in widgets if isinstance(w, SkyChart)), None)
+    assert orbit_w is not None, "no OrbitChart in the grid"
+    assert sky_w is not None, "no SkyChart in the grid"
+    # both have a ChartView with a non-empty scene
+    from nightscribe.gui.widgets.base_chart import ChartView
+    assert isinstance(orbit_w.view, ChartView)
+    assert isinstance(sky_w.view, ChartView)
+    assert orbit_w.view.scene().items(), "orbit scene is empty"
+    assert sky_w.view.scene().items(), "sky scene is empty"
 
 
 def test_no_charts_hides_the_whole_group(panel):
     # FAKE_UNCONFIRMED has no elements, no ephemeris and no simbad:
-    # build_charts produces nothing, so the whole charts group disappears
-    # instead of a grid of «why not» lines.
+    # build_charts produces nothing, so the whole charts group disappears.
     panel.show(FAKE_UNCONFIRMED)
     assert panel.grp_charts.isHidden()
-    for lbl in panel._labels.values():
-        assert lbl.isHidden()
-        assert lbl.pixmap().isNull()
+    assert panel._grid.count() == 0, "grid should be empty"
+    assert panel._slot_data == {}
 
 
 def test_missing_state_keeps_charts_hidden(panel):
     panel.show({})
     assert panel.state() == "missing"
-    # the ready group is gone
     assert panel.grp_charts.isHidden()
-    for lbl in panel._labels.values():
-        assert lbl.isHidden()
-        assert lbl.pixmap().isNull()
+    assert panel._grid.count() == 0
+    assert panel._slot_data == {}
 
 
-def test_charts_slot_uses_panel_title(panel):
-    # When a chart lands, its click→zoom viewer title is the panel one.
+def test_charts_slot_title_recorded(panel):
+    # When a chart lands, its viewer title is stored in _slot_titles.
     panel.show(FAKE_ELEMENT)
-    assert panel._labels["orbit"].property("chart_png"), \
-        "orbit slot should record its chart file for click→zoom"
-    assert panel._labels["orbit"].property("chart_title"), \
-        "orbit slot should carry a title for the chart viewer"
+    assert "orbit" in panel._slot_titles, "orbit title not recorded"
+    assert panel._slot_titles["orbit"], "orbit title is empty"
 
 
 # ---------------- D3: capture / window block ----------------

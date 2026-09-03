@@ -341,13 +341,14 @@ def test_explore_dialog_orbit_chart(tmp_path):
     assert sb and sb["elements"]["e"] >= 1.0, "must be parabolic"
     # paint it (same as _dialog_explore_done used to do)
     panel.show(e)
-    pix = panel._labels["orbit"].pixmap()
-    assert pix is not None and not pix.isNull(), \
-        "orbit slot must show a pixmap for a parabolic comet"
-    # the label must carry the chart path for the zoom/export viewer
-    assert panel._labels["orbit"].property("chart_png"), \
-        "orbit label must expose its PNG path for the chart viewer"
-    assert (Path(panel._labels["orbit"].property("chart_png"))).exists()
+    # orbit is now a live vector widget (ADR-029), not a QLabel+QPixmap
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    orbit = next((item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), OrbitChart)), None)
+    assert orbit is not None, "no OrbitChart in the grid"
+    assert not orbit.isHidden()
+    assert orbit.view.scene().items(), "orbit scene is empty"
+    # _slot_data records the elements for click→viewer rebuild
+    assert "orbit" in panel._slot_data, "orbit slot data not recorded"
 
 
 def test_chart_viewer_zoom_and_export(tmp_path):
@@ -615,15 +616,17 @@ def test_explore_dialog_unconfirmed_neo():
     assert not e["data"].get("sbdb"), "must not have SBDB for unconfirmed"
     # paint it — must not crash and must populate the sky slot
     panel.show(e)
-    # orbit slot: no elements, so the slot is hidden (rev 2026-08-27:
-    # unbuildable slots disappear instead of a "why not" line)
-    orbit_lbl = panel._labels["orbit"]
-    assert orbit_lbl.isHidden(), \
-        "orbit slot must be hidden for unconfirmed objects (no elements)"
-    # sky slot: must render from unconfirmed ra_deg/dec_deg
-    sky_pix = panel._labels["sky"].pixmap()
-    assert sky_pix is not None and not sky_pix.isNull(), \
-        "sky slot must show a pixmap from the unconfirmed object's coordinates"
+    # orbit slot: no elements → no OrbitChart in the grid (ADR-029 vector
+    # slot is simply absent, not an empty QLabel)
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    orbit_widgets = [item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), OrbitChart)]
+    assert not orbit_widgets, \
+        "no OrbitChart should exist for unconfirmed objects (no elements)"
+    # sky slot: live SkyChart widget rendering from unconfirmed ra/dec
+    from nightscribe.gui.widgets.sky_widget import SkyChart
+    sky_widgets = [item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), SkyChart)]
+    assert sky_widgets, "no SkyChart in the grid for unconfirmed object"
+    assert sky_widgets[0].view.scene().items(), "sky scene is empty"
 
 
 def test_enrich_unconfirmed_with_neofixer_orbit():

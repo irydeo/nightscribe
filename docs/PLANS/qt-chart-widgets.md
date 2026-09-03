@@ -38,7 +38,9 @@ del lienzo — sin recalcular ni escalar un bitmap de ratio fijo.
 - [x] **Fase 1** — ADR-029 + `ChartView` base (zoom/pan/fit/export/hover) — *10 tests en `tests/unit/test_chartview.py`, guard-test de hueco en `test_style.py`* (`fa94696`)
 - [x] **Fase 2** — `OrbitChart` (animación + hover de r/ν/t) — *8 tests en `tests/unit/test_orbitchart.py`* (`bedf0ce`)
 - [x] **Fase 3** — `SkyChart` (+ `TransitChart`) (hover hora/altura/azimut, ventana segura, click en banda → `best_time_clicked`) — *10 tests en `tests/unit/test_skychart.py`; sampler puro compartido `core/sky_math.sample_night` (mismo diccionario que `viz/sky_view.py`); fix del `QGraphicsScene.render(target=, source=)` en `ChartView.export_png` (el export daba PNG negro)*
-- [ ] **Fase 4** — Integrar en `overview.py` / `chart_viewer.py` / proyectos
+- [x] **Fase 4a** — `ChartViewer` dual-mode (widget vectorial + pixmap PNG); zoom/fit → `widget.view`, export → `widget.export_png()`, memoria por título, fábrica `open_chart_widget()` (5 tests widget-mode)
+- [x] **Fase 4b** — `overview.py`: slots orbit/sky → `OrbitChart`/`SkyChart` vivos (zoom/pan/hover), transit/field → `QLabel+QPixmap`; click re-construye widget y abre `ChartViewer`; se borran `_fit_slots`/`_orig_pngs`/`_labels`/`resizeEvent`
+- [ ] **Fase 4c** — `main_window.py`: migrar referencias al viewer + comprobar compatibilidad
 - [ ] **Fase 5** — Docs (ADR-010 alcance, WORKFLOWS) + limpieza
 
 > Regla de oro: cada fase termina **con la suite verde** (`tests/unit` +

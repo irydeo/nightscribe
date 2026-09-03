@@ -1925,4 +1925,17 @@
         <translation>Found: %1 (%2, %3)</translation>
     </message>
 </context>
+<context>
+    <name>OrbitChart</name>
+    <message>
+        <location filename="../widgets/orbit_widget.py" line="0"/>
+        <source>no return (open orbit)</source>
+        <translation>no return (open orbit)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/orbit_widget.py" line="0"/>
+        <source>CA %1 AU (%2)</source>
+        <translation>CA %1 AU (%2)</translation>
+    </message>
+</context>
 </TS>

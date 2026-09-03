@@ -180,3 +180,40 @@ def planet_heliocentric(pname, jd):
     x, y, z, r = ephem_minor._elements_to_ecliptic(
         els["om"], els["i"], els["w"], els["a"], els["e"], els["ma"])
     return (x, y, z, r)
+
+
+def distance_to_earth(elements, jd):
+    # Geocentric distance of the object (AU) — the number an
+    # observer cares most about when planning a night.
+    # @args: elements - dict (a or q, e, i, om, w, ma/tp/epoch)
+    #        jd - Julian date
+    # @return: float in AU, or None if the object cannot be located
+    pos = position_now(elements, jd)
+    if pos is None:
+        return None
+    xo, yo, zo, _r, _nu = pos
+    xe, ye, ze, _re = planet_heliocentric("earth", jd)
+    return math.sqrt((xo - xe) ** 2 + (yo - ye) ** 2 + (zo - ze) ** 2)
+
+
+def closest_approach(elements, jd_center, half_window_days=60.0, n=480):
+    # Samples the object-Earth distance over a window centred on
+    # `jd_center` and returns the minimum. The grid is deliberately
+    # coarse: the widget's date scrub drives the "right now" view, so
+    # the purpose here is a label, not an ephemeris-grade answer.
+    # @args: elements - dict (a or q, e, i, om, w, ma/tp/epoch)
+    #        jd_center - centre of the search window
+    #        half_window_days - half the window in days (default 60)
+    #        n - samples across the window
+    # @return: (jd_best, dist_au) or None if the object cannot be located
+    best_jd, best_d = None, float("inf")
+    for k in range(n + 1):
+        jd = jd_center - half_window_days + 2.0 * half_window_days * k / n
+        d = distance_to_earth(elements, jd)
+        if d is None:
+            continue
+        if d < best_d:
+            best_d, best_jd = d, jd
+    if best_jd is None:
+        return None
+    return (best_jd, best_d)

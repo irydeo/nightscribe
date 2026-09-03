@@ -40,7 +40,7 @@ import math
 from PySide6.QtCore import (Qt, QTimer, Signal, QEvent, QElapsedTimer)
 from PySide6.QtGui import QPen, QBrush, QColor, QPainterPath
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                               QPushButton, QSlider, QSizePolicy,
+                               QPushButton, QSlider, QSizePolicy, QLabel,
                                QGraphicsEllipseItem, QGraphicsPathItem,
                                QGraphicsSimpleTextItem)
 
@@ -104,7 +104,7 @@ class OrbitChart(QWidget):
         # -- the vector canvas (owns the scene, zoom, pan, hover, export) --
         self.view = ChartView()
 
-        # -- controls row: play/pause + the time slider --------------------
+        # -- controls row: play/pause + the time slider + the status line --
         self._play_btn = QPushButton("Play")
         self._play_btn.setFixedSize(54, 24)
         self._play_btn.clicked.connect(self._toggle_play)
@@ -113,12 +113,23 @@ class OrbitChart(QWidget):
         self._slider.sliderReleased.connect(self._on_slider_seek)
         self._slider.valueChanged.connect(self._on_slider_drag)
 
+        # A single status line, right-aligned in the controls row. The
+        # text is updated by _refresh_status whenever the moving point
+        # moves (slider, Play, set_elements) so the observer always sees
+        # "where the object is right now" alongside the orbit (docs/
+        # PLANS/explore-orbit-state.md, Slice 2).
+        self._status = QLabel("")
+        self._status.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        from ...viz import palette as _pal
+        self._status.setStyleSheet("color: %s;" % _pal.MUTED)
+
         controls = QWidget()
         row = QHBoxLayout(controls)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
         row.addWidget(self._play_btn)
         row.addWidget(self._slider, 1)
+        row.addWidget(self._status)
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -138,6 +149,7 @@ class OrbitChart(QWidget):
         self._orbit_item = None      # the object's ellipse polyline
         self._orbit_pts = []         # sampled scene points, for hover hit-test
         self._label_font = self.view.font()
+        self._ca_cache = None        # (jd_best, dist_au) of closest approach
 
         # animation window
         self._jd0 = None
@@ -160,6 +172,78 @@ class OrbitChart(QWidget):
 
         self._reset_controls()
 
+    # ------------------------------------------------- helpers ------------
+
+    def _format_date(self, jd):
+        # @args: jd - a Julian date
+        # @return: a short locale-aware date string (e.g. "03 sep 2026").
+        from datetime import datetime, timezone
+        try:
+            utc = datetime.fromtimestamp((float(jd) - 2440587.5) * 86400.0,
+                                         tz=timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            return ""
+        return utc.strftime("%d %b %Y")
+
+    def _trend(self, els, jd):
+        # @args: els - elements dict; jd - current Julian date
+        # @return: an arrow ("→" approaching, "←" receding, "·" flat)
+        #          or None if the object cannot be located. A 6-day offset
+        #          with a 0.0005 AU deadband keeps the label honest
+        #          without flickering on the slider.
+        d_now = orbit_math.distance_to_earth(els, jd)
+        if d_now is None:
+            return None
+        d_ago = orbit_math.distance_to_earth(els, jd - 6.0)
+        if d_ago is None:
+            return "·"
+        diff = d_ago - d_now
+        if diff > 0.0005:
+            return "\u2192"
+        if diff < -0.0005:
+            return "\u2190"
+        return "\u00b7"
+
+    def status_text(self):
+        # @return: a single line, e.g.
+        #   "03 Sep 2026  ·  0.726 AU  →  ·  CA 0.718 AU (14 Sep 2026)"
+        # When the object is open (e >= 1) the closest-approach clause is
+        # replaced by "no return (open orbit)".
+        if not self._elements or self._cur_jd is None:
+            return ""
+        d_now = orbit_math.distance_to_earth(self._elements, self._cur_jd)
+        if d_now is None:
+            return ""
+        parts = []
+        seg_date = self._format_date(self._cur_jd)
+        if seg_date:
+            parts.append(seg_date)
+        seg_d = "%.3f AU" % d_now
+        trend = self._trend(self._elements, self._cur_jd)
+        if trend:
+            seg_d += "  " + trend
+        parts.append(seg_d)
+        if (self._elements or {}).get("e", 0) >= 1.0:
+            parts.append(self.tr("no return (open orbit)"))
+        elif self._ca_cache is not None:
+            jd_best, ca_d = self._ca_cache
+            if jd_best is not None and ca_d is not None \
+                    and ca_d < d_now - 0.0005:
+                parts.append(self.tr("CA %1 AU (%2)")
+                             .replace("%1", "%.3f" % ca_d)
+                             .replace("%2", self._format_date(jd_best)))
+        return "  \u00b7  ".join(parts)
+
+    def _refresh_status(self):
+        # Paints the status line from the stored elements / date. Safe to
+        # call at any time — returns quietly when there is no data. The
+        # closest-approach value is computed once in set_elements (it is
+        # a property of the orbit, not of the slider cursor).
+        if not self._elements or self._cur_jd is None:
+            self._status.setText("")
+            return
+        self._status.setText(self.status_text())
+
     # ------------------------------------------------- public API ---------
 
     def set_elements(self, elements, jd, obj_name=""):
@@ -170,6 +254,18 @@ class OrbitChart(QWidget):
         self._elements = dict(elements or {})
         self._obj_name = obj_name or ""
         self._cur_jd = float(jd)
+        # The closest-approach is a property of the orbit (a one-time
+        # minimisation over the search window), not of the slider date,
+        # so compute it once per set_elements call. Do it here — before
+        # stop_animation() — so the _refresh_status() call inside it reads
+        # the fresh value rather than any stale cache from a previous object.
+        self._ca_cache = None
+        if (self._elements or {}).get("e", 0) < 1.0:
+            try:
+                self._ca_cache = orbit_math.closest_approach(
+                    self._elements, float(jd))
+            except Exception:
+                self._ca_cache = None
         self.stop_animation()
 
         cx, cy, span_au = self._frame_span()
@@ -190,6 +286,7 @@ class OrbitChart(QWidget):
         self._slider.setValue(int(round(self._frac * 1000)))
         self._updating_slider = False
         self._controls_ready()
+        self._refresh_status()
         self.view.fit_to_scene()
         self.date_moved.emit(float(self._cur_jd))
 
@@ -208,6 +305,7 @@ class OrbitChart(QWidget):
         self._running = False
         self._timer.stop()
         self._set_play_label()
+        self._refresh_status()
 
     def position(self):
         # @return: (x, y, z, r, nu) of the current point, or None
@@ -483,6 +581,7 @@ class OrbitChart(QWidget):
         self._updating_slider = True
         self._slider.setValue(int(round(frac * 1000)))
         self._updating_slider = False
+        self._refresh_status()
         self.date_moved.emit(float(self._cur_jd))
 
     def _play(self):

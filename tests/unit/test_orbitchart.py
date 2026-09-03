@@ -187,3 +187,118 @@ def test_widget_package_has_no_matplotlib():
         env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
         capture_output=True, text=True)
     assert res.returncode == 0, f"matplotlib leaked: {res.stderr}"
+
+
+# ---------------- status line -------------------------------------------
+# docs/PLANS/explore-orbit-state.md, Slice 2. The status label must:
+#   * show a date, the current geocentric distance and a trend arrow;
+#   * include a closest-approach clause for closed orbits (when the CA
+#     is in the future relative to the current point);
+#   * say "sin retorno (órbita abierta)" for open orbits.
+
+
+def _open_elements():
+    # A synthetic hyperbolic escapee, locatable for a long arc around tp.
+    return {"q": 0.98, "e": 1.02, "i": 84.0, "om": 110.0, "w": 210.0,
+            "tp": 2460690.0}
+
+
+def test_status_line_has_date_distance_trend(qapp):
+    # A closed orbit should produce a non-empty line with a date, an AU
+    # distance and one of the three arrows.
+    w = _mk_chart(qapp)
+    w.set_elements(_ELEMENTS, _JD, "o")
+    line = w.status_text()
+    assert line, "status line must not be empty after set_elements"
+    assert " AU" in line
+    # one of the three status markers must appear
+    assert any(tok in line for tok in ("\u2192", "\u2190", "\u00b7"))
+    w.close()
+
+
+def test_status_line_open_orbit_flag(qapp):
+    # An open (e >= 1) orbit must carry the "no return" marker, in either
+    # language (the test does not depend on which qm is installed).
+    w = _mk_chart(qapp)
+    els = _open_elements()
+    w.set_elements(els, els["tp"] + 30.0, "escapee")
+    line = w.status_text()
+    # the marker is the only language-specific clause; check the marker
+    # is present (translated or not), and the CA is NOT (because the
+    # orbit is open).
+    low = line.lower()
+    assert ("no return" in low) or ("retorno" in low), \
+        f"open-orbit marker missing: {line!r}"
+    assert " CA " not in line, f"must not show CA for open orbit: {line!r}"
+    w.close()
+
+
+def test_status_line_updates_with_slider(qapp):
+    # Scrubbing the slider must move both the date and the distance in
+    # the status line (the point follows, and the label recomputes).
+    w = _mk_chart(qapp)
+    w.set_elements(_ELEMENTS, _JD, "o")
+    before = w._status.text()
+    # seek to a different spot on the window
+    w._seek_to(0.5)
+    after = w._status.text()
+    assert before != after, "status line did not change on _seek_to"
+    w.close()
+
+
+def test_status_label_empty_before_set_elements(qapp):
+    # Before any orbit is loaded the label must be empty (no crash, no
+    # stale data from a previous object).
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    w2 = OrbitChart()
+    w2.resize(400, 300)
+    w2.show()
+    qapp.processEvents()
+    assert w2.status_text() == ""
+    assert w2._status.text() == ""
+    w2.close()
+
+
+def test_format_date_shape(qapp):
+    # _format_date must produce a short, human date (e.g. "03 Sep 2026").
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    w3 = OrbitChart()
+    # 2461287.33 is 2026 Sep 3
+    s = w3._format_date(2461287.33)
+    assert s, "date must not be empty"
+    assert len(s) <= 25
+    assert s[:2].isdigit() or s[:2].isalpha()
+    assert s[-4:].isdigit()
+    w3.close()
+
+
+def test_trend_returns_arrow_or_dot(qapp):
+    # _trend must return one of the three markers (or None), never
+    # anything else — the UI builds on this without branching on strings.
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    w4 = OrbitChart()
+    t = w4._trend(_ELEMENTS, _JD)
+    assert t in ("\u2192", "\u2190", "\u00b7"), f"got {t!r}"
+    w4.close()
+
+
+def test_ca_cache_computed_for_closed(qapp):
+    # After set_elements with a closed orbit, the closest-approach cache
+    # must be populated (a property of the orbit, computed once).
+    w = _mk_chart(qapp)
+    w.set_elements(_ELEMENTS, _JD, "o")
+    assert w._ca_cache is not None
+    jd_best, d_best = w._ca_cache
+    assert jd_best > 0.0
+    assert d_best > 0.0
+    w.close()
+
+
+def test_ca_cache_not_computed_for_open(qapp):
+    # An open orbit must NOT have a CA computed (there is no minimum to
+    # find — the point goes to infinity).
+    w = _mk_chart(qapp)
+    els = _open_elements()
+    w.set_elements(els, els["tp"] + 30.0, "escapee")
+    assert w._ca_cache is None, "open orbit must not have a CA"
+    w.close()

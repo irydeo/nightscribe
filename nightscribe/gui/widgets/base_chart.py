@@ -14,7 +14,7 @@
 import math
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QPen, QPixmap,
                             QPainter)
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene,
@@ -78,6 +78,7 @@ class ChartView(QGraphicsView):
         self._tip_emitted = False       # has hover_changed(True) fired since last hide?
         self._scene_rect_hint = None    # QRectF set by set_scene_rect, or None
         self._drag_start = None         # viewport point where the current pan started
+        self._fit_pending = False       # a resize fit is queued, not yet run
 
         # --- chrome (view-level, not scene-level) -----------------------
         self.setBackgroundBrush(QBrush(QColor(palette.BG)))
@@ -195,7 +196,21 @@ class ChartView(QGraphicsView):
     def resizeEvent(self, event):
         # The parent gave us a new size: keep the scene fitted to it so the
         # chart never letterboxes (that was the old QPixmap problem).
+        #
+        # A window drag queues dozens of configure events per frame; each
+        # one used to force a full antialiased fitInView (a synchronous
+        # scene re-render). On a slow raster path that saturates the GUI
+        # thread and reads as a hard freeze. We coalesce: at most one
+        # fit runs per event-loop turn regardless of how many resizes are
+        # queued (_fit_pending guard + 0 ms singleShot).
         super().resizeEvent(event)
+        if not self._fit_pending:
+            self._fit_pending = True
+            QTimer.singleShot(0, self._do_fit)
+
+    def _do_fit(self):
+        # One deferred fit per queued resize burst (see resizeEvent).
+        self._fit_pending = False
         self.fit_to_scene()
 
     # ------------------------------------------------- hover -------------

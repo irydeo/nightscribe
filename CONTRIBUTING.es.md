@@ -20,7 +20,9 @@
 ## Traducciones (GUI)
 
 ```bash
-pyside6-lupdate nightscribe/gui -ts nightscribe/gui/i18n/nightscribe_es.ts \
+# nota: lista las fuentes explícitamente — escanear el directorio omitiría los .py
+pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/ui/*.ui \
+    -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # traduce
 pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts     # compila .qm

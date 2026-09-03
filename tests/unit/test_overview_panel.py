@@ -461,11 +461,75 @@ def test_capture_block_pccp_omits_rate_when_missing(panel):
         f"exposure must be omitted without a rate: {chips!r}"
 
 
-# ---------------- D5: Explore dialog flavour (post button) ----------
+def test_capture_block_safe_window_chip(panel):
+    # (ADR-020) a saved capture plan computes a safe window: the chip shows
+    # the safe span plus the latest-safe-start, and the red warning is absent.
+    ctx = {
+        "kind": "neo",
+        "mag": 19.5,
+        "window_start": "2026-08-26T21:00:00+02:00",
+        "window_end": "2026-08-26T23:30:00+02:00",
+        "safe_window": "2026-08-27T02:00:00|2026-08-27T04:00:00",
+        "best_time": "2026-08-27T02:30:00",
+        "duration_s": 7200,
+    }
+    panel.show(FAKE_ELEMENT, ctx)
+    assert not panel.row_capture.isHidden()
+    chips = _chip_texts(panel)
+    assert any("02:00" in c and "04:00" in c for c in chips), \
+        f"safe window chip missing: {chips!r}"
+    assert any("≤ 02:30" in c for c in chips), \
+        f"latest-safe-start missing: {chips!r}"
+    assert not any("does not fit" in c.lower() for c in chips), \
+        f"must not warn when it fits: {chips!r}"
+
+
+def test_capture_block_does_not_fit_red_chip(panel):
+    # (ADR-020) a session is planned but it does not fit: the one red safety
+    # warning appears, and (because there is no safe span) no green chip.
+    ctx = {
+        "kind": "neo",
+        "mag": 19.5,
+        "window_start": "2026-08-26T21:00:00+02:00",
+        "window_end": "2026-08-26T21:30:00+02:00",
+        "duration_s": 7200,
+    }
+    panel.show(FAKE_ELEMENT, ctx)
+    assert not panel.row_capture.isHidden()
+    chips = _chip_texts(panel)
+    assert any("does not fit" in c.lower() and "120 min" in c for c in chips), \
+        f"red 'does not fit' chip missing: {chips!r}"
+    assert not any("≤" in c for c in chips), \
+        f"no latest-safe-start when the session does not fit: {chips!r}"
+
+
+def test_capture_block_no_plan_no_safe_chips(panel):
+    # (ADR-020) no capture plan saved: the safe-window and red chips are
+    # absent (the plain window/hours chips are the whole block).
+    ctx = {
+        "kind": "neo",
+        "mag": 19.5,
+        "window_start": "2026-08-26T21:00:00+02:00",
+        "window_end": "2026-08-26T23:30:00+02:00",
+    }
+    panel.show(FAKE_ELEMENT, ctx)
+    chips = _chip_texts(panel)
+    assert not any("≤" in c for c in chips), \
+        f"no latest-safe-start without a plan: {chips!r}"
+    assert not any("does not fit" in c.lower() for c in chips), \
+        f"no warning without a plan: {chips!r}"
+
+
+# ---------------- phase E (corrected 2026-09-02): the single CTA -------
 #
-# The Explore dialog is now this same panel with for_post=True: the
-# "Create post" button must appear and fire the owner's flow with the
-# object it is showing. The hub flavour (for_post=False) keeps it hidden.
+# The Explore dialog is now this same panel with for_post=True and a
+# single CTA at the bottom of the layout (the "Create project" /
+# "Continue project" face, depending on what the injected lookup says).
+# The old "Create post" affordance is gone: it lived inside the project
+# on its Publish step (or ad-hoc under Tools).
+#
+# The hub flavour (for_post=False) keeps the CTA invisible — the panel
+# is read-only there.
 
 class _PendingWorker(FakeWorker):
     """A worker that never delivers until the test releases it."""
@@ -484,64 +548,123 @@ def _release(worker):
     worker.finished.deliver(worker.payload)
 
 
-def test_post_button_hidden_by_default(qapp, tmp_path):
-    # the Projects hub flavour: no post affordance, nothing to click
+def test_cta_hidden_in_hub_flavour(qapp, tmp_path):
+    # the Projects hub keeps for_post=False: the CTA is not part of the
+    # panel's surface there, even after the object lands on it
     from nightscribe.gui.overview import ObjectPanel
     p = ObjectPanel(chart_dir=tmp_path / "charts")
     try:
-        assert p.btn_post.isHidden()
+        assert p.btn_project.isHidden()
         assert p.name() is None  # ... and no stale object either
+        # even after show() + ready, nothing changes
+        p.show(FAKE_ELEMENT)
+        assert p.btn_project.isHidden()
     finally:
         p.deleteLater()
 
 
-def test_post_button_visible_in_explore_flavour(qapp, tmp_path):
+def test_cta_hidden_without_lookup(qapp, tmp_path):
+    # for_post=True but no project_lookup: the "Explore without hub
+    # wiring" case, the CTA stays hidden — we don't know which face to
+    # give it
     from nightscribe.gui.overview import ObjectPanel
     p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
     try:
-        assert not p.btn_post.isHidden()
+        assert p.btn_project.isHidden()
+        p.show(FAKE_ELEMENT)
+        assert p.btn_project.isHidden()
     finally:
         p.deleteLater()
 
 
-def test_post_request_emits_object_on_ready(qapp, tmp_path):
-    # ready -> pressing the button asks the owner to build the post for
-    # exactly the object on the panel (name + fallback both travel)
+def test_cta_create_face_when_no_active(qapp, tmp_path):
+    # for_post=True + lookup returning None -> the CTA shows "Create
+    # project"
     from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                    project_lookup=lambda name: None)
+    try:
+        p.show(FAKE_ELEMENT)
+        assert not p.btn_project.isHidden()
+        assert p._action == "create"
+        assert "Create project" in p.btn_project.text()
+    finally:
+        p.deleteLater()
+
+
+def test_cta_continue_face_when_active(qapp, tmp_path):
+    # for_post=True + lookup returning a project -> the CTA shows
+    # "Continue project"
+    from nightscribe.gui.overview import ObjectPanel
+    hit = {"id": 1, "status": "active"}
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                    project_lookup=lambda name: hit)
+    try:
+        p.show(FAKE_ELEMENT)
+        assert not p.btn_project.isHidden()
+        assert p._action == "continue"
+        assert "Continue project" in p.btn_project.text()
+    finally:
+        p.deleteLater()
+
+
+def test_cta_create_signal_emits_object(qapp, tmp_path):
+    # clicking the CTA in "create" face fires project_create(name,
+    # fallback) — exactly the two args the owner (the Explore dialog's
+    # glue) needs; nothing else.
+    from nightscribe.gui.overview import ObjectPanel
+    fb = {"id": "neo1", "kind": "neo"}
     p = ObjectPanel(loader=lambda n, f=None: FakeWorker(FAKE_ELEMENT),
-                    chart_dir=tmp_path / "charts", for_post=True)
+                    chart_dir=tmp_path / "charts", for_post=True,
+                    project_lookup=lambda n: None)
     try:
-        p.explore("2026 QK (443089)", fallback_target={"id": "neo1"})
+        p.explore("2026 QK (443089)", fallback_target=fb)
         assert p.state() == "ready"
-        got = {}
-        p.post_requested.connect(lambda n, f: got.update(n=n, f=f))
-        p.btn_post.clicked.emit()
-        assert got.get("n") == "2026 QK (443089)"
-        assert got.get("f") == {"id": "neo1"}
+        got = []
+        p.project_create.connect(lambda n, f: got.append((n, f)))
+        p.btn_project.clicked.emit()
+        assert got == [("2026 QK (443089)", fb)], got
     finally:
         p.deleteLater()
 
 
-def test_post_request_emits_object_from_show(qapp, tmp_path):
-    # the hub-style show() path also records the object name: explore
-    # from an already-enriched dict and the post still names it
+def test_cta_continue_signal_emits_object(qapp, tmp_path):
+    # clicking the CTA in "continue" face fires project_continue(name,
+    # fallback) — a separate signal from project_create, so the owner
+    # never has to decode a flag argument to know the intent.
     from nightscribe.gui.overview import ObjectPanel
-    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                    project_lookup=lambda n: {"id": 1})
     try:
-        p.show(FAKE_ELEMENT, {"kind": "neo"})
-        assert p.state() == "ready"
-        assert p.name() == "2026 QK (443089)"
-        got = {}
-        p.post_requested.connect(lambda n, f: got.update(n=n))
-        p.btn_post.clicked.emit()
-        assert got.get("n") == "2026 QK (443089)"
+        p.show(FAKE_ELEMENT, None)
+        got = []
+        p.project_continue.connect(lambda n, f: got.append((n, f)))
+        p.btn_project.clicked.emit()
+        assert got == [("2026 QK (443089)", None)], got
     finally:
         p.deleteLater()
 
 
-def test_post_button_ignored_while_loading(qapp, tmp_path):
-    # the dialog must not build a post for an object that is still in
-    # flight: the button is there, but a click lands nowhere
+def test_cta_signals_are_two_and_distinct(qapp, tmp_path):
+    # both signals exist on the class with two args each (and only two,
+    # no stray third-arg `continue_` that PySide refuses to emit). The
+    # old project_action is gone.
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir=tmp_path / "charts")
+    from PySide6.QtCore import QMetaMethod
+    mm = p.metaObject()
+    names = [mm.method(i).name() for i in range(mm.methodCount())
+             if mm.method(i).methodType() == QMetaMethod.Signal]
+    assert "project_create" in names
+    assert "project_continue" in names
+    assert "project_action" not in names
+    assert "post_requested" not in names
+    p.deleteLater()
+
+
+def test_cta_ignored_while_loading(qapp, tmp_path):
+    # the dialog must not fire the CTA for an object that is still in
+    # flight: the button is hidden while the worker is out there
     from nightscribe.gui.overview import ObjectPanel
     loader = {}
 
@@ -551,34 +674,41 @@ def test_post_button_ignored_while_loading(qapp, tmp_path):
         return w
 
     p = ObjectPanel(loader=slow_loader, chart_dir=tmp_path / "charts",
-                    for_post=True)
+                    for_post=True, project_lookup=lambda n: None)
     try:
         p.explore("2026 QK (443089)")
         assert p.state() == "loading"
-        got = {}
-        p.post_requested.connect(lambda n, f: got.update(n=n))
-        p.btn_post.clicked.emit()
-        assert got == {}, "no post request while the worker is out there"
-        # release the worker; now the post is allowed
+        assert p.btn_project.isHidden()
+        got = []
+        p.project_create.connect(lambda n, f: got.append((n, f)))
+        p.project_continue.connect(lambda n, f: got.append((n, f)))
+        # the button is not clickable while hidden, but guard the
+        # signal-emission path too — a stray emit must not happen
+        p._cta_clicked()
+        assert got == [], "no CTA signal while the worker is out there"
+        # release the worker; now the CTA is visible and fires
         _release(loader["w"])
-        p.post_requested.connect(lambda n, f: got.update(n=n))
-        p.btn_post.clicked.emit()
-        assert got.get("n") == "2026 QK (443089)"
+        assert p.state() == "ready"
+        assert not p.btn_project.isHidden()
+        p._cta_clicked()
+        assert got == [("2026 QK (443089)", None)], got
     finally:
         p.deleteLater()
 
 
-def test_post_button_reset_on_cancel(qapp, tmp_path):
-    # cancel() blanks the panel: the stale name must not leak into the
-    # next object's post flow
+def test_cta_reset_on_blank(qapp, tmp_path):
+    # cancel() blanks the panel: the CTA hides and the stale name drops,
+    # so the next object's intent does not inherit the previous one
     from nightscribe.gui.overview import ObjectPanel
-    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
+    p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                    project_lookup=lambda n: None)
     try:
-        p.show(FAKE_ELEMENT, None)
-        assert p.name() == "2026 QK (443089)"
+        p.show(FAKE_ELEMENT)
+        assert not p.btn_project.isHidden()
         p.cancel()
         assert p.state() == "empty"
         assert p.name() is None
+        assert p.btn_project.isHidden()
     finally:
         p.deleteLater()
 
@@ -600,10 +730,22 @@ def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
     qapp.installTranslator(tr)
     try:
         from nightscribe.gui.overview import ObjectPanel
-        p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
-        assert p.btn_post.text() == "Crear post"
-        assert p.btn_post.toolTip() == (
-            "Genera los borradores bilingües + los gráficos de este objeto")
+        p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                        project_lookup=lambda n: None)
+        assert p.btn_project.isHidden()
+        p.show(FAKE_ELEMENT)
+        # phase E single CTA, "create" face
+        assert p.btn_project.text() == "\U0001f680  Crear proyecto"
+        assert p.btn_project.toolTip() == (
+            "Empezar un proyecto nuevo de este objeto")
+        # "continue" face once the lookup finds an active project
+        p2 = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                         project_lookup=lambda n: {"id": 1})
+        p2.show(FAKE_ELEMENT)
+        assert p2.btn_project.text() == "\u25b6  Continuar proyecto"
+        assert p2.btn_project.toolTip() == (
+            "Reanudar el proyecto activo de este objeto")
+        p2.deleteLater()
         assert p.grp_params.title() == "Parámetros"
         assert p.chk_deep.text() == "A fondo"
         assert p.grp_charts.title() == "Gráficos"
@@ -621,7 +763,7 @@ def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
                         for c in p.findChildren(QLabel) if c.toolTip())
         assert "Magnitud aparente prevista para esta noche" in tips
         assert "Tasa en el cielo esta noche" in tips
-        assert "por encima del horizonte" in tips
+        assert "por encima del límite" in tips
         p.lbl_state.setText(p.tr("Not found: %1").replace(
             "%1", p.tr("the requested object")))
         assert p.lbl_state.text() == "No encontrado: el objeto solicitado"
@@ -643,8 +785,12 @@ def test_panel_strings_resolve_in_english(qapp, tmp_path):
     qapp.installTranslator(tr)
     try:
         from nightscribe.gui.overview import ObjectPanel
-        p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True)
-        assert p.btn_post.text() == "Create post"
+        p = ObjectPanel(chart_dir=tmp_path / "charts", for_post=True,
+                        project_lookup=lambda n: {"id": 1})
+        p.show(FAKE_ELEMENT)
+        assert p.btn_project.text() == "\u25b6  Continue project"
+        assert p.btn_project.toolTip() == (
+            "Resume the active project for this object")
         assert p.grp_params.title() == "Parameters"
         assert p.grp_charts.title() == "Charts"
         p.deleteLater()

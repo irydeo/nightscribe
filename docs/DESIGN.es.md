@@ -35,16 +35,25 @@ Flujos guiados por tipo en WORKFLOWS.es.md.)*
 No es una tabla: es una **recomendación** (ver ADR-017 para el rediseño v2, ADR-019
 para v3).
 
-- **Banda «Ahora mismo»**: objetivos sobre el horizonte en este instante, con
-  altitud y azimut en vivo, ordenados por score.
+ - **Banda «Ahora mismo»**: objetivos sobre el horizonte en este instante, con
+   altitud y azimut en vivo, ordenados por score. Además de la ventana, cada tarjeta
+   muestra el **rango de observación seguro** (ADR-020): chip verde
+   «⊕ HH:MM–HH:MM · ≤ HH:MM» (ventana del plan + último inicio posible) u
+   **chip rojo «⚠ no cabe»** cuando la sesión planificada no encaja antes de que el
+   objeto cruse el horizonte — nunca se fuerza el equipo.
 - **Top 3 unificado** con medallas y la frase generada «por qué esta noche»
   (en el idioma de la interfaz).
-- Listado completo: ordenable pulsando cabeceras, **columnas dinámicas según el
-  filtro de tipo** (NEOs muestran NObs/MOID/prioridad NEOfixer; supernovas
-  muestran tipo/galaxia/fecha de descubrimiento...), más panel de detalle con
-  acciones por objetivo (Explorar / Post / Observado).
-- Botones por objetivo: *Marcar observado* (reporta a NEOfixer si hay clave), *Post* y
-  **Crear proyecto** (UX v3).
+ - Listado completo: ordenable pulsando cabeceras, **columnas dinámicas según el
+   filtro de tipo** (NEOs muestran NObs/MOID/prioridad NEOfixer; supernovas
+   muestran tipo/galaxia/fecha de descubrimiento...), más panel de detalle con
+   acciones por objetivo (Explorar / Post / Observado).
+  - Punto de entrada a **Explorar** (UX v3, fase E): la fila, el doble clic en la
+    tabla y el botón de la tarjeta (🔭 Explorar / ▶ Continuar según si hay proyecto
+    `active`) abren siempre el diálogo *Explorar* pre-rellenado. Dentro, la pestaña
+    *Detalles* ofrece un **CTA único** a ancho completo: «Continuar proyecto»
+    (verde) si hay un activo para el objeto, «Crear proyecto» (naranja) si no;
+    se retiran la pareja de botones y el antiguo botón de post. El proyecto ya no se
+    crea desde la tarjeta, sino desde el diálogo.
 
 ### Estructura de la interfaz
 

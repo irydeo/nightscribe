@@ -11,6 +11,7 @@
 #
 ############################################################
 
+import datetime
 import json
 import logging
 import time
@@ -42,6 +43,14 @@ def _now():
     return time.time()
 
 
+def _json_default(obj):
+    # @args: obj - any object
+    # @return: a JSON-safe representation (datetimes as ISO strings)
+    if isinstance(obj, (datetime.datetime, datetime.date)):
+        return obj.isoformat()
+    raise TypeError(f"not JSON serializable: {type(obj)}")
+
+
 def _row_to_project(row):
     # @return: project dict from a SELECT row
     return {"id": row[0], "kind": row[1], "object_name": row[2],
@@ -71,7 +80,7 @@ def create(db, kind, object_name, context=None):
         logger.warning("unknown project kind: %s", kind)
         return None
     now = _now()
-    ctx = json.dumps(context or {}, ensure_ascii=False)
+    ctx = json.dumps(context or {}, ensure_ascii=False, default=_json_default)
     cur = db.execute(
         "INSERT INTO projects (kind, object_name, status, created, updated,"
         " context) VALUES (?, ?, ?, ?, ?, ?)",
@@ -193,7 +202,8 @@ def update_step_data(db, project_id, step, data):
     db.execute(
         "UPDATE project_steps SET data=?, updated=?"
         " WHERE project_id=? AND step=?",
-        (json.dumps(existing, ensure_ascii=False), _now(), project_id, step),
+        (json.dumps(existing, ensure_ascii=False, default=_json_default),
+         _now(), project_id, step),
     )
     db.commit()
     return True
@@ -211,7 +221,8 @@ def update_context(db, project_id, context):
     existing.update(context)
     db.execute(
         "UPDATE projects SET context=?, updated=? WHERE id=?",
-        (json.dumps(existing, ensure_ascii=False), _now(), project_id),
+        (json.dumps(existing, ensure_ascii=False, default=_json_default),
+         _now(), project_id),
     )
     db.commit()
     return True

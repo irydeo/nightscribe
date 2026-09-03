@@ -64,7 +64,11 @@ def _observability(t, cfg):
     # 0-30: altitude, hours up, brightness vs. the user's limits, plus a soft
     # Moon penalty (ADR-020): warning, never a hard filter.
     score = 0.0
-    max_alt = t.get("max_alt")
+    # the actually-reachable altitude (horizon-clipped) when available; the
+    # raw astronomical peak is only the fallback for kinds that have no
+    # local-horizon context — advertising an altitude behind an obstacle
+    # would let a blocked object outscore a freely-visible one
+    max_alt = t.get("safe_max_alt", t.get("max_alt"))
     if max_alt is not None:
         score += _clamp((max_alt - 15) / 60.0 * 18, 0, 18)
     hours = t.get("hours_up")
@@ -423,3 +427,35 @@ def top_n(targets, cfg=None, db=None, n=3):
         if item not in top:
             top.append(item)
     return top, scored
+
+
+def best_per_kind(scored, n=5):
+    # For the Tonight grid (WORKFLOWS 7quater K3): keep at most the n best
+    # targets of every kind, so one kind cannot drown the other six — the
+    # input is already in global-score order, so the output stays sorted by
+    # global score (variety without grouping).
+    # @args: scored - list of (target, score, parts, phrase) tuples,
+    #        n - per-kind cap (<=0 means no cap)
+    # @return: (grid list, best ids) where grid is the capped, score-sorted
+    #          list and best ids holds the id of the BEST target of each
+    #          kind present (the "rings" of the grid)
+    if n <= 0:
+        # with no cap the grid is the whole night, and the best of each kind
+        # is simply its first (highest scoring) member (scored is sorted)
+        firsts = {}
+        for item in scored:
+            firsts.setdefault(item[0].get("kind") or "", item[0].get("id"))
+        return list(scored), set(firsts.values())
+
+    per_kind_count = {}
+    grid = []
+    best_per_kind = {}   # kind -> best id (input is global-score order)
+    for t, _score, _parts, _phrase in scored:
+        kind = t.get("kind") or ""
+        if per_kind_count.get(kind, 0) >= n:
+            continue
+        per_kind_count[kind] = per_kind_count.get(kind, 0) + 1
+        if kind not in best_per_kind:
+            best_per_kind[kind] = t.get("id")
+        grid.append((t, _score, _parts, _phrase))
+    return grid, set(best_per_kind.values())

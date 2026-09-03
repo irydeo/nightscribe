@@ -56,8 +56,16 @@ def window():
     app = QApplication.instance() or QApplication([])
     from nightscribe.gui import theme
     theme.apply_theme(app)
+    from nightscribe import config as cfgmod
     from nightscribe.gui.main_window import MainWindow
+    # With a real (configured) config, __init__ schedules
+    # QTimer.singleShot(on_compute_tonight) — a network worker that would
+    # wipe the rows mid-test. Keep the suite headless by hiding the flag
+    # while the window is built.
+    real = cfgmod.config.is_configured
+    cfgmod.config.is_configured = lambda: False
     w = MainWindow()
+    cfgmod.config.is_configured = real
     yield w
     w.close()
 
@@ -105,16 +113,19 @@ def test_row_shows_why_phrase_and_action(window):
         assert len(btns) == 1, f"row {i}: expected 1 button, got {len(btns)}"
 
 
-def test_top3_rows_get_the_metallic_ring(window):
+def test_best_per_kind_rows_get_the_metallic_ring(window):
+    # K3: the ring now lands on the best-of-each-VISIBLE-KIND, not on the
+    # first three rows.  The fixture has one target per kind, so every row
+    # wears the ring — and if two rows shared a kind, only the higher one
+    # would keep it.
     _rebuild(window)
     rows = _all_rows(window)
     ring = "border: 1px solid #5a6478;"
+    kinds = [t[0]["kind"] for t in TARGETS]
+    assert len(set(kinds)) == len(kinds), "fixture must have one target per kind"
     for i, row in enumerate(rows):
-        if len(rows) >= 3 and i < 3:
-            assert ring in row.styleSheet(), f"row {i} lost its podium ring"
-        else:
-            assert ring not in row.styleSheet(), \
-                f"row {i} must not wear a podium ring"
+        assert ring in row.styleSheet(), \
+            f"row {i} (kind {kinds[i]}) lost its best-of-kind ring"
 
 
 def test_loading_state_and_empty_state(window):
@@ -172,3 +183,64 @@ def _QWidget():
     # Indirection so the module imports cleanly without PySide6 at parse time.
     from PySide6.QtWidgets import QWidget
     return QWidget
+
+
+# ---------------- phase E: the smart card button ----------------
+
+def test_card_button_explore_when_no_project(window, monkeypatch):
+    # No active project for this object -> "Explore" button, wired to
+    # _open_explore_dialog with the target's name.
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(mw.project, "list_projects",
+                        lambda db, status=None: [])
+    t = {"id": "snX", "name": "SN 2026abc", "kind": "sn"}
+    btn = window._card_button(t)
+    assert "Explore" in btn.text() or "Explorar" in btn.text(), \
+        f"expected Explore label, got {btn.text()!r}"
+    called = {}
+    monkeypatch.setattr(window, "_open_explore_dialog",
+                        lambda name: called.update(n=name))
+    btn.clicked.emit()
+    assert called.get("n") == "SN 2026abc", called
+
+
+def test_card_button_continue_when_project_exists(window, monkeypatch):
+    # An active project already exists for this object -> "Continue"
+    # button, wired to _start_or_continue (which resumes the project).
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(
+        mw.project, "list_projects",
+        lambda db, status=None:
+            [{"id": 1, "object_name": "SN 2026abc", "status": "active"}])
+    t = {"id": "snX", "name": "SN 2026abc", "kind": "sn"}
+    btn = window._card_button(t)
+    assert "Continue" in btn.text() or "Continuar" in btn.text(), \
+        f"expected Continue label, got {btn.text()!r}"
+    called = {"t": None}
+    monkeypatch.setattr(window, "_start_or_continue",
+                        lambda t2: called.__setitem__("t", t2))
+    btn.clicked.emit()
+    assert called["t"] is t
+
+
+def test_card_button_continue_falls_back_to_create(window, monkeypatch):
+    # The card's Continue still creates a fresh project when _goto_active_
+    # project misses (e.g. the lookup returned a project by name but the
+    # hub's selection could not match).
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(
+        mw.project, "list_projects",
+        lambda db, status=None:
+            [{"id": 1, "object_name": "2026 QK (443089)", "status": "active"}])
+    t = {"id": "443089", "name": "2026 QK (443089)", "kind": "neo"}
+    btn = window._card_button(t)
+    assert "Continue" in btn.text() or "Continuar" in btn.text(), \
+        f"expected Continue label, got {btn.text()!r}"
+    # pretend the hub selection misses and _create_project fires instead
+    monkeypatch.setattr(window, "_goto_active_project",
+                        lambda name, fallback=None: False)
+    called = {}
+    monkeypatch.setattr(window, "_create_project",
+                        lambda tt: called.update(t=tt) or {"id": 99})
+    btn.clicked.emit()
+    assert called.get("t") is t

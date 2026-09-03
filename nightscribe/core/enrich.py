@@ -48,7 +48,10 @@ def enrich(name, date=None, site="Z41", fallback_target=None):
         from . import solar
         return {"type": "sun", "name": "Sun", "data": solar.solar_now()}
     if kind == "transient":
-        return {"type": "transient", "name": name, "data": _enrich_transient(name)}
+        # transients have no orbit: the planner target (Rochester fields) is
+        # the fallback context when SIMBAD does not know the name (ADR-027)
+        return {"type": "transient", "name": name,
+                "data": _enrich_transient(name, fallback_target)}
     if kind == "exoplanet":
         return {"type": "exoplanet", "name": name,
                 "data": exoplanet_archive.planet(name)}
@@ -70,9 +73,11 @@ def enrich(name, date=None, site="Z41", fallback_target=None):
     return out
 
 
-def _enrich_transient(name):
-    # @args: name - transient id (SN..., AT...)
-    # @return: dict with SIMBAD identity + host galaxy
+def _enrich_transient(name, fallback_target=None):
+    # @args: name - transient id (SN..., AT2026..., 2026...),
+    #        fallback_target - planner target dict (Rochester fields), used
+    #        to fill in what SIMBAD does not know for this object (ADR-027)
+    # @return: dict with SIMBAD identity + host galaxy + context
     ident = simbad.query_id(name)
     host = simbad.query_around_galaxy(name)
     out = {"simbad": ident, "host": host}
@@ -80,6 +85,51 @@ def _enrich_transient(name):
         # light travel time from the host redshift (small z approximation)
         d_mpc = host["z"] * 299792.458 / 70.0
         out["dist_mly"] = round(d_mpc * 3.26156, 1)
+    if fallback_target:
+        _copy_window_context(out, fallback_target)
+        _merge_transient_context(out, fallback_target)
+    return out
+
+
+def _copy_window_context(out, t):
+    # The night's window facts from the planner target: the data dict owns
+    # the safe-window bullet (narrative._safe_window_bullets reads it from d
+    # or from unconfirmed) and build_charts draws it on the sky chart.
+    # @args: out - data dict to extend, t - planner target dict
+    # @return: out, same dict (mutated in place)
+    for key in ("safe_window", "best_time", "window_start", "window_end",
+                "hours_up", "max_alt", "latest_safe_start"):
+        if t.get(key) is not None:
+            out.setdefault(key, t[key])
+    if t.get("duration_s") is not None:
+        out.setdefault("duration_s", t["duration_s"])
+    return out
+
+
+def _merge_transient_context(out, t):
+    # Fills a transient's missing facts from the planner context (ADR-027):
+    # the Rochester row already has host/type/magnitude/coordinates/date, so
+    # when SIMBAD does not know the SN the panel still tells a real story.
+    # Never overwrites a fact SIMBAD gave us, and keeps the dict shape.
+    # @args: out - the data dict being built, t - planner target dict
+    # @return: out, same dict (mutated in place)
+    host = t.get("host")
+    if host and str(host).lower() not in ("", "none", "unknown"):
+        if isinstance(host, dict):
+            out.setdefault("host", host)
+        else:
+            out["host"] = out.get("host") or {"name": str(host)}
+    sn_type = (t.get("sn_type") or "").strip()
+    if sn_type and not (out.get("simbad") or {}).get("otype"):
+        # store as the event type: the narrative reads otype from simbad or here
+        out.setdefault("otype", sn_type)
+    if t.get("mag") is not None and not (out.get("simbad") or {}).get("vmag"):
+        out.setdefault("mag", t["mag"])
+    if t.get("ra_deg") is not None:
+        out.setdefault("ra_deg", t["ra_deg"])
+        out.setdefault("dec_deg", t.get("dec_deg"))
+    if t.get("disc_date"):
+        out.setdefault("disc_date", t["disc_date"])
     return out
 
 

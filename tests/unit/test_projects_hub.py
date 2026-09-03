@@ -324,11 +324,19 @@ def test_no_projects_clears_state(window):
     assert "No projects" in window.projects.lbl_header.text()
 
 
-# ---------------- D5: the Explore dialog over the shared panel -------
+# ---------------- D5 (corrected 2026-09-02): Explore dialog + CTA ----
+#
+# The old D5 test asserted the "Create post" button was visible. It is
+# gone from the panel (posts now live inside the project on its Publish
+# step). _explore_panel still builds the same ObjectPanel class in the
+# dialog flavour (for_post=True), so the surface to check here is now
+# "the CTA is present but not yet visible (no lookup / still loading)",
+# and the hub-style _lookup wiring is what the phase-E test below
+# exercises.
 
-def test_explore_panel_is_shared_panel_with_post_button(window, tmp_path):
-    # _explore_panel builds the SAME ObjectPanel class the hub uses, in the
-    # dialog flavour (post button visible), and starts loading at once —
+def test_explore_panel_is_shared_panel(window, tmp_path):
+    # _explore_panel builds the SAME ObjectPanel class the hub uses, in
+    # the dialog flavour (for_post=True), and starts loading at once —
     # the fake loader answers, so the panel lands on "ready".
     from nightscribe.gui.overview import ObjectPanel
     orig_loader = window._explore_loader
@@ -337,7 +345,7 @@ def test_explore_panel_is_shared_panel_with_post_button(window, tmp_path):
     try:
         panel = window._explore_panel("2026 QK (443089)")
         assert isinstance(panel, ObjectPanel)
-        assert not panel.btn_post.isHidden()
+        assert panel._for_post is True
         assert panel._loader == window._explore_loader
         assert panel.state() == "ready"
         assert panel.name() == "2026 QK (443089)"
@@ -346,10 +354,12 @@ def test_explore_panel_is_shared_panel_with_post_button(window, tmp_path):
         panel.deleteLater()
 
 
-def test_explore_panel_post_signal_carries_name(window, tmp_path):
-    # pressing the button must ask the owner (the dialog's glue) to build
-    # post drafts for exactly the object on the panel, with the fallback
-    # target along — that is the contract the dialog glue listens to.
+def test_explore_panel_signal_contracts_exist(window, tmp_path):
+    # The panel's Explore-dialog flavour must expose exactly the two
+    # project signals with a two-arg signature each (name + fallback).
+    # No `post_requested` anymore (the old D5 post affordance was
+    # dropped); no third-arg `continue_` flag (which PySide refuses to
+    # emit — the TypeError the user hit).
     from nightscribe.gui.overview import ObjectPanel
     window._explore_loader = (lambda name, fallback_target=None:
                               FakeWorker(FAKE_ELEMENT))
@@ -358,14 +368,91 @@ def test_explore_panel_post_signal_carries_name(window, tmp_path):
         window._tonight_all = [(fake_fallback, 80, 0.9, "ph")]
         panel = window._explore_panel("443089")
         assert isinstance(panel, ObjectPanel)
-        assert not panel.btn_post.isHidden()
-        assert panel.state() == "ready"
-        assert panel.name() == "443089"
-        got = {}
-        panel.post_requested.connect(lambda n, f: got.update(n=n, f=f))
-        panel.btn_post.clicked.emit()
-        assert got.get("n") == "443089"
-        assert got.get("f") is fake_fallback
+        assert hasattr(panel, "project_create")
+        assert hasattr(panel, "project_continue")
+        assert not hasattr(panel, "post_requested")
+        assert not hasattr(panel, "project_action")
+        # and the fake fallback target is available for the CTA to carry
+        assert panel._fallback is fake_fallback
     finally:
         window._tonight_all = []
         panel.deleteLater()
+
+
+# ---------------- phase E: _goto_active_project ----------------------
+
+def test_goto_active_project_matches_by_name(window):
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = project.create(dbmod.db, "neo", "SN-goto",
+                       {"kind": "neo", "mag": 18.0})
+    window.on_refresh_projects()
+    ok = window._goto_active_project("SN-goto")
+    assert ok is True
+    # selected in the hub list
+    lst = window.projects.lst_projects
+    sel = lst.currentItem()
+    from PySide6.QtCore import Qt
+    assert sel is not None and sel.data(Qt.UserRole) == p["id"]
+
+
+def test_goto_active_project_matches_by_fallback_id(window):
+    # NEOCP/PCCP keep an MPC number as `id`, while the object_name stored
+    # on the project may be a different string — the fallback path must
+    # still find it via the fallback's id/name.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = project.create(dbmod.db, "pccp", "PDC11321",
+                       {"kind": "pccp", "mag": 20.5})
+    window.on_refresh_projects()
+    # the planner target may carry a different id; the project is stored
+    # under "PDC11321" and must still match through the fallback name.
+    target = {"id": "PDC11321-2", "name": "PDC11321"}
+    ok = window._goto_active_project("PDC11321-2", fallback=target)
+    assert ok is True
+    # selected in the hub list
+    lst = window.projects.lst_projects
+    from PySide6.QtCore import Qt
+    sel = lst.currentItem()
+    assert sel is not None and sel.data(Qt.UserRole) == p["id"]
+
+
+def test_goto_active_project_no_match_returns_false(window):
+    ok = window._goto_active_project("SN-unknown")
+    assert ok is False
+    return_ok = window._goto_active_project("sn-unknown-2",
+                                            fallback={"id": "nope"})
+    assert return_ok is False
+
+
+def test_explore_panel_lookup_injects_fallback_id(window, tmp_path):
+    # phase E (corrected) — _explore_panel wires a project_lookup that
+    # honours the planner target's id AND name, so NEOCP/PCCP keep their
+    # lookup working when the project is stored under one of them.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    # the project was created with the target id as its name (a common
+    # NEOCP situation: the MPC number, not the provisional name)
+    project.create(dbmod.db, "neo", "T41", {"kind": "neo", "mag": 19.5})
+    window._explore_loader = (lambda name, fallback_target=None:
+                              FakeWorker(FAKE_ELEMENT))
+    try:
+        fb = {"id": "T41", "name": "443089", "kind": "neo"}
+        window._tonight_all = [(fb, 80, 0.9, "ph")]
+        panel = window._explore_panel("443089")
+        try:
+            # the panel's _project_lookup must hit via the fallback id,
+            # not just through the name being explored
+            assert panel._project_lookup is not None
+            assert panel._project_lookup("443089") is not None
+            assert panel._project_lookup("T41") is not None
+            # and the CTA resolves to "Continue" (there IS an active
+            # project for this object)
+            panel.show(FAKE_ELEMENT)
+            assert not panel.btn_project.isHidden()
+            assert panel._action == "continue"
+            assert "Continue project" in panel.btn_project.text()
+        finally:
+            panel.deleteLater()
+    finally:
+        window._tonight_all = []

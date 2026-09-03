@@ -16,8 +16,19 @@
         <property name="orientation"><enum>Qt::Horizontal</enum></property>
        </spacer>
       </item>
+       <item>
+        <widget class="QLabel" name="lbl_filter">
+         <property name="text"><string>Filter:</string></property>
+        </widget>
+      </item>
       <item>
-       <widget class="QLabel" name="lbl_moon">
+        <widget class="QComboBox" name="cmb_filter">
+         <property name="toolTip"><string>Restrict the suggestions and the full list to one object kind</string></property>
+         <property name="minimumWidth"><number>150</number></property>
+        </widget>
+      </item>
+       <item>
+        <widget class="QLabel" name="lbl_moon">
         <property name="maximumSize"><size><width>32</width><height>32</height></size></property>
         <property name="alignment"><set>Qt::AlignCenter</set></property>
         <property name="text"><string/></property>
@@ -56,29 +67,17 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="grp_list">
-     <property name="title"><string>Full target list</string></property>
-     <layout class="QVBoxLayout" name="listLayout">
-      <item>
-       <layout class="QHBoxLayout" name="filterLayout">
-        <item><widget class="QLabel" name="lbl_filter"><property name="text"><string>Filter:</string></property></widget></item>
+      <widget class="QGroupBox" name="grp_list">
+       <property name="title"><string>Full target list</string></property>
+       <layout class="QVBoxLayout" name="listLayout">
         <item>
-         <widget class="QComboBox" name="cmb_filter">
-          <item><property name="text"><string>All</string></property></item>
-          <item><property name="text"><string>NEOs</string></property></item>
-          <item><property name="text"><string>Supernovae</string></property></item>
-          <item><property name="text"><string>Comets</string></property></item>
-          <item><property name="text"><string>PCCP</string></property></item>
-          <item><property name="text"><string>Transits</string></property></item>
-          <item><property name="text"><string>Close approaches</string></property></item>
-         </widget>
+         <layout class="QHBoxLayout" name="observedLayout">
+          <item><widget class="QCheckBox" name="chk_show_observed"><property name="text"><string>Show observed</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><spacer name="observedSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         </layout>
         </item>
-        <item><widget class="QCheckBox" name="chk_show_observed"><property name="text"><string>Show observed</string></property><property name="checked"><bool>true</bool></property></widget></item>
-        <item><spacer name="filterSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-       </layout>
-      </item>
-      <item>
-        <widget class="QTableWidget" name="tbl_targets">
+        <item>
+         <widget class="QTableWidget" name="tbl_targets">
          <property name="sortingEnabled"><bool>true</bool></property>
          <property name="toolTip"><string>Double-click a row to start or continue its project</string></property>
         </widget>

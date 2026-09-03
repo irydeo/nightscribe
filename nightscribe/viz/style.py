@@ -33,6 +33,16 @@ SIZES = {"instagram": (1080, 1080), "facebook": (1200, 630),
          "panel": (1200, 675)}
 
 
+def pick(lang, es, en):
+    # Single-language string: exported charts follow the configured UI
+    # language instead of hard-coding "es / en" (ADR-018, 2026-09-02).
+    # @args: lang - "es"|"en" (default "es"), es / en - the two strings
+    # @return: the Spanish one when lang is not "en", else the English
+    if (lang or "es") == "en":
+        return en
+    return es
+
+
 def apply_style():
     # Sets the NightScribe matplotlib rcParams. Call once at import.
     matplotlib.rcParams.update({

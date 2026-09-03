@@ -251,13 +251,23 @@ Antes de la Fase D, el **PUNTO DE ENTRADA** histórico (proyecto UX v3, fases 1-
      envío al MPC). Panel «MPC report» en el hub de Proyectos. Subcomando CLI
      `nightscribe project list|create|advance|show`. i18n completo (208 cadenas ES/EN).
      **Todas las fases completas.**
-   El **horizonte TheSkyX real** sigue mockeado: cuando el usuario comparta su fichero,
-   sustituir el parser/fixture de `core/horizon.py` validando contra ese fichero (ADR-020).
+     El **horizonte de seguridad TheSkyX está completo** (E1+E2, 2026-08-28):
+     (E1) `core/horizon.py` interpreta la exportación de límites de SkyX
+     (`docs/limits-sample.hrz` = referencia canónica) además del texto `az alt`,
+     con 16 tests de seguridad y rechazo de ficheros rotos.
+     (E2) El horizonte **válido manda**: en Ajustes desactiva `min_alt`
+     (tooltip explicativo) y `horizon_margin_deg` suma sobre él. El **rango seguro**
+     es visible en toda la app (ADR-020): `planner.safe_window_for` calcula span
+     seguro + `best_time` + `latest_safe_start`; `sky_view` somorea el span y marca
+     «empezar hasta HH:MM»; las tarjetas de *Esta noche* y el hub del proyecto
+     muestran chip verde «⊕ HH:MM–HH:MM · ≤ HH:MM» ochip rojo «⚠ no cabe» cuando la
+     sesión planificada no encaja; la prosa ES/EN incluye la ventana y su aviso
+     («NO forzar el equipo»). 313 tests unitarios en verde.
    Los **formatos nativos de NINA/CCDciel/TheSkyX/CdC** son puntos de partida que requieren
    validación contra las versiones del usuario en importación real (ADR-021).
 
  **Próximos pasos sugeridos** (fuera del rediseño inicial):
- - Sustituir el mock del horizonte por el fichero TheSkyX real del usuario.
+ - *(Hecho 2026-08-28: el horizonte TheSkyX real ya se interpreta y manda sobre `min_alt` — E1+E2 arriba.)*
  - **Icono lunar real (2026-08-27)**: `gui/moon_icon.py` compone el disco de
    la Luna (`assets/moon_disk.png`, foto CC BY-SA 3.0 — `assets/ATTRIBUTION.txt`)
    con el terminador por geometría exacta (`r·cos E`), creciente a la derecha /
@@ -271,6 +281,201 @@ Antes de la Fase D, el **PUNTO DE ENTRADA** histórico (proyecto UX v3, fases 1-
 4. Reglas vigentes: código en inglés con cabecera GPL y comentarios `# @args:`,
    cadenas de GUI por `self.tr()`, red solo desde `core/sources/` vía `core/db.py`,
    documentación bilingüe (ADR-013), tests unitarios por módulo + funcionales de flujo.
+
+### 7quater. Filtro de tipo de objeto sobre la pestaña «Esta noche» (2026-08-30)
+
+Motivación: el filtro de tipo (NEO / SN / CMT / PCCP / TRN / ALT) vivía hoy solo
+dentro de la **tabla colapsada** (cascada `grp_list / cmb_filter`), a la altura del
+piano: las **filas amplias** del grid superior y el **podio** (anillo / color más
+intenso) siempre se montaban sobre *todos* los objetivos de la noche, mezclando
+clases. El observador no puede decirle a la app «hoy solo quiero ver supernovas»
+ni «deja de mostrar cometas». **K1** sube el filtro a la cabecera y lo hace válido
+para la vista entera (filas + tabla); **K2** convierte el tipo mostrado en una
+preferencia permanente (lista blanca) en Ajustes.
+
+**Decisiones pactadas (2026-08-30)**:
+
+1. **Un solo filtro en la cabecera** (K1). El `cmb_filter` sale de `grp_list` y se
+   instala en la fila de `Tonight` (junto a `lbl_context` y `lbl_moon`). Al
+   cambiarlo, **ambas vistas se actualizan a la vez**: el grid recalcula sus filas
+   con el tipo elegido **y** su podium sobre **lo visible** (los 3 primeros del
+   conjunto filtrado, no de la noche completa), y la tabla se repone con las
+   columnas propias del tipo (`TABLE_COLS[kind]`). Fuente de verdad única:
+   `MainWindow._visible_targets()` (whitelist + filtro); grid y tabla la invocan.
+2. **Lista blanca de tipos habilitados** en Ajustes (K2). Se añade
+   `config["enabled_kinds"]` (defecto = 6 tipos) y un grupo «Tonight: object kinds»
+   en `tab_observing` con 6 checkboxes (NEO, SN, CMT, PCCP, TRN, ALT). Al pulsar
+   *Guardar*, el combo **solo muestra los tipos habilitados** + «All»; si el tipo
+   activo acaba de deshabilitarse, cae a «All»; si la whitelist creció, el combo
+   crece también. «All» significa **todos los tipos habilitados**, no todos los de
+   la noche.
+3. **`core/` no se toca**: toda la filtración vive en `gui/main_window.py` —
+   `config.py` (defaults), `ui/tonight_tab.ui` (header combo), `ui/settings_dialog.ui`
+   (grupo kinds), `main_window.py` (`_rebuild_kind_filters`, `_enabled_kinds`,
+   `_visible_targets`, `_apply_kind_filter`). `suggest.top_n` sigue diversificando;
+   `enabled_kinds` solo corta *lo que se muestra* en la pestaña, nunca el scoring.
+4. **Persistencia**: `config["tonight_kind"]` ("" = All) se escribe en cada cambio
+   del combo y se restaura al arrancar si sigue en la whitelist. No hay un nuevo
+   ADR: es una decisión de UX local sobre el plano ya documentado en
+   ADR-019/ADR-026 (fuente única de `KIND_LABELS` / `KIND_COLORS`).
+5. **Tests**: `tests/unit/test_tonight_kinds.py` (offscreen): combo en la
+   cabecera con los 7 items (All + 6), grid y tabla acotados al tipo, podium
+   recalculado sobre lo visible, persistencia de `tonight_kind`, whitelist que
+   recorta/crece el combo, fallback a «All» al deshabilitar el tipo activo.
+   `pytest tests/unit` verde.
+
+ ### 7quinquies. Tope «mejores por tipo» + anillo best-of-kind (K3, 2026-08-30)
+
+ Motivación: con K1+K2 la «noche» puede traer 15 NEOs del NEOfixer, 90 SNs
+ del Rochester, 15 cometas del COBS… y el grid los pintaba todos a la vez
+ (muro de una sola clase que abocaba a filtrar por tipo para ver algo).
+ **K3** introduce el tope *mejores de cada tipo* (variante configurable,
+ no agrupada) directamente en el grid, y el **anillo** pasa a caer sobre el
+ *mejor de cada tipo visible* — no sobre «los 3 primeros del conjunto».
+
+ **Decisiones pactadas (2026-08-30)**:
+
+ 1. **`core/suggest.best_per_kind(scored, n)`**: entrada ya puntuada y
+    ordenada por score global (la que devuelve `top_n`); mantiene como
+    máximo `n` de cada tipo (defecto `config["best_per_kind_n"] = 5`,
+    configurable 1..50); `n<=0` = sin tope. Devuelve `(grid, best_ids)`:
+    `grid` conserva el **orden por score global** (no agrupado por tipo),
+    y `best_ids` = el id del **mejor de cada tipo presente** (el anillo).
+ 2. **Grid «Esta noche»** (`_build_suggestion_grid`): filtra por
+    «visible» (K1+K2), aplica `best_per_kind`, y pinta el resultado. El
+    anillo cae al **mejor de cada tipo visible** (no a los i<3), y el
+    botón de estado sigue en la derecha. El grid se reconstruye al
+    cambiar `best_per_kind_n` desde Ajustes.
+ 3. **Tabla «Esta noche»**: **sin cambios** — la lista completa (los 6
+    grupos, los scores, los filtros de observación) sigue siendo *el
+    conjunto completo*; solo cambia su *orden* y su *tinte* (ya era
+    best-per-rank 0/1/2), que ahora también es top-3 *global* sobre lo
+    visible. `suggest.top_n` (CLI) no se toca.
+ 4. **Planner `_comet_targets`** (bottleneck): las 15 ephémerides
+    Horizons **van en paralelo** (pool de ~4 workers, los `cobs` siguen
+    siendo los 15 más brillantes). `n_comets=15` se conserva.
+ 5. **Config**: `config["best_per_kind_n"] = 5` (nuevo, default 5) y
+    `ui/settings_dialog.ui` `tab_observing` → fila `spn_best_pk`
+    (SpinBox 1..50) con traducción ES/EN.
+ 6. **Tests**: `tests/unit/test_best_per_kind.py` (6 casos: tope, mejor
+    por tipo, sin tope, orden, id vacío, entrada vacía);
+    `test_tonight_rows.py` actualizado — *ahora* toda fila del fixture
+    lleva anillo (un por tipo ⇒ best-of-each);
+    `test_tonight_kinds.py` actualizado — el pccp (rank 4 global) SÍ
+    lleva anillo al cambiar al filtro «pccp» (y SÍ lo conserva en
+    «All»). `pytest tests/unit` verde (345 tests, 13.1 s).
+ 7. **Idiomas**: 346 cadenas (2 nuevas), 0 unfinished.
+
+ **Punto de entrada (para cualquier IA o humano que retome esta pantalla)**:
+
+1. Leer esta sección 7quater, ADR-019 (hub de pestañas) y ADR-026 (fuente única
+   de temas).
+2. Empezar por **K1** (`tonight_tab.ui` + `main_window.py` `_apply_kind_filter` /
+   `_visible_targets`), validar el contrato (grid + tabla a la vez, podium sobre
+   lo visible), y proseguir con **K2** (`config.enabled_kinds` + grupo kinds en
+   `settings_dialog.ui` + guardas en `on_open_settings`).
+3. **No tocar** `core/` para filtrar — si surge que toca, abrir ADR nuevo antes
+   de escribir el mínimo (el planificador ya devuelve los 6 grupos, el scoring
+   sigue diversificando; la whitelist solo corta la vista).
+4. Cabecera GPL obligatoria en todo `.py` nuevo, código en inglés, cadenas
+   visibles en la GUI por `self.tr()` (patrón de `main_window.py`), pares ES/EN
+   por `orbits.pick` (o `tr()` para los estáticos). Idioma activo:
+   `config.get("language")` (patrón `MainWindow._lang`).
+
+ ### 7ses. Fase E — Punto de entrada unificado (2026-09-02)
+
+ Motivación: con las fases D y K hechas, las formas de «ir hacia un objeto»
+ estaban repartidas: clic en la fila → **Explorar**, doble clic en la
+ tabla → **creaba un proyecto en silencio**, botón de la fila → **proyecto**.
+ El observador no podía elegir conscientemente entre explorar y trabajar
+ sobre un proyecto; y la tablea (la vista más rápida) no le enseñaba el
+ contenido del objeto antes de crear nada. **Fase E** unifica: un solo
+ punto de entrada («Explorar») y los botones Explorar/Continuar
+ son puras atajos; el proyecto se crea o se reanuda *desde dentro* del
+ diálogo Explorar.
+
+ **Decisiones pactadas (2026-09-02)**:
+
+ 1. **Clic en fila → Explorar** (ya era así; se mantiene).
+ 2. **Doble clic en la tabla → Explorar** (antes: creaba proyecto en
+    silencio — ahora es `_table_open_explore`, mismo destino que la fila
+    y que el botón Explorar).
+ 3. **Botón de la fila** (`_card_button`): verde **«▶ Continuar»**
+    cuando ya hay un proyecto activo para ese objeto (corto a
+    `_start_or_continue`, que salta al hub); naranja **«🔭 Explorar»**
+    si no (abre el diálogo Explorar con ese objeto). El botón es un
+    atajo, no una acción distinta de las de la fila.
+  4. **Diálogo Explorar** (`_open_explore_dialog`): la única acción del
+     panel es el **CTA único** (fondo de la sección de gráficos, ancho
+     completo, 46 px). El **«Crear post»** de D5 desaparece: los posts
+     se escriben dentro del proyecto (paso Publicar) o a demanda desde
+     Herramientas. La cara del CTA depende del `project_lookup` que la
+     ventana le inyecta: **verde «Continuar proyecto»** si existe un
+     activo para el objeto, **naranja «Crear proyecto»** si no.
+     Emite una de las dos señales nuevas, cada una con dos argumentos
+     (`name, fallback`): `project_create` / `project_continue`
+     (la anterior `project_action(name, fallback, continue_)` se
+     elimina). `MainWindow` reacciona en `_on_create` (va a
+     `_create_project`) y `_on_continue` (va a `_goto_active_project`;
+     si el «nombre explorado» no coincide con el activo, crea uno):
+     en ambos casos el diálogo se cierra después.
+ 5. **`_create_project` ahora retorna el `dict` creado** (o `None`,
+    con un aviso en la barra de estado si el tipo no es válido para
+    proyecto — p. ej. un transit ad-hoc desde el menú Herramientas
+    no puede crear un proyecto, solo un post).
+ 6. **`_goto_active_project(name, fallback=None)`** (nuevo, privado):
+    busca el proyecto activo cuyo `object_name` coincide con `name`
+    o con el `id`/`name` del `fallback` (los NEOCP/PCCP guardan el
+    número MPC como `id` y un nombre provisional como `name`;
+    cualquiera de los dos puede ser el que quedó en el proyecto), y
+    selecciona en el hub. Devuelve `True/False`.
+  7. **El panel sigue siendo testeable**: el `ObjectPanel` acepta
+     `project_lookup` como callable inyectado (no importa `core.db`
+     directamente — `MainWindow._explore_panel` lo construye);
+     `for_post=False` (hub) → el CTA se oculta; `for_post=True`
+     (Explorar) → el CTA se muestra en cuanto el objeto está cargado
+     y la consulta dice qué cara ponerse.
+
+ **Tests**: `tests/unit/test_overview_panel.py` (7 nuevos: parejas ocultas
+ sin lookup, «Continuar» cuando hay activo, «Crear» cuando no, señales con
+ el `continue_` correcto, ignorado mientras carga, `_blank` las reseta);
+ `test_tonight_rows.py` (3 nuevos: botón «Explorar» conectado a
+ `_open_explore_dialog`, botón «Continuar» conectado a
+ `_start_or_continue`, y la senda fallback «continuar» → «crear»);
+ `test_projects_hub.py` (4 nuevos: `_goto_active_project` por nombre, por
+ `fallback id`, sin coincidencia, y el `project_lookup` del diálogo
+ honra el `id`/`name` del planner); `test_tonight_table.py` ya cubría el
+ doble clic. `pytest tests/unit` verde.
+
+ **Idiomas**: 4 cadenas nuevas («Continuar», «Explorar»,
+ «Continuar proyecto», «Crear proyecto» + sus tooltips), pares ES/EN en
+ ambos `.ts` y ambos `.qm` recompilados.
+
+ **Punto de entrada (para quien retome esta fase)**:
+
+ 1. Leer esta sección, ADR-019 (hub) y ADR-026 (temas).
+  2. Los 4 puntos de contacto con `gui/`: `_card_button`,
+     `_table_open_explore`, `_open_explore_dialog`, `_explore_panel`
+     (en `main_window.py`) y el constructor de `ObjectPanel` +
+     `_refresh_cta` / `_cta_clicked` (en `overview.py`).
+ 3. **No tocar** `core/project.py` para añadir tipos — `VALID_KINDS`
+    sigue siendo la fuente única; si un tipo nuevo entra, añade el
+    caso a los tests de creación (el diálogo ya lo honra por el
+    `kind` guardado en el target).
+  4. Cabecera GPL, código inglés, `self.tr()` en la GUI, `pyside6-lrelease`
+     tras cada cambio de `.ts`.
+
+  **Corrección (2026-09-02, mismo día)**: los tests de la pareja y el
+  smoke de i18n fallaban porque la API de la pareja es ahora el CTA
+  único. El `ObjectPanel` expone `btn_project` (un solo botón a ancho
+  completo, `min-height: 46`, fondo de la sección) y las señales
+  `project_create(name, fallback)` / `project_continue(name,
+  fallback)` (2 args cada una; `post_requested` y `project_action` se
+  retiran). La ventana conecta los dos en `_on_create` /
+  `_on_continue` (`main_window.py:1979`), el «orquestador» anterior
+  (`_do_project` / `_make_post` / `_explore_post`) queda eliminado.
+  Los 9 tests de `test_overview_panel.py` (CTA) + los 4 de
+  `test_projects_hub.py` + los 2 de `test_tonight_rows.py` pasan.
 
 Cada fase deja la app funcional e incluye sus tests. No mezclar fases en un mismo
 commit sin que la anterior esté verificada.

@@ -1,6 +1,6 @@
 # ADR-019: UX v3 — project-centric workflow
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02
 
 ## Español
 
@@ -46,6 +46,24 @@ el blink pregunta objeto/coordenadas/FITS cada vez, aunque la app ya los conozca
   `current` a `publish`); `gui/main_window.py` elimina `_build_analyse_tab` y
   `_project_explore`; el stepper muestra `/4`. El diálogo *Explore…* del menú
   Herramientas se conserva intacto (ad-hoc, sin proyecto).
+
+**Revisión (2026-09-02)** — punto de entrada unificado (fase E):
+
+- **Explore es la única puerta de entrada desde Esta noche**: clic en una fila, doble
+  clic en cualquier columna de la tabla y el botón de la tarjeta abren siempre el
+  diálogo *Explorar* pre-rellenado. Antes, la fila abría el panel de detalles directamente
+  y solo el botón de la tarjeta llevaba al diálogo.
+- **El proyecto se crea o retoma *dentro* del diálogo**, desde la pestaña *Detalles*
+  (`ObjectPanel`) con dos botones mutuamente excluyentes: «Continuar proyecto» (si ya
+  existe uno `active` para ese objeto) o «Crear proyecto» (si no). El resto del tiempo
+  (sin proyecto en foco, o en el hub) los botones no se muestran. `ObjectPanel` recibe
+  `project_lookup` inyectado desde `MainWindow` — no importa `core.db` directamente.
+- El botón de la tarjeta refleja el estado: «▶ Continuar» si hay proyecto `active`,
+  «🔭 Explorar» si no; si al pulsar «Continuar» el proyecto ya no existe, cae a «Explorar».
+- Consecuencias: `gui/overview.py` `ObjectPanel` gana la señal `project_action`, los
+  botones `btn_project_continue`/`btn_project_create` y `_refresh_project_buttons()`;
+  `gui/main_window.py` gana `_table_open_explore`, `_goto_active_project` y refactoriza
+  `_start_or_continue`; i18n ES/EN ampliada; tests unitarios de las tres vistas.
 
 **Persistencia** (migraciones `user_version` 0→1→2 en `core/db.py`, per ADR-002):
 
@@ -104,6 +122,30 @@ name/coordinates/FITS every time, even when the app already knows them.
   `current` flag to `publish`); `gui/main_window.py` drops `_build_analyse_tab` and
   `_project_explore`; the stepper now shows `/4`. The Tools-menu *Explore…* dialog is
   untouched (ad-hoc, no project).
+
+**Review (2026-09-02)** — single unified entry point (phase E):
+
+- **Explore is the only doorway from Tonight**: clicking a row, double-clicking any
+  table column and the card button all open the pre-filled *Explore* dialog. Before,
+  the row opened the details panel directly and only the card button went to the dialog.
+- **The project is created or resumed *inside* the dialog**, on the *Details* tab
+  (`ObjectPanel`) via a **single CTA** (one full-width button at the bottom): it shows
+  "Continue project" (green) when an `active` one already exists for that object, or
+  "Create project" (orange) when it does not. Otherwise (no project in focus, or in the
+  hub) the CTA is hidden. `ObjectPanel` receives `project_lookup` injected from
+  `MainWindow` — it does not import `core.db` directly. The CTA fires one of two
+  distinct signals (`project_create` / `project_continue`, each `(name, fallback)`), so
+  the owner never decodes a flag argument to know the intent. The D5 "Create post"
+  button is gone: posts are written inside the project (Publish step) or ad-hoc from Tools.
+- The card button reflects the state: "▶ Continue" if there is an `active` project,
+  "🔭 Explore" if not; pressing "Continue" on a project that no longer exists falls
+  back to "Explore".
+- Consequences: `gui/overview.py` `ObjectPanel` gains the `btn_project` CTA, the
+  `project_create` / `project_continue` signals and `_refresh_cta()` / `_cta_clicked()`;
+  `gui/main_window.py` gains `_table_open_explore`, `_goto_active_project`, the
+  `_on_create` / `_on_continue` glue and refactors `_start_or_continue`; ES/EN i18n
+  extended (stale "Create post" strings retired from both `.ts`, `.qm` recompiled);
+  unit tests cover the three views.
 
 **Persistence** (`user_version` 0→1→2 migrations in `core/db.py`, per ADR-002):
 

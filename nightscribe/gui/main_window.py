@@ -15,14 +15,15 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QFile, Qt, Signal
+from PySide6.QtCore import (QFile, Qt, Signal, QPropertyAnimation,
+                            QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QHBoxLayout,
-                                QInputDialog, QLabel, QLineEdit, QListWidgetItem,
-                                QMainWindow, QMessageBox, QPushButton,
-                                QScrollArea,
+                                QInputDialog, QLabel, QLineEdit,
+                                QListWidgetItem, QMainWindow, QMessageBox,
+                                QProgressBar, QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QTextEdit, QVBoxLayout, QWidget,
                                 QTableWidgetItem)
@@ -35,6 +36,7 @@ from ..core import (ephemeris, mpc_report, orbits, project,
 from ..core.db import db
 from . import theme
 from .overview import ObjectPanel
+from .skeleton import ShimmerRow
 from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
                       MpcResolveWorker, PostWorker, SunWorker, TonightWorker)
 
@@ -67,15 +69,15 @@ def _load_ui(name, parent=None):
 # Per-kind table columns for the full (collapsed) table
 TABLE_COLS = {
     "neo": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
-            ("Max alt", "max_alt"), ("Best time (UTC)", "max_time"),
+            ("Max alt", "max_alt"), ("Best time (UTC)", "best_time"),
             ("NEOfixer", "nf"), ("NObs", "nobs"), ("MOID (AU)", "moid"),
             ("Observed", "obs")],
     "sn": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
            ("SN type", "sn_type"), ("Host galaxy", "host"),
            ("Discovered", "disc"), ("Max alt", "max_alt"), ("Observed", "obs")],
     "comet": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
-              ("Perihelion", "perihelion"), ("Max alt", "max_alt"),
-              ("Best time (UTC)", "max_time"), ("Observed", "obs")],
+               ("Perihelion", "perihelion"), ("Max alt", "max_alt"),
+               ("Best time (UTC)", "best_time"), ("Observed", "obs")],
     "pccp": [("Object", "name"), ("Score", "score"), ("PCCP score", "pccp"),
              ("Mag", "mag"), ("Arc (days)", "arc"), ("NObs", "nobs"),
              ("Max alt", "max_alt"), ("Observed", "obs")],
@@ -90,9 +92,13 @@ TABLE_COLS = {
 }
 TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
                       ("Mag", "mag"), ("Max alt", "max_alt"),
-                      ("Best time (UTC)", "max_time"), ("NEOfixer", "nf"),
+                      ("Best time (UTC)", "best_time"), ("NEOfixer", "nf"),
                       ("NObs", "nobs"), ("Discovered", "disc"),
                       ("Observed", "obs")]
+
+# Canonical kind order (theme.KIND_LABELS order, ADR-026): the tonight filter
+# combo and the settings whitelist stay in the same order wherever shown.
+KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert"]
 
 
 class _ClickableFrame(QFrame):
@@ -173,8 +179,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(win.centralwidget)
         self.setStatusBar(win.statusbar)
         self.setMenuBar(win.menubar)
-        self.resize(1200, 800)
+        self.resize(self._initial_size())
         self._menus = win
+        self._build_status_progress()
 
         self._build_tabs()
         self._connect_menu()
@@ -195,6 +202,42 @@ class MainWindow(QMainWindow):
         self._blink_render_timer.setInterval(120)
         self._blink_render_timer.timeout.connect(self._blink_render)
 
+    def _build_status_progress(self):
+        # One global progress bar, docked to the RIGHT of the status bar (the
+        # standard Qt spot for the current action). It stays hidden and is
+        # shown while "Compute tonight" runs; it is a pure visual gauge (no
+        # text on the bar — the message text lives beside it and in the
+        # header, see _tonight_progress). We use addPermanentWidget on purpose:
+        # a widget in the normal (left) area sits *behind* the area that
+        # showMessage() paints into, so the bar would cover the message.
+        bar = QProgressBar()
+        bar.setObjectName("status_progress")
+        bar.setFixedHeight(18)
+        bar.setFixedWidth(180)
+        bar.setTextVisible(False)         # the bar is the gauge, text is elsewhere
+        bar.setFormat("")
+        bar.setRange(0, 0)                # busy (indeterminate) by default
+        bar.setStyleSheet(
+            "QProgressBar#status_progress { border: 1px solid %s;"
+            " border-radius: 4px; background: %s; }"
+            "QProgressBar#status_progress::chunk {"
+            " background: %s; border-radius: 3px; }" %
+            (theme.C_LINE, theme.C_BASE, theme.C_ACCENT))
+        bar.setVisible(False)
+        self.statusBar().addPermanentWidget(bar)   # right (next to the size grip)
+        self._status_progress = bar
+        # smooth gauge: the value animates between steps instead of jumping
+        self._bar_anim = QPropertyAnimation(self._status_progress, b"value", self)
+        # one shared clock drives every skeleton row's shimmer
+        self._skeleton_timer = QTimer(self)
+        self._skeleton_timer.timeout.connect(self._skeleton_tick)
+        self._skeleton_rows = []
+
+    def _skeleton_tick(self):
+        # Repaints every skeleton row with the current shimmer position
+        for row in self._skeleton_rows:
+            row.update()
+
     # ---------------- helpers ----------------
 
     def _lang(self):
@@ -210,6 +253,19 @@ class MainWindow(QMainWindow):
     def _step_label(self, key):
         labels = _STEP_LABELS_ES if self._lang() == "es" else _STEP_LABELS_EN
         return labels.get(key, key)
+
+    def _initial_size(self):
+        # ~90% of the screen's available area (menu bar + task bar already
+        # excluded), with a sane floor for small displays. Adapts to any
+        # resolution/DPI instead of a fixed 1200x800.
+        from PySide6.QtCore import QSize
+        from PySide6.QtGui import QGuiApplication
+        screen = QGuiApplication.primaryScreen()
+        if screen is None:
+            return QSize(1200, 800)
+        g = screen.availableGeometry()
+        return QSize(max(int(g.width() * 0.9), 640),
+                     max(int(g.height() * 0.9), 480))
 
     def _goto_tab(self, index):
         from PySide6.QtWidgets import QTabWidget
@@ -232,6 +288,14 @@ class MainWindow(QMainWindow):
         # table starts collapsed
         self.tonight.grp_list.setVisible(False)
         self._prepare_table()
+        # remember and restore the Tonight kind filter (WORKFLOWS 7quater):
+        # the combo starts empty, so populate it from the enabled kinds and
+        # re-select last night's choice if it is still enabled
+        self._rebuild_kind_filters()
+        saved = config.get("tonight_kind", "") or None
+        if saved and self.tonight.cmb_filter.findData(saved) >= 0:
+            self.tonight.cmb_filter.setCurrentIndex(
+                self.tonight.cmb_filter.findData(saved))
 
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
@@ -253,20 +317,18 @@ class MainWindow(QMainWindow):
         self._menus.action_docs.triggered.connect(self.on_docs)
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
-        self._menus.action_lang_system.triggered.connect(
-            lambda: self._set_language("system"))
-        self._menus.action_lang_es.triggered.connect(
-            lambda: self._set_language("es"))
-        self._menus.action_lang_en.triggered.connect(
-            lambda: self._set_language("en"))
 
     def _connect(self):
         t = self.tonight
         t.btn_compute.clicked.connect(self.on_compute_tonight)
         t.btn_show_all.toggled.connect(self._toggle_table)
-        t.cmb_filter.currentIndexChanged.connect(self._fill_table)
-        t.chk_show_observed.stateChanged.connect(self._fill_table)
-        t.tbl_targets.cellDoubleClicked.connect(self._table_start_project)
+        # one filter rules grid + table (WORKFLOWS 7quater): the header combo
+        # changes both views at once
+        t.cmb_filter.currentIndexChanged.connect(self._apply_kind_filter)
+        # "show observed" only reshapes the table, the grid keeps its podium
+        # (a lambda: the check-state int must not leak into want=)
+        t.chk_show_observed.stateChanged.connect(lambda _s: self._fill_table())
+        t.tbl_targets.cellDoubleClicked.connect(self._table_open_explore)
         p = self.projects
         p.btn_refresh.clicked.connect(self.on_refresh_projects)
         p.cmb_filter.currentIndexChanged.connect(self.on_refresh_projects)
@@ -293,12 +355,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtCore import QUrl
         QDesktopServices.openUrl(QUrl(url))
 
-    # ---------------- menu: language / settings / help ----------------
-
-    def _set_language(self, lang):
-        config.set("language", lang)
-        self.statusBar().showMessage(
-            self.tr("Language saved — restart the app to apply it"), 8000)
+    # ---------------- menu: settings / help ----------------
 
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
@@ -322,6 +379,28 @@ class MainWindow(QMainWindow):
         dlg.spn_moon_sep.setValue(float(config.get("moon_min_sep_deg", 45)))
         dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
         dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
+        dlg.edt_tns_bot.setText(config.get("tns_bot_name", ""))
+        dlg.edt_tns_bot_key.setText(config.get("tns_bot_key", ""))
+        # Tonight object kinds (WORKFLOWS 7quater): the whitelist mirrors the
+        # settings checkboxes; default (missing/legacy) is every kind.
+        enabled = self._enabled_kinds()
+        for k in KIND_ORDER:
+            box = getattr(dlg, f"chk_kind_{k}", None)
+            if box is not None:
+                box.setChecked(k in enabled)
+        # K3: the per-kind cap for the Tonight grid (default 5)
+        dlg.spn_best_pk.setValue(int(config.get("best_per_kind_n", 5)))
+        # interface language: system | es | en (applies on restart)
+        dlg.cmb_language.addItems([self.tr("System"), self.tr("Spanish"),
+                                   self.tr("English")])
+        lang = config.get("language", "system")
+        dlg.cmb_language.setCurrentIndex(
+            {"system": 0, "es": 1, "en": 2}.get(lang, 0))
+        # horizon preview + the min_alt precedence rule (ADR-020): a usable
+        # file turns the flat minimum altitude off because the file decides
+        dlg.edt_horizon_file.textChanged.connect(
+            lambda _t: self._horizon_file_preview(dlg))
+        self._horizon_file_preview(dlg)
         # panel chart resolution mode: populate the options in a stable order
         dlg.cmb_chart_zoom.addItems([
             self.tr("Fast: re-scale the pre-drawn chart (default)"),
@@ -354,20 +433,95 @@ class MainWindow(QMainWindow):
         config.set("moon_min_sep_deg", dlg.spn_moon_sep.value())
         config.set("moon_max_illum", dlg.spn_moon_illum.value())
         config.set("overhead_s", dlg.spn_overhead.value())
+        config.set("tns_bot_name", dlg.edt_tns_bot.text().strip())
+        config.set("tns_bot_key", dlg.edt_tns_bot_key.text().strip())
+        # Tonight object kinds: keep at least one, else refuse to save
+        enabled = [k for k in KIND_ORDER
+                   if getattr(dlg, f"chk_kind_{k}", None) is not None
+                   and getattr(dlg, f"chk_kind_{k}").isChecked()]
+        if not enabled:
+            box = getattr(dlg, "lbl_kinds_hint", None)
+            if box is not None:
+                box.setStyleSheet(f"color: {theme.C_WARN};")
+                box.setText(self.tr("Enable at least one object kind."))
+            return
+        config.set("enabled_kinds", enabled)
+        config.set("best_per_kind_n", dlg.spn_best_pk.value())
+        # if the header filter points at a kind that just got removed,
+        # fall back to "All" so nothing is left dangling
+        current = self.tonight.cmb_filter.currentData()
+        if current and current not in enabled:
+            self.tonight.cmb_filter.blockSignals(True)
+            self.tonight.cmb_filter.setCurrentIndex(0)  # "All"
+            self.tonight.cmb_filter.blockSignals(False)
+            config.set("tonight_kind", "")
+        # re-apply the filter: this re-populates the combo with the new
+        # whitelist and refreshes both views (the whitelist may have grown
+        # too, so we always re-apply, not only when the selection dropped)
+        if self._tonight_all:
+            self._apply_kind_filter()
+        # interface language: "system" (index 0) | "es" | "en"; a change
+        # only applies after a restart
+        # K3: the per-kind cap changed AND the grid is live? Rebuild it.
+        if self._tonight_all:
+            self._build_suggestion_grid()
+        prev_lang = config.get("language", "system")
+        new_lang = ("system", "es", "en")[dlg.cmb_language.currentIndex()]
+        lang_changed = new_lang != prev_lang
+        config.set("language", new_lang)
         # panel chart resolution: "scale" (index 0) | "re-render" (index 1) —
         # if the hub's panel is already on screen, re-draw it to apply
         config.set("chart_zoom", "scale"
                    if dlg.cmb_chart_zoom.currentIndex() == 0 else "re-render")
         if self._proj_panel is not None and self._proj_panel.state() == "ready":
             self._proj_panel.rebuild_charts()
-        self.statusBar().showMessage(self.tr("Settings saved"), 6000)
+        if lang_changed:
+            self.statusBar().showMessage(
+                self.tr("Settings saved — restart the app to change the language"),
+                8000)
+        else:
+            self.statusBar().showMessage(self.tr("Settings saved"), 6000)
 
     def _horizon_browse_into(self, dlg):
+        # @args: dlg - the settings dialog; fills its file field with a
+        #          browsed horizon file (TheSkyX .hrz first, ADR-020)
         path, _ = QFileDialog.getOpenFileName(
-            dlg, self.tr("Choose the horizon file"), "",
-            "Text files (*.txt);;All files (*)")
+            dlg, self.tr("Choose the limit file"), "",
+            "Limit files (*.hrz *.txt *.hor);;TheSkyX limits (*.hrz);"
+            ";;Text files (*.txt);;All files (*)")
         if path:
             dlg.edt_horizon_file.setText(path)
+
+    def _horizon_file_preview(self, dlg):
+        # Precedence rule made visible (ADR-020): while a horizon file loads
+        # successfully it IS the safety reference, so the flat minimum
+        # altitude is greyed out; if the file is missing or broken the
+        # minimum altitude takes over again (the planner behaves the same).
+        # @args: dlg - settings dialog with edt_horizon_file / spn_min_alt
+        path = (dlg.edt_horizon_file.text() or "").strip()
+        stats = getattr(dlg, "lbl_horizon_stats", None)
+        if not path:
+            dlg.spn_min_alt.setEnabled(True)
+            if stats:
+                stats.setText("")
+            return
+        from ..core import horizon as _hor
+        h = _hor.load(path)
+        if h is None:
+            dlg.spn_min_alt.setEnabled(True)
+            if stats:
+                stats.setText(self.tr(
+                    "Could not be read as a limit file — the flat "
+                    "minimum altitude is used instead"))
+            return
+        s = h.stats()
+        dlg.spn_min_alt.setEnabled(False)
+        if stats:
+            peak = self.tr("peak at azimuth %1°").replace(
+                "%1", str(int(round(s["peak_az"]))))
+            stats.setText(
+                f"{s['min_alt']:.1f}° – {s['max_alt']:.1f}° {peak} "
+                f"({len(h.points)} {self.tr('points')})")
 
     def _resolve_into(self, dlg):
         code = dlg.edt_mpc_code.text().strip().upper()
@@ -501,31 +655,64 @@ class MainWindow(QMainWindow):
         self._show_loading_state()
         self.statusBar().showMessage(self.tr("Computing tonight…"))
         w = TonightWorker(config, db)
+        w.progress.connect(self._tonight_progress)
         w.finished.connect(self._tonight_done)
         self._keep(w)
         w.start()
 
+    def _tonight_progress(self, msg):
+        # One load phase arrived (see workers.TonightWorker). The human label
+        # is picked from a literal tr() table so lupdate sees it (CONTRIBUTING
+        # rule 5: every visible string through tr()); the worker only sends
+        # the phase key + index/total. The bar (status-left) is the gauge;
+        # the message text and the header both reflect the current phase.
+        key = msg.get("key", "")
+        phases = {
+            "neo": self.tr("Loading NEOfixer targets…"),
+            "sn": self.tr("Loading supernovae…"),
+            "comet": self.tr("Locating comets…"),
+            "pccp": self.tr("Checking PCCP candidates…"),
+            "transit": self.tr("Scanning exoplanet transits…"),
+            "approach": self.tr("Fetching close approaches…"),
+            "scoring": self.tr("Scoring targets…"),
+        }
+        label = phases.get(key, key)
+        index = int(msg.get("index", 0))
+        total = int(msg.get("total", 0))
+        text = (self.tr("Step %1 of %2 — %3").replace("%1", str(index)).
+                replace("%2", str(total)).replace("%3", label))
+        self.statusBar().showMessage(text)
+        self.tonight.lbl_context.setText(text)
+        bar = self._status_progress
+        bar.setVisible(True)                       # make sure it's on
+        bar.setRange(1, max(total, 1))
+        bar.setFormat("")                          # the bar is a pure gauge
+        bar.setTextVisible(False)
+        # animate the fill to the new step instead of jumping
+        self._bar_anim.setDuration(200)
+        self._bar_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._bar_anim.setStartValue(bar.value())
+        self._bar_anim.setEndValue(index)
+        self._bar_anim.start()
+
     def _show_loading_state(self):
-        # Skeleton rows while the worker runs (same shape as the final rows)
+        # Skeleton rows while the worker runs (same shape as the final rows),
+        # each with a moving shimmer highlight driven by one shared timer.
         container = self._clear_suggestions()
         layout = container.layout()
-        for _i in range(6):
-            skel = QFrame()
-            skel.setMinimumHeight(64)
-            skel.setStyleSheet(
-                f"QFrame#skelrow {{ background: {theme.C_BASE};"
-                " border-radius: 8px; }}")
-            skel.setObjectName("skelrow")
-            sly = QVBoxLayout(skel)
-            sly.setContentsMargins(14, 10, 14, 10)
-            bar1 = QFrame(); bar1.setFixedSize(420, 14)
-            bar2 = QFrame(); bar2.setFixedSize(560, 10)
-            for b in (bar1, bar2):
-                b.setStyleSheet(f"background: {theme.C_LINE}; border-radius: 4px;")
-            sly.addWidget(bar1)
-            sly.addWidget(bar2)
-            layout.addWidget(skel)
+        self._skeleton_rows = []
+        n = 6
+        for i in range(n):
+            row = ShimmerRow(index=i, total_rows=n)
+            layout.addWidget(row)
+            self._skeleton_rows.append(row)
         layout.addStretch()
+        # start the shimmer clock (one for all rows) if not already running
+        if not self._skeleton_timer.isActive():
+            self._skeleton_timer.start(30)
+        # global status-bar gauge: on, busy until the first phase arrives
+        self._status_progress.setVisible(True)
+        self._status_progress.setRange(0, 0)
         self.tonight.lbl_context.setText(self.tr("Computing tonight…"))
         # a placeholder phase (first quarter) so the disc is not empty
         # while computing; the real phase replaces it in _update_night_header
@@ -535,6 +722,9 @@ class MainWindow(QMainWindow):
 
     def _tonight_done(self, top, all_scored, error=""):
         self.tonight.btn_compute.setEnabled(True)
+        self._stop_skeleton()
+        self._bar_anim.stop()
+        self._status_progress.setVisible(False)
         if error or not all_scored:
             msg = error or self.tr("no sources answered")
             self._show_empty_state(msg)
@@ -550,10 +740,17 @@ class MainWindow(QMainWindow):
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
 
+    def _stop_skeleton(self):
+        # Stops the shared shimmer timer (idempotent) once loading ends
+        if self._skeleton_timer.isActive():
+            self._skeleton_timer.stop()
+
     def _show_empty_state(self, msg):
         # Single helpful message when no targets are available
         container = self._clear_suggestions()
         layout = container.layout()
+        self._stop_skeleton()
+        self._status_progress.setVisible(False)
         lbl = QLabel(self.tr("No targets found") + "\n\n" + msg + "\n\n"
                         + self.tr("Check your network and try again."))
         lbl.setAlignment(Qt.AlignCenter)
@@ -624,14 +821,80 @@ class MainWindow(QMainWindow):
         return container
 
     def _build_suggestion_grid(self):
-        # One wide row per target, best first. The top 3 wear a subtle
-        # metallic ring — same layout, a quiet podium, no medals (v3 phase B).
+        # K3 (WORKFLOWS 7quater): only the targets that pass the header
+        # filter are shown, capped at best_per_kind_n per kind (variety,
+        # never a wall of one kind) but still ordered by global score.
+        # The ring lands on the best target of EACH visible kind, not on
+        # "the top 3 of the night".
+        self._rebuild_kind_filters()
+        want = self.tonight.cmb_filter.currentData()
+        # start from the visible set (already whitelist-aware), then apply
+        # the K3 per-kind cap. _tonight_all is already in global-score
+        # order, but we re-sort to be safe (tests may inject the list).
+        visible = self._visible_targets(want)
+        visible.sort(key=lambda x: (-x[1], x[0]["name"]))
+        n = int(config.get("best_per_kind_n", 5) or 0)
+        shown, best_ids = suggest.best_per_kind(visible, n)
+        self._grid = shown
+        self._grid_best = best_ids
         container = self._clear_suggestions()
         container.layout().addStretch()
-        for i, (t, score, parts, phrase) in enumerate(self._tonight_all):
-            row = self._make_row(t, score, parts, phrase, top3=i < 3)
+        for (t, score, parts, phrase) in shown:
+            row = self._make_row(t, score, parts, phrase, ring=(t.get("id") in best_ids))
             container.layout().insertWidget(container.layout().count() - 1,
-                                            row)
+                                              row)
+
+    def _rebuild_kind_filters(self):
+        # One filter rules both views (WORKFLOWS 7quater): the header combo
+        # offers only the enabled kinds (settings whitelist, K2), "All" first.
+        # Re-populating with an unchanged list leaves the current kind (and
+        # the persistent selection) untouched; a removed kind falls back to
+        # "All" so nothing points at a dead option.
+        cmb = self.tonight.cmb_filter
+        old = cmb.currentData()  # None = "All"
+        enabled = [k for k in KIND_ORDER
+                   if k in self._enabled_kinds()
+                   and k in self._KIND_LABELS]
+        # block the signal: this runs from several hooks and we fill the
+        # views right after
+        cmb.blockSignals(True)
+        cmb.clear()
+        cmb.addItem(self.tr("All"), None)
+        for k in enabled:
+            cmb.addItem(self._KIND_LABELS[k], k)
+        idx = cmb.findData(old) if old else 0
+        cmb.setCurrentIndex(idx if idx >= 0 else 0)
+        cmb.blockSignals(False)
+
+    def _enabled_kinds(self):
+        # @return: the settings whitelist; missing/legacy -> every kind
+        val = config.get("enabled_kinds")
+        if not isinstance(val, list) or not val:
+            return list(KIND_ORDER)
+        return val
+
+    def _visible_targets(self, want):
+        # @args: want - a kind key, or None ("All" = every *enabled* kind)
+        # @return: the scored list, order preserved, cut to the filter.
+        #   Disabled kinds are hidden everywhere (the whitelist, K2), so
+        #   "All" means "all enabled kinds", never "everything in the night".
+        enabled = self._enabled_kinds()
+        all_ = self._tonight_all or []
+        if want:
+            return [x for x in all_ if x[0].get("kind") == want]
+        return [x for x in all_ if x[0].get("kind") in enabled]
+
+    def _apply_kind_filter(self, _index=None):
+        # Header combo changed (WORKFLOWS 7quater): refresh BOTH views with
+        # the same kind at once, keep the previous choice, and drop any that
+        # is no longer enabled. Index is ignored — only the combo's data.
+        want = self.tonight.cmb_filter.currentData()
+        try:
+            config.set("tonight_kind", want or "")
+        except Exception:
+            pass
+        self._build_suggestion_grid()
+        self._fill_table(want)
 
     def _chip(self, text, color, tip=""):
         # @return: a small pill label (status / window / moon / warning chip)
@@ -641,19 +904,20 @@ class MainWindow(QMainWindow):
             lbl.setToolTip(tip)
         return lbl
 
-    def _make_row(self, t, score, parts, phrase, top3=False):
+    def _make_row(self, t, score, parts, phrase, ring=False):
         # @return: one wide, click-to-explore row:
         #   [kind icon]  [name .......... status chips]
         #               [why-tonight phrase, always visible]
         #               [score bar 4 segments ......... NN  Start/Continue]
+        # ring: K3 — True on the best target of each visible kind
         kind = t.get("kind", "")
         kind_color = self._KIND_COLORS.get(kind, "#888888")
         kind_label = self._KIND_LABELS.get(kind, kind)
         row = _ClickableFrame()
-        ring = " border: 1px solid #5a6478;" if top3 else ""
+        ring_css = " border: 1px solid #5a6478;" if ring else ""
         row.setStyleSheet(
             f"QFrame#tonightrow {{ background: {theme.C_BASE}"
-            f" border-radius: 8px;{ring} }}"
+            f" border-radius: 8px;{ring_css} }}"
             f"QFrame#tonightrow:hover {{ background: #1a1f30; }}")
         row.setObjectName("tonightrow")
         row.setCursor(Qt.PointingHandCursor)
@@ -691,20 +955,45 @@ class MainWindow(QMainWindow):
             head.addWidget(self._chip(
                 f"{ws}–{we}", theme.C_OK,
                 self.tr("Best time to observe: visible %1–%2 UTC"
-                        " (above the horizon)").replace("%1", ws)
+                        " (above the limit)").replace("%1", ws)
                 .replace("%2", we)))
+        # safe window (ADR-020): only present when a capture plan was saved
+        # for this target (via the project hub); the chip doubles as the
+        # red "does not fit" warning when it cannot be placed.
+        if t.get("safe_window"):
+            s0, s1 = t["safe_window"].split("|")
+            s0h, s1h = s0[11:16], s1[11:16]
+            bt = t.get("best_time")
+            bt_hm = bt[11:16] if bt else None
+            if bt_hm:
+                head.addWidget(self._chip(
+                    f"⊕ {s0h}–{s1h} · ≤ {bt_hm}",
+                    theme.C_GOOD,
+                    self.tr("Safe window %1–%2 UTC — the planned session "
+                            "fits, latest safe start ≤ %3")
+                    .replace("%1", s0h).replace("%2", s1h).replace("%3", bt_hm)))
+        elif t.get("duration_s") and not t.get("safe_window"):
+            # a session was planned but it could not be placed inside
+            # tonight's visible span: the one safety warning
+            mins = int(round(int(t.get("duration_s", 0)) / 60))
+            head.addWidget(self._chip(
+                f"⚠ {self.tr('does not fit')} · {mins} min",
+                theme.C_WARN,
+                self.tr("The planned {0} min session does not fit in the "
+                        "time the object is above your local limit. "
+                        "Do NOT force the instrument.").format(mins)))
         badge = self._now_badge(t)
         if badge:
             now = badge.startswith("▲")
             if now:
                 head.addWidget(self._chip(
                     self.tr("now"), theme.C_GOOD,
-                    self.tr("Above the horizon right now")))
+                    self.tr("Above the limit right now")))
             elif not head_has_window:
                 # window chip is absent, so the rise time is all we show
                 head.addWidget(self._chip(
                     badge, theme.C_OK,
-                    self.tr("Rises above the horizon at %1 UTC")
+                    self.tr("Rises above the limit at %1 UTC")
                     .replace("%1", badge[:-1])))
         info = suggest.moon_info(t, config)
         if info and info.get("warning"):
@@ -801,43 +1090,53 @@ class MainWindow(QMainWindow):
         return f"{self.tr('window')} {ws}–{we}"
 
     def _card_button(self, t):
-        # @return: full-width color-coded button — orange for Start,
-        # green for Continue
+        # @return: the smart shortcut button of the Tonight row:
+        #   "Continue" (green) when an active project already exists for
+        #     this object — it jumps straight to the project, like it did.
+        #   "Explore"  (orange) when no project exists — it opens the
+        #     Explore dialog (the single entry point of phase E); the
+        #     user then explicitly picks "Create project" from there.
+        # The row's click is always Explore, so the button is purely a
+        # shortcut to the more likely destination.
+        name = t.get("name") or t.get("id")
         existing = project.list_projects(db, "active")
-        has_proj = any(p["object_name"] == t.get("name")
+        has_proj = any(p["object_name"] == name
                        or p["object_name"] == t.get("id")
                        for p in existing)
         if has_proj:
             btn = QPushButton(f"▶ {self.tr('Continue')}")
+            btn.setToolTip(self.tr(
+                "Resume the active project for this object"))
             btn.setStyleSheet(
                 "QPushButton { background: #2a7a3a; color: #e8eaf2;"
                 " border: none; border-radius: 4px; padding: 5px;"
                 " font-weight: bold; }"
                 "QPushButton:hover { background: #3a9a4a; }")
+            btn.clicked.connect(
+                lambda _=False, t=t: self._start_or_continue(t))
         else:
-            btn = QPushButton(f"▶ {self.tr('Start')}")
+            btn = QPushButton(f"🔭 {self.tr('Explore')}")
+            btn.setToolTip(self.tr(
+                "Open the object in the Explore dialog (you can also "
+                "create a project from there)"))
             btn.setStyleSheet(
                 "QPushButton { background: #c46922; color: #e8eaf2;"
                 " border: none; border-radius: 4px; padding: 5px;"
                 " font-weight: bold; }"
                 "QPushButton:hover { background: #e47932; }")
-        btn.clicked.connect(lambda _=False, t=t: self._start_or_continue(t))
+            btn.clicked.connect(
+                lambda _=False, n=name: self._open_explore_dialog(n))
         return btn
 
     def _start_or_continue(self, t):
-        # Start a new project or jump to the existing one
-        existing = project.list_projects(db, "active")
-        match = next((p for p in existing
-                      if p["object_name"] == t.get("name")
-                      or p["object_name"] == t.get("id")), None)
-        if match:
-            self._goto_tab(1)
-            for i in range(self.projects.lst_projects.count()):
-                if self.projects.lst_projects.item(i).data(Qt.UserRole) == match["id"]:
-                    self.projects.lst_projects.setCurrentRow(i)
-                    break
-        else:
-            self._create_project(t)
+        # Start a new project or jump to the existing one (phase E: the
+        # hub's "Continue" shortcut and the Explore dialog's "Continue
+        # project" button both end up here).
+        t = t if isinstance(t, dict) else {}
+        if self._goto_active_project(t.get("name") or t.get("id"),
+                                     fallback=t):
+            return
+        self._create_project(t)
 
     def _refresh_now_badges(self):
         # Refresh the "now" badges on existing cards (timer tick)
@@ -870,9 +1169,15 @@ class MainWindow(QMainWindow):
         if key == "mag":
             return float(t["mag"]) if t.get("mag") is not None else None
         if key == "max_alt":
-            return float(t["max_alt"]) if t.get("max_alt") is not None else None
-        if key == "max_time":
-            return (t.get("max_time") or "")[11:16] or "—"
+            # the reachable altitude (horizon-clipped) when computed, else
+            # the raw astronomical peak for kinds without local context
+            v = t.get("safe_max_alt", t.get("max_alt"))
+            return float(v) if v is not None else None
+        if key == "best_time":
+            # recommended (horizon-safe) time first; the raw peak is only a
+            # fallback for kinds that carry no recommendation
+            val = t.get("best_time") or t.get("max_time") or ""
+            return val[11:16] or "—"
         if key == "nf":
             nf = str(t.get("nf_priority") or "")
             if not nf:
@@ -924,27 +1229,29 @@ class MainWindow(QMainWindow):
             return "✔" if db.is_observed(t["id"]) else ""
         return "—"
 
-    def _fill_table(self):
+    def _fill_table(self, want=None):
         # The full list as themed rows (UX v3 phase C): same data as before,
         # but the row is the unit — kind-tinted, the top 3 wear a stronger
         # tint (a quiet podium, like the wide rows above), hover and
         # selection come from the global theme (ADR-026). Double-click a row
-        # to start / continue its project.
-        kind_filter = self.tonight.cmb_filter.currentIndex()
-        kinds = [None, "neo", "sn", "comet", "pccp", "transit", "alert"]
-        want = kinds[kind_filter] if kind_filter < len(kinds) else None
+        # to start / continue its project. WORKFLOWS 7quater: the kind comes
+        # from the header combo (want=None -> every enabled kind).
+        if want is None:
+            want = self.tonight.cmb_filter.currentData()
         cols = TABLE_COLS.get(want, TABLE_COLS_DEFAULT)
         show_obs = self.tonight.chk_show_observed.isChecked()
         tbl = self.tonight.tbl_targets
         score_idx = next((i for i, (_h, k) in enumerate(cols) if k == "score"),
-                         1)
+                          1)
         tbl.setSortingEnabled(False)
         tbl.setRowCount(0)
         tbl.setColumnCount(len(cols))
         tbl.setHorizontalHeaderLabels([self.tr(h) for h, _k in cols])
-        kept = [x for x in self._tonight_all
-                if (not want or x[0]["kind"] == want)
-                and (show_obs or not db.is_observed(x[0]["id"]))]
+        # start from the whitelist-aware visible set (the grid uses the very
+        # same helper, so both views always agree on what "All" means), then
+        # apply the observed-only switch
+        kept = [x for x in self._visible_targets(want)
+                if show_obs or not db.is_observed(x[0]["id"])]
         # best first (score desc, name asc) so the podium tints land on the
         # top 3 of what is actually shown
         kept.sort(key=lambda x: (-x[1], x[0]["name"]))
@@ -985,7 +1292,14 @@ class MainWindow(QMainWindow):
                 "▾ " + self.tr("Show all targets (%1)").replace(
                     "%1", str(len(self._tonight_all))))
 
-    def _table_start_project(self, row, _col):
+    def _table_open_explore(self, row, _col):
+        # Phase E (single entry point): a double click on any column of
+        # the full list opens the Explore dialog for that target — the
+        # same target that the row's click opens, and the same destination
+        # the "Explore" shortcut of the card uses. The project is still
+        # created from the Explore dialog's own "Create project" button,
+        # so the gesture is consistent across both views (the full list
+        # is no longer a silent project creator).
         tbl = self.tonight.tbl_targets
         for col in range(tbl.columnCount()):
             item = tbl.item(row, col)
@@ -993,7 +1307,7 @@ class MainWindow(QMainWindow):
                 continue
             t = item.data(Qt.UserRole)
             if t:
-                self._start_or_continue(t)
+                self._open_explore_dialog(t.get("name") or t.get("id"))
                 return
 
     # ---------------- Projects (ADR-019 v3.1) ----------------
@@ -1206,6 +1520,31 @@ class MainWindow(QMainWindow):
                 db, self._current_project["id"], "plan",
                 {"n_frames": spn.value(), "exp_s": spn_exp.value(),
                  "filter": cmb_f.currentText()})
+            # (re)compute the safe window from this plan's duration and
+            # store it in the project context so the overview, narrative
+            # and sky chart all agree (ADR-020).
+            p = self._current_project
+            ctx = p.get("context") or {}
+            ra = ctx.get("ra_deg")
+            dec = ctx.get("dec_deg")
+            if ra is not None and dec is not None:
+                from ..core import exposure as _exp
+                dur = _exp.session_duration_s(
+                    spn.value(), spn_exp.value(),
+                    float(config.get("overhead_s", 15.0)))
+                from ..core import planner as _planner
+                sw = _planner.safe_window_for(ra, dec, config, dur)
+                ctx.update(sw)
+                project.update_context(db, p["id"],
+                                      {k: v for k, v in sw.items()
+                                       if v is not None})
+                # refresh the overview panel: the capture chips and the
+                # sky chart now carry the safe window
+                panel = self._get_proj_panel()
+                if panel._e is not None:
+                    panel._ctx = ctx
+                    panel._render_capture(panel._e)
+                    panel._render_charts(panel._e)
             self.statusBar().showMessage(self.tr("Plan saved"), 5000)
 
     def _build_capture_tab(self, p, kind, ctx):
@@ -1566,20 +1905,26 @@ class MainWindow(QMainWindow):
         self.on_refresh_projects()
 
     def _create_project(self, target):
+        # @args: target - a planner target dict (must carry name/id and kind)
+        # @return: the created project dict (with "id"), or None if the kind
+        #          is not a valid project kind or the name is missing; the
+        #          Explore dialog uses this to decide whether to close
         kind = target.get("kind")
         name = target.get("name") or target.get("id")
         if kind not in project.VALID_KINDS or not name:
             self.statusBar().showMessage(
                 self.tr("Cannot create a project for this target"), 6000)
-            return
+            return None
         ctx = {k: target.get(k) for k in
-               ("id", "name", "kind", "mag", "ra_deg", "dec_deg",
-                "max_alt", "max_time", "window_start", "window_end",
-                "hours_up", "sn_type", "host", "disc_date",
-                "rate_arcsec_min", "nobs", "moid", "h",
-                "nf_score", "nf_priority", "neocp", "pccp_score",
-                "perihelion_date", "transit", "approach")
-               if target.get(k) is not None}
+                ("id", "name", "kind", "mag", "ra_deg", "dec_deg",
+                 "max_alt", "safe_max_alt", "max_time", "window_start",
+                 "window_end", "safe_window", "best_time",
+                 "latest_safe_start", "hours_up", "sn_type", "host",
+                 "disc_date",
+                 "rate_arcsec_min", "nobs", "moid", "h",
+                 "nf_score", "nf_priority", "neocp", "pccp_score",
+                 "perihelion_date", "transit", "approach")
+                if target.get(k) is not None}
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
@@ -1590,6 +1935,35 @@ class MainWindow(QMainWindow):
                     break
             self.statusBar().showMessage(
                 self.tr("Project created: %1").replace("%1", name), 8000)
+        return p
+
+    def _goto_active_project(self, name, fallback=None):
+        # Jumps to the existing active project that matches `name` (or the
+        # fallback's id if it carries one) and selects it in the hub list.
+        # Used by "Continue" of the card and by the Explore dialog's
+        # "Continue project" button (phase E).
+        # @args: name - object name to match, fallback - planner target with
+        #         a possible "id" that was recorded when the project was
+        #         created (NEOCP/PCCP names and their MPC numbers are not
+        #         equal)
+        # @return: True if an active project was found and the hub shows it
+        candidates = {name}
+        if isinstance(fallback, dict):
+            for k in ("id", "name"):
+                v = fallback.get(k)
+                if v:
+                    candidates.add(v)
+        existing = project.list_projects(db, "active")
+        match = next((p for p in existing for c in candidates
+                      if p["object_name"] == c), None)
+        if not match:
+            return False
+        self._goto_tab(1)
+        for i in range(self.projects.lst_projects.count()):
+            if self.projects.lst_projects.item(i).data(Qt.UserRole) == match["id"]:
+                self.projects.lst_projects.setCurrentRow(i)
+                break
+        return True
 
     # ---------------- Contextual dialogs (Explore / Post / Blink) --------
 
@@ -1603,9 +1977,12 @@ class MainWindow(QMainWindow):
         self._open_blink_dialog()
 
     def _open_explore_dialog(self, name):
-        # D5 (docs/WORKFLOWS.es.md): the Explore… dialog is now the shared
-        # ObjectPanel (gui/overview.py) plus its "Create post" button — the
-        # same panel the Projects hub shows, one source of truth.
+        # E (docs/WORKFLOWS.es.md §7ses, corrected 2026-09-02): the
+        # Explore… dialog is the shared ObjectPanel (gui/overview.py)
+        # with a single CTA at its bottom — "Create project" /
+        # "Continue project" depending on the injected lookup. The old
+        # "Create post" button is gone: posts are built inside the
+        # project (Publish step) or ad-hoc under Tools.
         # @args: name - object identifier to explore
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("Explore — %1").replace("%1", name))
@@ -1619,17 +1996,32 @@ class MainWindow(QMainWindow):
         layout = QVBoxLayout(dlg)
         layout.addWidget(area)
 
-        def _make_post(sig, nm, fb):
-            # one-shot slot: open the post dialog for the object on the
-            # panel and close the Explore dialog right after
-            try:
-                sig.disconnect(_make_post)
-            except (TypeError, RuntimeError):
-                pass
-            self._open_post_dialog(nm)
+        def _target(nm, fb):
+            # build the minimal target dict the project layer needs:
+            # the planner fallback (if any) plus the explored name
+            t = dict(fb or {})
+            t["name"] = nm
+            return t
+
+        def _on_create(nm, fb):
+            # the CTA said "create a fresh project on this object". `fb`
+            # is the planner target (Tonight) or None for an ad-hoc
+            # Tools-menu name. PySide6 passes only the declared args.
+            self._create_project(_target(nm, fb))
             dlg.accept()
 
-        panel.post_requested.connect(_make_post)
+        def _on_continue(nm, fb):
+            # the CTA said "resume the active project". When nothing
+            # matches the ad-hoc name (Tools menu), create it — same
+            # intent as the card's green "Continue" button.
+            fb = fb if isinstance(fb, dict) else None
+            name_or_id = nm or (fb.get("id") if fb else None)
+            if not self._goto_active_project(name_or_id, fb):
+                self._create_project(_target(nm, fb))
+            dlg.accept()
+
+        panel.project_create.connect(_on_create)
+        panel.project_continue.connect(_on_continue)
         dlg.exec()
 
     def _explore_panel(self, name):
@@ -1637,11 +2029,29 @@ class MainWindow(QMainWindow):
         # loading `name` on it (the window keeps the worker, per D4's rule).
         # @args: name - object identifier
         # @return: the ready-to-show ObjectPanel (already loading `name`)
-        panel = ObjectPanel(loader=self._explore_loader,
-                            chart_dir=str(paths.data_dir() / "posts"),
-                            for_post=True, parent=self)
         fallback = next((t for t, _s, _p, _ph in self._tonight_all
                          if t["id"] == name or t["name"] == name), None)
+        def _active_for(nm):
+            # phase E — the panel asks us for the active-project lookup.
+            # We try the name it gives us, plus the fallback's id/name,
+            # because NEOCP/PCCP keep their MPC number as `id` and a
+            # different string as `name` (and the project we created
+            # stored one of them).
+            candidates = {nm} if nm else set()
+            if isinstance(fallback, dict):
+                for k in ("id", "name"):
+                    v = fallback.get(k)
+                    if v:
+                        candidates.add(v)
+            if not candidates:
+                return None
+            return next((p for p in project.list_projects(db, "active")
+                         if p["object_name"] in candidates), None)
+        panel = ObjectPanel(loader=self._explore_loader,
+                            chart_dir=str(paths.data_dir() / "posts"),
+                            for_post=True,
+                            project_lookup=_active_for,
+                            parent=self)
         panel.explore(name, fallback_target=fallback)
         return panel
 
@@ -1651,12 +2061,6 @@ class MainWindow(QMainWindow):
         worker = ExploreWorker(config, name, fallback_target=fallback_target)
         self._keep(worker)
         return worker
-
-    def _explore_post(self, name):
-        # The Explore dialog's "Create post": open the post dialog for the
-        # explored object (same flow as the hub's paso 5 button).
-        # @args: name - object identifier
-        self._open_post_dialog(name)
 
     def _render_object_charts(self, e, prefix, outdir=None):
         # Renders every chart the enriched object supports into the posts

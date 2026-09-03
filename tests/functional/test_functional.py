@@ -19,6 +19,8 @@ import pytest
 
 pytestmark = pytest.mark.network
 
+import tempfile
+
 from pathlib import Path
 
 from nightscribe.config import config
@@ -148,6 +150,104 @@ def test_enrich_transient():
     e = enrich.enrich("SN2023ixf", site=MPC)
     assert e and e["type"] == "transient"
     assert e["data"].get("dist_mly")
+
+
+def test_enrich_transient_fallback_rochester(monkeypatch):
+    # ADR-027 with real data: take a live Rochester SN, degrade SIMBAD, and
+    # verify the planner context still gives host/type/mag/coords + a real
+    # hook (not the generic follow-up).
+    from nightscribe.core import narrative
+    from nightscribe.core.sources import rochester
+    # ADR-027 with real data: a live Rochester SN with a known host, degrade
+    # SIMBAD, and verify the planner context still gives a real hook (naming
+    # the host) and the sky chart from the planner coordinates. The exact
+    # route (full-name transient vs short-name unconfirmed) is what the unit
+    # tests pin down offline; here we only need a hosted SN.
+    s = next((r for r in rochester.latest_sne(19.0)
+              if r.get("host")
+              and r["host"].lower() not in ("none", "unk", "")), None)
+    if not s:
+        pytest.skip("no hosted SN on Rochester right now")
+    import datetime
+    from nightscribe.core import coords as _coords
+    ra = _coords.ra_hms_to_deg(s["ra"])
+    dec = _coords.dec_dms_to_deg(s["dec"])
+    date_ok = False
+    try:
+        d = datetime.datetime.strptime(s["date"].split(".")[0], "%Y/%m/%d")
+        if (datetime.datetime.now() - d).days <= 90:
+            date_ok = True
+    except ValueError:
+        pass
+    if not date_ok:
+        pytest.skip(f"{s['name']} is too old for the night list")
+    monkeypatch.setattr(simbad, "query_id", lambda *a, **k: None)
+    monkeypatch.setattr(simbad, "query_around_galaxy", lambda *a, **k: None)
+    target = {
+        "id": s["name"], "kind": "sn", "name": s["name"],
+        "mag": s["mag"], "ra_deg": ra, "dec_deg": dec,
+        "sn_type": s.get("type"), "host": s["host"], "disc_date": s["date"],
+    }
+    e = enrich.enrich(s["name"], site=MPC, fallback_target=target)
+    assert e and e["type"] in ("transient", "sn"), \
+        f"unexpected type {e['type']!r}"
+    data = e["data"]
+    # verify the host made it into the data dict or unconfirmed sub-dict
+    host = (data.get("host") or {}).get("name") or \
+           (data.get("unconfirmed") or {}).get("host")
+    assert host == s["host"], f"host lost in data: {host!r}"
+    hook = narrative.hook(e)
+    assert s["host"] in hook["es"] or s["host"] in hook["en"], \
+        f"hook must name the host galaxy: {hook}"
+    # the sky chart renders from the planner coordinates (no SIMBAD needed)
+    import matplotlib
+    matplotlib.use("Agg")
+    p = post.build_charts(
+        e, Path(tempfile.mkdtemp(prefix="ns_sn_fallback_")), "fallback",
+        fmt="panel", cfg=config)
+    assert "sky" in p, f"sky chart expected from planner coords: {list(p)}"
+
+
+def test_enrich_comet_fallback_cobs(monkeypatch):
+    # ADR-027 with real data: a live COBS comet whose name SBDB does not
+    # resolve degrades to the unconfirmed-comet path with a real hook and
+    # perihelion bullets instead of a generic follow-up.
+    from nightscribe.core import narrative
+    from nightscribe.core.sources import cobs
+    c = cobs.active_comets(18.0)[0]
+    monkeypatch.setattr(sbdb, "get", lambda *a, **k: None)
+    monkeypatch.setattr(neofixer, "orbit", lambda *a, **k: None)
+    try:
+        import datetime
+        from nightscribe.core import coords
+        rows = horizons.ephemeris(c["mpc_name"] or c["name"], center=MPC)
+        ra = coords.ra_hms_to_deg(rows[0]["ra"])
+        dec = coords.dec_dms_to_deg(rows[0]["dec"])
+        delta = rows[0]["delta"]
+    except Exception:
+        pytest.skip(f"no Horizons rows for {c['name']} tonight")
+    target = {
+        "id": c["name"], "kind": "comet", "name": c["fullname"] or c["name"],
+        "mag": c["mag"], "ra_deg": ra, "dec_deg": dec,
+        "perihelion_date": c.get("perihelion_date"), "delta_au": delta,
+    }
+    name = target["name"]
+    kind = enrich.detect_type(name)
+    assert kind == "small_body", f"{name} must parse as a small body"
+    e = enrich.enrich(name, site=MPC, fallback_target=target)
+    assert e and e.get("data")
+    assert e["data"].get("unconfirmed"), \
+        f"must take the unconfirmed path: {e['data'].keys()}"
+    hook = narrative.hook(e)
+    assert target["name"] in hook["es"] or target["name"] in hook["en"], \
+        f"hook must name the comet: {hook}"
+    bullets = narrative.fact_bullets(e)
+    if c.get("perihelion_date"):
+        assert any((c["perihelion_date"] in b["es"]) or
+                   (c["perihelion_date"] in b["en"]) for b in bullets)
+    else:
+        assert any("candidato" in b["es"].lower() or "candidate" in b["en"].lower()
+                   for b in bullets)
 
 
 def test_solar_now():
@@ -335,6 +435,159 @@ def test_post_charts_attached_to_project(tmp_db):
     w.close()
 
 
+def _fake_worker_factory(e):
+    # Stand-in for ExploreWorker: start() lands the payload at once
+    # so the CTA reaches the "ready" state without any network round-trip.
+    # @args: e  -- the enriched payload dict to deliver
+    # @return:  a callable(name, fallback_target) that yields a fake worker
+    class _Signal:
+        def __init__(self):
+            self._c = []
+        def connect(self, cb):
+            self._c.append(cb)
+        def disconnect(self, cb=None):
+            if cb is None:
+                self._c = []
+            elif cb in self._c:
+                self._c.remove(cb)
+        def deliver(self, payload):
+            for cb in list(self._c):
+                cb(payload)
+
+    class _Worker:
+        def __init__(self):
+            self.finished = _Signal()
+        def start(self):
+            self.finished.deliver(e)
+
+    def _loader(name, fallback_target=None):
+        return _Worker()
+
+    return _loader
+
+
+def test_explore_dialog_cta_create_project(tmp_db):
+    # Regression (2026-09-02): clicking the Explore dialog's CTA used to
+    # raise "TypeError: _on_create() missing 1 required positional
+    # argument: 'fb'" because the glue signature was (sig, nm, fb) but
+    # PySide6 delivers only the two args declared on the signal.
+    # This drives the real MainWindow._open_explore_dialog end-to-end:
+    # fake loader drops a PCCP payload instantly, the CTA in "create"
+    # face fires, and a project must land in the tmp db.
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QDialog
+    app = QApplication.instance() or QApplication([])
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import MainWindow
+    from nightscribe.gui.overview import ObjectPanel
+
+    NAME = "PDC9999"
+    e = {"name": NAME, "type": "pccp",
+         "data": {"unconfirmed": {"id": NAME, "name": NAME, "kind": "pccp",
+                                  "nf_score": 8.0, "nf_priority": "A",
+                                  "nobs": 6, "arc_days": 3, "moid": 0.05,
+                                  "pccp_score": 75.0, "mag": 19.8}}}
+    fallback = {"id": NAME, "kind": "pccp", "name": NAME, "packed": NAME,
+                "ra_deg": 120.0, "dec_deg": 10.0}
+
+    w = MainWindow()
+    w._tonight_all = [(fallback, 90, 0.5, 0)]
+    orig_db    = mw.db
+    orig_loader = w._explore_loader
+    mw.db        = tmp_db
+    w._explore_loader = _fake_worker_factory(e)
+
+    clicked = []
+
+    class _DialogStub(QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+        def exec(self):
+            panel = self.findChild(ObjectPanel)
+            assert panel is not None, "dialog must contain an ObjectPanel"
+            assert not panel.btn_project.isHidden(), \
+                "CTA must be visible once the object has loaded"
+            panel.btn_project.clicked.emit()
+            clicked.append(panel._action)
+            return QDialog.Accepted
+
+    orig_cls = mw.QDialog
+    mw.QDialog = _DialogStub
+    try:
+        w._open_explore_dialog(NAME)
+        assert clicked == ["create"], \
+            f"CTA must fire in 'create' face -- got {clicked}"
+        rows = project.list_projects(tmp_db, "active")
+        assert rows and rows[0]["object_name"] == NAME, \
+            f"CTA-click must persist a new active project -- got {rows}"
+    finally:
+        mw.QDialog          = orig_cls
+        w._explore_loader   = orig_loader
+        mw.db              = orig_db
+        w.close()
+
+
+def test_explore_dialog_cta_continue_project(tmp_db):
+    # The other half of the same regression: with an active project
+    # already on file for the object, the CTA must show the "continue"
+    # face and emit project_continue(name, fallback) -- two args.
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QDialog
+    app = QApplication.instance() or QApplication([])
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import MainWindow
+    from nightscribe.gui.overview import ObjectPanel
+
+    NAME = "2099 XX"
+    e = {"name": NAME, "type": "neo",
+         "data": {"unconfirmed": {"id": NAME, "name": NAME, "kind": "neo",
+                                  "nf_score": 8.0, "nf_priority": "A",
+                                  "nobs": 6, "arc_days": 3, "moid": 0.05,
+                                  "mag": 19.8}}}
+    fallback = {"id": NAME, "kind": "neo", "name": NAME, "packed": NAME}
+
+    w = MainWindow()
+    w._tonight_all = [(fallback, 90, 0.5, 0)]
+    orig_db = mw.db
+    orig_loader = w._explore_loader
+    mw.db = tmp_db
+    w._explore_loader = _fake_worker_factory(e)
+
+    project.create(tmp_db, "neo", NAME, {"id": NAME, "kind": "neo"})
+    before = len(project.list_projects(tmp_db, "active"))
+    clicked = []
+
+    class _DialogStub(QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+        def exec(self):
+            panel = self.findChild(ObjectPanel)
+            assert panel is not None
+            assert panel._action == "continue", \
+                f"CTA must be in 'continue' face -- got {panel._action}"
+            panel.btn_project.clicked.emit()
+            clicked.append(panel._action)
+            return QDialog.Accepted
+
+    orig_cls = mw.QDialog
+    mw.QDialog = _DialogStub
+    try:
+        w._open_explore_dialog(NAME)
+        assert clicked == ["continue"]
+        after = len(project.list_projects(tmp_db, "active"))
+        assert before == after, \
+            f"continue must not create a second project (before={before}, after={after})"
+    finally:
+        mw.QDialog          = orig_cls
+        w._explore_loader   = orig_loader
+        mw.db              = orig_db
+        w.close()
+
+
 def test_explore_dialog_unconfirmed_neo():
     # Unconfirmed NEO (no SBDB entry): the orbit tab must show an
     # informative message and the sky tab must render from the
@@ -472,7 +725,6 @@ def test_blink_real_mirrored_frame():
     from nightscribe.viz import blink_view
     import matplotlib
     matplotlib.use("Agg")
-    from pathlib import Path
     fixture = Path(__file__).parents[1] / "fixtures" / "sn2026zji_new_image.fits"
     pair = blink.prepare_pair(fixture, sn_name="2026zji")
     assert pair["flipped"] is True            # mirrored solve was corrected

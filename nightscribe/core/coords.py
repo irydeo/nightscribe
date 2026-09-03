@@ -215,7 +215,9 @@ def hours_above(ra_deg, dec_deg, lat_deg, lon_deg, min_alt, date=None):
     return n / 6.0
 
 
-def _tonight_samples(ra_deg, dec_deg, lat_deg, lon_deg, date, step_min=10):
+def samples_tonight(ra_deg, dec_deg, lat_deg, lon_deg, date, step_min=10):
+    # Altitude/azimuth samples of an object across tonight's darkness.
+    # Single source of samples shared by window/hours/safe-span helpers.
     # @return: list of (datetime, alt, az) sampled across tonight's darkness
     window = tonight_window(lat_deg, lon_deg, date)
     if not window:
@@ -237,9 +239,9 @@ def window_above(ra_deg, dec_deg, lat_deg, lon_deg, threshold_fn,
     # tonight's darkness. threshold_fn(az)->alt is a Horizon/FlatHorizon
     # alt_at callable (ADR-020); margin is the safety margin in degrees.
     # @return: (start_utc, end_utc) or None when it never clears the horizon
-    samples = _tonight_samples(ra_deg, dec_deg, lat_deg, lon_deg, date)
+    samples = samples_tonight(ra_deg, dec_deg, lat_deg, lon_deg, date)
     above = [t for (t, alt, az) in samples
-             if alt >= threshold_fn(az) + margin]
+              if alt >= threshold_fn(az) + margin]
     if not above:
         return None
     return above[0], above[-1]
@@ -249,7 +251,7 @@ def hours_above_h(ra_deg, dec_deg, lat_deg, lon_deg, threshold_fn,
                   date=None, margin=0.0):
     # Hours above the local horizon (threshold_fn + margin) during tonight.
     # @return: hours as float (0 if none)
-    samples = _tonight_samples(ra_deg, dec_deg, lat_deg, lon_deg, date)
+    samples = samples_tonight(ra_deg, dec_deg, lat_deg, lon_deg, date)
     n = sum(1 for (_t, alt, az) in samples
             if alt >= threshold_fn(az) + margin)
     return n / 6.0

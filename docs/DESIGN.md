@@ -33,17 +33,26 @@ project, with ad-hoc access under Tools. Guided per-kind flows in WORKFLOWS.md.)
 
 Not a table: a **recommendation** (see ADR-017 for the v2 redesign, ADR-019 for v3).
 
-- **"Right now" band**: targets currently above the horizon, with live altitude
-  and azimuth, ordered by score.
+ - **"Right now" band**: targets currently above the horizon, with live altitude
+   and azimuth, ordered by score. Beyond the window, each card also shows the **safe
+   observing range** (ADR-020): a green «⊕ HH:MM–HH:MM · ≤ HH:MM» chip (the planned
+   window + the latest safe start) or a **red «⚠ does not fit» chip** when the
+   planned session cannot finish before the object drops below the horizon — the
+   instrument is never forced.
 - **Top 3 unified ranking** (NEOs, supernovae, comets, PCCP candidates and
   exoplanet transits compete on one 0–100 score) with medals and a generated
   one-liner: *"why tonight"* (in the UI language).
-- Full target list below: **sortable by clicking any column header**, with
-  **dynamic columns per type filter** (NEOs show NObs/MOID/NEOfixer priority;
-  supernovae show type/host/discovery date...) plus a detail panel with
-  per-target actions (Explore / Post / Observed).
-- Buttons per target: *Mark observed* (optionally reports to NEOfixer), *Post* and
-  **Create project** (UX v3).
+ - Full target list below: **sortable by clicking any column header**, with
+   **dynamic columns per type filter** (NEOs show NObs/MOID/NEOfixer priority;
+   supernovae show type/host/discovery date...) plus a detail panel with
+   per-target actions (Explore / Post / Observed).
+  - Entry point to **Explore** (UX v3, phase E): the row, the double-click on the
+    table and the card button (🔭 Explore / ▶ Continue, depending on whether an
+    `active` project exists) all open the pre-filled *Explore* dialog. Inside, the
+    *Details* tab offers a **single full-width CTA**: "Continue project" (green) if
+    one is active for the object, "Create project" (orange) if not; the earlier
+    pair of buttons and the old "Create post" button are removed. The project is no
+    longer created from the card, but from the dialog.
 
 ### Interface shell
 

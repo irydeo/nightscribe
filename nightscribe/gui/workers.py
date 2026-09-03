@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class TonightWorker(QThread):
     # Builds tonight's target list and scores it in the background.
     finished = Signal(list, list, str)  # top, all_scored, error message
+    progress = Signal(dict)             # phase message {key, label, index, total}
 
     def __init__(self, cfg, db, date=None, top=3):
         super().__init__()
@@ -32,14 +33,26 @@ class TonightWorker(QThread):
         self._date = date
         self._top = top
 
+    def _phase(self, key):
+        # @args: key - one of core/PLANNER.PHASES (see planner.PHASES)
+        # Emits a phase index/total pair. The human label is chosen by the
+        # GUI from a literal self.tr() table (so lupdate picks it up, the way
+        # CONTRIBUTING rule 5 demands).
+        from ..core import planner
+        total = len(planner.PHASES)
+        index = planner.PHASES.index(key) + 1
+        self.progress.emit({"key": key, "index": index, "total": total})
+
     def run(self):
         # Does the heavy work off the GUI thread.
         from ..core import planner, suggest
         try:
-            targets = planner.build_tonight(self._cfg, self._date)
+            targets = planner.build_tonight(self._cfg, self._date,
+                                            on_phase=lambda i, k: self._phase(k))
             if not targets:
                 self.finished.emit([], [], "no sources answered")
                 return
+            self._phase("scoring")
             top, all_scored = suggest.top_n(targets, self._cfg, self._db,
                                             self._top)
             self.finished.emit(top, all_scored, "")

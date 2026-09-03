@@ -165,6 +165,24 @@ def test_soft_penalty_lowers_score():
     assert within - beyond >= 1.5
 
 
+def test_observability_prefers_reachable_altitude():
+    # The score's observability must use the horizon-clipped altitude
+    # (safe_max_alt) when the planner provides it; otherwise a high raw
+    # peak hiding behind a local obstacle would outrank a freely-visible
+    # object with the same raw peak but a lower reachable one.
+    blocked = {"kind": "neo", "mag": 18, "hours_up": 4,
+               "max_alt": 70, "safe_max_alt": 46}
+    free = {"kind": "neo", "mag": 18, "hours_up": 4,
+            "max_alt": 70, "safe_max_alt": 70}
+    # raw max_alt alone would give both the same score -> no ranking
+    a = suggest._observability(blocked, None)
+    b = suggest._observability(free, None)
+    assert b > a  # the free one scores higher
+    # and a target with no safe_max_alt (transits/alerts) falls back
+    only_raw = {"kind": "neo", "mag": 18, "hours_up": 4, "max_alt": 70}
+    assert suggest._observability(only_raw, None) == b
+
+
 def test_soft_limit_does_not_drop_neo_beyond_limit():
     # ADR-025: beyond-limit NEOs/PCCPs are warned, never cut out of Top N
     a = _neo(mag=21.0)

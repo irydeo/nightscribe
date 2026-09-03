@@ -50,6 +50,138 @@ def test_transit_window_tonight(exoclock_sample):
         assert t["egress"] > t["ingress"]
 
 
+def test_transits_threshold_fn_rejects_and_accepts(exoclock_sample):
+    # A 90-degree horizon rejects everything; a 0-degree horizon accepts
+    # what the flat min_alt check would too (threshold_fn replaces it).
+    from nightscribe.core import horizon
+    planets = []
+    for key, p in exoclock_sample.items():
+        planets.append({
+            "name": p["name"], "ra": coords.ra_hms_to_deg(p["ra_j2000"]),
+            "dec": coords.dec_dms_to_deg(p["dec_j2000"]),
+            "t0": float(p["ephem_mid_time"]),
+            "period": float(p["ephem_period"]),
+            "duration_h": p.get("duration_hours"),
+            "v_mag": p.get("v_mag"),
+        })
+    date = datetime.date(2026, 8, 21)
+    out = transits.transits_tonight(planets, 40.55, -3.37, date,
+                                    threshold_fn=horizon.FlatHorizon(90).alt_at)
+    assert out == []
+    out = transits.transits_tonight(planets, 40.55, -3.37, date,
+                                    threshold_fn=horizon.FlatHorizon(0).alt_at)
+    for t in out:
+        assert t["max_alt"] >= 0.0
+
+
+def _synth_transit_planet(dec_deg):
+    # A synthetic planet whose star transits at midnight (RA == LST), so
+    # the star is on the meridian at mid-transit — alt = 90 - |lat - dec|,
+    # the exact max. @return: (planets, lat, lon, date)
+    lat, lon = 40.55, -3.37
+    midnight = datetime.datetime(2026, 8, 22, 0, 0,
+                                 tzinfo=datetime.timezone.utc)
+    lst = coords.lst_degrees(coords.jd_from_datetime(midnight), lon)
+    planets = [{
+        "name": "SYN b", "star": "SYN",
+        "ra": lst, "dec": dec_deg,
+        "t0": coords.jd_from_datetime(midnight),
+        "period": 1.0,
+        "duration_h": 2.0,
+        "v_mag": 8.0,
+    }]
+    return planets, lat, lon, datetime.date(2026, 8, 21)
+
+
+def test_transit_rejected_when_star_never_rises():
+    # dec -80 from lat +40.55 peaks 39 degrees BELOW the horizon: the
+    # mid-transit gate must drop this transit no matter the fallback
+    # (the old "one of three samples above" gate admitted it).
+    from nightscribe.core import horizon
+    planets, lat, lon, date = _synth_transit_planet(-80.0)
+    out = transits.transits_tonight(planets, lat, lon, date,
+                                    threshold_fn=horizon.FlatHorizon(30.0).alt_at)
+    assert out == []
+
+
+def test_transit_mid_gate_applies_margin():
+    # Meridian altitude exactly 31.0 degrees: kept against a 30-degree
+    # floor, rejected when the margin pushes the requirement to 32.
+    from nightscribe.core import horizon
+    planets, lat, lon, date = _synth_transit_planet(-18.45)
+    out = transits.transits_tonight(planets, lat, lon, date,
+                                    threshold_fn=horizon.FlatHorizon(30.0).alt_at)
+    assert out
+    assert all(t["max_alt"] >= 30.5 for t in out)
+    out = transits.transits_tonight(planets, lat, lon, date,
+                                    threshold_fn=horizon.FlatHorizon(30.0).alt_at,
+                                    margin=2.0)
+    assert out == []
+
+
+def test_transit_targets_forwards_margin(monkeypatch):
+    # The planner must pass the horizon margin into the gate, so an
+    # invisible star never leaks into the night list (end-to-end wiring).
+    from nightscribe.core import horizon, planner
+    from nightscribe.core.sources import exoclock
+    planets, lat, lon, date = _synth_transit_planet(-80.0)
+    monkeypatch.setattr(exoclock, "planets", lambda: planets)
+    hor = horizon.FlatHorizon(30.0)
+    assert planner._transit_targets(lat, lon, date, hor, 20.0,
+                                    margin=2.0) == []
+
+
+def test_visibility_safe_span(fake_cfg):
+    # A star transiting at midnight (RA == LST at midnight) from the
+    # north at dec +30, against a flat 30-degree horizon, with a planned
+    # 2 h session: safe window + best time + consistent latest start.
+    from nightscribe.core import horizon, planner
+    lat, lon = 40.55, -3.37
+    date = datetime.date(2026, 8, 21)
+    midnight = datetime.datetime(2026, 8, 22, 0, 0,
+                                 tzinfo=datetime.timezone.utc)
+    lst = coords.lst_degrees(coords.jd_from_datetime(midnight), lon)
+    hor = horizon.FlatHorizon(30.0)
+    v = planner._visibility(lst, 30.0, lat, lon, date, hor, 0.0,
+                            duration_s=7200)
+    assert v["safe_window"] is not None
+    s_start, s_end = (datetime.datetime.fromisoformat(x)
+                      for x in v["safe_window"].split("|"))
+    best = datetime.datetime.fromisoformat(v["best_time"])
+    latest = datetime.datetime.fromisoformat(v["latest_safe_start"])
+    assert s_start <= best <= latest <= s_end
+    assert (s_end - s_start) >= datetime.timedelta(seconds=7200)
+
+
+def test_visibility_no_session_gives_meridian(fake_cfg):
+    # Without a planned session, best_time is the meridian crossing.
+    from nightscribe.core import horizon, planner
+    lat, lon = 40.55, -3.37
+    date = datetime.date(2026, 8, 21)
+    midnight = datetime.datetime(2026, 8, 22, 0, 0,
+                                 tzinfo=datetime.timezone.utc)
+    lst = coords.lst_degrees(coords.jd_from_datetime(midnight), lon)
+    hor = horizon.FlatHorizon(30.0)
+    v = planner._visibility(lst, 30.0, lat, lon, date, hor, 0.0)
+    assert v["safe_window"] is None
+    # meridian crossing = peak altitude = max_time
+    assert v["best_time"] == v["max_time"]
+    assert v["window_start"] is not None and v["window_end"] is not None
+
+
+def test_visibility_never_rises(fake_cfg):
+    # A far-southern target (dec -80 from the north) never clears the
+    # 30-degree floor → no window, no best time, zero hours up.
+    from nightscribe.core import horizon, planner
+    lat, lon = 40.55, -3.37
+    date = datetime.date(2026, 8, 21)
+    hor = horizon.FlatHorizon(30.0)
+    v = planner._visibility(100.0, -80.0, lat, lon, date, hor, 0.0)
+    assert v["window_start"] is None
+    assert v["best_time"] is None
+    assert v["hours_up"] == 0.0
+
+
 def _fake_enriched():
     return {
         "type": "small_body", "name": "TEST1",

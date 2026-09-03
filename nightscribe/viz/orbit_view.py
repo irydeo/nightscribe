@@ -79,13 +79,14 @@ def _orbit_xy(elements, n=360):
 
 
 def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
-                fmt="instagram", watermark="NightScribe", size=None):
+                fmt="instagram", watermark="NightScribe", size=None, lang="es"):
     # Renders the object's orbit among the inner planets.
     # @args: elements - SBDB elements dict, jd - Julian date (today),
     #        obj_name - label, approach - dict from cad.next_approach,
     #        out - output PNG path (returns figure if None),
     #        fmt - size preset, watermark - footer text,
-    #        size - (w, h) px override (panel re-render mode)
+    #        size - (w, h) px override (panel re-render mode),
+    #        lang - string language ("es"|"en"); charts follow the UI language
     # @return: matplotlib figure (and writes PNG if out is given)
     import matplotlib.pyplot as plt
 
@@ -103,21 +104,26 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
             a = q / (1.0 - e)
             elements = dict(elements, a=a)
 
-    # span: for open orbits use q; for bound orbits use aphelion distance
-    if e >= 1.0:
-        q = elements.get("q", 1.0)
-        span = max(2.0, min(q * 6, 15))
-    else:
-        span = 2.0
-        Q = elements.get("Q") or elements.get("ad") \
-            or elements.get("a", 1.0) * (1 + elements.get("e", 0))
-        if Q and Q > 6:
-            span = min(Q * 1.15, 32)
-        else:
-            span = max(2.0, Q * 1.25)
-    planets = ["mercury", "venus", "earth", "mars"]
-    if span > 6:
-        planets.append("jupiter")
+    # frame: the smallest square that contains the object's orbit AND the Sun,
+    # centred on that union (not the orbit alone — the Sun sits at a focus, so
+    # an eccentric orbit's centre is offset and framing it alone left a big
+    # empty side). The 1 AU ring is the chart's ruler ("1 AU = Earth–Sun") and
+    # always stays in frame; the larger Mars/Jupiter references are drawn only
+    # when they already fit inside that square, so small/inner targets keep a
+    # tight crop instead of being padded out to Mars (ADR-010, 2026-09-02).
+    xs0, ys0 = _orbit_xy(elements)
+    ox = list(xs0) + [0.0]
+    oy = list(ys0) + [0.0]
+    cx = (min(ox) + max(ox)) / 2.0
+    cy = (min(oy) + max(oy)) / 2.0
+    span = max((max(ox) - min(ox)) / 2.0,
+               (max(oy) - min(oy)) / 2.0,
+               1.0 + abs(cx), 1.0 + abs(cy)) * 1.06
+    planets = ["mercury", "venus", "earth"]
+    for r, pname in ((_ORBIT_SPAN["mars"], "mars"),
+                     (_ORBIT_SPAN["jupiter"], "jupiter")):
+        if span >= r + max(abs(cx), abs(cy)):
+            planets.append(pname)
     for pname in planets:
         pos = ephem_minor.planet(pname, jd) if pname != "earth" else None
         r = _ORBIT_SPAN[pname]
@@ -145,7 +151,8 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
 
     # the Sun at the origin
     ax.plot(0, 0, "o", color=style.SUN, ms=12, zorder=6)
-    ax.annotate("Sol / Sun", (0, 0), textcoords="offset points",
+    ax.annotate(style.pick(lang, "Sol", "Sun"), (0, 0),
+                textcoords="offset points",
                 xytext=(8, -12), color=style.SUN, fontsize=8)
 
     # the object's orbit and current position
@@ -186,18 +193,25 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
                             xytext=(8, 8), color=style.ACCENT, fontsize=10,
                             fontweight="bold")
 
-    ax.set_xlim(-span, span)
-    ax.set_ylim(-span, span)
+    ax.set_xlim(cx - span, cx + span)
+    ax.set_ylim(cy - span, cy + span)
     ax.set_xticks([])
     ax.set_yticks([])
-    ax.set_title(f"{obj_name} — órbita / orbit" if obj_name else "Órbita / Orbit",
-                 loc="left")
-    ax.text(0.02, 0.98, f"1 AU = Tierra–Sol / Earth–Sun  ·  {span:.0f} AU vista",
+    ax.set_title(
+        style.pick(lang,
+                   f"{obj_name} — órbita" if obj_name else "Órbita",
+                   f"{obj_name} — orbit" if obj_name else "Orbit"),
+        loc="left")
+    ax.text(0.02, 0.98,
+            style.pick(
+                lang,
+                f"1 AU = Tierra–Sol  ·  vista {span * 2:.0f} AU",
+                f"1 AU = Earth–Sun  ·  {span * 2:.0f} AU across"),
             transform=ax.transAxes, va="top", color=style.MUTED, fontsize=8)
 
     # close-approach inset: Earth-Moon system
     if approach and approach.get("dist_ld"):
-        _draw_approach_inset(fig, ax, approach)
+        _draw_approach_inset(fig, ax, approach, lang=lang)
 
     style.watermark(fig, watermark)
     if out:
@@ -206,9 +220,10 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
     return fig
 
 
-def _draw_approach_inset(fig, ax, approach):
+def _draw_approach_inset(fig, ax, approach, lang="es"):
     # Small inset showing the flyby distance against the Moon's orbit.
-    # @args: fig - figure, ax - main axes, approach - dict from cad
+    # @args: fig - figure, ax - main axes, approach - dict from cad,
+    #        lang - string language ("es"|"en")
     import matplotlib.pyplot as plt
     inset = fig.add_axes([0.66, 0.63, 0.27, 0.27])
     inset.set_facecolor(style.BG)
@@ -217,10 +232,12 @@ def _draw_approach_inset(fig, ax, approach):
     moon_orbit = plt.Circle((0, 0), 1.0, fill=False, color=style.MUTED, lw=1.0)
     inset.add_patch(moon_orbit)
     inset.plot(0, 0, "o", color=style.ACCENT2, ms=8)
-    inset.annotate("Tierra/Earth", (0, 0), textcoords="offset points",
+    inset.annotate(style.pick(lang, "Tierra", "Earth"), (0, 0),
+                   textcoords="offset points",
                    xytext=(8, -12), color=style.ACCENT2, fontsize=7)
     inset.plot(1, 0, "o", color="#c9c9c9", ms=5)
-    inset.annotate("Luna/Moon", (1, 0), textcoords="offset points",
+    inset.annotate(style.pick(lang, "Luna", "Moon"), (1, 0),
+                   textcoords="offset points",
                    xytext=(6, 5), color=style.MUTED, fontsize=7)
     # the flyby, stylised as a straight pass at the given distance
     inset.plot([-span, span], [ld, ld], color=style.ACCENT, lw=1.5, ls="--")
@@ -229,7 +246,9 @@ def _draw_approach_inset(fig, ax, approach):
                    xytext=(-span * 30, 6), color=style.ACCENT, fontsize=7,
                    fontweight="bold")
     if ld < 0.5:
-        inset.text(0.5, 0.02, "¡Más cerca que la Luna! / Closer than the Moon!",
+        inset.text(0.5, 0.02,
+                   style.pick(lang, "¡Más cerca que la Luna!",
+                              "Closer than the Moon!"),
                    transform=inset.transAxes, ha="center", va="bottom",
                    color=style.ACCENT, fontsize=7, fontweight="bold")
     inset.set_xlim(-span, span)
@@ -238,7 +257,8 @@ def _draw_approach_inset(fig, ax, approach):
     inset.set_xticks([])
     inset.set_yticks([])
     date = (approach.get("date") or "")[:11]
-    inset.set_title(f"Aproximación / Close approach\n{date}", fontsize=8,
-                    color=style.FG)
+    inset.set_title(
+        style.pick(lang, f"Aproximación\n{date}", f"Close approach\n{date}"),
+        fontsize=8, color=style.FG)
     for spine in inset.spines.values():
         spine.set_color(style.MUTED)

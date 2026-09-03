@@ -47,7 +47,8 @@ def cmd_tonight(args):
     limit = float(cfg.get("limit_mag", 20.0))
     for i, (t, score, parts, phrase) in enumerate(top):
         mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
-        alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
+        alt = t.get("safe_max_alt", t.get("max_alt"))
+        alt = f"{alt:.0f}°" if alt else "—"
         beyond, _delta = suggest.beyond_limit(t, cfg)
         if beyond:
             n_beyond += 1
@@ -118,7 +119,9 @@ def cmd_solar(args):
         hmi = sdo.latest_image("HMII", 1024)
         s["hmi_img"] = str(hmi) if hmi else None
         out = paths.data_dir() / "posts" / "sun.png"
-        sun_panel.draw_sun(img, s, out=out)
+        sun_panel.draw_sun(img, s, out=out,
+                           lang=cfg.ui_language() if hasattr(cfg, "ui_language")
+                           else "es")
         print(f"PNG -> {out}")
 
 

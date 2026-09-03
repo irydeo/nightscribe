@@ -20,6 +20,9 @@ logger = logging.getLogger(__name__)
 
 # Exoplanet transits are events: t0 + n*period (see ADR-015). We compute
 # them locally and keep those crossing tonight's darkness for the site.
+# Safety (ADR-020): a transit is listed only when the star clears the local
+# horizon + margin AT MID-TRANSIT — the moment the planet crosses. The
+# ingress/egress samples stay as coverage information, not as the gate.
 
 
 def transit_times(t0_jd, period_days, from_jd, to_jd):
@@ -42,18 +45,26 @@ def transit_times(t0_jd, period_days, from_jd, to_jd):
     return times
 
 
-def _altitude_ok(ra, dec, lat, lon, jd, min_alt):
-    # @return: altitude of the star at a given instant
-    alt, _ = coords.altaz(ra, dec, lat, coords.lst_degrees(jd, lon))
-    return alt
+def _altaz_at(ra, dec, lat, lon, jd):
+    # @return: (altitude, azimuth) of the star at a given instant
+    alt, az = coords.altaz(ra, dec, lat, coords.lst_degrees(jd, lon))
+    return alt, az
 
 
-def transits_tonight(planets, lat, lon, date=None, min_alt=30.0, max_vmag=14.0):
+def transits_tonight(planets, lat, lon, date=None, threshold_fn=None,
+                      min_alt=None, max_vmag=14.0, margin=0.0):
     # Exoplanet transits visible from a site during tonight's darkness.
     # @args: planets - list from sources.exoclock.planets(),
     #        lat, lon - site, date - datetime.date (UTC, tonight),
-    #        min_alt - min star altitude, max_vmag - star magnitude limit
+    #        threshold_fn - az->min altitude per the local horizon (ADR-020),
+    #        min_alt - flat fallback (used when threshold_fn is not given),
+    #        max_vmag - star magnitude limit,
+    #        margin - extra safety degrees on top of the horizon (ADR-020),
+    #                 applied at the gate exactly like the other families
     # @return: list of dicts with the transit window and coverage
+    if threshold_fn is None:
+        threshold_fn = (lambda az, m=min_alt: m) if min_alt is not None \
+            else (lambda az: 30.0)
     window = coords.tonight_window(lat, lon, date)
     if not window:
         return []
@@ -69,12 +80,15 @@ def transits_tonight(planets, lat, lon, date=None, min_alt=30.0, max_vmag=14.0):
             half = dur_h / 48.0  # half duration in days
             ingress = mid_jd - half
             egress = mid_jd + half
-            # star altitude at ingress, mid, egress
-            alts = [_altitude_ok(p["ra"], p["dec"], lat, lon, jd, min_alt)
-                    for jd in (ingress, mid_jd, egress)]
-            above = sum(1 for a in alts if a >= min_alt)
-            if above == 0:
+            # star altitude/azimuth at ingress, mid, egress
+            pts = [_altaz_at(p["ra"], p["dec"], lat, lon, jd)
+                   for jd in (ingress, mid_jd, egress)]
+            # gate: the star must be up when the planet actually crosses —
+            # a transit only glimpsed at ingress/egress is not observable
+            mid_alt, mid_az = pts[1]
+            if mid_alt < threshold_fn(mid_az) + margin:
                 continue
+            above = sum(1 for (a, az) in pts if a >= threshold_fn(az) + margin)
             coverage = above / 3.0
             results.append({
                 "name": p["name"],
@@ -91,7 +105,7 @@ def transits_tonight(planets, lat, lon, date=None, min_alt=30.0, max_vmag=14.0):
                 "priority": p.get("priority"),
                 "min_telescope_in": p.get("min_telescope_in"),
                 "oc_min": p.get("oc_min"),
-                "max_alt": round(max(alts), 1),
+                "max_alt": round(max(a for (a, _az) in pts), 1),
             })
     results.sort(key=lambda t: (not t["full"], t["ingress"]))
     return results

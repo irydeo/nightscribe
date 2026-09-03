@@ -83,10 +83,24 @@ class ObjectPanel(QWidget):
     #   loading — a worker is still out there
     #   missing — the loader came back empty
     #   ready   — hook + bullets + parameters table
-    # post_requested(name, fallback_target) — the optional "Create post"
-    # button fired it (shown only when loaded with for_post, i.e. the
-    # Explore dialog of D5; the Projects hub keeps it hidden).
-    post_requested = Signal(str, object)
+    #
+    # Single CTA at the bottom of the panel (Phase E, corrected
+    # 2026-09-02, docs/WORKFLOWS.es.md §7ses): one button, not a row of
+    # three. It reads the _project_lookup (injected callable(name) ->
+    # dict-or-None) and presents either
+    #      project_create(name, fallback_target)     — no active project
+    #      project_continue(name, fallback_target)   — one already exists
+    # so the owner (the Explore dialog's glue in MainWindow) always knows
+    # which intent fired. The "Create post" affordance was dropped (the
+    # Posts dialog lives where it belongs: inside the project on its
+    # *Publish* step, and ad-hoc under Tools).
+    #
+    # The CTA stays hidden while the hub is showing (for_post=False),
+    # while the object is still loading, or while no project_lookup was
+    # injected — the panel stays testable and free from the core.db
+    # import.
+    project_create = Signal(str, object)
+    project_continue = Signal(str, object)
     # Entry points:
     #   show(e, ctx)      — render an already-enriched dict (hub, tests)
     #   explore(name,...) — ask the injected loader for a worker and
@@ -95,7 +109,7 @@ class ObjectPanel(QWidget):
     #                       user switches to another project)
 
     def __init__(self, loader=None, chart_dir=None, for_post=False,
-                 parent=None):
+                 project_lookup=None, parent=None):
         # @args: loader - callable(name, fallback_target) returning a
         #                     QThread-like worker with finished=Signal(dict)
         #                     and start(); None means the ExploreWorker
@@ -103,9 +117,14 @@ class ObjectPanel(QWidget):
         #         chart_dir - directory where the PNG charts are written;
         #                     defaults to the user data dir's "posts".
         #                     Injectable so tests can point at tmp_path.
-        #         for_post - the Explore-dialog flavour (D5): show the
-        #                    "Create post" button next to the panel
-        #         parent - parent widget
+        #         for_post  - the Explore-dialog flavour (Phase E): expose
+        #                     the project CTA; the hub keeps this False
+        #         project_lookup - optional callable(name) -> dict-of-active
+        #                     project or None. When given AND for_post
+        #                     AND the object is loaded, the CTA shows the
+        #                     "Continue project" or "Create project"
+        #                     variant depending on the lookup result.
+        #        parent - parent widget
         super().__init__(parent)
         self._loader = loader or self._default_loader
         self._chart_dir = chart_dir
@@ -116,22 +135,13 @@ class ObjectPanel(QWidget):
         self._state = "empty"
         self._name = None        # identifier currently being shown/fetched
         self._fallback = None    # planner target (unconfirmed NEOCP/PCCP)
-        self._for_post = False   # the Explore dialog wants the post affordance
+        self._for_post = for_post   # the Explore dialog exposes the CTA
+        self._project_lookup = project_lookup
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        self._for_post = for_post
         self._e = None          # last enriched dict (re-render on mode change)
         self._orig_pngs = {}    # slot key -> chart PNG path, for re-fitting
-
-        # top row: the "Create post" affordance (D5, Explore dialog only)
-        self.btn_post = QPushButton(self.tr("Create post"))
-        self.btn_post.setToolTip(self.tr(
-            "Build the bilingual drafts + charts for this object"))
-        self.btn_post.clicked.connect(self._ask_post)
-        if not for_post:
-            self.btn_post.hide()
-        layout.addWidget(self.btn_post, 0, Qt.AlignRight)
 
         # state line (loading / not found); hidden when ready
         self.lbl_state = QLabel()
@@ -215,6 +225,21 @@ class ObjectPanel(QWidget):
         self.grp_charts.hide()
         layout.addWidget(self.grp_charts)
 
+        # single CTA at the very bottom (phase E): the one action of the
+        # Explore-dialog flavour. Hidden right away; _refresh_cta() gives
+        # it its "Create project" / "Continue project" face (and only then
+        # shows it) once the object is on the panel.
+        self.btn_project = QPushButton(self.tr("Create project"))
+        self.btn_project.setCursor(Qt.PointingHandCursor)
+        self.btn_project.setMinimumHeight(46)
+        self.btn_project.setSizePolicy(QSizePolicy.Expanding,
+                                       QSizePolicy.Fixed)
+        self._action = "create"    # which intent the CTA currently fires
+        self.btn_project.clicked.connect(self._cta_clicked)
+        self.btn_project.hide()
+        layout.addSpacing(6)
+        layout.addWidget(self.btn_project)
+
     def resizeEvent(self, event):
         # The panel resizes with its window: re-fit every chart slot on
         # top (the pixmap was rendered once, we only re-scale it).
@@ -257,6 +282,9 @@ class ObjectPanel(QWidget):
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
+        # the object is not yet resolved, so the CTA must not be on
+        # screen (it needs a name and a lookup hit/miss to pick a face)
+        self.btn_project.hide()
 
     def _state_missing(self, name=None):
         # @args: name - identifier, shown when given (falls back to the one
@@ -272,6 +300,7 @@ class ObjectPanel(QWidget):
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
+        self._refresh_cta()
 
     def _state_ready(self, e):
         # @args: e - enriched dict from enrich.enrich()
@@ -294,23 +323,68 @@ class ObjectPanel(QWidget):
         self._refill_params()
         self._render_charts(e)
         self._render_capture(e)
+        self._refresh_cta()
         self._state = "ready"
 
     # ---------------- public API ----------------
 
     def name(self):
-        # @return: the identifier this panel is showing (or was showing),
-        #          for the Explore dialog's "Create post" flow (D5)
+        # @return: the identifier this panel is showing (or was showing);
+        #          tests and the owner (dialog glue) use it to assert state
         return self._name
 
-    def _ask_post(self):
-        # @return: asks the owner (the Explore dialog's window) to build
-        #          post drafts for the object currently on the panel
+    def _cta_clicked(self):
+        # @return: fires the matching signal. `_action` is the intent the
+        #          CTA is currently presenting ("create" | "continue"),
+        #          decided by _refresh_cta from the lookup result, so the
+        #          owner needs zero bookkeeping to know which one fired.
         if self._worker is not None:
-            return  # still loading — nothing to build a post from yet
-        if self._name is None:
+            return  # still loading — the panel does not yet know the intent
+        if self._name is None or not self._for_post:
             return
-        self.post_requested.emit(self._name, self._fallback)
+        if self._action == "continue":
+            self.project_continue.emit(self._name, self._fallback)
+        else:
+            self.project_create.emit(self._name, self._fallback)
+
+    def _refresh_cta(self):
+        # Gives the CTA its face — "Create project" or "Continue project"
+        # — or leaves it hidden when the panel is not in the Explore
+        # flavour, no lookup was injected, or the object is not loaded.
+        # Called from _state_ready / _state_loading / _blank / _state_missing.
+        if not self._for_post or self._project_lookup is None \
+                or self._name is None:
+            self.btn_project.hide()
+            return
+        try:
+            active = self._project_lookup(self._name)
+        except Exception:
+            active = None
+        if active is not None:
+            self._action = "continue"
+            self.btn_project.setText(
+                "\u25b6  " + self.tr("Continue project"))
+            self.btn_project.setToolTip(self.tr(
+                "Resume the active project for this object"))
+            self.btn_project.setStyleSheet(
+                "QPushButton { background: #2a7a3a; color: #e8eaf2;"
+                " border: none; border-radius: 6px; font-size: 15px;"
+                " font-weight: bold; }"
+                "QPushButton:hover { background: #3a9a4a; }"
+                "QPushButton:pressed { background: #236733; }")
+        else:
+            self._action = "create"
+            self.btn_project.setText(
+                "\U0001f680  " + self.tr("Create project"))
+            self.btn_project.setToolTip(self.tr(
+                "Start a new project for this object"))
+            self.btn_project.setStyleSheet(
+                "QPushButton { background: #b45309; color: #ffffff;"
+                " border: none; border-radius: 6px; font-size: 15px;"
+                " font-weight: bold; }"
+                "QPushButton:hover { background: #d97706; }"
+                "QPushButton:pressed { background: #92400e; }")
+        self.btn_project.show()
 
     def show(self, e, ctx=None):
         # Renders the ready state from an enriched dict; an empty dict is
@@ -374,6 +448,7 @@ class ObjectPanel(QWidget):
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
+        self.btn_project.hide()
         for lbl in self._labels.values():
             lbl.hide()
             lbl.setPixmap(QPixmap())
@@ -535,9 +610,12 @@ class ObjectPanel(QWidget):
         # magnitude, apparent rate (NEO/PCCP only), max no-trail exposure
         # (rate + camera profile) and the hours-above-horizon window.
         # Returns an empty list when nothing applies, which hides the block.
+        # ADR-027: prefer the context passed to show() but fall back to the
+        # planner target that the hub / explore-flow gave us, so an SN or
+        # comet explored without a project still shows mag/window chips.
         # @args: e - enriched dict (only for the object type as a fallback)
         chips = []
-        ctx = self._ctx or {}
+        ctx = self._ctx or self._fallback or {}
         kind = ctx.get("kind") or e.get("type")
 
         # magnitude: the context's live, tonight figure (omitted if absent)
@@ -585,7 +663,7 @@ class ObjectPanel(QWidget):
             we_hm = we[11:16]
             chips.append((
                 f"{ws_hm}–{we_hm}", theme.C_OK,
-                self.tr("Times the object is safely above the horizon")))
+                self.tr("Times the object is safely above the limit")))
             hours = ctx.get("hours_up")
             if hours:
                 try:
@@ -596,6 +674,35 @@ class ObjectPanel(QWidget):
                     chips.append((
                         f"{hours:.1f} h", theme.C_TEXT,
                         self.tr("How long it stays a valid target")))
+
+        # safe window (ADR-020): the run of the night where the planned
+        # capture session still clears the local horizon; only set when a
+        # project's capture plan was saved, and always with the latest-safe-
+        # start. The red "does not fit" chip is the one safety warning.
+        if ctx.get("safe_window"):
+            s0, s1 = ctx["safe_window"].split("|")
+            s0h, s1h = s0[11:16], s1[11:16]
+            bt = ctx.get("best_time")
+            bt_hm = bt[11:16] if bt else None
+            hint = self.tr("The capture window that still clears your "
+                           "local limit — the telescope stays in safe "
+                           "altitude through the whole session")
+            if bt_hm:
+                label = f"⊕ {s0h}–{s1h} · ≤ {bt_hm}"
+                hint += self.tr(" · ≤ HH:MM is the latest safe start")
+            else:
+                label = f"⊕ {s0h}–{s1h}"
+            chips.append((label, theme.C_GOOD, hint))
+        elif (ctx.get("duration_s") and ctx.get("window_start")
+                and ctx.get("window_end")):
+            # a session was planned but it does not fit tonight's span
+            mins = int(round(int(ctx.get("duration_s", 0)) / 60))
+            chips.append((
+                f"⚠ {self.tr('does not fit')} · {mins} min",
+                theme.C_WARN,
+                self.tr("The planned {0} min session does not fit in the "
+                        "time the object is above your local limit. "
+                        "Do NOT force the instrument.").format(mins)))
         return chips
 
     def _render_capture(self, e):

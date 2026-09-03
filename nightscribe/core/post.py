@@ -166,14 +166,17 @@ def attach_charts(post, charts, resources=None):
     return post
 
 
-def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None):
+def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
+                 lang=None):
     # Renders the object's charts into outdir (one PNG each). The prefix
     # must end in "_" so the file name reads e.g. "4443_Atlas_orbit.png".
     # @args: e - enriched dict, outdir - Path, safe - file name prefix,
     #        cfg - Config (horizon settings) or None,
     #        fmt - size preset of style.SIZES ("instagram" for posts,
     #              "panel" for the in-GUI overview),
-    #        size - (w, h) px override of the preset (panel re-render mode)
+    #        size - (w, h) px override of the preset (panel re-render mode),
+    #        lang - "es"|"en" for the chart strings; defaults to the
+    #               configured UI language via cfg.ui_language()
     # @return: dict {chart_key: Path} of the charts actually produced
     import matplotlib
     matplotlib.use("Agg")
@@ -181,6 +184,9 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None):
     from . import coords
     from ..viz import orbit_view, sky_view, sn_view
     outdir = Path(outdir)  # callers may pass a str (panel chart_dir, CLI)
+    if lang is None:
+        lang = cfg.ui_language() if (cfg and hasattr(cfg, "ui_language")) \
+               else "es"
     d = e.get("data") or {}
     jd = coords.jd_from_datetime(
         datetime.datetime.now(datetime.timezone.utc))
@@ -194,7 +200,7 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None):
         orbit_view.draw_orbit(dict(els), jd=jd,
                               obj_name=e["name"],
                               approach=d.get("next_approach"), out=str(p),
-                              fmt=fmt, size=size)
+                              fmt=fmt, size=size, lang=lang)
         charts["orbit"] = p
     # sky position: ephemeris, then SIMBAD, then the unconfirmed dict
     ra_deg = dec_deg = None
@@ -215,33 +221,58 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None):
     if ra_deg is None and unc and unc.get("ra_deg") is not None:
         ra_deg = float(unc["ra_deg"])
         dec_deg = float(unc.get("dec_deg", 0.0))
+    if ra_deg is None and d.get("ra_deg") is not None:
+        # ADR-027: a degraded transient (SIMBAD does not know it) still has
+        # the planner's coordinates — enough for the sky chart
+        ra_deg = float(d["ra_deg"])
+        dec_deg = float(d.get("dec_deg") or 0.0)
     if ra_deg is not None:
         p = outdir / f"{safe}sky.png"
         hor = None
         if cfg:
             from . import horizon as _horizon
             hor = _horizon.from_config(cfg)
-        sky_view.draw_sky(ra_deg, dec_deg, cfg.get("lat") if cfg else None,
-                          cfg.get("lon") if cfg else None,
-                           obj_name=e["name"], out=str(p), fmt=fmt,
-                           horizon=hor.alt_at if hor else None,
-                           margin=float(cfg.get("horizon_margin_deg", 0))
-                           if cfg else 0.0, size=size)
-        charts["sky"] = p
+        # safe span from the planner target (data dict, or the unconfirmed
+        # fallback for objects SBDB does not know); None when not planned
+        src = d if d.get("safe_window") else (unc or {})
+        sw = best = None
+        raw = src.get("safe_window")
+        if raw:
+            s0, s1 = raw.split("|")
+            sw = (datetime.datetime.fromisoformat(s0),
+                  datetime.datetime.fromisoformat(s1))
+        raw = src.get("best_time")
+        if raw:
+            best = datetime.datetime.fromisoformat(raw)
+        try:
+            sky_view.draw_sky(ra_deg, dec_deg,
+                              cfg.get("lat") if cfg else None,
+                              cfg.get("lon") if cfg else None,
+                               obj_name=e["name"], out=str(p), fmt=fmt,
+                               horizon=hor.alt_at if hor else None,
+                               margin=float(cfg.get("horizon_margin_deg", 0))
+                                if cfg else 0.0, safe_window=sw,
+                               best_time=best, size=size, lang=lang)
+        except Exception:
+            # no site/lat-lon to plot from: omit the slot rather than fail
+            logger.exception("sky chart skipped for %s", e["name"])
+        else:
+            charts["sky"] = p
     if sim and ra_deg is not None:
         from .sources import cutouts
         img = cutouts.reference_cutout(ra_deg, dec_deg)
         if img:
             p = outdir / f"{safe}field.png"
             sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p),
-                                  fmt=fmt, size=size)
+                                  fmt=fmt, size=size, lang=lang)
             charts["field"] = p
     # exoplanet transit: light curve of the event (planner target's dict)
     tr = d.get("transit") or (unc or {}).get("transit")
     if tr and tr.get("mid") and e.get("type") in ("transit", "exoplanet"):
         from ..viz import transit_view
         p = outdir / f"{safe}transit.png"
-        transit_view.draw_transit(tr, out=str(p), fmt=fmt, size=size)
+        transit_view.draw_transit(tr, out=str(p), fmt=fmt, size=size,
+                                  lang=lang)
         charts["transit"] = p
     plt.close("all")
     return charts

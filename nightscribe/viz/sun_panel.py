@@ -34,9 +34,10 @@ _R_SUN_FRAC = 0.469
 
 
 def draw_sun(sdo_path, sun_data, out=None, fmt="instagram",
-             watermark="NightScribe"):
+              watermark="NightScribe", lang="es"):
     # @args: sdo_path - local JPEG Path (or None), sun_data - dict from
-    #        solar.solar_now(), out - PNG path, fmt - size, watermark - footer
+    #        solar.solar_now(), out - PNG path, fmt - size, watermark - footer,
+    #        lang - string language ("es"|"en"); charts follow the UI language
     # @return: matplotlib figure (and writes PNG if out is given)
     fig = plt.figure(figsize=(10.8, 10.8), dpi=100)
     style.apply_style()
@@ -50,10 +51,12 @@ def draw_sun(sdo_path, sun_data, out=None, fmt="instagram",
         img = plt.imread(str(sdo_path))
         ax_img.imshow(img)
     else:
-        ax_img.text(0.5, 0.5, "SDO\nno disponible / unavailable", ha="center",
-                    va="center", color=style.MUTED)
-    ax_img.set_title("NASA SDO — hoy / today", color=style.FG, fontsize=11,
-                     loc="left")
+        ax_img.text(0.5, 0.5,
+                    style.pick(lang, "SDO\nno disponible",
+                               "SDO\nunavailable"),
+                    ha="center", va="center", color=style.MUTED)
+    ax_img.set_title(style.pick(lang, "NASA SDO — hoy", "NASA SDO — today"),
+                     color=style.FG, fontsize=11, loc="left")
 
     # right: annotated HMI continuum image with NOAA region labels
     ax_map = fig.add_axes([0.68, 0.34, 0.28, 0.52])
@@ -69,20 +72,30 @@ def draw_sun(sdo_path, sun_data, out=None, fmt="instagram",
     ax_txt.axis("off")
     lines = []
     if sun_data.get("ssn") is not None:
-        lines.append(f"Manchas / Sunspot number: {sun_data['ssn']:.0f}"
-                     f"   ·   F10.7: {sun_data.get('f107'):.0f} sfu")
+        lines.append(
+            style.pick(
+                lang,
+                f"Nº de manchas: {sun_data['ssn']:.0f}"
+                f"   ·   F10.7: {sun_data.get('f107'):.0f} sfu",
+                f"Sunspot number: {sun_data['ssn']:.0f}"
+                f"   ·   F10.7: {sun_data.get('f107'):.0f} sfu"))
     if sun_data.get("flare_7d"):
         fl = sun_data["flare_7d"]
-        lines.append(f"Fulguración semanal / Weekly flare: "
-                     f"{fl['class']}{fl['value']}")
+        lines.append(
+            style.pick(lang, "Fulguración semanal: ", "Weekly flare: ")
+            + f"{fl['class']}{fl['value']}")
     if sun_data.get("kp") is not None:
-        aur = {"possible": "¡Auroras posibles! / Auroras possible!",
-               "unlikely": "Sin auroras en latitudes medias / No mid-latitude auroras"
+        aur = {"possible": style.pick(lang, "¡Auroras posibles!",
+                                      "Auroras possible!"),
+               "unlikely": style.pick(
+                   lang, "Sin auroras en latitudes medias",
+                   "No mid-latitude auroras")
                }.get(sun_data.get("aurora"), "")
         lines.append(f"Kp: {sun_data['kp']:.1f}   ·   {aur}")
     ax_txt.text(0, 0.95, "\n".join(lines), va="top", color=style.FG,
                 fontsize=12, family="monospace")
-    fig.suptitle("El Sol ahora / The Sun now", color=style.FG, fontsize=15,
+    fig.suptitle(style.pick(lang, "El Sol ahora", "The Sun now"),
+                 color=style.FG, fontsize=15,
                  fontweight="bold", x=0.06, ha="left")
     style.watermark(fig, watermark + " · NASA/SDO")
     if out:

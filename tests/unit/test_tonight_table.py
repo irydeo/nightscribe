@@ -178,12 +178,14 @@ def test_observed_hidden_when_unchecked(window, monkeypatch):
     assert "C/2024 A1 (ATLAS)" in _names(window)
 
 
-def test_double_click_starts_from_any_column(window, monkeypatch):
-    # double-click must start / continue the project no matter which
-    # column the user hits — the target travels in the row
+def test_double_click_opens_explore_from_any_column(window, monkeypatch):
+    # Phase E (single entry point): the double-click on any column of the
+    # full list opens the Explore dialog for that target — the same
+    # gesture and the same destination as the row's click or the card's
+    # "Explore" shortcut.
     captured = []
-    monkeypatch.setattr(window, "_start_or_continue",
-                        lambda t: captured.append(t))
+    monkeypatch.setattr(window, "_open_explore_dialog",
+                        lambda name: captured.append(name))
     tbl = window.tonight.tbl_targets
     _fill(window)
     name_row = [r for r in range(tbl.rowCount())
@@ -191,8 +193,8 @@ def test_double_click_starts_from_any_column(window, monkeypatch):
     for col in range(tbl.columnCount()):
         captured.clear()
         tbl.cellDoubleClicked.emit(name_row, col)
-        assert len(captured) == 1, f"column {col} did not start a project"
-        assert captured[0]["id"] == "neo1"
+        assert len(captured) == 1, f"column {col} did not open Explore"
+        assert captured[0] == "2026 QK (443089)"
 
 
 def _names_name(tbl, r):

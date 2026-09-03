@@ -11,6 +11,7 @@
 #
 ############################################################
 
+import datetime
 import logging
 
 from . import style
@@ -22,33 +23,45 @@ logger = logging.getLogger(__name__)
 
 
 def draw_transit(transit, out=None, fmt="facebook", watermark="NightScribe",
-                 size=None):
+                 size=None, lang="es"):
     # @args: transit - dict from transits.py, out - PNG path,
     #        fmt - size preset, watermark - footer text,
-    #        size - (w, h) px override (panel re-render mode)
+    #        size - (w, h) px override (panel re-render mode),
+    #        lang - string language ("es"|"en"); charts follow the UI language
     # @return: matplotlib figure (and writes PNG if out is given)
     fig, ax = style.new_fig(fmt, size=size)
 
     depth = (transit.get("depth_mmag") or 10.0) / 1000.0  # mmag -> relative flux
     dur_h = transit.get("duration_h") or 2.0
     mid = transit["mid"]
-    mid_h = mid.hour + mid.minute / 60.0
+    if isinstance(mid, str):
+        mid = datetime.datetime.fromisoformat(mid)
+    # relative hours around the transit (mid = 0), so it never shows 26/28
+    t_mid = 0.0
 
     # trapezoid: flat, linear drop, flat bottom, linear rise
     t_ing = dur_h * 0.15
-    xs = [mid_h - dur_h / 2 - 0.5, mid_h - dur_h / 2, mid_h - dur_h / 2 + t_ing,
-          mid_h + dur_h / 2 - t_ing, mid_h + dur_h / 2, mid_h + dur_h / 2 + 0.5]
+    xs = [-dur_h / 2 - 0.5, -dur_h / 2, -dur_h / 2 + t_ing,
+          dur_h / 2 - t_ing, dur_h / 2, dur_h / 2 + 0.5]
     ys = [1.0, 1.0, 1.0 - depth, 1.0 - depth, 1.0, 1.0]
+    # real clock-time labels for the hour ticks, but plotted by offset
+    ticks = [-1, 0, 1]
+    labels = [f"{(mid + datetime.timedelta(hours=i)):%H:%M}" for i in ticks]
+    ax.set_xticks(ticks)
+    ax.set_xticklabels(labels, fontsize=8)
+
     ax.plot(xs, ys, color=style.ACCENT2, lw=2.2)
     ax.fill_between(xs, ys, 1.0, color=style.ACCENT2, alpha=0.15)
 
     star = transit.get("star") or ""
     depth_pct = depth * 100
-    ax.set_title(f"{transit.get('name')} ({star})", loc="left")
-    ax.set_xlabel("UTC (h)")
-    ax.set_ylabel("Brillo relativo / Relative brightness")
+    ax.set_title(f"{transit.get('name')} ({star})" if star else transit.get("name", ""),
+                 loc="left")
+    ax.set_xlabel(style.pick(lang, "hora local", "local time"))
+    ax.set_ylabel(style.pick(lang, "Brillo relativo", "Relative brightness"))
+    ax.set_xlim(-dur_h / 2 - 1.5, dur_h / 2 + 1.5)
     ax.set_ylim(1.0 - depth * 1.4, 1.001)
-    ax.text(mid_h, 1.0 - depth * 1.15,
+    ax.text(t_mid, 1.0 - depth * 1.15,
             f"−{depth_pct:.1f}% · {dur_h:.1f} h",
             ha="center", color=style.ACCENT, fontsize=10, fontweight="bold")
     ax.grid(True, alpha=0.2)

@@ -42,6 +42,11 @@ DEFAULTS = {
     "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
     "moon_max_illum": 0.5,        # above this, faint targets get penalized
     "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
+    # Tonight filter (WORKFLOWS 7quater): the enabled object kinds are the
+    # whitelist shown in the header combo and in Settings; missing means all.
+    "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert"],
+    "tonight_kind": "",           # last-used header filter; "" = "All"
+    "best_per_kind_n": 5,         # per-kind cap for the Tonight grid
     # panel chart resolution mode: "scale" (fast 1× re-scale) |
     # "re-render" (charts drawn at 2× for crispness in big slots)
     "chart_zoom": "scale",
@@ -50,7 +55,8 @@ DEFAULTS = {
 
 class Config:
     # Tiny persistent configuration on top of a JSON file in the user
-    # config dir. Values are always strings/numbers/bools.
+    # config dir. Values are strings/numbers/bools, and lists of strings
+    # (enabled_kinds).
 
     def __init__(self):
         self._file = paths.config_dir() / "nightscribe.json"

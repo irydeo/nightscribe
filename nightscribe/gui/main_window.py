@@ -1988,13 +1988,29 @@ class MainWindow(QMainWindow):
         dlg.setWindowTitle(self.tr("Explore — %1").replace("%1", name))
         area = QScrollArea()
         area.setWidgetResizable(True)
-        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         area.setFrameShape(QFrame.Shape.NoFrame)
         panel = self._explore_panel(name)
         area.setWidget(panel)
-        dlg.resize(980, 720)
+        # Small first size (loading state only); the real size comes
+        # from `panel.ready` via a 0 ms singleShot (so the panels'
+        # lazy sizeHints are computed before we read them).
+        dlg.resize(720, 540)
         layout = QVBoxLayout(dlg)
         layout.addWidget(area)
+
+        def _fit(_e):
+            # Once the panel is ready, fit the dialog to its natural
+            # content size so the 2×2 chart grid and the parameters
+            # table fit without visible scroll. The 0 ms pump lets
+            # the panels' lazy sizeHints resolve first.
+            QTimer.singleShot(0, _apply_fit)
+
+        def _apply_fit():
+            from .overview import resize_to_panel_content
+            try:
+                resize_to_panel_content(dlg, panel)
+            except RuntimeError:
+                pass
 
         def _target(nm, fb):
             # build the minimal target dict the project layer needs:
@@ -2022,6 +2038,12 @@ class MainWindow(QMainWindow):
 
         panel.project_create.connect(_on_create)
         panel.project_continue.connect(_on_continue)
+        panel.ready.connect(_fit)
+        # If the worker already finished (cached, or the FakeWorker
+        # pattern in tests), the ready signal may fire before this
+        # connect — in which case the fit is driven by the next
+        # event loop turn below.
+        QTimer.singleShot(0, _apply_fit)
         dlg.exec()
 
     def _explore_panel(self, name):

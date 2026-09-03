@@ -63,6 +63,17 @@ def _chip(text, color, tip=""):
     return lbl
 
 
+# Resizes `parent` so the `panel` fits its content (with a minimum
+# size floor). Used by the Explore dialog and tested in isolation.
+# @args: parent - the container widget (e.g. an Explora QDialog)
+#        panel  - the ObjectPanel whose sizeHint sets the new size
+def resize_to_panel_content(parent, panel):
+    hint = panel.sizeHint()
+    w = max(int(hint.width()),  420)
+    h = max(int(hint.height()), 320)
+    parent.resize(w, h)
+
+
 class _SlotClick(QObject):
     # Opens the zoom/export viewer when a chart slot is released.
     # Vector slots rebuild a fresh widget; PNG slots copy the file.
@@ -112,6 +123,10 @@ class ObjectPanel(QWidget):
     # 2026-09-02, docs/WORKFLOWS.es.md §7ses).
     project_create = Signal(str, object)
     project_continue = Signal(str, object)
+    # Fires once the enriched dict is on screen. A parent (e.g. the
+    # Explore dialog) can use this to resize itself to the panel's
+    # content — the panel's sizeHint is only meaningful here.
+    ready = Signal(dict)
 
     def __init__(self, loader=None, chart_dir=None, for_post=False,
                  project_lookup=None, parent=None):
@@ -277,6 +292,9 @@ class ObjectPanel(QWidget):
         self._render_capture(e)
         self._refresh_cta()
         self._state = "ready"
+        # The charts (and the CTA) are now on screen; let the owner
+        # (e.g. the Explore dialog) fit itself to the content.
+        self.ready.emit(e)
 
     # ---------------- public API ----------------
 

@@ -803,3 +803,89 @@ def test_panel_strings_resolve_in_english(qapp, tmp_path):
         p.deleteLater()
     finally:
         qapp.removeTranslator(tr)
+
+
+# ---------------- ready signal (Explore dialog sizing) ----------------
+
+def test_ready_signal_in_metaobject(qapp):
+    # ADR-029 phase 5+: the `ready` signal lets the Explore dialog
+    # resize itself to the panel's content (see docs/PLANS/
+    # explore-orbit-state.md, Slice 1).
+    from PySide6.QtCore import QMetaMethod
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(chart_dir="/tmp/charts")
+    mm = p.metaObject()
+    names = [mm.method(i).name() for i in range(mm.methodCount())
+             if mm.method(i).methodType() == QMetaMethod.Signal]
+    assert "ready" in names, f"ready signal missing: {names}"
+    p.deleteLater()
+
+
+def test_ready_signal_fires_with_enriched_payload(panel, qapp):
+    # When the panel reaches "ready" state via show(FAKE_ELEMENT),
+    # the `ready` signal must fire exactly once and the payload
+    # must be the enriched dict.
+    events = []
+    panel.ready.connect(lambda e: events.append(e))
+    panel.show(FAKE_ELEMENT)
+    assert panel.state() == "ready"
+    assert len(events) == 1, f"ready should fire exactly once, got {len(events)}"
+    assert events[0] == FAKE_ELEMENT
+
+
+def test_ready_signal_not_fired_by_missing_state(panel, qapp):
+    # A missing payload ({} from a fake loader) should leave the
+    # panel in "missing" and never fire `ready`.
+    from PySide6.QtCore import QMetaMethod
+    events = []
+    panel.ready.connect(lambda e: events.append(e))
+    # force missing state directly
+    panel._state_missing("SN1987AAA")
+    assert panel.state() == "missing"
+    assert events == [], "ready must not fire in missing state"
+
+
+def test_resize_to_panel_content_uses_hint(qapp):
+    # The helper is module-level so the Explore dialog (and any other
+    # caller) can reuse it without dragging a whole panel fixture.
+    from PySide6.QtWidgets import QWidget, QLabel
+    from nightscribe.gui.overview import resize_to_panel_content
+    from PySide6.QtCore import QSize
+
+    class FixedHint(QWidget):
+        def sizeHint(self):
+            return QSize(520, 410)
+
+    p = FixedHint()
+    p.show()
+    cont = QWidget()
+    cont.show()
+    resize_to_panel_content(cont, p)
+    assert cont.size().width() == 520
+    assert cont.size().height() == 410
+    p.deleteLater()
+    cont.deleteLater()
+
+
+def test_resize_to_panel_content_applies_floor(qapp):
+    # A degenerate hint (0,0) must still give the dialog a usable
+    # minimum, not collapse the window.
+    from PySide6.QtWidgets import QWidget
+    from nightscribe.gui.overview import resize_to_panel_content
+    from PySide6.QtCore import QSize
+
+    class ZeroHint(QWidget):
+        def sizeHint(self):
+            return QSize(0, 0)
+
+    p = ZeroHint()
+    p.show()
+    cont = QWidget()
+    cont.show()
+    resize_to_panel_content(cont, p)
+    # Floor values per overview.resize_to_panel_content
+    assert cont.size().width() >= 420, f"got {cont.size().width()}"
+    assert cont.size().height() >= 320, f"got {cont.size().height()}"
+    p.deleteLater()
+    cont.deleteLater()
+

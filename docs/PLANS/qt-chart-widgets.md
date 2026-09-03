@@ -40,7 +40,7 @@ del lienzo — sin recalcular ni escalar un bitmap de ratio fijo.
 - [x] **Fase 3** — `SkyChart` (+ `TransitChart`) (hover hora/altura/azimut, ventana segura, click en banda → `best_time_clicked`) — *10 tests en `tests/unit/test_skychart.py`; sampler puro compartido `core/sky_math.sample_night` (mismo diccionario que `viz/sky_view.py`); fix del `QGraphicsScene.render(target=, source=)` en `ChartView.export_png` (el export daba PNG negro)*
 - [x] **Fase 4a** — `ChartViewer` dual-mode (widget vectorial + pixmap PNG); zoom/fit → `widget.view`, export → `widget.export_png()`, memoria por título, fábrica `open_chart_widget()` (5 tests widget-mode)
 - [x] **Fase 4b** — `overview.py`: slots orbit/sky → `OrbitChart`/`SkyChart` vivos (zoom/pan/hover), transit/field → `QLabel+QPixmap`; click re-construye widget y abre `ChartViewer`; se borran `_fit_slots`/`_orig_pngs`/`_labels`/`resizeEvent`
-- [ ] **Fase 4c** — `main_window.py`: migrar referencias al viewer + comprobar compatibilidad
+- [x] **Fase 4c** — Verificado: `main_window.py` sin referencias huérfanas al viewer antiguo; los tres métodos del panel usados (`rebuild_charts`, `_render_capture`, `_render_charts`) siguen presentes; QPixmap solo para logos/iconos (no chart). Sin cambios de código (verificación-only, green 389+42)
 - [ ] **Fase 5** — Docs (ADR-010 alcance, WORKFLOWS) + limpieza
 
 > Regla de oro: cada fase termina **con la suite verde** (`tests/unit` +
@@ -271,10 +271,12 @@ cambiar el layout).
 
 **Verificación**: suite completa unit + funcional verde.
 
-**Decisión al terminar**: ¿panel y viewer usan **la misma instancia** del widget (un
-mismo widget se re-pinta al cambiar de tamaño) o se usan dos instancias idénticas
-(simpler pero un poco más caro en memoria)? ¿el proyecto guarda el "estado"
-(zoom/fecha) del widget entre sesiones?
+**Decisión al terminar** (resuelta 2026-09-03, Fase 4b/c): el **panel** retiene su
+propia instancia viva; al **click** se reconstruye una **segunda instancia** y se
+abre en el `ChartViewer` (la opción "dos instancias", la más simple; la memoria es
+despreciable frente a la de los propios widgets). El **"estado"** (zoom/fecha) del
+widget **no** se persiste entre sesiones: el widget se re-construye al abrir, y el
+estado de "mejor hora / ventana segura" se re-deriva de `e` en cada `rebuild_charts()`.
 
 ---
 

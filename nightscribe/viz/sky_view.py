@@ -14,7 +14,7 @@
 import datetime
 import logging
 
-from ..core import coords, ephem_minor
+from ..core import sky_math
 from . import style
 
 logger = logging.getLogger(__name__)
@@ -40,8 +40,12 @@ def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
     #        lang - string language ("es"|"en"); charts follow the UI language
     # @return: matplotlib figure (and writes PNG if out is given)
     fig, ax = style.new_fig(fmt, size=size)
-    window = coords.tonight_window(lat, lon, date)
-    if not window:
+    # the night window + the series come from the shared pure sampler
+    # (core/sky_math), so this chart and the GUI widget can never drift apart
+    # (ADR-029, the same rule the orbit chart follows).
+    s = sky_math.sample_night(ra_deg, dec_deg, lat, lon, date,
+                              horizon=horizon, margin=margin)
+    if not s:
         ax.text(0.5, 0.5,
                 style.pick(lang, "Sin noche astronómica",
                            "No astronomical night"),
@@ -50,13 +54,14 @@ def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
         if out:
             style.save(fig, out)
         return fig
-    start, end = window
+    start, end = s["start"], s["end"]
+    rel, alts, moon_alts, hor_alts = s["rel"], s["alt"], s["moon"], s["horizon"]
 
     # x-axis: hours *relative* to astronomical dusk (start of the window).
-    # Dusk is always at t=0, dawn a few hours later (up to 24 h), so the
-    # axis never shows 26/28 — only real clock hours, one tick per hour.
-    # `start` is aware-UTC; planner/test callers pass a mix of aware and
-    # naive datetimes, so fold everything into aware-UTC before subtracting.
+    # Dusk is always at t=0, dawn a few hours later (up to 24 h), so the axis
+    # never shows 26/28 — only real clock hours, one tick per hour. `start` is
+    # aware-UTC; planner/test callers pass a mix of aware and naive datetimes,
+    # so fold everything into aware-UTC before subtracting.
     def _utc(dt):
         # @args: dt - datetime (aware or naive)
         # @return: aware-UTC equivalent, naive inputs assumed to be UTC
@@ -67,22 +72,6 @@ def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
     def _pos(dt):
         # @return: hours from `start`, keeping across-midnight times positive
         return (_utc(dt) - start).total_seconds() / 3600.0
-
-    times, alts, moon_alts, hor_alts = [], [], [], []
-    t = start - datetime.timedelta(hours=1)
-    t_end = end + datetime.timedelta(hours=1)
-    while t <= t_end:
-        jd = coords.jd_from_datetime(t)
-        lst = coords.lst_degrees(jd, lon)
-        alt, az = coords.altaz(ra_deg, dec_deg, lat, lst)
-        m = ephem_minor.moon(jd)
-        malt, _ = coords.altaz(m["ra"], m["dec"], lat, lst)
-        times.append(t)
-        alts.append(alt)
-        moon_alts.append(malt)
-        hor_alts.append(horizon(az) + margin if horizon else 30.0)
-        t += datetime.timedelta(minutes=10)
-    rel = [_pos(t) for t in times]
 
     # one label per hour boundary of the night, real clock time, no 26/28
     span = (end - start).total_seconds() / 3600.0

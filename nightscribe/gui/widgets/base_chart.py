@@ -14,7 +14,7 @@
 import math
 from pathlib import Path
 
-from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QPen, QPixmap,
                             QPainter)
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene,
@@ -62,7 +62,10 @@ class ChartView(QGraphicsView):
     # user picking a moment (e.g. SkyChart's "best time" click). The base
     # itself does nothing with them.
     hover_changed = Signal(bool)        # True while the tooltip is on screen
-    scene_clicked = Signal()            # left-mouse release on the scene (no drag)
+    scene_clicked = Signal(QPointF)    # left-mouse release on the scene (no
+                                       # drag); the QPointF is in *scene*
+                                       # coordinates so a subclass can hit-test
+                                       # it (e.g. SkyChart's safe-window band).
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -179,11 +182,13 @@ class ChartView(QGraphicsView):
 
     def mouseReleaseEvent(self, event):
         # A left release with no meaningful motion is a "click on the scene"
-        # (the subclass may react: e.g. SkyChart picking a time).
+        # (the subclass may react: e.g. SkyChart picking a time). The QPointF
+        # is in *scene* coordinates so the hit-test is unambiguous.
         if event.button() == Qt.LeftButton and self._drag_start is not None:
             moved = (event.position().toPoint() - self._drag_start).manhattanLength()
             if moved < 4:
-                self.scene_clicked.emit()
+                sc = self.mapToScene(event.position().toPoint())
+                self.scene_clicked.emit(QPointF(sc.x(), sc.y()))
         self._drag_start = None
         super().mouseReleaseEvent(event)
 
@@ -315,7 +320,13 @@ class ChartView(QGraphicsView):
         left, top = self.mapToScene(0, 0).toPoint().x(), self.mapToScene(0, 0).toPoint().y()
         w = self.mapToScene(vw, 0).x() - left
         h = self.mapToScene(0, vh).y() - top
-        self._scene.render(painter, QRectF(left, top, w, h))
+        # target:  the destination rect in the pixmap (0,0,pw,ph)
+        # source:  the scene rect to render (what the user was looking at)
+        # Passing only one rect to QGraphicsScene.render() treats it as the
+        # *target*; the source defaults to the full itemsBoundingRect, which
+        # was producing a dark / empty PNG whenever the viewport was zoomed.
+        self._scene.render(painter, target=QRectF(0, 0, pw, ph),
+                           source=QRectF(left, top, w, h))
         painter.end()
         pix.save(str(path))
         return path

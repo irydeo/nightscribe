@@ -117,6 +117,110 @@ def test_zoom_buttons_1to1_in_out(qapp, chart, cfg):
     v.close()
 
 
+_ELEMENT = {"a": 2.3, "e": 0.35, "i": 8.0, "om": 10.0, "w": 20.0,
+            "ma": 50.0, "epoch": 2460000.0}
+
+
+def _widget(qapp, w=600, h=500):
+    # @return: a sized, populated OrbitChart (offscreen) for widget mode.
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    w_ = OrbitChart()
+    w_.set_elements(_ELEMENT, 2460500.0, "test object")
+    w_.resize(w, h)
+    w_.show()
+    qapp.processEvents()
+    return w_
+
+
+def test_widget_mode_embeds_the_chart(qapp, cfg):
+    # widget mode: the live chart is inside the dialog, no scroll/pixmap
+    from nightscribe.gui.chart_viewer import ChartViewer
+    ch = _widget(qapp)
+    v = ChartViewer(widget=ch, title="orbit live")
+    assert v._mode == "widget"
+    assert v._label is None and v._scroll is None
+    assert ch.parent() == v
+    assert v._view is ch.view
+    # the canvas is fitted to the scene once the geometry lands
+    v.resize(900, 700)
+    _events()
+    v._zoom_fit()
+    sc = v._view.transform().m11()
+    assert sc > 0
+    v.close()
+
+
+def test_widget_mode_zoom_buttons_drive_the_view(qapp, cfg):
+    # Zoom + / − on the toolbar scale the ChartView (not a frozen pixmap)
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v = ChartViewer(widget=_widget(qapp))
+    v.show()
+    _events()
+    s0 = v._view.transform().m11()
+    v._zoom_in()
+    assert v._view.transform().m11() > s0
+    v._zoom_out()
+    v._zoom_out()
+    assert v._view.transform().m11() <= s0 * 1.001
+    # Fit brings the canvas back to its stable reference
+    v._zoom_fit()
+    assert v._view.transform().m11() > 0
+    v.close()
+
+
+def test_widget_mode_export_renders_the_scene(qapp, cfg, tmp_path):
+    # widget-mode export renders what is on the canvas to a fresh PNG
+    from nightscribe.gui.chart_viewer import ChartViewer
+    from PySide6.QtWidgets import QFileDialog
+    v = ChartViewer(widget=_widget(qapp), title="live")
+    v.show()
+    v.resize(900, 700)
+    _events()
+    v._zoom_fit()
+    dest = tmp_path / "live_orbit.png"
+    orig = QFileDialog.getSaveFileName
+    QFileDialog.getSaveFileName = staticmethod(
+        lambda *a, **k: (str(dest), ""))
+    try:
+        v._export()
+    finally:
+        QFileDialog.getSaveFileName = orig
+    import struct
+    with open(dest, "rb") as f:
+        data = f.read()
+    assert len(data) > 1000
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    w, h = struct.unpack(">II", data[16:24])
+    assert w > 100 and h > 100
+    v.close()
+
+
+def test_widget_mode_keeps_size_memory(qapp, cfg):
+    # window-size memory is keyed by the title for widget mode too
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v1 = ChartViewer(widget=_widget(qapp), title="mem")
+    v1.resize(820, 540)
+    v1.close()
+    sizes = cfg.get("chart_viewer_sizes") or {}
+    assert sizes.get("mem") == [820, 540]
+    v2 = ChartViewer(widget=_widget(qapp), title="mem")
+    assert (v2.size().width(), v2.size().height()) == (820, 540)
+    v2.close()
+
+
+def test_open_chart_widget_factory(qapp, cfg):
+    # the factory opens without exec'ing the dialog in tests
+    from unittest.mock import patch
+    from nightscribe.gui import chart_viewer
+    ch = _widget(qapp)
+    with patch.object(chart_viewer.ChartViewer, "exec") as ex:
+        chart_viewer.open_chart_widget(None, ch, title="factory")
+        ex.assert_called_once()
+    v = chart_viewer.ChartViewer(widget=ch, title="factory")
+    assert v._widget is ch
+    v.close()
+
+
 def test_window_size_is_remembered_per_chart(qapp, chart, cfg):
     from nightscribe.gui.chart_viewer import ChartViewer
 

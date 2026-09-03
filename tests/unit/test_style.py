@@ -56,6 +56,42 @@ def test_panel_squeezes_default_margins():
     plt.close("all")
 
 
+def test_exported_orbit_png_fills_width(tmp_path):
+    # regression guard: the saved PNG must own the width (tight crop).
+    # We use the square `instagram` preset because `draw_orbit` forces
+    # equal-aspect + symmetric bounds — in a 16:9 slot (panel) the chart
+    # letterboxes by design, so a width-fill invariant only holds on a
+    # square slot. In that case a side margin wider than ~10% means the
+    # plot is being padded out.
+    from PIL import Image
+    from nightscribe.viz import orbit_view
+    els = {"a": 1.350, "e": 0.400, "i": 6.2,
+           "q": 0.810, "Q": 1.890, "per": 560.0}
+    out = tmp_path / "orbit_instagram.png"
+    fig = orbit_view.draw_orbit(dict(els), obj_name="t", out=str(out),
+                                fmt="instagram")
+    im = Image.open(out).convert("RGB")
+    w, h = im.size
+    px = im.load()
+    bg = px[5, 5]
+    def _bg(c):
+        return all(abs(int(c[i]) - bg[i]) < 12 for i in range(3))
+    left = 0
+    while left < w and _bg(px[left, h // 2]):
+        left += 1
+    right = w - 1
+    while right >= 0 and _bg(px[right, h // 2]):
+        right -= 1
+    margin_l = left / w
+    margin_r = (w - 1 - right) / w
+    # 15% threshold: catches a real letterbox (the old QPixmap bug was
+    # ~40%+ on the panel slot), while allowing for the normal text /
+    # label overflows that a tight crop leaves at most ~10-12%.
+    assert margin_l < 0.15, f"left margin {margin_l:.2%} — letterboxed"
+    assert margin_r < 0.15, f"right margin {margin_r:.2%} — letterboxed"
+    plt.close("all")
+
+
 def test_draw_orbit_panel_figure_dimensions():
     # a chart drawn for the panel keeps the preset figure, the override
     # doubles it (the PNG itself is tight-cropped on save — style.save)

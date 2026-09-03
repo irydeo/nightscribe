@@ -16,18 +16,21 @@ from pathlib import Path
 
 import matplotlib
 
+from . import palette
+
 logger = logging.getLogger(__name__)
 
 # One style for every chart, used by the GUI canvas and the PNG exports
-# alike (see ADR-010). Dark space theme, consistent accents.
+# alike (see ADR-010). The *colours* live in `viz.palette` (no matplotlib
+# dependency, importable from the PySide6-only GUI chart widgets); ADR-029.
 
-BG = "#0b0d17"
-FG = "#e8eaf2"
-ACCENT = "#ffb347"      # warm orange: the object
-ACCENT2 = "#6ec1ff"     # cool blue: Earth
-MUTED = "#8a90a6"       # labels and grids
-SUN = "#ffd76e"
-DANGER = "#ff6b6b"
+BG     = palette.BG
+FG     = palette.FG
+ACCENT = palette.ACCENT
+ACCENT2 = palette.ACCENT2
+MUTED  = palette.MUTED
+SUN    = palette.SUN
+DANGER = palette.DANGER
 
 SIZES = {"instagram": (1080, 1080), "facebook": (1200, 630),
          "panel": (1200, 675)}

@@ -149,6 +149,13 @@ class ChartView(QGraphicsView):
             return
         r = r.adjusted(-r.width() * pad, -r.height() * pad,
                        r.width() * pad, r.height() * pad)
+        # Pin the scene rect to the padded frame before fitting. QGraphicsView
+        # auto-grows its sceneRect to enclose every item, so a stray out-of-
+        # frame item (e.g. a safe/transit band for a session that falls outside
+        # the night, or a best-time marker) would otherwise pull fitInView off
+        # centre and clip the chart. Anchoring it here keeps the fit exactly on
+        # the chart's own frame, for every chart built on this base.
+        self.setSceneRect(r)
         self.fitInView(r, Qt.KeepAspectRatio)
 
     def reset_view(self):

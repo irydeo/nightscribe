@@ -266,8 +266,11 @@ Antes de la Fase D, el **PUNTO DE ENTRADA** histórico (proyecto UX v3, fases 1-
    Los **formatos nativos de NINA/CCDciel/TheSkyX/CdC** son puntos de partida que requieren
    validación contra las versiones del usuario en importación real (ADR-021).
 
- **Próximos pasos sugeridos** (fuera del rediseño inicial):
- - *(Hecho 2026-08-28: el horizonte TheSkyX real ya se interpreta y manda sobre `min_alt` — E1+E2 arriba.)*
+  **Próximos pasos sugeridos** (fuera del rediseño inicial):
+  - **`ApproachChart` (plan 2026-09-04)**: carta vectorial animada geocéntrica
+    (Tierra / Luna de referencia) como 5º slot del grid del panel. El plan
+    completo está en `docs/PLANS/approach-chart.md`.
+  - *(Hecho 2026-08-28: el horizonte TheSkyX real ya se interpreta y manda sobre `min_alt` — E1+E2 arriba.)*
  - **Icono lunar real (2026-08-27)**: `gui/moon_icon.py` compone el disco de
    la Luna (`assets/moon_disk.png`, foto CC BY-SA 3.0 — `assets/ATTRIBUTION.txt`)
    con el terminador por geometría exacta (`r·cos E`), creciente a la derecha /

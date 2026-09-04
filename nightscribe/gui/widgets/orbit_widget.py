@@ -37,10 +37,12 @@ at the top of `gui/widgets/__init__.py`); the colours come from `viz.palette`.
 """
 
 import math
-from PySide6.QtCore import (Qt, QTimer, Signal, QEvent, QElapsedTimer)
-from PySide6.QtGui import QPen, QBrush, QColor, QPainterPath
+from PySide6.QtCore import Qt, QTimer, Signal, QEvent, QElapsedTimer, QRectF, QPointF
+from PySide6.QtGui import (QPen, QBrush, QColor, QPainterPath,
+                           QPixmap, QPainter, QPolygonF, QIcon)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                               QPushButton, QSlider, QSizePolicy, QLabel,
+                               QPushButton, QSlider, QSizePolicy,
+                               QLabel,
                                QGraphicsEllipseItem, QGraphicsPathItem,
                                QGraphicsSimpleTextItem)
 
@@ -89,6 +91,51 @@ def _bound_orbit(elements):
     return True
 
 
+def _play_icon(px: int = 16) -> QIcon:
+    # @args: px - icon width/height in device px
+    # @return: QIcon with a solid white "play" triangle on a transparent
+    #         canvas. We draw it ourselves instead of using the theme's
+    #         standardIcon so the colour never changes with the active
+    #         QStyle (dark theme -> theme icon is barely visible).
+    pm = QPixmap(px, px)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    # triangle sits a little right-of-centre so it reads as "play"
+    tri = QPolygonF([
+        QPointF(px * 0.30, px * 0.22),
+        QPointF(px * 0.30, px * 0.78),
+        QPointF(px * 0.80, px * 0.50),
+    ])
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor("white"))
+    p.drawPolygon(tri)
+    p.end()
+    return QIcon(pm)
+
+
+def _pause_icon(px: int = 16) -> QIcon:
+    # @args: px - icon width/height in device px
+    # @return: QIcon with two solid white vertical bars.
+    pm = QPixmap(px, px)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing, True)
+    w = px * 0.20
+    gap = px * 0.14
+    bar_h = px * 0.64
+    top = (px - bar_h) / 2.0
+    p.setPen(Qt.NoPen)
+    p.setBrush(QColor("white"))
+    cx = px * 0.5
+    left = cx - gap / 2.0 - w
+    right = cx + gap / 2.0
+    p.drawRect(QRectF(left, top, w, bar_h))
+    p.drawRect(QRectF(right, top, w, bar_h))
+    p.end()
+    return QIcon(pm)
+
+
 class OrbitChart(QWidget):
     """The interactive orbit chart: a vector canvas + time controls."""
 
@@ -105,8 +152,12 @@ class OrbitChart(QWidget):
         self.view = ChartView()
 
         # -- controls row: play/pause + the time slider + the status line --
-        self._play_btn = QPushButton("Play")
-        self._play_btn.setFixedSize(54, 24)
+        # Icon-based (Qt standard media icons) so no string is ever visible
+        # on the button — nothing to translate, no font dependence.
+        self._play_btn = QPushButton()
+        self._play_btn.setIcon(_play_icon())
+        self._play_btn.setToolTip(self.tr("Play"))
+        self._play_btn.setFixedHeight(24)
         self._play_btn.clicked.connect(self._toggle_play)
         self._slider = QSlider(Qt.Horizontal)
         self._slider.setRange(0, 1000)
@@ -634,7 +685,8 @@ class OrbitChart(QWidget):
         self._set_play_label()
 
     def _set_play_label(self):
-        self._play_btn.setText("Pause" if self._running else "Play")
+        self._play_btn.setIcon(_pause_icon() if self._running else _play_icon())
+        self._play_btn.setToolTip(self.tr("Pause" if self._running else "Play"))
 
     def _reset_controls(self):
         # No orbit loaded yet: the controls are inert until set_elements().

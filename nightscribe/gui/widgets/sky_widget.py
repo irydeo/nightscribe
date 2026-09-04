@@ -48,13 +48,27 @@ from ...viz import palette
 from .base_chart import ChartView
 
 
-# The scene works in a *normalised* coordinate system: the framed half-extent
-# is always _HALF scene units on each axis, independent of the night's span
+# The scene works in a *normalised* coordinate system: the data-area
+# half-extent is always _HALF scene units, independent of the night's span
 # in hours. That keeps the fonts and line widths scale-independent (a
 # QGraphicsScene font is in scene units and quantises to whole pixels, so it
 # would dwarf a short night or dwarf the labels of a long one otherwise).
 # Same convention as orbit_widget.py.
 _HALF = 500.0
+
+# Reserved bands OUTSIDE the data area so the hour tick labels and the two
+# axis captions never sit on top of the plot (before the fix they were
+# painted inside the data region and collided with the curve / "90°" tick).
+# The scene rect is widened by exactly these two bands (see _build_scene);
+# the data mapping stays the same — alt 90° is still the top edge (-_HALF)
+# and alt 0° the bottom edge (+_HALF), so hover / safe-band math is unchanged.
+_BAND_TOP = 95.0     # above the data: "90°" tick + the "Alt (°)" caption
+_BAND_BOT = 100.0    # below the data: the hour labels + the "UTC…" caption
+# Minimum centre-to-centre spacing (scene units) between two adjacent hour
+# labels. On a long night (say 12 h+, where every-integer labels would kiss)
+# _build_scene bumps the hour step up until the spacing honours this, so the
+# labels keep breathing room instead of running together.
+_GAP_H = 95.0
 
 # Scene z-order (higher is drawn on top) so labels never hide under a band.
 _Z_DARK = 0.0
@@ -67,10 +81,11 @@ _Z_TRANSIT = 6.0
 _Z_BEST = 7.0
 _Z_LABEL = 8.0
 
-# A cursor within this fraction of _HALF of the target curve counts as
-# "on the curve", so the hover probe fires without pixel-snapping.
-# 8% (same as orbit_widget._HIT_TOL) — forgiving to the eye, precise enough
-# to be useful (the curve is 10-min sampled).
+# A cursor this close to the target curve (a fraction of _HALF, in DATA
+# units) counts as "on the curve", so the hover probe fires without the
+# user needing to pixel-snap. 8% (same as orbit_widget._HIT_TOL) is
+# forgiving to the eye, precise enough to be useful (the curve is 10-min
+# sampled).
 _HIT_TOL = 0.08
 
 # Font sizes in scene units (kept the same order of magnitude as
@@ -252,20 +267,31 @@ class SkyChart(QWidget):
         # limit, the dark-window shading, the safe-window band and the
         # best-time marker (and, for TransitChart, the transit band).
         self.view.clear()
-        self.view.set_scene_rect(-_HALF, -_HALF, 2.0 * _HALF, 2.0 * _HALF)
+        # Widen the scene by the two label bands (the data area keeps its
+        # -_HALF..+_HALF shape; only the frame grows so the hour labels and
+        # the captions have room outside the plot).
+        self.view.set_scene_rect(-_HALF, -_HALF - _BAND_TOP,
+                                 2.0 * _HALF, 2.0 * _HALF + _BAND_TOP + _BAND_BOT)
 
         # --- grid: hour + altitude ticks (drawn first, so they sit behind) --
         span = self._span_h
         # altitude ticks at 15°, 30°, 45°, 60°, 75°, 90° (a horizontal line at
-        # each degree, plus a small degree label to the left)
+        # each degree, plus a small degree label to the left; nudge it 8 units
+        # in from the frame so the text does not kiss the plot border)
         for a in (15, 30, 45, 60, 75, 90):
             x0, y0 = self._to_scene(-1.0, a)
             x1, y1 = self._to_scene(-1.0 + span + 2.0, a)
             self._add_grid_line(x0, y0, x1, y1)
-            self._add_tick_label(f"{a}°", x0 + 2, y0 + _FONT_TICK / 2,
+            self._add_tick_label(f"{a}°", x0 + 8, y0 - _FONT_TICK / 2,
                                  QColor(palette.MUTED), bold=False)
-        # hour labels at every integer boundary (including the 1 h of margin
-        # on either side) so the axis never shows "26/28"
+        # hour labels in the BOTTOM band (below y=+_HALF, i.e. below alt=0°).
+        # Every integer gridline still gets a vertical line; but the *labels*
+        # are drawn every `step` hours so they keep _GAP_H apart even on a
+        # 12 h+ night (step stays 1 on a normal short night).
+        per_hour = (2.0 * _HALF) / max(1e-9, span + 2.0)
+        step = 1
+        while step * per_hour < _GAP_H and step < 24:
+            step += 1
         if self._samples:
             start = self._samples["start"]
         else:
@@ -273,13 +299,19 @@ class SkyChart(QWidget):
         if start is not None:
             for i in range(-1, int(span) + 2):
                 p = float(i)
-                sx0, sy0 = self._to_scene(p, 0.0)
-                sx1, sy1 = self._to_scene(p, 90.0)
-                self._add_grid_line(sx0, sy0, sx1, sy1)
+                sx0, _ = self._to_scene(p, 0.0)
+                # vertical gridline still spans the data area (0° .. 90°)
+                sx1, sy_top = self._to_scene(p, 90.0)
+                self._add_grid_line(sx0, _HALF, sx1, sy_top)
+                if i % step != 0:
+                    continue
                 label = f"{(start + _dt.timedelta(hours=i)):%H:%M}Z"
-                self._add_tick_label(label, sx0 - _FONT_TICK / 2,
-                                     sy1 + _FONT_TICK / 2 + 2,
-                                     QColor(palette.MUTED), bold=False)
+                it = self._add_tick_label(label, 0, _HALF + 14,
+                                          QColor(palette.MUTED), bold=False)
+                # centre the label exactly on its gridline using its real
+                # bounding box (no more guessing at a width)
+                w = it.boundingRect().width()
+                it.setPos(sx0 - w / 2.0, _HALF + 14)
         self._add_axis_caption_alt()
         self._add_axis_caption_time()
 
@@ -407,27 +439,36 @@ class SkyChart(QWidget):
         return it
 
     def _add_axis_caption_alt(self):
-        # A short axis label ("Alt (°)") on the left, "h →" at the top.
-        it = QGraphicsSimpleTextItem(self.tr("Alt (°)"))
-        it.setBrush(QBrush(QColor(palette.FG)))
-        f = self._label_font
-        f.setPixelSize(_FONT_LABEL)
-        it.setFont(f)
-        it.setPos(-_HALF + 6, -_HALF - 2)
-        it.setZValue(_Z_LABEL)
-        self.view.scene().addItem(it)
-        self.view._items_registered.append(it)
+        # "Alt (°)" — the altitude axis title, in the TOP band (above the
+        # data), left-aligned and clearly clear of the "90°" tick, so it
+        # never sits on the plot or on another label.
+        it = self._caption(self.tr("Alt (°)"))
+        # anchor the caption's centre a little above the data top edge
+        cy = -_HALF - _BAND_TOP * 0.55
+        it.setPos(-_HALF + 6, cy - it.boundingRect().height() / 2.0)
 
     def _add_axis_caption_time(self):
-        it = QGraphicsSimpleTextItem(self.tr("UTC (h desde anochecer)"))
+        # "UTC…" — the time axis title, in the BOTTOM band (below the data),
+        # centred under the hour labels, clear of them by its real height.
+        it = self._caption(self.tr("UTC (h desde anochecer)"))
+        w = it.boundingRect().width()
+        cy = _HALF + _BAND_BOT * 0.75
+        it.setPos(-(w / 2.0), cy - it.boundingRect().height() / 2.0)
+
+    def _caption(self, text):
+        # @args: text - the caption string (already translated)
+        # @return: a QGraphicsSimpleTextItem at _Z_LABEL, font _FONT_LABEL,
+        #          placed in the scene (the caller sets the final pos, using
+        #          the real boundingRect for centring, so nothing kisses).
+        it = QGraphicsSimpleTextItem(text)
         it.setBrush(QBrush(QColor(palette.FG)))
         f = self._label_font
         f.setPixelSize(_FONT_LABEL)
         it.setFont(f)
-        it.setPos(_HALF - 260, _HALF - _FONT_LABEL - 4)
         it.setZValue(_Z_LABEL)
         self.view.scene().addItem(it)
         self.view._items_registered.append(it)
+        return it
 
     def _add_poly(self, rel, alt, color, width, dash, z):
         # @args: rel, alt - parallel arrays (hours from start, degrees);

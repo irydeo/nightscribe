@@ -82,7 +82,8 @@ def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
             ticks.append(p)
             labels.append(f"{(start + datetime.timedelta(hours=i)):%H:%M}Z")
     ax.set_xticks(ticks)
-    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    # flat labels — shorter than the slot width, no angle to fight the axis.
+    ax.set_xticklabels(labels, rotation=0, ha="center", fontsize=8)
 
     ax.plot(rel, alts, color=style.ACCENT, lw=2.2,
             label=obj_name or style.pick(lang, "Objeto", "Object"))
@@ -133,9 +134,11 @@ def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
 
     ax.set_xlim(-1, span + 1)
     ax.set_ylim(0, 90)
+    # labelpad 10-11 pt: clear the (now horizontal) hour labels below so the
+    # axis title never kisses the tick text.
     ax.set_xlabel(style.pick(lang, "UTC (h) desde el anochecer",
-                             "UTC (h) from dusk"))
-    ax.set_ylabel(style.pick(lang, "Altitud (°)", "Altitude (°)"))
+                             "UTC (h) from dusk"), labelpad=11)
+    ax.set_ylabel(style.pick(lang, "Altitud (°)", "Altitude (°)"), labelpad=8)
     ax.set_title(obj_name or style.pick(lang, "Cielo nocturno", "Night sky"),
                  loc="left")
     ax.legend(loc="upper right", fontsize=8, framealpha=0.2)

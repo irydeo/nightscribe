@@ -317,7 +317,7 @@ class ApproachChart(QWidget):
         circle.setZValue(_Z_REF)
         self.view.scene().addItem(circle)
         self.view._items_registered.append(circle)
-        self._add_label("1 LD", r_circle, -_FONT_PX,
+        self._add_label(self.tr("1 LD"), r_circle, -_FONT_PX,
                         QColor(palette.MUTED), bold=False)
 
         # Moon: a fixed scale reference at its real position for track_center.
@@ -328,12 +328,12 @@ class ApproachChart(QWidget):
         except Exception:
             mx = my = 0.0
         self._add_dot(mx, my, _DOT_MOON, _MOON_COLOR, _Z_MARK)
-        self._add_label("Moon", mx + _DOT_MOON + 2, my - _FONT_PX,
+        self._add_label(self.tr("Moon"), mx + _DOT_MOON + 2, my - _FONT_PX,
                         _MOON_COLOR, bold=False)
 
         # Earth at the origin.
         self._add_dot(0.0, 0.0, _DOT_EARTH, QColor(palette.ACCENT2), _Z_MARK)
-        self._add_label("Earth", _DOT_EARTH + 2, -_FONT_PX,
+        self._add_label(self.tr("Earth"), _DOT_EARTH + 2, -_FONT_PX,
                         QColor(palette.ACCENT2), bold=True)
 
         # Geocentric track (dashed, ACCENT).
@@ -397,7 +397,8 @@ class ApproachChart(QWidget):
         item.setZValue(_Z_MARK)
         self.view.scene().addItem(item)
         self.view._items_registered.append(item)
-        self._add_label("CA  %.2f LD" % d_ld, cx + r + 4, cy - _FONT_PX,
+        self._add_label(self.tr("CA %1 LD").replace("%1", "%.2f" % d_ld),
+                        cx + r + 4, cy - _FONT_PX,
                         QColor(palette.ACCENT), bold=True)
         return item
 

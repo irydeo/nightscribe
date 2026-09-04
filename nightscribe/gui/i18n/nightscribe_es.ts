@@ -1143,6 +1143,11 @@
         <translation>Clic para ampliar / exportar</translation>
     </message>
     <message>
+        <location filename="../overview.py" line="42"/>
+        <source>Approach</source>
+        <translation>Aproximación</translation>
+    </message>
+    <message>
         <location filename="../overview.py" line="252"/>
         <source>Loading…</source>
         <translation>Cargando…</translation>
@@ -1956,6 +1961,49 @@
         <location filename="../widgets/orbit_widget.py" line="0"/>
         <source>CA %1 AU (%2)</source>
         <translation>CA %1 AU (%2)</translation>
+    </message>
+</context>
+<context>
+    <name>ApproachChart</name>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>1 LD</source>
+        <translation>1 LD</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>Moon</source>
+        <translation>Luna</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>Earth</source>
+        <translation>Tierra</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>CA %1 LD</source>
+        <translation>CA %1 LD</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>no return (open orbit)</source>
+        <translation>sin retorno (órbita abierta)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>CA %1 LD (%2)</source>
+        <translation>CA %1 LD (%2)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>Play</source>
+        <translation>Reproducir</translation>
+    </message>
+    <message>
+        <location filename="../widgets/approach_widget.py" line="0"/>
+        <source>Pause</source>
+        <translation>Pausa</translation>
     </message>
 </context>
 </TS>

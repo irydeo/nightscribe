@@ -266,9 +266,9 @@ def test_explore_not_found_state(panel, qapp):
 # children and checking _slot_data for the vector ones.
 
 def _grid_widgets(panel):
-    """@return: list of child widgets in the charts grid."""
+    """@return: list of child widgets in the charts grid (5-slot layout)."""
     return [panel._grid.itemAt(r * 2 + c).widget()
-            for r in range(2) for c in range(2)
+            for r in range(3) for c in range(2)
             if panel._grid.itemAt(r * 2 + c)]
 
 
@@ -329,6 +329,50 @@ def test_charts_slot_title_recorded(panel):
     panel.show(FAKE_ELEMENT)
     assert "orbit" in panel._slot_titles, "orbit title not recorded"
     assert panel._slot_titles["orbit"], "orbit title is empty"
+
+
+def test_approach_slot_present_for_bound_orbit(panel):
+    # The approach slot is the third cell (row 1, col 0) and appears for a
+    # body with propagatable elements (a or q) — FAKE_ELEMENT has both.
+    panel.show(FAKE_ELEMENT)
+    from nightscribe.gui.widgets.approach_widget import ApproachChart
+    widgets = _grid_widgets(panel)
+    ap_w = next((w for w in widgets if isinstance(w, ApproachChart)), None)
+    assert ap_w is not None, "no ApproachChart in the grid"
+    assert ap_w.property("chart_key") == "approach"
+    # grid cell: 5th slot -> index 2 -> (1, 0)
+    assert panel._grid.itemAt(1 * 2 + 0).widget() is ap_w
+    # rebuild data is stored for the click-through viewer
+    assert "approach" in panel._slot_data
+    assert "elements" in panel._slot_data["approach"]
+    assert "jd" in panel._slot_data["approach"]
+    assert "approach" in panel._slot_titles
+
+
+def test_approach_slot_rebuild_widget_works(panel):
+    # Clicking the slot rebuilds a fresh ApproachChart for the viewer:
+    # the rebuilt widget must accept the stored data without raising and
+    # expose the same elements.
+    panel.show(FAKE_ELEMENT)
+    data = panel._slot_data.get("approach")
+    assert data is not None, "approach slot data missing"
+    rebuilt = panel._rebuild_widget("approach", data)
+    from nightscribe.gui.widgets.approach_widget import ApproachChart
+    assert isinstance(rebuilt, ApproachChart)
+    assert rebuilt.elements() == data["elements"]
+
+
+def test_approach_slot_absent_without_elements(panel):
+    # FAKE_UNCONFIRMED has no sbdb: the approach chart cannot be drawn,
+    # and it must not appear (nor leave a dangling title for it).
+    from nightscribe.gui.widgets.approach_widget import ApproachChart
+    panel.show(FAKE_UNCONFIRMED)
+    widgets = _grid_widgets(panel)
+    assert not any(isinstance(w, ApproachChart) for w in widgets)
+    assert "approach" not in panel._slot_data
+    # and the make/extract helpers answer None for it
+    assert panel._make_vector("approach", FAKE_UNCONFIRMED) is None
+    assert panel._extract("approach", FAKE_UNCONFIRMED) is None
 
 
 # ---------------- D3: capture / window block ----------------

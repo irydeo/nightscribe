@@ -1987,7 +1987,7 @@ class MainWindow(QMainWindow):
 
         def _fit(_e):
             # Once the panel is ready, fit the dialog to its natural
-            # content size so the 2×2 chart grid and the parameters
+            # content size so the charts grid and the parameters
             # table fit without visible scroll. The 0 ms pump lets
             # the panels' lazy sizeHints resolve first.
             QTimer.singleShot(0, _apply_fit)

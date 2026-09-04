@@ -40,15 +40,17 @@ from . import theme
 
 # Viewer / slot titles, translated at the point of use.
 _TITLE = {"orbit": "Orbit", "sky": "Sky tonight",
+          "approach": "Approach",
           "field": "Reference field", "transit": "Light curve"}
 
 # Grid order, left to right; the ones build_charts actually produced are
 # laid out in this order (the rest stay hidden).
-_CHART_SLOTS = ("orbit", "sky", "field", "transit")
+_CHART_SLOTS = ("orbit", "sky", "approach", "field", "transit")
 
-# Slots that get a live vector widget (OrbitChart / SkyChart); the rest
-# keep the QLabel+QPixmap route (light curve / cutout have no widget yet).
-_VECTOR_SLOTS = frozenset({"orbit", "sky"})
+# Slots that get a live vector widget (OrbitChart / SkyChart /
+# ApproachChart); the rest keep the QLabel+QPixmap route (light curve
+# / cutout have no widget yet).
+_VECTOR_SLOTS = frozenset({"orbit", "sky", "approach"})
 
 
 def _chip(text, color, tip=""):
@@ -207,9 +209,10 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         layout.addWidget(self.grp_params)
 
-        # charts 2×2 (D2): orbit/sky are vector widgets; field/transit are
-        # QLabel+QPixmap. The grid is filled in _render_charts and emptied
-        # by _empty_grid (state transitions: ready -> blank -> ready).
+        # charts grid (D2): orbit/sky/approach are vector widgets;
+        # field/transit are QLabel+QPixmap. The grid is filled in
+        # _render_charts and emptied by _empty_grid (state transitions:
+        # ready -> blank -> ready).
         self.grp_charts = QGroupBox(self.tr("Charts"))
         self._grid = QGridLayout(self.grp_charts)
         self._grid.setSpacing(8)
@@ -469,7 +472,7 @@ class ObjectPanel(QWidget):
     # slots it only acts as a "can I make this chart?" gate.
 
     def _render_charts(self, e):
-        # Builds the 2×2 charts grid for this object.
+        # Builds the charts grid for this object.
         # @args: e - enriched dict
         from ..core import post
         outdir = self._chart_dir or paths.data_dir() / "posts"
@@ -484,6 +487,19 @@ class ObjectPanel(QWidget):
         self._empty_grid()
 
         for key in _CHART_SLOTS:
+            # "approach" is a pure-vector slot: build_charts never returns
+            # an "approach" PNG, so gate on orbital elements directly.
+            if key == "approach":
+                self._slot_titles[key] = self.tr(_TITLE[key])
+                w = self._make_vector(key, e)
+                if w is not None:
+                    row, col = self._slot_rowcol(key)
+                    w.setProperty("chart_key", key)
+                    w.setCursor(Qt.PointingHandCursor)
+                    w.installEventFilter(self._slot_click)
+                    self._slot_data[key] = self._extract(key, e)
+                    self._grid.addWidget(w, row, col)
+                continue
             chart = charts.get(key)
             if not chart:
                 continue  # omit what is missing
@@ -500,15 +516,17 @@ class ObjectPanel(QWidget):
             else:
                 self._place_png(key, chart)
 
-        self.grp_charts.setVisible(bool(charts))
+        # "approach" is purely vector: the group must stay visible even
+        # when build_charts produced no PNG (elements without an ephemeris).
+        self.grp_charts.setVisible(bool(charts) or bool(self._slot_data))
 
     def _slot_rowcol(self, key):
-        # @return: (row, col) of the slot in the 2×2 grid
+        # @return: (row, col) of the slot in the charts grid
         idx = _CHART_SLOTS.index(key)
         return (idx // 2, idx % 2)
 
     def _empty_grid(self):
-        # Removes every widget from the 2×2 chart grid and clears slot state.
+        # Removes every widget from the charts grid and clears slot state.
         gl = self._grid
         while gl.count():
             item = gl.takeAt(0)
@@ -568,6 +586,22 @@ class ObjectPanel(QWidget):
                 horizon=data.get("horizon"),
                 transit=data.get("transit"),
                 margin=data.get("margin", 0.0))
+            return w
+        elif key == "approach":
+            # A pure vector slot: needs elements that can actually be
+            # propagated (a/q plus the time data); the widget itself
+            # degrades gracefully, but without those we cannot draw.
+            from ..core import coords
+            d = e.get("data") or {}
+            sb = d.get("sbdb")
+            els = (sb or {}).get("elements")
+            if not els or (els.get("a") is None and els.get("q") is None):
+                return None
+            jd = coords.jd_from_datetime(
+                datetime.datetime.now(datetime.timezone.utc))
+            from .widgets.approach_widget import ApproachChart
+            w = ApproachChart()
+            w.set_elements(els, jd, e.get("name", ""))
             return w
         return None
 
@@ -647,6 +681,16 @@ class ObjectPanel(QWidget):
                 "margin": margin, "transit": tr,
             }
 
+        elif key == "approach":
+            d = e.get("data") or {}
+            sb = d.get("sbdb")
+            els = (sb or {}).get("elements")
+            if not els or (els.get("a") is None and els.get("q") is None):
+                return None
+            jd = coords.jd_from_datetime(
+                datetime.datetime.now(datetime.timezone.utc))
+            return {"elements": els, "jd": jd, "name": e.get("name", "")}
+
         return None
 
     def _rebuild_widget(self, key, data):
@@ -671,6 +715,12 @@ class ObjectPanel(QWidget):
                 horizon=data.get("horizon"),
                 transit=data.get("transit"),
                 margin=data.get("margin", 0.0))
+            return w
+        elif key == "approach":
+            from .widgets.approach_widget import ApproachChart
+            w = ApproachChart()
+            w.set_elements(data["elements"], data["jd"],
+                            data.get("name", ""))
             return w
         return None
 

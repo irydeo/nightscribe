@@ -1,6 +1,14 @@
 # ADR-028: Settings as four tabs — el diálogo deja de crecer en vertical
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-29
+**Estado / Status**: Accepted (actualizado 2026-09-04) · **Fecha / Date**: 2026-08-29
+
+> **Actualización (2026-09-04)**: la pestaña **Charts** (`tab_charts` /
+> `chart_zoom`) se ha eliminado — la opción de resolución "re-scale vs.
+> re-draw 2×" se retiró al añadir los widgets vectoriales (ADR-029), que
+> dibujan a resolución nativa y hacen la opción redundante. El diálogo
+> queda por tanto en **tres** pestañas (Site & equipment / Observing /
+> Integrations). El texto histórico de abajo conserva el porqué del
+> reordenamiento; el resultado vigente es de tres pestañas.
 
 ## Español
 
@@ -22,7 +30,8 @@ copiando el fichero de settings — no eran visibles en ningún sitio:
 
 **Decisión**: reorganizar `settings_dialog.ui` como un `QTabWidget` de
 cuatro pestañas, agrupando por tarea del usuario (no por origen del
-ajuste):
+ajuste). _Vigencia hoy: tres pestañas — la de Charts se retiró el
+2026-09-04 (ver actualización de arriba):_
 
 1. **Site & equipment** (`tab_site`) — quién es y con qué observa:
    `grp_language` (nuevo: `cmb_language`), `grp_site` (código MPC,
@@ -35,6 +44,8 @@ ajuste):
    (`spn_overhead`).
 3. **Charts** (`tab_charts`) — calidad de los gráficos:
    `cmb_chart_zoom` (fast re-scale vs. re-draw 2×) + `lbl_chart_zoom`.
+   _(retirada 2026-09-04: la opción `chart_zoom` eliminó con los
+   widgets vectoriales de ADR-029, que dibujan a resolución nativa)_
 4. **Integrations** (`tab_integrations`) — claves API opcionales:
    NEOfixer, Astrometry y las nuevas `edt_tns_bot` / `edt_tns_bot_key`.
 
@@ -98,7 +109,9 @@ editing the settings file — no GUI exposed them:
    the posts) had no fields anywhere in the GUI.
 
 **Decision**: restructure `settings_dialog.ui` as a `QTabWidget` with
-four tabs, grouped by user task (not by origin of the setting):
+four tabs, grouped by user task (not by origin of the setting). _Current
+state: three tabs — the Charts tab was removed on 2026-09-04 (see the
+update note above):_
 
 1. **Site & equipment** (`tab_site`) — who and with what you observe:
    `grp_language` (new: `cmb_language`), `grp_site` (MPC code, name,
@@ -111,6 +124,8 @@ four tabs, grouped by user task (not by origin of the setting):
    (`spn_overhead`).
 3. **Charts** (`tab_charts`) — chart quality: `cmb_chart_zoom`
    (fast re-scale vs. 2× re-draw) + `lbl_chart_zoom`.
+   _(removed 2026-09-04: the `chart_zoom` option went away with the
+   vector widgets of ADR-029, which render at native resolution)_
 4. **Integrations** (`tab_integrations`) — optional API keys:
    NEOfixer, Astrometry and the new `edt_tns_bot` / `edt_tns_bot_key`.
 

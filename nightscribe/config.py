@@ -47,9 +47,6 @@ DEFAULTS = {
     "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert"],
     "tonight_kind": "",           # last-used header filter; "" = "All"
     "best_per_kind_n": 5,         # per-kind cap for the Tonight grid
-    # panel chart resolution mode: "scale" (fast 1× re-scale) |
-    # "re-render" (charts drawn at 2× for crispness in big slots)
-    "chart_zoom": "scale",
 }
 
 

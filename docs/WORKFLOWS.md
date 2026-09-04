@@ -179,13 +179,17 @@ truncated `lbl_context` header (`gui/ui/projects_tab.ui:51`).
    **hidden** instead of a "why not" line; when no chart is generated at all,
    the whole group disappears. Panel charts use the `panel` size (1200×675,
    added to `style.SIZES`) for less margin and more legibility in the window.
-4. **Chart resolution setting**: `Settings > Panel charts` adds a
-   *On window resize* choice — **Fast** (the chart is drawn once at the
-   `panel` size and re-scaled, the default) or **Sharper** (re-drawn at 2×,
-   2400×1350, so big slots stay crisp). Stored as `config["chart_zoom"]`
-   (`"scale"` / `"re-render"`) and read by `ObjectPanel` before every
-   `build_charts` call; switching the setting while a panel is on screen
-   re-draws it (`rebuild_charts`).
+ 4. **Chart resolution setting**: `Settings > Panel charts` adds a
+    *On window resize* choice — **Fast** (the chart is drawn once at the
+    `panel` size and re-scaled, the default) or **Sharper** (re-drawn at 2×,
+    2400×1350, so big slots stay crisp). Stored as `config["chart_zoom"]`
+    (`"scale"` / `"re-render"`) and read by `ObjectPanel` before every
+    `build_charts` call; switching the setting while a panel is on screen
+    re-draws it (`rebuild_charts`).
+    _(Removed 2026-09-04: the `chart_zoom` option and the Settings > Charts
+    tab were dropped once the ADR-029 vector widgets arrived, which render at
+    native resolution. See `docs/adr/ADR-028` and the Slice 0 of
+    `docs/PLANS/approach-chart.md`.)_
 5. **Chart viewer opens fitted**: clicking a chart opens `ChartViewer`
    fitted to the window — the dialog is sized to the image's aspect so the
    default view fills it without scrolling (wheel zoom / drag pan / 1:1

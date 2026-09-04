@@ -13,8 +13,8 @@
 
 """Settings dialog layout smoke tests (offscreen, ADR-028).
 
-The dialog is now a QTabWidget with four tabs (Site & equipment /
-Observing / Charts / Integrations) instead of eight stacked boxes.
+The dialog is now a QTabWidget with three tabs (Site & equipment /
+Observing / Integrations) instead of eight stacked boxes.
 What these tests lock in:
 
 * the tab order and the widgets that live on each tab;
@@ -58,10 +58,10 @@ def _tab_widgets(dlg, index):
     return [w.objectName() for w in page.findChildren(QWidget) if w.objectName()]
 
 
-def test_four_tabs_in_order(qapp):
+def test_three_tabs_in_order(qapp):
     dlg = _dlg()
     tabs = _tab_names(dlg)
-    assert len(tabs) == 4
+    assert len(tabs) == 3
     # the last tab (integrations) is stable in every locale — it is the
     # API-keys page, named identically in ES and EN on purpose
     assert tabs[-1] in ("Integrations", "Integraciones")
@@ -106,17 +106,9 @@ def test_observating_tab_widgets(qapp):
     dlg.deleteLater()
 
 
-def test_charts_tab_widgets(qapp):
-    dlg = _dlg()
-    names = set(_tab_widgets(dlg, 2))
-    assert "cmb_chart_zoom" in names
-    assert "lbl_chart_zoom" in names
-    dlg.deleteLater()
-
-
 def test_integrations_tab_widgets(qapp):
     dlg = _dlg()
-    names = set(_tab_widgets(dlg, 3))
+    names = set(_tab_widgets(dlg, 2))
     for w in ["edt_neofixer_key", "edt_astrometry_key",
               "edt_tns_bot", "edt_tns_bot_key"]:
         assert w in names, f"{w} expected on the Integrations tab"

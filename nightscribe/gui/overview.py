@@ -50,9 +50,6 @@ _CHART_SLOTS = ("orbit", "sky", "field", "transit")
 # keep the QLabel+QPixmap route (light curve / cutout have no widget yet).
 _VECTOR_SLOTS = frozenset({"orbit", "sky"})
 
-# The re-render mode (Settings > Charts) draws 2× the panel preset.
-_RENDER2X = (2400, 1350)
-
 
 def _chip(text, color, tip=""):
     # @return: a small pill label, the same idiom the Tonight rows use
@@ -476,16 +473,14 @@ class ObjectPanel(QWidget):
         # @args: e - enriched dict
         from ..core import post
         outdir = self._chart_dir or paths.data_dir() / "posts"
-        size = _RENDER2X if self._chart_zoom() == "re-render" else None
         try:
             charts = post.build_charts(e, outdir, "_overview_",
-                                       cfg=self._chart_cfg(), fmt="panel",
-                                       size=size)
+                                       cfg=self._chart_cfg(), fmt="panel")
         except Exception:
             charts = {}
 
-        # Start from an empty grid (the panel can re-render on a new
-        # object or after a resolution-mode change).
+        # Start from an empty grid (the panel re-renders when the object
+        # changes).
         self._empty_grid()
 
         for key in _CHART_SLOTS:
@@ -678,17 +673,6 @@ class ObjectPanel(QWidget):
                 margin=data.get("margin", 0.0))
             return w
         return None
-
-    def rebuild_charts(self):
-        # Re-draws the charts with the active resolution mode.
-        if self._e is None:
-            return
-        self._render_charts(self._e)
-
-    def _chart_zoom(self):
-        # @return: "scale" | "re-render" (config, default "scale")
-        from ..config import config
-        return config.get("chart_zoom", "scale")
 
     def _chart_cfg(self):
         # @return: the active Config

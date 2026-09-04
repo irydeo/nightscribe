@@ -401,13 +401,6 @@ class MainWindow(QMainWindow):
         dlg.edt_horizon_file.textChanged.connect(
             lambda _t: self._horizon_file_preview(dlg))
         self._horizon_file_preview(dlg)
-        # panel chart resolution mode: populate the options in a stable order
-        dlg.cmb_chart_zoom.addItems([
-            self.tr("Fast: re-scale the pre-drawn chart (default)"),
-            self.tr("Sharper: re-draw the chart at 2× resolution")])
-        zoom = config.get("chart_zoom", "scale")
-        idx = 0 if zoom == "scale" else 1
-        dlg.cmb_chart_zoom.setCurrentIndex(idx)
         dlg.btn_resolve.clicked.connect(lambda: self._resolve_into(dlg))
         dlg.btn_horizon_browse.clicked.connect(
             lambda: self._horizon_browse_into(dlg))
@@ -469,12 +462,6 @@ class MainWindow(QMainWindow):
         new_lang = ("system", "es", "en")[dlg.cmb_language.currentIndex()]
         lang_changed = new_lang != prev_lang
         config.set("language", new_lang)
-        # panel chart resolution: "scale" (index 0) | "re-render" (index 1) —
-        # if the hub's panel is already on screen, re-draw it to apply
-        config.set("chart_zoom", "scale"
-                   if dlg.cmb_chart_zoom.currentIndex() == 0 else "re-render")
-        if self._proj_panel is not None and self._proj_panel.state() == "ready":
-            self._proj_panel.rebuild_charts()
         if lang_changed:
             self.statusBar().showMessage(
                 self.tr("Settings saved — restart the app to change the language"),

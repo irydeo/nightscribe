@@ -182,13 +182,17 @@ cabecera `lbl_context` de una sola línea truncada (`gui/ui/projects_tab.ui:51`)
    gráfico, el grupo completo desaparece. Los gráficos del panel usan el tamaño
    `panel` (1200×675, añadido a `style.SIZES`) para menos margen y más
    legibilidad en la ventana.
-4. **Ajuste de resolución de gráficos**: `Ajustes > Gráficos del panel` añade
-   la opción *Al redimensionar la ventana* — **Rápido** (el gráfico se dibuja
-   una vez al tamaño `panel` y se re-escala, el predeterminado) o **Más
-   nitidez** (se redibuja a 2×, 2400×1350, para que los paneles grandes queden
-   nítidos). Se guarda como `config["chart_zoom"]` (`"scale"` / `"re-render"`)
-   y `ObjectPanel` lo lee antes de cada llamada a `build_charts`; cambiar el
-   ajustes con un panel en pantalla lo redibuja (`rebuild_charts`).
+ 4. **Ajuste de resolución de gráficos**: `Ajustes > Gráficos del panel` añade
+    la opción *Al redimensionar la ventana* — **Rápido** (el gráfico se dibuja
+    una vez al tamaño `panel` y se re-escala, el predeterminado) o **Más
+    nitidez** (se redibuja a 2×, 2400×1350, para que los paneles grandes queden
+    nítidos). Se guarda como `config["chart_zoom"]` (`"scale"` / `"re-render"`)
+    y `ObjectPanel` lo lee antes de cada llamada a `build_charts`; cambiar el
+    ajustes con un panel en pantalla lo redibuja (`rebuild_charts`).
+    *(Retirado 2026-09-04: la opción `chart_zoom` y la pestaña Ajustes >
+    Gráficos se eliminaron cuando llegaron los widgets vectoriales de ADR-029,
+    que dibujan a resolución nativa. Ver `docs/adr/ADR-028` y el plan
+    `docs/PLANS/approach-chart.md`, Slice 0.)*
 5. **Visor de gráficos abierto ajustado**: al hacer click sobre un gráfico,
    `ChartViewer` se abre ajustado a la ventana — el diálogo adopta el
    aspecto de la imagen para que la vista por defecto la llene sin

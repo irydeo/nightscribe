@@ -63,9 +63,12 @@ Concretamente:
    - `orbit_widget.py` (Fase 2) — `OrbitChart(ChartView)`: anillos, elipse,
      Sol, punto del objeto animado, hover.
    - `sky_widget.py` (Fase 3) — `SkyChart(ChartView)`: curva de altitud,
-     Luna, ventana segura, mejor hora, hover; `TransitChart(SkyChart)`.
-   - **`gui/widgets/*` no importa `matplotlib`** (prohibido — un test lo
-     asienta). Solo `core/*` (matemática) y `PySide6`.
+      Luna, ventana segura, mejor hora, hover; `TransitChart(SkyChart)`.
+    - `approach_widget.py` (Fase 4) — `ApproachChart(Widget)`: Tierra en el
+      origen, círculo de 1 LD, Luna fija, traza geocéntrica animada, diamante
+      CA, status en LD; matemática en `core/approach_math.py`.
+    - **`gui/widgets/*` no importa `matplotlib`** (prohibido — un test lo
+      asienta). Solo `core/*` (matemática) y `PySide6`.
    - Los colores de los charts salen de un **módulo nuevo
      `nightscribe/viz/palette.py`** (sin matplotlib), que `viz/style.py`
      delega ahora; así `gui/widgets` toma los colores sin arrastrar a
@@ -175,10 +178,13 @@ Specifically:
      subclasses to return `r/ν/t` or `time/alt/az` at each scene coordinate.
    - `orbit_widget.py` (phase 2) — `OrbitChart(ChartView)`: planet rings,
      the ellipse, the Sun, the animated object marker, hover.
-   - `sky_widget.py` (phase 3) — `SkyChart(ChartView)`: altitude curve, Moon,
-     safe window, best time, hover; `TransitChart(SkyChart)`.
-   - **`gui/widgets/*` does not import `matplotlib`** (prohibited — a test
-     asserts this). Only `core/*` (math) and `PySide6`.
+    - `sky_widget.py` (phase 3) — `SkyChart(ChartView)`: altitude curve, Moon,
+      safe window, best time, hover; `TransitChart(SkyChart)`.
+    - `approach_widget.py` (phase 4) — `ApproachChart(QWidget)`: Earth at the
+      origin, 1 LD circle, fixed Moon, animated geocentric track, CA diamond,
+      LD status; math in `core/approach_math.py`.
+    - **`gui/widgets/*` does not import `matplotlib`** (prohibited — a test
+      asserts this). Only `core/*` (math) and `PySide6`.
    - Chart colours come from a **new module `nightscribe/viz/palette.py`**
      (matplotlib-free), which `viz/style.py` now delegates to; this way
      `gui/widgets` takes the colours without dragging `viz.style` (which

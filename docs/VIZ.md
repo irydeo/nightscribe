@@ -53,6 +53,25 @@ size is adjustable, the survey background can be equalized with `auto_gain` (med
 matching), and the blink dwell is configurable. The same stretch and zoom feed the
 live GUI blink tab.
 
+### ApproachChart — animated geocentric view (ADR-029)
+
+Interactive vector chart in `gui/widgets/approach_widget.py` (no matplotlib).
+Shows the object approaching **from Earth's perspective**, using the **Moon as a
+fixed 1 LD scale reference** (real position at the reference date, not animated).
+
+- Earth at the origin (`ACCENT2` dot), moving object point (`ACCENT`).
+- 1 LD reference circle (`MUTED`); Moon at its real ecliptic position on it.
+- Dashed geocentric track (`ACCENT`) over a ±30-day window centred on the CA
+  (or the given date when `e ≥ 1`).
+- CA diamond + `CA X.XX LD` label (closed orbits only).
+- Status: `<date> · X.XX LD <trend> · CA X.XX LD (<CA date>)` or
+  `<date> · X.XX LD <trend> · no return (open orbit)`.
+- Play/Pause + scrub slider + hover over the track (`R = X.XX LD`).
+- PNG export via `ChartView.export_png` (renders what is visible, zoom included).
+- Orbital math in `core/approach_math.py` (pure, no matplotlib).
+- Does not replace the static inset in `viz/orbit_view.py` (social PNGs are
+  unchanged); it is the live GUI equivalent.
+
 ## Rules
 
 - No third-party copyrighted images in exports: only public-domain (SDO) or

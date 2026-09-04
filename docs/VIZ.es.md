@@ -56,6 +56,26 @@ fondo del survey se puede igualar con `auto_gain` (por mediana) y la cadencia de
 blink es configurable. El mismo estirado y zoom alimenta la pestaña de blink en vivo
 de la GUI.
 
+### ApproachChart — vista geocéntrica animada (ADR-029)
+
+Carta vectorial interactiva en `gui/widgets/approach_widget.py` (sin matplotlib).
+Muestra cómo se acerca el objeto **visto desde la Tierra**, usando la **Luna como
+vara de escala fija** (posición real en la fecha de referencia, no animada).
+
+- Tierra en el origen (punto `ACCENT2`), punto del objeto móvil (`ACCENT`).
+- Círculo de 1 LD (`MUTED`) como referencia de escala; Luna en su posición
+  real en ese círculo.
+- Traza geocéntrica discontinua (`ACCENT`) en una ventana de ±30 días
+  alrededor del CA (o la fecha dada si no hay CA, `e ≥ 1`).
+- Diamante CA con etiqueta `CA X.XX LD` (solo órbitas cerradas).
+- Status: `<fecha> · X.XX LD <tendencia> · CA X.XX LD (<fecha CA>)` o
+  `<fecha> · X.XX LD <tendencia> · no return (open orbit)`.
+- Play/Pause + slider de scrub + hover sobre la traza (`R = X.XX LD`).
+- Export PNG vía `ChartView.export_png` (lo que se ve, zoom incluido).
+- Matemática en `core/approach_math.py` (pura, sin matplotlib).
+- No sustituye al inset estático de `viz/orbit_view.py` (sigue exportando la
+  PNG de redes); es su equivalente vivo en la GUI.
+
 ## Reglas
 
 - Nada de imágenes de terceros con copyright en las exportaciones: solo material de

@@ -1,5 +1,9 @@
 # Plan — `ApproachChart`: vista geocéntrica de la aproximación (Tierra / Luna de escala)
 
+> **CIERRADO (2026-09-04)** — las 6 slices están implementadas y a commit
+> (`6f91d92`, `a98327f`, `ab72de5`, `ecece37`, `127303b`, Slice 5 docs).
+> Suite unitaria verde. Este documento queda como registro de diseño.
+
 **rama**: `feat/qt-chart-widgets` (sobre el cierre de `explore-orbit-state`, ADR-029)
 **arranca sobre**: `767633b` (Slice 2 `explore-orbit-state`)
 **fecha**: 2026-09-04 · **autor**: FJC (con la IA)
@@ -180,12 +184,12 @@ El slot aparece **solo si** hay elementos orbitales para `els` — la regla
 
 | Slice | Contenido | Tests | Commits |
 |---|---|---|---|
-| **0** — `chart_zoom` removal | `settings_dialog.ui` (quitar `tab_charts`), `main_window.py:405-410,472-475`, `overview.py:54,479,688-691`, `config.py:52`, `test_settings_tabs.py` (4→3), `ADR-028`, `WORKFLOWS` | suite verde | 1 |
-| **1** — `core/approach_math.py` | `AU_PER_LD`, `earth_geocentric`, `geocentric_position`, `geocentric_track`, `closest_approach_geocentric`, `ld_from_au`, `au_from_ld`. Puro, sin matplotlib. | ~10 cases in `test_approach_math.py` (no net) | 1 |
-| **2** — `approach_widget.py` | `ApproachChart`: `set_elements`, `_build_scene`, `_sync_point`, `_hover`, `status_text`, Play/animation. | ~10 cases in `test_approachchart.py` (offscreen) | 1 |
-| **3** — Integración `overview.py` | Slot `"approach"`, `_TITLE`, `_CHART_SLOTS`, `_VECTOR_SLOTS`, `_slot_rowcol`, `_make_vector`, `_extract`, `_rebuild_widget`. | suite verde + 3 tests nuevos en `test_overview_panel.py` (slot aparece/desaparece) | 1 |
-| **4** — i18n | Strings `OrbitChart`-style en contexto `ApproachChart`: "Tierra", "Luna", "Aproximación", "¡Más cerca que la Luna!", "no return (open orbit)". `lrelease` ambos `.qm`. | 2 tests (`test_i18n_approachchart.py`) | 1 |
-| **5** — Docs | `VIZ.es.md`, `VIZ.md`: nuevo § "ApproachChart — vista geocéntrica animada". `ADR-029-qt-view-widgets.md`: añadir `approach_widget.py` al scope. `PLAN` cerrado. | suite verde | 1 commit (docs) |
+ | **0** — `chart_zoom` removal ✅ | `settings_dialog.ui` (quitar `tab_charts`), `main_window.py:405-410,472-475`, `overview.py:54,479,688-691`, `config.py:52`, `test_settings_tabs.py` (4→3), `ADR-028`, `WORKFLOWS` | suite verde | `6f91d92` |
+ | **1** — `core/approach_math.py` ✅ | `AU_PER_LD`, `earth_geocentric`, `geocentric_position`, `geocentric_track`, `closest_approach_geocentric`, `ld_from_au`, `au_from_ld`. Puro, sin matplotlib. | 10 cases en `test_approach_math.py` (no net) | `a98327f` |
+ | **2** — `approach_widget.py` ✅ | `ApproachChart`: `set_elements`, `_build_scene`, `_sync_point`, `_hover`, `status_text`, Play/animation. | 12 cases en `test_approachchart.py` (offscreen) | `ab72de5` |
+ | **3** — Integración `overview.py` ✅ | Slot `"approach"`, `_TITLE`, `_CHART_SLOTS`, `_VECTOR_SLOTS`, `_slot_rowcol`, `_make_vector`, `_extract`, `_rebuild_widget`. | suite verde + 3 tests nuevos en `test_overview_panel.py` (slot aparece/desaparece) | `ecece37` |
+ | **4** — i18n ✅ | Strings en contexto `ApproachChart`: "Tierra", "Luna", "1 LD", "CA X.XX LD", "Play"/"Pause", "no return (open orbit)"; título "Approach" en ObjectPanel. `lrelease` ambos `.qm`. | 3 tests (`test_i18n_approachchart.py`) | `127303b` |
+ | **5** — Docs ✅ | `VIZ.es.md`, `VIZ.md`: nuevo § "ApproachChart". `ADR-029-qt-view-widgets.md`: `approach_widget.py` en el scope (ambas lenguas). Este PLAN cerrado. | suite verde | 1 commit (docs) |
 
 ### Reglas del paquete (repetidas para el que implemente)
 

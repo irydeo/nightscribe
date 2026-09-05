@@ -66,7 +66,9 @@ Concretamente:
       Luna, ventana segura, mejor hora, hover; `TransitChart(SkyChart)`.
     - `approach_widget.py` (Fase 4) — `ApproachChart(Widget)`: Tierra en el
       origen, círculo de 1 LD, Luna fija, traza geocéntrica animada, diamante
-      CA, status en LD; matemática en `core/approach_math.py`.
+      CA, status en LD; matemática en `core/approach_math.py`. Capa visual:
+      halos de separación, placas de rótulo con anti-colisión, traza
+      discontinua y círculo de 1 LD punteado.
     - **`gui/widgets/*` no importa `matplotlib`** (prohibido — un test lo
       asienta). Solo `core/*` (matemática) y `PySide6`.
    - Los colores de los charts salen de un **módulo nuevo
@@ -182,7 +184,9 @@ Specifically:
       safe window, best time, hover; `TransitChart(SkyChart)`.
     - `approach_widget.py` (phase 4) — `ApproachChart(QWidget)`: Earth at the
       origin, 1 LD circle, fixed Moon, animated geocentric track, CA diamond,
-      LD status; math in `core/approach_math.py`.
+      LD status; math in `core/approach_math.py`. Visual layer: separation
+      halos, label plates with collision avoidance, dashed track and dotted
+      1 LD circle.
     - **`gui/widgets/*` does not import `matplotlib`** (prohibited — a test
       asserts this). Only `core/*` (math) and `PySide6`.
    - Chart colours come from a **new module `nightscribe/viz/palette.py`**

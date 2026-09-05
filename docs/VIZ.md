@@ -72,6 +72,21 @@ fixed 1 LD scale reference** (real position at the reference date, not animated)
 - Does not replace the static inset in `viz/orbit_view.py` (social PNGs are
   unchanged); it is the live GUI equivalent.
 
+**Visual polish:**
+
+- Separation halos (a thin ring in the body's own colour, `NoBrush`, cosmetic
+  pen) around Earth, the Moon, the object point and the CA diamond — the
+  bodies always read as distinct, even when their distances coincide.
+- Labels (Earth / Moon / 1 LD / CA) sit on a **background plate** (BG at 85 %
+  + a MUTED border) so they do not blend into the track or the circle.
+- **Collision-avoidant placement**: each label probes 8 directions around its
+  anchor (starting from the most natural one) and takes the first whose rect
+  neither crosses the track nor another plate; if none is safe it falls back
+  to the preferred one. Labels are fixed in the frame (they do not follow the
+  scrubber).
+- Geocentric track dashed at 2.4 px `[8, 5]`; the 1 LD reference circle dotted
+  at 1.5 px `[2, 4]` (both cosmetic pens: they do not thicken on zoom).
+
 ## Rules
 
 - No third-party copyrighted images in exports: only public-domain (SDO) or

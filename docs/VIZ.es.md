@@ -76,6 +76,19 @@ vara de escala fija** (posición real en la fecha de referencia, no animada).
 - No sustituye al inset estático de `viz/orbit_view.py` (sigue exportando la
   PNG de redes); es su equivalente vivo en la GUI.
 
+**Acabado visual (polish):**
+
+- Halos de separación (anillo fino del color del cuerpo, `NoBrush`, pen
+  cosmetic) alrededor de Tierra, Luna, punto del objeto y diamante CA — los
+  cuerpos siempre se leen separados, aunque se pisen en distancia.
+- Etiquetas (Tierra / Luna / 1 LD / CA) sobre una **placa de fondo** (BG al
+  85 % + borde MUTED) que no se funde con la traza ni con el círculo.
+- **Posicionamiento anti-colisión**: cada etiqueta prueba 8 direcciones
+  alrededor de su ancla (empezando por la más natural) y elige la primera
+  cuyo rect no cruce la traza ni otra placa; si ninguna, cae a la preferida. Las etiquetas son fijas en el frame (no se mueven con el scrub).
+- Traza geocéntrica discontinua 2.4 px `[8, 5]`; círculo de 1 LD punteado
+  1.5 px `[2, 4]` (ambas pens cosméticas: no engrosan con el zoom).
+
 ## Reglas
 
 - Nada de imágenes de terceros con copyright en las exportaciones: solo material de

@@ -179,9 +179,9 @@ traza discontinua y círculo 1 LD punteado".
 
 | # | Contenido | Files | Tests | Suite |
 |---|---|---|---|---|
-| **A** | Halos + tamaños + dashes de traza y círculo. Sin placas aún (etiquetas en su offset original, solo más grandes). | `approach_widget.py` | 3 (halos, dashes traza, dashes círculo) | verde + commit |
-| **B** | Placas + `_pick_label_offset` + `DIRS8` + `preferred` por etiqueta + CA perpendicular. | `approach_widget.py` | 2 (placas, anti-colisión) | verde + commit |
-| **C** | Docs (VIZ×2 + ADR-029). Sin código nuevo. | 3 docs | 0 | verde + commit |
+| **A** ✅ | Halos + tamaños + dashes de traza y círculo. Sin placas aún (etiquetas en su offset original, solo más grandes). | `approach_widget.py` | 3 (halos, dashes traza, dashes círculo) | verde · `332afb3` |
+| **B** ✅ | Placas + `_pick_label_offset` + `DIRS8` + `preferred` por etiqueta + CA. | `approach_widget.py` | 2 (placas, anti-colisión) | verde · `ddc4a11` |
+| **C** ✅ | Docs (VIZ×2 + ADR-029). Sin código nuevo. | 3 docs | 0 | verde · 1 commit (docs) | **PLAN cerrado.**
 
 Regla de oro: cada slice termina con `pytest tests/unit` verde y
 `git commit` antes de empezar la siguiente.

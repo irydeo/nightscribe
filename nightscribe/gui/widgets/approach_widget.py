@@ -41,21 +41,35 @@ from .base_chart import ChartView
 from .orbit_widget import _play_icon, _pause_icon
 
 # Scene z-order (higher is drawn on top)
-_Z_REF    = 0.0    # 1 LD reference circle
-_Z_TRACK  = 1.0    # geocentric track polyline
-_Z_MARK   = 2.0    # Earth, Moon, CA diamond
-_Z_POINT  = 3.0    # the moving object dot
-_Z_LABEL  = 4.0    # chart labels
+_Z_REF     = 0.0    # 1 LD reference circle
+_Z_TRACK   = 1.0    # geocentric track polyline
+_Z_HALO    = 1.5    # separation rings behind markers
+_Z_MARK    = 2.0    # Earth, Moon, CA diamond (solid fills)
+_Z_POINT   = 3.0    # the moving object dot
+_Z_LABEL   = 4.0    # chart label plates
+_Z_TEXT    = 5.0    # chart label text
 
 # Normalised scene scale (mirrors orbit_widget): the frame maps to these
-# units regardless of the object's LD scale, so fonts and dots never
+# units regardless of the object's LD scale, so fonts and dot sizes never
 # dwarf a small scene or shrink to nothing on a large one.
-_HALF     = 500.0   # framed half-extent, scene units
-_DOT_EARTH = 14    # Earth marker radius (scene units)
-_DOT_MOON  = 10
-_DOT_POINT = 14     # moving object dot
-_DOT_CA    = 10     # CA diamond half-width (scene units)
-_FONT_PX   = 26     # label font height, scene units
+_HALF     = 500.0    # framed half-extent, scene units
+_DOT_EARTH = 18     # Earth marker radius (scene units)
+_DOT_MOON  = 14     # Moon marker radius
+_DOT_POINT = 16     # moving object dot radius
+_DOT_CA    = 14     # CA diamond half-width (scene units)
+_HALO_EARTH = 42    # Earth halo diameter
+_HALO_MOON  = 34    # Moon halo diameter
+_HALO_POINT = 40    # moving-object halo diameter
+_HALO_CA    = 34    # CA diamond halo diameter
+_FONT_PX    = 28    # label font height (scene units)
+
+# Stroke styles for the reference circle and the geocentric track.
+# Both are cosmetic pens — they do not thicken under zoom (ADR-029 rule:
+# the chart stays crisp, the labels/dots are the "scale" tokens).
+_CIRCLE_PEN  = 1.5  # 1 LD reference circle stroke
+_CIRCLE_DASH = (2, 4)   # dotted "guide ring"
+_TRACK_PEN   = 2.4  # geocentric track stroke
+_TRACK_DASH  = (8, 5)   # dashed "path"
 
 # Hover tolerance: a cursor this far off the track (fraction of _HALF)
 # still counts. Same convention as orbit_widget.
@@ -308,10 +322,11 @@ class ApproachChart(QWidget):
 
         # 1 LD reference circle (Earth centred = scene origin).
         r_circle = approach_math.AU_PER_LD * self._scale
-        pen = QPen(QColor(palette.MUTED), 1.0)
+        pen = QPen(QColor(palette.MUTED), _CIRCLE_PEN)
         pen.setCosmetic(True)
+        pen.setDashPattern(list(_CIRCLE_DASH))
         circle = QGraphicsEllipseItem(-r_circle, -r_circle,
-                                      2.0 * r_circle, 2.0 * r_circle)
+                                       2.0 * r_circle, 2.0 * r_circle)
         circle.setPen(pen)
         circle.setBrush(Qt.NoBrush)
         circle.setZValue(_Z_REF)
@@ -327,12 +342,14 @@ class ApproachChart(QWidget):
             mx, my = self._to_scene(m_au_x, m_au_y)
         except Exception:
             mx = my = 0.0
-        self._add_dot(mx, my, _DOT_MOON, _MOON_COLOR, _Z_MARK)
+        self._add_dot_with_halo(mx, my, _DOT_MOON, _HALO_MOON,
+                                _MOON_COLOR, _Z_MARK)
         self._add_label(self.tr("Moon"), mx + _DOT_MOON + 2, my - _FONT_PX,
                         _MOON_COLOR, bold=False)
 
         # Earth at the origin.
-        self._add_dot(0.0, 0.0, _DOT_EARTH, QColor(palette.ACCENT2), _Z_MARK)
+        self._add_dot_with_halo(0.0, 0.0, _DOT_EARTH, _HALO_EARTH,
+                                QColor(palette.ACCENT2), _Z_MARK)
         self._add_label(self.tr("Earth"), _DOT_EARTH + 2, -_FONT_PX,
                         QColor(palette.ACCENT2), bold=True)
 
@@ -359,10 +376,23 @@ class ApproachChart(QWidget):
             -_DOT_POINT, -_DOT_POINT, 2.0 * _DOT_POINT, 2.0 * _DOT_POINT)
         self._point_item.setBrush(QBrush(QColor(palette.ACCENT)))
         self._point_item.setPen(QPen(Qt.NoPen))
-        self._point_item.setZValue(_Z_POINT)
+        self._point_item.setZValue(_Z_POINT + 1)
         self._point_item.setVisible(False)
         self.view.scene().addItem(self._point_item)
         self.view._items_registered.append(self._point_item)
+        # A faint halo behind the moving point, so it reads clearly as it
+        # traverses the track. Created once, hidden with the point, moved
+        # by _sync_point (same offset logic as the solid dot).
+        self._point_halo = QGraphicsEllipseItem(
+            -_HALO_POINT / 2.0, -_HALO_POINT / 2.0, _HALO_POINT, _HALO_POINT)
+        hpen = QPen(QColor(palette.ACCENT), 1.0)
+        hpen.setCosmetic(True)
+        self._point_halo.setPen(hpen)
+        self._point_halo.setBrush(Qt.NoBrush)
+        self._point_halo.setZValue(_Z_POINT)
+        self._point_halo.setVisible(False)
+        self.view.scene().addItem(self._point_halo)
+        self.view._items_registered.append(self._point_halo)
 
     def _draw_track(self, xs, ys):
         # A single dashed open polyline through all sampled points.
@@ -372,9 +402,9 @@ class ApproachChart(QWidget):
         for k in range(1, len(xs)):
             pp.lineTo(xs[k] * sc, -(ys[k] * sc))
         item = QGraphicsPathItem(pp)
-        pen = QPen(QColor(palette.ACCENT), 1.8)
+        pen = QPen(QColor(palette.ACCENT), _TRACK_PEN)
         pen.setCosmetic(True)
-        pen.setStyle(Qt.DashLine)
+        pen.setDashPattern(list(_TRACK_DASH))
         item.setPen(pen)
         item.setBrush(Qt.NoBrush)
         item.setZValue(_Z_TRACK)
@@ -383,8 +413,19 @@ class ApproachChart(QWidget):
 
     def _add_ca_diamond(self, cx, cy, d_ld):
         # @return: the QGraphicsPathItem. A small solid diamond (4-point)
-        #          plus a bold "CA" label offset up-right from it.
+        #          ringed by a halo (so it reads as a "special" marker,
+        #          distinct from the moving dot) plus a bold "CA" label.
         r = _DOT_CA
+        # Halo first (behind), so it does not cover the diamond fill.
+        half = _HALO_CA / 2.0
+        halo = QGraphicsEllipseItem(cx - half, cy - half, _HALO_CA, _HALO_CA)
+        hpen = QPen(QColor(palette.ACCENT), 1.5)
+        hpen.setCosmetic(True)
+        halo.setPen(hpen)
+        halo.setBrush(Qt.NoBrush)
+        halo.setZValue(_Z_HALO)
+        self.view.scene().addItem(halo)
+        self.view._items_registered.append(halo)
         pp = QPainterPath()
         pp.moveTo(cx, cy - r)
         pp.lineTo(cx + r, cy)
@@ -412,6 +453,22 @@ class ApproachChart(QWidget):
         self.view._items_registered.append(it)
         return it
 
+    def _add_dot_with_halo(self, cx, cy, r, halo_d, color, z):
+        # A solid dot (as _add_dot) ringed by a thin separation halo, so a
+        # body reads clearly against the track / the 1 LD circle.
+        # @args: cx, cy scene coords; r dot radius; halo_d halo DIAMETER;
+        #        color; z z-order for the solid dot.
+        halo = QGraphicsEllipseItem(cx - halo_d / 2.0, cy - halo_d / 2.0,
+                                    halo_d, halo_d)
+        hpen = QPen(color, 1.5)
+        hpen.setCosmetic(True)
+        halo.setPen(hpen)
+        halo.setBrush(Qt.NoBrush)
+        halo.setZValue(_Z_HALO)
+        self.view.scene().addItem(halo)
+        self.view._items_registered.append(halo)
+        return self._add_dot(cx, cy, r, color, z)
+
     def _add_label(self, text, cx, cy, color, bold):
         # @return: QGraphicsSimpleTextItem offset up-right from (cx, cy).
         it = QGraphicsSimpleTextItem(text)
@@ -430,17 +487,25 @@ class ApproachChart(QWidget):
     # ------------------------------------------------ sync -----------------
 
     def _sync_point(self):
-        # @return: None. Moves (or hides) the moving dot to self._cur_jd.
+        # @return: None. Moves (or hides) the moving dot — and its halo —
+        #          to self._cur_jd.
         if self._point_item is None or not self._elements:
             return
         g = approach_math.geocentric_position(self._elements, self._cur_jd)
         if g is None:
             self._point_item.setVisible(False)
+            if self._point_halo is not None:
+                self._point_halo.setVisible(False)
             return
         sx, sy = self._to_scene(g[0], g[1])
         self._point_item.setVisible(True)
         self._point_item.setRect(sx - _DOT_POINT, sy - _DOT_POINT,
                                  2.0 * _DOT_POINT, 2.0 * _DOT_POINT)
+        if self._point_halo is not None:
+            self._point_halo.setVisible(True)
+            self._point_halo.setRect(sx - _HALO_POINT / 2.0,
+                                     sy - _HALO_POINT / 2.0,
+                                     _HALO_POINT, _HALO_POINT)
 
     def _sync_slider(self):
         # Reflects the current position on the slider (no feedback loop).

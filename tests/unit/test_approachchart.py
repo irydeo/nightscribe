@@ -219,6 +219,65 @@ def test_export_png_not_blank(qapp, tmp_path):
     w.close()
 
 
+def _ellipse_no_brush(it):
+    # @args: it - a QGraphicsItem
+    # @return: True when it is an unfilled ellipse (halo or reference ring).
+    from PySide6.QtCore import Qt
+    return type(it).__name__ == "QGraphicsEllipseItem" \
+        and it.brush().style() == Qt.BrushStyle.NoBrush
+
+
+def test_halos_present(qapp):
+    # Earth, Moon, the moving point and the CA are each ringed by a thin
+    # SOLID separation halo (NoBrush, solid cosmetic pen, width >= 1.0).
+    # The 1 LD reference circle also has a NoBrush ellipse but a CUSTOM-DASH
+    # pen — it must NOT be counted as a halo (it is the "ring" itself).
+    from PySide6.QtCore import Qt
+    w = _mk_chart(qapp)
+    scene = w.view.scene()
+    halos = [it for it in scene.items()
+             if _ellipse_no_brush(it)
+             and it.pen().style() == Qt.PenStyle.SolidLine
+             and it.pen().isCosmetic()
+             and it.pen().widthF() >= 1.0]
+    assert len(halos) >= 4, f"expected >= 4 SOLID halos, found {len(halos)}"
+    w.close()
+
+
+def test_track_pen_dashed_wider(qapp):
+    # The geocentric track is a path item with a cosmetic pen, width >= 2.0
+    # (thicker than 1.8) and a non-empty dash pattern (the 8/5 look).
+    w = _mk_chart(qapp)
+    scene = w.view.scene()
+    tracks = [it for it in scene.items()
+              if type(it).__name__ == "QGraphicsPathItem"]
+    dashed = [it for it in tracks
+              if it.pen().widthF() >= 2.0
+              and it.pen().dashPattern()
+              and it.pen().isCosmetic()]
+    assert dashed, "no dashed cosmetic track pen >= 2.0 found"
+    pat = list(dashed[0].pen().dashPattern())
+    assert len(pat) == 2 and pat[0] > pat[1], f"unexpected dash {pat}"
+    w.close()
+
+
+def test_circle_pen_dashed(qapp):
+    # The 1 LD reference circle: dotted ellipse (dash 2, 4), pen ~1.5 px,
+    # cosmetic, NoBrush.  At least one such item must exist in the scene.
+    w = _mk_chart(qapp)
+    scene = w.view.scene()
+    matches = [it for it in scene.items()
+               if _ellipse_no_brush(it)
+               and it.pen().dashPattern()
+               and it.pen().isCosmetic()
+               and it.pen().widthF() >= 1.0]
+    assert matches, "1 LD dotted reference circle not found"
+    pat = list(matches[0].pen().dashPattern())
+    assert len(pat) == 2 and abs(pat[0] - 2.0) < 0.01 \
+        and abs(pat[1] - 4.0) < 0.01, f"bad dash {pat}"
+    w.close()
+
+
 def test_widget_package_has_no_matplotlib():
     # The widget package must never pull in matplotlib (ADR-029).
     code = (

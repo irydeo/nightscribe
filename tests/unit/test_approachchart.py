@@ -278,6 +278,60 @@ def test_circle_pen_dashed(qapp):
     w.close()
 
 
+def test_label_plates_present(qapp):
+    # Each of the four labels ("1 LD", "Moon", "Earth", "CA") gets a plate:
+    # a QGraphicsRectItem filled with a semi-transparent BG @ ~217 alpha and
+    # a MUTED border @ ~102 alpha.  The closed-orbit test element must produce
+    # >= 4 such plates.
+    from PySide6.QtGui import QColor
+    from nightscribe.gui.widgets.approach_widget import (
+        _PLATE_BG_A, _PLATE_BRD_A, palette)
+    w = _mk_chart(qapp)
+    scene = w.view.scene()
+    bg_col = QColor(palette.BG); bg_col.setAlpha(_PLATE_BG_A)
+    brd_col = QColor(palette.MUTED); brd_col.setAlpha(_PLATE_BRD_A)
+    plates = [it for it in scene.items()
+              if type(it).__name__ == "QGraphicsRectItem"
+              and it.brush().color() == bg_col
+              and it.pen().color() == brd_col]
+    assert len(plates) >= 4, \
+        f"expected >= 4 label plates, found {len(plates)}"
+    w.close()
+
+
+def test_labels_clear_of_track(qapp):
+    # No label plate may touch the geocentric track: a plate is "safe" when
+    # its four corners are all at least _HALF * _COL_TOL away from every
+    # track point.  The test orbit has a non-degenerate track, so this is a
+    # real check (not an empty list).
+    import math
+    from nightscribe.gui.widgets.approach_widget import (_HALF, _COL_TOL)
+    w = _mk_chart(qapp)
+    assert len(w._track_pts) > 0, "track must be non-empty for this test"
+    pts = [(p[0], p[1]) for p in w._track_pts]
+    scene = w.view.scene()
+    plates = [it for it in scene.items()
+              if type(it).__name__ == "QGraphicsRectItem"]
+    assert plates, "no label plates to check"
+    tol = _HALF * _COL_TOL
+    tol2 = tol * tol
+    for plate in plates:
+        r = plate.rect()
+        corners = (
+            (r.left(),   r.top()),
+            (r.right(),  r.top()),
+            (r.left(),   r.bottom()),
+            (r.right(),  r.bottom()),
+        )
+        for cpx, cpy in corners:
+            for px, py in pts:
+                d2 = (px - cpx) ** 2 + (py - cpy) ** 2
+                assert d2 >= tol2, \
+                    f"plate corner ({cpx:.2f},{cpy:.2f}) within " \
+                    f"{tol:.3f} of track point ({px:.2f},{py:.2f})"
+    w.close()
+
+
 def test_widget_package_has_no_matplotlib():
     # The widget package must never pull in matplotlib (ADR-029).
     code = (

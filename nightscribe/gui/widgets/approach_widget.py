@@ -27,12 +27,12 @@ zoom, drag-pan, hover probe, PNG export). The orbital math is in
 `viz.palette`.
 """
 
-from PySide6.QtCore import Qt, QTimer, Signal, QEvent, QElapsedTimer
-from PySide6.QtGui import (QPen, QBrush, QColor, QPainterPath)
+from PySide6.QtCore import Qt, QTimer, Signal, QEvent, QElapsedTimer, QRectF
+from PySide6.QtGui import (QPen, QBrush, QColor, QPainterPath, QFontMetrics)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                 QPushButton, QSlider, QSizePolicy, QLabel,
                                 QGraphicsEllipseItem, QGraphicsPathItem,
-                                QGraphicsSimpleTextItem)
+                                QGraphicsSimpleTextItem, QGraphicsRectItem)
 
 from ...core import approach_math
 from ...core import orbit_math
@@ -70,6 +70,33 @@ _CIRCLE_PEN  = 1.5  # 1 LD reference circle stroke
 _CIRCLE_DASH = (2, 4)   # dotted "guide ring"
 _TRACK_PEN   = 2.4  # geocentric track stroke
 _TRACK_DASH  = (8, 5)   # dashed "path"
+
+# Label plate + anti-collision tuning.  Each label is drawn as
+#   <text>  on top of  a <plate>  (= BG @ ~85% + MUTED border @ ~40%)
+# so the text never fuses with the track / the 1 LD circle behind it.
+# Placement: we try 8 directions around the anchor in order (starting
+# from a "preferred" one) and pick the first whose plate neither crosses
+# the track polyline nor overlaps a previously placed plate.
+_PLATE_PAD   = (6, 8)   # (x, y) padding around the text, scene units
+_PLATE_BG_A  = 217      # alpha (0–255) of the BG plate fill
+_PLATE_BRD_A = 102      # alpha of the MUTED plate border
+_COL_TOL     = 0.05     # "a plate is on the track" if a plate corner is
+                        # within this fraction of _HALF of a track point
+
+# The 8 compass directions we probe (NE first, going clockwise).  Vectors
+# are unit-ish; we multiply by (plate_w, plate_h) for the actual offset,
+# so wide labels travel further horizontally than vertically — this
+# keeps the plate readable at any aspect.
+DIRS8 = [
+    ( 1, -1),   # NE  (preferred for "Earth", "Moon", "CA")
+    ( 1,  0),   # E
+    ( 1,  1),   # SE
+    ( 0,  1),   # S
+    (-1, -1),   # NW  (preferred for "1 LD" — points inward)
+    (-1,  0),   # W
+    (-1,  1),   # SW
+    ( 0, -1),   # N
+]
 
 # Hover tolerance: a cursor this far off the track (fraction of _HALF)
 # still counts. Same convention as orbit_widget.
@@ -137,6 +164,7 @@ class ApproachChart(QWidget):
         self._track_pts  = []              # (sx, sy, r_ld, jd) tuples
         self._point_item = None            # the moving dot
         self._ca_item    = None            # CA diamond marker
+        self._occupied   = []              # label plate rects placed this turn
 
         # animation window
         self._jd0   = None
@@ -318,6 +346,7 @@ class ApproachChart(QWidget):
         #        track_center - date used to place the Moon.
         # Draws: 1 LD circle → Moon → Earth → track → CA marker → moving point.
         self.view.clear()
+        self._occupied = []                # clear stale label plates
         self.view.set_scene_rect(-_HALF, -_HALF, 2.0 * _HALF, 2.0 * _HALF)
 
         # 1 LD reference circle (Earth centred = scene origin).
@@ -332,8 +361,9 @@ class ApproachChart(QWidget):
         circle.setZValue(_Z_REF)
         self.view.scene().addItem(circle)
         self.view._items_registered.append(circle)
-        self._add_label(self.tr("1 LD"), r_circle, -_FONT_PX,
-                        QColor(palette.MUTED), bold=False)
+        self._add_label(self.tr("1 LD"), (r_circle, 0.0),
+                        QColor(palette.MUTED), bold=False,
+                        preferred=(DIRS8[4][0], DIRS8[4][1]))
 
         # Moon: a fixed scale reference at its real position for track_center.
         try:
@@ -344,14 +374,16 @@ class ApproachChart(QWidget):
             mx = my = 0.0
         self._add_dot_with_halo(mx, my, _DOT_MOON, _HALO_MOON,
                                 _MOON_COLOR, _Z_MARK)
-        self._add_label(self.tr("Moon"), mx + _DOT_MOON + 2, my - _FONT_PX,
-                        _MOON_COLOR, bold=False)
+        self._add_label(self.tr("Moon"), (mx, my),
+                        _MOON_COLOR, bold=False,
+                        preferred=(DIRS8[0][0], DIRS8[0][1]))
 
         # Earth at the origin.
         self._add_dot_with_halo(0.0, 0.0, _DOT_EARTH, _HALO_EARTH,
                                 QColor(palette.ACCENT2), _Z_MARK)
-        self._add_label(self.tr("Earth"), _DOT_EARTH + 2, -_FONT_PX,
-                        QColor(palette.ACCENT2), bold=True)
+        self._add_label(self.tr("Earth"), (0.0, 0.0),
+                        QColor(palette.ACCENT2), bold=True,
+                        preferred=(DIRS8[0][0], DIRS8[0][1]))
 
         # Geocentric track (dashed, ACCENT).
         if xs:
@@ -439,8 +471,9 @@ class ApproachChart(QWidget):
         self.view.scene().addItem(item)
         self.view._items_registered.append(item)
         self._add_label(self.tr("CA %1 LD").replace("%1", "%.2f" % d_ld),
-                        cx + r + 4, cy - _FONT_PX,
-                        QColor(palette.ACCENT), bold=True)
+                        (cx, cy),
+                        QColor(palette.ACCENT), bold=True,
+                        preferred=(DIRS8[0][0], DIRS8[0][1]))
         return item
 
     def _add_dot(self, cx, cy, r, color, z):
@@ -469,20 +502,108 @@ class ApproachChart(QWidget):
         self.view._items_registered.append(halo)
         return self._add_dot(cx, cy, r, color, z)
 
-    def _add_label(self, text, cx, cy, color, bold):
-        # @return: QGraphicsSimpleTextItem offset up-right from (cx, cy).
-        it = QGraphicsSimpleTextItem(text)
-        it.setBrush(QBrush(color))
-        f = self.view.font()
+    def _add_label(self, text, anchor, color, bold, preferred=None):
+        # @args: text - the label string; anchor (ax, ay) scene coords (the
+        #        body the label refers to); color; bold; preferred (dx, dy)
+        #        unit vector to try first (defaults to NE).
+        # @return: the QGraphicsSimpleTextItem (the plate is drawn under it).
+        # Draws a <plate> then the text, choosing a placement around
+        # `anchor` that does not cross the track or any other plate.
+        from PySide6.QtGui import QFont
+        f = QFont(self.view.font())
         f.setPixelSize(_FONT_PX)
         if bold:
             f.setBold(True)
+        metrics = QFontMetrics(f)
+        tw = metrics.horizontalAdvance(text)
+        th = metrics.height()
+        ax, ay = anchor
+        plate_rect = self._pick_label_offset((ax, ay), (tw, th),
+                                              self._track_pts,
+                                              self._occupied, preferred)
+        plate = QGraphicsRectItem(plate_rect)
+        pbg = QColor(palette.BG)
+        pbg.setAlpha(_PLATE_BG_A)
+        pbr = QColor(palette.MUTED)
+        pbr.setAlpha(_PLATE_BRD_A)
+        plate.setBrush(QBrush(pbg))
+        ppen = QPen(pbr, 1.0)
+        ppen.setCosmetic(True)
+        plate.setPen(ppen)
+        plate.setZValue(_Z_LABEL)
+        self.view.scene().addItem(plate)
+        self.view._items_registered.append(plate)
+
+        it = QGraphicsSimpleTextItem(text)
+        it.setBrush(QBrush(color))
         it.setFont(f)
-        it.setPos(cx, cy)
-        it.setZValue(_Z_LABEL)
+        # centre the text on the plate
+        it.setPos(plate_rect.left() + (plate_rect.width() - tw) / 2.0,
+                  plate_rect.top() + (plate_rect.height() - th) / 2.0)
+        it.setZValue(_Z_LABEL + 1)
         self.view.scene().addItem(it)
         self.view._items_registered.append(it)
+
+        self._occupied.append(plate_rect)
         return it
+
+    def _pick_label_offset(self, anchor, size_wh, track_pts,
+                           occupied, preferred):
+        # Tries the 8 compass directions in order (preferred first) and
+        # returns the first QRectF whose plate is "safe" — does not come
+        # within _COL_TOL of any track point AND does not overlap a
+        # previously placed plate.  Falls back to the preferred direction
+        # if none is safe (never hides the label).
+        # @args: anchor (ax, ay) scene; size_wh (w, h); track_pts list[(px,py)];
+        #        occupied list[QRectF]; preferred (dx, dy) unit vector or None.
+        # @return: QRectF for the plate, centred on `anchor` + a direction
+        #          offset (so the plate sits to one side of the anchor).
+        w, h = size_wh
+        pad_x, pad_y = _PLATE_PAD
+        pw, ph = w + 2.0 * pad_x, h + 2.0 * pad_y
+        cands = []
+        if preferred:
+            cands.append(tuple(preferred))
+        for d in DIRS8:
+            if preferred and d == tuple(preferred):
+                continue
+            cands.append(d)
+        tol = _HALF * _COL_TOL
+        pts = [(p[0], p[1]) for p in (track_pts or [])]
+        safe_first = cands[0]
+        for d in cands:
+            off = (d[0] * (pw / 2.0), d[1] * (ph / 2.0))
+            plate = QRectF(anchor[0] + off[0] - pw / 2.0,
+                           anchor[1] + off[1] - ph / 2.0, pw, ph)
+            if self._plate_ok(plate, pts, occupied, tol):
+                return plate
+        # No safe direction found — put it at the preferred (or first).
+        d = safe_first
+        off = (d[0] * (pw / 2.0), d[1] * (ph / 2.0))
+        return QRectF(anchor[0] + off[0] - pw / 2.0,
+                      anchor[1] + off[1] - ph / 2.0, pw, ph)
+
+    def _plate_ok(self, plate, pts, occupied, tol):
+        # @args: plate QRectF; pts list[(px,py)]; occupied list[QRectF];
+        #        tol distance threshold (scene units).
+        # @return: True when `plate` keeps a safe distance from every track
+        #          point and overlaps no already-placed plate.
+        corners = (
+            (plate.left(),   plate.top()),
+            (plate.right(),  plate.top()),
+            (plate.left(),   plate.bottom()),
+            (plate.right(),  plate.bottom()),
+        )
+        tol2 = tol * tol
+        for cpx, cpy in corners:
+            for px, py in pts:
+                dx, dy = px - cpx, py - cpy
+                if dx * dx + dy * dy < tol2:
+                    return False
+        for other in occupied:
+            if plate.intersects(other):
+                return False
+        return True
 
     # ------------------------------------------------ sync -----------------
 

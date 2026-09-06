@@ -175,7 +175,30 @@
         </spacer>
        </item>
       </layout>
-     </widget>
+      </widget>
+      <widget class="QWidget" name="tab_ccdciel">
+       <attribute name="title"><string>CCDciel</string></attribute>
+       <layout class="QVBoxLayout" name="vbox_ccdciel">
+        <item>
+         <widget class="QGroupBox" name="grp_ccdciel">
+          <property name="title"><string>JSON-RPC connection</string></property>
+          <layout class="QFormLayout">
+           <item row="0" column="0"><widget class="QLabel" name="lbl_ccdhost"><property name="text"><string>Host:</string></property></widget></item>
+           <item row="0" column="1"><widget class="QLineEdit" name="edt_ccdciel_host"><property name="toolTip"><string>Address of the computer running CCDciel (usually 127.0.0.1)</string></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="lbl_ccdport"><property name="text"><string>Port:</string></property></widget></item>
+           <item row="1" column="1"><widget class="QSpinBox" name="spn_ccdciel_port"><property name="minimum"><number>1</number></property><property name="maximum"><number>65535</number></property><property name="value"><number>3277</number></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="lbl_ccdauto"><property name="text"><string>Auto-connect on start:</string></property></widget></item>
+           <item row="2" column="1"><widget class="QCheckBox" name="chk_ccdciel_auto"><property name="toolTip"><string>Connect to CCDciel automatically when the app starts (off by default)</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="vspacer_ccdciel">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
     </widget>
    </item>
    <item>

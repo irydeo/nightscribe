@@ -37,22 +37,23 @@ from ..core.db import db
 from . import theme
 from .overview import ObjectPanel
 from .skeleton import ShimmerRow
-from .workers import (BlinkExportWorker, BlinkWorker, ExploreWorker,
-                      MpcResolveWorker, PostWorker, SunWorker, TonightWorker)
+from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
+                      ExploreWorker, MpcResolveWorker, PostWorker, SunWorker,
+                      TonightWorker)
 
 logger = logging.getLogger(__name__)
 
 UI_DIR = Path(__file__).parent / "ui"
 
-# Four guided steps for every project kind. The old "analyse" step (ADR-019,
-# review 2026-08-28) was dropped: the explore view already lives in the
-# Details tab and the SN blink now sits in "process".
-_STEP_KEYS = ("plan", "capture", "process", "publish")
-_STEP_TABS = {0: "tab_plan", 1: "tab_capture", 2: "tab_process",
-              3: "tab_publish"}
-_STEP_LABELS_ES = {"plan": "Plan", "capture": "Captura", "process": "Procesado",
+# Three guided steps for every project kind. The old "analyse" step (ADR-019,
+# review 2026-08-28) was dropped, and "capture" merged into "plan" (ADR-030,
+# 2026-09-06): planning the session and exporting/running it against CCDciel
+# is one step — Plan & Captura.
+_STEP_KEYS = ("plan", "process", "publish")
+_STEP_TABS = {0: "tab_plan", 1: "tab_process", 2: "tab_publish"}
+_STEP_LABELS_ES = {"plan": "Plan & Captura", "process": "Procesado",
                    "publish": "Publicar"}
-_STEP_LABELS_EN = {"plan": "Plan", "capture": "Capture", "process": "Process",
+_STEP_LABELS_EN = {"plan": "Plan & Capture", "process": "Process",
                    "publish": "Publish"}
 
 
@@ -174,6 +175,17 @@ class MainWindow(QMainWindow):
         self._project_widgets = {}
         self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
 
+        # CCDciel integration (ADR-030). The connection survives project
+        # switches: the observatory does not re-connect per target.
+        self._ccd_client = None
+        self._ccd_connected = False
+        self._ccd_filter_names = []
+        self._ccd_version = ""
+        self._ccd_worker = None
+        self._ccd_timer = QTimer(self)
+        self._ccd_timer.setInterval(1500)
+        self._ccd_timer.timeout.connect(self._ccd_poll_tick)
+
         win = _load_ui("main_window")
         self.setWindowTitle(f"{win.windowTitle()} {full_version()}")
         self.setCentralWidget(win.centralwidget)
@@ -191,8 +203,11 @@ class MainWindow(QMainWindow):
         # local SQLite, never the network). The "Refresh" button stays as a
         # fallback, and _on_main_tab_changed keeps the list fresh on every
         # visit to the Projects tab.
-        from PySide6.QtCore import QTimer
         QTimer.singleShot(0, self.on_refresh_projects)
+        if config.get("ccdciel_auto_connect", False):
+            # ADR-030: opt-in, off by default — connecting an observatory is
+            # a human decision, not something the app does silently.
+            QTimer.singleShot(600, self._ccd_connect)
         self.statusBar().showMessage(
             f"NightScribe {full_version()} — "
             + self.tr("Ready — press 'Compute tonight'"), 8000)
@@ -396,6 +411,11 @@ class MainWindow(QMainWindow):
         dlg.spn_moon_sep.setValue(float(config.get("moon_min_sep_deg", 45)))
         dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
         dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
+        dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
+                                                     "127.0.0.1")))
+        dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
+        dlg.chk_ccdciel_auto.setChecked(
+            bool(config.get("ccdciel_auto_connect", False)))
         dlg.edt_tns_bot.setText(config.get("tns_bot_name", ""))
         dlg.edt_tns_bot_key.setText(config.get("tns_bot_key", ""))
         # Tonight object kinds (WORKFLOWS 7quater): the whitelist mirrors the
@@ -443,6 +463,9 @@ class MainWindow(QMainWindow):
         config.set("moon_min_sep_deg", dlg.spn_moon_sep.value())
         config.set("moon_max_illum", dlg.spn_moon_illum.value())
         config.set("overhead_s", dlg.spn_overhead.value())
+        config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
+        config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
+        config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
         config.set("tns_bot_name", dlg.edt_tns_bot.text().strip())
         config.set("tns_bot_key", dlg.edt_tns_bot_key.text().strip())
         # Tonight object kinds: keep at least one, else refuse to save
@@ -1343,8 +1366,8 @@ class MainWindow(QMainWindow):
                           "pccp": "PCCP", "transit": self.tr("Transit")}.get(
                           p["kind"], p["kind"])
             cur = project.current_step(db, p["id"]) or "done"
-            step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 4
-            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/4")
+            step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
+            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/3")
             item.setData(Qt.UserRole, p["id"])
             lst.addItem(item)
             if p["id"] == keep_id:
@@ -1422,10 +1445,10 @@ class MainWindow(QMainWindow):
                       "pccp": "Possible comet",
                       "transit": "Exoplanet transit"}.get(p["kind"], p["kind"])
         cur = project.current_step(db, p["id"])
-        step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 4
+        step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
         self.projects.lbl_header.setText(
             f"<b>[{kind_label}] {p['object_name']}</b> — "
-            f"{self.tr('step')} {step_n}/4")
+            f"{self.tr('step')} {step_n}/3")
         ctx = p["context"]
         parts = []
         if ctx.get("mag") is not None:
@@ -1440,7 +1463,7 @@ class MainWindow(QMainWindow):
 
     def _clear_step_tabs(self):
         # Remove all dynamic content from step tabs
-        for tab_name in ("tab_plan", "tab_capture", "tab_process",
+        for tab_name in ("tab_plan", "tab_process",
                          "tab_publish"):
             tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
             if tab and tab.layout():
@@ -1467,7 +1490,6 @@ class MainWindow(QMainWindow):
             self.projects.tabs_steps.setTabText(i + 1, f"{icon} {label}")
         # build content per step
         self._build_plan_tab(p, kind, ctx)
-        self._build_capture_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
         # "Detalles" stays open (set by _project_selected); the current
@@ -1476,6 +1498,9 @@ class MainWindow(QMainWindow):
         self._update_step_buttons()
 
     def _build_plan_tab(self, p, kind, ctx):
+        # Plan & Captura (ADR-030): the session plan (frames/exposure/filter),
+        # the calibration frames, the CCDciel/NINA/CSV export and the NEO
+        # ephemeris export all live in this single step.
         tab = self.projects.tabs_steps.findChild(QWidget, "tab_plan")
         layout = tab.layout()
         # common: capture plan inputs
@@ -1524,6 +1549,117 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_nframes"] = spn
         self._project_widgets["spn_exps"] = spn_exp
         self._project_widgets["cmb_filter"] = cmb_f
+        # CCDciel calibration frames (ADR-021): the generated target list
+        # appends a Dark and a Bias step from these counts (0 = omit).
+        grp = QGroupBox(self.tr("Calibration"))
+        cal_form = QFormLayout(grp)
+        spn_darks = QSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
+        spn_darks.setValue(25)
+        cal_form.addRow(self.tr("Darks:"), spn_darks)
+        spn_darkexp = QDoubleSpinBox(); spn_darkexp.setMinimum(0.1)
+        spn_darkexp.setMaximum(3600.0)
+        spn_darkexp.setValue(spn_exp.value())
+        cal_form.addRow(self.tr("Dark exposure (s):"), spn_darkexp)
+        spn_bias = QSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
+        spn_bias.setValue(100)
+        cal_form.addRow(self.tr("Bias:"), spn_bias)
+        layout.addWidget(grp)
+        if plan_data.get("n_darks") is not None:
+            spn_darks.setValue(int(plan_data["n_darks"]))
+        if plan_data.get("exp_dark"):
+            spn_darkexp.setValue(float(plan_data["exp_dark"]))
+        if plan_data.get("n_bias") is not None:
+            spn_bias.setValue(int(plan_data["n_bias"]))
+        self._project_widgets["spn_darks"] = spn_darks
+        self._project_widgets["spn_darkexp"] = spn_darkexp
+        self._project_widgets["spn_bias"] = spn_bias
+        # sequence export (all kinds)
+        layout.addWidget(QLabel(self.tr("Export capture sequence")))
+        cmb_fmt = QComboBox()
+        cmb_fmt.addItem(self.tr("NINA (JSON)"))
+        cmb_fmt.addItem(self.tr("CCDciel (targets)"))
+        cmb_fmt.addItem(self.tr("CSV (generic)"))
+        layout.addWidget(cmb_fmt)
+        btn_seq = QPushButton(self.tr("Export sequence…"))
+        btn_seq.clicked.connect(self._project_export_sequence)
+        layout.addWidget(btn_seq)
+        # CCDciel control (ADR-030): dashboard, filter wheel and slew/capture
+        # buttons. The connection itself lives on the window, not per project.
+        layout.addWidget(QLabel(""))
+        layout.addWidget(QLabel(self.tr("CCDciel control")))
+        ccd_row = QHBoxLayout()
+        btn_ccd_connect = QPushButton(self.tr("Connect CCDciel"))
+        btn_ccd_connect.clicked.connect(self._ccd_connect)
+        ccd_row.addWidget(btn_ccd_connect)
+        btn_ccd_disconnect = QPushButton(self.tr("Disconnect"))
+        btn_ccd_disconnect.clicked.connect(self._ccd_disconnect)
+        ccd_row.addWidget(btn_ccd_disconnect)
+        btn_ccd_refresh = QPushButton(self.tr("Refresh"))
+        btn_ccd_refresh.clicked.connect(self._ccd_refresh)
+        ccd_row.addWidget(btn_ccd_refresh)
+        lbl_ccd_status = QLabel(self.tr("CCDciel: not connected"))
+        ccd_row.addWidget(lbl_ccd_status)
+        ccd_row.addStretch()
+        layout.addLayout(ccd_row)
+        grp_ccd = QGroupBox(self.tr("Observatory status"))
+        ccd_form = QFormLayout(grp_ccd)
+        lbl_ccd_version = QLabel(self.tr("—"))
+        ccd_form.addRow(self.tr("Version:"), lbl_ccd_version)
+        lbl_ccd_temp = QLabel(self.tr("—"))
+        ccd_form.addRow(self.tr("CCD temperature:"), lbl_ccd_temp)
+        lbl_ccd_tracking = QLabel(self.tr("—"))
+        ccd_form.addRow(self.tr("Tracking:"), lbl_ccd_tracking)
+        lbl_ccd_slew = QLabel(self.tr("—"))
+        ccd_form.addRow(self.tr("Slew:"), lbl_ccd_slew)
+        layout.addWidget(grp_ccd)
+        # filter wheel feeding the staged capture plan
+        f_row = QHBoxLayout()
+        f_row.addWidget(QLabel(self.tr("Filter on wheel:")))
+        cmb_ccd_filter = QComboBox()
+        for f in ("L", "R", "G", "B", "Ha", "OIII", "SII"):
+            cmb_ccd_filter.addItem(f)
+        f_row.addWidget(cmb_ccd_filter)
+        btn_ccd_push = QPushButton(self.tr("Send plan"))
+        btn_ccd_push.clicked.connect(self._ccd_send_plan)
+        f_row.addWidget(btn_ccd_push)
+        btn_ccd_start = QPushButton(self.tr("Start capture"))
+        btn_ccd_start.clicked.connect(self._ccd_start_capture)
+        f_row.addWidget(btn_ccd_start)
+        f_row.addStretch()
+        layout.addLayout(f_row)
+        m_row = QHBoxLayout()
+        btn_ccd_goto = QPushButton(self.tr("Point telescope"))
+        btn_ccd_goto.clicked.connect(self._ccd_goto)
+        m_row.addWidget(btn_ccd_goto)
+        btn_ccd_sync = QPushButton(self.tr("Sync telescope"))
+        btn_ccd_sync.clicked.connect(self._ccd_sync)
+        m_row.addWidget(btn_ccd_sync)
+        m_row.addStretch()
+        layout.addLayout(m_row)
+        self._project_widgets.update({
+            "ccd_connect": btn_ccd_connect,
+            "ccd_disconnect": btn_ccd_disconnect,
+            "ccd_refresh": btn_ccd_refresh,
+            "ccd_status": lbl_ccd_status,
+            "ccd_version": lbl_ccd_version,
+            "ccd_temp": lbl_ccd_temp,
+            "ccd_tracking": lbl_ccd_tracking,
+            "ccd_slew": lbl_ccd_slew,
+            "cmb_ccd_filter": cmb_ccd_filter,
+            "ccd_push": btn_ccd_push,
+            "ccd_start": btn_ccd_start,
+            "ccd_goto": btn_ccd_goto,
+            "ccd_sync": btn_ccd_sync,
+        })
+        self._ccd_apply_state()
+        # NEO: also ephemeris export
+        if kind in ("neo", "pccp"):
+            layout.addWidget(QLabel(""))
+            layout.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
+            btn_eph = QPushButton(self.tr("Export ephemeris…"))
+            btn_eph.clicked.connect(self._project_export_ephem)
+            layout.addWidget(btn_eph)
+        self._project_widgets["cmb_seqfmt"] = cmb_fmt
         # save plan button
         btn_save = QPushButton(self.tr("Save plan"))
         btn_save.clicked.connect(self._project_save_plan)
@@ -1576,55 +1712,234 @@ class MainWindow(QMainWindow):
                     panel._render_charts(panel._e)
             self.statusBar().showMessage(self.tr("Plan saved"), 5000)
 
-    def _build_capture_tab(self, p, kind, ctx):
-        tab = self.projects.tabs_steps.findChild(QWidget, "tab_capture")
-        layout = tab.layout()
-        # sequence export (all kinds)
-        layout.addWidget(QLabel(self.tr("Export capture sequence")))
-        cmb_fmt = QComboBox()
-        cmb_fmt.addItem(self.tr("NINA (JSON)"))
-        cmb_fmt.addItem(self.tr("CCDciel (targets)"))
-        cmb_fmt.addItem(self.tr("CSV (generic)"))
-        layout.addWidget(cmb_fmt)
-        btn_seq = QPushButton(self.tr("Export sequence…"))
-        btn_seq.clicked.connect(self._project_export_sequence)
-        layout.addWidget(btn_seq)
-        # CCDciel calibration frames (ADR-021): the generated target list
-        # appends a Dark and a Bias step from these counts (0 = omit).
-        grp = QGroupBox(self.tr("Calibration"))
-        form = QFormLayout(grp)
-        spn_darks = QSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
-        spn_darks.setValue(25)
-        form.addRow(self.tr("Darks:"), spn_darks)
-        spn_darkexp = QDoubleSpinBox(); spn_darkexp.setMinimum(0.1)
-        spn_darkexp.setMaximum(3600.0)
-        spn_exps = self._project_widgets.get("spn_exps")
-        spn_darkexp.setValue(spn_exps.value() if spn_exps else 60.0)
-        form.addRow(self.tr("Dark exposure (s):"), spn_darkexp)
-        spn_bias = QSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
-        spn_bias.setValue(100)
-        form.addRow(self.tr("Bias:"), spn_bias)
-        layout.addWidget(grp)
-        plan_data = next((s["data"] for s in p["steps"]
-                          if s["step"] == "plan"), {})
-        if plan_data.get("n_darks") is not None:
-            spn_darks.setValue(int(plan_data["n_darks"]))
-        if plan_data.get("exp_dark"):
-            spn_darkexp.setValue(float(plan_data["exp_dark"]))
-        if plan_data.get("n_bias") is not None:
-            spn_bias.setValue(int(plan_data["n_bias"]))
-        self._project_widgets["spn_darks"] = spn_darks
-        self._project_widgets["spn_darkexp"] = spn_darkexp
-        self._project_widgets["spn_bias"] = spn_bias
-        # NEO: also ephemeris export
-        if kind in ("neo", "pccp"):
-            layout.addWidget(QLabel(""))
-            layout.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
-            btn_eph = QPushButton(self.tr("Export ephemeris…"))
-            btn_eph.clicked.connect(self._project_export_ephem)
-            layout.addWidget(btn_eph)
-        self._project_widgets["cmb_seqfmt"] = cmb_fmt
-        layout.addStretch()
+    # -- CCDciel control (ADR-030) -----------------------------------------
+
+    def _ccd_apply_state(self):
+        # Enable/disable the CCDciel widgets after a connection change and
+        # refresh the status line. Safe to call even before the widgets exist.
+        w = self._project_widgets
+        if not w.get("ccd_connect"):
+            return
+        on = self._ccd_connected
+        for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
+                    "ccd_start", "ccd_goto", "ccd_sync"):
+            w[key].setEnabled(on)
+        w["cmb_ccd_filter"].setEnabled(on)
+        w["ccd_connect"].setEnabled(not on)
+        if not on:
+            w["ccd_status"].setText(self.tr("CCDciel: not connected"))
+            w["ccd_version"].setText(self.tr("—"))
+            w["ccd_temp"].setText(self.tr("—"))
+            w["ccd_tracking"].setText(self.tr("—"))
+            w["ccd_slew"].setText(self.tr("—"))
+        else:
+            w["ccd_status"].setText(
+                f"{self.tr('CCDciel')}: {self._ccd_client.host}:"
+                f"{self._ccd_client.port} · {self._ccd_version}")
+            self._ccd_fill_filters()
+
+    def _ccd_connect(self):
+        # Manual connect button (ADR-030): build a client from config and let
+        # a worker prove it answers JSON-RPC 2.0 on the background thread.
+        if (self._ccd_worker is not None and self._ccd_worker.isRunning()):
+            return
+        from ..core.sources import ccdciel
+        self._ccd_client = ccdciel.Client(
+            host=str(config.get("ccdciel_host", "127.0.0.1")),
+            port=int(config.get("ccdciel_port", 3277)))
+        self._ccd_version = self.tr("—")
+
+        def action(c):
+            version = c.ping()
+            if version is None:
+                raise ccdciel.CCDcielError("no JSON-RPC answer")
+            return {"version": version, "dashboard": c.dashboard(),
+                    "filters": c.filters()}
+
+        self._ccd_worker = CcdcielWorker(self._ccd_client, action)
+        self._ccd_worker.finished.connect(self._ccd_on_connect)
+        self._ccd_worker.start()
+
+    def _ccd_on_connect(self, result, error):
+        # @args: result - dict with version/dashboard/filters, error - message
+        self._ccd_worker = None
+        if error or not result:
+            QMessageBox.warning(self, self.tr("CCDciel"),
+                                self.tr("Could not connect to CCDciel.")
+                                + f"\n{error}")
+            self._ccd_connected = False
+            self._ccd_apply_state()
+            return
+        self._ccd_connected = True
+        self._ccd_version = str(result.get("version", self.tr("—")))
+        self._ccd_filter_names = list(result.get("filters") or [])
+        self._ccd_timer.start()
+        self._ccd_render_dashboard(result.get("dashboard") or {})
+        self._ccd_apply_state()
+        self.statusBar().showMessage(
+            f"{self.tr('CCDciel connected')} · {self._ccd_version}", 5000)
+
+    def _ccd_disconnect(self):
+        self._ccd_connected = False
+        self._ccd_timer.stop()
+        self._ccd_filter_names = []
+        self._ccd_version = self.tr("—")
+        self._ccd_apply_state()
+
+    def _ccd_run(self, slot, action, poll=False):
+        # One worker at a time keeps slew/capture/filter commands ordered.
+        # @args: slot - slot(result, error), action - callable(Client),
+        #        poll - wait for Telescope_slewing to settle before emitting
+        if (self._ccd_worker is not None and self._ccd_worker.isRunning()):
+            return
+        self._ccd_worker = CcdcielWorker(self._ccd_client, action,
+                                         poll_slew=poll)
+        self._ccd_worker.finished.connect(slot)
+        self._ccd_worker.start()
+
+    def _ccd_refresh(self):
+        # @return: re-fetches the observatory dashboard through the cache
+        self._ccd_run(self._ccd_on_refreshed, lambda c: c.dashboard())
+
+    def _ccd_on_refreshed(self, result, error):
+        self._ccd_worker = None
+        if error:
+            self.statusBar().showMessage(error, 5000)
+            return
+        self._ccd_render_dashboard(result or {})
+
+    def _ccd_render_dashboard(self, dash):
+        # @args: dash - sections dict as returned by the "status" method
+        w = self._project_widgets
+        if not w.get("ccd_temp"):
+            return
+        cam = dash.get("camera") or {}
+        temp = cam.get("temperature")
+        w["ccd_temp"].setText(f"{temp} °C" if temp is not None else self.tr("—"))
+        mount = dash.get("mount") or {}
+        tracking = mount.get("tracking")
+        if tracking is None:
+            w["ccd_tracking"].setText(self.tr("—"))
+        elif tracking:
+            w["ccd_tracking"].setText(self.tr("Tracking"))
+        else:
+            w["ccd_tracking"].setText(self.tr("Stopped"))
+        slewing = mount.get("slewing")
+        if slewing is None:
+            w["ccd_slew"].setText(self.tr("—"))
+        elif slewing:
+            w["ccd_slew"].setText(self.tr("Slewing…"))
+        else:
+            w["ccd_slew"].setText(self.tr("Idle"))
+
+    def _ccd_poll_tick(self):
+        # QTimer tick: cheap cached read of the dashboard while a project is
+        # open, no network from the GUI thread (ADR-030).
+        if not (self._ccd_connected and self._current_project):
+            return
+        if not self._project_widgets.get("ccd_temp"):
+            return
+        self._ccd_render_dashboard(self._ccd_client.dashboard())
+
+    def _ccd_fill_filters(self):
+        # @return: fills the wheel combo from CCDciel (fallback labels when
+        #          the wheel is disconnected or slots are unnamed)
+        w = self._project_widgets
+        cmb = w.get("cmb_ccd_filter")
+        if not cmb:
+            return
+        names = self._ccd_filter_names or ["L", "R", "G", "B", "Ha", "OIII",
+                                           "SII"]
+        before = cmb.currentText()
+        cmb.blockSignals(True)
+        cmb.clear()
+        for name in names:
+            if name and name not in ("", "-", "None"):
+                cmb.addItem(name)
+        if cmb.count() == 0:
+            cmb.addItem(self.tr("No filter"))
+        idx = cmb.findText(before)
+        if idx >= 0:
+            cmb.setCurrentIndex(idx)
+        cmb.blockSignals(False)
+
+    def _ccd_goto(self):
+        # Point the mount at the current object (async slew, waits to settle).
+        ctx = self._current_project.get("context") or {}
+        if ctx.get("ra_deg") is None:
+            self.statusBar().showMessage(
+                self.tr("This object has no coordinates yet."), 5000)
+            return
+        w = self._project_widgets
+        w["ccd_slew"].setText(self.tr("Slewing…"))
+        w["ccd_goto"].setEnabled(False)
+        ra, dec = ctx["ra_deg"], ctx["dec_deg"]
+        self._ccd_run(self._ccd_on_goto, lambda c: c.slew_target(ra, dec),
+                      poll=True)
+
+    def _ccd_on_goto(self, _result, error):
+        w = self._project_widgets
+        if w.get("ccd_goto"):
+            w["ccd_goto"].setEnabled(True)
+        if error:
+            w["ccd_slew"].setText(self.tr("Failed"))
+            self.statusBar().showMessage(error, 8000)
+            return
+        w["ccd_slew"].setText(self.tr("Idle"))
+        self.statusBar().showMessage(
+            self.tr("Telescope pointed at the object."), 5000)
+
+    def _ccd_sync(self):
+        # Align the mount with the current object's coordinates.
+        ctx = self._current_project.get("context") or {}
+        if ctx.get("ra_deg") is None:
+            self.statusBar().showMessage(
+                self.tr("This object has no coordinates yet."), 5000)
+            return
+        ra, dec = ctx["ra_deg"], ctx["dec_deg"]
+        self._ccd_run(self._ccd_on_synced, lambda c: c.sync_target(ra, dec))
+
+    def _ccd_on_synced(self, _result, error):
+        if error:
+            self.statusBar().showMessage(error, 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Telescope synced to the object."), 5000)
+
+    def _ccd_send_plan(self):
+        # Stage the planned frames/exposure/filter inside CCDciel (Capture_set*).
+        spn = self._project_widgets.get("spn_nframes")
+        spn_exp = self._project_widgets.get("spn_exps")
+        cmb = self._project_widgets.get("cmb_ccd_filter")
+        if not (spn and spn_exp and cmb):
+            return
+        n_frames = spn.value()
+        exp_s = spn_exp.value()
+        f_idx = cmb.currentIndex()
+        name = self._current_project["object_name"]
+
+        def action(c):
+            c.set_filter(f_idx)
+            return c.push_plan(n_frames, exp_s, name)
+
+        self._ccd_run(self._ccd_on_sent, action)
+
+    def _ccd_on_sent(self, _result, error):
+        if error:
+            self.statusBar().showMessage(error, 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Capture plan sent to CCDciel."), 5000)
+
+    def _ccd_start_capture(self):
+        self._ccd_run(self._ccd_on_started, lambda c: c.start_capture())
+
+    def _ccd_on_started(self, _result, error):
+        if error:
+            self.statusBar().showMessage(error, 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Capture started in CCDciel."), 5000)
 
     def _build_process_tab(self, p, kind, ctx):
         tab = self.projects.tabs_steps.findChild(QWidget, "tab_process")

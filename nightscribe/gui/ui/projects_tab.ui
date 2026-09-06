@@ -65,14 +65,10 @@
           <attribute name="title"><string>Plan</string></attribute>
           <layout class="QVBoxLayout" name="planLayout"/>
          </widget>
-        <widget class="QWidget" name="tab_capture">
-         <attribute name="title"><string>Capture</string></attribute>
-         <layout class="QVBoxLayout" name="captureLayout"/>
-        </widget>
         <widget class="QWidget" name="tab_process">
-         <attribute name="title"><string>Process</string></attribute>
-         <layout class="QVBoxLayout" name="processLayout"/>
-        </widget>
+          <attribute name="title"><string>Process</string></attribute>
+          <layout class="QVBoxLayout" name="processLayout"/>
+         </widget>
 
         <widget class="QWidget" name="tab_publish">
          <attribute name="title"><string>Publish</string></attribute>

@@ -39,6 +39,11 @@ DEFAULTS = {
     "pixel_um": 3.76,           # camera pixel size in microns
     "focal_mm": 2000.0,         # telescope focal length in mm
     "overhead_s": 15.0,         # per-frame readout/slew overhead in seconds
+    # CCDciel JSON-RPC (ADR-030). Manual connect by default: the observatory
+    # software is a human decision, not an automatic one.
+    "ccdciel_host": "127.0.0.1",
+    "ccdciel_port": 3277,
+    "ccdciel_auto_connect": False,
     "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
     "moon_max_illum": 0.5,        # above this, faint targets get penalized
     "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized

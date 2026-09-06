@@ -26,11 +26,12 @@ one a **project** is born that guides everything else without re-asking anything
 ## 3. Anatomy of a project
 
 Persistent entity (ADR-019): kind, target, status (`active`/`done`/`archived`), full
-JSON context and four guided steps. Context is captured when the project is created
+JSON context and three guided steps. Context is captured when the project is created
 from Tonight (target snapshot: coords, mag, rate, window…) and enriched at each step
 (exported sequence, imported FITS, measurements, posts).
 
-**Steps**: Plan → Capture → Process → Publish.
+**Steps**: Plan & Capture → Process → Publish (ADR-019's 2026-09-06 review merged the
+Capture step into Plan and added real CCDciel control — ADR-030).
 
 ## 4. Flow — supernova / transient
 
@@ -38,7 +39,9 @@ from Tonight (target snapshot: coords, mag, rate, window…) and enriched at eac
    horizon and "safe start until HH:MM". The user sets N frames × exposure and filter;
    the app checks the session ends inside the safety range.
 2. **Capture**: export sequence (NINA JSON / CCDciel / CSV) with name, J2000 coords
-   and times; the file is registered in the project.
+   and times; the file is registered in the project. **With CCDciel connected**
+   (ADR-030) the same tab can also: point/sync the telescope, send the plan (target,
+   exposure, frame count, filter) and start the capture live.
 3. **Process** (external): the user calibrates/stacks with their own tools; back in
    NightScribe, "Import result FITS" — **without asking for target or coordinates**
    (already in context) — then confirm with the blink, matched against PS1-g
@@ -54,7 +57,8 @@ from Tonight (target snapshot: coords, mag, rate, window…) and enriched at eac
    Warning if the session would end outside the safety range.
 2. **Capture**: export **ephemerides** at a configurable step for TheSkyX and Cartes
    du Ciel (formats validated against real imports in phase 5; CSV as the base) +
-   sequence for the capture software.
+   sequence for the capture software. With CCDciel connected (ADR-030): send the plan
+   and start the capture live.
 3. **Process**: the user measures externally (Astrometrica or other) and **pastes**
    the measurements into the project → validation (80-col/ADES, MPC code, designation)
    → packaged file ready to email to the MPC (ADR-022). Sending is done by the user.
@@ -66,7 +70,7 @@ from Tonight (target snapshot: coords, mag, rate, window…) and enriched at eac
 
 ## 6. Later flows
 
-Comets and exoplanet transits reuse the same 4-step skeleton once the SN and NEO flows
+Comets and exoplanet transits reuse the same 3-step skeleton once the SN and NEO flows
 are settled. Out of this initial redesign.
 
 ## 7. Roadmap and entry point

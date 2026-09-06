@@ -61,10 +61,10 @@ def _tab_widgets(dlg, index):
 def test_three_tabs_in_order(qapp):
     dlg = _dlg()
     tabs = _tab_names(dlg)
-    assert len(tabs) == 3
-    # the last tab (integrations) is stable in every locale — it is the
-    # API-keys page, named identically in ES and EN on purpose
-    assert tabs[-1] in ("Integrations", "Integraciones")
+    assert len(tabs) == 4
+    # the last tab is the CCDciel JSON-RPC page (ADR-030), named identically
+    # in every locale on purpose
+    assert tabs[-1] == "CCDciel"
     # the first tab is the site page (language-aware)
     assert tabs[0] in ("Site & equipment", "Sitio y equipo")
     dlg.deleteLater()
@@ -112,6 +112,14 @@ def test_integrations_tab_widgets(qapp):
     for w in ["edt_neofixer_key", "edt_astrometry_key",
               "edt_tns_bot", "edt_tns_bot_key"]:
         assert w in names, f"{w} expected on the Integrations tab"
+    dlg.deleteLater()
+
+
+def test_ccdciel_tab_widgets(qapp):
+    dlg = _dlg()
+    names = set(_tab_widgets(dlg, 3))
+    for w in ["edt_ccdciel_host", "spn_ccdciel_port", "chk_ccdciel_auto"]:
+        assert w in names, f"{w} expected on the CCDciel tab"
     dlg.deleteLater()
 
 

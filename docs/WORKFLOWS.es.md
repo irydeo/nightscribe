@@ -26,11 +26,12 @@ elección nace un **proyecto** que guía todo lo demás sin volver a preguntar n
 ## 3. Anatomía de un proyecto
 
 Entidad persistente (ADR-019): tipo, objeto, estado (`active`/`done`/`archived`),
-contexto JSON completo y cuatro pasos guiados. El contexto se captura al crear el
+contexto JSON completo y tres pasos guiados. El contexto se captura al crear el
 proyecto desde Esta noche (snapshot del objetivo: coords, mag, rate, ventana…) y se
 enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
 
-**Pasos**: Plan → Captura → Procesado → Publicar.
+**Pasos**: Plan & Captura → Procesado → Publicar (revisión 2026-09-06 de ADR-019: el
+paso Captura se fundió en el Plan y gana el control real de CCDciel — ADR-030).
 
 ## 4. Flujo — supernova / transitorio
 
@@ -38,7 +39,10 @@ enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
    horizonte real y «inicio seguro hasta HH:MM». El usuario define N tomas × exposición
    y filtro; la app comprueba que la sesión termina dentro del rango de seguridad.
 2. **Captura**: exportar secuencia (NINA JSON / CCDciel / CSV) con nombre, coords J2000
-   y tiempos; el fichero queda registrado en el proyecto.
+   y tiempos; el fichero queda registrado en el proyecto. **Con CCDciel conectado**
+   (ADR-030) también se puede: apuntar/sincronizar el telescopio, enviar el plan
+   (objeto, exposición, nº de tomas, filtro) e iniciar la captura desde la misma
+   pestaña.
 3. **Procesado** (externo): el usuario calibra/apila con sus programas; al volver,
    «Importar FITS resultado» — **sin preguntar objeto ni coordenadas** (ya están en el
    contexto) — y confirma con el blink, casado con PS1-g (pipeline ADR-018
@@ -53,7 +57,8 @@ enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
    seguro». Aviso si la sesión terminaría fuera de seguridad.
 2. **Captura**: exportar **efemérides** a paso configurable para TheSkyX y Cartes du
    Ciel (formatos validados con importación real en la fase 5; CSV como base) +
-   secuencia para el software de captura.
+   secuencia para el software de captura. Con CCDciel conectado (ADR-030): enviar el
+   plan e iniciar la captura en vivo.
 3. **Procesado**: el usuario mide fuera (Astrometrica u otro) y **pega** las medidas en
    el proyecto → validación (80-col/ADES, código MPC, designación) → fichero
    empaquetado listo para enviar al MPC (ADR-022). El envío lo hace el usuario.
@@ -64,7 +69,7 @@ enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
 
 ## 6. Flujos posteriores
 
-Cometas y tránsitos de exoplanetas reutilizan el mismo esqueleto de 4 pasos cuando los
+Cometas y tránsitos de exoplanetas reutilizan el mismo esqueleto de 3 pasos cuando los
 flujos de SN y NEO estén asentados. Fuera de este rediseño inicial.
 
 ## 7. Hoja de ruta y punto de entrada

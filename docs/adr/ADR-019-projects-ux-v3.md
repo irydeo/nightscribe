@@ -1,6 +1,6 @@
 # ADR-019: UX v3 — project-centric workflow
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06
 
 ## Español
 
@@ -65,13 +65,25 @@ el blink pregunta objeto/coordenadas/FITS cada vez, aunque la app ya los conozca
   `gui/main_window.py` gana `_table_open_explore`, `_goto_active_project` y refactoriza
   `_start_or_continue`; i18n ES/EN ampliada; tests unitarios de las tres vistas.
 
-**Persistencia** (migraciones `user_version` 0→1→2 en `core/db.py`, per ADR-002):
+**Revisión (2026-09-06)** — «Captura» se funde en «Plan» (paso único Plan & Captura):
+
+- Planificar la sesión (tomas/exposición/filtro), exportar la secuencia y ejecutarla es
+  **un único paso**, no dos. La pestaña «Captura» desaparece: su contenido (calibración
+  CCDciel, exportación NINA/CCDciel/CSV, efemérides NEO) se integra en la pestaña del
+  Plan, que además gana el **control real de CCDciel** (ADR-030).
+- Consecuencias: `core/project.py` `STEPS` pasa a `("plan","process","publish")`;
+  migración `user_version` 2→3 (funde los `data` de `capture` en `plan`, pasa `current`
+  a `process` si un proyecto se había quedado en captura y borra la fila); el stepper
+  muestra `/3`; `_build_capture_tab` se elimina y su contenido vive en `_build_plan_tab`.
+
+**Persistencia** (migraciones `user_version` 0→1→2→3 en `core/db.py`, per ADR-002):
 
 - `projects(id, kind, object_name, status, created, updated, context JSON)`
 - `project_steps(project_id, step, status, data JSON, updated)`
 - `project_files(project_id, path, kind, created)`
 - `observations` gana columna `project_id` NULL.
 - `user_version` 1→2: elimina el paso `analyse` (revisión 2026-08-28).
+- `user_version` 2→3: elimina el paso `capture`, fundido en `plan` (revisión 2026-09-06).
 
 **Consecuencias**: `gui/main_window.py` se reorganiza (hub de Proyectos con stepper por
 tipo); las tarjetas de Esta noche ganan la acción «Crear proyecto»; el blink standalone
@@ -147,13 +159,25 @@ name/coordinates/FITS every time, even when the app already knows them.
   extended (stale "Create post" strings retired from both `.ts`, `.qm` recompiled);
   unit tests cover the three views.
 
-**Persistence** (`user_version` 0→1→2 migrations in `core/db.py`, per ADR-002):
+**Review (2026-09-06)** — "Capture" merged into "Plan" (single Plan & Capture step):
+
+- Planning the session (frames/exposure/filter), exporting the sequence and running it
+  is **one step**, not two. The "Capture" tab disappears: its content (CCDciel
+  calibration, NINA/CCDciel/CSV export, NEO ephemerides) moves into the Plan tab, which
+  additionally gains **real CCDciel control** (ADR-030).
+- Consequences: `core/project.py` `STEPS` becomes `("plan","process","publish")`;
+  `user_version` 2→3 migration (merges the `capture` data into `plan`, hands `current`
+  to `process` if a project was parked there, and drops the row); the stepper now shows
+  `/3`; `_build_capture_tab` is gone, its content lives in `_build_plan_tab`.
+
+**Persistence** (`user_version` 0→1→2→3 migrations in `core/db.py`, per ADR-002):
 
 - `projects(id, kind, object_name, status, created, updated, context JSON)`
 - `project_steps(project_id, step, status, data JSON, updated)`
 - `project_files(project_id, path, kind, created)`
 - `observations` gains a NULL `project_id` column.
 - `user_version` 1→2: removes the `analyse` step (review 2026-08-28).
+- `user_version` 2→3: removes the `capture` step, merged into `plan` (review 2026-09-06).
 
 **Consequences**: `gui/main_window.py` is reorganised (Projects hub with a per-kind
 stepper); Tonight cards gain the "Create project" action; the standalone blink survives

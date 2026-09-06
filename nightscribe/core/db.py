@@ -11,6 +11,7 @@
 #
 ############################################################
 
+import json
 import logging
 import sqlite3
 import time
@@ -45,6 +46,8 @@ SOURCE_TTL = {
     "cutouts": 30 * DAY,
     "tns": 6 * HOUR,
     "astrometry": 30 * DAY,
+    "ccdciel": 60,  # local JSON-RPC: covers quick reads (temp, filters,
+                    # slewing) without hammering the observatory software
 }
 
 _SCHEMA = """
@@ -125,6 +128,35 @@ def _migrate(conn):
                     ("current", time.time(), pid, "publish"))
             conn.execute("DELETE FROM project_steps WHERE id=?", (sid,))
         conn.execute("PRAGMA user_version = 2")
+    if v < 3:
+        # ADR-030 review (2026-09-06): "capture" was merged into "plan"
+        # (Plan & Captura). Move its data over, hand "current" to "process"
+        # if a project was stopped on capture, then drop the step row.
+        rows = conn.execute(
+            "SELECT id, project_id, status, data FROM project_steps"
+            " WHERE step=?",
+            ("capture",)).fetchall()
+        for sid, pid, status, data in rows:
+            if status == "current":
+                conn.execute(
+                    "UPDATE project_steps SET status=?, updated=?"
+                    " WHERE project_id=? AND step=?",
+                    ("current", time.time(), pid, "process"))
+            if data and data != "{}":
+                plan = conn.execute(
+                    "SELECT data FROM project_steps WHERE project_id=?"
+                    " AND step=?",
+                    (pid, "plan")).fetchone()
+                if plan:
+                    merged = json.loads(plan[0] or "{}")
+                    merged.update(json.loads(data))
+                    conn.execute(
+                        "UPDATE project_steps SET data=?, updated=?"
+                        " WHERE project_id=? AND step=?",
+                        (json.dumps(merged, ensure_ascii=False), time.time(),
+                         pid, "plan"))
+            conn.execute("DELETE FROM project_steps WHERE id=?", (sid,))
+        conn.execute("PRAGMA user_version = 3")
     conn.commit()
 
 

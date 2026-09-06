@@ -887,8 +887,9 @@ def test_gui_boots_offscreen():
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)
     assert not w.tonight.grp_list.isVisible()
-    # projects step tabs: Details (the object card) + 4 steps
-    assert w.projects.tabs_steps.count() == 5
+    # projects step tabs: Details (the object card) + 3 steps (capture ->
+    # plan, ADR-030)
+    assert w.projects.tabs_steps.count() == 4
     assert w.projects.tabs_steps.tabText(0) == "Details"
     # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]
@@ -897,3 +898,30 @@ def test_gui_boots_offscreen():
     assert w.tonight.tbl_targets.isSortingEnabled()
     assert w.history.tbl_history.isSortingEnabled()
     w.close()
+
+
+# ---------------- CCDciel JSON-RPC (local server, ADR-030) ------------
+
+def _ccdciel_up(host="127.0.0.1", port=3277):
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def test_ccdciel_jsonrpc_ping():
+    # CCDciel is a local observatory program, not a web source: skip when it
+    # is not running (the GUI connect button is the manual path).
+    if not _ccdciel_up():
+        pytest.skip("no CCDciel JSON-RPC server on localhost:3277")
+    from nightscribe.core.sources import ccdciel
+    client = ccdciel.Client()
+    version = client.ping()
+    assert version  # something like "2.20.1"
+    assert client.filters() or True  # wheel is optional on real setups
+    dash = client.dashboard()
+    assert isinstance(dash, dict)
+    devs = dash.get("devices") or {}
+    assert "connected" in devs or "camera" in dash

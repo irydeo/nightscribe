@@ -191,8 +191,8 @@ def test_select_project_drives_panel(window, panel):
     assert panel.state() == "ready"
     assert panel.lbl_hook.text()
     # step machine and buttons stayed intact ("Details" tab first, then the
-    # four steps)
-    assert window.projects.tabs_steps.count() == 5
+    # three steps — capture merged into plan, ADR-030)
+    assert window.projects.tabs_steps.count() == 4
     # a project opens on "Details": prev has no target there, next enters
     # step 1
     assert window.projects.tabs_steps.currentIndex() == 0
@@ -527,12 +527,12 @@ def test_refresh_preserves_selected_project(window):
     assert lst.currentItem().data(Qt.UserRole) == p["id"]
 
 
-def test_capture_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
-                                                    monkeypatch):
-    # The Capture tab carries the CCDciel calibration group (ADR-021) and the
-    # export button writes a real ".targets" list (CONFIG Version="5") with
-    # Light + Dark + Bias steps, using the project safe window as the
-    # informative StartTime/EndTime.
+def test_plan_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
+                                                 monkeypatch):
+    # The merged Plan & Capture tab (ADR-030) carries the CCDciel calibration
+    # group (ADR-021) and the export button writes a real ".targets" list
+    # (CONFIG Version="5") with Light + Dark + Bias steps, using the project
+    # safe window as the informative StartTime/EndTime.
     import xml.etree.ElementTree as ET
     from PySide6.QtWidgets import QFileDialog
     ctx = dict(NEO_CTX)
@@ -574,3 +574,48 @@ def test_capture_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
     assert data["n_darks"] == 20
     assert data["n_bias"] == 30
     assert data["exp_dark"] == 90.0
+
+
+# ---------------- CCDciel control section (ADR-030) --------------------
+
+def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
+    # Without a connection every CCDciel button is disabled and the status
+    # line says so; the connect button is the one enabled thing.
+    _create_and_select(window, "neo", "ccd-section-target",
+                       {"kind": "neo", "mag": 19.0})
+    w = window._project_widgets
+    assert w["ccd_connect"].isEnabled()
+    assert window._ccd_connected is False
+    for key in ("ccd_disconnect", "ccd_refresh", "ccd_push", "ccd_start",
+                "ccd_goto", "ccd_sync"):
+        assert not w[key].isEnabled(), f"{key} should start disabled"
+    assert not w["cmb_ccd_filter"].isEnabled()
+    assert w["ccd_status"].text() == window.tr("CCDciel: not connected")
+
+
+def test_plan_tab_ccdciel_filter_fallback_list(window, panel):
+    # The wheel combo carries a sane static fallback until CCDciel answers.
+    _create_and_select(window, "neo", "ccd-filter-target",
+                       {"kind": "neo", "mag": 19.0})
+    cmb = window._project_widgets["cmb_ccd_filter"]
+    items = [cmb.itemText(i) for i in range(cmb.count())]
+    assert "L" in items and "Ha" in items and "OIII" in items
+
+
+def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
+    # When the wheel answers, the fallback list is replaced by the real one.
+    from nightscribe.core.sources import ccdciel
+    window._ccd_filter_names = ["Red", "Green", "Blue"]
+    window._ccd_version = "2.20"
+    window._ccd_client = ccdciel.Client()
+    window._ccd_connected = True
+    try:
+        _create_and_select(window, "neo", "ccd-wheel-target",
+                           {"kind": "neo", "mag": 19.0})
+        cmb = window._project_widgets["cmb_ccd_filter"]
+        items = [cmb.itemText(i) for i in range(cmb.count())]
+        assert items == ["Red", "Green", "Blue"]
+    finally:
+        window._ccd_connected = False
+        window._ccd_client = None
+        window._ccd_filter_names = []

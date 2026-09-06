@@ -864,6 +864,181 @@
         <translation>Bias:</translation>
     </message>
     <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>CCDciel control</source>
+        <translation>CCDciel control</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Connect CCDciel</source>
+        <translation>Connect CCDciel</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Disconnect</source>
+        <translation>Disconnect</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>CCDciel: not connected</source>
+        <translation>CCDciel: not connected</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Observatory status</source>
+        <translation>Observatory status</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Version:</source>
+        <translation>Version:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>CCD temperature:</source>
+        <translation>CCD temperature:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Tracking:</source>
+        <translation>Tracking:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Slew:</source>
+        <translation>Slew:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Filter on wheel:</source>
+        <translation>Filter on wheel:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Send plan</source>
+        <translation>Send plan</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Start capture</source>
+        <translation>Start capture</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Point telescope</source>
+        <translation>Point telescope</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Sync telescope</source>
+        <translation>Sync telescope</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>No filter</source>
+        <translation>No filter</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Could not connect to CCDciel.</source>
+        <translation>Could not connect to CCDciel.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>CCDciel connected</source>
+        <translation>CCDciel connected</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>—</source>
+        <translation>—</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Slewing…</source>
+        <translation>Slewing…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Idle</source>
+        <translation>Idle</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Stopped</source>
+        <translation>Stopped</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Tracking</source>
+        <translation>Tracking</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Failed</source>
+        <translation>Failed</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>This object has no coordinates yet.</source>
+        <translation>This object has no coordinates yet.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Telescope pointed at the object.</source>
+        <translation>Telescope pointed at the object.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Telescope synced to the object.</source>
+        <translation>Telescope synced to the object.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Capture plan sent to CCDciel.</source>
+        <translation>Capture plan sent to CCDciel.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Capture started in CCDciel.</source>
+        <translation>Capture started in CCDciel.</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="0"/>
+        <source>JSON-RPC connection</source>
+        <translation>JSON-RPC connection</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="0"/>
+        <source>Host:</source>
+        <translation>Host:</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="0"/>
+        <source>Port:</source>
+        <translation>Port:</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="0"/>
+        <source>Auto-connect on start:</source>
+        <translation>Auto-connect on start:</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="0"/>
+        <source>Address of the computer running CCDciel (usually 127.0.0.1)</source>
+        <translation>Address of the computer running CCDciel (usually 127.0.0.1)</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="0"/>
+        <source>Connect to CCDciel automatically when the app starts (off by default)</source>
+        <translation>Connect to CCDciel automatically when the app starts (off by default)</translation>
+    </message>
+    <message>
         <location filename="../main_window.py" line="1713"/>
         <source>Ephemeris format</source>
         <translation>Ephemeris format</translation>

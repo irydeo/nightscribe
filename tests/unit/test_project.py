@@ -20,15 +20,15 @@ def _sn_target():
             "ra_deg": 180.0, "dec_deg": 40.0, "kind": "sn"}
 
 
-def test_create_initialises_four_steps(tmp_db):
+def test_create_initialises_three_steps(tmp_db):
+    # ADR-019 dropped "analyse"; ADR-030 merged "capture" into "plan".
     p = project.create(tmp_db, "sn", "SN 2026ziz", _sn_target())
     assert p is not None
     assert p["kind"] == "sn"
     assert p["status"] == "active"
     assert p["object_name"] == "SN 2026ziz"
-    assert len(p["steps"]) == 4
-    assert [s["step"] for s in p["steps"]] == ["plan", "capture", "process",
-                                               "publish"]
+    assert len(p["steps"]) == 3
+    assert [s["step"] for s in p["steps"]] == ["plan", "process", "publish"]
     assert p["steps"][0]["status"] == "current"
     for s in p["steps"][1:]:
         assert s["status"] == "pending"
@@ -56,7 +56,7 @@ def test_advance_moves_current_forward(tmp_db):
 
 def test_advance_through_all_marks_done(tmp_db):
     p = project.create(tmp_db, "neo", "2021EQ3")
-    for _ in range(4):
+    for _ in range(3):
         p = project.advance(tmp_db, p["id"])
     assert p["status"] == "done"
     assert all(s["status"] == "done" for s in p["steps"])
@@ -69,7 +69,7 @@ def test_current_step_helper(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
     assert project.current_step(tmp_db, p["id"]) == "plan"
     project.advance(tmp_db, p["id"])
-    assert project.current_step(tmp_db, p["id"]) == "capture"
+    assert project.current_step(tmp_db, p["id"]) == "process"
 
 
 def test_list_projects_filters_by_status(tmp_db):
@@ -81,7 +81,7 @@ def test_list_projects_filters_by_status(tmp_db):
     allp = project.list_projects(tmp_db)
     assert len(allp) == 2
     # mark one done via full advance (advance is a no-op past the end)
-    for _ in range(4):
+    for _ in range(3):
         project.advance(tmp_db, p2["id"])
     done = project.list_projects(tmp_db, "done")
     assert len(done) == 1
@@ -90,7 +90,7 @@ def test_list_projects_filters_by_status(tmp_db):
 
 def test_set_step_status_skip(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
-    assert project.set_step_status(tmp_db, p["id"], "capture", "skipped")
+    assert project.set_step_status(tmp_db, p["id"], "process", "skipped")
     p = project.get(tmp_db, p["id"])
     assert p["steps"][1]["status"] == "skipped"
 
@@ -147,15 +147,15 @@ def test_delete_cascades(tmp_db):
     assert rows[0] == 0
 
 
-def test_migration_user_version_is_two(tmp_db):
+def test_migration_user_version_is_three(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 2
+    assert v == 3
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
     # A pre-v2 database still knows the old "analyse" step. Build one by hand
     # (schema at user_version 1, a project stopped on "analyse"), then reopen
-    # it so the v1->v2 migration runs and check it cleaned up gracefully.
+    # it so the v1->v2->v3 migrations run and check it cleaned up gracefully.
     import sqlite3
     import time
     from nightscribe.core import db as dbmod
@@ -184,15 +184,67 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 3
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
-    # analyse is gone and "current" moved onto publish
-    assert ("analyse", "current") not in steps
-    assert all(s != "analyse" for s, _st in steps)
-    assert [s for s, _st in steps] == ["plan", "capture", "process", "publish"]
+    # analyse (v2) and capture (v3) are gone; "current" ended on publish
+    assert all(s not in (("analyse", "current"), ("capture", "current"))
+               for s in steps)
+    assert [s for s, _st in steps] == ["plan", "process", "publish"]
     assert dict(steps)["publish"] == "current"
+
+
+def test_migration_v2_merges_capture_into_plan(tmp_path):
+    # A pre-v3 database (user_version 2) still has the "capture" step with
+    # the calibration counts. Reopen it: the v3 migration moves that data
+    # into "plan", hands "current" to "process" and drops the capture row.
+    import sqlite3
+    import json
+    import time
+    from nightscribe.core import db as dbmod
+    from nightscribe.core.db import Database
+
+    file = tmp_path / "v2.db"
+    conn = sqlite3.connect(str(file))
+    conn.executescript(dbmod._SCHEMA)
+    conn.executescript(dbmod._V1)
+    conn.execute("ALTER TABLE observations ADD COLUMN project_id INTEGER")
+    now = time.time()
+    cur = conn.execute(
+        "INSERT INTO projects (kind, object_name, status, created, updated,"
+        " context) VALUES ('neo', 'SNx2', 'active', ?, ?, '{}')", (now, now))
+    pid = cur.lastrowid
+    # capture holds real data and the flow is parked on it
+    for step, status, data in (("plan", "done",
+                                json.dumps({"n_frames": 30, "exp_s": 60.0})),
+                               ("capture", "current",
+                                json.dumps({"n_darks": 18, "n_bias": 40,
+                                            "exp_dark": 90.0})),
+                               ("process", "pending", "{}"),
+                               ("publish", "pending", "{}")):
+        conn.execute(
+            "INSERT INTO project_steps (project_id, step, status, data,"
+            " updated) VALUES (?, ?, ?, ?, ?)", (pid, step, status, data, now))
+    conn.execute("PRAGMA user_version = 2")
+    conn.commit()
+    conn.close()
+
+    db = Database(str(file))
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+    steps = db.execute(
+        "SELECT step, status, data FROM project_steps WHERE project_id=?"
+        " ORDER BY id",
+        (pid,)).fetchall()
+    assert [s for s, _st, _d in steps] == ["plan", "process", "publish"]
+    plan = dict((s, st) for s, st, _d in steps)
+    assert plan["process"] == "current"
+    # the capture data landed inside the plan step (merged, not replaced)
+    plan_data = json.loads(dict((s, d) for s, _st, d in steps)["plan"])
+    assert plan_data["n_frames"] == 30
+    assert plan_data["n_darks"] == 18
+    assert plan_data["n_bias"] == 40
+    assert plan_data["exp_dark"] == 90.0
 
 
 def test_observations_has_project_id_column(tmp_db):

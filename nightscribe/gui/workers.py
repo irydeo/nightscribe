@@ -222,3 +222,42 @@ class BlinkExportWorker(QThread):
         except Exception as err:  # never crash the GUI on render problems
             logger.exception("blink export failed: %s", err)
             self.finished.emit("", str(err))
+
+
+class CcdcielWorker(QThread):
+    # Runs a single CCDciel JSON-RPC action off the GUI thread and reports
+    # the result. The action receives the Client; anything network-shaped
+    # stays out of the UI thread (ADR-030). When poll_slew is set the worker
+    # also waits for Telescope_slewing to settle before emitting.
+    finished = Signal(object, str)  # result payload, error message
+
+    def __init__(self, client, action, poll_slew=False):
+        super().__init__()
+        self._client = client
+        self._action = action
+        self._poll_slew = poll_slew
+
+    def run(self):
+        # @return: emits (result, "") on success, (None, message) on failure
+        from ..core.sources import ccdciel
+        try:
+            result = self._action(self._client)
+            if self._poll_slew:
+                self._wait_slew()
+            self.finished.emit(result, "")
+        except ccdciel.CCDcielError as err:
+            logger.info("ccdciel command failed: %s", err)
+            self.finished.emit(None, str(err))
+        except Exception as err:  # never crash the GUI on daft payloads
+            logger.exception("ccdciel worker failed: %s", err)
+            self.finished.emit(None, str(err))
+
+    def _wait_slew(self):
+        # Polls Telescope_slewing (live, uncached) until the mount stops.
+        # The 300 s ceiling keeps a dead server from hanging the worker.
+        slept = 0.0
+        while slept < 300.0:
+            if not self._client.slewing():
+                return
+            self.msleep(900)
+            slept += 0.9

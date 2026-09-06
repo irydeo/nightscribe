@@ -27,6 +27,10 @@ altitude and azimuth at the point under the cursor. It shades:
      `horizon.alt_at(az)` per-azimuth curve);
    * the **Moon** altitude as a dotted grey line.
 
+   A compact **legend** in the bottom-right of the data area says what each
+   line is (target, Moon, horizon limit), with the same swatch styles/colours
+   as the lines themselves and the matplotlib export.
+
 `TransitChart` is a subclass that adds the transit's ingress/egress shaded
 band on top of the same sky chart, so the user can see the transit window
 against the actual sky visibility of the star.
@@ -39,7 +43,7 @@ can never drift apart.
 import datetime as _dt
 
 from PySide6.QtCore import QPointF, Qt, Signal
-from PySide6.QtGui import QPen, QBrush, QColor, QPainterPath
+from PySide6.QtGui import QPen, QBrush, QColor, QPainterPath, QFontMetricsF
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QSizePolicy,
                                QGraphicsSimpleTextItem)
 
@@ -413,6 +417,9 @@ class SkyChart(QWidget):
         # the concrete chart may add a transit band on top (TransitChart)
         self._draw_transit()
 
+        # legend: which line is which (bottom-right of the data area)
+        self._add_legend()
+
     # ------------------------------------------------- scene helpers ------
 
     def _add_grid_line(self, x0, y0, x1, y1):
@@ -477,10 +484,16 @@ class SkyChart(QWidget):
         if not rel:
             return None
         pp = QPainterPath()
-        x0, y0 = self._to_scene(rel[0], alt[0])
+        # the altitude is clamped to >= 0 at draw time: a body below the
+        # horizon would otherwise dip into the hour-label band under the
+        # 0° baseline (same clamp matplotlib applies with its ylim(0, 90)
+        # in viz/sky_view.py). Only the *drawn* polyline is clamped; the
+        # raw samples stay untouched so the hover tooltip still reports
+        # the real (possibly negative) altitude.
+        x0, y0 = self._to_scene(rel[0], max(0.0, alt[0]))
         pp.moveTo(x0, y0)
         for i in range(1, len(rel)):
-            xi, yi = self._to_scene(rel[i], alt[i])
+            xi, yi = self._to_scene(rel[i], max(0.0, alt[i]))
             pp.lineTo(xi, yi)
         item = self.view.scene().addPath(pp)
         pen = QPen(color, width)
@@ -571,6 +584,65 @@ class SkyChart(QWidget):
             _hex_alpha(palette.ACCENT, 46), "transit", _Z_TRANSIT)
         self._add_band_label(self.tr("tránsito"),
                              (x0 + x1) / 2.0, y1 + _FONT_LABEL)
+
+    def _add_legend(self):
+        # Draws a compact legend in the bottom-right of the data area that
+        # says what each line is: the target curve, the Moon and the local
+        # horizon limit. Swatch styles/colours mirror the actual lines and
+        # the matplotlib export (viz/sky_view.py), so the widget and the
+        # PNG cannot disagree. A soft dark backdrop keeps it readable over
+        # gridlines and curves.
+        if not self._samples:
+            return
+        entries = [
+            (self._obj_name or self.tr("Objeto"),
+             palette.ACCENT, 1.8, []),
+            (self.tr("Luna"), "#c9c9c9", 1.2, _DOTTED),
+            (self.tr("Límite"), palette.MUTED, 1.0, _DASH),
+        ]
+        fmt = self._label_font
+        fmt.setPixelSize(_FONT_LABEL)
+        fm = QFontMetricsF(fmt)
+        rows = [(text, color, width, dash, fm.horizontalAdvance(text))
+                for text, color, width, dash in entries]
+        text_w = max(row[4] for row in rows)
+        sw = 60            # swatch length
+        gap = 16           # swatch -> text gap
+        pad = 16           # backdrop padding
+        row_h = 44         # vertical pitch between rows
+        right = _HALF - 12
+        text_x = right - text_w
+        sw_x = text_x - gap - sw
+        top = _HALF - 12 - row_h * len(rows)
+        for i, (text, color, width, dash, _w) in enumerate(rows):
+            cy = top + i * row_h + row_h / 2.0
+            line = self.view.scene().addLine(sw_x, cy, sw_x + sw, cy)
+            pen = QPen(QColor(color), width)
+            pen.setCosmetic(True)
+            if dash:
+                pen.setStyle(Qt.DashLine)
+                pen.setDashPattern(dash)
+            line.setPen(pen)
+            line.setZValue(_Z_LABEL)
+            self.view._items_registered.append(line)
+            lb = QGraphicsSimpleTextItem(text)
+            lb.setBrush(QBrush(QColor(palette.FG)))
+            lb.setFont(self._label_font)
+            lb.setPos(text_x, cy - fm.height() / 2.0)
+            lb.setZValue(_Z_LABEL)
+            self.view.scene().addItem(lb)
+            self.view._items_registered.append(lb)
+        # backdrop under the swatches/labels (between the top labels and the
+        # plot lines, so it dims only the plot beneath the legend corner)
+        x0 = sw_x - pad
+        y0 = top - pad
+        w = (right - sw_x) + 2 * pad
+        h = row_h * len(rows) + 2 * pad
+        bg = self.view.scene().addRect(x0, y0, w, h)
+        bg.setBrush(QBrush(_hex_alpha(palette.BG, 210)))
+        bg.setPen(Qt.NoPen)
+        bg.setZValue(_Z_LABEL - 0.5)
+        self.view._items_registered.append(bg)
 
     # ------------------------------------------------- hover --------------
 

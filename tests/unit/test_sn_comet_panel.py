@@ -211,8 +211,9 @@ def test_panel_sn_sky_chart_offline(panel, no_sources):
     assert "NGC 5128" in facts and "II" in facts
     # the sky slot is now a live vector widget (ADR-029) with a non-empty scene
     from nightscribe.gui.widgets.sky_widget import SkyChart
-    sky = next((item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), SkyChart)), None)
-    assert sky is not None, "no SkyChart widget found in the grid"
+    sky = next((panel._tabs.widget(i) for i in range(panel._tabs.count())
+                if isinstance(panel._tabs.widget(i), SkyChart)), None)
+    assert sky is not None, "no SkyChart widget found in the tabs"
     assert not sky.isHidden()
     assert sky.view.scene().items(), "sky scene is empty"
     # capture chips: magnitude + the safe window the planner computed

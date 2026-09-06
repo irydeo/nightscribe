@@ -456,3 +456,121 @@ def test_explore_panel_lookup_injects_fallback_id(window, tmp_path):
             panel.deleteLater()
     finally:
         window._tonight_all = []
+
+
+# ---------------- auto-refresh the hub list (2026-09-06) ------------
+#
+# Projects must be visible without pressing "Refresh": the list loads at
+# startup and refreshes again on every visit to the Projects tab. The
+# "Refresh" button stays as a just-in-case fallback.
+
+def test_projects_list_populated_at_startup():
+    # A fresh MainWindow must show whatever projects already exist the
+    # moment it opens — no manual "Refresh" needed. The constructor only
+    # defers a singleShot(0), so we must process queued events for it to
+    # fire. The shared temp DB already holds projects from earlier tests,
+    # so the expectation is simply "at least one row rendered".
+    from PySide6.QtCore import QCoreApplication
+    from nightscribe.config import config
+    from nightscribe.gui.main_window import MainWindow
+    orig_cfg = config.is_configured
+    config.is_configured = lambda: False
+    w = MainWindow()
+    w._now_timer.stop()
+    w._blink_timer.stop()
+    w._blink_render_timer.stop()
+    try:
+        for _ in range(3):      # let the deferred startup refresh land
+            QCoreApplication.processEvents()
+        assert w.projects.lst_projects.count() > 0
+        # the manual fallback button is still there
+        assert w.projects.btn_refresh is not None
+        assert not w.projects.btn_refresh.isHidden()
+    finally:
+        config.is_configured = orig_cfg
+        w.close()
+
+
+def test_refresh_projects_populates_list_without_button(window):
+    # Simply refreshing (what the tab-change hook does) fills the list from
+    # the database with zero manual interaction.
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    project.create(dbmod.db, "comet", "auto-refresh-comet",
+                   {"kind": "comet", "mag": 13.0})
+    window.on_refresh_projects()
+    labels = [window.projects.lst_projects.item(i).text()
+              for i in range(window.projects.lst_projects.count())]
+    assert any("auto-refresh-comet" in t for t in labels)
+
+
+def test_refresh_preserves_selected_project(window):
+    # Re-entering the Projects tab reloads the list (clear + re-add); the
+    # project the user is currently viewing must stay selected.
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    p = project.create(dbmod.db, "neo", "keep-me-selected",
+                       {"kind": "neo", "mag": 18.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    lst.blockSignals(True)
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            lst.setCurrentRow(i)
+            break
+    lst.blockSignals(False)
+    assert lst.currentItem().data(Qt.UserRole) == p["id"]
+    # a refresh re-renders the list but keeps the selection
+    window.on_refresh_projects()
+    assert lst.currentItem() is not None
+    assert lst.currentItem().data(Qt.UserRole) == p["id"]
+
+
+def test_capture_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
+                                                    monkeypatch):
+    # The Capture tab carries the CCDciel calibration group (ADR-021) and the
+    # export button writes a real ".targets" list (CONFIG Version="5") with
+    # Light + Dark + Bias steps, using the project safe window as the
+    # informative StartTime/EndTime.
+    import xml.etree.ElementTree as ET
+    from PySide6.QtWidgets import QFileDialog
+    ctx = dict(NEO_CTX)
+    ctx.update({"ra_deg": 9.36667, "dec_deg": 72.3475,
+                "safe_window": "2026-09-06T16:52:02+00:00|"
+                               "2026-09-07T12:53:15+00:00"})
+    _create_and_select(window, "neo", "seq-capture-target", ctx)
+    w = window._project_widgets
+    assert w["spn_darks"].value() == 25   # calibration group defaults
+    assert w["spn_bias"].value() == 100
+    assert w["spn_darkexp"].value() > 0.0  # follows the light exposure
+    out = tmp_path / "seq-capture-target.targets"
+    w["cmb_seqfmt"].setCurrentIndex(1)   # CCDciel (targets)
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName",
+        lambda *a, **k: (str(out), "*.targets"))
+    window._project_export_sequence()
+    assert out.exists()
+    root = ET.parse(out).getroot()
+    assert root.tag == "CONFIG"
+    assert root.get("Version") == "5"
+    assert root.get("ListName") == "seq-capture-target"
+    tgt = root.find("Targets/Target1")
+    assert tgt.get("ObjectName") == "seq-capture-target"
+    assert tgt.get("StartTime") == "16:52:02"
+    assert tgt.get("EndTime") == "12:53:15"
+    steps = root.findall(".//Plan/Steps/*")
+    assert [s.get("FrameType") for s in steps] == ["Light", "Dark", "Bias"]
+    # saving the plan persists the calibration counts
+    w["spn_nframes"].setValue(42)
+    w["spn_darks"].setValue(20)
+    w["spn_darkexp"].setValue(90.0)
+    w["spn_bias"].setValue(30)
+    window._project_save_plan()
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    p = project.get(dbmod.db, window._current_project["id"])
+    data = next(s["data"] for s in p["steps"] if s["step"] == "plan")
+    assert data["n_darks"] == 20
+    assert data["n_bias"] == 30
+    assert data["exp_dark"] == 90.0

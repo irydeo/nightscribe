@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CONFIG Version="5" ListName="AT2026zjn_sample" TargetNum="1" RepeatCount="1">
+  <Targets RepeatDone="0" ResetRepeat="True" IgnoreRestart="False">
+    <Target1 PA="-" RA="00h37m28s" Dec="+72d20m51s" Path="" Plan="" Skip="False" Delay="0" EndSet="True" EndTime="12:53:15" Preview="False" FlatBinX="0" FlatBinY="0" FlatGain="0" DarkNight="False" FlatCount="0" FlatFstop="" StartRise="True" StartTime="16:52:02" FlatOffset="0" ObjectName="AT2026zjn" RepeatDone="0" ScriptArgs="" EndMeridian="-9999" FlatFilters="" HFM_Enabled="True" RepeatCount="1" UpdateCoord="False" AutofocusTemp="False" SolarTracking="False" StartMeridian="-9999" PreviewExposure="0.001" InplaceAutofocus="True" AstrometryPointing="True" MandatoryStartTime="False" NoAutoguidingChange="False">
+      <Plan Name="" StepNum="3">
+        <Steps>
+          <Step1 Done="0" Gain="1" Type="0" Count="180" Fstop="" Dither="True" Filter="Clear" Offset="0" Binning="1x1" Exposure="10" Autofocus="True" FrameType="Light" ScriptArgs="" ScriptName="" ScriptPath="" StackCount="1" SwitchName="" Description="Light" DitherCount="25" SwitchValue="" AutofocusCount="50" AutofocusStart="True" SwitchNickname=""/>
+          <Step2 Done="0" Gain="1" Type="0" Count="25" Fstop="" Dither="False" Filter="Dark" Offset="0" Binning="1x1" Exposure="10" Autofocus="False" FrameType="Dark" ScriptArgs="" ScriptName="" ScriptPath="" StackCount="1" SwitchName="" Description="Dark" DitherCount="0" SwitchValue="" AutofocusCount="0" AutofocusStart="False" SwitchNickname=""/>
+          <Step3 Done="0" Gain="1" Type="0" Count="100" Fstop="" Dither="False" Filter="Dark" Offset="0" Binning="1x1" Exposure="0" Autofocus="False" FrameType="Bias" ScriptArgs="" ScriptName="" ScriptPath="" StackCount="1" SwitchName="" Description="Bias" DitherCount="0" SwitchValue="" AutofocusCount="0" AutofocusStart="False" SwitchNickname=""/>
+        </Steps>
+      </Plan>
+    </Target1>
+  </Targets>
+  <Startup Unpark="False" SeqStop="False" SeqStart="False" RunScript="False" SeqStopAt="0:00:00" CoolCamera="False" SeqStartAt="22:30:00" StartScript="" SeqStopTwilight="False" SeqStartTwilight="False"/>
+  <Termination Park="False" CloseDome="False" EndScript="" RunScript="False" WarmCamera="True" ErrorScript="" StopTracking="True" ErrorRunScript="False"/>
+</CONFIG>

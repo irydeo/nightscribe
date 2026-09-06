@@ -258,34 +258,54 @@ def test_explore_not_found_state(panel, qapp):
     p.deleteLater()
 
 
-# ---------------- D2: charts grid (ADR-029 vector slots) ----------------
+# ---------------- D2: chart tabs (ADR-029 vector slots) ----------------
 #
 # orbit / sky are live vector widgets (OrbitChart / SkyChart, ADR-029);
 # field / transit are QLabel+QPixmap. build_charts is still run and acts
-# as a "can I make this chart?" gate. We inspect the grid by counting
-# children and checking _slot_data for the vector ones.
+# as a "can I make this chart?" gate. Each produced chart lands on its own
+# tab, labelled with its title. We inspect the tabs by counting children
+# and checking _slot_data for the vector ones.
 
-def _grid_widgets(panel):
-    """@return: list of child widgets in the charts grid (5-slot layout)."""
-    return [panel._grid.itemAt(r * 2 + c).widget()
-            for r in range(3) for c in range(2)
-            if panel._grid.itemAt(r * 2 + c)]
+def _chart_tabs(panel):
+    """@return: the widgets in the chart tab group, in tab order."""
+    return [panel._tabs.widget(i) for i in range(panel._tabs.count())]
 
 
-def test_charts_grid_present_when_ready(panel):
+def test_charts_tabs_present_when_ready(panel):
     panel.show(FAKE_ELEMENT)
     assert panel.state() == "ready"
-    # the group is visible and has widgets in it
+    # the group is visible and has tabs in it
     assert not panel.grp_charts.isHidden()
-    widgets = _grid_widgets(panel)
-    assert len(widgets) >= 2, \
-        f"expected ≥2 chart slots, got {len(widgets)}"
+    tabs = _chart_tabs(panel)
+    assert len(tabs) >= 2, \
+        f"expected ≥2 chart tabs, got {len(tabs)}"
     # orbit and sky are vector slots (data extracted for click rebuild)
     assert "orbit" in panel._slot_data, "orbit slot data missing"
     assert "sky" in panel._slot_data, "sky slot data missing"
     # field needs the network (a reference cutout); it is absent offline
     assert "field" not in panel._slot_data
-    assert "field" not in [w.property("chart_key") for w in widgets]
+    assert "field" not in [w.property("chart_key") for w in tabs]
+
+
+def test_chart_tab_titles_recorded(panel):
+    # FAKE_ELEMENT renders orbit/sky/approach: each tab is labelled with
+    # the chart's translated title and the viewer title matches.
+    panel.show(FAKE_ELEMENT)
+    assert panel._tabs.count() >= 3, f"expected ≥3 tabs, got {panel._tabs.count()}"
+    from nightscribe.gui.widgets.approach_widget import ApproachChart
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    from nightscribe.gui.widgets.sky_widget import SkyChart
+    tabs = _chart_tabs(panel)
+    keys = [w.property("chart_key") for w in tabs]
+    assert keys == ["orbit", "sky", "approach"], f"tab order wrong: {keys}"
+    for i, w in enumerate(tabs):
+        title = panel._tabs.tabText(i)
+        assert title, f"tab {i} has an empty title"
+        assert panel._slot_titles[w.property("chart_key")] == title, \
+            f"tab title {title!r} != viewer title for {w.property('chart_key')}"
+    assert isinstance(tabs[0], OrbitChart)
+    assert isinstance(tabs[1], SkyChart)
+    assert isinstance(tabs[2], ApproachChart)
 
 
 def test_vector_slots_are_live_widgets(panel):
@@ -294,11 +314,11 @@ def test_vector_slots_are_live_widgets(panel):
     panel.show(FAKE_ELEMENT)
     from nightscribe.gui.widgets.orbit_widget import OrbitChart
     from nightscribe.gui.widgets.sky_widget import SkyChart
-    widgets = _grid_widgets(panel)
-    orbit_w = next((w for w in widgets if isinstance(w, OrbitChart)), None)
-    sky_w = next((w for w in widgets if isinstance(w, SkyChart)), None)
-    assert orbit_w is not None, "no OrbitChart in the grid"
-    assert sky_w is not None, "no SkyChart in the grid"
+    tabs = _chart_tabs(panel)
+    orbit_w = next((w for w in tabs if isinstance(w, OrbitChart)), None)
+    sky_w = next((w for w in tabs if isinstance(w, SkyChart)), None)
+    assert orbit_w is not None, "no OrbitChart in the tabs"
+    assert sky_w is not None, "no SkyChart in the tabs"
     # both have a ChartView with a non-empty scene
     from nightscribe.gui.widgets.base_chart import ChartView
     assert isinstance(orbit_w.view, ChartView)
@@ -307,12 +327,25 @@ def test_vector_slots_are_live_widgets(panel):
     assert sky_w.view.scene().items(), "sky scene is empty"
 
 
+def test_single_chart_hides_tab_bar(panel, monkeypatch):
+    # When only ONE chart can be produced, the tab bar auto-hides so the
+    # chart stands alone (no useless single-tab strip); the group stays.
+    from nightscribe.core import post
+    monkeypatch.setattr(post, "build_charts", lambda *_a, **_k: {})
+    panel.show(FAKE_ELEMENT)          # vector approach still renders
+    assert panel.state() == "ready"
+    assert not panel.grp_charts.isHidden(), "charts group must stay visible"
+    assert panel._tabs.count() == 1, f"expected 1 tab, got {panel._tabs.count()}"
+    assert panel._tabs.tabBarAutoHide(), \
+        "tab bar must auto-hide for a single chart"
+
+
 def test_no_charts_hides_the_whole_group(panel):
     # FAKE_UNCONFIRMED has no elements, no ephemeris and no simbad:
     # build_charts produces nothing, so the whole charts group disappears.
     panel.show(FAKE_UNCONFIRMED)
     assert panel.grp_charts.isHidden()
-    assert panel._grid.count() == 0, "grid should be empty"
+    assert panel._tabs.count() == 0, "tabs should be empty"
     assert panel._slot_data == {}
 
 
@@ -320,28 +353,26 @@ def test_missing_state_keeps_charts_hidden(panel):
     panel.show({})
     assert panel.state() == "missing"
     assert panel.grp_charts.isHidden()
-    assert panel._grid.count() == 0
+    assert panel._tabs.count() == 0
     assert panel._slot_data == {}
 
 
 def test_charts_slot_title_recorded(panel):
-    # When a chart lands, its viewer title is stored in _slot_titles.
+    # When a chart lands, its viewer/tab title is stored in _slot_titles.
     panel.show(FAKE_ELEMENT)
     assert "orbit" in panel._slot_titles, "orbit title not recorded"
     assert panel._slot_titles["orbit"], "orbit title is empty"
 
 
 def test_approach_slot_present_for_bound_orbit(panel):
-    # The approach slot is the third cell (row 1, col 0) and appears for a
-    # body with propagatable elements (a or q) — FAKE_ELEMENT has both.
+    # The approach tab appears for a body with propagatable elements (a or
+    # q) — FAKE_ELEMENT has both.
     panel.show(FAKE_ELEMENT)
     from nightscribe.gui.widgets.approach_widget import ApproachChart
-    widgets = _grid_widgets(panel)
-    ap_w = next((w for w in widgets if isinstance(w, ApproachChart)), None)
-    assert ap_w is not None, "no ApproachChart in the grid"
+    tabs = _chart_tabs(panel)
+    ap_w = next((w for w in tabs if isinstance(w, ApproachChart)), None)
+    assert ap_w is not None, "no ApproachChart in the tabs"
     assert ap_w.property("chart_key") == "approach"
-    # grid cell: 5th slot -> index 2 -> (1, 0)
-    assert panel._grid.itemAt(1 * 2 + 0).widget() is ap_w
     # rebuild data is stored for the click-through viewer
     assert "approach" in panel._slot_data
     assert "elements" in panel._slot_data["approach"]
@@ -367,8 +398,8 @@ def test_approach_slot_absent_without_elements(panel):
     # and it must not appear (nor leave a dangling title for it).
     from nightscribe.gui.widgets.approach_widget import ApproachChart
     panel.show(FAKE_UNCONFIRMED)
-    widgets = _grid_widgets(panel)
-    assert not any(isinstance(w, ApproachChart) for w in widgets)
+    tabs = _chart_tabs(panel)
+    assert not any(isinstance(w, ApproachChart) for w in tabs)
     assert "approach" not in panel._slot_data
     # and the make/extract helpers answer None for it
     assert panel._make_vector("approach", FAKE_UNCONFIRMED) is None
@@ -891,31 +922,38 @@ def test_ready_signal_not_fired_by_missing_state(panel, qapp):
 
 def test_resize_to_panel_content_uses_hint(qapp):
     # The helper is module-level so the Explore dialog (and any other
-    # caller) can reuse it without dragging a whole panel fixture.
+    # caller) can reuse it without dragging a whole panel fixture. The
+    # width follows the hint (with the reading floor); the height adds the
+    # window-chrome headroom so the panel's foot (the CTA) fits the viewport.
     from PySide6.QtWidgets import QWidget, QLabel
-    from nightscribe.gui.overview import resize_to_panel_content
+    from nightscribe.gui.overview import (resize_to_panel_content,
+                                          _DLG_CHROME)
     from PySide6.QtCore import QSize
 
     class FixedHint(QWidget):
         def sizeHint(self):
-            return QSize(520, 410)
+            return QSize(990, 760)
 
     p = FixedHint()
     p.show()
     cont = QWidget()
     cont.show()
     resize_to_panel_content(cont, p)
-    assert cont.size().width() == 520
-    assert cont.size().height() == 410
+    # hint width 990 > floor -> followed exactly.
+    assert cont.size().width() == 990
+    # height = hint + chrome (760 + 60) — the chrome headroom, above the floor.
+    assert cont.size().height() == 760 + _DLG_CHROME
     p.deleteLater()
     cont.deleteLater()
 
 
 def test_resize_to_panel_content_applies_floor(qapp):
-    # A degenerate hint (0,0) must still give the dialog a usable
-    # minimum, not collapse the window.
+    # A degenerate hint (0,0) must still give the dialog a usable, readable
+    # minimum — wide enough for the text columns, tall enough to show the
+    # whole panel — not collapse the window.
     from PySide6.QtWidgets import QWidget
-    from nightscribe.gui.overview import resize_to_panel_content
+    from nightscribe.gui.overview import (resize_to_panel_content,
+                                           _MIN_READ_W, _MIN_READ_H)
     from PySide6.QtCore import QSize
 
     class ZeroHint(QWidget):
@@ -927,9 +965,46 @@ def test_resize_to_panel_content_applies_floor(qapp):
     cont = QWidget()
     cont.show()
     resize_to_panel_content(cont, p)
-    # Floor values per overview.resize_to_panel_content
-    assert cont.size().width() >= 420, f"got {cont.size().width()}"
-    assert cont.size().height() >= 320, f"got {cont.size().height()}"
+    assert cont.size().width() >= _MIN_READ_W, \
+        f"got width {cont.size().width()} < {_MIN_READ_W}"
+    assert cont.size().height() >= _MIN_READ_H, \
+        f"got height {cont.size().height()} < {_MIN_READ_H}"
     p.deleteLater()
     cont.deleteLater()
+
+
+def test_resize_keeps_full_panel_visible(qapp):
+    # Regression: the whole READY panel must fit its container's viewport —
+    # the scroll area must NOT show a vertical scrollbar whose fold hides
+    # the bottom CTA. resize() sizes the whole dialog, so the helper adds
+    # chrome headroom on top of the panel's sizeHint. We assemble the same
+    # stack the Explore dialog uses (QScrollArea + for_post panel).
+    import tempfile, pathlib
+    from PySide6.QtWidgets import (QWidget, QDialog, QScrollArea, QFrame,
+                                   QVBoxLayout)
+    from nightscribe.gui.overview import ObjectPanel, resize_to_panel_content
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    p = ObjectPanel(chart_dir=tmp / "charts", for_post=True,
+                    project_lookup=lambda _n: None)
+    p.show(FAKE_ELEMENT)
+    dlg = QDialog()
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(QFrame.Shape.NoFrame)
+    area.setWidget(p)
+    lay = QVBoxLayout(dlg)
+    lay.addWidget(area)
+    dlg.show()
+    qapp.processEvents()
+    resize_to_panel_content(dlg, p)
+    qapp.processEvents()
+    # the CTA is not hidden, and the panel foot fits the visible viewport
+    assert not p.btn_project.isHidden(), "CTA must be shown for for_post"
+    vp_h = area.viewport().height()
+    assert p.height() <= vp_h, \
+        f"panel {p.height()} taller than viewport {vp_h} (CTA below the fold)"
+    assert not area.verticalScrollBar().isVisible(), \
+        "vertical scrollbar must not appear for the ready panel"
+    dlg.deleteLater()
+    p.deleteLater()
 

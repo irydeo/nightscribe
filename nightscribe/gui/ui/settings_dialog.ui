@@ -4,7 +4,7 @@
  <widget class="QDialog" name="SettingsDialog">
   <property name="windowTitle"><string>Settings</string></property>
   <property name="modal"><bool>true</bool></property>
-  <property name="minimumSize"><size><width>640</width><height>520</height></size></property>
+  <property name="minimumSize"><size><width>800</width><height>720</height></size></property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QTabWidget" name="tabWidget">

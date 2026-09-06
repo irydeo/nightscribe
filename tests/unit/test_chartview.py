@@ -119,6 +119,47 @@ def test_export_png_writes_file(qapp, tmp_path):
     assert magic == b"\x89PNG", f"not a PNG: {magic!r}"
 
 
+def _has_watermark_pixels(img):
+    # @args: img - QImage; @return: True when pixels close to palette.MUTED
+    #        appear in the bottom-right corner region (the watermark spot).
+    muted = (138, 144, 166)          # palette.MUTED "#8a90a6"
+    tol = 60
+    rx0, rx1 = int(img.width() * 0.7), img.width()
+    ry0, ry1 = img.height() - 60, img.height()
+    for y in range(ry0, ry1):
+        for x in range(rx0, rx1):
+            c = img.pixelColor(x, y)
+            if (abs(c.red() - muted[0]) <= tol
+                    and abs(c.green() - muted[1]) <= tol
+                    and abs(c.blue() - muted[2]) <= tol):
+                return True
+    return False
+
+
+def test_export_png_stamps_bottom_right_watermark(qapp, tmp_path):
+    # The chart stamps its signature bottom-right — on screen (drawForeground)
+    # and, crucially, in the exported PNG (scene.render alone would skip it).
+    from PySide6.QtGui import QImage
+    v = _mk_view(qapp)
+    assert v._watermark == "NightScribe", "default watermark missing"
+    out = tmp_path / "wm.png"
+    v.export_png(out)
+    assert _has_watermark_pixels(QImage(str(out))), (
+        "watermark not painted in the bottom-right corner of the export")
+    # set_watermark("") disables it
+    v.set_watermark("")
+    out2 = tmp_path / "nowm.png"
+    v.export_png(out2)
+    assert not _has_watermark_pixels(QImage(str(out2))), (
+        "watermark still present after set_watermark('')")
+    # a custom signature is honoured
+    v.set_watermark("Irydeo")
+    out3 = tmp_path / "custom.png"
+    v.export_png(out3)
+    assert _has_watermark_pixels(QImage(str(out3)))
+    v.close()
+
+
 def test_hover_probe_shows_and_hides_tooltip(qapp):
     # the contract: set_hover_probe(fn) where fn(x, y) -> (hit, text).
     # While hit=True a tooltip is on the scene; after leaveEvent it is

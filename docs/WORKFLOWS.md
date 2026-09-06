@@ -77,7 +77,7 @@ are settled. Out of this initial redesign.
 | 2 | Constraint foundation: `core/horizon.py`, Moon, `core/exposure.py`, camera profile in config, planner/suggest integration, horizon silhouette in `sky_view`, tests | **Done (2026-08-24)** |
 | 3 | Project model: db migration (`user_version` 0→1), `core/project.py`, step machine, tests | **Done (2026-08-24)** |
 | 4 | GUI v3: 4 tabs, Projects hub with per-kind stepper, contextual blink, Tonight cards with "Create project" and "safe start", Settings (Camera/Horizon/Session/Moon), i18n | **Done (2026-08-24)** |
-| 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | **Done (2026-08-24)** |
+| 5 | Exporters: `core/sequence.py` (NINA/CCDciel/CSV) + ephemerides (CSV + TheSkyX + CdC validated against real imports), tests | **Done (2026-08-24)**; CCDciel with the real `.targets` format (CONFIG v5) against `docs/ccdciel_sequence_sample.targets` (**2026-09-06**) |
 | 6 | `core/mpc_report.py` + step in the NEO flow + minimal CLI `project` subcommand + polish, i18n and final docs | **Done (2026-08-24)** |
 
 ### 7bis. Home screen redesign (2026-08-25)
@@ -155,9 +155,9 @@ truncated `lbl_context` header (`gui/ui/projects_tab.ui:51`).
 | Phase | Deliverable | Acceptance | Status |
 |---|---|---|---|
 | **D1** | `gui/overview.py`: `ObjectPanel` without charts — *loading / not found / ready* states, hook line, bullets, parameter table with a wide (multiline) explanation column. `show(e, ctx=None)` + injectable `loader` (offscreen, no network). GPL header, ES/EN pairs | Panel built offscreen; with fake `e`: hook visible, parameter rows with explanation; with `{}`: *not found* state | **Done (2026-08-26)** — `gui/overview.py` + `tests/unit/test_overview_panel.py` (9 offscreen tests, no network) |
- | **D2** | `ObjectPanel` with a **2×2 chart grid** filled by `core/post.build_charts`; "why not" messages (hyperbolic / no elements / unconfirmed) scaled to the widget | With fake `e`: 4 chart slots or the right absence messages; without `e`: empty | **Done (2026-08-26)** — `orbit/sky/families/field` grid in `gui/overview.py` + 5 offscreen tests in `tests/unit/test_overview_panel.py` (14 total, offline; only `field` would touch the network and stays on a "why not" line) → **revised 2026-08-27** — no families (below), slots `orbit/sky/field/transit`, `panel` size (1200×675); unbuildable slots are hidden instead of a "why not" line; with no chart, the whole group disappears |
+ | **D2** | `ObjectPanel` with a **2×2 chart grid** filled by `core/post.build_charts`; "why not" messages (hyperbolic / no elements / unconfirmed) scaled to the widget | With fake `e`: 4 chart slots or the right absence messages; without `e`: empty | **Done (2026-08-26)** — `orbit/sky/families/field` grid in `gui/overview.py` + 5 offscreen tests in `tests/unit/test_overview_panel.py` (14 total, offline; only `field` would touch the network and stays on a "why not" line) → **revised 2026-08-27** — no families (below), slots `orbit/sky/field/transit`, `panel` size (1200×675); unbuildable slots are hidden instead of a "why not" line; with no chart, the whole group disappears → **2026-09-06** — the produced charts are grouped into **tabs** (`QTabWidget` in `gui/overview.py`, one tab per chart, titled; with a single chart the tab bar auto-hides and it stands alone; the 2×2 grid is gone) |
 | **D3** | `ObjectPanel` with **capture/window blocks** from `ctx`: mag, ″/min rate, max no-trail exposure (neo/pccp only, with rate + `pixel_um`/`focal_mm`), window start–end + hours above; missing data is omitted | With a fake neo `ctx`: full chips; with an sn `ctx`: no rate/exposure; does not break on empty `ctx` | **Done (2026-08-26)** — chip row in `gui/overview.py` (mag / rate / max no-trail exposure / window / hours, from `project.context`; rate and exposure only for neo/pccp) + 5 offscreen tests in `tests/unit/test_overview_panel.py` (19 total, no network). New `self.tr()` strings pending D6 i18n (D1/D2 pattern) |
- | **D4** | **Integration in the hub**: the hub inserts `ObjectPanel` between `lbl_context` and `tabs_steps` (keeping the `lbl_context` header). On project selection → `loader` = `ExploreWorker` (same `fallback_target` from the context), worker kept via `_keep`, the in-flight worker is cancelled when switching project | Without network: selecting a project shows *loading* state and does not crash; step machine, plan panel and buttons stay intact; offscreen smoke tests | **Done (2026-08-26)** — `gui/main_window.py` builds the `ObjectPanel` lazily in `_get_proj_panel()` (wrapped in a `QScrollArea`, inserted before `tabs_steps`); `_project_selected` loads it with `ctx` + `fallback_target` and `cancel()`s the in-flight worker when switching (a late result never lands on the next) + `tests/unit/test_projects_hub.py` (6 offscreen tests, no network) → **revised 2026-08-27** — the panel now lives inside the **Details** tab (index 0, new in `projects_tab.ui`), which is the one left open on project selection; prev/skip/done are disabled on it and next enters step 1 |
+ | **D4** | **Integration in the hub**: the hub inserts `ObjectPanel` between `lbl_context` and `tabs_steps` (keeping the `lbl_context` header). On project selection → `loader` = `ExploreWorker` (same `fallback_target` from the context), worker kept via `_keep`, the in-flight worker is cancelled when switching project | Without network: selecting a project shows *loading* state and does not crash; step machine, plan panel and buttons stay intact; offscreen smoke tests | **Done (2026-08-26)** — `gui/main_window.py` builds the `ObjectPanel` lazily in `_get_proj_panel()` (wrapped in a `QScrollArea`, inserted before `tabs_steps`); `_project_selected` loads it with `ctx` + `fallback_target` and `cancel()`s the in-flight worker when switching (a late result never lands on the next) + `tests/unit/test_projects_hub.py` (6 offscreen tests, no network) → **revised 2026-08-27** — the panel now lives inside the **Details** tab (index 0, new in `projects_tab.ui`), which is the one left open on project selection; prev/skip/done are disabled on it and next enters step 1 → **2026-09-06** — the hub list is **always up to date without "Refresh"**: `on_refresh_projects()` is scheduled with `QTimer.singleShot(0,…)` when the app opens and re-run on every visit to the Projects tab (`_on_main_tab_changed`, `tabs.currentChanged` → index 1); the **Refresh** button stays as a fallback; the selected project is **preserved** across a refresh (its `id` is re-selected after re-rendering); +3 offscreen tests in `tests/unit/test_projects_hub.py` (load on startup, list without the button, selection preserved) |
 | **D5** | ***Explore…* dialog over the shared panel**: `main_window.py:1504` becomes `ObjectPanel` + a *Make post* button; the `_dialog_explore_*` functions delegate to the panel; chart click→zoom is kept (the panel exposes its chart labels); `_project_explore` (step 4) / `_tools_explore` keep working | The Tools-menu *Explore…* dialog is identical in content; the NEO step 4 still opens it pre-filled | **Done (2026-08-26)** — `_open_explore_dialog` now builds `ObjectPanel(for_post=True)` inside a `QScrollArea` + a *Create post* button (the panel's `post_requested(name, fallback)` signal → `_open_post_dialog` + close); the `_dialog_explore*` / `_orbit_rows` / `_ChartClickFilter` / `_set_scaled_pixmap` helpers are gone (they live in `overview.py` already); `_render_object_charts` stays for the post flow; the orphan `explore_tab.ui` is deleted. Tests: 6 new offscreen in `test_overview_panel.py` (post button visible/hidden, `post_requested` carries name + fallback, in-flight guard, cancel clears) + 2 in `test_projects_hub.py` (integration of `_explore_panel`) + the 2 functional tests now drive the panel (parabolic orbit chart + unconfirmed NEO) |
 | **D6** | **i18n + verification + docs**: `lupdate`/`lrelease` → `nightscribe_{es,en}.ts/.qm` (ADR-014); `pytest tests/unit` green; this section with final statuses | New strings translated ES/EN; smoke tests in `tests/unit/test_overview_panel.py` (D1-D3) + hub smoke (D4) green | **Done (2026-08-26)** — `pyside6-lupdate` (sources `gui/*.py + gui/ui/*.ui`) refreshes both `.ts` (+17 `ObjectPanel` strings, −21 obsolete `ExploreTab`); 17 new strings filled by hand (EN passthrough, ES translated); `pyside6-lrelease` → 2 `.qm` (306 strings, 0 unfinished); i18n smoke: `test_panel_strings_resolve_in_{spanish,english}` loads each `.qm` and verifies `btn_post` / `grp_params` / `grp_charts` / table headers / chip tooltips → 234 tests green (no network) |
 
@@ -239,7 +239,7 @@ Before Phase D, the historical **ENTRY POINT** (UX v3 project, phases 1-6):
      dialogs (pre-filled from project), ad-hoc access from the Tools menu, Tonight cards
      with "Create project" + window + Moon, Settings extended with Camera/Horizon/
      Session/Moon groups, `sky_view` with real horizon, i18n (.ts/.qm) updated.
-   - Phase 5: `core/sequence.py` (NINA JSON / CCDciel XML / generic CSV capture
+   - Phase 5: `core/sequence.py` (NINA JSON / CCDciel `.targets` / generic CSV capture
      sequence exporters) and `core/ephemeris.py` (Horizons-based generation + CSV /
      TheSkyX / Cartes du Ciel ephemeris exporters). "Capture plan" panel in the Projects
      hub with frames/exposure/filter fields and export buttons. The native NINA/CCDciel/
@@ -262,8 +262,13 @@ Before Phase D, the historical **ENTRY POINT** (UX v3 project, phases 1-6):
     «⊕ HH:MM–HH:MM · ≤ HH:MM» chip or a red «⚠ does not fit» chip when the planned
     session does not fit; the ES/EN prose carries the window and its warning
     («DO NOT force the instrument»). 313 unit tests green.
-   The **native NINA/CCDciel/TheSkyX/CdC formats** are starting points that require
-   validation against the user's software versions via real import (ADR-021).
+   The **native CCDciel format is now real**: `export_ccdciel` writes the
+   `.targets` list (CONFIG Version="5") fixed against a real user export
+   (`docs/ccdciel_sequence_sample.targets`, 2026-09-06), with **Light + Dark + Bias**
+   steps (calibration configurable in the project's Capture tab) and the default
+   rise/set window that CCDciel recomputes from its own observatory settings.
+   **NINA** and **generic CSV** remain starting points that require validation
+   against the user's software versions via real import (ADR-021).
 
 **Suggested next steps** (beyond the initial redesign):
 - *(Done 2026-08-28: the real TheSkyX horizon is parsed and now outranks `min_alt` — see E1+E2 above.)*
@@ -413,7 +418,11 @@ shown kinds into a permanent whitelist preference in Settings.
      continue_)` is gone). `MainWindow` reacts in `_on_create` (goes to
      `_create_project`) and `_on_continue` (goes to
      `_goto_active_project`; creates a fresh one if the "explored name"
-     does not match the active); the dialog closes after either.
+     does not match the active); the dialog closes after either. The
+     dialog auto-fits to its content with reading floors
+     (`resize_to_panel_content` in `gui/overview.py`: width ≥ 780,
+     height = sizeHint + frame headroom) so the text reads comfortably
+     and the CTA is always visible with no vertical scroll.
  5. **`_create_project` now returns the created dict** (or `None`, with a
     status-bar message when the kind is not a valid project kind — e.g. an
     ad-hoc transit from the Tools menu cannot create a project, only a post).

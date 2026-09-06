@@ -834,6 +834,36 @@
         <translation>CSV (generic)</translation>
     </message>
     <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>NINA (JSON)</source>
+        <translation>NINA (JSON)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>CCDciel (targets)</source>
+        <translation>CCDciel (targets)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Calibration</source>
+        <translation>Calibration</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Darks:</source>
+        <translation>Darks:</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Dark exposure (s):</source>
+        <translation>Dark exposure (s):</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Bias:</source>
+        <translation>Bias:</translation>
+    </message>
+    <message>
         <location filename="../main_window.py" line="1713"/>
         <source>Ephemeris format</source>
         <translation>Ephemeris format</translation>
@@ -1126,6 +1156,26 @@
         <location filename="../overview.py" line="42"/>
         <source>Approach</source>
         <translation>Approach</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="42"/>
+        <source>Orbit</source>
+        <translation>Orbit</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="42"/>
+        <source>Sky tonight</source>
+        <translation>Sky tonight</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="42"/>
+        <source>Reference field</source>
+        <translation>Reference field</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="42"/>
+        <source>Light curve</source>
+        <translation>Light curve</translation>
     </message>
     <message>
         <location filename="../overview.py" line="252"/>
@@ -1984,6 +2034,64 @@
         <location filename="../widgets/approach_widget.py" line="0"/>
         <source>Pause</source>
         <translation>Pause</translation>
+    </message>
+</context>
+<context>
+    <name>SkyChart</name>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>Sin noche astronómica</source>
+        <translation>No astronomical night</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>empezar hasta {t}</source>
+        <translation>start by {t}</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>mejor hora {t}</source>
+        <translation>best time {t}</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>Alt (°)</source>
+        <translation>Altitude (°)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>UTC (h desde anochecer)</source>
+        <translation>UTC (h from dusk)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>tránsito</source>
+        <translation>transit</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source> · empezar hasta {t}</source>
+        <translation> · start by {t}</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>de {a} a {b}</source>
+        <translation>from {a} to {b}</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>Objeto</source>
+        <translation>Object</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>Luna</source>
+        <translation>Moon</translation>
+    </message>
+    <message>
+        <location filename="../widgets/sky_widget.py" line="0"/>
+        <source>Límite</source>
+        <translation>Limit</translation>
     </message>
 </context>
 </TS>

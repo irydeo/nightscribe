@@ -28,11 +28,12 @@ zoom, drag-pan, hover probe, PNG export). The orbital math is in
 """
 
 from PySide6.QtCore import Qt, QTimer, Signal, QEvent, QElapsedTimer, QRectF
-from PySide6.QtGui import (QPen, QBrush, QColor, QPainterPath, QFontMetrics)
+from PySide6.QtGui import (QPen, QBrush, QColor, QPainterPath,
+                           QPainterPathStroker, QFontMetrics)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                 QPushButton, QSlider, QSizePolicy, QLabel,
                                 QGraphicsEllipseItem, QGraphicsPathItem,
-                                QGraphicsSimpleTextItem, QGraphicsRectItem)
+                                QGraphicsSimpleTextItem)
 
 from ...core import approach_math
 from ...core import orbit_math
@@ -46,7 +47,7 @@ _Z_TRACK   = 1.0    # geocentric track polyline
 _Z_HALO    = 1.5    # separation rings behind markers
 _Z_MARK    = 2.0    # Earth, Moon, CA diamond (solid fills)
 _Z_POINT   = 3.0    # the moving object dot
-_Z_LABEL   = 4.0    # chart label plates
+_Z_LABEL   = 4.0    # label text halos
 _Z_TEXT    = 5.0    # chart label text
 
 # Normalised scene scale (mirrors orbit_widget): the frame maps to these
@@ -68,31 +69,57 @@ _FONT_PX    = 28    # label font height (scene units)
 # the chart stays crisp, the labels/dots are the "scale" tokens).
 _CIRCLE_PEN  = 1.5  # 1 LD reference circle stroke
 _CIRCLE_DASH = (2, 4)   # dotted "guide ring"
-_TRACK_PEN   = 2.4  # geocentric track stroke
+_TRACK_PEN   = 1.5  # geocentric track stroke (thin, so the moving dot reads)
 _TRACK_DASH  = (8, 5)   # dashed "path"
 
-# Label plate + anti-collision tuning.  Each label is drawn as
-#   <text>  on top of  a <plate>  (= BG @ ~85% + MUTED border @ ~40%)
-# so the text never fuses with the track / the 1 LD circle behind it.
+# Frame geometry.  The half-extent frames the OBJECT'S STORY — the pass and
+# its ±30-day approach sweep — so the asteroid is ON SCREEN as soon as the
+# chart loads: span = 1.9 × the farthest of (pass, current point, arc).  A
+# close flyby never shrinks into a speck: the span is bound so the pass
+# stays at least _PASS_SCENE_MIN of the half-frame (the far arc ends are
+# clipped at the frame edge, which is accepted).  There is NO zoom ceiling
+# and no edge (the CA is always in frame and drawn as the diamond).
+_MIN_SPAN_LD = 0.3     # safety floor (LD) — only guards degenerate ~0 spans
+_PASS_SCENE_MIN = 0.30 # the pass must sit at >= this fraction of the half-frame
+
+# Earth–Moon scale bundle: drawn ALWAYS, tucked into a corner, always
+# readable.  The dashed circle's radius is the TRUE 1 LD scene radius
+# clamped to a fixed legible band — the Moon keeps its real direction from
+# Earth; only the distance is treated diagrammatically at extreme zooms.
+_BUNDLE_RADIUS_MIN = 55.0  # far passes: Moon never fuses into the Earth dot
+_BUNDLE_RADIUS_MAX = 140.0 # close passes: the reference never eats the canvas
+_CORNER_FRAC = 0.62        # bundle centre sits this far out toward its corner
+
+# Label tuning — labels carry NO background box (ADR-029 keeps the canvas
+# light); each label is its text plus a thin BG-colour contour (a "halo")
+# that keeps the glyphs readable over the dashed track and the markers.
 # Placement: we try 8 directions around the anchor in order (starting
-# from a "preferred" one) and pick the first whose plate neither crosses
-# the track polyline nor overlaps a previously placed plate.
+# from a "preferred" one) and pick the first whose layout box neither
+# crosses the track polyline, nor overlaps a previously placed box, nor
+# steps on a solid marker (Earth, Moon, CA), and stays inside the frame.
 _PLATE_PAD   = (6, 8)   # (x, y) padding around the text, scene units
-_PLATE_BG_A  = 217      # alpha (0–255) of the BG plate fill
-_PLATE_BRD_A = 102      # alpha of the MUTED plate border
-_COL_TOL     = 0.05     # "a plate is on the track" if a plate corner is
+_TEXT_HALO_W = 2.0      # halo stroke width (px) around the glyphs
+_COL_TOL     = 0.05     # "a label is on the track" if a box corner is
                         # within this fraction of _HALF of a track point
+_OBST_PAD    = 6.0      # extra clearance between a label box and a marker
+
+# Earth and Moon labels probe a LADDER of push-out radii (as multiples of
+# their own gap).  The two bodies always stay separated (the bundle radius
+# is clamped), but when they sit close together the extra radii walk the
+# preferred label away from its neighbour into the empty space instead of
+# cramming both next to each other.
+_PROBE_RADII = (1.0, 2.0, 3.5)
 
 # The 8 compass directions we probe (NE first, going clockwise).  Vectors
 # are unit-ish; we multiply by (plate_w, plate_h) for the actual offset,
 # so wide labels travel further horizontally than vertically — this
 # keeps the plate readable at any aspect.
 DIRS8 = [
-    ( 1, -1),   # NE  (preferred for "Earth", "Moon", "CA")
+    ( 1, -1),   # NE  (preferred for "CA")
     ( 1,  0),   # E
     ( 1,  1),   # SE
     ( 0,  1),   # S
-    (-1, -1),   # NW  (preferred for "1 LD" — points inward)
+    (-1, -1),   # NW
     (-1,  0),   # W
     (-1,  1),   # SW
     ( 0, -1),   # N
@@ -160,6 +187,7 @@ class ApproachChart(QWidget):
         self._cur_jd     = None
         self._span_au    = 1.0             # frame half-extent in AU
         self._scale      = _HALF           # scene units per AU
+        self._ox = self._oy = 0.0          # Earth/Moon bundle corner offset
         self._ca_cache   = None            # (jd_best, dist_au, dist_ld)
         self._track_pts  = []              # (sx, sy, r_ld, jd) tuples
         self._point_item = None            # the moving dot
@@ -226,25 +254,38 @@ class ApproachChart(QWidget):
 
     def _to_scene(self, au_x, au_y):
         # @args: au_x, au_y - a geocentric ecliptic point in AU (Earth at 0,0)
-        # @return: scene (sx, sy) — y-flipped for "north up". No cx/cy offset
-        #          because Earth sits at the frame origin (unlike orbit_widget
-        #          where the Sun sits at a focus).
-        return (au_x * self._scale, -(au_y * self._scale))
+        # @return: scene (sx, sy) — y-flipped for "north up", shifted by the
+        #          corner offset (self._ox, self._oy) so the Earth/Moon
+        #          bundle lives in the chosen corner, not at the frame hub.
+        return (au_x * self._scale + self._ox,
+                -(au_y * self._scale) + self._oy)
 
     def _to_au(self, sx, sy):
         # @args: sx, sy - scene coords
         # @return: the geocentric ecliptic point in AU (inverse of _to_scene).
-        return (sx / self._scale, -sy / self._scale)
+        return ((sx - self._ox) / self._scale,
+                -(sy - self._oy) / self._scale)
 
     @staticmethod
-    def _frame_span_au(r_lds):
-        # @args: r_lds - list of geocentric distances in LD (from the track)
-        # @return: frame half-extent in AU. Must hold at least 1.5 LD (to
-        #          leave visual margin inside the 1 LD circle) AND the
-        #          largest sampled point, plus 10 % padding.
-        max_ld = max(r_lds) if r_lds else 0.0
-        span_ld = max(1.5, max_ld)
-        return span_ld * approach_math.AU_PER_LD * 1.10
+    def _frame_span_au(pass_ld, r_now_ld, r_max_ld):
+        # @args: pass_ld - the closest-approach distance in LD (CA for closed
+        #        orbits, the closest sampled point for open ones);
+        #        r_now_ld - the object's distance at the load date;
+        #        r_max_ld - the farthest sampled track point (±30-day arc).
+        # @return: frame half-extent in AU.  Frames the object's STORY so the
+        #          asteroid and its approach sweep are on screen the moment
+        #          the chart loads: span = 1.9 × max(pass, current, arc).
+        #          The pass is protected — span ≤ pass/_PASS_SCENE_MIN — so a
+        #          close flyby never shrinks into a speck just to fit the far
+        #          arc ends (those clip at the frame edge, as before).
+        if pass_ld:
+            fit_ld = 1.9 * max(pass_ld, r_now_ld or 0.0, r_max_ld or 0.0)
+            span_ld = min(fit_ld, pass_ld / _PASS_SCENE_MIN)
+        else:
+            # open orbit (no pass): fit the sampled arc / current point.
+            fit_ld = 1.9 * max(r_now_ld or 0.0, r_max_ld or 0.0)
+            span_ld = fit_ld or _MIN_SPAN_LD
+        return max(_MIN_SPAN_LD, span_ld) * approach_math.AU_PER_LD
 
     # ------------------------------------------------ public API -----------
 
@@ -280,9 +321,47 @@ class ApproachChart(QWidget):
         except Exception:
             jds, xs, ys, zs, r_lds = [], [], [], [], []
 
-        # Frame extent and scale (must be set before _build_scene).
-        self._span_au = self._frame_span_au(r_lds)
+        # Frame extent and scale (must be set before _build_scene): frame the
+        # object's STORY — the pass plus the current point and the ±30-day
+        # arc — so the asteroid is visible the moment the chart loads.  The
+        # pass stays protected by _PASS_SCENE_MIN (see _frame_span_au).
+        if self._ca_cache is not None:
+            pass_ld = self._ca_cache[2]
+        elif r_lds:
+            pass_ld = min(r_lds)
+        else:
+            pass_ld = 0.0
+        g_now = (approach_math.geocentric_position(self._elements,
+                                                   self._cur_jd)
+                 if self._elements else None)
+        r_now_ld = g_now[4] if g_now else 0.0
+        r_max_ld = max(r_lds) if r_lds else 0.0
+        self._span_au = self._frame_span_au(pass_ld, r_now_ld, r_max_ld)
         self._scale   = _HALF / self._span_au
+
+        # Corner for the Earth–Moon bundle: the corner FARTHEST from the
+        # encounter (CA for closed orbits, the current point otherwise), so
+        # the approach sweep gets the rest of the canvas.
+        c = _CORNER_FRAC * _HALF
+        self._ox, self._oy = -c, -c
+        u = None
+        if self._ca_cache is not None:
+            try:
+                g_best = approach_math.geocentric_position(
+                    self._elements, self._ca_cache[0])
+                if g_best is not None:
+                    u = (g_best[0], -g_best[1])
+            except Exception:
+                u = None
+        elif g_now is not None:
+            u = (g_now[0], -g_now[1])
+        if u is not None and (abs(u[0]) + abs(u[1])) > 1e-9:
+            best = None
+            for cdx, cdy in ((c, c), (-c, c), (c, -c)):
+                d = cdx * u[0] + cdy * u[1]
+                if best is None or d < best[0]:
+                    best = (d, cdx, cdy)
+            self._ox, self._oy = best[1], best[2]
 
         # Store track scene coords for hover hit-testing.
         self._track_pts = [
@@ -344,52 +423,72 @@ class ApproachChart(QWidget):
     def _build_scene(self, xs, ys, track_center):
         # @args: xs, ys - geocentric ecliptic track in AU (parallel lists);
         #        track_center - date used to place the Moon.
-        # Draws: 1 LD circle → Moon → Earth → track → CA marker → moving point.
+        # Draws: Earth–Moon scale bundle (clamped, corner) → track → CA marker
+        #        → moving point.
         self.view.clear()
-        self._occupied = []                # clear stale label plates
+        self._occupied = []                # clear stale label layout boxes
+        self._obstacles = []               # clear stale marker obstacles
+        self._ca_item = None               # clear stale CA diamond marker
         self.view.set_scene_rect(-_HALF, -_HALF, 2.0 * _HALF, 2.0 * _HALF)
 
-        # 1 LD reference circle (Earth centred = scene origin).
-        r_circle = approach_math.AU_PER_LD * self._scale
+        # Earth–Moon scale bundle — ALWAYS drawn, tucked into the corner
+        # chosen by set_elements (opposite the encounter).  The dashed
+        # circle's radius is the TRUE 1 LD scene radius clamped to a fixed
+        # legible band [MIN, MAX]; the Moon keeps its real direction from
+        # Earth, so the two bodies stay readable at any zoom (the radius is
+        # diagrammatic at extreme zooms; the distance numbers live in the
+        # status line and the CA label).
+        earth_x, earth_y = self._ox, self._oy
+        true_r = approach_math.AU_PER_LD * self._scale
+        r_circle = min(max(true_r, _BUNDLE_RADIUS_MIN), _BUNDLE_RADIUS_MAX)
         pen = QPen(QColor(palette.MUTED), _CIRCLE_PEN)
         pen.setCosmetic(True)
         pen.setDashPattern(list(_CIRCLE_DASH))
-        circle = QGraphicsEllipseItem(-r_circle, -r_circle,
-                                       2.0 * r_circle, 2.0 * r_circle)
+        circle = QGraphicsEllipseItem(earth_x - r_circle, earth_y - r_circle,
+                                      2.0 * r_circle, 2.0 * r_circle)
         circle.setPen(pen)
         circle.setBrush(Qt.NoBrush)
         circle.setZValue(_Z_REF)
         self.view.scene().addItem(circle)
         self.view._items_registered.append(circle)
-        self._add_label(self.tr("1 LD"), (r_circle, 0.0),
-                        QColor(palette.MUTED), bold=False,
-                        preferred=(DIRS8[4][0], DIRS8[4][1]))
 
-        # Moon: a fixed scale reference at its real position for track_center.
+        # Moon: real geocentric direction for track_center, scaled to the
+        # (possibly clamped) bundle radius.
+        moon_dir = None
         try:
             m_au_x, m_au_y, _m_au_r, _m_ld = (
                 approach_math.moon_geocentric_ecliptic(track_center))
-            mx, my = self._to_scene(m_au_x, m_au_y)
+            msx, msy = self._to_scene(m_au_x, m_au_y)
+            dx, dy = msx - earth_x, msy - earth_y
+            dlen = (dx * dx + dy * dy) ** 0.5 or 1.0
+            mx = earth_x + dx / dlen * r_circle
+            my = earth_y + dy / dlen * r_circle
+            moon_dir = self._dir8_nearest(dx, dy)
         except Exception:
-            mx = my = 0.0
+            mx, my = earth_x, earth_y
         self._add_dot_with_halo(mx, my, _DOT_MOON, _HALO_MOON,
                                 _MOON_COLOR, _Z_MARK)
+        self._obstacles.append((mx, my, _HALO_MOON / 2.0 + _OBST_PAD))
         self._add_label(self.tr("Moon"), (mx, my),
                         _MOON_COLOR, bold=False,
-                        preferred=(DIRS8[0][0], DIRS8[0][1]))
+                        preferred=moon_dir, probe_radii=_PROBE_RADII)
 
-        # Earth at the origin.
-        self._add_dot_with_halo(0.0, 0.0, _DOT_EARTH, _HALO_EARTH,
+        # Earth — the bundle centre, in the corner.
+        self._add_dot_with_halo(earth_x, earth_y, _DOT_EARTH, _HALO_EARTH,
                                 QColor(palette.ACCENT2), _Z_MARK)
-        self._add_label(self.tr("Earth"), (0.0, 0.0),
+        self._obstacles.append((earth_x, earth_y,
+                                _HALO_EARTH / 2.0 + _OBST_PAD))
+        earth_pref = self._dir8_nearest(-earth_x, -earth_y)
+        self._add_label(self.tr("Earth"), (earth_x, earth_y),
                         QColor(palette.ACCENT2), bold=True,
-                        preferred=(DIRS8[0][0], DIRS8[0][1]))
+                        preferred=earth_pref, probe_radii=_PROBE_RADII)
 
         # Geocentric track (dashed, ACCENT).
         if xs:
             self._draw_track(xs, ys)
 
-        # CA diamond marker (closed orbits only).
+        # CA marker: the framing keeps the encounter in-frame by design, so
+        # it is always the diamond (no edge-PIN regime).
         if self._ca_cache is not None:
             try:
                 jd_best, d_au, d_ld = self._ca_cache
@@ -399,7 +498,7 @@ class ApproachChart(QWidget):
                     cax, cay = self._to_scene(g[0], g[1])
                     self._ca_item = self._add_ca_diamond(cax, cay, d_ld)
             except Exception:
-                self._ca_item = None
+                pass
         else:
             self._ca_item = None
 
@@ -427,12 +526,17 @@ class ApproachChart(QWidget):
         self.view._items_registered.append(self._point_halo)
 
     def _draw_track(self, xs, ys):
-        # A single dashed open polyline through all sampled points.
+        # A single dashed open polyline through all sampled points, shifted
+        # by the bundle corner offset (self._ox, self._oy) like every other
+        # scene element — Earth, Moon, CA diamond, moving dot and the hover
+        # points (_track_pts).  The track lives around the bundle, not the
+        # origin.
         sc = self._scale
+        ox, oy = self._ox, self._oy
         pp = QPainterPath()
-        pp.moveTo(xs[0] * sc, -(ys[0] * sc))
+        pp.moveTo(xs[0] * sc + ox, -(ys[0] * sc) + oy)
         for k in range(1, len(xs)):
-            pp.lineTo(xs[k] * sc, -(ys[k] * sc))
+            pp.lineTo(xs[k] * sc + ox, -(ys[k] * sc) + oy)
         item = QGraphicsPathItem(pp)
         pen = QPen(QColor(palette.ACCENT), _TRACK_PEN)
         pen.setCosmetic(True)
@@ -447,6 +551,8 @@ class ApproachChart(QWidget):
         # @return: the QGraphicsPathItem. A small solid diamond (4-point)
         #          ringed by a halo (so it reads as a "special" marker,
         #          distinct from the moving dot) plus a bold "CA" label.
+        # The label is preferred along the approach direction (away from the
+        # Earth/Moon corner), so it opens into the empty part of the canvas.
         r = _DOT_CA
         # Halo first (behind), so it does not cover the diamond fill.
         half = _HALO_CA / 2.0
@@ -470,10 +576,12 @@ class ApproachChart(QWidget):
         item.setZValue(_Z_MARK)
         self.view.scene().addItem(item)
         self.view._items_registered.append(item)
+        self._obstacles.append((cx, cy, _HALO_CA / 2.0 + _OBST_PAD))
+        onward = self._dir8_nearest(cx - self._ox, cy - self._oy)
         self._add_label(self.tr("CA %1 LD").replace("%1", "%.2f" % d_ld),
                         (cx, cy),
                         QColor(palette.ACCENT), bold=True,
-                        preferred=(DIRS8[0][0], DIRS8[0][1]))
+                        preferred=onward)
         return item
 
     def _add_dot(self, cx, cy, r, color, z):
@@ -502,13 +610,16 @@ class ApproachChart(QWidget):
         self.view._items_registered.append(halo)
         return self._add_dot(cx, cy, r, color, z)
 
-    def _add_label(self, text, anchor, color, bold, preferred=None):
+    def _add_label(self, text, anchor, color, bold, preferred=None,
+                   probe_radii=(1.0,)):
         # @args: text - the label string; anchor (ax, ay) scene coords (the
         #        body the label refers to); color; bold; preferred (dx, dy)
-        #        unit vector to try first (defaults to NE).
-        # @return: the QGraphicsSimpleTextItem (the plate is drawn under it).
-        # Draws a <plate> then the text, choosing a placement around
-        # `anchor` that does not cross the track or any other plate.
+        #        unit vector to try first (defaults to NE); probe_radii -
+        #        ladder of push-out radii (× the anchor's own gap).
+        # @return: the QGraphicsSimpleTextItem (a thin BG halo sits under it).
+        # Draws <halo> then the text — no background box — choosing a
+        # placement around `anchor` that does not cross the track, another
+        # label, a solid marker or the frame edge.
         from PySide6.QtGui import QFont
         f = QFont(self.view.font())
         f.setPixelSize(_FONT_PX)
@@ -517,47 +628,84 @@ class ApproachChart(QWidget):
         metrics = QFontMetrics(f)
         tw = metrics.horizontalAdvance(text)
         th = metrics.height()
-        ax, ay = anchor
-        plate_rect = self._pick_label_offset((ax, ay), (tw, th),
-                                              self._track_pts,
-                                              self._occupied, preferred)
-        plate = QGraphicsRectItem(plate_rect)
-        pbg = QColor(palette.BG)
-        pbg.setAlpha(_PLATE_BG_A)
-        pbr = QColor(palette.MUTED)
-        pbr.setAlpha(_PLATE_BRD_A)
-        plate.setBrush(QBrush(pbg))
-        ppen = QPen(pbr, 1.0)
-        ppen.setCosmetic(True)
-        plate.setPen(ppen)
-        plate.setZValue(_Z_LABEL)
-        self.view.scene().addItem(plate)
-        self.view._items_registered.append(plate)
+        rect = self._pick_label_offset(anchor, (tw, th),
+                                       self._track_pts,
+                                       self._occupied, preferred,
+                                       self._obstacles,
+                                       probe_radii=probe_radii)
+        it = self._render_label_text(text, rect, f, color)
+        self._occupied.append(rect)
+        return it
+
+    @staticmethod
+    def _dir8_nearest(vx, vy):
+        # @args: vx, vy - a direction vector in scene coordinates.
+        # @return: the DIRS8 entry nearest to that direction (highest dot
+        #          product), or None for a (near-)zero vector.
+        best, best_dot = None, -1.0
+        for d in DIRS8:
+            dot = d[0] * vx + d[1] * vy
+            if dot > best_dot:
+                best_dot, best = dot, d
+        if best_dot < 1e-9:
+            return None
+        return best
+
+    def _render_label_text(self, text, rect, font, color):
+        # @args: text - the label string; rect - layout QRectF (padded);
+        #        font - QFont; color - glyph colour.
+        # @return: the QGraphicsSimpleTextItem.
+        # Draws the same text stroked in the BG colour underneath (a crisp
+        # contour that keeps the glyphs readable over the dashed track / the
+        # markers) and the coloured text on top.  No background box.
+        metrics = QFontMetrics(font)
+        tw = metrics.horizontalAdvance(text)
+        th = metrics.height()
+        tx = rect.left() + (rect.width() - tw) / 2.0
+        ty = rect.top() + (rect.height() - th) / 2.0
+
+        path = QPainterPath()
+        path.addText(0.0, 0.0, font, text)
+        stroker = QPainterPathStroker()
+        stroker.setWidth(_TEXT_HALO_W)
+        stroker.setJoinStyle(Qt.RoundJoin)
+        stroker.setCapStyle(Qt.RoundCap)
+        halo_path = stroker.createStroke(path)
+        hb = halo_path.boundingRect()
+        halo = QGraphicsPathItem(halo_path)
+        halo.setBrush(QBrush(QColor(palette.BG)))
+        halo.setPen(QPen(Qt.NoPen))
+        halo.setPos(tx - hb.left(), ty - hb.top())   # align bbox with the text
+        halo.setZValue(_Z_LABEL)
+        self.view.scene().addItem(halo)
+        self.view._items_registered.append(halo)
 
         it = QGraphicsSimpleTextItem(text)
         it.setBrush(QBrush(color))
-        it.setFont(f)
-        # centre the text on the plate
-        it.setPos(plate_rect.left() + (plate_rect.width() - tw) / 2.0,
-                  plate_rect.top() + (plate_rect.height() - th) / 2.0)
-        it.setZValue(_Z_LABEL + 1)
+        it.setFont(font)
+        it.setPos(tx, ty)
+        it.setZValue(_Z_TEXT)
         self.view.scene().addItem(it)
         self.view._items_registered.append(it)
-
-        self._occupied.append(plate_rect)
         return it
 
     def _pick_label_offset(self, anchor, size_wh, track_pts,
-                           occupied, preferred):
-        # Tries the 8 compass directions in order (preferred first) and
-        # returns the first QRectF whose plate is "safe" — does not come
-        # within _COL_TOL of any track point AND does not overlap a
-        # previously placed plate.  Falls back to the preferred direction
-        # if none is safe (never hides the label).
+                           occupied, preferred, obstacles=None,
+                           probe_radii=(1.0,)):
+        # Tries the 8 compass directions in order (preferred first), walking
+        # a LADDER of push-out radii (probe_radii × the anchor's own gap),
+        # and returns the first QRectF whose box is "safe" — does not come
+        # within _COL_TOL of any track point, does not overlap a previously
+        # placed box, does not step on a solid marker (obstacles as
+        # (cx, cy, r) circles) AND stays inside the framed canvas.  Falls
+        # back to the preferred direction at radius 1.0 if none is safe
+        # (never hides the label).
         # @args: anchor (ax, ay) scene; size_wh (w, h); track_pts list[(px,py)];
-        #        occupied list[QRectF]; preferred (dx, dy) unit vector or None.
-        # @return: QRectF for the plate, centred on `anchor` + a direction
-        #          offset (so the plate sits to one side of the anchor).
+        #        occupied list[QRectF]; preferred (dx, dy) unit vector or None;
+        #        obstacles list[(cx, cy, r)] or None;
+        #        probe_radii - ladder of push-out multipliers (default 1.0).
+        # @return: QRectF for the label box, centred on `anchor` + a direction
+        #          offset (so the box sits to one side of the anchor).
         w, h = size_wh
         pad_x, pad_y = _PLATE_PAD
         pw, ph = w + 2.0 * pad_x, h + 2.0 * pad_y
@@ -570,24 +718,40 @@ class ApproachChart(QWidget):
             cands.append(d)
         tol = _HALF * _COL_TOL
         pts = [(p[0], p[1]) for p in (track_pts or [])]
+        # A label anchored on a marker must clear it: push the probe outward
+        # by the anchor's own obstacle radius so the inner edge sits beside
+        # the body (halo + pad), never on top of it.  Obstacles whose centre
+        # is elsewhere (other bodies) are handled by the per-direction check.
+        gap = 0.0
+        for (ox, oy, orad) in (obstacles or []):
+            if abs(ox - anchor[0]) < 1e-6 and abs(oy - anchor[1]) < 1e-6:
+                gap = max(gap, orad)
         safe_first = cands[0]
-        for d in cands:
-            off = (d[0] * (pw / 2.0), d[1] * (ph / 2.0))
-            plate = QRectF(anchor[0] + off[0] - pw / 2.0,
-                           anchor[1] + off[1] - ph / 2.0, pw, ph)
-            if self._plate_ok(plate, pts, occupied, tol):
-                return plate
+        for rad in probe_radii:
+            r_gap = rad * gap
+            for d in cands:
+                off = (d[0] * (pw / 2.0 + r_gap),
+                       d[1] * (ph / 2.0 + r_gap))
+                plate = QRectF(anchor[0] + off[0] - pw / 2.0,
+                               anchor[1] + off[1] - ph / 2.0, pw, ph)
+                if self._plate_ok(plate, pts, occupied, tol, obstacles):
+                    return plate
         # No safe direction found — put it at the preferred (or first).
         d = safe_first
-        off = (d[0] * (pw / 2.0), d[1] * (ph / 2.0))
+        off = (d[0] * (pw / 2.0 + gap), d[1] * (ph / 2.0 + gap))
         return QRectF(anchor[0] + off[0] - pw / 2.0,
                       anchor[1] + off[1] - ph / 2.0, pw, ph)
 
-    def _plate_ok(self, plate, pts, occupied, tol):
+    def _plate_ok(self, plate, pts, occupied, tol, obstacles=None):
         # @args: plate QRectF; pts list[(px,py)]; occupied list[QRectF];
-        #        tol distance threshold (scene units).
-        # @return: True when `plate` keeps a safe distance from every track
-        #          point and overlaps no already-placed plate.
+        #        tol distance threshold (scene units); obstacles list[(cx, cy, r)].
+        # @return: True when `plate` stays fully inside the framed canvas,
+        #          keeps a safe distance from every track point, overlaps no
+        #          already-placed box AND does not come within any marker
+        #          obstacle (r) of its centre.
+        if (plate.left() < -_HALF or plate.right() > _HALF
+                or plate.top() < -_HALF or plate.bottom() > _HALF):
+            return False
         corners = (
             (plate.left(),   plate.top()),
             (plate.right(),  plate.top()),
@@ -602,6 +766,13 @@ class ApproachChart(QWidget):
                     return False
         for other in occupied:
             if plate.intersects(other):
+                return False
+        for ox, oy, orad in (obstacles or []):
+            # shortest distance from the marker centre to the plate rect
+            cx = min(max(ox, plate.left()), plate.right())
+            cy = min(max(oy, plate.top()), plate.bottom())
+            dx, dy = ox - cx, oy - cy
+            if dx * dx + dy * dy < orad * orad:
                 return False
         return True
 

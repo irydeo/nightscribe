@@ -32,6 +32,14 @@ drivers, ni slew, ni comunicación en tiempo real (eso sigue siendo del proyecto
    preliminar de NEOfixer `/orbit/` propagada localmente — se exportan efemérides
    completas marcadas como preliminares.
 5. Los ficheros generados se registran en `project_files` (ADR-019).
+   **Actualizado 2026-09-06**: el formato **CCDciel ya es real** — `export_ccdciel`
+   escribe listas `.targets` (CONFIG Version="5") fijadas contra la exportación real
+   del usuario (`docs/ccdciel_sequence_sample.targets`): pasos **Light + Dark + Bias**
+   (nº de oscuros/exposición/bias configurables en la pestaña Captura del proyecto, por
+   defecto 25 oscuros + 100 bias), ventana rise/set por defecto que CCDciel recalcula
+   con su configuración del observatorio y `StartTime`/`EndTime` informativos desde la
+   ventana segura del plan. NINA y CSV siguen siendo best-effort (validación pendiente
+   contra la versión real del usuario).
 
 **Consecuencias**: DESIGN.md actualiza su «fuera de alcance»: control de telescopios
 sigue fuera; **exportar ficheros está dentro**. Tests unitarios de cada exportador
@@ -61,6 +69,14 @@ drivers, no slewing, no real-time communication (that remains the sibling projec
 4. **NEO ephemerides for planetariums**: configurable-step CSV as the base +
    **TheSkyX** and **Cartes du Ciel** formats. Exact formats are fixed **against a real
    import** in the user's installations during phase 5 (not specified blindly).
+   **Updated 2026-09-06**: the **CCDciel format is now real** — `export_ccdciel`
+   writes `.targets` lists (CONFIG Version="5") fixed against the user's actual
+   export (`docs/ccdciel_sequence_sample.targets`): **Light + Dark + Bias** steps
+   (dark count/exposure and bias count configurable in the project's Capture tab,
+   default 25 darks + 100 bias), the default rise/set window that CCDciel recomputes
+   from its own observatory settings, and informative `StartTime`/`EndTime` from the
+   plan's safe window. NINA and CSV remain best-effort (validation pending against
+   the user's real version).
    ~~For unconfirmed objects (no orbital elements) the NEOfixer/Horizons ephemeris is
    the only route — the table is exported, not elements.~~ **Updated by ADR-023**:
    since 2026-08-25 NEOCP objects use the preliminary NEOfixer `/orbit/` solution

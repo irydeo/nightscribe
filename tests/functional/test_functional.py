@@ -343,8 +343,9 @@ def test_explore_dialog_orbit_chart(tmp_path):
     panel.show(e)
     # orbit is now a live vector widget (ADR-029), not a QLabel+QPixmap
     from nightscribe.gui.widgets.orbit_widget import OrbitChart
-    orbit = next((item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), OrbitChart)), None)
-    assert orbit is not None, "no OrbitChart in the grid"
+    orbit = next((panel._tabs.widget(i) for i in range(panel._tabs.count())
+                  if isinstance(panel._tabs.widget(i), OrbitChart)), None)
+    assert orbit is not None, "no OrbitChart in the chart tabs"
     assert not orbit.isHidden()
     assert orbit.view.scene().items(), "orbit scene is empty"
     # _slot_data records the elements for click→viewer rebuild
@@ -616,16 +617,20 @@ def test_explore_dialog_unconfirmed_neo():
     assert not e["data"].get("sbdb"), "must not have SBDB for unconfirmed"
     # paint it — must not crash and must populate the sky slot
     panel.show(e)
-    # orbit slot: no elements → no OrbitChart in the grid (ADR-029 vector
-    # slot is simply absent, not an empty QLabel)
+    # orbit slot: no elements → no OrbitChart in the chart tabs (ADR-029
+    # vector slot is simply absent, not an empty QLabel)
     from nightscribe.gui.widgets.orbit_widget import OrbitChart
-    orbit_widgets = [item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), OrbitChart)]
+    orbit_widgets = [panel._tabs.widget(i)
+                     for i in range(panel._tabs.count())
+                     if isinstance(panel._tabs.widget(i), OrbitChart)]
     assert not orbit_widgets, \
         "no OrbitChart should exist for unconfirmed objects (no elements)"
     # sky slot: live SkyChart widget rendering from unconfirmed ra/dec
     from nightscribe.gui.widgets.sky_widget import SkyChart
-    sky_widgets = [item.widget() for item in [panel._grid.itemAt(r * 2 + c) for r in range(2) for c in range(2)] if item and isinstance(item.widget(), SkyChart)]
-    assert sky_widgets, "no SkyChart in the grid for unconfirmed object"
+    sky_widgets = [panel._tabs.widget(i)
+                   for i in range(panel._tabs.count())
+                   if isinstance(panel._tabs.widget(i), SkyChart)]
+    assert sky_widgets, "no SkyChart in the chart tabs for unconfirmed object"
     assert sky_widgets[0].view.scene().items(), "sky scene is empty"
 
 

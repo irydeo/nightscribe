@@ -246,3 +246,74 @@ def test_window_size_is_remembered_per_chart(qapp, chart, cfg):
     v3.close()
     os.replace(other, chart)
     assert (v3.size().width(), v3.size().height()) != (780, 520)
+
+
+def test_safe_name_sanitises(qapp):
+    # illegal chars and whitespace runs become "_", edges are trimmed
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v = ChartViewer(widget=_widget(qapp))
+    assert v._safe_name("2026 QK") == "2026_QK"
+    assert v._safe_name("a/b\\c:d*e?f\"g<h>i|j") == "a_b_c_d_e_f_g_h_i_j"
+    assert v._safe_name("  Pad   dos  ") == "Pad_dos"
+    assert v._safe_name("") == ""
+    v.close()
+
+
+def test_suggested_name_contains_object_widget(qapp):
+    # vector mode, object known: <object>_<key>.png
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v = ChartViewer(widget=_widget(qapp), title="Orbit",
+                    obj_name="2026 QK", chart_key="orbit")
+    assert v._suggested_name() == "2026_QK_orbit.png"
+    v.close()
+
+
+def test_suggested_name_contains_object_pixmap(qapp, chart):
+    # pixmap mode: the generic "_overview_" file name is replaced by the
+    # object-scoped one
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v = ChartViewer(chart, title="Orbit", obj_name="2026 QK",
+                    chart_key="orbit")
+    assert v._suggested_name() == "2026_QK_orbit.png"
+    v.close()
+
+
+def test_suggested_name_falls_back_to_title_without_object(qapp, chart):
+    # no object name: keep the historical defaults (png name / key + .png)
+    from nightscribe.gui.chart_viewer import ChartViewer
+    vp = ChartViewer(chart)
+    assert vp._suggested_name() == chart.name
+    vp.close()
+    vw = ChartViewer(widget=_widget(qapp), title="Orbit live")
+    assert vw._suggested_name() == "Orbit_live.png"
+    vw.close()
+
+
+def test_export_writes_object_named_file(qapp, tmp_path, monkeypatch):
+    # full click-through: the export dialog defaults to a user-land path
+    # with the object in the name and the PNG really lands there
+    from pathlib import Path
+    from nightscribe.gui.chart_viewer import ChartViewer
+    from PySide6.QtWidgets import QFileDialog
+
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
+    v = ChartViewer(widget=_widget(qapp), title="Orbit",
+                    obj_name="2026 QK", chart_key="orbit")
+    v.show()
+    v.resize(900, 700)
+    _events()
+    v._zoom_fit()
+    default = str(tmp_path / v._suggested_name())
+    orig = QFileDialog.getSaveFileName
+    QFileDialog.getSaveFileName = staticmethod(
+        lambda *a, **k: (default, ""))
+    try:
+        v._export()
+    finally:
+        QFileDialog.getSaveFileName = orig
+    dest = tmp_path / "2026_QK_orbit.png"
+    with open(dest, "rb") as f:
+        data = f.read()
+    assert data[:8] == b"\x89PNG\r\n\x1a\n"
+    assert len(data) > 1000
+    v.close()

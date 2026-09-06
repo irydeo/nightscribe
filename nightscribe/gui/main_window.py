@@ -20,7 +20,7 @@ from PySide6.QtCore import (QFile, Qt, Signal, QPropertyAnimation,
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
-                                QHBoxLayout,
+                                QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
                                 QListWidgetItem, QMainWindow, QMessageBox,
                                 QProgressBar, QPushButton, QScrollArea,
@@ -186,10 +186,16 @@ class MainWindow(QMainWindow):
         self._build_tabs()
         self._connect_menu()
         self._connect()
+        # Projects are visible from the very first open: load the hub list
+        # once the event loop starts (a deferred singleShot reads only the
+        # local SQLite, never the network). The "Refresh" button stays as a
+        # fallback, and _on_main_tab_changed keeps the list fresh on every
+        # visit to the Projects tab.
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, self.on_refresh_projects)
         self.statusBar().showMessage(
             f"NightScribe {full_version()} — "
             + self.tr("Ready — press 'Compute tonight'"), 8000)
-        from PySide6.QtCore import QTimer
         if config.is_configured():
             QTimer.singleShot(400, self.on_compute_tonight)
         self._now_timer = QTimer(self)
@@ -320,6 +326,13 @@ class MainWindow(QMainWindow):
 
     def _connect(self):
         t = self.tonight
+        # Refresh the Projects hub list every time the user enters that
+        # tab, so it is always up to date without pressing "Refresh" (which
+        # stays as a just-in-case fallback).
+        from PySide6.QtWidgets import QTabWidget
+        self.centralWidget().findChild(
+            QTabWidget, "tabs").currentChanged.connect(
+                self._on_main_tab_changed)
         t.btn_compute.clicked.connect(self.on_compute_tonight)
         t.btn_show_all.toggled.connect(self._toggle_table)
         # one filter rules grid + table (WORKFLOWS 7quater): the header combo
@@ -359,6 +372,10 @@ class MainWindow(QMainWindow):
 
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
+        # The Observing tab packs four group boxes; give it room so the
+        # kind checkboxes and rows are never crushed (the .ui minimum is
+        # the floor; the initial size opens it comfortably).
+        dlg.resize(860, 740)
         dlg.edt_mpc_code.setText(config.get("mpc_code", ""))
         dlg.edt_obs_name.setText(config.get("observatory_name", ""))
         dlg.spn_lat.setValue(float(config.get("lat", 0)))
@@ -1299,12 +1316,27 @@ class MainWindow(QMainWindow):
 
     # ---------------- Projects (ADR-019 v3.1) ----------------
 
+    def _on_main_tab_changed(self, index):
+        # @args: index - the newly selected top-level tab index
+        #        (1 == the Projects hub, per main_window.ui order)
+        # @return: None
+        # Keep the Projects hub list always fresh: refresh on every visit,
+        # so projects appear without pressing "Refresh" (which stays as a
+        # just-in-case fallback). Only the Projects tab triggers a reload.
+        if index == 1:
+            self.on_refresh_projects()
+
     def on_refresh_projects(self):
         idx = self.projects.cmb_filter.currentIndex()
         statuses = ("active", None, "done", "archived")
         status = statuses[idx] if idx < len(statuses) else None
         projects = project.list_projects(db, status)
         lst = self.projects.lst_projects
+        # preserve the selected project across the refresh (the list reloads
+        # on every visit to the tab and at startup, so we must not drop the
+        # project the user is currently viewing)
+        sel = lst.currentItem()
+        keep_id = sel.data(Qt.UserRole) if sel is not None else None
         lst.clear()
         for p in projects:
             kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
@@ -1315,6 +1347,8 @@ class MainWindow(QMainWindow):
             item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/4")
             item.setData(Qt.UserRole, p["id"])
             lst.addItem(item)
+            if p["id"] == keep_id:
+                lst.setCurrentItem(item)
         if not projects:
             self.projects.lbl_header.setText(
                 self.tr("No projects yet. Create one from Tonight."))
@@ -1502,29 +1536,37 @@ class MainWindow(QMainWindow):
         spn = self._project_widgets.get("spn_nframes")
         spn_exp = self._project_widgets.get("spn_exps")
         cmb_f = self._project_widgets.get("cmb_filter")
+        spn_darks = self._project_widgets.get("spn_darks")
+        spn_darkexp = self._project_widgets.get("spn_darkexp")
+        spn_bias = self._project_widgets.get("spn_bias")
         if spn and spn_exp and cmb_f:
+            n_darks = spn_darks.value() if spn_darks else 0
+            exp_dark = spn_darkexp.value() if (spn_darkexp and n_darks) else None
+            n_bias = spn_bias.value() if spn_bias else 0
             project.update_step_data(
                 db, self._current_project["id"], "plan",
                 {"n_frames": spn.value(), "exp_s": spn_exp.value(),
-                 "filter": cmb_f.currentText()})
-            # (re)compute the safe window from this plan's duration and
-            # store it in the project context so the overview, narrative
-            # and sky chart all agree (ADR-020).
+                 "filter": cmb_f.currentText(), "n_darks": n_darks,
+                 "exp_dark": exp_dark, "n_bias": n_bias})
+            # (re)compute the safe window from this plan's duration (including
+            # calibration frames) and store it in the project context so the
+            # overview, narrative and sky chart all agree (ADR-020).
             p = self._current_project
             ctx = p.get("context") or {}
             ra = ctx.get("ra_deg")
             dec = ctx.get("dec_deg")
             if ra is not None and dec is not None:
-                from ..core import exposure as _exp
-                dur = _exp.session_duration_s(
-                    spn.value(), spn_exp.value(),
-                    float(config.get("overhead_s", 15.0)))
+                plan = sequence.make_plan(
+                    spn.value(), spn_exp.value(), cmb_f.currentText(),
+                    overhead_s=float(config.get("overhead_s", 15.0)),
+                    n_darks=n_darks, exp_dark=exp_dark, n_bias=n_bias)
+                dur = plan["duration_s"]
                 from ..core import planner as _planner
                 sw = _planner.safe_window_for(ra, dec, config, dur)
                 ctx.update(sw)
                 project.update_context(db, p["id"],
-                                      {k: v for k, v in sw.items()
-                                       if v is not None})
+                                       {k: v for k, v in sw.items()
+                                        if v is not None})
                 # refresh the overview panel: the capture chips and the
                 # sky chart now carry the safe window
                 panel = self._get_proj_panel()
@@ -1540,13 +1582,40 @@ class MainWindow(QMainWindow):
         # sequence export (all kinds)
         layout.addWidget(QLabel(self.tr("Export capture sequence")))
         cmb_fmt = QComboBox()
-        cmb_fmt.addItem("NINA (JSON)")
-        cmb_fmt.addItem("CCDciel (XML)")
-        cmb_fmt.addItem("CSV (generic)")
+        cmb_fmt.addItem(self.tr("NINA (JSON)"))
+        cmb_fmt.addItem(self.tr("CCDciel (targets)"))
+        cmb_fmt.addItem(self.tr("CSV (generic)"))
         layout.addWidget(cmb_fmt)
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
         layout.addWidget(btn_seq)
+        # CCDciel calibration frames (ADR-021): the generated target list
+        # appends a Dark and a Bias step from these counts (0 = omit).
+        grp = QGroupBox(self.tr("Calibration"))
+        form = QFormLayout(grp)
+        spn_darks = QSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
+        spn_darks.setValue(25)
+        form.addRow(self.tr("Darks:"), spn_darks)
+        spn_darkexp = QDoubleSpinBox(); spn_darkexp.setMinimum(0.1)
+        spn_darkexp.setMaximum(3600.0)
+        spn_exps = self._project_widgets.get("spn_exps")
+        spn_darkexp.setValue(spn_exps.value() if spn_exps else 60.0)
+        form.addRow(self.tr("Dark exposure (s):"), spn_darkexp)
+        spn_bias = QSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
+        spn_bias.setValue(100)
+        form.addRow(self.tr("Bias:"), spn_bias)
+        layout.addWidget(grp)
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        if plan_data.get("n_darks") is not None:
+            spn_darks.setValue(int(plan_data["n_darks"]))
+        if plan_data.get("exp_dark"):
+            spn_darkexp.setValue(float(plan_data["exp_dark"]))
+        if plan_data.get("n_bias") is not None:
+            spn_bias.setValue(int(plan_data["n_bias"]))
+        self._project_widgets["spn_darks"] = spn_darks
+        self._project_widgets["spn_darkexp"] = spn_darkexp
+        self._project_widgets["spn_bias"] = spn_bias
         # NEO: also ephemeris export
         if kind in ("neo", "pccp"):
             layout.addWidget(QLabel(""))
@@ -1717,16 +1786,25 @@ class MainWindow(QMainWindow):
         spn = self._project_widgets.get("spn_nframes")
         spn_exp = self._project_widgets.get("spn_exps")
         cmb_f = self._project_widgets.get("cmb_filter")
-        if not (spn and spn_exp and cmb_f):
+        spn_darks = self._project_widgets.get("spn_darks")
+        spn_darkexp = self._project_widgets.get("spn_darkexp")
+        spn_bias = self._project_widgets.get("spn_bias")
+        if not (spn and spn_exp and cmb_f and spn_darks
+                and spn_darkexp and spn_bias):
             return
-        plan = sequence.make_plan(spn.value(), spn_exp.value(),
-                                  cmb_f.currentText(), cfg=config)
-        ctx = self._current_project["context"]
+        n_darks = spn_darks.value()
+        plan = sequence.make_plan(
+            spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
+            n_darks=n_darks,
+            exp_dark=spn_darkexp.value() if n_darks else None,
+            n_bias=spn_bias.value())
+        ctx = self._current_project.get("context") or {}
         target = {"name": self._current_project["object_name"],
-                  "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg")}
+                  "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),
+                  "safe_window": ctx.get("safe_window")}
         fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
-        ext = {"nina": ".json", "ccdciel": ".xml", "csv": ".csv"}[fmt]
+        ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
         outdir = paths.data_dir() / "exports"
         outdir.mkdir(parents=True, exist_ok=True)
         default = outdir / f"{target['name']}_sequence{ext}"

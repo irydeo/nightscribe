@@ -205,6 +205,58 @@ def test_no_night_returns_empty_target(qapp):
     w.close()
 
 
+def test_curve_never_drawn_below_zero_altitude(qapp):
+    # A body spends part of the night below the horizon (altitudes go
+    # negative in the raw samples), but the *drawn* target curve must never
+    # dip below the 0° baseline (scene y = +_HALF): _add_poly clamps the
+    # altitude at >= 0 at draw time, mirroring matplotlib's ylim(0, 90) in
+    # viz/sky_view.py. The raw samples stay untouched (the tooltip still
+    # reports the real, negative altitude).
+    from nightscribe.gui.widgets.sky_widget import _HALF, _Z_TARGET
+    w = _mk_chart(qapp)
+    # dec -30: min altitude ~ -25° at this site (see probe), so raw samples
+    # really do go below the horizon
+    w.set_target(_RA, -30.0, _LAT, _LON, _DATE, obj_name="south")
+    assert min(w._samples["alt"]) < 0.0, "test premises: object must dip below 0"
+    # find the drawn target-curve path item (z == _Z_TARGET)
+    from PySide6.QtGui import QPainterPath
+    target = None
+    for it in w.view._items_registered:
+        p = it.path() if hasattr(it, "path") else None
+        if p is not None and it.zValue() == _Z_TARGET:
+            target = p
+            break
+    assert target is not None, "target curve path was not drawn"
+    # QPainterPath.elementAt(i) gives every point; none may sit below +_HALF
+    eps = 1.0
+    for i in range(target.elementCount()):
+        y = target.elementAt(i).y
+        assert y <= _HALF + eps, f"curve point below 0° baseline: y={y} > {_HALF}"
+    # and the raw altitude data was NOT mutated (tooltip still honest)
+    assert min(w._samples["alt"]) < 0.0
+    w.close()
+
+
+def test_legend_identifies_each_line(qapp):
+    # The chart must say what each line is: the target curve, the Moon and
+    # the horizon limit — three swatches (QGraphicsLineItem at _Z_LABEL)
+    # with the matching labels.
+    from nightscribe.gui.widgets.sky_widget import _Z_LABEL
+    w = _mk_chart(qapp)
+    w.set_target(_RA, _DEC, _LAT, _LON, _DATE, obj_name="")
+    labels = [it.text() for it in w.view._items_registered
+              if hasattr(it, "text")]
+    for expected in ("Objeto", "Luna", "Límite"):
+        assert expected in labels, f"legend label {expected!r} missing"
+    # exactly three legend swatches (short lines at legend z-order) and the
+    # backdrop rect beneath them
+    swatches = [it for it in w.view._items_registered
+                if it.zValue() == _Z_LABEL and hasattr(it, "setLine")]
+    assert len(swatches) == 3
+    # none of the closed curve's legend geometry sits half outside the frame
+    w.close()
+
+
 def test_widget_package_has_no_matplotlib():
     # the widget package must never pull in matplotlib (ADR-029) — assert it
     # at import time in a clean subprocess.

@@ -11,6 +11,7 @@
 #
 ############################################################
 
+import re
 import shutil
 from pathlib import Path
 
@@ -19,6 +20,10 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
                                QPushButton, QScroller, QScrollArea,
                                QVBoxLayout)
+
+# characters that no sane file system keeps in a name (Windows + the
+# control range); the export dialog suggestion is sanitised through this.
+_ILLEGAL = re.compile(r'[\\/:*?"<>|\x00-\x1f]')
 
 # The chart viewer opens in one of two modes (ADR-029 Fase 4):
 #
@@ -53,11 +58,17 @@ class ChartViewer(QDialog):
     # a flat PNG file (`png_path`) or a live vector chart widget (`widget`).
     # @args: png_path - chart file (pixmap mode);
     #        widget   - a chart widget with a `view` (widget mode);
-    #        title    - window title, parent - widget
-    def __init__(self, png_path=None, widget=None, title="", parent=None):
+    #        title    - window title, parent - widget;
+    #        obj_name - display name of the astronomical object;
+    #        chart_key - "orbit"|"sky"|"approach"|... (for the export
+    #                     default file name)
+    def __init__(self, png_path=None, widget=None, title="", obj_name="",
+                 chart_key="", parent=None):
         super().__init__(parent)
         self._mode = "pixmap" if png_path is not None else "widget"
         self._widget = widget
+        self._obj_name = obj_name
+        self._chart_key = chart_key
 
         if self._mode == "pixmap":
             self._path = Path(png_path)
@@ -233,6 +244,29 @@ class ChartViewer(QDialog):
         self._save_size()
         super().closeEvent(event)
 
+    # ---- suggested export name -------------------------------------------
+
+    @staticmethod
+    def _safe_name(text):
+        # @return: text fit for a file name (illegal chars and whitespace
+        #          runs become "_", leading/trailing underscores stripped)
+        if not text:
+            return ""
+        text = _ILLEGAL.sub("_", str(text))
+        text = re.sub(r"\s+", "_", text).strip("_")
+        return text
+
+    def _suggested_name(self):
+        # @return: default file name for the export dialog.
+        #   With obj_name → <object>_<chart>.png (no "overview_" prefix).
+        #   Without it: historical defaults (png name / chart title + .png)
+        tag = self._chart_key or self._safe_name(self._key)
+        if self._obj_name:
+            return f"{self._safe_name(self._obj_name)}_{self._safe_name(tag)}.png"
+        if self._mode == "pixmap":
+            return self._path.name
+        return f"{self._safe_name(self._key)}.png"
+
     # ---- export ---------------------------------------------------------
 
     def _export(self):
@@ -241,8 +275,7 @@ class ChartViewer(QDialog):
         # (zoom included), via the widget's own export.
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Export chart"),
-            str(Path.home() / (self._path.name if self._path
-                               else self._key)),
+            str(Path.home() / self._suggested_name()),
             "PNG (*.png);;All files (*)")
         if not out:
             return
@@ -253,16 +286,20 @@ class ChartViewer(QDialog):
         self.setWindowTitle(f"{self.windowTitle()} — {self.tr('exported')}")
 
 
-def open_chart(parent, png_path, title=""):
+def open_chart(parent, png_path, title="", obj_name="", chart_key=""):
     # Convenience: opens the viewer for a chart PNG file.
-    # @args: parent - widget, png_path - chart PNG, title - window title
-    dlg = ChartViewer(png_path, title=title, parent=parent)
+    # @args: parent - widget, png_path - chart PNG, title - window title,
+    #        obj_name - object display name, chart_key - "orbit"|"sky"|...
+    dlg = ChartViewer(png_path, title=title, obj_name=obj_name,
+                      chart_key=chart_key, parent=parent)
     dlg.exec()
 
 
-def open_chart_widget(parent, widget, title=""):
+def open_chart_widget(parent, widget, title="", obj_name="", chart_key=""):
     # Convenience: opens the viewer around a live vector chart widget.
     # @args: parent - widget, widget - a chart widget (OrbitChart, etc.),
-    #        title - window title
-    dlg = ChartViewer(widget=widget, title=title, parent=parent)
+    #        title - window title, obj_name - object display name,
+    #        chart_key - "orbit"|"sky"|"approach"|...
+    dlg = ChartViewer(widget=widget, title=title, obj_name=obj_name,
+                      chart_key=chart_key, parent=parent)
     dlg.exec()

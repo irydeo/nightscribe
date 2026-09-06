@@ -16,7 +16,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QPen, QPixmap,
-                            QPainter)
+                            QPainter, QFontMetricsF)
 from PySide6.QtWidgets import (QGraphicsRectItem, QGraphicsScene,
                                 QGraphicsSimpleTextItem, QGraphicsView)
 
@@ -27,8 +27,8 @@ from ...viz import palette
 # adds its items into the scene and installs a hover callback that says
 # what to show at each scene coordinate. This layer owns only the
 # generic chrome — the dark canvas, the zoom and pan, the fit-to-parent
-# rule, the hover tooltip and the PNG export — and deliberately knows
-# nothing about the concrete chart.
+# rule, the hover tooltip, the bottom-right watermark and the PNG export —
+# and deliberately knows nothing about the concrete chart.
 
 # The tooltip box is a semi-transparent panel with a 1px border; it follows
 # the cursor while the hover probe answers "yes".
@@ -42,6 +42,14 @@ _TT_FONT_PX = 12
 _WHEEL = 1.25
 _ZOOM_MIN = 0.05
 _ZOOM_MAX = 8.0
+
+# Bottom-right watermark: same muted, low-opacity small text the matplotlib
+# exports stamp on their PNGs (viz/style.watermark). Drawn in *viewport*
+# space so it stays corner-anchored while the user zooms/pans.
+_WM_TEXT = "NightScribe"
+_WM_FONT_PT = 8
+_WM_MARGIN = 10          # px from the bottom-right corner
+_WM_ALPHA = 0.8
 
 
 class ChartView(QGraphicsView):
@@ -79,6 +87,9 @@ class ChartView(QGraphicsView):
         self._scene_rect_hint = None    # QRectF set by set_scene_rect, or None
         self._drag_start = None         # viewport point where the current pan started
         self._fit_pending = False       # a resize fit is queued, not yet run
+        self._watermark = _WM_TEXT      # bottom-right signature
+        self._wm_font = QFont()
+        self._wm_font.setPointSize(_WM_FONT_PT)
 
         # --- chrome (view-level, not scene-level) -----------------------
         self.setBackgroundBrush(QBrush(QColor(palette.BG)))
@@ -163,6 +174,43 @@ class ChartView(QGraphicsView):
         # enclosing widget, or by a double-click on the scene (a subclass
         # may wire that; the base does not).
         self.fit_to_scene()
+
+    # ------------------------------------------------- watermark ----------
+
+    def set_watermark(self, text):
+        # @args: text — the bottom-right signature (e.g. "NightScribe"),
+        #        or "" / None to drop it. Mirrors the matplotlib exports'
+        #        watermark param (viz/style.watermark).
+        self._watermark = text or ""
+
+    def _paint_watermark(self, painter, w, h):
+        # @args: painter - a QPainter in DEVICE coordinates (viewport or
+        #        pixmap), w, h - the painted surface size in device units.
+        # Draws the bottom-right signature, same small font / muted colour /
+        #        alpha as the matplotlib exports.
+        text = self._watermark
+        if not text:
+            return
+        painter.save()
+        painter.setFont(self._wm_font)
+        painter.setPen(QPen(QColor(palette.MUTED)))
+        painter.setOpacity(_WM_ALPHA)
+        tw = QFontMetricsF(self._wm_font).horizontalAdvance(text)
+        painter.drawText(w - tw - _WM_MARGIN, h - _WM_MARGIN, text)
+        painter.restore()
+
+    def drawForeground(self, painter, rect):
+        # Annotates the chart with the bottom-right watermark, painted in
+        # viewport space so it stays corner-anchored while the user
+        # zooms/pans (scene items would drift with the transform).
+        super().drawForeground(painter, rect)
+        if not self._watermark:
+            return
+        painter.save()
+        painter.resetTransform()
+        self._paint_watermark(painter, self.viewport().width(),
+                              self.viewport().height())
+        painter.restore()
 
     def _zoom_by(self, factor):
         # @args: factor — a positive number; applied to the current scale
@@ -347,8 +395,14 @@ class ChartView(QGraphicsView):
         # Passing only one rect to QGraphicsScene.render() treats it as the
         # *target*; the source defaults to the full itemsBoundingRect, which
         # was producing a dark / empty PNG whenever the viewport was zoomed.
+        painter.save()
         self._scene.render(painter, target=QRectF(0, 0, pw, ph),
                            source=QRectF(left, top, w, h))
+        painter.restore()
+        # QGraphicsScene.render() paints only the scene items — the view's
+        # drawForeground watermark is not drawn into the pixmap, so stamp it
+        # again here (same device-space signature, bottom-right).
+        self._paint_watermark(painter, pw, ph)
         painter.end()
         pix.save(str(path))
         return path

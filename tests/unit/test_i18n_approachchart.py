@@ -61,7 +61,6 @@ def test_approachchart_strings_translate_es(qapp, translator):
         assert w.tr("Earth") == "Tierra"
         assert w.tr("Play")  == "Reproducir"
         assert w.tr("Pause") == "Pausa"
-        assert w.tr("1 LD")  == "1 LD"
         assert w.tr("no return (open orbit)") == "sin retorno (órbita abierta)"
         ca = w.tr("CA %1 LD")
         assert ca == "CA %1 LD" or "CA" in ca

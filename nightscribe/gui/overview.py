@@ -14,12 +14,16 @@
 # The object's «business card» as one reusable panel (phase D,
 # docs/WORKFLOWS.es.md §7ter): hook phrase, fact bullets, the
 # parameters table with a wide, multi-line explanation column and a
-# charts row (D2) rendered by core.post.build_charts. A slot that
+# charts group (D2) rendered by core.post.build_charts. A slot that
 # build_charts cannot produce is hidden (the «omit what is missing»
 # rule); when no chart can be made, the whole charts group disappears
 # instead of leaving a grid of «why not» lines.
 #
-# The orbit and sky slots are live vector widgets (OrbitChart / SkyChart,
+# The charts group shows every produced chart on its OWN TAB (each tab
+# carries the chart's title, e.g. "Orbit", "Sky tonight"): with a single
+# chart the tab bar auto-hides and the chart stands alone; with several
+# they group side by side behind tabs. The orbit, sky and approach slots
+# are live vector widgets (OrbitChart / SkyChart / ApproachChart,
 # ADR-029 Fase 2-3) that the user can zoom, pan and hover. The transit
 # (light curve) and field (cutout) slots have no vector widget yet and
 # keep the QLabel+QPixmap route. Clicking any slot opens the same
@@ -29,10 +33,10 @@ import datetime
 
 from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QCheckBox, QFrame, QGridLayout, QGroupBox,
+from PySide6.QtWidgets import (QCheckBox, QFrame, QGroupBox,
                                 QHBoxLayout, QLabel, QHeaderView, QPushButton,
-                                QSizePolicy, QTableWidget, QTableWidgetItem,
-                                QVBoxLayout, QWidget)
+                                QSizePolicy, QTabWidget, QTableWidget,
+                                QTableWidgetItem, QVBoxLayout, QWidget)
 
 from ..core import exposure, narrative, orbits
 from .. import paths
@@ -62,14 +66,27 @@ def _chip(text, color, tip=""):
     return lbl
 
 
-# Resizes `parent` so the `panel` fits its content (with a minimum
-# size floor). Used by the Explore dialog and tested in isolation.
+# Reading-size floors for the Explore dialog (resize_to_panel_content):
+# wide enough that the hook line and the "What it means" column read
+# comfortably; tall enough that the CTA button at the panel's foot never
+# hides under the scroll area. The height gets an extra delta because
+# resize() sizes the WHOLE window (title bar + frame + layout margins),
+# so the panel's full height needs a little headroom to fit without a
+# vertical scrollbar.
+_MIN_READ_W = 780     # comfortable reading width (px)
+_MIN_READ_H = 640     # minimum usable height (px)
+_DLG_CHROME = 60      # title bar / frame / margins headroom (px)
+
+
+# Resizes `parent` so the `panel` fits its content, keeping it wide and
+# tall enough to read and to show the whole panel (CTA included). Used by
+# the Explore dialog and tested in isolation.
 # @args: parent - the container widget (e.g. an Explora QDialog)
 #        panel  - the ObjectPanel whose sizeHint sets the new size
 def resize_to_panel_content(parent, panel):
     hint = panel.sizeHint()
-    w = max(int(hint.width()),  420)
-    h = max(int(hint.height()), 320)
+    w = max(int(hint.width()), _MIN_READ_W)
+    h = max(int(hint.height()) + _DLG_CHROME, _MIN_READ_H)
     parent.resize(w, h)
 
 
@@ -89,6 +106,7 @@ class _SlotClick(QObject):
             return False
         p = self._panel
         title = p._slot_titles.get(key, "")
+        obj_name = p._name or ""
         if key in _VECTOR_SLOTS:
             data = p._slot_data.get(key)
             if data is None:
@@ -96,14 +114,16 @@ class _SlotClick(QObject):
             rebuilt = p._rebuild_widget(key, data)
             if rebuilt:
                 from .chart_viewer import open_chart_widget
-                open_chart_widget(p, rebuilt, title=title)
+                open_chart_widget(p, rebuilt, title=title,
+                                  obj_name=obj_name, chart_key=key)
                 return True
         else:
             png = obj.property("chart_png")
             if not png:
                 return False
             from .chart_viewer import open_chart
-            open_chart(p, png, title=title)
+            open_chart(p, png, title=title, obj_name=obj_name,
+                       chart_key=key)
             return True
         return False
 
@@ -114,8 +134,9 @@ class ObjectPanel(QWidget):
     #   missing — the loader came back empty
     #   ready   — hook + bullets + parameters table
     #
-    # Charts (D2): orbit and sky are live vector widgets (ADR-029);
-    # transit and field keep QLabel+QPixmap. Clicking any of them opens
+    # Charts (D2): one tab per produced chart — orbit/sky/approach are
+    # live vector widgets (ADR-029), transit/field keep QLabel+QPixmap;
+    # a single chart hides the tab bar. Clicking any of them opens
     # ChartViewer in the matching mode.
     #
     # Single CTA at the bottom of the panel (Phase E, corrected
@@ -209,15 +230,23 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         layout.addWidget(self.grp_params)
 
-        # charts grid (D2): orbit/sky/approach are vector widgets;
-        # field/transit are QLabel+QPixmap. The grid is filled in
-        # _render_charts and emptied by _empty_grid (state transitions:
+        # charts tabs (D2): each produced chart gets its own tab labelled
+        # with the chart's title; with a single chart the tab bar hides and
+        # the chart stands alone. orbit/sky/approach are vector widgets;
+        # field/transit are QLabel+QPixmap. The tabs are (re)filled in
+        # _render_charts and emptied by _empty_tabs (state transitions:
         # ready -> blank -> ready).
         self.grp_charts = QGroupBox(self.tr("Charts"))
-        self._grid = QGridLayout(self.grp_charts)
-        self._grid.setSpacing(8)
+        self._tabs = QTabWidget(self.grp_charts)
+        self._tabs.setTabBarAutoHide(True)
+        self._tabs.setDocumentMode(True)
+        # a sane floor so the auto-fit dialog does not collapse a chart
+        self._tabs.setMinimumSize(480, 340)
+        lay = QVBoxLayout(self.grp_charts)
+        lay.setContentsMargins(6, 4, 6, 6)
+        lay.addWidget(self._tabs)
         self._slot_data = {}    # key -> data dict (for rebuild on click)
-        self._slot_titles = {}  # key -> translated title (for the viewer)
+        self._slot_titles = {}  # key -> translated title (for tabs + viewer)
         self._slot_click = _SlotClick(self)
         self.grp_charts.hide()
         layout.addWidget(self.grp_charts)
@@ -396,7 +425,7 @@ class ObjectPanel(QWidget):
         self._name = None
         self._fallback = None
         self._clear_chips()
-        self._empty_grid()
+        self._empty_tabs()
         self.lbl_state.hide()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
@@ -466,13 +495,15 @@ class ObjectPanel(QWidget):
 
     # ---------------- charts (D2, ADR-029) ----------------
     #
-    # orbit / sky  — live vector widgets (OrbitChart / SkyChart).
-    # field/transit — QLabel+QPixmap (no vector widget for cutout/light curve).
-    # build_charts still runs (core/post.py unchanged); for the vector
-    # slots it only acts as a "can I make this chart?" gate.
+    # Each produced chart lands on its OWN tab, labelled with the chart's
+    # title; with a single chart the tab bar auto-hides.
+    # orbit / sky / approach — live vector widgets (OrbitChart, SkyChart,
+    # ApproachChart). field/transit — QLabel+QPixmap (no vector widget for
+    # cutout/light curve). build_charts still runs (core/post.py unchanged);
+    # for the vector slots it only acts as a "can I make this chart?" gate.
 
     def _render_charts(self, e):
-        # Builds the charts grid for this object.
+        # Builds the charts tabs for this object.
         # @args: e - enriched dict
         from ..core import post
         outdir = self._chart_dir or paths.data_dir() / "posts"
@@ -482,9 +513,9 @@ class ObjectPanel(QWidget):
         except Exception:
             charts = {}
 
-        # Start from an empty grid (the panel re-renders when the object
+        # Start from empty tabs (the panel re-renders when the object
         # changes).
-        self._empty_grid()
+        self._empty_tabs()
 
         for key in _CHART_SLOTS:
             # "approach" is a pure-vector slot: build_charts never returns
@@ -493,12 +524,11 @@ class ObjectPanel(QWidget):
                 self._slot_titles[key] = self.tr(_TITLE[key])
                 w = self._make_vector(key, e)
                 if w is not None:
-                    row, col = self._slot_rowcol(key)
                     w.setProperty("chart_key", key)
                     w.setCursor(Qt.PointingHandCursor)
                     w.installEventFilter(self._slot_click)
                     self._slot_data[key] = self._extract(key, e)
-                    self._grid.addWidget(w, row, col)
+                    self._tabs.addTab(w, self._slot_titles[key])
                 continue
             chart = charts.get(key)
             if not chart:
@@ -507,12 +537,11 @@ class ObjectPanel(QWidget):
             if key in _VECTOR_SLOTS:
                 w = self._make_vector(key, e)
                 if w is not None:
-                    row, col = self._slot_rowcol(key)
                     w.setProperty("chart_key", key)
                     w.setCursor(Qt.PointingHandCursor)
                     w.installEventFilter(self._slot_click)
                     self._slot_data[key] = self._extract(key, e)
-                    self._grid.addWidget(w, row, col)
+                    self._tabs.addTab(w, self._slot_titles[key])
             else:
                 self._place_png(key, chart)
 
@@ -520,28 +549,22 @@ class ObjectPanel(QWidget):
         # when build_charts produced no PNG (elements without an ephemeris).
         self.grp_charts.setVisible(bool(charts) or bool(self._slot_data))
 
-    def _slot_rowcol(self, key):
-        # @return: (row, col) of the slot in the charts grid
-        idx = _CHART_SLOTS.index(key)
-        return (idx // 2, idx % 2)
-
-    def _empty_grid(self):
-        # Removes every widget from the charts grid and clears slot state.
-        gl = self._grid
-        while gl.count():
-            item = gl.takeAt(0)
-            w = item.widget()
+    def _empty_tabs(self):
+        # Removes every chart tab and clears the slot state.
+        while self._tabs.count():
+            w = self._tabs.widget(0)
+            self._tabs.removeTab(0)
             if w is not None:
                 w.deleteLater()
         self._slot_data.clear()
         self._slot_titles.clear()
 
     def _place_png(self, key, png_path):
-        # Loads a chart PNG into a QLabel and places it in the grid.
+        # Loads a chart PNG into a QLabel and places it in its own tab.
         # @args: key - slot name, png_path - Path from build_charts
         lbl = QLabel()
         lbl.setAlignment(Qt.AlignCenter)
-        lbl.setMinimumHeight(220)
+        lbl.setMinimumHeight(300)
         pix = QPixmap(str(png_path))
         if not pix.isNull():
             lbl.setPixmap(pix)
@@ -550,8 +573,7 @@ class ObjectPanel(QWidget):
         lbl.setCursor(Qt.PointingHandCursor)
         lbl.setToolTip(self.tr("Click to zoom / export"))
         lbl.installEventFilter(self._slot_click)
-        row, col = self._slot_rowcol(key)
-        self._grid.addWidget(lbl, row, col)
+        self._tabs.addTab(lbl, self._slot_titles[key])
 
     def _make_vector(self, key, e):
         # Builds the appropriate live chart widget for this slot.

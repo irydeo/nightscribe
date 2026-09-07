@@ -264,6 +264,12 @@ class ObjectPanel(QWidget):
         hdr.setSectionResizeMode(0, QHeaderView.Interactive)
         hdr.setSectionResizeMode(1, QHeaderView.Interactive)
         hdr.setSectionResizeMode(2, QHeaderView.Stretch)
+        # multi-line rows must follow the stretch column when the window
+        # resizes: re-fit them every time the explanation column changes
+        # width (the header stretches AFTER the viewport's Resize event,
+        # so watching the section itself is the reliable hook)
+        self._rows_busy = False
+        hdr.sectionResized.connect(self._param_section_resized)
         tbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         gl.addWidget(tbl)
         self.grp_params.hide()
@@ -954,6 +960,22 @@ class ObjectPanel(QWidget):
                                      _chip(text, color, tip))
         self.row_capture.show()
 
+    def _param_section_resized(self, index, _old, new):
+        # Re-fits the wrapped rows after the explanation column changed
+        # width (window resize / column fit). The signal fires BEFORE
+        # columnWidth() reports the new size, so the section is nudged
+        # to `new` first (a no-op for the header, which is already
+        # setting it); _rows_busy breaks the recursion (new row heights
+        # can toggle the scrollbar, which resizes the sections again).
+        if index != 2 or self._rows_busy:
+            return
+        self._rows_busy = True
+        try:
+            self.tbl_params.setColumnWidth(2, new)
+            self.tbl_params.resizeRowsToContents()
+        finally:
+            self._rows_busy = False
+
     def _refill_params(self):
         # Fills the parameters table from the cached rows.
         rows = list(self._rows)
@@ -969,10 +991,13 @@ class ObjectPanel(QWidget):
             tbl.setItem(row, 0, QTableWidgetItem(param))
             tbl.setItem(row, 1, QTableWidgetItem(str(r["value"])))
             tbl.setItem(row, 2, QTableWidgetItem(self._txt(r)))
-        # fit the columns to their content, cap Parameter/Value so the
-        # explanation keeps its air, then grow the rows for wrapped text
-        tbl.resizeColumnsToContents()
+        # Fit Parameter/Value to their content, capped so the explanation
+        # keeps its air; NEVER resizeToContents on the stretch column —
+        # with word wrap the hint is the full one-line width and the
+        # column would balloon past the viewport. The stretch column
+        # takes what is left; _RowResizer re-fits rows on real resizes.
         for col in (0, 1):
+            tbl.resizeColumnToContents(col)
             if tbl.columnWidth(col) > _PARAM_COL_MAX_W:
                 tbl.setColumnWidth(col, _PARAM_COL_MAX_W)
         tbl.resizeRowsToContents()

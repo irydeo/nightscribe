@@ -465,14 +465,26 @@ def test_coords_block_simbad_fallback(panel):
 # explanation (no more vertical clipping); Parameter/Value are capped
 # so a long value cannot starve the explanation column.
 
-def test_params_table_wraps_long_explanations(panel):
+def _grow_table(panel, qapp):
+    # Shows the panel at a realistic size so the table lays out with real
+    # column widths — an unshown widget has an arbitrary viewport and the
+    # font metrics depend on which test module created the QApplication.
+    from PySide6.QtWidgets import QWidget
+    panel.resize(900, 800)
+    QWidget.show(panel)     # ObjectPanel.show(e) shadows QWidget.show()
+    qapp.processEvents()
+
+
+def test_params_table_wraps_long_explanations(panel, qapp):
+    _grow_table(panel, qapp)
     panel.show(FAKE_ELEMENT)
+    qapp.processEvents()
     tbl = panel.tbl_params
     assert tbl.wordWrap(), "word wrap must be on for the params table"
-    default_h = tbl.verticalHeader().defaultSectionSize()
+    two_lines = 2 * tbl.fontMetrics().lineSpacing()
     heights = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    assert max(heights) > default_h, \
-        f"no row grew for a long explanation: {heights} (default {default_h})"
+    assert max(heights) >= two_lines, \
+        f"no row grew for a long explanation: {heights}"
 
 
 def test_params_table_column_width_capped(panel):
@@ -484,16 +496,43 @@ def test_params_table_column_width_capped(panel):
             f"column {col} is {tbl.columnWidth(col)} > {_PARAM_COL_MAX_W}"
 
 
-def test_params_table_rewraps_on_in_depth_toggle(panel):
+def test_params_table_rewraps_on_in_depth_toggle(panel, qapp):
     # toggling «in depth» refills the table: the wrap/resize must run
     # again so the longer deep explanations are not clipped either
+    _grow_table(panel, qapp)
     panel.show(FAKE_ELEMENT)
     panel.chk_deep.setChecked(True)
+    qapp.processEvents()
     tbl = panel.tbl_params
-    default_h = tbl.verticalHeader().defaultSectionSize()
+    two_lines = 2 * tbl.fontMetrics().lineSpacing()
     heights = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    assert max(heights) > default_h, \
-        f"deep rows clipped after toggle: {heights} (default {default_h})"
+    assert max(heights) >= two_lines, \
+        f"deep rows clipped after toggle: {heights}"
+
+
+def test_params_table_rows_follow_window_resize(panel, qapp):
+    # The wrapped rows must re-fit when the window changes width: the
+    # stretch column follows the window and the rows follow the column
+    # (regression: sectionResized fires BEFORE columnWidth() updates,
+    # which used to leave the rows one resize behind).
+    _grow_table(panel, qapp)
+    panel.show(FAKE_ELEMENT)
+    qapp.processEvents()
+    tbl = panel.tbl_params
+    two_lines = 2 * tbl.fontMetrics().lineSpacing()
+    wide = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
+    panel.resize(500, 800)
+    qapp.processEvents()
+    narrow = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
+    assert max(narrow) > max(wide), \
+        f"rows did not grow on shrink: {wide} -> {narrow}"
+    assert max(narrow) > 3 * two_lines, \
+        f"narrow table should wrap to several lines: {narrow}"
+    panel.resize(1200, 800)
+    qapp.processEvents()
+    wider = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
+    assert max(wider) < max(narrow), \
+        f"rows did not shrink back on grow: {narrow} -> {wider}"
 
 
 # ---------------- D3: capture / window block ----------------

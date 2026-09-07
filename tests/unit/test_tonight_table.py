@@ -33,7 +33,8 @@ TARGETS = [
      {"es": "Descubierta hace 3 días.", "en": "Discovered 3 days ago."}),
     ({"id": "neo1", "kind": "neo", "name": "2026 QK (443089)", "mag": 21.5,
       "max_alt": 55, "window_start": "2026-08-25T00:30:00+02:00",
-      "window_end": "2026-08-25T04:10:00+02:00"}, 66.0,
+      "window_end": "2026-08-25T04:10:00+02:00",
+      "disc_date": "2026-08-14"}, 66.0,
      {"scientific": 30.0, "observability": 18.0, "urgency": 10.0, "hook": 8.0},
      {"es": "En la página de confirmación del MPC.",
       "en": "On the MPC confirmation page."}),
@@ -195,6 +196,39 @@ def test_double_click_opens_explore_from_any_column(window, monkeypatch):
         tbl.cellDoubleClicked.emit(name_row, col)
         assert len(captured) == 1, f"column {col} did not open Explore"
         assert captured[0] == "2026 QK (443089)"
+
+
+def test_neo_view_has_discovered_column(window):
+    # object-card plan, subplan 5: NEOs get the Discovered column too,
+    # filled with the ISO date the planner resolved (SBDB/NEOfixer)
+    _fill(window)
+    window.tonight.cmb_filter.setCurrentIndex(1)  # NEOs
+    try:
+        tbl = window.tonight.tbl_targets
+        labels = [tbl.horizontalHeaderItem(c).text()
+                  for c in range(tbl.columnCount())]
+        disc_col = next((i for i, l in enumerate(labels)
+                         if l in ("Discovered", "Descubierta")), None)
+        assert disc_col is not None, \
+            f"no Discovered column in the NEO view: {labels}"
+        assert tbl.item(0, disc_col).text() == "2026-08-14"
+    finally:
+        window.tonight.cmb_filter.setCurrentIndex(0)
+        window._fill_table()
+
+
+def test_all_view_discovered_normalizes_formats(window):
+    # the default view shows the same date whatever format the source
+    # used (Rochester "2026/08/30", SBDB "2004-Mar-15", ISO…)
+    _fill(window)
+    tbl = window.tonight.tbl_targets
+    labels = [tbl.horizontalHeaderItem(c).text()
+              for c in range(tbl.columnCount())]
+    disc_col = next(i for i, l in enumerate(labels)
+                    if l in ("Discovered", "Descubierta"))
+    neo_row = next(r for r in range(tbl.rowCount())
+                   if tbl.item(r, 0).text() == "2026 QK (443089)")
+    assert tbl.item(neo_row, disc_col).text() == "2026-08-14"
 
 
 def _names_name(tbl, r):

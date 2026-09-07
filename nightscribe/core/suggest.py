@@ -14,7 +14,7 @@
 import datetime
 import logging
 
-from . import coords, ephem_minor
+from . import coords, dates, ephem_minor
 
 logger = logging.getLogger(__name__)
 
@@ -52,12 +52,9 @@ def _scientific(t):
 
 
 def _freshness_days(t):
-    # Days since a transient's discovery (None if unknown).
-    try:
-        d = datetime.datetime.strptime(t["disc_date"].split(".")[0], "%Y/%m/%d")
-        return (datetime.datetime.now() - d).days
-    except (KeyError, ValueError, AttributeError):
-        return None
+    # Days since a transient's discovery (None if unknown). Any source
+    # format counts (object-card plan, subplan 5d).
+    return dates.days_since(t.get("disc_date"))
 
 
 def _observability(t, cfg):

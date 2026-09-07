@@ -15,6 +15,7 @@ import logging
 
 import requests
 
+from .. import coords
 from ..db import db
 
 logger = logging.getLogger(__name__)
@@ -132,6 +133,18 @@ def parse_neofixer_orbit(data, packed):
     arc_days = None
     if obs.get("earliest") and obs.get("latest"):
         arc_days = round(obs["latest"] - obs["earliest"], 2)
+    # first observation = the discovery night, for all practical purposes;
+    # NEOfixer hands us the ISO string (the JD float is the fallback)
+    disc_date = None
+    earliest_iso = obs.get("earliest iso")
+    if earliest_iso:
+        disc_date = str(earliest_iso)[:10]
+    elif obs.get("earliest"):
+        try:
+            disc_date = coords.datetime_from_jd(
+                obs["earliest"]).date().isoformat()
+        except (TypeError, ValueError, OverflowError):
+            disc_date = None
     return {
         "fullname": packed,
         "des": packed,
@@ -147,6 +160,7 @@ def parse_neofixer_orbit(data, packed):
         "rms_residual": raw.get("rms_residual"),
         "n_resids": raw.get("n_resids"),
         "arc_days": arc_days,
+        "disc_date": disc_date,
         "preliminary": True,            # flag for narrative/UI wording
     }
 

@@ -26,10 +26,30 @@ def test_parse_sbdb_apophis(sbdb_apophis):
     assert abs(body["phys"]["diameter"] - 0.34) < 0.01
     assert abs(body["phys"]["H"] - 19.09) < 0.01
     assert body["elements"]["a"] > 0
+    # object-card plan 5a: discovery date — the fixture has no discovery
+    # record, so the orbit's first_obs ("2004-03-15") fills in
+    assert body["disc_date"] == "2004-03-15"
 
 
 def test_parse_sbdb_unknown():
     assert sbdb.parse_sbdb({}) is None
+
+
+def test_parse_sbdb_discovery_record_wins():
+    # when SBDB does send the discovery block (get() asks discovery=1),
+    # its "YYYY-Mmm-DD" date is normalised and preferred over first_obs
+    raw = {"object": {"des": "99942", "fullname": "99942 Apophis"},
+           "discovery": {"date": "2004-Jun-19", "who": "R. Tucker"},
+           "orbit": {"first_obs": "2004-03-15", "elements": []}}
+    body = sbdb.parse_sbdb(raw)
+    assert body["disc_date"] == "2004-06-19"
+
+
+def test_parse_sbdb_without_any_date():
+    # no discovery block and no first_obs: the key exists as None
+    raw = {"object": {"des": "X", "fullname": "X"}, "orbit": {}}
+    body = sbdb.parse_sbdb(raw)
+    assert body["disc_date"] is None
 
 
 def test_parse_neofixer_orbit(fixture_path):
@@ -57,6 +77,9 @@ def test_parse_neofixer_orbit(fixture_path):
     assert body["phys"]["H"] == pytest.approx(26.74)
     assert body["arc_days"] == pytest.approx(0.47, abs=0.01)
     assert body["preliminary"] is True
+    # object-card plan 5b: first observation = the discovery night
+    # (NEOfixer's "earliest iso" is 2026-08-24T07:55:33Z)
+    assert body["disc_date"] == "2026-08-24"
     # the parsed elements must propagate with our Kepler solver
     from nightscribe.core import ephem_minor
     out = ephem_minor.kepler_ra_dec(els, els["epoch"])

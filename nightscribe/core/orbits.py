@@ -495,14 +495,12 @@ def _sn_type_text(otype):
 
 
 def days_since(date_str):
-    # @args: date_str - "YYYY/MM/DD" or "YYYY-MM-DD"
+    # Kept for convenience: the single implementation lives in dates.py
+    # (object-card plan, subplan 5d).
+    # @args: date_str - any format dates.normalize_date accepts
     # @return: whole days from that date to today, or None if unparseable
-    import datetime as _dt
-    try:
-        d = _dt.date.fromisoformat(date_str.strip().replace("/", "-"))
-    except (ValueError, AttributeError):
-        return None
-    return (_dt.date.today() - d).days
+    from . import dates
+    return dates.days_since(date_str)
 
 
 def explain_transient(d):

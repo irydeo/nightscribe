@@ -16,6 +16,7 @@ import logging
 
 import requests
 
+from .. import dates
 from ..db import db
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,10 @@ def parse_sbdb(data):
             phys[p["name"]] = float(p["value"])
         except (KeyError, TypeError, ValueError):
             phys[p.get("name")] = p.get("value")  # keep strings (e.g. spectral class)
+    # discovery date ("2004-Mar-15") when asked for it, else the first
+    # observation of the orbit solution — both normalised to ISO
+    disc = (data.get("discovery") or {}).get("date")
+    first_obs = (data.get("orbit") or {}).get("first_obs")
     return {
         "fullname": obj.get("fullname") or obj.get("des"),
         "des": obj.get("des"),
@@ -50,6 +55,8 @@ def parse_sbdb(data):
         "elements": elements,
         "moid": elements.get("moid") or data.get("orbit", {}).get("moid"),
         "phys": phys,
+        "disc_date": dates.normalize_date(disc)
+        or dates.normalize_date(first_obs),
     }
 
 
@@ -58,7 +65,8 @@ def get(name):
     # @args: name - any designation ("Apophis", "2021EQ3", "29P")
     # @return: normalised dict or None
     def fetch():
-        r = requests.get(URL, params={"sstr": name, "phys-par": "1"}, timeout=30)
+        r = requests.get(URL, params={"sstr": name, "phys-par": "1",
+                                      "discovery": "1"}, timeout=30)
         r.raise_for_status()
         return r.content, "application/json"
     try:

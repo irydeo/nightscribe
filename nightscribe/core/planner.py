@@ -15,9 +15,9 @@ import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import coords, horizon, transits
+from . import coords, dates, horizon, transits
 from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
-                      rochester)
+                      rochester, sbdb)
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +197,38 @@ def safe_window_for(ra_deg, dec_deg, cfg, duration_s, date=None):
     return out
 
 
+def _disc_date_for(t):
+    # Exact discovery date for a NEO (object-card plan, subplan 5c):
+    # SBDB's discovery record first (or the orbit's first observation),
+    # else the NEOfixer preliminary orbit's earliest observation.
+    # @args: t - planner target dict ("name"/"packed" keys)
+    # @return: "YYYY-MM-DD" or None
+    name = t.get("name") or t.get("packed")
+    if not name:
+        return None
+    body = sbdb.get(name)
+    if body and body.get("disc_date"):
+        return body["disc_date"]
+    orb = neofixer.orbit(t.get("packed") or name)
+    if orb:
+        return orb.get("disc_date")
+    return None
+
+
+def _fill_disc_dates(targets):
+    # Resolves disc_date for each target in a small thread pool: SBDB is
+    # one HTTP call per object (cached for a week), so a serial loop
+    # would slow Tonight down on a cold cache (same pattern as comets).
+    # @args: targets - planner target dicts, mutated in place
+    if not targets:
+        return
+    with ThreadPoolExecutor(max_workers=min(4, len(targets))) as pool:
+        found = list(pool.map(_disc_date_for, targets))
+    for t, d in zip(targets, found):
+        if d:
+            t["disc_date"] = d
+
+
 def _neo_targets(site, n, lat, lon, date, hor, margin, duration_s=None):
     # NEOfixer priority list for the site (see ADR-003).
     out = []
@@ -220,6 +252,7 @@ def _neo_targets(site, n, lat, lon, date, hor, margin, duration_s=None):
             })
         except (TypeError, KeyError) as err:
             logger.debug("skipping NEO target: %s", err)
+    _fill_disc_dates(out)
     return out
 
 
@@ -305,6 +338,7 @@ def _pccp_targets(lat, lon, date, hor, margin, duration_s=None):
             "mag": mag, "ra_deg": ra, "dec_deg": dec,
             "pccp_score": c.get("score"), "arc_days": c.get("arc"),
             "nobs": c.get("nobs"),
+            "disc_date": dates.normalize_date(c.get("discovery")),
             **_visibility(ra, dec, lat, lon, date, hor, margin, duration_s),
         })
     return out

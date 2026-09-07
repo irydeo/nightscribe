@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 from .. import paths
 from ..config import config
 from ..version import full_version
-from ..core import (ephemeris, mpc_report, orbits, project,
+from ..core import (dates, ephemeris, mpc_report, orbits, project,
                     sequence, suggest)
 from ..core.db import db
 from . import theme
@@ -72,7 +72,7 @@ TABLE_COLS = {
     "neo": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
             ("Max alt", "max_alt"), ("Best time (UTC)", "best_time"),
             ("NEOfixer", "nf"), ("NObs", "nobs"), ("MOID (AU)", "moid"),
-            ("Observed", "obs")],
+            ("Discovered", "disc"), ("Observed", "obs")],
     "sn": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
            ("SN type", "sn_type"), ("Host galaxy", "host"),
            ("Discovered", "disc"), ("Max alt", "max_alt"), ("Observed", "obs")],
@@ -1220,7 +1220,7 @@ class MainWindow(QMainWindow):
         if key == "moid":
             return float(t["moid"]) if t.get("moid") is not None else None
         if key == "disc":
-            return (t.get("disc_date") or "").split(".")[0] or "—"
+            return dates.normalize_date(t.get("disc_date")) or "—"
         if key == "sn_type":
             return t.get("sn_type") or "—"
         if key == "host":

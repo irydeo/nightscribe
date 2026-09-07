@@ -601,3 +601,213 @@ def explain_transient(d):
                   f"{z*100:.2f}%. The host galaxy's distance comes from that "
                   "stretching."})
     return out
+
+
+# ---------------- Exoplanet transit interpreter ----------------
+# (object-card plan, subplan 3b: the transit card tells the event of
+# the night AND the planet's story, one same table idiom)
+
+def _hm(dt):
+    # @args: dt - datetime or ISO-8601 string
+    # @return: "HH:MM" string, or None
+    import datetime as _dt
+    if isinstance(dt, str):
+        try:
+            dt = _dt.datetime.fromisoformat(dt)
+        except ValueError:
+            return None
+    if isinstance(dt, _dt.datetime):
+        return dt.strftime("%H:%M")
+    return None
+
+
+_DISC_METHOD = {
+    "transit": {"es": "tránsitos (viéndola parpadear)", "en": "transits (watching it blink)"},
+    "radial velocity": {"es": "velocidad radial (el bamboleo de la estrella)", "en": "radial velocity (the star's wobble)"},
+    "imaging": {"es": "imagen directa (una foto del propio planeta)", "en": "direct imaging (an actual picture of the planet)"},
+    "microlensing": {"es": "microlente (un alineamiento cósmico de azar)", "en": "microlensing (a chance cosmic alignment)"},
+    "timing": {"es": "cronometraje (cambios en pulsos o tránsitos de otros)", "en": "timing (shifts in pulses or in other transits)"},
+}
+
+
+def explain_transit(d, aperture_in=None):
+    # Interprets an exoplanet transit: tonight's event first (start, end,
+    # depth, duration, telescope verdict), then the planet's story.
+    # @args: d - enriched data dict (Exoplanet Archive fields + the
+    #        planner's "transit" event merged by enrich, ADR-027 pattern),
+    #        aperture_in - the user's telescope aperture in inches (or None)
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    tr = d.get("transit") or {}
+
+    ing, mid, egr = (_hm(tr.get(k)) for k in ("ingress", "mid", "egress"))
+    if ing and egr:
+        mid_es = f" El momento central ({mid} UTC) es cuando más luz tapa: planifica alrededor de ese instante." if mid else ""
+        mid_en = f" Mid-transit ({mid} UTC) is when it blocks the most light: plan around that instant." if mid else ""
+        out.append({
+            "param": {"es": "Tránsito esta noche", "en": "Transit tonight"},
+            "value": f"{ing} – {egr} UTC", "level": "basic",
+            "es": f"El planeta cruza hoy el disco de su estrella entre las "
+                  f"{ing} y las {egr} UTC.{mid_es}",
+            "en": f"The planet crosses its star's disc tonight between "
+                  f"{ing} and {egr} UTC.{mid_en}"})
+
+    dur = tr.get("duration_h")
+    if dur:
+        out.append({
+            "param": {"es": "Duración del tránsito", "en": "Transit duration"},
+            "value": f"{dur:.1f} h", "level": "basic",
+            "es": f"El cruce completo dura unas {dur:.1f} horas: es la sesión "
+                  "mínima para ver la bajada y la subida de luz enteras, con "
+                  "un margen fuera de tránsito para comparar.",
+            "en": f"The full crossing lasts about {dur:.1f} hours: the minimum "
+                  "session to watch the whole dimming and recovery, plus some "
+                  "out-of-transit margin to compare."})
+
+    depth = tr.get("depth_mmag")
+    if depth:
+        pct = (1.0 - 10.0 ** (-float(depth) / 2500.0)) * 100.0
+        out.append({
+            "param": {"es": "Profundidad", "en": "Depth"},
+            "value": f"{depth:.1f} mmag ({pct:.1f}%)", "level": "basic",
+            "es": f"La estrella pierde un {pct:.1f}% de su brillo "
+                  f"({depth:.1f} milésimas de magnitud) mientras dura el "
+                  "cruce. Cualquier cosa por debajo del 1% ya pide fotometría "
+                  "cuidadosa: esto es exactamente lo que vas a medir.",
+            "en": f"The star loses {pct:.1f}% of its brightness "
+                  f"({depth:.1f} millimagnitudes) while the crossing lasts. "
+                  "Anything under 1% already calls for careful photometry: "
+                  "this is exactly what you are going to measure."})
+
+    vmag = tr.get("v_mag")
+    if vmag is None:
+        vmag = d.get("mag")
+    if vmag is not None:
+        try:
+            vmag = float(vmag)
+        except (TypeError, ValueError):
+            vmag = None
+    if vmag is not None:
+        out.append({
+            "param": {"es": "Brillo de la estrella", "en": "Star brightness"},
+            "value": f"{vmag:.1f} mag", "level": "basic",
+            "es": f"La estrella madre brilla con magnitud {vmag:.1f}: cuanto "
+                  "más brillante, más fotones por segundo y más fácil sale la "
+                  "pequeña caída de luz del tránsito.",
+            "en": f"The host star shines at magnitude {vmag:.1f}: the "
+                  "brighter it is, the more photons per second and the easier "
+                  "the tiny transit dip comes out."})
+
+    min_in = tr.get("min_telescope_in")
+    if min_in:
+        if aperture_in:
+            ok = float(aperture_in) >= float(min_in)
+            verdict_es = ("Tu equipo llega de sobra: este tránsito es para ti."
+                          if ok else
+                          "Tu equipo se queda corto: con mucha paciencia quizá "
+                          "roces la señal, pero lo sensato es dejárselo a "
+                          "telescopios mayores.")
+            verdict_en = ("Your telescope is up to it: this transit is yours."
+                          if ok else
+                          "Your telescope falls short: with a lot of patience "
+                          "you might graze the signal, but the sensible call "
+                          "is leaving it to bigger scopes.")
+            out.append({
+                "param": {"es": "Telescopio mínimo (el tuyo)",
+                          "en": "Min. telescope (yours)"},
+                "value": f"{min_in:.0f}″ / {float(aperture_in):.0f}″",
+                "level": "basic",
+                "es": f"ExoClock estima que hacen falta al menos {min_in:.0f}″ "
+                      f"de apertura para medir esta caída de luz. {verdict_es}",
+                "en": f"ExoClock estimates at least {min_in:.0f}″ of aperture "
+                      f"are needed to measure this dip. {verdict_en}"})
+        else:
+            out.append({
+                "param": {"es": "Telescopio mínimo", "en": "Min. telescope"},
+                "value": f"{min_in:.0f}″", "level": "basic",
+                "es": f"ExoClock estima un mínimo de {min_in:.0f}″ de apertura "
+                      "para este tránsito. Configura tu telescopio en Ajustes "
+                      "y te diré si llegas.",
+                "en": f"ExoClock estimates a minimum of {min_in:.0f}″ of "
+                      "aperture for this transit. Set up your telescope in "
+                      "Settings and I will tell you whether you make it."})
+
+    per = d.get("pl_orbper")
+    if per:
+        out.append({
+            "param": {"es": "Su año", "en": "Its year"},
+            "value": f"{per:.2f} d", "level": "deep",
+            "es": f"Da una vuelta a su estrella cada {per:.2f} días "
+                  "terrestres: por eso los tránsitos se repiten tan a menudo "
+                  "y puedes planearlos con calendario.",
+            "en": f"It laps its star every {per:.2f} Earth days: that is why "
+                  "transits repeat so often and you can plan them with a "
+                  "calendar."})
+
+    radj = d.get("pl_radj")
+    if radj:
+        out.append({
+            "param": {"es": "Tamaño del planeta", "en": "Planet size"},
+            "value": f"{radj:.2f} Rjup", "level": "deep",
+            "es": f"Radio de {radj:.2f} veces Júpiter (unas {radj*11.21:.0f} "
+                  "Tierras). Los gigantes gaseosos tapan más luz: son los "
+                  "favoritos para empezar en fotometría.",
+            "en": f"Radius {radj:.2f} times Jupiter (about {radj*11.21:.0f} "
+                  "Earths). Gas giants block more light: they are the "
+                  "favourite starters in photometry."})
+
+    mass = d.get("pl_bmassj")
+    if mass:
+        out.append({
+            "param": {"es": "Masa del planeta", "en": "Planet mass"},
+            "value": f"{mass:.2f} Mjup", "level": "deep",
+            "es": f"Pesa {mass:.2f} veces Júpiter. Junto con el radio dice si "
+                  "es un gigante hinchado o denso: una pista sobre su "
+                  "atmósfera.",
+            "en": f"It weighs {mass:.2f} Jupiters. Together with the radius "
+                  "it tells whether it is a puffy or a dense giant: a clue "
+                  "about its atmosphere."})
+
+    dist_pc = d.get("sy_dist")
+    if dist_pc:
+        ly = float(dist_pc) * 3.26156
+        out.append({
+            "param": {"es": "Distancia", "en": "Distance"},
+            "value": f"{dist_pc:.0f} pc", "level": "deep",
+            "es": f"A {ly:.0f} años luz ({dist_pc:.0f} pársecs): la luz que "
+                  "tapa el planeta salió de allí hace esos años.",
+            "en": f"{ly:.0f} light-years away ({dist_pc:.0f} parsecs): the "
+                  "light the planet blocks left there that many years ago."})
+
+    method = (d.get("discoverymethod") or "").strip()
+    year = d.get("disc_year")
+    if method or year:
+        how = _DISC_METHOD.get(method.lower(), {"es": method, "en": method})
+        out.append({
+            "param": {"es": "Descubrimiento", "en": "Discovery"},
+            "value": f"{method} ({year})" if year else method,
+            "level": "deep",
+            "es": f"Descubierto en {year} por {how['es']}." if year else
+                  f"Descubierto por {how['es']}.",
+            "en": f"Discovered in {year} by {how['en']}." if year else
+                  f"Discovered by {how['en']}."})
+
+    oc = tr.get("oc_min")
+    if oc is not None:
+        try:
+            oc = float(oc)
+        except (TypeError, ValueError):
+            oc = None
+    if oc is not None:
+        out.append({
+            "param": {"es": "Deriva del calendario (O-C)", "en": "Timetable drift (O-C)"},
+            "value": f"{oc:+.0f} min", "level": "deep",
+            "es": f"El tránsito llega {oc:+.0f} min respecto a la efeméride "
+                  "de referencia. Si la deriva crece, el calendario pide "
+                  "repaso: tu medida de esta noche es justo la que lo "
+                  "actualiza.",
+            "en": f"Mid-transit arrives {oc:+.0f} min off the reference "
+                  "ephemeris. If the drift grows, the timetable needs "
+                  "revision: tonight's measurement is exactly what updates "
+                  "it."})
+    return out

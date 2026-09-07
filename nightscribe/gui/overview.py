@@ -614,6 +614,10 @@ class ObjectPanel(QWidget):
             return orbits.explain_neofixer(d["unconfirmed"])
         if e.get("type") == "transient":
             return orbits.explain_transient(d)
+        if e.get("type") == "exoplanet" or d.get("transit"):
+            from ..config import config
+            return orbits.explain_transit(
+                d, aperture_in=config.get("aperture_inches"))
         return []
 
     # ---------------- charts (D2, ADR-029) ----------------

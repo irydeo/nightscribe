@@ -53,8 +53,13 @@ def enrich(name, date=None, site="Z41", fallback_target=None):
         return {"type": "transient", "name": name,
                 "data": _enrich_transient(name, fallback_target)}
     if kind == "exoplanet":
-        return {"type": "exoplanet", "name": name,
-                "data": exoplanet_archive.planet(name)}
+        # the Archive knows the planet; only the planner target knows
+        # TONIGHT's event (ingress/egress/depth/min telescope) — merge it
+        # the ADR-027 way, never overwriting an Archive fact
+        data = exoplanet_archive.planet(name) or {}
+        if fallback_target:
+            _merge_transit_context(data, fallback_target)
+        return {"type": "exoplanet", "name": name, "data": data}
     data = _enrich_small_body(name, date, site)
     if not data and fallback_target is not None:
         # unconfirmed object: NEOfixer may still know a preliminary
@@ -103,6 +108,24 @@ def _copy_window_context(out, t):
             out.setdefault(key, t[key])
     if t.get("duration_s") is not None:
         out.setdefault("duration_s", t["duration_s"])
+    return out
+
+
+def _merge_transit_context(out, t):
+    # Fills an exoplanet's missing facts from the planner target (ADR-027
+    # pattern): the ExoClock event lives in the target's "transit" sub-dict
+    # and the Archive knows nothing about tonight. Never overwrites an
+    # Archive fact (setdefault only).
+    # @args: out - the data dict being built, t - planner target dict
+    # @return: out, same dict (mutated in place)
+    if t.get("transit") is not None:
+        out.setdefault("transit", t["transit"])
+    if t.get("mag") is not None:
+        out.setdefault("mag", t["mag"])
+    if out.get("ra") is None and t.get("ra_deg") is not None:
+        out["ra"] = t["ra_deg"]
+        out["dec"] = t.get("dec_deg")
+    _copy_window_context(out, t)
     return out
 
 

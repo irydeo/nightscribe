@@ -623,6 +623,127 @@ def test_sn_table_omits_missing_facts(panel):
     assert not any("descub" in p or "discover" in p for p in params), params
 
 
+# ---------------- object-card plan, subplan 3b: transit table --------
+#
+# Exoplanet transits get the table too: tonight's event (start, end,
+# depth, duration, telescope verdict) plus the planet's story in the
+# «in depth» rows. Data = Archive fields + the merged ExoClock event.
+
+def _transit_fixture():
+    import datetime
+    return {
+        "type": "exoplanet",
+        "name": "HD 209458 b",
+        "data": {
+            "pl_name": "HD 209458 b", "hostname": "HD 209458",
+            "pl_orbper": 3.5247, "pl_radj": 1.38, "pl_bmassj": 0.73,
+            "sy_dist": 48.3, "disc_year": 1999, "discoverymethod": "Transit",
+            "ra": 330.795, "dec": 18.884,
+            "transit": {
+                "ingress": datetime.datetime(2026, 9, 7, 22, 40,
+                                             tzinfo=datetime.timezone.utc),
+                "mid": datetime.datetime(2026, 9, 8, 0, 15,
+                                         tzinfo=datetime.timezone.utc),
+                "egress": datetime.datetime(2026, 9, 8, 1, 50,
+                                            tzinfo=datetime.timezone.utc),
+                "duration_h": 3.1, "depth_mmag": 16.4, "v_mag": 7.65,
+                "min_telescope_in": 6.0, "oc_min": -12.0,
+            },
+        },
+    }
+
+
+def test_transit_has_params_table(panel):
+    panel.show(_transit_fixture())
+    assert panel.state() == "ready"
+    assert not panel.grp_params.isHidden(), "transit must get a params table"
+    rows = _param_cells(panel)
+    assert all(len(r[2]) > 40 for r in rows), \
+        f"explanation column too short: {[r[2] for r in rows]!r}"
+    params = [r[0].lower() for r in rows]
+    assert any("tránsito" in p or "transit tonight" in p for p in params), params
+    assert any("profundidad" in p or "depth" in p for p in params), params
+    assert any("duración" in p or "duration" in p for p in params), params
+
+
+def test_transit_table_shows_start_end_and_depth(panel):
+    # the headline facts: when it starts (ingress), when it ends and
+    # how deep the dip is — in mmag and in % of flux
+    panel.show(_transit_fixture())
+    rows = _param_cells(panel)
+    when = next(r for r in rows if "UTC" in r[1])
+    assert "22:40" in when[1] and "01:50" in when[1], when[1]
+    depth = next(r for r in rows
+                 if "profundidad" in r[0].lower() or "depth" in r[0].lower())
+    assert "16.4" in depth[1], f"mmag missing: {depth[1]!r}"
+    assert "1.5%" in depth[1], f"flux % missing: {depth[1]!r}"
+
+
+def test_transit_table_telescope_verdict(panel):
+    # aperture 10″ vs minimum 6″: the verdict row says the user makes it
+    from nightscribe.config import config
+    saved = config.get("aperture_inches")
+    config._data["aperture_inches"] = 10.0
+    try:
+        panel.show(_transit_fixture())
+    finally:
+        config._data["aperture_inches"] = saved
+    rows = _param_cells(panel)
+    tel = next(r for r in rows
+               if "telescop" in r[0].lower() or "telescope" in r[0].lower())
+    assert "6″" in tel[1] and "10″" in tel[1], f"verdict value: {tel[1]!r}"
+    meaning = tel[2].lower()
+    assert ("llega" in meaning or "up to it" in meaning), meaning
+    assert not ("corto" in meaning or "falls short" in meaning), meaning
+
+
+def test_transit_table_telescope_verdict_short(panel):
+    # aperture 4″ vs minimum 6″: the verdict must say so, honestly
+    from nightscribe.config import config
+    saved = config.get("aperture_inches")
+    config._data["aperture_inches"] = 4.0
+    try:
+        panel.show(_transit_fixture())
+    finally:
+        config._data["aperture_inches"] = saved
+    rows = _param_cells(panel)
+    tel = next(r for r in rows
+               if "telescop" in r[0].lower() or "telescope" in r[0].lower())
+    meaning = tel[2].lower()
+    assert ("corto" in meaning or "falls short" in meaning), meaning
+
+
+def test_transit_table_deep_rows(panel):
+    # the planet's story lives under «in depth»: period, size, distance,
+    # discovery and the O-C drift (why tonight's timing matters)
+    panel.show(_transit_fixture())
+    basic = [r[0].lower() for r in _param_cells(panel)]
+    assert not any("o-c" in p or "deriva" in p for p in basic), basic
+    panel.chk_deep.setChecked(True)
+    deep = _param_cells(panel)
+    params = [r[0].lower() for r in deep]
+    assert any("año" in p or "year" in p for p in params), params
+    assert any("tamaño" in p or "size" in p for p in params), params
+    assert any("o-c" in p or "deriva" in p for p in params), params
+    oc = next(r for r in deep
+              if "o-c" in r[0].lower() or "deriva" in r[0].lower())
+    assert "-12" in oc[1], f"O-C value missing: {oc[1]!r}"
+
+
+def test_transit_table_without_event_shows_archive_only(panel):
+    # typed into Explore with no planner row: no «tonight» row, but the
+    # planet's story is still tabulated in the deep rows
+    fx = _transit_fixture()
+    del fx["data"]["transit"]
+    panel.show(fx)
+    rows = _param_cells(panel)
+    params = [r[0].lower() for r in rows]
+    assert not any("tránsito" in p or "transit tonight" in p
+                   for p in params), params
+    panel.chk_deep.setChecked(True)
+    assert _param_cells(panel), "archive-only transit table is empty"
+
+
 # ---------------- D3: capture / window block ----------------
 #
 # The block reads the project context snapshot (the numbers a capture plan

@@ -92,6 +92,11 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
   pública. Consultas: `query id <nombre>` (tipo, coordenadas, flujo V),
   `query around <nombre> radius=<r>` (candidatas a galaxia anfitriona con redshift
   vía `%RV`). TTL: 7 d.
+  Respaldo: ante un fallo de red el mismo script se reintenta una vez contra el
+  espejo de Harvard (`https://simbad.harvard.edu/simbad/sim-script`) — los
+  `query around` pesados superan con frecuencia el timeout de 40 s en Estrasburgo
+  mientras el espejo responde 3× más rápido (medido 2026-09); los scripts
+  `around` usan 60 s, los `id` 40 s.
 
 ### TNS (Transient Name Server) — `tns.py` — posiciones de transientes frescos
 

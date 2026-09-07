@@ -88,6 +88,11 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
 - `POST https://simbad.cds.unistra.fr/simbad/sim-script` — public script interface.
   Queries: `query id <name>` (otype, coordinates, V flux), `query around <name>
   radius=<r>` (host galaxy candidates with redshift via `%RV`). TTL: 7 d.
+  Fallback: on a network failure the same script is retried once against the
+  Harvard mirror (`https://simbad.harvard.edu/simbad/sim-script`) — heavy
+  `query around` scripts regularly exceed the 40 s read timeout on Strasbourg
+  while the mirror answers 3x faster (measured 2026-09); `around` scripts get
+  60 s, `id` scripts 40 s.
 
 ### TNS (Transient Name Server) — `tns.py` — freshest transient positions
 

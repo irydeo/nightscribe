@@ -60,15 +60,33 @@ def parse_sbdb(data):
     }
 
 
+def _fetch_one(sstr):
+    # @args: sstr - SBDB search string
+    # @return: (body bytes, content_type); raises on HTTP/network error
+    r = requests.get(URL, params={"sstr": sstr, "phys-par": "1",
+                                  "discovery": "1"}, timeout=30)
+    r.raise_for_status()
+    return r.content, "application/json"
+
+
 def get(name):
     # Fetches a small body (asteroid or comet) from JPL SBDB.
+    # SBDB's sstr resolver rejects full comet names with a parenthetical
+    # ("P/2020 G1 (Pimentel)" -> 400); on a 400 we retry once with the
+    # parenthetical part dropped, which resolves fine. The retried lookup
+    # gets its own cache key, so the retry only ever happens once.
     # @args: name - any designation ("Apophis", "2021EQ3", "29P")
     # @return: normalised dict or None
     def fetch():
-        r = requests.get(URL, params={"sstr": name, "phys-par": "1",
-                                      "discovery": "1"}, timeout=30)
-        r.raise_for_status()
-        return r.content, "application/json"
+        try:
+            return _fetch_one(name)
+        except requests.HTTPError as err:
+            short = name.split("(")[0].strip()
+            if (err.response is not None and err.response.status_code == 400
+                    and short and short != name):
+                logger.info("SBDB 400 for %s; retrying as %s", name, short)
+                return _fetch_one(short)
+            raise
     try:
         body, _ = db.http_get(f"sbdb:{name}", "sbdb", fetch)
         return parse_sbdb(json.loads(body.decode("utf-8", "replace")))

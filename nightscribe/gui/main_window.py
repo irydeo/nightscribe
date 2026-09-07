@@ -1640,6 +1640,10 @@ class MainWindow(QMainWindow):
         m_row.addWidget(btn_ccd_astrometry)
         m_row.addStretch()
         layout.addLayout(m_row)
+        lbl_ccd_coords = QLabel(self._ccd_coords_text(ctx, kind))
+        lbl_ccd_coords.setStyleSheet("color: #9aa0a6;")
+        lbl_ccd_coords.setWordWrap(True)
+        layout.addWidget(lbl_ccd_coords)
         self._project_widgets.update({
             "ccd_connect": btn_ccd_connect,
             "ccd_disconnect": btn_ccd_disconnect,
@@ -1654,6 +1658,7 @@ class MainWindow(QMainWindow):
             "ccd_start": btn_ccd_start,
             "ccd_goto": btn_ccd_goto,
             "ccd_sync": btn_ccd_astrometry,
+            "ccd_coords": lbl_ccd_coords,
         })
         self._ccd_apply_state()
         # NEO: also ephemeris export
@@ -1903,8 +1908,91 @@ class MainWindow(QMainWindow):
             cmb.setCurrentIndex(idx)
         cmb.blockSignals(False)
 
+    def _ccd_coords_text(self, ctx, kind):
+        # @args: ctx - project context, kind - project kind
+        # @return: label describing the freshness of the pointing coords:
+        #          moving kinds show the epoch of the last fresh computation
+        #          (or "from the plan" when never refreshed); fixed kinds
+        #          just say so.
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None:
+            return self.tr("This object has no coordinates yet.")
+        if kind in ("neo", "comet", "pccp"):
+            epoch = ctx.get("coords_epoch")
+            if epoch:
+                return self.tr("Position at %1 UT").replace("%1", epoch)
+            return self.tr("Position from the plan (not refreshed)")
+        return self.tr("Fixed coordinates")
+
+    def _ccd_update_coords_label(self):
+        # Refreshes the coords/epoch label from the current project context.
+        p = self._current_project
+        lbl = self._project_widgets.get("ccd_coords")
+        if not p or not lbl:
+            return
+        lbl.setText(self._ccd_coords_text(p.get("context") or {},
+                                          p.get("kind")))
+
+    def _ccd_point_action(self, slew_fn, ctx):
+        # Builds a CcdcielWorker action that resolves a fresh position for
+        # moving kinds (neo/comet/pccp) right before slewing, so the mount
+        # never points at a stale snapshot. Fixed kinds (sn/transit) use the
+        # stored coordinates. The action returns the position dict so the
+        # slot can update the project context and the freshness label.
+        # @args: slew_fn - c.slew_target or c.astrometry_goto,
+        #        ctx - project context dict
+        # @return: callable(Client) -> position dict
+        kind = self._current_project.get("kind")
+        obj_id = (ctx.get("id") or ctx.get("packed")
+                  or self._current_project["object_name"])
+        site = config.get("mpc_code", "Z41")
+        if kind in ("neo", "comet", "pccp"):
+            def action(c):
+                pos = ephemeris.position_at(obj_id, site,
+                                            fallback_target=ctx)
+                if pos is None:
+                    pos = {"ra_deg": ctx["ra_deg"], "dec_deg": ctx["dec_deg"],
+                           "epoch_iso": None, "source": "snapshot",
+                           "preliminary": False, "fell_back": True,
+                           "rate_arcsec_min": ctx.get("rate_arcsec_min")}
+                slew_fn(c, pos["ra_deg"], pos["dec_deg"])
+                return pos
+            return action
+        ra, dec = ctx["ra_deg"], ctx["dec_deg"]
+
+        def fixed(c):
+            slew_fn(c, ra, dec)
+            return {"ra_deg": ra, "dec_deg": dec, "source": "snapshot",
+                    "preliminary": False, "epoch_iso": None}
+        return fixed
+
+    def _ccd_apply_position(self, pos):
+        # Folds a fresh position into the project context and refreshes the
+        # coords/epoch label. The context is the single source the overview,
+        # sky chart and re-pointing all read.
+        # @args: pos - dict from position_at / the worker action
+        if not pos or not self._current_project:
+            return
+        p = self._current_project
+        upd = {"ra_deg": pos["ra_deg"], "dec_deg": pos["dec_deg"]}
+        if pos.get("epoch_iso"):
+            upd["coords_epoch"] = pos["epoch_iso"]
+        if pos.get("rate_arcsec_min") is not None:
+            upd["rate_arcsec_min"] = pos["rate_arcsec_min"]
+        if pos.get("source"):
+            upd["coords_source"] = pos["source"]
+        project.update_context(db, p["id"], upd)
+        p.setdefault("context", {}).update(upd)
+        self._ccd_update_coords_label()
+        if pos.get("fell_back"):
+            self.statusBar().showMessage(
+                self.tr("No fresh ephemeris; using the plan coordinates."),
+                8000)
+
     def _ccd_goto(self):
-        # Point the mount at the current object (async slew, waits to settle).
+        # Point the mount at the current object. Moving kinds get a fresh
+        # position resolved inside the worker (network off the GUI thread);
+        # the async slew then waits for Telescope_slewing to settle.
         ctx = self._current_project.get("context") or {}
         if ctx.get("ra_deg") is None:
             self.statusBar().showMessage(
@@ -1913,11 +2001,11 @@ class MainWindow(QMainWindow):
         w = self._project_widgets
         w["ccd_slew"].setText(self.tr("Slewing…"))
         w["ccd_goto"].setEnabled(False)
-        ra, dec = ctx["ra_deg"], ctx["dec_deg"]
-        self._ccd_run(self._ccd_on_goto, lambda c: c.slew_target(ra, dec),
-                      poll=True)
+        action = self._ccd_point_action(
+            lambda c, ra, dec: c.slew_target(ra, dec), ctx)
+        self._ccd_run(self._ccd_on_goto, action, poll=True)
 
-    def _ccd_on_goto(self, _result, error):
+    def _ccd_on_goto(self, result, error):
         w = self._project_widgets
         if w.get("ccd_goto"):
             w["ccd_goto"].setEnabled(True)
@@ -1926,30 +2014,34 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(error, 8000)
             return
         w["ccd_slew"].setText(self.tr("Idle"))
+        self._ccd_apply_position(result)
         self.statusBar().showMessage(
             self.tr("Telescope pointed at the object."), 5000)
 
     def _ccd_astrometry_goto(self):
         # Astrometric pointing at the current object: CCDciel slews,
-        # plate-solves and corrects. The client polls the running flag,
-        # so no mount-state polling is needed here.
+        # plate-solves and corrects. Moving kinds resolve a fresh position
+        # first (the plate solve absorbs any residual ephemeris error as
+        # long as the prediction lands inside the solve field). The client
+        # polls the running flag, so no mount-state polling is needed here.
         ctx = self._current_project.get("context") or {}
         if ctx.get("ra_deg") is None:
             self.statusBar().showMessage(
                 self.tr("This object has no coordinates yet."), 5000)
             return
-        ra, dec = ctx["ra_deg"], ctx["dec_deg"]
-        self._ccd_run(self._ccd_on_astrometry,
-                      lambda c: c.astrometry_goto(ra, dec), poll=False)
+        action = self._ccd_point_action(
+            lambda c, ra, dec: c.astrometry_goto(ra, dec), ctx)
+        self._ccd_run(self._ccd_on_astrometry, action, poll=False)
 
-    def _ccd_on_astrometry(self, _result, error):
-        # @args: _result - apparent coords the mount was told to point at
-        #        (unused here), error - error text
+    def _ccd_on_astrometry(self, result, error):
+        # @args: result - position dict the worker resolved (or None),
+        #        error - error text
         if error:
             self.statusBar().showMessage(error, 8000)
-        else:
-            self.statusBar().showMessage(
-                self.tr("Astrometric pointing finished."), 5000)
+            return
+        self._ccd_apply_position(result)
+        self.statusBar().showMessage(
+            self.tr("Astrometric pointing finished."), 5000)
 
     def _ccd_send_plan(self):
         # Stage the planned frames/exposure/filter inside CCDciel (Capture_set*).

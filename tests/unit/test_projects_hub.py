@@ -619,3 +619,116 @@ def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
         window._ccd_connected = False
         window._ccd_client = None
         window._ccd_filter_names = []
+
+
+# ---------------- fresh-ephemeris goto (moving targets) ----------------
+
+class _FakeScope:
+    # Records the slew/astrometry coordinates the mount was told to point at.
+    def __init__(self):
+        self.slew = None
+        self.astro = None
+
+    def slew_target(self, ra, dec):
+        self.slew = (ra, dec)
+        return ra / 15.0, dec
+
+    def astrometry_goto(self, ra, dec):
+        self.astro = (ra, dec)
+        return ra / 15.0, dec
+
+
+def test_coords_text_moving_not_refreshed(window):
+    txt = window._ccd_coords_text({"ra_deg": 10, "dec_deg": 20}, "neo")
+    assert txt == window.tr("Position from the plan (not refreshed)")
+
+
+def test_coords_text_moving_with_epoch(window):
+    txt = window._ccd_coords_text(
+        {"ra_deg": 10, "dec_deg": 20,
+         "coords_epoch": "2026-09-07 22:30:00"}, "comet")
+    assert "22:30:00" in txt
+
+
+def test_coords_text_fixed(window):
+    txt = window._ccd_coords_text({"ra_deg": 10, "dec_deg": 20}, "sn")
+    assert txt == window.tr("Fixed coordinates")
+
+
+def test_point_action_neo_resolves_fresh(window, panel, monkeypatch):
+    # A moving kind resolves a fresh position inside the worker action and
+    # slews to it (never to the stale snapshot).
+    import nightscribe.core.ephemeris as eph
+    fresh = {"ra_deg": 123.45, "dec_deg": -12.0, "rate_arcsec_min": 5.0,
+             "epoch_iso": "2026-09-07 22:30:00", "source": "horizons",
+             "preliminary": False}
+    monkeypatch.setattr(eph, "position_at",
+                        lambda name, site, when=None, fallback_target=None:
+                        fresh)
+    ctx = {"id": "2026AB", "ra_deg": 10.0, "dec_deg": 20.0, "kind": "neo",
+           "rate_arcsec_min": 4.0}
+    _create_and_select(window, "neo", "2026AB", ctx)
+    scope = _FakeScope()
+    action = window._ccd_point_action(
+        lambda c, ra, dec: c.slew_target(ra, dec),
+        window._current_project["context"])
+    pos = action(scope)
+    assert scope.slew == (123.45, -12.0)
+    assert pos["source"] == "horizons"
+
+
+def test_point_action_sn_uses_snapshot(window, panel, monkeypatch):
+    # A fixed kind never touches the network: it slews to the stored coords.
+    import nightscribe.core.ephemeris as eph
+    flag = {"pa": False}
+    monkeypatch.setattr(eph, "position_at",
+                        lambda *a, **k: flag.__setitem__("pa", True))
+    ctx = {"ra_deg": 50.0, "dec_deg": 10.0, "kind": "sn"}
+    _create_and_select(window, "sn", "SN2026x", ctx)
+    scope = _FakeScope()
+    action = window._ccd_point_action(
+        lambda c, ra, dec: c.slew_target(ra, dec),
+        window._current_project["context"])
+    pos = action(scope)
+    assert scope.slew == (50.0, 10.0)
+    assert pos["source"] == "snapshot"
+    assert flag["pa"] is False
+
+
+def test_point_action_neo_falls_back_to_snapshot(window, panel, monkeypatch):
+    # No fresh ephemeris available -> the snapshot is used, flagged so the
+    # UI can warn the observer.
+    import nightscribe.core.ephemeris as eph
+    monkeypatch.setattr(eph, "position_at",
+                        lambda *a, **k: None)
+    ctx = {"id": "PCCP1", "ra_deg": 80.0, "dec_deg": -5.0, "kind": "pccp"}
+    _create_and_select(window, "pccp", "PCCP1", ctx)
+    scope = _FakeScope()
+    action = window._ccd_point_action(
+        lambda c, ra, dec: c.slew_target(ra, dec),
+        window._current_project["context"])
+    pos = action(scope)
+    assert scope.slew == (80.0, -5.0)
+    assert pos["fell_back"] is True
+
+
+def test_apply_position_updates_context_and_label(window, panel):
+    # A fresh position folds into the project context and the coords label
+    # shows the new epoch.
+    ctx = {"id": "2026AB", "ra_deg": 10.0, "dec_deg": 20.0, "kind": "neo",
+           "rate_arcsec_min": 4.0}
+    _create_and_select(window, "neo", "2026AB", ctx)
+    window._ccd_apply_position(
+        {"ra_deg": 123.45, "dec_deg": -12.0, "rate_arcsec_min": 5.0,
+         "epoch_iso": "2026-09-07 22:30:00", "source": "horizons",
+         "preliminary": False})
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = project.get(dbmod.db, window._current_project["id"])
+    c = p["context"]
+    assert c["ra_deg"] == 123.45
+    assert c["dec_deg"] == -12.0
+    assert c["coords_epoch"] == "2026-09-07 22:30:00"
+    assert c["rate_arcsec_min"] == 5.0
+    assert c["coords_source"] == "horizons"
+    assert "22:30:00" in window._project_widgets["ccd_coords"].text()

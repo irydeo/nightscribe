@@ -484,3 +484,42 @@ shown kinds into a permanent whitelist preference in Settings.
 
 Each phase leaves the app working and ships its own tests. Do not mix phases in one
 commit without the previous one being verified.
+
+### 7septies. Unified object card (2026-09-07, ADR-031)
+
+Motivation: the object card only gave a parameters table to NEO/comet/PCCP;
+SNe and transits were left with hook + bullets, the table clipped long
+explanations, the coordinates were nowhere to be seen, "Discovered" did not
+apply to NEOs and the ADR-015 aperture filter was never implemented. Plan:
+`docs/PLANS/object-card.md` (branch `feature/object-card`).
+
+**What changes** (one subplan = one commit):
+
+0. **Copyable coordinates**: block under the hook with RA/Dec in decimal and
+   sexagesimal + a "Copy" button (`_coords_from`: same source chain as the
+   sky chart).
+1. **Multi-line table**: wordWrap + row auto-height that follows the stretch
+   column on resizes (beware: `sectionResized` fires before `columnWidth()`
+   updates — the handler forces the notified width first).
+2. **SN table**: `orbits.explain_transient` (type, host galaxy, distance,
+   brightness, discovery; redshift in depth).
+3. **Transit card**: bug fixed — the exoplanet branch of `enrich` used to
+   lose the ExoClock event; it is now merged with the ADR-027 pattern.
+   `orbits.explain_transit` table with start/end UTC, depth (mmag and %),
+   duration and the **minimum telescope vs. your aperture verdict**.
+4. **Per-kind chips with one grammar**: SN gains event type and freshness
+   ("N d", green when ≤14 days); transit gains depth Δmmag.
+5. **Exact "Discovered" for NEOs and PCCPs**: SBDB `discovery=1` (fallback
+   `first_obs`), NEOfixer `/orbit/` for NEOCP, PCCP maps its own column.
+   Parallel pool of 4 + 7-day cache. New single `core/dates.py`.
+6. **Hard aperture gate for transits**: `transits_tonight(aperture_in=)` +
+   `transit_scope_filter` toggle in Settings > Observing (on by default; no
+   ExoClock datum means no discard — ADR-025 spirit).
+
+**Status**: subplans 0-6 done; unit suite green (555). Commits: `72d66ee`
+(plan), `b163f6c`, `376a23c`+`67ceadf`, `02c05bf`, `3412c3c`, `8c4c336`,
+`afab280`, `03290ea` + the i18n/docs closing commit.
+
+**i18n note**: the `lupdate` command documented in CONTRIBUTING now includes
+`gui/widgets/*.py` — without it lupdate marks live chart-widget strings as
+"vanished" and the i18n tests fail on regeneration.

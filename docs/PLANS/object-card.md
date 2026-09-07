@@ -1,5 +1,11 @@
 # Plan — Ficha de objeto: enriquecer, unificar y pulir
 
+> **CERRADO (2026-09-07)** — los 8 subplanes (0-7) están implementados y a
+> commit en `feature/object-card` (`b163f6c`, `376a23c`+`67ceadf`, `02c05bf`,
+> `3412c3c`, `8c4c336`, `afab280`, `03290ea` + cierre i18n/docs). Suite
+> unitaria verde (555). ADR-031 recoge la decisión. Este documento queda como
+> registro de diseño.
+
 **rama**: `feature/object-card` (derivada de `dev/v0.1`)
 **arranca sobre**: `b0693c4` (dev/v0.1 al día con origin)
 **fecha**: 2026-09-07 · **autor**: FJC (con la IA)

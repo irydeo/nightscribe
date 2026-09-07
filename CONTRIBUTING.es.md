@@ -21,7 +21,10 @@
 
 ```bash
 # nota: lista las fuentes explícitamente — escanear el directorio omitiría los .py
-pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/ui/*.ui \
+# (y las cartas vectoriales viven en gui/widgets/ — si las dejas fuera,
+# lupdate marca sus cadenas "vanished" y los tests de i18n fallan)
+pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
+    nightscribe/gui/ui/*.ui \
     -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # traduce

@@ -21,7 +21,10 @@ Thanks for your interest! These rules keep the project maintainable by humans.
 
 ```bash
 # note: list sources explicitly — scanning the directory silently skips .py files
-pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/ui/*.ui \
+# (and the chart widgets live in gui/widgets/ — leaving them out makes
+# lupdate mark their strings "vanished" and the i18n tests fail)
+pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
+    nightscribe/gui/ui/*.ui \
     -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # translate

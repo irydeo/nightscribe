@@ -31,3 +31,9 @@
 | [023](ADR-023-neocp-preliminary-orbits.md) | Órbitas preliminares NEOCP vía NEOfixer /orbit/ / NEOCP preliminary orbits via NEOfixer |
 | [024](ADR-024-post-references-resources.md) | Post autocontenido: el markdown referencia gráficos y blink / self-contained post: markdown references charts & blink |
 | [025](ADR-025-mag-limit-hybrid.md) | Magnitud límite híbrida: duro donde se mide, aviso donde se predice / hybrid limiting mag: hard where measured, warned where predicted |
+| [026](ADR-026-dark-global-theme.md) | Tema oscuro global: una hoja de estilos, una paleta / dark global theme: one stylesheet, one palette |
+| [027](ADR-027-panel-context-fallback.md) | Ficha con contexto del planner: la historia no depende de SIMBAD/SBDB / panel context fallback: the story does not depend on SIMBAD/SBDB |
+| [028](ADR-028-settings-tabs.md) | Configuración en cuatro pestañas / settings as four tabs |
+| [029](ADR-029-qt-view-widgets.md) | Cartas vectoriales en la GUI (QGraphics, sin matplotlib) / vector chart widgets (QGraphics, no matplotlib) |
+| [030](ADR-030-ccdciel-json-rpc.md) | Integración en vivo con CCDciel (JSON-RPC) / CCDciel live integration (JSON-RPC) |
+| [031](ADR-031-object-card-unification.md) | Ficha de objeto unificada: coords copiables, tabla multilínea y por tipo, «Discovered» en NEOs, filtro de apertura / unified object card: copyable coords, per-type multi-line table, NEO "Discovered", aperture gate |

@@ -544,3 +544,42 @@ Suite verde: unit 389, functional 42 (+1 skip).
 
 Cada fase deja la app funcional e incluye sus tests. No mezclar fases en un mismo
 commit sin que la anterior esté verificada.
+
+### 7septies. Ficha de objeto unificada (2026-09-07, ADR-031)
+
+Motivación: la ficha solo daba tabla de parámetros a NEO/cometa/PCCP; SN y
+tránsitos se quedaban en hook + bullets, la tabla cortaba las explicaciones
+largas, las coordenadas no se veían, «Discovered» no aplicaba a NEOs y el
+filtro de apertura de ADR-015 nunca se había implementado. Plan:
+`docs/PLANS/object-card.md` (rama `feature/object-card`).
+
+**Qué cambia** (un subplan = un commit):
+
+0. **Coordenadas copiables**: bloque bajo el hook con AR/Dec en decimal y
+   sexagesimal + botón «Copiar» (`_coords_from`: misma cadena de fuentes que
+   la carta de cielo).
+1. **Tabla multilínea**: wordWrap + auto-alto de fila que sigue a la columna
+   elástica al redimensionar (ojo: `sectionResized` llega antes de que
+   `columnWidth()` se actualice — el handler fuerza el ancho notificado).
+2. **Tabla para SN**: `orbits.explain_transient` (tipo, galaxia, distancia,
+   brillo, descubrimiento; z a fondo).
+3. **Ficha de tránsitos**: bug arreglado — la rama exoplanet de `enrich`
+   pierde el evento ExoClock; ahora se fusiona con el patrón ADR-027. Tabla
+   `orbits.explain_transit` con inicio/fin UTC, profundidad (mmag y %),
+   duración y **veredicto telescopio mínimo vs. tu apertura**.
+4. **Chips por tipo con la misma gramática**: SN gana tipo y frescura
+   («N d», verde si ≤14 días); tránsito gana profundidad Δmmag.
+5. **«Discovered» exacto en NEOs y PCCP**: SBDB `discovery=1` (fallback
+   `first_obs`), NEOfixer `/orbit/` para NEOCP, PCCP mapea su propia columna.
+   Pool paralelo de 4 + caché 7 días. Nuevo `core/dates.py` único.
+6. **Filtro duro de apertura en tránsitos**: `transits_tonight(aperture_in=)`
+   + interruptor `transit_scope_filter` en Configuración > Observación
+   (activado por defecto; sin dato ExoClock no se descarta — ADR-025).
+
+**Estado**: subplanes 0-6 hechos; suite unitaria verde (555). Commits:
+`72d66ee` (plan), `b163f6c`, `376a23c`+`67ceadf`, `02c05bf`, `3412c3c`,
+`8c4c336`, `afab280`, `03290ea` + cierre i18n/docs.
+
+**Nota i18n**: el comando `lupdate` documentado en CONTRIBUTING ahora incluye
+`gui/widgets/*.py` — sin él, lupdate marca «vanished» cadenas vivas de las
+cartas vectoriales y los tests de i18n fallan al regenerar.

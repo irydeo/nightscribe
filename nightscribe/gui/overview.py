@@ -33,7 +33,8 @@
 
 import datetime
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import (QEvent, QObject, QT_TRANSLATE_NOOP, Qt,
+                            Signal)
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QCheckBox, QFrame, QGroupBox,
                                 QHBoxLayout, QLabel, QHeaderView, QPushButton,
@@ -44,10 +45,13 @@ from ..core import exposure, narrative, orbits
 from .. import paths
 from . import theme
 
-# Viewer / slot titles, translated at the point of use.
-_TITLE = {"orbit": "Orbit", "sky": "Sky tonight",
-          "approach": "Approach",
-          "field": "Reference field", "transit": "Light curve"}
+# Viewer / slot titles, translated at the point of use (tr() at the tab
+# site; QT_TRANSLATE_NOOP marks them here so lupdate can see them).
+_TITLE = {"orbit": QT_TRANSLATE_NOOP("ObjectPanel", "Orbit"),
+          "sky": QT_TRANSLATE_NOOP("ObjectPanel", "Sky tonight"),
+          "approach": QT_TRANSLATE_NOOP("ObjectPanel", "Approach"),
+          "field": QT_TRANSLATE_NOOP("ObjectPanel", "Reference field"),
+          "transit": QT_TRANSLATE_NOOP("ObjectPanel", "Light curve")}
 
 # Grid order, left to right; the ones build_charts actually produced are
 # laid out in this order (the rest stay hidden).

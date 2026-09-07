@@ -14,6 +14,7 @@
 import csv
 import datetime
 import logging
+import math
 from pathlib import Path
 
 from . import coords, ephem_minor
@@ -227,3 +228,177 @@ def export(rows, out, fmt="csv", obj_name=""):
     if fmt == "cdc":
         return export_cdc(rows, out.with_suffix(".txt"), obj_name)
     return export_csv(rows, out.with_suffix(".csv"), obj_name)
+
+
+# ---------------- fresh position for moving targets (goto) ---------------
+
+def _floor_30min(dt):
+    # @args: dt - aware UTC datetime
+    # @return: dt floored to the nearest half-hour boundary (cache key stays
+    #          stable for repeated gotos within 30 min)
+    return dt.replace(second=0, microsecond=0,
+                      minute=(dt.minute // 30) * 30)
+
+
+def _iso(when):
+    # @args: when - datetime
+    # @return: "YYYY-MM-DD HH:MM:SS" UTC string
+    return when.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def _row_jd(row):
+    # @args: row - Horizons-style row with "time" "YYYY-Mon-DD HH:MM"
+    # @return: Julian date (float) or None on parse error
+    try:
+        t = datetime.datetime.strptime(row["time"], "%Y-%b-%d %H:%M")
+        return coords.jd_from_datetime(
+            t.replace(tzinfo=datetime.timezone.utc))
+    except (ValueError, KeyError):
+        return None
+
+
+def _motion(j0, ra0, dec0, j1, ra1, dec1):
+    # Apparent angular rate (arcsec/min) and position angle (deg, east of
+    # north) of the motion between two positions. RA is expected already
+    # unwrapped across the 0h/24h seam.
+    # @return: (rate_arcsec_min, pa_deg)
+    dt_min = (j1 - j0) * 1440.0
+    if dt_min <= 0:
+        return 0.0, 0.0
+    dra = ra1 - ra0
+    ddec = dec1 - dec0
+    dec_mid = math.radians((dec0 + dec1) / 2.0)
+    rate = math.hypot(dra * math.cos(dec_mid), ddec) * 3600.0 / dt_min
+    pa = math.degrees(math.atan2(dra * math.cos(dec_mid), ddec)) % 360.0
+    return rate, pa
+
+
+def _interpolate(rows, jd):
+    # Linear interpolation of (ra_deg, dec_deg) to jd between the two
+    # bracketing rows (RA unwrapped at the 0h/24h seam); the apparent rate
+    # and PA come from the same pair.
+    # @args: rows - Horizons rows (time/ra/dec), jd - target instant
+    # @return: {ra_deg, dec_deg, rate_arcsec_min, pa_deg} or None
+    pts = []
+    for r in rows:
+        j = _row_jd(r)
+        if j is None:
+            continue
+        try:
+            ra = coords.ra_hms_to_deg(r["ra"])
+            dec = coords.dec_dms_to_deg(r["dec"])
+        except (ValueError, KeyError):
+            continue
+        pts.append((j, ra, dec))
+    if not pts:
+        return None
+    pts.sort()
+    n = len(pts)
+    if n == 1:
+        return {"ra_deg": pts[0][1] % 360, "dec_deg": pts[0][2],
+                "rate_arcsec_min": 0.0, "pa_deg": 0.0}
+    if jd <= pts[0][0]:
+        i, frac = 0, 0.0
+    elif jd >= pts[-1][0]:
+        i, frac = n - 2, 1.0
+    else:
+        i = next(k for k in range(n - 1)
+                 if pts[k][0] <= jd <= pts[k + 1][0])
+        span = pts[i + 1][0] - pts[i][0]
+        frac = (jd - pts[i][0]) / span if span else 0.0
+    j0, ra0, dec0 = pts[i]
+    j1, ra1, dec1 = pts[i + 1]
+    dra = ra1 - ra0
+    if dra > 180:
+        dra -= 360
+    elif dra < -180:
+        dra += 360
+    ra = (ra0 + frac * dra) % 360
+    dec = dec0 + frac * (dec1 - dec0)
+    rate, pa = _motion(j0, ra0, dec0, j1, ra0 + dra, dec1)
+    return {"ra_deg": ra, "dec_deg": dec,
+            "rate_arcsec_min": rate, "pa_deg": pa}
+
+
+def _kepler_at(elements, jd):
+    # Local two-body propagation: position at jd plus a numerical rate from
+    # a +1 h delta. RA is unwrapped before differencing so the rate does not
+    # spike across the 0h/24h seam.
+    # @return: {ra_deg, dec_deg, rate_arcsec_min, pa_deg} or None
+    p0 = ephem_minor.kepler_ra_dec(elements, jd)
+    if not p0:
+        return None
+    ra0, dec0 = p0[0], p0[1]
+    dh = 1.0 / 24.0
+    p1 = ephem_minor.kepler_ra_dec(elements, jd + dh)
+    if not p1:
+        return {"ra_deg": ra0 % 360, "dec_deg": dec0,
+                "rate_arcsec_min": 0.0, "pa_deg": 0.0}
+    ra1, dec1 = p1[0], p1[1]
+    dra = ra1 - ra0
+    if dra > 180:
+        dra -= 360
+    elif dra < -180:
+        dra += 360
+    rate, pa = _motion(jd, ra0, dec0, jd + dh, ra0 + dra, dec1)
+    return {"ra_deg": ra0 % 360, "dec_deg": dec0,
+            "rate_arcsec_min": rate, "pa_deg": pa}
+
+
+def _horizons_fine_rows(name, site, when):
+    # Horizons ephemeris at a 2-min step over a ±2 h window around `when`,
+    # rounded to a 30-min boundary so the cache key is reusable.
+    # @return: list of Horizons rows (see horizons.parse_ephemeris)
+    from .sources import horizons
+    start = _floor_30min(when - datetime.timedelta(hours=2))
+    stop = start + datetime.timedelta(hours=4)
+    return horizons.ephemeris(
+        name, center=site,
+        start=start.strftime("%Y-%m-%d %H:%M"),
+        stop=stop.strftime("%Y-%m-%d %H:%M"),
+        step="2m")
+
+
+def position_at(name, site, when=None, fallback_target=None):
+    # Geocentric J2000 RA/Dec of a minor body at a given instant, resolved
+    # fresh so a goto never points at a stale snapshot of a moving target.
+    # Horizons is queried at a fine step and the two rows bracketing `when`
+    # are linearly interpolated. When Horizons knows nothing of the object
+    # (unconfirmed NEOCP), the position is propagated locally with Kepler:
+    # SBDB elements first, then the preliminary NEOfixer orbit.
+    # @args: name - Horizons designation / packed / name, site - MPC code,
+    #        when - UTC datetime (default now),
+    #        fallback_target - planner dict (packed/id) for NEOCP fallback
+    # @return: dict {ra_deg, dec_deg, rate_arcsec_min, pa_deg, epoch_iso,
+    #          source, preliminary} or None when no source resolves
+    when = when or datetime.datetime.now(datetime.timezone.utc)
+    jd = coords.jd_from_datetime(when)
+    rows = _horizons_fine_rows(name, site, when)
+    if rows:
+        out = _interpolate(rows, jd)
+        if out:
+            out["source"] = "horizons"
+            out["preliminary"] = bool(rows[0].get("preliminary"))
+            out["epoch_iso"] = _iso(when)
+            return out
+    from .sources import sbdb
+    body = sbdb.get(name)
+    if body and body.get("elements"):
+        out = _kepler_at(body["elements"], jd)
+        if out:
+            out["source"] = "kepler:sbdb"
+            out["preliminary"] = False
+            out["epoch_iso"] = _iso(when)
+            return out
+    from .sources import neofixer
+    packed = (fallback_target or {}).get("packed") \
+        or (fallback_target or {}).get("id") or name
+    orb = neofixer.orbit(packed)
+    if orb and orb.get("elements"):
+        out = _kepler_at(orb["elements"], jd)
+        if out:
+            out["source"] = "kepler:neofixer"
+            out["preliminary"] = True
+            out["epoch_iso"] = _iso(when)
+            return out
+    return None

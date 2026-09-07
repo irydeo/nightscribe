@@ -80,6 +80,12 @@ _MIN_READ_H = 640     # minimum usable height (px)
 _DLG_CHROME = 60      # title bar / frame / margins headroom (px)
 
 
+# Width cap for the Parameter/Value columns (object-card plan, subplan
+# 1): without it a long value steals the room the multi-line
+# "What it means" column needs.
+_PARAM_COL_MAX_W = 280
+
+
 # Resizes `parent` so the `panel` fits its content, keeping it wide and
 # tall enough to read and to show the whole panel (CTA included). Used by
 # the Explore dialog and tested in isolation.
@@ -251,9 +257,12 @@ class ObjectPanel(QWidget):
         tbl.setEditTriggers(QTableWidget.NoEditTriggers)
         tbl.setSelectionBehavior(QTableWidget.SelectRows)
         tbl.setSelectionMode(QTableWidget.SingleSelection)
+        # multi-line cells (object-card plan, subplan 1): the explanation
+        # wraps and the row grows — no more vertically clipped text
+        tbl.setWordWrap(True)
         hdr = tbl.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(0, QHeaderView.Interactive)
+        hdr.setSectionResizeMode(1, QHeaderView.Interactive)
         hdr.setSectionResizeMode(2, QHeaderView.Stretch)
         tbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         gl.addWidget(tbl)
@@ -960,3 +969,10 @@ class ObjectPanel(QWidget):
             tbl.setItem(row, 0, QTableWidgetItem(param))
             tbl.setItem(row, 1, QTableWidgetItem(str(r["value"])))
             tbl.setItem(row, 2, QTableWidgetItem(self._txt(r)))
+        # fit the columns to their content, cap Parameter/Value so the
+        # explanation keeps its air, then grow the rows for wrapped text
+        tbl.resizeColumnsToContents()
+        for col in (0, 1):
+            if tbl.columnWidth(col) > _PARAM_COL_MAX_W:
+                tbl.setColumnWidth(col, _PARAM_COL_MAX_W)
+        tbl.resizeRowsToContents()

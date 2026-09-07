@@ -459,6 +459,43 @@ def test_coords_block_simbad_fallback(panel):
     assert f"{dec_deg:+.5f}°" in txt, f"SIMBAD Dec not rendered: {txt!r}"
 
 
+# ---------------- object-card plan, subplan 1: multi-line table ------
+#
+# The "What it means" column wraps and the rows grow to fit the whole
+# explanation (no more vertical clipping); Parameter/Value are capped
+# so a long value cannot starve the explanation column.
+
+def test_params_table_wraps_long_explanations(panel):
+    panel.show(FAKE_ELEMENT)
+    tbl = panel.tbl_params
+    assert tbl.wordWrap(), "word wrap must be on for the params table"
+    default_h = tbl.verticalHeader().defaultSectionSize()
+    heights = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
+    assert max(heights) > default_h, \
+        f"no row grew for a long explanation: {heights} (default {default_h})"
+
+
+def test_params_table_column_width_capped(panel):
+    from nightscribe.gui.overview import _PARAM_COL_MAX_W
+    panel.show(FAKE_ELEMENT)
+    tbl = panel.tbl_params
+    for col in (0, 1):
+        assert tbl.columnWidth(col) <= _PARAM_COL_MAX_W, \
+            f"column {col} is {tbl.columnWidth(col)} > {_PARAM_COL_MAX_W}"
+
+
+def test_params_table_rewraps_on_in_depth_toggle(panel):
+    # toggling «in depth» refills the table: the wrap/resize must run
+    # again so the longer deep explanations are not clipped either
+    panel.show(FAKE_ELEMENT)
+    panel.chk_deep.setChecked(True)
+    tbl = panel.tbl_params
+    default_h = tbl.verticalHeader().defaultSectionSize()
+    heights = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
+    assert max(heights) > default_h, \
+        f"deep rows clipped after toggle: {heights} (default {default_h})"
+
+
 # ---------------- D3: capture / window block ----------------
 #
 # The block reads the project context snapshot (the numbers a capture plan

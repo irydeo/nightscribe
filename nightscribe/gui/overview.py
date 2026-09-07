@@ -612,6 +612,8 @@ class ObjectPanel(QWidget):
                                            arc_days=sb.get("arc_days"))
         if d.get("unconfirmed"):
             return orbits.explain_neofixer(d["unconfirmed"])
+        if e.get("type") == "transient":
+            return orbits.explain_transient(d)
         return []
 
     # ---------------- charts (D2, ADR-029) ----------------

@@ -535,6 +535,94 @@ def test_params_table_rows_follow_window_resize(panel, qapp):
         f"rows did not shrink back on grow: {narrow} -> {wider}"
 
 
+# ---------------- object-card plan, subplan 2: SN parameters table ---
+#
+# Supernovae get the same parameters table the small bodies already
+# had (orbits.explain_transient): event type, host galaxy, distance,
+# brightness, discovery date — redshift under the «in depth» toggle.
+
+def _sn_full_fixture():
+    # A supernova with everything the panel can tabulate (SIMBAD +
+    # the ADR-027 planner-context merge already applied).
+    return {
+        "type": "transient",
+        "name": "2026ziz",
+        "data": {
+            "simbad": {"otype": "SN Ia", "ra": "14 03 38.6",
+                       "dec": "+54 18 42.0", "vmag": 14.2, "z": 0.0114},
+            "host": {"name": "NGC 5908", "z": 0.0114},
+            "dist_mly": 121.0,
+            "disc_date": "2026/08/30",
+        },
+    }
+
+
+def test_sn_has_params_table(panel):
+    panel.show(_sn_full_fixture())
+    assert panel.state() == "ready"
+    assert not panel.grp_params.isHidden(), "SN must get a params table"
+    rows = _param_cells(panel)
+    assert len(rows) >= 4, f"expected ≥4 SN rows, got {len(rows)}"
+    # every explanation is a real sentence, in whichever language is on
+    assert all(len(r[2]) > 40 for r in rows), \
+        f"explanation column too short: {[r[2] for r in rows]!r}"
+    params = [r[0].lower() for r in rows]
+    assert any("tipo" in p or "type" in p for p in params), params
+    assert any("galaxia" in p or "host" in p for p in params), params
+    assert any("distancia" in p or "distance" in p for p in params), params
+    assert any("descub" in p or "discover" in p for p in params), params
+
+
+def test_sn_table_explains_the_event_type(panel):
+    # the Ia row must translate the jargon, not just repeat it
+    panel.show(_sn_full_fixture())
+    rows = _param_cells(panel)
+    typerow = next(r for r in rows if "SN Ia" in r[1])
+    meaning = typerow[2].lower()
+    assert "enana blanca" in meaning or "white dwarf" in meaning, meaning
+    assert "vela" in meaning or "candle" in meaning, meaning
+
+
+def test_sn_table_redshift_is_deep_only(panel):
+    panel.show(_sn_full_fixture())
+    basic = [r[0].lower() for r in _param_cells(panel)]
+    assert not any("redshift" in p or "corrimiento" in p for p in basic), \
+        f"redshift leaked into the basic view: {basic}"
+    panel.chk_deep.setChecked(True)
+    deep = _param_cells(panel)
+    zrow = next((r for r in deep
+                 if "redshift" in r[0].lower()
+                 or "corrimiento" in r[0].lower()), None)
+    assert zrow is not None, "no redshift row after the in-depth toggle"
+    assert "0.0114" in zrow[1], f"redshift value missing: {zrow[1]!r}"
+
+
+def test_sn_table_from_context_only(panel):
+    # ADR-027 fallback: SIMBAD silent, the planner context carries
+    # type/mag/date — the table must still tell the story.
+    fx = {"type": "transient", "name": "2026zzz",
+          "data": {"otype": "II", "mag": 16.7, "disc_date": "2026-09-01",
+                   "host": {"name": "UGC 11852"}}}
+    panel.show(fx)
+    rows = _param_cells(panel)
+    assert len(rows) >= 4, f"context-only SN too thin: {rows!r}"
+    typerow = next(r for r in rows if r[1] == "II")
+    assert "masiva" in typerow[2].lower() or "massive" in typerow[2].lower()
+
+
+def test_sn_table_omits_missing_facts(panel):
+    # a minimal fixture (host name only) must not raise and shows only
+    # what exists — the «omit what is missing» rule
+    fx = {"type": "transient", "name": "2026zzz",
+          "data": {"host": {"name": "NGC 5908"}}}
+    panel.show(fx)
+    rows = _param_cells(panel)
+    params = [r[0].lower() for r in rows]
+    assert any("galaxia" in p or "host" in p for p in params), params
+    assert not any("distancia" in p or "distance" in p for p in params), params
+    assert not any("descub" in p or "discover" in p for p in params), params
+
+
 # ---------------- D3: capture / window block ----------------
 #
 # The block reads the project context snapshot (the numbers a capture plan

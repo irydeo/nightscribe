@@ -450,3 +450,154 @@ def explain_neofixer(t):
             "es": "Mínimo acercamiento teórico entre su órbita y la terrestre, aún por confirmar.",
             "en": "Minimum theoretical approach between its orbit and Earth's, still to be confirmed."})
     return out
+
+
+# ---------------- Transient (supernova) interpreter ----------------
+# (object-card plan, subplan 2: the SN card gets the same parameters
+# table the small bodies already had)
+
+def _sn_type_text(otype):
+    # @args: otype - SIMBAD/Rochester type string ("SN Ia", "II", ...)
+    # @return: {"es","en"} explaining the kind of explosion
+    t = (otype or "").strip().lower()
+    t = t[2:].strip() if t.startswith("sn") else t
+    if t.startswith("ia"):
+        return {"es": "una enana blanca que estalló por fusión termonuclear "
+                      "descontrolada: su brillo es tan uniforme que las usamos "
+                      "de «velas estándar» para medir distancias",
+                "en": "a white dwarf blown up by runaway thermonuclear "
+                      "fusion: their brightness is so uniform we use them as "
+                      "'standard candles' to measure distances"}
+    if t.startswith("ib") or t.startswith("ic"):
+        return {"es": "el colapso de una estrella masiva que ya había perdido "
+                      "su envoltura de hidrógeno (y quizá de helio)",
+                "en": "the collapse of a massive star that had already shed "
+                      "its hydrogen (and maybe helium) envelope"}
+    if t.startswith("ii"):
+        return {"es": "el colapso de una estrella masiva que conservaba su "
+                      "hidrógeno: la muerte clásica de una gigante",
+                "en": "the collapse of a massive star that kept its "
+                      "hydrogen: the classic death of a giant"}
+    if t.startswith("i"):
+        return {"es": "el colapso de una estrella masiva sin rastro de "
+                      "hidrógeno en su luz",
+                "en": "the collapse of a massive star with no hydrogen left "
+                      "in its light"}
+    if t.startswith(("cv", "nova")):
+        return {"es": "no una supernova sino una nova: una erupción en la "
+                      "superficie de una enana blanca, mucho más tenue",
+                "en": "not a supernova but a nova: an eruption on a white "
+                      "dwarf's surface, far fainter"}
+    return {"es": "una explosión estelar cuyo tipo exacto aún se está "
+                  "clasificando (de ahí el nombre genérico)",
+            "en": "a stellar explosion whose exact type is still being "
+                  "classified (hence the generic name)"}
+
+
+def _days_since(date_str):
+    # @args: date_str - "YYYY/MM/DD" or "YYYY-MM-DD"
+    # @return: whole days from that date to today, or None if unparseable
+    import datetime as _dt
+    try:
+        d = _dt.date.fromisoformat(date_str.strip().replace("/", "-"))
+    except (ValueError, AttributeError):
+        return None
+    return (_dt.date.today() - d).days
+
+
+def explain_transient(d):
+    # Interprets what we know about a supernova/transient: event type, host
+    # galaxy, distance, redshift, current brightness, discovery date.
+    # @args: d - the enriched data dict (enrich._enrich_transient shape,
+    #        with the ADR-027 planner-context merge already applied)
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    sim = d.get("simbad") or {}
+    host = d.get("host") or {}
+
+    otype = (sim.get("otype") or d.get("otype") or "").strip()
+    if otype:
+        kind = _sn_type_text(otype)
+        out.append({
+            "param": {"es": "Tipo de evento", "en": "Event type"},
+            "value": otype, "level": "basic",
+            "es": f"Es {kind['es']}.",
+            "en": f"It is {kind['en']}."})
+
+    hname = host.get("name") if isinstance(host, dict) else None
+    if hname:
+        out.append({
+            "param": {"es": "Galaxia anfitriona", "en": "Host galaxy"},
+            "value": str(hname), "level": "basic",
+            "es": "La supernova no vive sola: explotó dentro de esta galaxia. "
+                  "En tus imágenes la verás como un puntito de luz nuevo junto "
+                  "a ella (o dentro).",
+            "en": "The supernova does not live alone: it exploded inside this "
+                  "galaxy. In your images it shows as a new pinpoint of light "
+                  "next to it (or within it)."})
+
+    dist = d.get("dist_mly")
+    if dist:
+        out.append({
+            "param": {"es": "Distancia", "en": "Distance"},
+            "value": f"{dist:.0f} Mly", "level": "basic",
+            "es": f"Su luz salió de viaje hace {dist:.0f} millones de años: "
+                  "la estrella que ves explotar murió cuando aquí aún no "
+                  "existía nada parecido a nosotros.",
+            "en": f"Its light set off {dist:.0f} million years ago: the star "
+                  "you see exploding died long before anything like us walked "
+                  "the Earth."})
+
+    mag = d.get("mag")
+    if mag is None:
+        mag = sim.get("vmag")
+    if mag is not None:
+        try:
+            mag = float(mag)
+        except (TypeError, ValueError):
+            mag = None
+    if mag is not None:
+        out.append({
+            "param": {"es": "Brillo actual", "en": "Current brightness"},
+            "value": f"{mag:.1f} mag", "level": "basic",
+            "es": f"Magnitud {mag:.1f}: cuanto menor el número, más fácil la "
+                  "captura. Las supernovas se desvanecen en semanas — cada "
+                  "noche cuenta para la curva de luz.",
+            "en": f"Magnitude {mag:.1f}: the lower the number, the easier the "
+                  "catch. Supernovae fade away over weeks — every night counts "
+                  "for the light curve."})
+
+    disc = (d.get("disc_date") or "").strip()
+    if disc:
+        days = _days_since(disc)
+        ago_es = f" — hace {days} días" if days is not None and days >= 0 else ""
+        ago_en = f" — {days} days ago" if days is not None and days >= 0 else ""
+        out.append({
+            "param": {"es": "Descubierta", "en": "Discovered"},
+            "value": disc, "level": "basic",
+            "es": f"Fecha de descubrimiento{ago_es}. Cuanto más joven la "
+                  "supernova, más valioso es medirla: la curva temprana dice "
+                  "cómo era la estrella que explotó.",
+            "en": f"Discovery date{ago_en}. The younger the supernova, the "
+                  "more valuable your measurement: the early curve tells what "
+                  "the exploded star was like."})
+
+    z = host.get("z") if isinstance(host, dict) else None
+    if z is None:
+        z = sim.get("z")
+    if z is not None:
+        try:
+            z = float(z)
+        except (TypeError, ValueError):
+            z = None
+    if z is not None:
+        out.append({
+            "param": {"es": "Corrimiento al rojo (z)", "en": "Redshift (z)"},
+            "value": f"z = {z:.4f}", "level": "deep",
+            "es": "La expansión del universo estira su luz un "
+                  f"{z*100:.2f}%. De ese estiramiento sale la distancia de "
+                  "la galaxia anfitriona.",
+            "en": "The expansion of the universe stretches its light by "
+                  f"{z*100:.2f}%. The host galaxy's distance comes from that "
+                  "stretching."})
+    return out

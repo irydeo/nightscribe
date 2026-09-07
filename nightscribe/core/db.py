@@ -163,8 +163,17 @@ def _migrate(conn):
 class Database:
     # Single SQLite access point: HTTP cache plus the observatory's own
     # observation history. Everything persistent lives here (see ADR-002).
+    #
+    # The connection is shared with the planner's thread pools (comets,
+    # NEO discovery dates — object-card plan 5c), and one sqlite3
+    # connection must never run two statements at once: every public
+    # method serialises through _lock. (Without it, concurrent calls
+    # interleave and sqlite3 raises "bad parameter or other API misuse",
+    # and an interrupted write can even land a half-bound row.)
 
     def __init__(self, db_file=None):
+        import threading
+        self._lock = threading.RLock()
         self._file = str(db_file or paths.db_path())
         self._conn = sqlite3.connect(self._file, check_same_thread=False)
         self._conn.execute("PRAGMA foreign_keys = ON")
@@ -179,11 +188,13 @@ class Database:
         # Does NOT auto-commit: call commit() when your operation is done.
         # @args: sql - SQL string with placeholders, params - tuple/list
         # @return: sqlite3 cursor (caller may fetchone/fetchall)
-        return self._conn.execute(sql, params)
+        with self._lock:
+            return self._conn.execute(sql, params)
 
     def commit(self):
         # Commits the current transaction
-        self._conn.commit()
+        with self._lock:
+            self._conn.commit()
 
     # ---------------- HTTP cache ----------------
 
@@ -191,28 +202,38 @@ class Database:
         # Returns a fresh cached response for the key, or None.
         # @args: key - cache key (usually url + sorted params)
         # @return: (body bytes, content_type) or None
-        row = self._conn.execute(
-            "SELECT body, content_type, fetched, ttl FROM http_cache WHERE key=?",
-            (key,),
-        ).fetchone()
-        if not row:
-            return None
-        body, content_type, fetched, ttl = row
-        if time.time() - fetched > ttl:
-            return None
-        return body, content_type
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT body, content_type, fetched, ttl FROM http_cache"
+                " WHERE key=?",
+                (key,),
+            ).fetchone()
+            if not row:
+                return None
+            body, content_type, fetched, ttl = row
+            if fetched is None or ttl is None:
+                # poisoned row (a legacy DB or an interrupted racy write):
+                # drop it and let the caller refetch
+                self._conn.execute("DELETE FROM http_cache WHERE key=?",
+                                   (key,))
+                self._conn.commit()
+                return None
+            if time.time() - fetched > ttl:
+                return None
+            return body, content_type
 
     def cache_put(self, key, source, body, content_type=""):
         # Stores a response in the cache with the TTL of its source.
         # @args: key - cache key, source - source name (see SOURCE_TTL),
         #        body - raw bytes, content_type - optional MIME type
         ttl = SOURCE_TTL.get(source, 6 * HOUR)
-        self._conn.execute(
-            "INSERT OR REPLACE INTO http_cache (key, source, fetched, ttl, body,"
-            " content_type) VALUES (?, ?, ?, ?, ?, ?)",
-            (key, source, time.time(), ttl, body, content_type),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO http_cache (key, source, fetched, ttl,"
+                " body, content_type) VALUES (?, ?, ?, ?, ?, ?)",
+                (key, source, time.time(), ttl, body, content_type),
+            )
+            self._conn.commit()
 
     def http_get(self, key, source, fetch_fn):
         # Cache-aside helper: returns cached bytes or calls fetch_fn(),
@@ -237,44 +258,50 @@ class Database:
         #        obs_date - ISO date string, notes - free text,
         #        project_id - optional link to a project (ADR-019)
         obs_date = obs_date or time.strftime("%Y-%m-%d")
-        self._conn.execute(
-            "INSERT INTO observations"
-            " (object, type, obs_date, notes, created, project_id)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            (obj, obj_type, obs_date, notes, time.time(), project_id),
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO observations"
+                " (object, type, obs_date, notes, created, project_id)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (obj, obj_type, obs_date, notes, time.time(), project_id),
+            )
+            self._conn.commit()
 
     def unmark_observed(self, obj):
         # Removes all observed marks for an object.
         # @args: obj - object name
-        self._conn.execute("DELETE FROM observations WHERE object=?", (obj,))
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute("DELETE FROM observations WHERE object=?",
+                               (obj,))
+            self._conn.commit()
 
     def is_observed(self, obj):
         # @args: obj - object name
         # @return: True if the object was ever marked as observed
-        row = self._conn.execute(
-            "SELECT 1 FROM observations WHERE object=? LIMIT 1", (obj,)
-        ).fetchone()
-        return bool(row)
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM observations WHERE object=? LIMIT 1", (obj,)
+            ).fetchone()
+            return bool(row)
 
     def mark_posted(self, obj):
         # Flags the latest observation of an object as already posted.
         # @args: obj - object name
-        self._conn.execute(
-            "UPDATE observations SET posted=1 WHERE object=?", (obj,)
-        )
-        self._conn.commit()
+        with self._lock:
+            self._conn.execute(
+                "UPDATE observations SET posted=1 WHERE object=?", (obj,)
+            )
+            self._conn.commit()
 
     def history(self, limit=100):
         # @args: limit - max rows
         # @return: list of dicts with the latest observations
-        rows = self._conn.execute(
-            "SELECT object, type, obs_date, notes, posted FROM observations"
-            " ORDER BY created DESC LIMIT ?",
-            (limit,),
-        ).fetchall()
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT object, type, obs_date, notes, posted FROM observations"
+                " ORDER BY created DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
         return [
             {"object": r[0], "type": r[1], "obs_date": r[2], "notes": r[3],
              "posted": bool(r[4])}
@@ -284,12 +311,13 @@ class Database:
     def observed_recently(self, obj, days=30):
         # @args: obj - object name, days - look-back window
         # @return: True if the object was posted within the window
-        row = self._conn.execute(
-            "SELECT 1 FROM observations WHERE object=? AND posted=1"
-            " AND created > ? LIMIT 1",
-            (obj, time.time() - days * DAY),
-        ).fetchone()
-        return bool(row)
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM observations WHERE object=? AND posted=1"
+                " AND created > ? LIMIT 1",
+                (obj, time.time() - days * DAY),
+            ).fetchone()
+            return bool(row)
 
 
 # Shared instance (tests build their own with a temp file)

@@ -52,7 +52,8 @@ def _altaz_at(ra, dec, lat, lon, jd):
 
 
 def transits_tonight(planets, lat, lon, date=None, threshold_fn=None,
-                      min_alt=None, max_vmag=14.0, margin=0.0):
+                      min_alt=None, max_vmag=14.0, margin=0.0,
+                      aperture_in=None):
     # Exoplanet transits visible from a site during tonight's darkness.
     # @args: planets - list from sources.exoclock.planets(),
     #        lat, lon - site, date - datetime.date (UTC, tonight),
@@ -61,6 +62,10 @@ def transits_tonight(planets, lat, lon, date=None, threshold_fn=None,
     #        max_vmag - star magnitude limit,
     #        margin - extra safety degrees on top of the horizon (ADR-020),
     #                 applied at the gate exactly like the other families
+    #        aperture_in - the user's telescope aperture in inches: a hard
+    #                 gate against ExoClock's min_telescope_in (ADR-015
+    #                 consequence, object-card plan subplan 6); a planet
+    #                 without that datum is NEVER discarded
     # @return: list of dicts with the transit window and coverage
     if threshold_fn is None:
         threshold_fn = (lambda az, m=min_alt: m) if min_alt is not None \
@@ -75,6 +80,15 @@ def transits_tonight(planets, lat, lon, date=None, threshold_fn=None,
     for p in planets:
         if p.get("v_mag") and p["v_mag"] > max_vmag:
             continue
+        if aperture_in is not None:
+            try:
+                min_tel = p.get("min_telescope_in")
+                too_big = min_tel is not None \
+                    and float(min_tel) > float(aperture_in)
+            except (TypeError, ValueError):
+                too_big = False
+            if too_big:
+                continue
         for mid_jd in transit_times(p["t0"], p["period"], from_jd, to_jd):
             dur_h = p.get("duration_h") or 2.0
             half = dur_h / 48.0  # half duration in days

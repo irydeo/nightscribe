@@ -61,7 +61,8 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
          lambda: _pccp_targets(lat, lon, date, hor, margin,
                                session_duration_s)),
         (5, "transit",
-         lambda: _transit_targets(lat, lon, date, hor, limit_mag, margin)),
+         lambda: _transit_targets(lat, lon, date, hor, limit_mag, margin,
+                                  _transit_aperture(cfg))),
         (6, "approach",
          lambda: _approach_alerts()),
     )
@@ -344,14 +345,31 @@ def _pccp_targets(lat, lon, date, hor, margin, duration_s=None):
     return out
 
 
-def _transit_targets(lat, lon, date, hor, limit_mag=14.0, margin=0.0):
+def _transit_aperture(cfg):
+    # The hard aperture gate for transits (ADR-015 consequence, object-card
+    # plan subplan 6): the user's aperture when the Settings toggle is on,
+    # else None (no gate). A missing/unparseable aperture also means no gate.
+    # @args: cfg - Config instance
+    # @return: float inches or None
+    if not cfg.get("transit_scope_filter", True):
+        return None
+    try:
+        ap = cfg.get("aperture_inches")
+        return float(ap) if ap else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _transit_targets(lat, lon, date, hor, limit_mag=14.0, margin=0.0,
+                     aperture_in=None):
     # Exoplanet transits computed locally from the ExoClock catalogue.
     # The star must clear the local horizon + margin at mid-transit
     # (ADR-020) — the same safety rule as every other family.
     out = []
     for t in transits.transits_tonight(exoclock.planets(), lat, lon, date,
-                                       threshold_fn=hor.alt_at,
-                                       max_vmag=limit_mag, margin=margin):
+                                        threshold_fn=hor.alt_at,
+                                        max_vmag=limit_mag, margin=margin,
+                                        aperture_in=aperture_in):
         out.append({
             "id": t["name"], "kind": "transit",
             "name": t["name"], "mag": t.get("v_mag"),

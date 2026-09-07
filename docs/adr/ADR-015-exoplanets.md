@@ -22,6 +22,14 @@ Finder (web scrapeable pero sin API); predecir con TESS oficial (más complejo).
 prioridades científicas reales de la comunidad Ariel; factibilidad filtrada por la
 apertura del telescopio del usuario (Configuración).
 
+**Actualización (2026-09-07, plan object-card, subplan 6)**: la consecuencia de
+apertura ya está implementada — `transits_tonight(aperture_in=...)` descarta los
+eventos cuyo `min_telescope_inches` de ExoClock supera la apertura del usuario;
+interruptor `transit_scope_filter` (Configuración > Observación, por defecto
+activado) y, siguiendo el espíritu de ADR-025, un evento sin dato de telescopio
+mínimo **nunca** se descarta. La ficha del tránsito muestra el veredicto
+«telescopio mínimo vs. tu apertura» (`orbits.explain_transit`).
+
 ## English
 
 **Context**: exoplanet transits are the first *event*-based feature with a time
@@ -40,3 +48,11 @@ Archive** (TAP). ETD remains an external link.
 **Consequences**: offline transit planning after one daily download; real scientific
 priorities from the Ariel community; feasibility filtered by the user's telescope
 aperture (Settings).
+
+**Update (2026-09-07, object-card plan, subplan 6)**: the aperture consequence is
+now implemented — `transits_tonight(aperture_in=...)` drops events whose ExoClock
+`min_telescope_inches` exceeds the user's aperture; the `transit_scope_filter`
+toggle (Settings > Observing, default on) disables it, and following the ADR-025
+spirit an event with no minimum-telescope datum is **never** dropped. The transit
+card shows the "minimum telescope vs. your aperture" verdict
+(`orbits.explain_transit`).

@@ -123,6 +123,14 @@
           </layout>
          </widget>
         </item>
+         <item>
+          <widget class="QGroupBox" name="grp_transits">
+           <property name="title"><string>Exoplanet transits</string></property>
+           <layout class="QFormLayout">
+            <item row="0" column="0" colspan="2"><widget class="QCheckBox" name="chk_transit_scope_filter"><property name="text"><string>Hide transits that need a bigger telescope than mine</string></property><property name="toolTip"><string>ExoClock estimates the minimum aperture each transit needs; when checked, Tonight drops the events above your aperture (Site tab)</string></property></widget></item>
+           </layout>
+          </widget>
+         </item>
         <item>
          <widget class="QGroupBox" name="grp_moon">
           <property name="title"><string>Moon constraint</string></property>

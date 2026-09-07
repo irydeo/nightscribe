@@ -131,6 +131,64 @@ def test_transit_targets_forwards_margin(monkeypatch):
                                     margin=2.0) == []
 
 
+def test_transit_aperture_gate_drops_too_big_a_scope():
+    # object-card plan, subplan 6: ExoClock says this transit needs a 71"
+    # telescope; a 10" rig never sees it leave the list, an 80" one does
+    from nightscribe.core import horizon
+    planets, lat, lon, date = _synth_transit_planet(-18.45)
+    planets[0]["min_telescope_in"] = 71.0
+    out = transits.transits_tonight(
+        planets, lat, lon, date,
+        threshold_fn=horizon.FlatHorizon(30.0).alt_at, aperture_in=10.0)
+    assert out == [], "a 71\"-class transit must not reach a 10\" tonight list"
+    out = transits.transits_tonight(
+        planets, lat, lon, date,
+        threshold_fn=horizon.FlatHorizon(30.0).alt_at, aperture_in=80.0)
+    assert out, "the same transit must pass with an 80\" aperture"
+
+
+def test_transit_aperture_gate_keeps_unknowns():
+    # no min_telescope datum is NOT a reason to discard (ADR-025 spirit:
+    # hard only where the catalogue speaks)
+    from nightscribe.core import horizon
+    planets, lat, lon, date = _synth_transit_planet(-18.45)
+    assert planets[0].get("min_telescope_in") is None
+    out = transits.transits_tonight(
+        planets, lat, lon, date,
+        threshold_fn=horizon.FlatHorizon(30.0).alt_at, aperture_in=4.0)
+    assert out, "a transit without aperture data must survive"
+
+
+def test_transit_targets_forwards_aperture(monkeypatch):
+    # end-to-end wiring: the planner passes the gate down (same pattern
+    # as test_transit_targets_forwards_margin)
+    from nightscribe.core import horizon, planner
+    from nightscribe.core.sources import exoclock
+    planets, lat, lon, date = _synth_transit_planet(-18.45)
+    planets[0]["min_telescope_in"] = 71.0
+    monkeypatch.setattr(exoclock, "planets", lambda: planets)
+    hor = horizon.FlatHorizon(30.0)
+    assert planner._transit_targets(lat, lon, date, hor, 20.0,
+                                    aperture_in=10.0) == []
+    out = planner._transit_targets(lat, lon, date, hor, 20.0,
+                                   aperture_in=80.0)
+    assert out
+
+
+def test_transit_aperture_helper_toggle_and_fallback():
+    # the Settings toggle decides: off -> no gate; on -> the configured
+    # aperture; missing/garbage aperture -> no gate (never discard blind)
+    from nightscribe.core import planner
+    cfg = {"transit_scope_filter": True, "aperture_inches": 10.0}
+    assert planner._transit_aperture(cfg) == 10.0
+    assert planner._transit_aperture(
+        {**cfg, "transit_scope_filter": False}) is None
+    assert planner._transit_aperture(
+        {"transit_scope_filter": True, "aperture_inches": None}) is None
+    assert planner._transit_aperture(
+        {"transit_scope_filter": True, "aperture_inches": "junk"}) is None
+
+
 def test_visibility_safe_span(fake_cfg):
     # A star transiting at midnight (RA == LST at midnight) from the
     # north at dec +30, against a flat 30-degree horizon, with a planned

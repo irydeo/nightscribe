@@ -397,6 +397,8 @@ class MainWindow(QMainWindow):
         dlg.spn_lon.setValue(float(config.get("lon", 0)))
         dlg.spn_height.setValue(int(config.get("height", 0)))
         dlg.spn_aperture.setValue(float(config.get("aperture_inches", 10)))
+        dlg.chk_transit_scope_filter.setChecked(
+            bool(config.get("transit_scope_filter", True)))
         dlg.spn_limit_mag.setValue(float(config.get("limit_mag", 20)))
         dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
         dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
@@ -451,6 +453,8 @@ class MainWindow(QMainWindow):
         config.set("lon", dlg.spn_lon.value())
         config.set("height", dlg.spn_height.value())
         config.set("aperture_inches", dlg.spn_aperture.value())
+        config.set("transit_scope_filter",
+                   dlg.chk_transit_scope_filter.isChecked())
         config.set("limit_mag", dlg.spn_limit_mag.value())
         config.set("min_alt", dlg.spn_min_alt.value())
         config.set("neofixer_key", dlg.edt_neofixer_key.text().strip())

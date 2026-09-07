@@ -26,6 +26,9 @@ DEFAULTS = {
     "lon": -3.37,           # degrees east
     "height": 631,          # meters
     "aperture_inches": 10.0,
+    # hard gate: drop Tonight transits whose ExoClock minimum aperture is
+    # above ours (ADR-015 consequence, object-card plan subplan 6)
+    "transit_scope_filter": True,
     "limit_mag": 20.0,
     "min_alt": 30.0,        # degrees above horizon
     "language": "system",   # system | es | en

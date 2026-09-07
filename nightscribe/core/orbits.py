@@ -494,7 +494,7 @@ def _sn_type_text(otype):
                   "classified (hence the generic name)"}
 
 
-def _days_since(date_str):
+def days_since(date_str):
     # @args: date_str - "YYYY/MM/DD" or "YYYY-MM-DD"
     # @return: whole days from that date to today, or None if unparseable
     import datetime as _dt
@@ -569,7 +569,7 @@ def explain_transient(d):
 
     disc = (d.get("disc_date") or "").strip()
     if disc:
-        days = _days_since(disc)
+        days = days_since(disc)
         ago_es = f" — hace {days} días" if days is not None and days >= 0 else ""
         ago_en = f" — {days} days ago" if days is not None and days >= 0 else ""
         out.append({

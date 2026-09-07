@@ -744,6 +744,40 @@ def test_transit_table_without_event_shows_archive_only(panel):
     assert _param_cells(panel), "archive-only transit table is empty"
 
 
+# ---------------- object-card plan, subplan 4: per-kind chips --------
+#
+# Every family fills its chip row with the same grammar: an SN card or
+# a transit card must not look sparse next to a NEO's. The extras come
+# from the enriched data, so they show even without a planner context.
+
+def test_capture_block_sn_type_and_freshness_chips(panel):
+    # SN card: event type + days-since-discovery chips from the data
+    from nightscribe.core import orbits
+    panel.show(_sn_full_fixture())
+    chips = _chip_texts(panel)
+    assert any("SN Ia" in c for c in chips), f"type chip missing: {chips!r}"
+    days = orbits.days_since("2026/08/30")
+    assert any(c == f"{days} d" for c in chips), \
+        f"freshness chip missing: {chips!r}"
+
+
+def test_capture_block_transit_depth_chip(panel):
+    # transit card: the star-dimming chip from the merged ExoClock event
+    panel.show(_transit_fixture())
+    chips = _chip_texts(panel)
+    assert any("16.4 mmag" in c for c in chips), \
+        f"depth chip missing: {chips!r}"
+
+
+def test_capture_block_extras_omit_missing(panel):
+    # bare SN (host name only, no context): no invented chips — the row
+    # hides itself entirely, same «omit what is missing» rule
+    panel.show(_sn_fixture())
+    assert panel.state() == "ready"
+    assert panel.row_capture.isHidden()
+    assert _chip_texts(panel) == []
+
+
 # ---------------- D3: capture / window block ----------------
 #
 # The block reads the project context snapshot (the numbers a capture plan

@@ -909,6 +909,35 @@ class ObjectPanel(QWidget):
                                 "target trails more than a pixel"))
                 ))
 
+        # kind-specific extras (object-card plan, subplan 4): every
+        # family fills its chip row with the same grammar — the card of
+        # an SN or a transit must not look sparse next to a NEO's
+        d = e.get("data") or {}
+        is_sn = kind in ("sn", "transient")
+        is_transit = kind == "transit" or bool(d.get("transit"))
+        if is_sn:
+            otype = (((d.get("simbad") or {}).get("otype"))
+                     or d.get("otype") or "").strip()
+            if otype:
+                chips.append((
+                    otype, theme.C_TEXT,
+                    self.tr("Type of stellar explosion")))
+            days = orbits.days_since(d["disc_date"]) \
+                if d.get("disc_date") else None
+            if days is not None and days >= 0:
+                chips.append((
+                    f"{days} d",
+                    theme.C_GOOD if days <= 14 else theme.C_TEXT,
+                    self.tr("Days since discovery — a young light curve "
+                            "is gold for science")))
+        if is_transit:
+            tr = d.get("transit") or ctx.get("transit") or {}
+            depth = tr.get("depth_mmag")
+            if depth:
+                chips.append((
+                    f"Δ {float(depth):.1f} mmag", theme.C_TEXT,
+                    self.tr("How much the star dims at mid-transit")))
+
         ws = ctx.get("window_start")
         we = ctx.get("window_end")
         if ws and we:

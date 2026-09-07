@@ -1631,9 +1631,9 @@ class MainWindow(QMainWindow):
         btn_ccd_goto = QPushButton(self.tr("Point telescope"))
         btn_ccd_goto.clicked.connect(self._ccd_goto)
         m_row.addWidget(btn_ccd_goto)
-        btn_ccd_sync = QPushButton(self.tr("Sync telescope"))
-        btn_ccd_sync.clicked.connect(self._ccd_sync)
-        m_row.addWidget(btn_ccd_sync)
+        btn_ccd_astrometry = QPushButton(self.tr("Astrometric Goto"))
+        btn_ccd_astrometry.clicked.connect(self._ccd_astrometry_goto)
+        m_row.addWidget(btn_ccd_astrometry)
         m_row.addStretch()
         layout.addLayout(m_row)
         self._project_widgets.update({
@@ -1649,7 +1649,7 @@ class MainWindow(QMainWindow):
             "ccd_push": btn_ccd_push,
             "ccd_start": btn_ccd_start,
             "ccd_goto": btn_ccd_goto,
-            "ccd_sync": btn_ccd_sync,
+            "ccd_sync": btn_ccd_astrometry,
         })
         self._ccd_apply_state()
         # NEO: also ephemeris export
@@ -1772,6 +1772,9 @@ class MainWindow(QMainWindow):
             return
         self._ccd_connected = True
         self._ccd_version = str(result.get("version", self.tr("—")))
+        w = self._project_widgets
+        if w.get("ccd_version"):
+            w["ccd_version"].setText(self._ccd_version)
         self._ccd_filter_names = list(result.get("filters") or [])
         self._ccd_timer.start()
         self._ccd_render_dashboard(result.get("dashboard") or {})
@@ -1798,33 +1801,64 @@ class MainWindow(QMainWindow):
         self._ccd_worker.start()
 
     def _ccd_refresh(self):
-        # @return: re-fetches the observatory dashboard through the cache
-        self._ccd_run(self._ccd_on_refreshed, lambda c: c.dashboard())
+        # @return: re-fetches the dashboard plus a live mount snapshot
+        # (slewing/tracking) on the worker thread — reads never block the UI.
+        def action(c):
+            from ..core.sources import ccdciel
+            payload = {"dashboard": c.dashboard()}
+            try:
+                payload["slewing"] = c.slewing()
+                payload["tracking"] = c.tracking()
+            except ccdciel.CCDcielError:
+                # mount state is optional in the dashboard; keep the rest
+                pass
+            return payload
+        self._ccd_run(self._ccd_on_refreshed, action)
 
     def _ccd_on_refreshed(self, result, error):
         self._ccd_worker = None
         if error:
             self.statusBar().showMessage(error, 5000)
             return
-        self._ccd_render_dashboard(result or {})
+        result = result or {}
+        self._ccd_render_dashboard(result.get("dashboard") or {},
+                                   result.get("slewing"),
+                                   result.get("tracking"))
 
-    def _ccd_render_dashboard(self, dash):
-        # @args: dash - sections dict as returned by the "status" method
+    def _ccd_render_dashboard(self, dash, slewing=None, tracking=None):
+        # @args: dash - sections dict from the "status" method,
+        #        slewing/tracking - live mount state (may override the
+        #                          dashboard when the server hides them there)
         w = self._project_widgets
         if not w.get("ccd_temp"):
             return
         cam = dash.get("camera") or {}
         temp = cam.get("temperature")
+        if temp is None and cam:
+            for key in ("ccd_temp", "temp", "temperature_C"):
+                if isinstance(cam.get(key), (int, float)):
+                    temp = cam[key]
+                    break
         w["ccd_temp"].setText(f"{temp} °C" if temp is not None else self.tr("—"))
         mount = dash.get("mount") or {}
-        tracking = mount.get("tracking")
+        if tracking is None:
+            tracking = mount.get("tracking")
+        if tracking is None and "tracking" in cam:
+            tracking = cam["tracking"]
+        if isinstance(tracking, str):
+            tracking = tracking.strip().lower() not in ("", "false", "no", "0")
         if tracking is None:
             w["ccd_tracking"].setText(self.tr("—"))
         elif tracking:
             w["ccd_tracking"].setText(self.tr("Tracking"))
         else:
             w["ccd_tracking"].setText(self.tr("Stopped"))
-        slewing = mount.get("slewing")
+        if slewing is None:
+            slewing = mount.get("slewing")
+        if slewing is None and "slewing" in cam:
+            slewing = cam["slewing"]
+        if isinstance(slewing, str):
+            slewing = slewing.strip().lower() not in ("", "false", "no", "0")
         if slewing is None:
             w["ccd_slew"].setText(self.tr("—"))
         elif slewing:
@@ -1833,13 +1867,15 @@ class MainWindow(QMainWindow):
             w["ccd_slew"].setText(self.tr("Idle"))
 
     def _ccd_poll_tick(self):
-        # QTimer tick: cheap cached read of the dashboard while a project is
-        # open, no network from the GUI thread (ADR-030).
+        # QTimer tick while a project is open: the read runs on the CCD worker
+        # thread (ADR-030: no network on the GUI thread); the cache keeps it
+        # cheap once the dashboard is warm. _ccd_run itself refuses to queue a
+        # second worker, so a busy refresh is simply skipped.
         if not (self._ccd_connected and self._current_project):
             return
         if not self._project_widgets.get("ccd_temp"):
             return
-        self._ccd_render_dashboard(self._ccd_client.dashboard())
+        self._ccd_refresh()
 
     def _ccd_fill_filters(self):
         # @return: fills the wheel combo from CCDciel (fallback labels when
@@ -1889,22 +1925,27 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             self.tr("Telescope pointed at the object."), 5000)
 
-    def _ccd_sync(self):
-        # Align the mount with the current object's coordinates.
+    def _ccd_astrometry_goto(self):
+        # Astrometric pointing at the current object: CCDciel slews,
+        # plate-solves and corrects. The client polls the running flag,
+        # so no mount-state polling is needed here.
         ctx = self._current_project.get("context") or {}
         if ctx.get("ra_deg") is None:
             self.statusBar().showMessage(
                 self.tr("This object has no coordinates yet."), 5000)
             return
         ra, dec = ctx["ra_deg"], ctx["dec_deg"]
-        self._ccd_run(self._ccd_on_synced, lambda c: c.sync_target(ra, dec))
+        self._ccd_run(self._ccd_on_astrometry,
+                      lambda c: c.astrometry_goto(ra, dec), poll=False)
 
-    def _ccd_on_synced(self, _result, error):
+    def _ccd_on_astrometry(self, _result, error):
+        # @args: _result - apparent coords the mount was told to point at
+        #        (unused here), error - error text
         if error:
             self.statusBar().showMessage(error, 8000)
         else:
             self.statusBar().showMessage(
-                self.tr("Telescope synced to the object."), 5000)
+                self.tr("Astrometric pointing finished."), 5000)
 
     def _ccd_send_plan(self):
         # Stage the planned frames/exposure/filter inside CCDciel (Capture_set*).

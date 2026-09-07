@@ -40,8 +40,9 @@ Capture step into Plan and added real CCDciel control — ADR-030).
    the app checks the session ends inside the safety range.
 2. **Capture**: export sequence (NINA JSON / CCDciel / CSV) with name, J2000 coords
    and times; the file is registered in the project. **With CCDciel connected**
-   (ADR-030) the same tab can also: point/sync the telescope, send the plan (target,
-   exposure, frame count, filter) and start the capture live.
+    (ADR-030) the same tab can also: point the telescope, run an **astrometric goto**
+    (plate-solve + correction), send the plan (target, exposure, frame count, filter)
+    and start the capture live.
 3. **Process** (external): the user calibrates/stacks with their own tools; back in
    NightScribe, "Import result FITS" — **without asking for target or coordinates**
    (already in context) — then confirm with the blink, matched against PS1-g

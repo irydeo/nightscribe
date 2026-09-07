@@ -177,22 +177,103 @@ def test_apparent_converts_ra_degrees_to_hours(client, fake_post):
     ra_h, dec = client.apparent(157.5, -20.0)
     assert ra_h == 10.5
     assert dec == -20.0
-    # [PAIR]-style parameter, one positional list (JSON-RPC [[RA, DEC]])
-    assert fake_post.calls[0]["json"]["params"] == [[10.5, -20.0]]
+    # two flat positional scalars: RA hours, DEC degrees
+    assert fake_post.calls[0]["json"]["params"] == [10.5, -20.0]
 
 
 def test_slew_j2000_to_apparent_then_async(client, fake_post):
     fake_post.bodies = [_ok([10.5, -20.0]), _cmd_ok()]
     client.slew_target(157.5, -20.0)
     assert fake_post.methods == ["J2000_to_Apparent", "Telescope_slewasync"]
-    assert fake_post.calls[1]["json"]["params"] == [[10.5, -20.0]]
+    assert fake_post.calls[1]["json"]["params"] == [10.5, -20.0]
 
 
 def test_sync_j2000_to_apparent_then_sync(client, fake_post):
     fake_post.bodies = [_ok([10.5, -20.0]), _cmd_ok()]
     client.sync_target(157.5, -20.0)
     assert fake_post.methods == ["J2000_to_Apparent", "Telescope_sync"]
-    assert fake_post.calls[1]["json"]["params"] == [[10.5, -20.0]]
+    assert fake_post.calls[1]["json"]["params"] == [10.5, -20.0]
+
+
+def test_astrometry_goto_async_j2000_to_apparent(client, fake_post):
+    fake_post.bodies = [_ok([10.5, -20.0]), _cmd_ok()]
+    ra_h, dec = client.astrometry_goto_async(157.5, -20.0)
+    assert fake_post.methods == ["J2000_to_Apparent", "Astrometry_Goto_Async"]
+    assert fake_post.calls[1]["json"]["params"] == [10.5, -20.0]
+    assert (ra_h, dec) == (10.5, -20.0)
+
+
+def test_astrometry_goto_running_truthy(client, fake_post):
+    fake_post.bodies = [_ok("False"), _ok({"running": 1}), _ok("True")]
+    assert client.astrometry_goto_running() is False
+    assert client.astrometry_goto_running() is True
+
+
+def test_astrometry_goto_result_truthy(client, fake_post):
+    fake_post.bodies = [_ok("True"), _ok(False)]
+    assert client.astrometry_goto_result() is True
+    assert client.astrometry_goto_result() is False
+
+
+def test_astrometry_goto_happy_path(client, fake_post, monkeypatch):
+    # Fake sleep: no wall-clock wait between polls.
+    monkeypatch.setattr(ccdciel.time, "sleep", lambda s: None)
+    # J2000->Apparent, Async, running(False...), Result
+    fake_post.bodies = [
+        _ok([10.5, -20.0]),     # Astrometry_Goto_Async setup
+        _cmd_ok(),              # Astrometry_Goto_Async
+        _ok(False),             # Astrometry_Goto_Running -> settled
+        _ok(True),              # Astrometry_Goto_Result -> OK
+    ]
+    ra_h, dec = client.astrometry_goto(157.5, -20.0, timeout_s=5, poll_s=0.1)
+    assert (ra_h, dec) == (10.5, -20.0)
+    assert fake_post.methods == [
+        "J2000_to_Apparent", "Astrometry_Goto_Async",
+        "Astrometry_Goto_Running", "Astrometry_Goto_Result"]
+
+
+def test_astrometry_goto_polls_until_running_false(client, fake_post, monkeypatch):
+    monkeypatch.setattr(ccdciel.time, "sleep", lambda s: None)
+    fake_post.bodies = [
+        _ok([10.5, -20.0]),     # apparent + async
+        _cmd_ok(),
+        _ok(True),              # still running
+        _ok(True),              # still running
+        _ok(False),             # settled
+        _ok(True),              # result OK
+    ]
+    client.astrometry_goto(157.5, -20.0, timeout_s=5, poll_s=0.01)
+    methods = fake_post.methods
+    assert methods.count("Astrometry_Goto_Running") == 3
+    assert methods[-1] == "Astrometry_Goto_Result"
+
+
+def test_astrometry_goto_timeout_raises(client, fake_post):
+    # Let real time elapse: deadline (0.05 s) will be hit by the polling
+    # loop while the fake keeps answering "running" forever.
+    fake_post.bodies = [
+        _ok([10.5, -20.0]),     # apparent + async
+        _cmd_ok(),
+        _ok(True),              # running, running, running ...
+        _ok(True),
+        _ok(True),
+        _ok(True),
+        _ok(True),
+    ]
+    with pytest.raises(ccdciel.CCDcielError, match="still running after"):
+        client.astrometry_goto(157.5, -20.0, timeout_s=0.05, poll_s=0.02)
+
+
+def test_astrometry_goto_result_false_raises(client, fake_post, monkeypatch):
+    monkeypatch.setattr(ccdciel.time, "sleep", lambda s: None)
+    fake_post.bodies = [
+        _ok([10.5, -20.0]),
+        _cmd_ok(),
+        _ok(False),             # settled
+        _ok(False),             # result: failed
+    ]
+    with pytest.raises(ccdciel.CCDcielError, match="without a successful"):
+        client.astrometry_goto(157.5, -20.0, timeout_s=5)
 
 
 def test_slewing_live_state_not_cached(client, fake_post):
@@ -200,6 +281,34 @@ def test_slewing_live_state_not_cached(client, fake_post):
     assert client.slewing() is True
     assert client.slewing() is False
     assert len(fake_post.calls) == 2  # live status never lands in the cache
+
+
+def test_slewing_tolerates_string_and_envelope(client, fake_post):
+    # Real servers answer "False" as text or inside an envelope; accept them.
+    fake_post.bodies = [_ok("False"), _ok({"slewing": 0}), _ok("True")]
+    assert client.slewing() is False
+    assert client.slewing() is False
+    assert client.slewing() is True
+
+
+def test_tracking_tolerates_strings(client, fake_post):
+    fake_post.bodies = [_ok("False"), _ok("true")]
+    assert client.tracking() is False
+    assert client.tracking() is True
+
+
+def test_failed_error_names_the_method(client, fake_post):
+    fake_post.bodies = [_ok({"status": "Failed!",
+                             "error": "Invalid number of parameter: 0, must be: 2"})]
+    with pytest.raises(ccdciel.CCDcielError, match="Telescope_slewasync"):
+        fake_post.calls.clear()
+        client.call("Telescope_slewasync", 10.5, -20.0)
+
+
+def test_unhandled_result_error_names_the_method(client, fake_post):
+    fake_post.bodies = [_ok("Failed!")]
+    with pytest.raises(ccdciel.CCDcielError, match="Telescope_sync"):
+        client.call("Telescope_sync", 10.5, -20.0)
 
 
 # ---------------- capture settings ----------------

@@ -935,8 +935,13 @@
     </message>
     <message>
         <location filename="../main_window.py" line="0"/>
-        <source>Sync telescope</source>
-        <translation>Sincronizar telescopio</translation>
+        <source>Astrometric Goto</source>
+        <translation>Ajuste astrométrico</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="0"/>
+        <source>Astrometric pointing finished.</source>
+        <translation>Ajuste astrométrico completado.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="0"/>

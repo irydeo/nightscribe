@@ -20,14 +20,21 @@ permite una integración real **sin drivers ni INDI** desde la GUI de NightScrib
    - **Lecturas** (estado, versión, filtros, dashboard `status`) → **cacheadas** vía
      `db.http_get` (source `"ccdciel"`, TTL **60 s**): el dashboard no machaca al
      programa del observatorio. **Nunca** cachear coordenadas de la montura en vivo.
-   - **Comandos** (`Telescope_slewasync`, `Telescope_sync`, `Wheel_setfilter`,
-     `Capture_set*`, `Capture_start`, `Telescope_slewing`) → **directos, sin caché**.
+    - **Comandos** (`Telescope_slewasync`, `Telescope_sync`, `Astrometry_Goto_Async`,
+      `Astrometry_Goto_Running`, `Astrometry_Goto_Result`, `Wheel_setfilter`,
+      `Capture_set*`, `Capture_start`, `Telescope_slewing`) → **directos, sin caché**.
    - Envelope: `result` valor / `{"status": "OK!"|"Failed!"}` / `error` JSON-RPC;
      cualquier fallo explícito lanza `CCDcielError` con el mensaje del servidor.
 2. **Coordenadas aparentes**: el plan guarda coords **J2000** (`ctx.ra_deg/dec_deg`);
-   el slew/sync convierten a aparente con **`J2000_to_Apparent`** (RA en horas, DEC en
-   grados) antes de `Telescope_slewasync`/`Telescope_sync`, y esperan a que
-   **`Telescope_slewing`** se apague.
+   el slew/sync convierten a aparente con **`J2000_to_Apparent`** y piden
+   **2 parámetros posicionales planos** (RA en horas, DEC en grados) —
+   *no* una lista `[[RA, DEC]]`: el servidor real responde
+   «Invalid number of parameter: 0, must be: 2» con la lista — antes de
+   `Telescope_slewasync`/`Telescope_sync`, y esperan a que
+   **`Telescope_slewing`** se apague. (Corrección 2026-09-06, contra el
+   servidor del observatorio: la referencia ap-i.net citada no está
+   disponible.) Los estados `Telescope_slewing`/`Telescope_tracking` se
+   interpretan con tolerancia (bool, entero o texto «True»/«False»).
 3. **Envío del plan**: el botón «Enviar plan» prepara en CCDciel
    `Capture_setobjectname/exposure/count/frametype=Light` + `Wheel_setfilter` (el combo
    de filtros se autorrellena de la rueda vía `Wheel_GetfiltersName`, con la lista
@@ -41,6 +48,15 @@ permite una integración real **sin drivers ni INDI** desde la GUI de NightScrib
 5. **GUI**: `CcdcielWorker` (QThread) ejecuta cada acción fuera del hilo de UI;
    dashboard de estado (versión, temperatura CCD, tracking, slew) y barra de estado de
    la conexión. Red nunca en el hilo de GUI.
+6. **Ajuste astrométrico** (revisión 2026-09-07): el botón «Sincronizar telescopio /
+   Sync telescope» pasa a **«Ajuste astrométrico / Astrometric Goto»** y llama a
+   `Client.astrometry_goto()`: dispara `Astrometry_Goto_Async [RA_aparente_h, DEC°]`,
+   sondea `Astrometry_Goto_Running` a intervalos de 1 s hasta que se apague
+   (tope **120 s**, `CCDcielError` si sigue activo), y comprueba
+   `Astrometry_Goto_Result` (`False` → `CCDcielError`). `Telescope_sync` y
+   `Client.sync_target` quedan en el cliente para compatibilidad/uso directo; el GUI
+   ya no los llama. La fila del worker mantiene su polling de `Telescope_slewing`
+   desactivado para este flujo, porque el bucle es el del astrometry.
 
 **Consecuencias**: `config.py` gana `ccdciel_host`/`ccdciel_port`/`ccdciel_auto_connect`;
 Settings gana el tab **CCDciel**; `db.py` `SOURCE_TTL["ccdciel"] = 60`; i18n ES/EN
@@ -67,14 +83,20 @@ tab (ADR-019, review 2026-09-06):
    - **Reads** (state, version, filters, `status` dashboard) → **cached** through
      `db.http_get` (source `"ccdciel"`, TTL **60 s**): the dashboard does not hammer the
      observatory software. **Never** cache live mount coordinates.
-   - **Commands** (`Telescope_slewasync`, `Telescope_sync`, `Wheel_setfilter`,
-     `Capture_set*`, `Capture_start`, `Telescope_slewing`) → **direct, uncached**.
+    - **Commands** (`Telescope_slewasync`, `Telescope_sync`, `Astrometry_Goto_Async`,
+      `Astrometry_Goto_Running`, `Astrometry_Goto_Result`, `Wheel_setfilter`,
+      `Capture_set*`, `Capture_start`, `Telescope_slewing`) → **direct, uncached**.
    - Envelope: plain `result` / `{"status": "OK!"|"Failed!"}` / JSON-RPC `error`; any
      explicit failure raises `CCDcielError` with the server message.
 2. **Apparent coordinates**: the plan stores **J2000** coords (`ctx.ra_deg/dec_deg`);
-   slew/sync convert to apparent via **`J2000_to_Apparent`** (RA in hours, DEC in
-   degrees) before `Telescope_slewasync`/`Telescope_sync`, and wait for
-   **`Telescope_slewing`** to stop.
+   slew/sync convert to apparent via **`J2000_to_Apparent`** and send
+   **2 flat positional params** (RA in hours, DEC in degrees) — *not* a
+   `[[RA, DEC]]` list: the real server answers “Invalid number of parameter:
+   0, must be: 2” with the list — before `Telescope_slewasync`/`Telescope_sync`,
+   and wait for **`Telescope_slewing`** to stop. (Fix 2026-09-06, against the
+   observatory server: the ap-i.net reference cited is not available.) The
+   `Telescope_slewing`/`Telescope_tracking` states read tolerantly (bool,
+   integer or "True"/"False" text).
 3. **Sending the plan**: "Send plan" stages
    `Capture_setobjectname/exposure/count/frametype=Light` + `Wheel_setfilter` on
    CCDciel (the filter combo auto-fills from the wheel via `Wheel_GetfiltersName`, with
@@ -88,6 +110,14 @@ tab (ADR-019, review 2026-09-06):
 5. **GUI**: `CcdcielWorker` (QThread) runs every action off the UI thread; status
    dashboard (version, CCD temperature, tracking, slew) plus a connection status bar.
    No network on the GUI thread.
+6. **Astrometric goto** (revision 2026-09-07): the "Sync telescope" button becomes
+   **"Astrometric Goto"** and calls `Client.astrometry_goto()`: it fires
+   `Astrometry_Goto_Async [RA_app_hours, DEC°]`, polls `Astrometry_Goto_Running`
+   every 1 s until it goes low (hard cap **120 s**, `CCDcielError` otherwise),
+   then checks `Astrometry_Goto_Result` (`False` → `CCDcielError`). `Telescope_sync`
+   and `Client.sync_target` remain in the client for compatibility/direct use; the
+   GUI no longer calls them. The worker keeps `poll_slew=False` for this flow
+   because the loop is the astrometry one, not `Telescope_slewing`.
 
 **Consequences**: `config.py` gains `ccdciel_host`/`ccdciel_port`/`ccdciel_auto_connect`;
 Settings gains the **CCDciel** tab; `db.py` `SOURCE_TTL["ccdciel"] = 60`; ES/EN i18n

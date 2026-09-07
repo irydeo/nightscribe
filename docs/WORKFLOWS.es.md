@@ -40,9 +40,9 @@ paso Captura se fundió en el Plan y gana el control real de CCDciel — ADR-030
    y filtro; la app comprueba que la sesión termina dentro del rango de seguridad.
 2. **Captura**: exportar secuencia (NINA JSON / CCDciel / CSV) con nombre, coords J2000
    y tiempos; el fichero queda registrado en el proyecto. **Con CCDciel conectado**
-   (ADR-030) también se puede: apuntar/sincronizar el telescopio, enviar el plan
-   (objeto, exposición, nº de tomas, filtro) e iniciar la captura desde la misma
-   pestaña.
+    (ADR-030) también se puede: apuntar el telescopio, hacer un **ajuste astrométrico**
+    (plate solve + corrección), enviar el plan (objeto, exposición, nº de tomas, filtro)
+    e iniciar la captura desde la misma pestaña.
 3. **Procesado** (externo): el usuario calibra/apila con sus programas; al volver,
    «Importar FITS resultado» — **sin preguntar objeto ni coordenadas** (ya están en el
    contexto) — y confirma con el blink, casado con PS1-g (pipeline ADR-018

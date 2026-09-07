@@ -13,6 +13,7 @@
 
 import json
 import logging
+import time
 
 import requests
 
@@ -22,6 +23,27 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_PORT = 3277
 _TIMEOUT = 4.0
+
+
+def truthy(result):
+    # Mount state replies drift between servers: a bare bool, an integer,
+    # "False"/"True" as text, or an envelope around the value. Settle them to
+    # a real bool (None when the payload does not say anything).
+    # @args: result - the "result" member of a Telescope_* state reply
+    # @return: True / False / None
+    while isinstance(result, dict):
+        for key in ("slewing", "tracking", "running", "value"):
+            if key in result:
+                result = result[key]
+                break
+        else:
+            return None
+    if isinstance(result, str):
+        return result.strip().lower() not in ("", "false", "no", "0",
+                                              "off", "idle", "stopped")
+    if result is None:
+        return None
+    return bool(result)
 
 
 class CCDcielError(Exception):
@@ -55,26 +77,33 @@ class Client:
         payload = {"jsonrpc": "2.0", "method": method, "id": 1}
         if params:
             payload["params"] = list(params)
+        logger.debug("jsonrpc %s %s", method, payload.get("params"))
         try:
             r = requests.post(self.url, json=payload, timeout=self.timeout)
             r.raise_for_status()
             body = r.json()
         except (requests.RequestException, ValueError) as err:
-            raise CCDcielError(f"no JSON-RPC response from {self.url}: {err}") from err
+            raise CCDcielError(f"{method}: no JSON-RPC response from {self.url}: {err}") from err
         if "error" in body:
-            raise CCDcielError(body["error"].get("message") or str(body["error"]))
+            raise CCDcielError(f"{method}: {body['error'].get('message') or body['error']}")
+        logger.debug("jsonrpc %s -> %s", method, body.get("result"))
         return body.get("result")
 
     @staticmethod
-    def _ok(result):
-        # @args: result - the "result" member of a command response
+    def _ok(result, method="command"):
+        # @args: result - the "result" member of a command response,
+        #        method - JSON-RPC method name (shown on failure, for the log)
         # @return: result, or raise CCDcielError on an explicit failure
         if isinstance(result, dict) and result.get("status"):
             if result["status"] in ("OK!", "OK"):
                 return result
-            raise CCDcielError(result.get("error") or result["status"])
+            raise CCDcielError(f"{method}: {result.get('error') or result['status']}")
         if isinstance(result, dict) and result.get("error"):
-            raise CCDcielError(str(result["error"]))
+            raise CCDcielError(f"{method}: {result['error']}")
+        # Some servers answer a bare failure word instead of an envelope.
+        if isinstance(result, str) and result.strip().lower() in (
+                "failed", "failed!", "error", "busy"):
+            raise CCDcielError(f"{method}: {result.strip()}")
         return result
 
     def call(self, method, *params):
@@ -82,7 +111,7 @@ class Client:
         # @args: method - JSON-RPC method, params - positional arguments
         # @return: result member (status envelope already checked)
         result = self._rpc(method, params if params else None)
-        return self._ok(result)
+        return self._ok(result, method)
 
     def read(self, method, key, params=None):
         # Cached read path (db.http_get, "ccdciel" source, 60 s TTL).
@@ -141,20 +170,20 @@ class Client:
 
     def slewing(self):
         # @return: True while the mount is slewing (live, uncached)
-        return bool(self.call("Telescope_slewing"))
+        return bool(truthy(self.call("Telescope_slewing")))
 
     def tracking(self):
         # @return: True when the mount is tracking (live, uncached)
-        return bool(self.call("Telescope_tracking"))
+        return bool(truthy(self.call("Telescope_tracking")))
 
     # -- coordinates and motion -------------------------------------------------
 
     def apparent(self, ra_deg, dec_deg):
         # @args: ra_deg/dec_deg - J2000 target coordinates (degrees)
         # @return: (ra_hours, dec_deg) apparent, as the mount expects them
-        # The pair arrives as one positional list, like the other [PAIR]
-        # commands in the reference (slew, sync, Eq2hz).
-        result = self.call("J2000_to_Apparent", [ra_deg / 15.0, dec_deg])
+        # The server wants two flat positional scalars (RA hours, DEC
+        # degrees), like Telescope_slewasync and Telescope_sync.
+        result = self.call("J2000_to_Apparent", ra_deg / 15.0, dec_deg)
         if isinstance(result, (list, tuple)) and len(result) >= 2:
             return float(result[0]), float(result[1])
         return ra_deg / 15.0, dec_deg
@@ -164,14 +193,66 @@ class Client:
         # @args: ra_deg/dec_deg - J2000 target coordinates (degrees)
         # @return: apparent (ra_hours, dec_deg) the mount was pointed at
         ra_h, dec = self.apparent(ra_deg, dec_deg)
-        self.call("Telescope_slewasync", [ra_h, dec])
+        self.call("Telescope_slewasync", ra_h, dec)
         return ra_h, dec
 
     def sync_target(self, ra_deg, dec_deg):
         # @args: ra_deg/dec_deg - J2000 coordinates (degrees) to align the mount to
         # @return: apparent (ra_hours, dec_deg) the mount was synced to
         ra_h, dec = self.apparent(ra_deg, dec_deg)
-        self.call("Telescope_sync", [ra_h, dec])
+        self.call("Telescope_sync", ra_h, dec)
+        return ra_h, dec
+
+    # -- astrometric pointing ------------------------------------------------------
+
+    DEFAULT_ASTROMETRY_TIMEOUT_S = 120.0
+    DEFAULT_ASTROMETRY_POLL_S = 1.0
+
+    def astrometry_goto_async(self, ra_deg, dec_deg):
+        # Fire the astrometric goto (slew + plate solve + correction) and
+        # return as soon as CCDciel accepts it. The job finishes in the
+        # background; poll astrometry_goto_running() for state.
+        # @args: ra_deg/dec_deg - J2000 target coordinates (degrees)
+        # @return: apparent (ra_hours, dec_deg) the mount was told to point at
+        ra_h, dec = self.apparent(ra_deg, dec_deg)
+        self.call("Astrometry_Goto_Async", ra_h, dec)
+        return ra_h, dec
+
+    def astrometry_goto_running(self):
+        # @return: True while the astrometric goto job is still working
+        return bool(truthy(self.call("Astrometry_Goto_Running")))
+
+    def astrometry_goto_result(self):
+        # Only meaningful once astrometry_goto_running() is False.
+        # @return: bool -- True when the last job ended in a successful
+        #          pointing, False on plate solve / correction failure,
+        #          None when the server does not say either way
+        return truthy(self.call("Astrometry_Goto_Result"))
+
+    def astrometry_goto(self, ra_deg, dec_deg,
+                        timeout_s=DEFAULT_ASTROMETRY_TIMEOUT_S,
+                        poll_s=DEFAULT_ASTROMETRY_POLL_S):
+        # High-level astrometric goto: fire the async job and poll its
+        # running flag until it settles, then check the result flag.
+        # @args: ra_deg/dec_deg - J2000 target (degrees),
+        #        timeout_s - hard cap on waiting (default 120 s),
+        #        poll_s - seconds between running-checks (default 1 s)
+        # @return: (ra_hours, dec_deg) apparent coordinates the mount
+        #          was told to point at
+        # @raise: CCDcielError when the job is still running after the
+        #         timeout, or when the job finished without a successful
+        #         pointing
+        ra_h, dec = self.astrometry_goto_async(ra_deg, dec_deg)
+        deadline = time.monotonic() + timeout_s
+        while self.astrometry_goto_running():
+            if time.monotonic() >= deadline:
+                raise CCDcielError(
+                    f"Astrometry_Goto still running after {int(timeout_s)} s")
+            time.sleep(poll_s)
+        ok = self.astrometry_goto_result()
+        if ok is False:
+            raise CCDcielError(
+                "Astrometry_Goto finished without a successful pointing")
         return ra_h, dec
 
     # -- filter wheel -------------------------------------------------------------

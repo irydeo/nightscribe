@@ -57,12 +57,38 @@ permite una integración real **sin drivers ni INDI** desde la GUI de NightScrib
    `Client.sync_target` quedan en el cliente para compatibilidad/uso directo; el GUI
    ya no los llama. La fila del worker mantiene su polling de `Telescope_slewing`
    desactivado para este flujo, porque el bucle es el del astrometry.
+7. **Efeméride fresca en el goto para cuerpos en movimiento** (revisión 2026-09-07):
+   los NEOs, cometas y candidatos PCCP no tienen coordenadas fijas — un NEO a
+   5″/min con un plan de hace 2 h lleva 10′ de error, y el goto astrométrico
+   resolvería el campo equivocado. Regla: para los kinds `neo`/`comet`/`pccp` el
+   botón de apuntar **recalcula la posición en el instante del click** antes del
+   slew, dentro del `CcdcielWorker` (red fuera del hilo de GUI). El helper
+   `core/ephemeris.py::position_at` consulta Horizons a paso fino (2 min, ventana
+   ±2 h redondeada a 30 min para reutilizar la caché) e interpola linealmente a
+   «ahora» (desenvolviendo AR en el salto 0h/24h); cadena de fallback sin red:
+   elementos SBDB propagados con Kepler → órbita preliminar NEOfixer (NEOCP no
+   confirmados) → snapshot del plan con aviso. SN y tránsitos siguen usando el
+   snapshot (coordenadas fijas). El contexto del proyecto gana `coords_epoch`/
+   `coords_source`/`rate_arcsec_min` frescos y el panel muestra
+   «Posición a las HH:MM:SS UT»; la ficha de objeto muestra la época de la
+   efeméride junto al RA/Dec copiable (`ephem_epoch`, fila más cercana a ahora
+   con paso 30 m en vez de `eph[0]` a 00:00 UT). El goto astrométrico absorbe el
+   residuo de efeméride con el plate solve, siempre que la predicción caiga
+   dentro del campo de resolución. **Fuera de esta iteración**:
+   `SolarTracking`/`UpdateCoord=True` en el `.targets` y tasas no siderales vía
+   JSON-RPC — requieren validación contra el CCDciel real; el cap anti-traza por
+   exposición (`max_exposure_no_trail` + `rate_arcsec_min`) ya protege los
+   frames.
 
 **Consecuencias**: `config.py` gana `ccdciel_host`/`ccdciel_port`/`ccdciel_auto_connect`;
 Settings gana el tab **CCDciel**; `db.py` `SOURCE_TTL["ccdciel"] = 60`; i18n ES/EN
 ampliada (~35 cadenas); tests unitarios del cliente con `requests.post` falso + worker
 offscreen + migración 2→3; test funcional que hace **skip** si no hay servidor en
-`localhost:3277`. El control de foco/dome/guiding/weather queda para una iteración
+`localhost:3277`. `core/ephemeris.py` gana `position_at` (+ helpers de interpolación
+y propagación); `enrich._enrich_small_body` usa paso 30 m y la fila más cercana a
+ahora (`ephem_epoch`); el contexto del proyecto lleva `coords_epoch`/`coords_source`;
+tests unitarios de interpolación, fallback y goto fresco. El control de
+foco/dome/guiding/weather queda para una iteración
 posterior (mismo transporte, más métodos).
 
 ## English
@@ -115,13 +141,38 @@ tab (ADR-019, review 2026-09-06):
    `Astrometry_Goto_Async [RA_app_hours, DEC°]`, polls `Astrometry_Goto_Running`
    every 1 s until it goes low (hard cap **120 s**, `CCDcielError` otherwise),
    then checks `Astrometry_Goto_Result` (`False` → `CCDcielError`). `Telescope_sync`
-   and `Client.sync_target` remain in the client for compatibility/direct use; the
-   GUI no longer calls them. The worker keeps `poll_slew=False` for this flow
-   because the loop is the astrometry one, not `Telescope_slewing`.
+    and `Client.sync_target` remain in the client for compatibility/direct use; the
+    GUI no longer calls them. The worker keeps `poll_slew=False` for this flow
+    because the loop is the astrometry one, not `Telescope_slewing`.
+7. **Fresh ephemeris in the goto for moving targets** (revision 2026-09-07):
+   NEOs, comets and PCCP candidates have no fixed coordinates — a 5″/min NEO
+   with a 2-hour-old plan is 10′ off, and the astrometric goto would solve the
+   wrong field. Rule: for kinds `neo`/`comet`/`pccp` the point button
+   **recomputes the position at click time** before slewing, inside the
+   `CcdcielWorker` (network off the GUI thread). The helper
+   `core/ephemeris.py::position_at` queries Horizons at a fine step (2 min,
+   ±2 h window rounded to 30 min to reuse the cache) and linearly interpolates
+   to "now" (RA unwrapped at the 0h/24h seam); offline fallback chain: SBDB
+   elements propagated with Kepler → NEOfixer preliminary orbit (unconfirmed
+   NEOCP) → plan snapshot with a warning. SN and transits keep using the
+   snapshot (fixed coordinates). The project context gains fresh
+   `coords_epoch`/`coords_source`/`rate_arcsec_min` and the panel shows
+   "Position at HH:MM:SS UT"; the object card shows the ephemeris epoch next
+   to the copyable RA/Dec (`ephem_epoch`, nearest row to now at a 30-min step
+   instead of `eph[0]` at 00:00 UT). The astrometric goto absorbs ephemeris
+   residual with the plate solve, as long as the prediction lands inside the
+   solve field. **Out of this iteration**: `SolarTracking`/`UpdateCoord=True`
+   in the `.targets` and non-sidereal rates via JSON-RPC — they need validation
+   against the real CCDciel; the per-exposure no-trail cap
+   (`max_exposure_no_trail` + `rate_arcsec_min`) already protects the frames.
 
 **Consequences**: `config.py` gains `ccdciel_host`/`ccdciel_port`/`ccdciel_auto_connect`;
 Settings gains the **CCDciel** tab; `db.py` `SOURCE_TTL["ccdciel"] = 60`; ES/EN i18n
 extended (~35 strings); client unit tests with a faked `requests.post` + offscreen
 worker + 2→3 migration; functional test that **skips** when no server listens on
-`localhost:3277`. Focuser/dome/guiding/weather control is deferred to a later iteration
+`localhost:3277`. `core/ephemeris.py` gains `position_at` (+ interpolation and
+propagation helpers); `enrich._enrich_small_body` uses a 30-min step and the row
+nearest now (`ephem_epoch`); the project context carries
+`coords_epoch`/`coords_source`; unit tests for interpolation, fallback and the
+fresh goto. Focuser/dome/guiding/weather control is deferred to a later iteration
 (same transport, more methods).

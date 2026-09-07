@@ -583,3 +583,35 @@ filtro de apertura de ADR-015 nunca se había implementado. Plan:
 **Nota i18n**: el comando `lupdate` documentado en CONTRIBUTING ahora incluye
 `gui/widgets/*.py` — sin él, lupdate marca «vanished» cadenas vivas de las
 cartas vectoriales y los tests de i18n fallan al regenerar.
+
+### 7octies. Goto con efeméride fresca para cuerpos en movimiento (2026-09-07, ADR-030 rev.)
+
+Motivación: los NEOs, cometas y PCCP no tienen coordenadas fijas (a diferencia
+de SN y tránsitos). El goto usaba el **snapshot** que el planner guardó al
+crear el proyecto — un NEO a 5″/min con un plan de hace 2 h acumula 10′ de
+error, y el goto astrométrico resolvía el campo equivocado. La ficha además
+mostraba la fila Horizons de las 00:00 UT (`eph[0]`, paso diario), hasta 24 h
+stale. Plan: `docs/PLANS/goto-fresh-ephemeris.md`.
+
+**Qué cambia** (un subplan = un commit):
+
+0. **`core/ephemeris.py::position_at`**: consulta Horizons a paso 2 min en
+   ventana ±2 h (redondeada a 30 min para reusar la caché), interpola linealmente
+   a «ahora» (desenvolviendo AR en el salto 0h/24h), deriva tasa aparente (″/min)
+   y PA. Fallback sin red: SBDB+Kepler → NEOfixer preliminar → `None`.
+1. **Goto fresco en `main_window.py`**: para `neo`/`comet`/`pccp` la acción del
+   `CcdcielWorker` resuelve `position_at` antes del slew/solve y pliega el
+   resultado en el contexto (`coords_epoch`/`coords_source`/`rate`). SN y
+   tránsitos siguen usando el snapshot. Etiqueta «Posición a las HH:MM:SS UT»
+   + aviso si cae al snapshot.
+2. **Ficha con época visible**: `_enrich_small_body` pide paso 30 m y elige la
+   fila más cercana a ahora (`ephem_epoch`); el bloque de coords muestra la
+   época junto al RA/Dec copiable.
+3. **Cierre**: i18n ES/EN (~4 cadenas), revisión de ADR-030, esta sección,
+   `pytest tests/unit` verde (582).
+
+**Estado**: subplanes 0-3 hechos; suite unitaria verde (582). **Fuera de esta
+iteración**: `SolarTracking`/`UpdateCoord=True` en el `.targets` y tasas no
+siderales vía JSON-RPC (necesitan validación contra el CCDciel real); el cap
+anti-traza por exposición (`max_exposure_no_trail` + `rate_arcsec_min`) ya
+protege los frames.

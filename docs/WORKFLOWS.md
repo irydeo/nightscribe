@@ -523,3 +523,36 @@ apply to NEOs and the ADR-015 aperture filter was never implemented. Plan:
 **i18n note**: the `lupdate` command documented in CONTRIBUTING now includes
 `gui/widgets/*.py` — without it lupdate marks live chart-widget strings as
 "vanished" and the i18n tests fail on regeneration.
+
+### 7octies. Fresh-ephemeris goto for moving targets (2026-09-07, ADR-030 rev.)
+
+Motivation: NEOs, comets and PCCP candidates have no fixed coordinates (unlike
+SN and transits). The goto used the **snapshot** the planner stored when the
+project was created — a 5″/min NEO with a 2-hour-old plan accrues 10′ of error,
+and the astrometric goto solved the wrong field. The card also showed the
+Horizons row at 00:00 UT (`eph[0]`, daily step), up to 24 h stale. Plan:
+`docs/PLANS/goto-fresh-ephemeris.md`.
+
+**What changes** (one subplan = one commit):
+
+0. **`core/ephemeris.py::position_at`**: queries Horizons at a 2-min step over
+   a ±2 h window (rounded to 30 min to reuse the cache), linearly interpolates
+   to "now" (RA unwrapped at the 0h/24h seam), derives the apparent rate
+   (″/min) and PA. Offline fallback: SBDB+Kepler → NEOfixer preliminary →
+   `None`.
+1. **Fresh goto in `main_window.py`**: for `neo`/`comet`/`pccp` the
+   `CcdcielWorker` action resolves `position_at` before the slew/solve and
+   folds the result into the context (`coords_epoch`/`coords_source`/`rate`).
+   SN and transits keep using the snapshot. A "Position at HH:MM:SS UT" label
+   + a warning when it falls back to the snapshot.
+2. **Card with visible epoch**: `_enrich_small_body` requests a 30-min step and
+   picks the row nearest now (`ephem_epoch`); the coords block shows the epoch
+   next to the copyable RA/Dec.
+3. **Closure**: ES/EN i18n (~4 strings), ADR-030 revision, this section,
+   `pytest tests/unit` green (582).
+
+**Status**: subplans 0-3 done; unit suite green (582). **Out of this
+iteration**: `SolarTracking`/`UpdateCoord=True` in the `.targets` and
+non-sidereal rates via JSON-RPC (they need validation against the real
+CCDciel); the per-exposure no-trail cap (`max_exposure_no_trail` +
+`rate_arcsec_min`) already protects the frames.

@@ -173,15 +173,18 @@ def _enrich_preliminary_orbit(target, date, site):
         return None
     out = {"sbdb": body, "preliminary": True, "unconfirmed": target}
     elements = body.get("elements") or {}
-    jd = coords.jd_from_datetime(
-        date if isinstance(date, datetime.datetime)
-        else datetime.datetime.now(datetime.timezone.utc))
+    when = (date if isinstance(date, datetime.datetime)
+            else datetime.datetime.now(datetime.timezone.utc))
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    jd = coords.jd_from_datetime(when)
     pos = ephem_minor.kepler_ra_dec(elements, jd)
     if pos:
         ra_deg, dec_deg, r, delta = pos
         out["ephem"] = {"ra": coords.ra_deg_to_hms(ra_deg),
                         "dec": coords.dec_deg_to_dms(dec_deg),
                         "r": r, "delta": delta}
+        out["ephem_epoch"] = when.strftime("%Y-%m-%d %H:%M")
         h = (body.get("phys") or {}).get("H")
         out["mag_now"] = orbits.visual_mag(h, r, delta)
         out["dist_now_km"] = delta * orbits.AU_KM
@@ -198,18 +201,44 @@ def _enrich_small_body(name, date, site):
     if not body:
         return None
     out = {"sbdb": body}
-    eph = horizons.ephemeris(body["des"] or name, center=site)
+    eph = horizons.ephemeris(body["des"] or name, center=site, step="30m")
     if eph:
-        out["ephem"] = eph[0]
+        row = _nearest_ephemeris_row(eph, date)
+        out["ephem"] = row
+        out["ephem_epoch"] = row.get("time")
         h = body["phys"].get("H")
-        out["mag_now"] = orbits.visual_mag(h, eph[0]["r"], eph[0]["delta"])
-        out["dist_now_km"] = eph[0]["delta"] * orbits.AU_KM
+        out["mag_now"] = orbits.visual_mag(h, row["r"], row["delta"])
+        out["dist_now_km"] = row["delta"] * orbits.AU_KM
     out["next_approach"] = cad.next_approach(body["des"] or name)
     elements = body.get("elements") or {}
     out["family"] = orbits.classify(elements, body.get("orbit_code"))
     # comet expected brightness (outburst detection feeds the narrative)
     m1, k1 = body["phys"].get("M1"), body["phys"].get("K1")
     if m1 and k1 and eph:
-        out["mag_expected"] = orbits.comet_expected_mag(m1, k1, eph[0]["r"],
-                                                        eph[0]["delta"])
+        out["mag_expected"] = orbits.comet_expected_mag(m1, k1, row["r"],
+                                                        row["delta"])
     return out
+
+
+def _nearest_ephemeris_row(rows, date=None):
+    # Picks the row whose time is closest to `date` (default now). With a
+    # 30-min step the nearest row is at most 15 min away — far better than
+    # eph[0] (00:00 UT) for a fast mover whose displayed position would
+    # otherwise be up to 24 h stale.
+    # @args: rows - list from horizons.ephemeris, date - datetime or None
+    # @return: the nearest row (first if none parse)
+    target = (date if isinstance(date, datetime.datetime)
+              else datetime.datetime.now(datetime.timezone.utc))
+    if target.tzinfo is None:
+        target = target.replace(tzinfo=datetime.timezone.utc)
+    best, best_dt = rows[0], None
+    for r in rows:
+        try:
+            t = datetime.datetime.strptime(r["time"], "%Y-%b-%d %H:%M")
+            t = t.replace(tzinfo=datetime.timezone.utc)
+        except (ValueError, KeyError):
+            continue
+        if best_dt is None or abs((t - target).total_seconds()) < \
+                abs((best_dt - target).total_seconds()):
+            best, best_dt = r, t
+    return best

@@ -459,6 +459,46 @@ def test_coords_block_simbad_fallback(panel):
     assert f"{dec_deg:+.5f}°" in txt, f"SIMBAD Dec not rendered: {txt!r}"
 
 
+def test_coords_block_shows_epoch_for_moving_target(panel):
+    # A moving target carries an ephemeris epoch: the block shows it so the
+    # observer sees how fresh the position is.
+    fx = __import__("copy").deepcopy(FAKE_ELEMENT)
+    fx["data"]["ephem_epoch"] = "2026-Sep-07 22:30"
+    panel.show(fx)
+    txt = panel.lbl_coords.text()
+    assert "Epoch" in txt, f"epoch label missing: {txt!r}"
+    # Horizons-style month is normalised to ISO
+    assert "2026-09-07 22:30" in txt
+
+
+def test_coords_block_no_epoch_for_fixed_target(panel):
+    # A supernova (fixed coordinates) has no ephemeris epoch: no epoch line.
+    fx = _sn_fixture()
+    fx["data"]["simbad"] = {"ra": "14 03 38.6", "dec": "+54 18 42.0",
+                            "otype": "SN*", "vmag": 14.2}
+    panel.show(fx)
+    assert "Epoch" not in panel.lbl_coords.text()
+
+
+def test_nearest_ephemeris_row_picks_closest_to_now():
+    # The helper used by enrich picks the row closest to the reference time,
+    # not the first one (which is 00:00 UT and up to 24 h stale for a NEO).
+    import datetime
+    from nightscribe.core import enrich
+    rows = [
+        {"time": "2026-Sep-07 00:00", "ra": "10 00 00", "dec": "+00 00 00",
+         "r": 1.0, "delta": 1.0},
+        {"time": "2026-Sep-07 22:30", "ra": "10 00 30", "dec": "+00 00 02",
+         "r": 1.0, "delta": 1.0},
+        {"time": "2026-Sep-08 00:00", "ra": "10 01 00", "dec": "+00 00 04",
+         "r": 1.0, "delta": 1.0},
+    ]
+    when = datetime.datetime(2026, 9, 7, 22, 35,
+                             tzinfo=datetime.timezone.utc)
+    row = enrich._nearest_ephemeris_row(rows, when)
+    assert row["time"] == "2026-Sep-07 22:30"
+
+
 # ---------------- object-card plan, subplan 1: multi-line table ------
 #
 # The "What it means" column wraps and the rows grow to fit the whole

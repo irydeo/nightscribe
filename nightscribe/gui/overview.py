@@ -367,7 +367,8 @@ class ObjectPanel(QWidget):
 
         ra, dec = self._coords_from(e)
         if ra is not None and dec is not None:
-            self._show_coords(ra, dec)
+            epoch = (e.get("data") or {}).get("ephem_epoch")
+            self._show_coords(ra, dec, epoch)
         else:
             self.row_coords.hide()
             self._coords_clip = ""
@@ -567,21 +568,41 @@ class ObjectPanel(QWidget):
                 pass
         return None, None
 
-    def _show_coords(self, ra_deg, dec_deg):
+    def _show_coords(self, ra_deg, dec_deg, epoch=None):
         # Paints the coordinates block; both formats go to the clipboard.
-        # @args: ra_deg, dec_deg - J2000 degrees
+        # When an ephemeris epoch is known (moving kinds) a third line shows
+        # the validity instant so the observer sees how fresh the position is.
+        # @args: ra_deg, dec_deg - J2000 degrees, epoch - "YYYY-Mon-DD HH:MM"
+        #        or ISO string (optional)
         from ..core import coords
         h, m, s = coords.ra_deg_to_hms(ra_deg).split()
         ra_sex = f"{h}h {m}m {s}s"
         sd, dm, ds = coords.dec_deg_to_dms(dec_deg).split()
         dec_sex = f"{sd[0]}{sd[1:]}° {dm}′ {ds}″"
         ra_dec, dec_dec = f"{ra_deg:.5f}°", f"{dec_deg:+.5f}°"
-        self.lbl_coords.setText(
-            f"{self.tr('RA')}  {ra_dec}  =  {ra_sex}\n"
-            f"{self.tr('Dec')} {dec_dec}  =  {dec_sex}")
-        self._coords_clip = (f"RA {ra_dec} = {ra_sex}\n"
-                             f"Dec {dec_dec} = {dec_sex}")
+        text = (f"{self.tr('RA')}  {ra_dec}  =  {ra_sex}\n"
+                f"{self.tr('Dec')} {dec_dec}  =  {dec_sex}")
+        clip = f"RA {ra_dec} = {ra_sex}\nDec {dec_dec} = {dec_sex}"
+        iso = self._epoch_iso(epoch) if epoch else None
+        if iso:
+            text += f"\n{self.tr('Epoch')}: {iso} UT"
+            clip += f"\nEpoch: {iso} UT"
+        self.lbl_coords.setText(text)
+        self._coords_clip = clip
         self.row_coords.show()
+
+    @staticmethod
+    def _epoch_iso(epoch):
+        # Normalises a Horizons-style "YYYY-Mon-DD HH:MM" epoch to the ISO
+        # "YYYY-MM-DD HH:MM" form; passes through anything else unchanged.
+        # @args: epoch - string
+        # @return: ISO-style string
+        import datetime
+        try:
+            t = datetime.datetime.strptime(epoch, "%Y-%b-%d %H:%M")
+            return t.strftime("%Y-%m-%d %H:%M")
+        except (ValueError, TypeError):
+            return epoch
 
     def _copy_coords(self):
         # Copies the coordinates (decimal + sexagesimal) to the clipboard.

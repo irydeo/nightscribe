@@ -12,12 +12,14 @@
 ############################################################
 
 # The object's «business card» as one reusable panel (phase D,
-# docs/WORKFLOWS.es.md §7ter): hook phrase, fact bullets, the
-# parameters table with a wide, multi-line explanation column and a
-# charts group (D2) rendered by core.post.build_charts. A slot that
-# build_charts cannot produce is hidden (the «omit what is missing»
-# rule); when no chart can be made, the whole charts group disappears
-# instead of leaving a grid of «why not» lines.
+# docs/WORKFLOWS.es.md §7ter): hook phrase, a coordinates block with
+# copyable RA/Dec (decimal + sexagesimal, object-card plan subplan 0),
+# fact bullets, the parameters table with a wide, multi-line
+# explanation column and a charts group (D2) rendered by
+# core.post.build_charts. A slot that build_charts cannot produce is
+# hidden (the «omit what is missing» rule); when no chart can be made,
+# the whole charts group disappears instead of leaving a grid of
+# «why not» lines.
 #
 # The charts group shows every produced chart on its OWN TAB (each tab
 # carries the chart's title, e.g. "Orbit", "Sky tonight"): with a single
@@ -185,6 +187,34 @@ class ObjectPanel(QWidget):
         self.lbl_hook.hide()
         layout.addWidget(self.lbl_hook)
 
+        # coordinates block (object-card plan, subplan 0): RA/Dec in
+        # decimal AND sexagesimal, with a one-click copy button. Hidden
+        # for objects without a known position (e.g. ESA alerts).
+        self.row_coords = QFrame()
+        self.row_coords.setStyleSheet(
+            f"background: {theme.C_BASE}; border-radius: 8px;"
+            f" border: 1px solid {theme.C_LINE};")
+        co_lay = QHBoxLayout(self.row_coords)
+        co_lay.setContentsMargins(10, 6, 10, 6)
+        self.lbl_coords = QLabel()
+        self.lbl_coords.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.lbl_coords.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        co_lay.addWidget(self.lbl_coords, 1)
+        self.btn_copy_coords = QPushButton("⧉  " + self.tr("Copy"))
+        self.btn_copy_coords.setCursor(Qt.PointingHandCursor)
+        self.btn_copy_coords.setToolTip(self.tr(
+            "Copy the coordinates (decimal and sexagesimal)"))
+        self.btn_copy_coords.setStyleSheet(
+            f"QPushButton {{ color: {theme.C_TEXT_DIM};"
+            f" background: transparent; border: 1px solid {theme.C_LINE};"
+            f" border-radius: 4px; padding: 2px 10px; }}"
+            f"QPushButton:hover {{ color: {theme.C_TEXT}; }}")
+        self.btn_copy_coords.clicked.connect(self._copy_coords)
+        co_lay.addWidget(self.btn_copy_coords)
+        self.row_coords.hide()
+        layout.addWidget(self.row_coords)
+        self._coords_clip = ""
+
         self.lbl_facts = QLabel()
         self.lbl_facts.setWordWrap(True)
         self.lbl_facts.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
@@ -278,6 +308,7 @@ class ObjectPanel(QWidget):
         self.lbl_state.show()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
+        self.row_coords.hide()
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
@@ -293,6 +324,7 @@ class ObjectPanel(QWidget):
         self.lbl_state.show()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
+        self.row_coords.hide()
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
@@ -313,6 +345,13 @@ class ObjectPanel(QWidget):
             self.lbl_facts.show()
         else:
             self.lbl_facts.hide()
+
+        ra, dec = self._coords_from(e)
+        if ra is not None and dec is not None:
+            self._show_coords(ra, dec)
+        else:
+            self.row_coords.hide()
+            self._coords_clip = ""
 
         self._rows = self._orbit_rows(e)
         self.grp_params.setVisible(bool(self._rows))
@@ -429,6 +468,8 @@ class ObjectPanel(QWidget):
         self.lbl_state.hide()
         self.lbl_hook.hide()
         self.lbl_facts.hide()
+        self.row_coords.hide()
+        self._coords_clip = ""
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
@@ -471,6 +512,71 @@ class ObjectPanel(QWidget):
         # @args: pair - {"es","en"} dict
         # @return: the string in the active language
         return orbits.pick(pair, self._lang())
+
+    # ---------------- coordinates block (object-card plan, subplan 0) --
+
+    @staticmethod
+    def _coords_from(e):
+        # Resolves the object's sky position trying the same source chain
+        # the sky chart uses: ephemeris, SIMBAD, NEOfixer unconfirmed,
+        # planner degrees, exoplanet archive degrees.
+        # @args: e - enriched dict
+        # @return: (ra_deg, dec_deg) floats, or (None, None) when unknown
+        from ..core import coords
+        d = e.get("data") or {}
+        for holder in (d.get("ephem"), d.get("simbad")):
+            if not holder:
+                continue
+            try:
+                return (coords.ra_hms_to_deg(holder["ra"]),
+                        coords.dec_dms_to_deg(holder["dec"]))
+            except (ValueError, AttributeError, KeyError):
+                pass
+        unc = d.get("unconfirmed")
+        if unc and unc.get("ra_deg") is not None:
+            try:
+                return float(unc["ra_deg"]), float(unc.get("dec_deg") or 0.0)
+            except (TypeError, ValueError):
+                pass
+        for ra_key in ("ra_deg", "ra"):
+            if d.get(ra_key) is None:
+                continue
+            dec_key = "dec_deg" if ra_key == "ra_deg" else "dec"
+            try:
+                return float(d[ra_key]), float(d.get(dec_key) or 0.0)
+            except (TypeError, ValueError):
+                pass
+        return None, None
+
+    def _show_coords(self, ra_deg, dec_deg):
+        # Paints the coordinates block; both formats go to the clipboard.
+        # @args: ra_deg, dec_deg - J2000 degrees
+        from ..core import coords
+        h, m, s = coords.ra_deg_to_hms(ra_deg).split()
+        ra_sex = f"{h}h {m}m {s}s"
+        sd, dm, ds = coords.dec_deg_to_dms(dec_deg).split()
+        dec_sex = f"{sd[0]}{sd[1:]}° {dm}′ {ds}″"
+        ra_dec, dec_dec = f"{ra_deg:.5f}°", f"{dec_deg:+.5f}°"
+        self.lbl_coords.setText(
+            f"{self.tr('RA')}  {ra_dec}  =  {ra_sex}\n"
+            f"{self.tr('Dec')} {dec_dec}  =  {dec_sex}")
+        self._coords_clip = (f"RA {ra_dec} = {ra_sex}\n"
+                             f"Dec {dec_dec} = {dec_sex}")
+        self.row_coords.show()
+
+    def _copy_coords(self):
+        # Copies the coordinates (decimal + sexagesimal) to the clipboard.
+        if not self._coords_clip:
+            return
+        from PySide6.QtGui import QGuiApplication
+        QGuiApplication.clipboard().setText(self._coords_clip)
+        self.btn_copy_coords.setText("✓  " + self.tr("Copied"))
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(1500, self._reset_copy_button)
+
+    def _reset_copy_button(self):
+        # Restores the copy button's face after the «copied» feedback.
+        self.btn_copy_coords.setText("⧉  " + self.tr("Copy"))
 
     def _orbit_rows(self, e):
         # @args: e - enriched dict
@@ -631,10 +737,10 @@ class ObjectPanel(QWidget):
         # Extracts the data needed to rebuild a fresh widget on click.
         # @args: key - slot name, e - enriched dict
         # @return: a dict suitable for _rebuild_widget, or None
-        from ..core import coords
         d = e.get("data") or {}
 
         if key == "orbit":
+            from ..core import coords
             sb = d.get("sbdb")
             els = (sb or {}).get("elements")
             if not els:
@@ -644,28 +750,8 @@ class ObjectPanel(QWidget):
             return {"elements": els, "jd": jd, "name": e.get("name", "")}
 
         elif key == "sky":
-            ra = dec = None
-            eph = d.get("ephem")
-            if eph:
-                try:
-                    ra = coords.ra_hms_to_deg(eph["ra"])
-                    dec = coords.dec_dms_to_deg(eph["dec"])
-                except (ValueError, AttributeError):
-                    pass
-            sim = d.get("simbad")
-            if sim and ra is None:
-                try:
-                    ra = coords.ra_hms_to_deg(sim["ra"])
-                    dec = coords.dec_dms_to_deg(sim["dec"])
-                except (ValueError, AttributeError):
-                    pass
+            ra, dec = self._coords_from(e)
             unc = d.get("unconfirmed")
-            if ra is None and unc and unc.get("ra_deg") is not None:
-                ra = float(unc["ra_deg"])
-                dec = float(unc.get("dec_deg", 0.0))
-            if ra is None and d.get("ra_deg") is not None:
-                ra = float(d["ra_deg"])
-                dec = float(d.get("dec_deg", 0.0))
 
             from ..config import config
             lat = config.get("lat")
@@ -704,6 +790,7 @@ class ObjectPanel(QWidget):
             }
 
         elif key == "approach":
+            from ..core import coords
             d = e.get("data") or {}
             sb = d.get("sbdb")
             els = (sb or {}).get("elements")

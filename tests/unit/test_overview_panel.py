@@ -406,6 +406,59 @@ def test_approach_slot_absent_without_elements(panel):
     assert panel._extract("approach", FAKE_UNCONFIRMED) is None
 
 
+# ---------------- object-card plan, subplan 0: coordinates block -----
+#
+# The block sits under the hook and shows RA/Dec in decimal AND
+# sexagesimal, with a copy button that puts both on the clipboard. It
+# hides for objects without a known position (ESA alerts, bare
+# unconfirmed rows). No network: fixtures carry their own coordinates.
+
+def test_coords_block_shows_decimal_and_sexagesimal(panel):
+    # FAKE_ELEMENT ephem: ra "12 00 00.000" (180°), dec "+30 00 00.000"
+    panel.show(FAKE_ELEMENT)
+    assert panel.state() == "ready"
+    assert not panel.row_coords.isHidden()
+    txt = panel.lbl_coords.text()
+    assert "180.00000°" in txt, f"decimal RA missing: {txt!r}"
+    assert "12h 00m 00.0s" in txt, f"sexagesimal RA missing: {txt!r}"
+    assert "+30.00000°" in txt, f"decimal Dec missing: {txt!r}"
+    assert "+30° 00′ 00.0″" in txt, f"sexagesimal Dec missing: {txt!r}"
+
+
+def test_coords_copy_button_fills_clipboard(panel, qapp):
+    # One click copies both formats (decimal and sexagesimal).
+    from PySide6.QtGui import QGuiApplication
+    panel.show(FAKE_ELEMENT)
+    panel.btn_copy_coords.click()
+    clip = QGuiApplication.clipboard().text()
+    assert "180.00000°" in clip, f"decimal RA not copied: {clip!r}"
+    assert "12h 00m 00.0s" in clip, f"sexagesimal RA not copied: {clip!r}"
+    assert "+30.00000°" in clip, f"decimal Dec not copied: {clip!r}"
+    assert "+30° 00′ 00.0″" in clip, f"sexagesimal Dec not copied: {clip!r}"
+
+
+def test_coords_block_hidden_without_position(panel):
+    # FAKE_UNCONFIRMED carries no ra/dec anywhere: the block must hide
+    # (the «omit what is missing» rule) and the panel stays ready.
+    panel.show(FAKE_UNCONFIRMED)
+    assert panel.state() == "ready"
+    assert panel.row_coords.isHidden()
+
+
+def test_coords_block_simbad_fallback(panel):
+    # No ephemeris: SIMBAD coordinates (sexagesimal strings) are used.
+    from nightscribe.core import coords
+    fx = _sn_fixture()
+    fx["data"]["simbad"] = {"ra": "14 03 38.6", "dec": "+54 18 42.0",
+                            "otype": "SN*", "vmag": 14.2}
+    panel.show(fx)
+    assert not panel.row_coords.isHidden()
+    txt = panel.lbl_coords.text()
+    assert "14h 03m 38.6s" in txt, f"SIMBAD RA not rendered: {txt!r}"
+    dec_deg = coords.dec_dms_to_deg("+54 18 42.0")
+    assert f"{dec_deg:+.5f}°" in txt, f"SIMBAD Dec not rendered: {txt!r}"
+
+
 # ---------------- D3: capture / window block ----------------
 #
 # The block reads the project context snapshot (the numbers a capture plan

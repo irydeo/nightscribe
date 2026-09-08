@@ -110,9 +110,16 @@ class _ClickableFrame(QFrame):
     clicked = Signal()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.clicked.emit()
-        super().mousePressEvent(event)
+        # The click opens a modal dialog (explore) synchronously from inside
+        # this event; a pending row deleteLater() can then run inside that
+        # nested loop and destroy the C++ object before we return. The row
+        # is rebuilt anyway, so swallow the stale-object RuntimeError.
+        try:
+            if event.button() == Qt.LeftButton:
+                self.clicked.emit()
+            super().mousePressEvent(event)
+        except RuntimeError:
+            pass
 
 
 class _ScoreBar(QFrame):
@@ -842,8 +849,13 @@ class MainWindow(QMainWindow):
         if container.layout():
             while container.layout().count():
                 item = container.layout().takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
+                w = item.widget() if item else None
+                if w is not None:
+                    # detach now: deleteLater alone may run inside a nested
+                    # modal loop and leave the old row painted/clickable over
+                    # the fresh grid.
+                    w.setParent(None)
+                    w.deleteLater()
         else:
             container.setLayout(QVBoxLayout(container))
         layout = container.layout()
@@ -1465,16 +1477,29 @@ class MainWindow(QMainWindow):
             parts.append(f"{ctx['rate_arcsec_min']:.1f}″/min")
         self.projects.lbl_context.setText(" · ".join(parts) or "—")
 
+    def _wipe_layout(self, layout):
+        # Delete every widget and nested layout inside `layout`. setParent(None)
+        # detaches widgets from the paint tree immediately (so none of them can
+        # linger over the new tab content), deleteLater() frees the C++ object.
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+            elif item.layout() is not None:
+                self._wipe_layout(item.layout())
+
     def _clear_step_tabs(self):
-        # Remove all dynamic content from step tabs
+        # Remove all dynamic content from step tabs. A wipe that only checked
+        # item.widget() left the widgets inside nested addLayout rows (the
+        # CCDciel controls of the plan tab) orphaned: they kept painting over
+        # the rebuilt tab and piled up across project switches.
         for tab_name in ("tab_plan", "tab_process",
                          "tab_publish"):
             tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
             if tab and tab.layout():
-                while tab.layout().count():
-                    item = tab.layout().takeAt(0)
-                    if item.widget():
-                        item.widget().deleteLater()
+                self._wipe_layout(tab.layout())
         self.projects.lbl_step_status.setText("—")
         self._project_widgets = {}
 

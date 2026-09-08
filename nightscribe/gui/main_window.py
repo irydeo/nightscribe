@@ -1658,9 +1658,18 @@ class MainWindow(QMainWindow):
         layout.addLayout(f_row)
         m_row = QHBoxLayout()
         btn_ccd_goto = QPushButton(self.tr("Point telescope"))
+        btn_ccd_goto.setToolTip(self.tr(
+            "Quick slew to the freshly-computed position of a moving "
+            "target: J2000_to_Apparent + Telescope_slewasync, no "
+            "plate-solve. Fast, but assumes the ephemeris is already "
+            "accurate."))
         btn_ccd_goto.clicked.connect(self._ccd_goto)
         m_row.addWidget(btn_ccd_goto)
         btn_ccd_astrometry = QPushButton(self.tr("Astrometric Goto"))
+        btn_ccd_astrometry.setToolTip(self.tr(
+            "Slew + capture + plate-solve and correct to the true sky "
+            "position. Absorbs residual ephemeris error; the reliable "
+            "route for NEOCPs and preliminary orbits."))
         btn_ccd_astrometry.clicked.connect(self._ccd_astrometry_goto)
         m_row.addWidget(btn_ccd_astrometry)
         m_row.addStretch()

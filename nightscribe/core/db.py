@@ -235,13 +235,15 @@ class Database:
             )
             self._conn.commit()
 
-    def http_get(self, key, source, fetch_fn):
+    def http_get(self, key, source, fetch_fn, force=False):
         # Cache-aside helper: returns cached bytes or calls fetch_fn(),
         # stores the result and returns it.
         # @args: key - cache key, source - source name,
-        #        fetch_fn - callable returning (body bytes, content_type)
+        #        fetch_fn - callable returning (body bytes, content_type),
+        #        force - True bypasses the cache read (still stores the
+        #                fresh result for the next caller)
         # @return: (body bytes, content_type)
-        cached = self.cache_get(key)
+        cached = None if force else self.cache_get(key)
         if cached:
             logger.debug("cache hit: %s", key)
             return cached

@@ -101,6 +101,32 @@ def diameter_from_h(h, albedo=DEFAULT_ALBEDO):
     return 1329.0 / math.sqrt(albedo) * 10 ** (-h / 5.0)
 
 
+def tisserand_earth(a, e, i_deg):
+    # Tisserand parameter w.r.t. Earth (a_p = 1 AU): T = 1/a + 2*sqrt(a*(1-e^2))*cos(i).
+    # T < 3 co-orbital / JFC regime for comets, T > 3 asteroid; valid for bound orbits.
+    # @args: a - semi-major axis (AU), e - eccentricity, i_deg - inclination (degrees)
+    # @return: T_E float, or None if elements are missing or non-bounded (a <= 0)
+    if a is None or e is None or i_deg is None:
+        return None
+    if a <= 0.0 or not (0.0 <= e < 1.0):
+        return None
+    cos_i = math.cos(math.radians(i_deg))
+    return 1.0 / a + 2.0 * math.sqrt(a * (1.0 - e * e)) * cos_i
+
+
+def encounter_velocity(v_obj, v_earth):
+    # Barbee-style encounter speed: |v_obj - v_earth| (heliocentric frame).
+    # @args: v_obj - (vx, vy, vz) km/s of the object,
+    #        v_earth - (vx, vy, vz) km/s of Earth
+    # @return: relative speed km/s, or None if inputs incomplete
+    if not v_obj or not v_earth or len(v_obj) < 3 or len(v_earth) < 3:
+        return None
+    dx = v_obj[0] - v_earth[0]
+    dy = v_obj[1] - v_earth[1]
+    dz = v_obj[2] - v_earth[2]
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+
 def pick(texts, lang):
     # Selects one language from a {"es", "en"} pair. The GUI always shows a
     # single language (ADR-017); only post.py keeps using both.

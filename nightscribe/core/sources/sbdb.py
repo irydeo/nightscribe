@@ -69,13 +69,14 @@ def _fetch_one(sstr):
     return r.content, "application/json"
 
 
-def get(name):
+def get(name, force=False):
     # Fetches a small body (asteroid or comet) from JPL SBDB.
     # SBDB's sstr resolver rejects full comet names with a parenthetical
     # ("P/2020 G1 (Pimentel)" -> 400); on a 400 we retry once with the
     # parenthetical part dropped, which resolves fine. The retried lookup
     # gets its own cache key, so the retry only ever happens once.
-    # @args: name - any designation ("Apophis", "2021EQ3", "29P")
+    # @args: name - any designation ("Apophis", "2021EQ3", "29P"),
+    #        force - True bypasses the cache read (still stores the fresh copy)
     # @return: normalised dict or None
     def fetch():
         try:
@@ -88,7 +89,7 @@ def get(name):
                 return _fetch_one(short)
             raise
     try:
-        body, _ = db.http_get(f"sbdb:{name}", "sbdb", fetch)
+        body, _ = db.http_get(f"sbdb:{name}", "sbdb", fetch, force=force)
         return parse_sbdb(json.loads(body.decode("utf-8", "replace")))
     except (requests.RequestException, ValueError) as err:
         logger.warning("SBDB lookup failed for %s: %s", name, err)

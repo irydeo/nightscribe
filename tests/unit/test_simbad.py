@@ -21,7 +21,7 @@ from nightscribe.core.sources import simbad
 
 class _NoCacheDb:
     # Stand-in for core.db.db: no caching, fetch always runs.
-    def http_get(self, _key, _source, fetch_fn):
+    def http_get(self, _key, _source, fetch_fn, **_kw):
         return fetch_fn()
 
 

@@ -84,10 +84,11 @@ def best_window(entries, min_alt=30.0):
     }
 
 
-def orbit(packed):
+def orbit(packed, force=False):
     # Preliminary orbital elements for an (often unconfirmed) object,
     # computed by NEOfixer with Bill Gray's Find_Orb from MPC astrometry.
-    # @args: packed - packed MPC designation (e.g. "6HJ1A21")
+    # @args: packed - packed MPC designation (e.g. "6HJ1A21"),
+    #        force - True bypasses the cache read (still writes the fresh copy)
     # @return: normalised dict shaped like sbdb.parse_sbdb, or None
     import json
 
@@ -96,7 +97,7 @@ def orbit(packed):
                             timeout=40).content, "application/json"
     try:
         body, _ = db.http_get(f"neofixer:orbit:{packed}", "neofixer-orbit",
-                              fetch)
+                              fetch, force=force)
         data = json.loads(body.decode("utf-8", "replace"))
         return parse_neofixer_orbit(data, packed)
     except (requests.RequestException, ValueError) as err:
@@ -127,7 +128,8 @@ def parse_neofixer_orbit(data, packed):
     elements = {k: v for k, v in elements.items() if v is not None}
     sigmas = {k[:-6]: v for k, v in raw.items()
               if k.endswith(" sigma") and v is not None}
-    moids = raw.get("MOIDs") or {}
+    moids = {k: v for k, v in (raw.get("MOIDs") or {}).items()
+             if isinstance(v, (int, float))}
     moid_earth = moids.get("Earth")
     obs = obj.get("observations") or {}
     arc_days = None
@@ -145,6 +147,16 @@ def parse_neofixer_orbit(data, packed):
                 obs["earliest"]).date().isoformat()
         except (TypeError, ValueError, OverflowError):
             disc_date = None
+    last_obs = None
+    latest_iso = obs.get("latest iso")
+    if latest_iso:
+        last_obs = str(latest_iso)[:10]
+    elif obs.get("latest"):
+        try:
+            last_obs = coords.datetime_from_jd(
+                obs["latest"]).date().isoformat()
+        except (TypeError, ValueError, OverflowError):
+            last_obs = None
     return {
         "fullname": packed,
         "des": packed,
@@ -156,11 +168,13 @@ def parse_neofixer_orbit(data, packed):
         "elements": elements,
         "sigmas": sigmas,
         "moid": moid_earth,
+        "moids": moids,
         "phys": {"H": raw.get("H"), "G": raw.get("G")},
         "rms_residual": raw.get("rms_residual"),
         "n_resids": raw.get("n_resids"),
         "arc_days": arc_days,
         "disc_date": disc_date,
+        "last_obs": last_obs,
         "preliminary": True,            # flag for narrative/UI wording
     }
 

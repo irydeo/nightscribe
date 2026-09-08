@@ -23,10 +23,10 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
                                 QListWidgetItem, QMainWindow, QMessageBox,
-                                QProgressBar, QPushButton, QScrollArea,
+                                QProgressBar,                                 QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
-                                QTextEdit, QVBoxLayout, QWidget,
-                                QTableWidgetItem)
+                                QCheckBox, QDialogButtonBox, QTextEdit,
+                                QVBoxLayout, QWidget, QTableWidgetItem)
 
 from .. import paths
 from ..config import config
@@ -2278,33 +2278,68 @@ class MainWindow(QMainWindow):
         if not self._current_project:
             return
         ctx = self._current_project["context"]
-        obj_id = ctx.get("id") or self._current_project["object_name"]
-        site = config.get("mpc_code", "Z41")
-        items = [self.tr("CSV (generic)"), "TheSkyX", "Cartes du Ciel"]
-        choice, ok = QInputDialog.getItem(
-            self, self.tr("Ephemeris format"), self.tr("Format:"),
-            items, 0, False)
-        if not ok:
+        obj_id = (ctx.get("id") or ctx.get("packed")
+                  or self._current_project["object_name"])
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Export ephemeris"))
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel(self.tr("Format:")))
+        combo = QComboBox()
+        combo.addItem(self.tr("MPC elements (MPOrbit)"), "mpx")
+        combo.setItemData(0, self.tr(
+            "One MPOrbit element line per object (the universal MPC "
+            "elements handover format), importable by any planetarium or "
+            "orbit reader. Best for orbit handover."), Qt.ToolTipRole)
+        combo.addItem(self.tr("MPC orbit report"), "fo")
+        combo.setItemData(1, self.tr(
+            "Orbital elements, perihelion, P/Q, state vector, MOIDs, "
+            "Tisserand, encounter speed, diameter and an MPC element "
+            "footer. Universal: importable by any planetarium or orbit "
+            "reader. Best for a readable follow-up report."), Qt.ToolTipRole)
+        layout.addWidget(combo)
+        chk_force = QCheckBox(self.tr("Force fresh data (bypass cache)"))
+        chk_force.setToolTip(self.tr(
+            "Re-query JPL SBDB / NEOfixer now instead of using the cached "
+            "orbit. Use after the MPC has improved the preliminary orbit."))
+        layout.addWidget(chk_force)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+        if not dlg.exec():
             return
-        fmt = {0: "csv", 1: "skyx", 2: "cdc"}[items.index(choice)]
-        ext = ".csv" if fmt == "csv" else ".txt"
+        fmt = combo.currentData()
+        force = chk_force.isChecked()
+
         outdir = paths.data_dir() / "exports"
         outdir.mkdir(parents=True, exist_ok=True)
-        default = outdir / f"{obj_id}_ephemeris{ext}"
+        base = obj_id
+        if fmt == "fo":
+            ext, default_name = ".txt", f"{base}_orbit_report.txt"
+        else:
+            ext, default_name = ".txt", f"{base}_elements.txt"
+        default = outdir / default_name
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Export ephemeris"), str(default),
             f"*{ext};;All files (*)")
         if not out:
             return
-        self.statusBar().showMessage(self.tr("Querying Horizons…"))
-        rows = ephemeris.generate(obj_id, site, step="30m")
-        if not rows:
-            self.statusBar().showMessage(
-                self.tr("No ephemeris for %1").replace("%1", obj_id), 8000)
-            return
+
         try:
-            path = ephemeris.export(rows, out, fmt=fmt,
-                                    obj_name=self._current_project["object_name"])
+            packed = ctx.get("packed")
+            if fmt == "fo":
+                path = ephemeris.export_fo_report(
+                    name=obj_id, out=out, packed=packed, force=force)
+            else:
+                path = ephemeris.export_mpc_elements(
+                    name=obj_id, out=out, packed=packed, force=force)
+            if not path:
+                self.statusBar().showMessage(
+                    self.tr("No orbit record for %1").replace("%1", obj_id),
+                    8000)
+                return
             project.add_file(db, self._current_project["id"], path, "ephemeris")
             self.statusBar().showMessage(
                 self.tr("Written to %1").replace("%1", path), 8000)

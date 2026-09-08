@@ -118,3 +118,26 @@ def test_distance_text_units():
     assert "lunares" in near["es"] and "lunar" in near["en"]
     far = orbits.distance_text(150e6)
     assert "millones" in far["es"] and "million" in far["en"]
+
+
+def test_tisserand_earth_sar2911():
+    # Validated against the Find_Orb sample report (Sar2911 -> 2.97758).
+    t = orbits.tisserand_earth(1.4624917, 0.2881631, 7.94982)
+    assert abs(t - 2.97758) < 1e-4
+
+
+def test_tisserand_earth_guards():
+    assert orbits.tisserand_earth(None, 0.1, 10.0) is None
+    assert orbits.tisserand_earth(-1.0, 0.1, 10.0) is None     # non-bounded
+    assert orbits.tisserand_earth(1.4, 1.2, 10.0) is None      # e out of range
+    # circular, coplanar orbit: T = 1/a + 2*sqrt(a) = 1 + 2 = 3.0
+    assert abs(orbits.tisserand_earth(1.0, 0.0, 0.0) - 3.0) < 1e-9
+
+
+def test_encounter_velocity():
+    # Same velocity -> zero relative speed; a 3-4-5 offset -> 5 units.
+    assert orbits.encounter_velocity((1, 2, 3), (1, 2, 3)) == 0.0
+    assert abs(orbits.encounter_velocity((4, 4, 0), (1, 0, 0)) - 5.0) < 1e-9
+    # incomplete input -> None
+    assert orbits.encounter_velocity((1, 2), (1, 2, 3)) is None
+    assert orbits.encounter_velocity(None, (1, 2, 3)) is None

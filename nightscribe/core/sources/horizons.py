@@ -67,8 +67,9 @@ def parse_ephemeris(result_text):
     return rows
 
 
-def _raw_ephemeris(command, center, start, stop, step):
+def _raw_ephemeris(command, center, start, stop, step, force=False):
     # One Horizons call, verbatim command.
+    # @args: force - True bypasses the cache read
     # @return: list of rows (see parse_ephemeris)
     params = {
         "format": "json", "COMMAND": f"'{command}'", "OBJ_DATA": "'NO'",
@@ -83,27 +84,30 @@ def _raw_ephemeris(command, center, start, stop, step):
         r.raise_for_status()
         return r.content, "application/json"
     key = f"horizons:{command}:{center}:{start}:{stop}:{step}"
-    body, _ = db.http_get(key, "horizons", fetch)
+    body, _ = db.http_get(key, "horizons", fetch, force=force)
     text = json.loads(body.decode("utf-8", "replace")).get("result", "")
     return parse_ephemeris(text)
 
 
-def ephemeris(command, center="Z41", start=None, stop=None, step="1 d"):
+def ephemeris(command, center="Z41", start=None, stop=None, step="1 d",
+              force=False):
     # Observer ephemeris for a small body. Periodic comets need the CAP
     # clause (current apparition), so we retry with it when the plain
     # designation finds nothing.
     # @args: command - Horizons target (designation), center - MPC code or
-    #        '500@399', start/stop - 'YYYY-MM-DD' strings, step - e.g. '1 d'
+    #        '500@399', start/stop - 'YYYY-MM-DD' strings, step - e.g. '1 d',
+    #        force - True bypasses the cache read
     # @return: list of rows (see parse_ephemeris); empty on failure
     import datetime
     today = datetime.datetime.now(datetime.timezone.utc)
     start = start or today.strftime("%Y-%m-%d")
     stop = stop or (today + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
     try:
-        rows = _raw_ephemeris(command, center, start, stop, step)
+        rows = _raw_ephemeris(command, center, start, stop, step,
+                              force=force)
         if not rows and "/" not in command and "DES=" not in command:
             rows = _raw_ephemeris(f"DES= {command}; CAP;", center, start,
-                                  stop, step)
+                                  stop, step, force=force)
         return rows
     except (requests.RequestException, ValueError) as err:
         logger.warning("Horizons failed for %s: %s", command, err)

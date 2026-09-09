@@ -782,3 +782,56 @@ def test_followup_session_notes_persist(window, panel):
     window._fu_save_notes(p["id"])
     s = fu.get_session(dbmod.db, sid)
     assert s["notes"] == "Clear night, good seeing"
+
+
+# ---------------- B3: photometry entry ----------------
+
+def test_fu_add_measurement_quick(window, panel):
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026meas", {"kind": "sn"})
+    window._fu_add_session(p["id"])
+    sessions = fu.list_sessions(dbmod.db, p["id"])
+    sid = sessions[0]["id"]
+    # simulate selecting the session
+    lst = window._project_widgets["fu_sessions"]
+    lst.setCurrentRow(0)
+    window._fu_current_session = sid
+    # set mag and add
+    spn_mag = window._project_widgets.get("fu_meas_mag")
+    spn_err = window._project_widgets.get("fu_meas_err")
+    cmb_filt = window._project_widgets.get("fu_meas_filt")
+    if spn_mag and cmb_filt:
+        spn_mag.setValue(16.55)
+        cmb_filt.setCurrentText("Clear")
+        window._fu_add_measurement(sid, p["id"], spn_mag, spn_err, cmb_filt)
+    pts = fu.list_points(dbmod.db, p["id"])
+    assert len(pts) == 1
+    assert pts[0]["mag"] == 16.55
+    assert pts[0]["source"] == "manual"
+
+
+def test_fu_paste_dialog_parses(window, panel):
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    from PySide6.QtWidgets import QDialog, QDialogButtonBox
+    p = _create_and_select(window, "sn", "SN2026paste", {"kind": "sn"})
+    # stub the dialog: auto-accept with pasted text
+    text = ("2020/09/08.853 16.557 C\n"
+            "2020/09/10.860 16.527 C\n")
+    orig_exec = QDialog.exec
+    QDialog.exec = lambda self: QDialog.Accepted
+    try:
+        # we can't easily inject text into the dialog's QTextEdit from outside,
+        # so we test the parser+save path directly instead
+        from nightscribe.core.photometry_import import parse_photometry
+        pts, skipped = parse_photometry(text)
+        assert len(pts) == 2
+        for pt in pts:
+            fu.add_point(dbmod.db, p["id"], pt["mjd"], pt["filter"],
+                         pt["mag"], err=pt["err"], source="paste")
+    finally:
+        QDialog.exec = orig_exec
+    saved = fu.list_points(dbmod.db, p["id"])
+    assert len(saved) == 2
+    assert all(s["source"] == "paste" for s in saved)

@@ -2213,6 +2213,15 @@ class MainWindow(QMainWindow):
         btn_add = QPushButton(self.tr("Add visit"))
         btn_add.clicked.connect(lambda: self._fu_add_session(pid))
         layout.addWidget(btn_add)
+        # B3: paste bulk photometry + import file
+        fu_btns = QHBoxLayout()
+        btn_paste = QPushButton(self.tr("Paste photometry…"))
+        btn_paste.clicked.connect(lambda: self._fu_paste_dialog(pid))
+        fu_btns.addWidget(btn_paste)
+        btn_file = QPushButton(self.tr("Import file…"))
+        btn_file.clicked.connect(lambda: self._fu_import_file(pid))
+        fu_btns.addWidget(btn_file)
+        layout.addLayout(fu_btns)
 
         # sessions list
         grp = QGroupBox(self.tr("Visits"))
@@ -2266,7 +2275,7 @@ class MainWindow(QMainWindow):
             return
         sid = items[0].data(Qt.UserRole)
         self._fu_current_session = sid
-        # rebuild the session detail area: images + notes
+        # rebuild the session detail area: images + measurements + notes
         detail = self._fu_detail
         self._wipe_layout(detail.layout())
         dlay = detail.layout()
@@ -2279,6 +2288,42 @@ class MainWindow(QMainWindow):
         self._fu_populate_images(img_lst, sid)
         dlay.addWidget(img_lst)
         self._project_widgets["fu_images"] = img_lst
+        # B3: quick measurement entry — just type the magnitude
+        grp_meas = QGroupBox(self.tr("Measurements"))
+        grp_meas.setLayout(QVBoxLayout())
+        meas_row = QHBoxLayout()
+        meas_row.addWidget(QLabel(self.tr("Mag:")))
+        spn_mag = QDoubleSpinBox()
+        spn_mag.setRange(-5.0, 30.0)
+        spn_mag.setDecimals(3)
+        spn_mag.setValue(16.0)
+        meas_row.addWidget(spn_mag)
+        meas_row.addWidget(QLabel(self.tr("Err:")))
+        spn_err = QDoubleSpinBox()
+        spn_err.setRange(0.0, 9.0)
+        spn_err.setDecimals(3)
+        spn_err.setValue(0.0)
+        spn_err.setSpecialValueText("—")
+        meas_row.addWidget(spn_err)
+        meas_row.addWidget(QLabel(self.tr("Filter:")))
+        cmb_filt = QComboBox()
+        cmb_filt.setEditable(True)
+        cmb_filt.addItems(["Clear", "V", "R", "B", "I", "NIR"])
+        meas_row.addWidget(cmb_filt)
+        btn_add_meas = QPushButton(self.tr("Add"))
+        btn_add_meas.clicked.connect(
+            lambda: self._fu_add_measurement(sid, pid, spn_mag,
+                                              spn_err, cmb_filt))
+        grp_meas.layout().addLayout(meas_row)
+        # measurements list for this session
+        meas_lst = QListWidget()
+        self._fu_populate_measurements(meas_lst, pid, sid)
+        grp_meas.layout().addWidget(meas_lst)
+        dlay.addWidget(grp_meas)
+        self._project_widgets["fu_meas_mag"] = spn_mag
+        self._project_widgets["fu_meas_err"] = spn_err
+        self._project_widgets["fu_meas_filt"] = cmb_filt
+        self._project_widgets["fu_measurements"] = meas_lst
         # notes
         s = fu.get_session(db, sid)
         notes = QTextEdit()
@@ -2288,6 +2333,47 @@ class MainWindow(QMainWindow):
         notes.textChanged.connect(lambda: self._fu_save_notes(pid))
         dlay.addWidget(notes)
         self._project_widgets["fu_notes"] = notes
+
+    def _fu_populate_measurements(self, lst, pid, sid):
+        # @args: lst - QListWidget, pid - project id, sid - session id
+        from ..core import followup as fu
+        lst.clear()
+        for pt in fu.list_points(db, pid):
+            if pt.get("session_id") == sid:
+                err_str = f" ±{pt['err']}" if pt["err"] is not None else ""
+                item = QListWidgetItem(
+                    f"[{pt['filter']}] mag {pt['mag']}{err_str}"
+                    f"  ({pt['source']})")
+                item.setData(Qt.UserRole, pt["id"])
+                lst.addItem(item)
+
+    def _fu_add_measurement(self, sid, pid, spn_mag, spn_err, cmb_filt):
+        # B3 quick entry: one click saves a point (date/filter from the session).
+        from ..core import followup as fu
+        mag = spn_mag.value()
+        err = spn_err.value() if spn_err.value() > 0 else None
+        filt = cmb_filt.currentText().strip() or "Clear"
+        # MJD from the session's date (obs_date → approximate MJD)
+        s = fu.get_session(db, sid)
+        mjd = None
+        if s and s["obs_date"]:
+            try:
+                import datetime
+                dt = datetime.datetime.strptime(
+                    s["obs_date"], "%Y-%m-%d").replace(
+                    tzinfo=datetime.timezone.utc)
+                from ..core.coords import jd_from_datetime
+                mjd = jd_from_datetime(dt) - 2400000.5
+            except ValueError:
+                pass
+        if mjd is None:
+            mjd = 0.0   # fallback: the caller can fix it in the paste view
+        fu.add_point(db, pid, mjd, filt, mag, err=err,
+                     source="manual", session_id=sid)
+        self._populate_project_files(pid)
+        meas_lst = self._project_widgets.get("fu_measurements")
+        if meas_lst:
+            self._fu_populate_measurements(meas_lst, pid, sid)
 
     def _fu_populate_images(self, lst, sid):
         # @args: lst - QListWidget, sid - session id
@@ -2356,6 +2442,103 @@ class MainWindow(QMainWindow):
             self._fu_populate_sessions(lst, pid)
             # select the new one (top of the list, ordered DESC)
             lst.setCurrentRow(0)
+
+    def _populate_project_files(self, pid):
+        # Refresh the project files list in the Details tab. The files list
+        # widget is built by Track A (A4); if it doesn't exist yet this is a
+        # safe no-op so B2/B3 don't crash on branches without A merged.
+        lst = getattr(self, "_proj_files_list", None)
+        if lst is None:
+            return
+        lst.clear()
+        for f in project.list_files(db, pid):
+            name = Path(f["path"]).name
+            dt = datetime.datetime.fromtimestamp(f["created"])
+            item = QListWidgetItem(
+                f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
+            item.setData(Qt.UserRole, str(f["path"]))
+            lst.addItem(item)
+
+    def _fu_paste_dialog(self, pid):
+        # B3: paste bulk photometry — tolerant parser + preview + save.
+        from ..core.photometry_import import parse_photometry
+        from ..core import followup as fu
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Paste photometry"))
+        dlg.setLayout(QVBoxLayout())
+        dlg.layout().addWidget(QLabel(self.tr(
+            "Paste your AIJ / Tycho / CSV measurements.\n"
+            "One per line: date  magnitude  [error]  filter")))
+        edit = QTextEdit()
+        edit.setMinimumSize(400, 200)
+        dlg.layout().addWidget(edit)
+        # default filter for lines without one
+        cmb_def = QComboBox()
+        cmb_def.setEditable(True)
+        cmb_def.addItems(["Clear", "V", "R", "B", "I", "NIR"])
+        dlg.layout().addWidget(QLabel(self.tr("Default filter:")))
+        dlg.layout().addWidget(cmb_def)
+        preview = QListWidget()
+        dlg.layout().addWidget(QLabel(self.tr("Preview:")))
+        dlg.layout().addWidget(preview)
+        btns = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        dlg.layout().addWidget(btns)
+        # live parse as the user types
+        def on_text_changed():
+            pts, skipped = parse_photometry(
+                edit.toPlainText(),
+                default_filter=cmb_def.currentText().strip() or "Clear")
+            preview.clear()
+            for p in pts:
+                err_str = f" ±{p['err']}" if p["err"] else ""
+                preview.addItem(
+                    f"mag {p['mag']}{err_str}  [{p['filter']}]")
+            if skipped:
+                preview.addItem(
+                    self.tr("({} lines skipped)").format(len(skipped)))
+        edit.textChanged.connect(on_text_changed)
+        cmb_def.currentTextChanged.connect(on_text_changed)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        pts, _ = parse_photometry(
+            edit.toPlainText(),
+            default_filter=cmb_def.currentText().strip() or "Clear")
+        for p in pts:
+            fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
+                         err=p["err"], source="paste")
+        self._populate_project_files(pid)
+
+    def _fu_import_file(self, pid):
+        # B3: optional file import — read, parse, preview, save.
+        from ..core.photometry_import import parse_photometry
+        from ..core import followup as fu
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("Import photometry file"), "",
+            "CSV/Text (*.csv *.txt *.tsv);;All files (*)")
+        if not path:
+            return
+        try:
+            text = Path(path).read_text(encoding="utf-8", errors="replace")
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("Cannot read file: %1").replace("%1", str(err)), 6000)
+            return
+        pts, skipped = parse_photometry(text)
+        # quick confirmation with a count
+        msg = self.tr("{} points parsed").format(len(pts))
+        if skipped:
+            msg += self.tr(", {} lines skipped").format(len(skipped))
+        if QMessageBox.question(
+                self, self.tr("Import"), msg,
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        for p in pts:
+            fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
+                         err=p["err"], source="file")
+        self._populate_project_files(pid)
 
     def _step_key_idx(self, idx):
         # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no

@@ -93,7 +93,7 @@ Cada rama de track mergea a `feature/object-card` al cerrarse.
 | Track | Estado |
 |---|---|
 | A — project-lifecycle | Pendiente |
-| B — sn-followup | Pendiente |
+| B — sn-followup | **Hecho (2026-09-09)** |
 | C — neo-consistency | Pendiente |
 | D — exoplanet-transit-project | Plan enmendado 2026-09-09 (×2: mañana de diseño + post-entrevista); subplanes 0-5 pendientes |
 

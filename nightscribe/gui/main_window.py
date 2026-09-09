@@ -375,6 +375,8 @@ class MainWindow(QMainWindow):
         p.btn_mark_done.clicked.connect(self._project_mark_done)
         p.btn_archive.clicked.connect(self._project_archive)
         p.btn_delete.clicked.connect(self._project_delete)
+        p.btn_close.clicked.connect(self._project_close)
+        p.btn_reopen.clicked.connect(self._project_reopen)
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(
@@ -1462,9 +1464,15 @@ class MainWindow(QMainWindow):
                       "transit": "Exoplanet transit"}.get(p["kind"], p["kind"])
         cur = project.current_step(db, p["id"])
         step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
-        self.projects.lbl_header.setText(
-            f"<b>[{kind_label}] {p['object_name']}</b> — "
-            f"{self.tr('step')} {step_n}/3")
+        header = f"<b>[{kind_label}] {p['object_name']}</b>"
+        if p.get("closed_at"):
+            dt = datetime.datetime.fromtimestamp(p["closed_at"])
+            header += f" — <span style='color:#8a90a6'>{self.tr('closed')} {dt.strftime('%Y-%m-%d')}</span>"
+            if p.get("outcome"):
+                header += f" <span style='color:#8a90a6'>({p['outcome']})</span>"
+        else:
+            header += f" — {self.tr('step')} {step_n}/3"
+        self.projects.lbl_header.setText(header)
         ctx = p["context"]
         parts = []
         if ctx.get("mag") is not None:
@@ -1476,6 +1484,26 @@ class MainWindow(QMainWindow):
         if ctx.get("rate_arcsec_min"):
             parts.append(f"{ctx['rate_arcsec_min']:.1f}″/min")
         self.projects.lbl_context.setText(" · ".join(parts) or "—")
+        # Button visibility: Close when active, Reopen when done/archived.
+        is_active = p["status"] == project.STATUS_ACTIVE
+        self.projects.btn_close.setVisible(is_active)
+        self.projects.btn_reopen.setVisible(not is_active)
+        # Close advisor (T10): suggest closing when a project has been idle
+        # for too long. v1: time-based; the evolution signal from track B
+        # (B11) plugs into this same label later. Sugiere, nunca decide.
+        advisor = self.projects.lbl_advisor
+        if is_active and p.get("updated"):
+            days = int((datetime.datetime.now().timestamp() - p["updated"]) / 86400)
+            threshold = int(config.get("close_advisor_days", 30))
+            if days >= threshold:
+                advisor.setText(
+                    self.tr("This project has been idle for {} days. "
+                            "Consider closing it.").format(days))
+                advisor.setVisible(True)
+            else:
+                advisor.setVisible(False)
+        else:
+            advisor.setVisible(False)
 
     def _wipe_layout(self, layout):
         # Delete every widget and nested layout inside `layout`. setParent(None)
@@ -2256,6 +2284,13 @@ class MainWindow(QMainWindow):
                                 _STEP_KEYS[n], project.STEP_DONE)
         self._project_next()
         self._refresh_current_project()
+        # A2: marking the last step done proposes closing the project.
+        if n == len(_STEP_KEYS) - 1:
+            if QMessageBox.question(
+                    self, self.tr("Close project"),
+                    self.tr("All steps are done. Close this project?"),
+                    QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
+                self._project_close()
 
     def _refresh_current_project(self):
         if not self._current_project:
@@ -2473,8 +2508,50 @@ class MainWindow(QMainWindow):
     def _project_archive(self):
         if not self._current_project:
             return
+        if QMessageBox.question(
+                self, self.tr("Archive project"),
+                self.tr("Archive this project? You can reopen it later."),
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
         project.set_status(db, self._current_project["id"],
                            project.STATUS_ARCHIVED)
+        self.on_refresh_projects()
+
+    def _project_close(self):
+        # Close the current active project with an outcome dialog (A2).
+        if not self._current_project:
+            return
+        p = self._current_project
+        if p["status"] != project.STATUS_ACTIVE:
+            return
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Close project"))
+        lay = QVBoxLayout(dlg)
+        lay.addWidget(QLabel(self.tr("Final outcome:")))
+        cmb = QComboBox()
+        cmb.setEditable(True)
+        for oc in project.OUTCOMES.get(p["kind"], project.OUTCOME_DEFAULT):
+            cmb.addItem(oc)
+        lay.addWidget(cmb)
+        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        outcome = cmb.currentText().strip() or None
+        project.close(db, p["id"], outcome)
+        self.on_refresh_projects()
+
+    def _project_reopen(self):
+        # Reopen a closed/archived project (A2). The "un año después" revisita
+        # is a real flow — this works from done AND archived.
+        if not self._current_project:
+            return
+        p = self._current_project
+        if p["status"] == project.STATUS_ACTIVE:
+            return
+        project.reopen(db, p["id"])
         self.on_refresh_projects()
 
     def _project_delete(self):

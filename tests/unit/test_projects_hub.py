@@ -732,3 +732,87 @@ def test_apply_position_updates_context_and_label(window, panel):
     assert c["rate_arcsec_min"] == 5.0
     assert c["coords_source"] == "horizons"
     assert "22:30:00" in window._project_widgets["ccd_coords"].text()
+
+
+# ---------------- A2: close / reopen / advisor ----------------
+
+def _reselect(window, pid):
+    # @args: window - MainWindow, pid - project id to re-select after a
+    #        status change (close/reopen) so the header and buttons refresh.
+    #        Switches the filter to "All" first so a done/archived project
+    #        still appears in the list.
+    from PySide6.QtCore import Qt
+    window.projects.cmb_filter.blockSignals(True)
+    window.projects.cmb_filter.setCurrentIndex(1)  # "All"
+    window.projects.cmb_filter.blockSignals(False)
+    lst = window.projects.lst_projects
+    lst.blockSignals(True)
+    window.on_refresh_projects()
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == pid:
+            lst.setCurrentRow(i)
+            break
+    lst.blockSignals(False)
+    window._project_selected()
+
+
+def test_close_button_visible_when_active(window, panel):
+    _create_and_select(window, "sn", "SN2026A2a", {"kind": "sn", "mag": 16.0})
+    assert not window.projects.btn_close.isHidden()
+    assert window.projects.btn_reopen.isHidden()
+
+
+def test_reopen_button_visible_when_done(window, panel):
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _create_and_select(window, "sn", "SN2026A2b", {"kind": "sn"})
+    project.close(dbmod.db, p["id"], "completed")
+    _reselect(window, p["id"])
+    assert window.projects.btn_close.isHidden()
+    assert not window.projects.btn_reopen.isHidden()
+
+
+def test_header_shows_closed_date_and_outcome(window, panel):
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _create_and_select(window, "sn", "SN2026A2c", {"kind": "sn"})
+    project.close(dbmod.db, p["id"], "confirmed_ia")
+    _reselect(window, p["id"])
+    txt = window.projects.lbl_header.text().lower()
+    assert "closed" in txt or "cerrad" in txt
+    assert "confirmed_ia" in window.projects.lbl_header.text()
+
+
+def test_advisor_banner_for_stale_project(window, panel):
+    import nightscribe.core.db as dbmod
+    import datetime
+    p = _create_and_select(window, "sn", "SN2026A2d", {"kind": "sn"})
+    # push the updated stamp 40 days back so the advisor fires
+    old = datetime.datetime.now().timestamp() - 40 * 86400
+    dbmod.db.execute("UPDATE projects SET updated=? WHERE id=?",
+                     (old, p["id"]))
+    dbmod.db.commit()
+    _reselect(window, p["id"])
+    assert not window.projects.lbl_advisor.isHidden()
+    assert window.projects.lbl_advisor.text()
+
+
+def test_advisor_hidden_for_fresh_project(window, panel):
+    _create_and_select(window, "sn", "SN2026A2e", {"kind": "sn"})
+    assert window.projects.lbl_advisor.isHidden()
+
+
+def test_archive_has_confirmation(window, panel):
+    # Archive must ask before acting (A2). We cancel the dialog so the project
+    # stays active and the close button is still visible.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    from PySide6.QtWidgets import QMessageBox
+    p = _create_and_select(window, "sn", "SN2026A2f", {"kind": "sn"})
+    orig = QMessageBox.question
+    QMessageBox.question = lambda *a, **kw: QMessageBox.No
+    try:
+        window._project_archive()
+        assert project.get(dbmod.db, p["id"])["status"] == "active"
+    finally:
+        QMessageBox.question = orig

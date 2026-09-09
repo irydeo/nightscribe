@@ -26,13 +26,15 @@
         <property name="toolTip"><string>Select a project to see its guided steps</string></property>
        </widget>
       </item>
-      <item>
-       <layout class="QHBoxLayout">
-        <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-        <item><widget class="QPushButton" name="btn_archive"><property name="text"><string>Archive</string></property></widget></item>
-        <item><widget class="QPushButton" name="btn_delete"><property name="text"><string>Delete</string></property></widget></item>
-       </layout>
-      </item>
+       <item>
+        <layout class="QHBoxLayout">
+         <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         <item><widget class="QPushButton" name="btn_reopen"><property name="text"><string>Reopen</string></property></widget></item>
+         <item><widget class="QPushButton" name="btn_close"><property name="text"><string>Close project</string></property></widget></item>
+         <item><widget class="QPushButton" name="btn_archive"><property name="text"><string>Archive</string></property></widget></item>
+         <item><widget class="QPushButton" name="btn_delete"><property name="text"><string>Delete</string></property></widget></item>
+        </layout>
+       </item>
      </layout>
     </widget>
    </item>
@@ -54,7 +56,14 @@
         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
        </widget>
       </item>
-      <item>
+       <item>
+        <widget class="QLabel" name="lbl_advisor">
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="text"><string></string></property>
+         <property name="styleSheet"><string notr="true">background-color: #3a3020; color: #e0c060; border: 1px solid #5a4a20; border-radius: 4px; padding: 6px;</string></property>
+        </widget>
+       </item>
+       <item>
         <widget class="QTabWidget" name="tabs_steps">
          <property name="currentIndex"><number>0</number></property>
          <widget class="QWidget" name="tab_details">

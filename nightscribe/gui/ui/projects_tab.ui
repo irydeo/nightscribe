@@ -8,19 +8,54 @@
      <property name="title"><string>Projects</string></property>
      <property name="maximumWidth"><number>300</number></property>
      <layout class="QVBoxLayout" name="listLayout">
-      <item>
-       <layout class="QHBoxLayout" name="filterLayout">
-        <item>
-         <widget class="QComboBox" name="cmb_filter">
-          <item><property name="text"><string>Active</string></property></item>
-          <item><property name="text"><string>All</string></property></item>
-          <item><property name="text"><string>Done</string></property></item>
-          <item><property name="text"><string>Archived</string></property></item>
-         </widget>
-        </item>
-        <item><widget class="QPushButton" name="btn_refresh"><property name="text"><string>Refresh</string></property></widget></item>
-       </layout>
-      </item>
+       <item>
+        <layout class="QHBoxLayout" name="filterLayout">
+         <item>
+          <widget class="QComboBox" name="cmb_filter">
+           <item><property name="text"><string>Active</string></property></item>
+           <item><property name="text"><string>All</string></property></item>
+           <item><property name="text"><string>Done</string></property></item>
+           <item><property name="text"><string>Archived</string></property></item>
+          </widget>
+         </item>
+         <item><widget class="QPushButton" name="btn_refresh"><property name="text"><string>Refresh</string></property></widget></item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="classifyLayout">
+         <item>
+          <widget class="QComboBox" name="cmb_kind">
+           <item><property name="text"><string>All types</string></property></item>
+           <item><property name="text"><string>SN</string></property></item>
+           <item><property name="text"><string>NEO</string></property></item>
+           <item><property name="text"><string>Comet</string></property></item>
+           <item><property name="text"><string>PCCP</string></property></item>
+           <item><property name="text"><string>Transit</string></property></item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="edt_search">
+           <property name="placeholderText"><string>Search…</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="sortLayout">
+         <item>
+          <widget class="QComboBox" name="cmb_sort">
+           <item><property name="text"><string>Updated</string></property></item>
+           <item><property name="text"><string>Created</string></property></item>
+           <item><property name="text"><string>Name</string></property></item>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="chk_favorites">
+           <property name="text"><string>★ Favorites first</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
       <item>
        <widget class="QListWidget" name="lst_projects">
         <property name="toolTip"><string>Select a project to see its guided steps</string></property>

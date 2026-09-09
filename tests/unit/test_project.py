@@ -461,3 +461,70 @@ def test_list_projects_returns_lifecycle_fields(tmp_db):
     assert items[0]["outcome"] == "completed"
     assert items[0]["closed_at"] is not None
     assert items[0]["status"] == "done"
+
+
+# ---------------- Track A / A3: list_projects classification ----------------
+
+def test_list_projects_filter_by_kind(tmp_db):
+    project.create(tmp_db, "sn", "SN1")
+    project.create(tmp_db, "neo", "NEO1")
+    sns = project.list_projects(tmp_db, kind="sn")
+    assert len(sns) == 1
+    assert sns[0]["kind"] == "sn"
+
+
+def test_list_projects_search(tmp_db):
+    project.create(tmp_db, "sn", "SN2026abc")
+    project.create(tmp_db, "sn", "SN2026xyz")
+    results = project.list_projects(tmp_db, search="abc")
+    assert len(results) == 1
+    assert "abc" in results[0]["object_name"]
+
+
+def test_list_projects_search_case_insensitive(tmp_db):
+    project.create(tmp_db, "sn", "SN_BrightOne")
+    results = project.list_projects(tmp_db, search="brightone")
+    assert len(results) == 1
+
+
+def test_list_projects_filter_by_tags(tmp_db):
+    p1 = project.create(tmp_db, "sn", "SN1")
+    project.set_tags(tmp_db, p1["id"], "ia, red")
+    p2 = project.create(tmp_db, "sn", "SN2")
+    project.set_tags(tmp_db, p2["id"], "iin, blue")
+    results = project.list_projects(tmp_db, tags="red")
+    assert len(results) == 1
+    assert results[0]["object_name"] == "SN1"
+
+
+def test_list_projects_favorites_first(tmp_db):
+    p1 = project.create(tmp_db, "sn", "SN1")
+    p2 = project.create(tmp_db, "sn", "SN2")
+    project.set_favorite(tmp_db, p2["id"], True)
+    results = project.list_projects(tmp_db, favorites_first=True)
+    assert results[0]["favorite"] is True
+
+
+def test_list_projects_order_by_name(tmp_db):
+    project.create(tmp_db, "sn", "ZZZ")
+    project.create(tmp_db, "sn", "AAA")
+    results = project.list_projects(tmp_db, order="name")
+    assert results[0]["object_name"] == "AAA"
+
+
+def test_list_projects_order_by_created(tmp_db):
+    p_old = project.create(tmp_db, "sn", "Old")
+    p_new = project.create(tmp_db, "sn", "New")
+    results = project.list_projects(tmp_db, order="created")
+    assert results[0]["object_name"] == "New"
+
+
+def test_list_projects_combined_filters(tmp_db):
+    p1 = project.create(tmp_db, "sn", "SN2026abc")
+    project.set_tags(tmp_db, p1["id"], "ia")
+    project.set_favorite(tmp_db, p1["id"], True)
+    p2 = project.create(tmp_db, "neo", "NEO2026abc")
+    results = project.list_projects(tmp_db, kind="sn", search="abc",
+                                     tags="ia", favorites_first=True)
+    assert len(results) == 1
+    assert results[0]["id"] == p1["id"]

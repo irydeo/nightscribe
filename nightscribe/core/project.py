@@ -119,20 +119,40 @@ def create(db, kind, object_name, context=None):
     return get(db, pid)
 
 
-def list_projects(db, status=None):
-    # @args: db - Database, status - filter or None for all
+def list_projects(db, status=None, kind=None, search=None, tags=None,
+                  favorites_first=False, order="updated"):
+    # @args: db - Database, status - active|done|archived or None for all,
+    #        kind - filter by VALID_KINDS entry or None,
+    #        search - case-insensitive substring on object_name or None,
+    #        tags - substring to match against the tags column or None,
+    #        favorites_first - ORDER BY favorite DESC before the chosen order,
+    #        order - "updated" | "created" | "name"
     # @return: list of project dicts (without steps/files)
     cols = ("id, kind, object_name, status, created, updated, context,"
             " closed_at, outcome, tags, favorite")
+    where, params = [], []
     if status:
-        rows = db.execute(
-            f"SELECT {cols} FROM projects WHERE status=? ORDER BY updated DESC",
-            (status,),
-        ).fetchall()
-    else:
-        rows = db.execute(
-            f"SELECT {cols} FROM projects ORDER BY updated DESC",
-        ).fetchall()
+        where.append("status=?")
+        params.append(status)
+    if kind:
+        where.append("kind=?")
+        params.append(kind)
+    if search:
+        where.append("LOWER(object_name) LIKE ?")
+        params.append(f"%{search.lower()}%")
+    if tags:
+        where.append("LOWER(tags) LIKE ?")
+        params.append(f"%{tags.lower()}%")
+    order_map = {"updated": "updated DESC", "created": "created DESC",
+                 "name": "object_name COLLATE NOCASE"}
+    order_clause = order_map.get(order, "updated DESC")
+    if favorites_first:
+        order_clause = f"favorite DESC, {order_clause}"
+    sql = f"SELECT {cols} FROM projects"
+    if where:
+        sql += " WHERE " + " AND ".join(where)
+    sql += f" ORDER BY {order_clause}"
+    rows = db.execute(sql, params).fetchall()
     return [_row_to_project(r) for r in rows]
 
 

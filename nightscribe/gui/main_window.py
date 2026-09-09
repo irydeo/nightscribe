@@ -325,6 +325,14 @@ class MainWindow(QMainWindow):
             self.tonight.cmb_filter.setCurrentIndex(
                 self.tonight.cmb_filter.findData(saved))
 
+        # A3: restore the projects hub classification prefs
+        self.projects.cmb_kind.setCurrentIndex(
+            int(config.get("projects_filter_kind", 0)))
+        self.projects.cmb_sort.setCurrentIndex(
+            int(config.get("projects_filter_sort", 0)))
+        self.projects.chk_favorites.setChecked(
+            bool(config.get("projects_filter_fav", False)))
+
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
         # cell — no default 2x2 selection, no row numbers. The per-kind column
@@ -377,6 +385,10 @@ class MainWindow(QMainWindow):
         p.btn_delete.clicked.connect(self._project_delete)
         p.btn_close.clicked.connect(self._project_close)
         p.btn_reopen.clicked.connect(self._project_reopen)
+        p.cmb_kind.currentIndexChanged.connect(self.on_refresh_projects)
+        p.edt_search.textChanged.connect(self.on_refresh_projects)
+        p.cmb_sort.currentIndexChanged.connect(self.on_refresh_projects)
+        p.chk_favorites.stateChanged.connect(self.on_refresh_projects)
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(
@@ -1371,7 +1383,22 @@ class MainWindow(QMainWindow):
         idx = self.projects.cmb_filter.currentIndex()
         statuses = ("active", None, "done", "archived")
         status = statuses[idx] if idx < len(statuses) else None
-        projects = project.list_projects(db, status)
+        # A3: classification — kind, search, favorites, sort
+        kind_idx = self.projects.cmb_kind.currentIndex()
+        kinds = (None, "sn", "neo", "comet", "pccp", "transit")
+        kind = kinds[kind_idx] if kind_idx < len(kinds) else None
+        search = self.projects.edt_search.text().strip() or None
+        sort_idx = self.projects.cmb_sort.currentIndex()
+        orders = ("updated", "created", "name")
+        order = orders[sort_idx] if sort_idx < len(orders) else "updated"
+        favorites = self.projects.chk_favorites.isChecked()
+        # persist the prefs (pattern of WORKFLOWS 7quater)
+        config.set("projects_filter_kind", kind_idx)
+        config.set("projects_filter_sort", sort_idx)
+        config.set("projects_filter_fav", favorites)
+        projects_list = project.list_projects(
+            db, status, kind=kind, search=search,
+            favorites_first=favorites, order=order)
         lst = self.projects.lst_projects
         # preserve the selected project across the refresh (the list reloads
         # on every visit to the tab and at startup, so we must not drop the
@@ -1379,18 +1406,32 @@ class MainWindow(QMainWindow):
         sel = lst.currentItem()
         keep_id = sel.data(Qt.UserRole) if sel is not None else None
         lst.clear()
-        for p in projects:
+        # A3: group by year of created (section headers, non-selectable)
+        last_year = None
+        for p in projects_list:
+            year = datetime.datetime.fromtimestamp(p["created"]).year
+            if year != last_year:
+                last_year = year
+                header = QListWidgetItem(f"— {year} —")
+                header.setFlags(Qt.NoItemFlags)
+                font = header.font()
+                font.setBold(True)
+                header.setFont(font)
+                header.setTextAlignment(Qt.AlignCenter)
+                lst.addItem(header)
             kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
                           "pccp": "PCCP", "transit": self.tr("Transit")}.get(
                           p["kind"], p["kind"])
             cur = project.current_step(db, p["id"]) or "done"
             step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
-            item = QListWidgetItem(f"[{kind_label}] {p['object_name']}  {step_n}/3")
+            star = "★ " if p.get("favorite") else ""
+            item = QListWidgetItem(
+                f"{star}[{kind_label}] {p['object_name']}  {step_n}/3")
             item.setData(Qt.UserRole, p["id"])
             lst.addItem(item)
             if p["id"] == keep_id:
                 lst.setCurrentItem(item)
-        if not projects:
+        if not projects_list:
             self.projects.lbl_header.setText(
                 self.tr("No projects yet. Create one from Tonight."))
             self.projects.lbl_context.setText("—")

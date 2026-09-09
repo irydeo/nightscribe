@@ -816,3 +816,95 @@ def test_archive_has_confirmation(window, panel):
         assert project.get(dbmod.db, p["id"])["status"] == "active"
     finally:
         QMessageBox.question = orig
+
+
+# ---------------- A3: hub classification ----------------
+
+def _reset_filters(window):
+    # Reset all hub filters to defaults so tests are hermetic on the
+    # module-scoped shared window.
+    for w in (window.projects.cmb_filter, window.projects.cmb_kind,
+              window.projects.cmb_sort, window.projects.edt_search,
+              window.projects.chk_favorites):
+        w.blockSignals(True)
+    window.projects.cmb_filter.setCurrentIndex(0)   # Active
+    window.projects.cmb_kind.setCurrentIndex(0)      # All types
+    window.projects.edt_search.setText("")
+    window.projects.cmb_sort.setCurrentIndex(0)      # Updated
+    window.projects.chk_favorites.setChecked(False)
+    for w in (window.projects.cmb_filter, window.projects.cmb_kind,
+              window.projects.cmb_sort, window.projects.edt_search,
+              window.projects.chk_favorites):
+        w.blockSignals(False)
+
+
+def test_hub_groups_by_year(window, panel):
+    _reset_filters(window)
+    _create_and_select(window, "sn", "SN2026grp", {"kind": "sn"})
+    lst = window.projects.lst_projects
+    texts = [lst.item(i).text() for i in range(lst.count())]
+    # at least one year header ("— 2026 —") is present
+    assert any("2026" in t and "—" in t for t in texts)
+
+
+def test_hub_kind_filter(window, panel):
+    _reset_filters(window)
+    from PySide6.QtCore import Qt
+    _create_and_select(window, "sn", "SN2026kf", {"kind": "sn"})
+    _create_and_select(window, "neo", "NEO2026kf", {"kind": "neo"})
+    # switch to SN-only
+    window.projects.cmb_kind.setCurrentIndex(1)  # SN
+    lst = window.projects.lst_projects
+    names = [lst.item(i).text() for i in range(lst.count())
+             if lst.item(i).data(Qt.UserRole) is not None]
+    assert any("SN2026kf" in n for n in names)
+    assert not any("NEO2026kf" in n for n in names)
+
+
+def test_hub_search(window, panel):
+    _reset_filters(window)
+    from PySide6.QtCore import Qt
+    _create_and_select(window, "sn", "SN_A3unique", {"kind": "sn"})
+    _create_and_select(window, "sn", "SN_A3other", {"kind": "sn"})
+    window.projects.edt_search.setText("A3unique")
+    lst = window.projects.lst_projects
+    names = [lst.item(i).text() for i in range(lst.count())
+             if lst.item(i).data(Qt.UserRole) is not None]
+    assert len(names) == 1
+    assert "A3unique" in names[0]
+    # clean up so the search doesn't leak into other tests
+    _reset_filters(window)
+
+
+def test_hub_favorites_star(window, panel):
+    _reset_filters(window)
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026fav", {"kind": "sn"})
+    project.set_favorite(dbmod.db, p["id"], True)
+    _reselect(window, p["id"])
+    lst = window.projects.lst_projects
+    texts = [lst.item(i).text() for i in range(lst.count())
+             if lst.item(i).data(Qt.UserRole) == p["id"]]
+    assert "★" in texts[0]
+    _reset_filters(window)
+
+
+def test_hub_favorites_first(window, panel):
+    _reset_filters(window)
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    p_fav = _create_and_select(window, "sn", "SN2026fav1st", {"kind": "sn"})
+    project.set_favorite(dbmod.db, p_fav["id"], True)
+    p_plain = _create_and_select(window, "sn", "SN2026plain", {"kind": "sn"})
+    window.projects.chk_favorites.setChecked(True)
+    lst = window.projects.lst_projects
+    names = [lst.item(i).text() for i in range(lst.count())
+             if lst.item(i).data(Qt.UserRole) is not None]
+    # the favourite project comes before the plain one
+    fav_idx = next(i for i, n in enumerate(names) if "fav1st" in n)
+    plain_idx = next(i for i, n in enumerate(names) if "plain" in n)
+    assert fav_idx < plain_idx
+    _reset_filters(window)

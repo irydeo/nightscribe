@@ -775,6 +775,7 @@ class MainWindow(QMainWindow):
         self._update_night_header()
         self._build_suggestion_grid()
         self._fill_table()
+        self._show_cadence_hints()
         self.statusBar().showMessage(
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
@@ -841,6 +842,53 @@ class MainWindow(QMainWindow):
         tip = (self.tr("Moon: %1% lit now, %2% by dawn")
                .replace("%1", f"{pct_now:.0f}").replace("%2", f"{pct_by_dawn:.0f}"))
         label.setToolTip(tip + "\n" + self._txt(why))
+
+    def _show_cadence_hints(self):
+        # B11: surface active SN projects that are due for a revisit ("hace
+        # N noches que no la visitas"). Reads the follow-up cadence from the
+        # project_sessions table and shows a chip in the Tonight header.
+        from ..core import followup as fu
+        # remove any previous cadence chip (idempotent across refreshes)
+        old = self.tonight.findChild(QLabel, "ns_cadence_chip")
+        if old is not None:
+            parent = old.parentWidget()
+            if parent and parent.layout():
+                parent.layout().removeWidget(old)
+            old.deleteLater()
+        threshold = int(config.get("sn_cadence_days", 3))
+        # query active SN projects directly (list_projects on this branch
+        # may not support the kind= filter from Track A yet)
+        rows = db.execute(
+            "SELECT id, object_name FROM projects"
+            " WHERE status='active' AND kind='sn'").fetchall()
+        hints = []
+        for pid, name in rows:
+            days = fu.days_since_last_session(db, pid)
+            if days is not None and days >= threshold:
+                hints.append((name, days))
+        if not hints:
+            return
+        hint_text = self.tr("SN follow-up due: ") + ", ".join(
+            f"{name} ({days}d)" for name, days in hints[:3])
+        if len(hints) > 3:
+            hint_text += f" +{len(hints) - 3}"
+        chip = self._chip(hint_text, "#e0c060",
+                          tip=self.tr("Active SN projects due for a revisit"))
+        chip.setObjectName("ns_cadence_chip")
+        # insert the chip in the tonight header's layout (the parent of
+        # lbl_context is a QWidget; find its containing layout)
+        parent = self.tonight.lbl_context.parentWidget()
+        header_layout = parent.layout() if parent else None
+        if header_layout is None:
+            # walk up to find a layout
+            p = parent
+            while p is not None:
+                if p.layout() is not None:
+                    header_layout = p.layout()
+                    break
+                p = p.parentWidget()
+        if header_layout and hasattr(header_layout, "addWidget"):
+            header_layout.addWidget(chip)
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and

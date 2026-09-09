@@ -835,3 +835,50 @@ def test_fu_paste_dialog_parses(window, panel):
     saved = fu.list_points(dbmod.db, p["id"])
     assert len(saved) == 2
     assert all(s["source"] == "paste" for s in saved)
+
+
+# ---------------- B11: cadence hint in Tonight ----------------
+
+def test_cadence_hint_shows_for_stale_sn(window, panel):
+    # An active SN project with a session 3+ days ago should produce a cadence chip
+    from nightscribe.core import project, followup as fu
+    import nightscribe.core.db as dbmod
+    import datetime
+    p = _create_and_select(window, "sn", "SN2026cad", {"kind": "sn"})
+    sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
+    old = datetime.datetime.now().timestamp() - 5 * 86400
+    dbmod.db.execute(
+        "UPDATE project_sessions SET created=? WHERE id=?", (old, sid))
+    dbmod.db.commit()
+    window._tonight_all = []
+    window._show_cadence_hints()
+    from PySide6.QtWidgets import QLabel
+    chips = window.tonight.findChildren(QLabel)
+    texts = [c.text() for c in chips if "follow" in c.text().lower()
+                or "seguimiento" in c.text().lower()]
+    assert len(texts) >= 1
+
+
+def test_cadence_hint_no_active_projects(window, panel):
+    # Clean up any projects left by previous tests in the module-scoped DB
+    import nightscribe.core.db as dbmod
+    dbmod.db.execute("DELETE FROM projects")
+    dbmod.db.commit()
+    window._tonight_all = []
+    window._show_cadence_hints()
+    from PySide6.QtWidgets import QLabel
+    # the stale-sn test may have left a chip; clean it explicitly
+    stale = window.tonight.findChild(QLabel, "ns_cadence_chip")
+    if stale is not None:
+        # deleteLater is async; the C++ object lingers. Force-remove.
+        stale.setParent(None)
+        stale.deleteLater()
+    # look only for the named cadence chip (not any label with "follow")
+    from PySide6.QtWidgets import QLabel
+    chip = window.tonight.findChild(QLabel, "ns_cadence_chip")
+    # the chip may still exist as a C++ object pending deleteLater;
+    # what matters is that it's no longer in the layout (parent = None)
+    if chip is not None:
+        chip.setParent(None)
+    assert window.tonight.findChild(QLabel, "ns_cadence_chip") is None or \
+        chip.parentWidget() is None

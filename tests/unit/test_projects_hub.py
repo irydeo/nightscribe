@@ -1250,3 +1250,142 @@ def test_cadence_hint_no_active_projects(window, panel):
         chip.setParent(None)
     assert window.tonight.findChild(QLabel, "ns_cadence_chip") is None or \
         chip.parentWidget() is None
+
+
+# ---------------- gap fixes: orphaned B5/B6/B10 + B9 ----------------
+
+def test_fu_quicklook_button_runs_engine(window, panel):
+    # B5 fix: the quick-look button calls series.quicklook on the project's
+    # stacked images and saves the resulting points as source='quicklook'.
+    from nightscribe.core import project, followup as fu, series
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026ql", {"kind": "sn",
+                                                      "ra_deg": 10.0,
+                                                      "dec_deg": 20.0})
+    sid = fu.create_session(dbmod.db, p["id"], "2026-09-08")
+    # register two stacked FITS (the files need not exist for the mock)
+    for i in range(2):
+        fu.add_image(dbmod.db, sid, "Clear", f"/tmp/fu_fake_{i}.fits",
+                     date_obs="2026-09-08", exptime_s=60.0)
+    # mock the engine: it returns synthetic points without reading FITS
+    orig = series.quicklook
+    series.quicklook = lambda *a, **k: {
+        "points": [
+            {"mjd": 60600.0, "filter": "Clear", "mag": -1.2, "err": 0.02,
+             "source": "quicklook"},
+            {"mjd": 60601.0, "filter": "Clear", "mag": -1.1, "err": 0.02,
+             "source": "quicklook"},
+        ],
+        "summary": {"verdict": "normal", "slope_mag_per_day": 0.1,
+                    "delta_from_peak": 0.1},
+        "ensemble": [(50, 50), (150, 150)],
+    }
+    try:
+        window._fu_run_quicklook(p["id"])
+    finally:
+        series.quicklook = orig
+    pts = fu.list_points(dbmod.db, p["id"])
+    qpoints = [pt for pt in pts if pt["source"] == "quicklook"]
+    assert len(qpoints) == 2
+
+
+def test_fu_animation_button_writes_files(window, panel):
+    # B6 fix: the animation button writes the evolution GIF/MP4 to the
+    # project folder and registers them in project_files.
+    from nightscribe.core import project, followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026anim", {"kind": "sn",
+                                                          "ra_deg": 10.0,
+                                                          "dec_deg": 20.0})
+    for i in range(3):
+        sid = fu.create_session(dbmod.db, p["id"], f"2026-09-0{8+i}")
+        fu.add_image(dbmod.db, sid, "Clear", f"/tmp/fu_fake_{i}.fits",
+                     date_obs=f"2026-09-0{8+i}", exptime_s=60.0)
+    # mock the animation writer AND the FITS reader: no real FITS needed
+    from nightscribe.viz import evolution_view
+    from nightscribe.core import fits_io
+    import numpy as np
+    import pathlib
+    orig_gif = evolution_view.make_evolution_gif
+    orig_vid = evolution_view.make_evolution_video
+    orig_read = fits_io.read_fits
+    written = []
+    def fake_read(path):
+        data = np.full((100, 100), 100.0, dtype=np.float32)
+        yy, xx = np.ogrid[:100, :100]
+        data += 3000 * np.exp(-((xx - 50) ** 2 + (yy - 50) ** 2) / (2 * 3 ** 2))
+        return {"SIMPLE": True, "BITPIX": -32, "NAXIS": 2,
+                 "NAXIS1": 100, "NAXIS2": 100}, data
+    def fake_gif(frames, dates, sn_xy_s, out, **kw):
+        pathlib.Path(out).write_bytes(b"GIF89a fake")
+        written.append(out)
+        return out
+    def fake_vid(frames, dates, sn_xy_s, out, **kw):
+        pathlib.Path(out).write_bytes(b"MP4 fake")
+        written.append(out)
+        return out
+    evolution_view.make_evolution_gif = fake_gif
+    evolution_view.make_evolution_video = fake_vid
+    fits_io.read_fits = fake_read
+    try:
+        window._fu_run_animation(p["id"])
+    finally:
+        evolution_view.make_evolution_gif = orig_gif
+        evolution_view.make_evolution_video = orig_vid
+        fits_io.read_fits = orig_read
+    files = project.list_files(dbmod.db, p["id"])
+    kinds = [f["kind"] for f in files]
+    assert "evo_gif" in kinds
+    assert "evo_mp4" in kinds
+
+
+def test_fu_annotated_fits_button_writes_copy(window, panel):
+    # B10 fix: the annotated FITS button writes a copy with NS_ keywords.
+    from nightscribe.core import project, followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026ann", {"kind": "sn",
+                                                          "ra_deg": 10.0,
+                                                          "dec_deg": 20.0})
+    sid = fu.create_session(dbmod.db, p["id"], "2026-09-08")
+    fu.add_image(dbmod.db, sid, "Clear", "/tmp/fu_fake.fits",
+                 date_obs="2026-09-08", exptime_s=60.0)
+    # mock the annotated writer: writes a fake file without reading the FITS
+    from nightscribe.core import fits_annotate
+    orig = fits_annotate.write_annotated_fits
+    import pathlib
+    written = []
+    def fake_write(inp, out, **kw):
+        pathlib.Path(out).write_bytes(b"ANNOTATED fake")
+        written.append(out)
+        return out
+    fits_annotate.write_annotated_fits = fake_write
+    try:
+        window._fu_export_annotated(p["id"])
+    finally:
+        fits_annotate.write_annotated_fits = orig
+    files = project.list_files(dbmod.db, p["id"])
+    kinds = [f["kind"] for f in files]
+    assert "fits" in kinds
+    assert any("annotated" in f["path"] for f in files)
+
+
+def _write_simple_fits(path, data):
+    # Minimal valid FITS writer for test fixtures (SIMPLE=T, BITPIX=-32,
+    # NAXIS=2, NAXIS1/2, END) — enough for fits_io.read_fits to parse.
+    import struct
+    h, w = data.shape
+    header = (
+        "SIMPLE  =                    T                                                  "
+        f"BITPIX  =                  -32                                                  "
+        f"NAXIS   =                    2                                                  "
+        f"NAXIS1  ={w:>20}                                                  "
+        f"NAXIS2  ={h:>20}                                                  "
+        "END                                                                             "
+    )
+    hdr_bytes = header.encode("ascii")
+    hdr_bytes += b" " * (2880 - len(hdr_bytes) % 2880)
+    body = data.astype(">f4").tobytes()
+    body += b"\x00" * ((2880 - len(body) % 2880) % 2880)
+    from pathlib import Path
+    Path(path).write_bytes(hdr_bytes + body)
+    return path

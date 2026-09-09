@@ -2578,14 +2578,14 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if not p:
             return
-        paths = []
+        fits_paths = []
         dates = []
         for s in fu.list_sessions(db, pid):
             for img in fu.list_images(db, s["id"]):
                 if img["fits_path"]:
-                    paths.append(img["fits_path"])
+                    fits_paths.append(img["fits_path"])
                     dates.append(s["obs_date"])
-        if len(paths) < 2:
+        if len(fits_paths) < 2:
             self.statusBar().showMessage(
                 self.tr("Need at least 2 stacked images"), 5000)
             return
@@ -2600,7 +2600,7 @@ class MainWindow(QMainWindow):
         try:
             frames_data = []
             dates_out = []
-            for path, date in zip(paths, dates):
+            for path, date in zip(fits_paths, dates):
                 import numpy as np
                 from ..core import fits_io, wcs as wcs_mod
                 header, data = fits_io.read_fits(path)
@@ -2640,12 +2640,12 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if not p:
             return
-        paths = []
+        fits_paths = []
         for s in fu.list_sessions(db, pid):
             for img in fu.list_images(db, s["id"]):
                 if img["fits_path"]:
-                    paths.append(img["fits_path"])
-        if not paths:
+                    fits_paths.append(img["fits_path"])
+        if not fits_paths:
             self.statusBar().showMessage(
                 self.tr("No stacked images registered"), 5000)
             return
@@ -2656,7 +2656,7 @@ class MainWindow(QMainWindow):
         if sn_ra is not None and sn_dec is not None:
             try:
                 from ..core import fits_io, wcs as wcs_mod
-                header, _ = fits_io.read_fits(paths[0])
+                header, _ = fits_io.read_fits(fits_paths[0])
                 wcs = wcs_mod.Wcs.from_header(header)
                 if wcs:
                     sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec)
@@ -2666,7 +2666,7 @@ class MainWindow(QMainWindow):
             f"{p['object_name']}_annotated.fits"
         try:
             fits_annotate.write_annotated_fits(
-                paths[0], str(out), sn_xy=sn_xy,
+                fits_paths[0], str(out), sn_xy=sn_xy,
                 obj_name=p["object_name"], ra_deg=sn_ra, dec_deg=sn_dec,
                 notes=self.tr("SN follow-up"))
             project.add_file(db, pid, str(out), "fits")

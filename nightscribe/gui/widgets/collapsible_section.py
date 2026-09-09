@@ -65,6 +65,10 @@ class CollapsibleSection(QWidget):
     def setContentWidget(self, widget):
         self._content_layout.addWidget(widget)
 
+    # @return: the inner QLayout of the section (for extra buttons)
+    def contentLayout(self):
+        return self._content_layout
+
     # @args: collapsed - True to start collapsed
     def setCollapsed(self, collapsed):
         self._expanded = not collapsed

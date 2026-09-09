@@ -146,10 +146,12 @@
        <item>
         <widget class="QGroupBox" name="grp_session">
          <property name="title"><string>Session defaults</string></property>
-         <layout class="QFormLayout">
-          <item row="0" column="0"><widget class="QLabel" name="lbl_overhead"><property name="text"><string>Per-frame overhead (s):</string></property></widget></item>
-          <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_overhead"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>120.0</double></property><property name="toolTip"><string>Readout/slew overhead added to every exposure frame</string></property></widget></item>
-         </layout>
+          <layout class="QFormLayout">
+           <item row="0" column="0"><widget class="QLabel" name="lbl_overhead"><property name="text"><string>Per-frame overhead (s):</string></property></widget></item>
+           <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_overhead"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>120.0</double></property><property name="toolTip"><string>Readout/slew overhead added to every exposure frame</string></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="lbl_sn_cadence"><property name="text"><string>SN revisit reminder (days):</string></property></widget></item>
+           <item row="1" column="1"><widget class="QSpinBox" name="spn_sn_cadence"><property name="minimum"><number>1</number></property><property name="maximum"><number>30</number></property><property name="toolTip"><string>Show a reminder when an active SN project has not been visited in this many nights</string></property></widget></item>
+          </layout>
         </widget>
        </item>
        <item>

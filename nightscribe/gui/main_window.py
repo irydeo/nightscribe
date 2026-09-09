@@ -51,6 +51,20 @@ UI_DIR = Path(__file__).parent / "ui"
 # 2026-09-06): planning the session and exporting/running it against CCDciel
 # is one step — Plan & Captura.
 _STEP_KEYS = ("plan", "process", "publish")
+
+# A2: outcome keys (from project.OUTCOMES) → human labels, by language.
+# The editable combo stores the key (English) and shows the label; «Otro»
+# is free text that passes through close() untouched.
+_OUTCOME_LABELS = {
+    "confirmed_ia": {"es": "Ia confirmada", "en": "Confirmed Ia"},
+    "confirmed_other": {"es": "Confirmada (otro tipo)", "en": "Confirmed (other)"},
+    "false_positive": {"es": "Falso positivo", "en": "False positive"},
+    "lost": {"es": "Perdida", "en": "Lost"},
+    "completed": {"es": "Completado", "en": "Completed"},
+    "reported_mpc": {"es": "Reportado al MPC", "en": "Reported to MPC"},
+    "reported_exoclock": {"es": "Reportado a ExoClock", "en": "Reported to ExoClock"},
+    "abandoned": {"es": "Abandonado", "en": "Abandoned"},
+}
 _STEP_TABS = {0: "tab_plan", 1: "tab_process", 2: "tab_publish"}
 _STEP_LABELS_ES = {"plan": "Plan & Captura", "process": "Procesado",
                    "publish": "Publicar"}
@@ -182,6 +196,8 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self._project_widgets = {}
         self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
+        self._advisor_dismissed = None  # A2: id of the project whose advisor
+        #                                the user dismissed this session
 
         # CCDciel integration (ADR-030). The connection survives project
         # switches: the observatory does not re-connect per target.
@@ -388,8 +404,16 @@ class MainWindow(QMainWindow):
         p.btn_reopen.clicked.connect(self._project_reopen)
         p.cmb_kind.currentIndexChanged.connect(self.on_refresh_projects)
         p.edt_search.textChanged.connect(self.on_refresh_projects)
+        p.edt_tag.textChanged.connect(self.on_refresh_projects)
         p.cmb_sort.currentIndexChanged.connect(self.on_refresh_projects)
         p.chk_favorites.stateChanged.connect(self.on_refresh_projects)
+        # A3: favorite star toggle + tags editor in the project header
+        p.btn_favorite.clicked.connect(self._project_toggle_favorite)
+        p.edt_tags.editingFinished.connect(self._project_tags_edited)
+        # A2: click on the advisor banner dismisses it for this session
+        self._advisor_dismissed = None
+        self.projects.lbl_advisor.mouseReleaseEvent = \
+            lambda _e: self._advisor_dismiss()
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(
@@ -435,6 +459,7 @@ class MainWindow(QMainWindow):
         dlg.spn_moon_sep.setValue(float(config.get("moon_min_sep_deg", 45)))
         dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
         dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
+        dlg.spn_sn_cadence.setValue(int(config.get("sn_cadence_days", 3)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
                                                      "127.0.0.1")))
         dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
@@ -489,6 +514,7 @@ class MainWindow(QMainWindow):
         config.set("moon_min_sep_deg", dlg.spn_moon_sep.value())
         config.set("moon_max_illum", dlg.spn_moon_illum.value())
         config.set("overhead_s", dlg.spn_overhead.value())
+        config.set("sn_cadence_days", dlg.spn_sn_cadence.value())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
@@ -1437,6 +1463,7 @@ class MainWindow(QMainWindow):
         kinds = (None, "sn", "neo", "comet", "pccp", "transit")
         kind = kinds[kind_idx] if kind_idx < len(kinds) else None
         search = self.projects.edt_search.text().strip() or None
+        tag = self.projects.edt_tag.text().strip() or None
         sort_idx = self.projects.cmb_sort.currentIndex()
         orders = ("updated", "created", "name")
         order = orders[sort_idx] if sort_idx < len(orders) else "updated"
@@ -1446,7 +1473,7 @@ class MainWindow(QMainWindow):
         config.set("projects_filter_sort", sort_idx)
         config.set("projects_filter_fav", favorites)
         projects_list = project.list_projects(
-            db, status, kind=kind, search=search,
+            db, status, kind=kind, search=search, tags=tag,
             favorites_first=favorites, order=order)
         lst = self.projects.lst_projects
         # preserve the selected project across the refresh (the list reloads
@@ -1527,6 +1554,10 @@ class MainWindow(QMainWindow):
             self._proj_files_list.itemDoubleClicked.connect(
                 self._open_project_file)
             sec.setContentWidget(self._proj_files_list)
+            # A4: "Show in folder" button (opens the file's parent folder)
+            btn_folder = QPushButton(self.tr("Show in folder"))
+            btn_folder.clicked.connect(self._open_project_folder)
+            sec.contentLayout().addWidget(btn_folder)
             sec.setCollapsed(True)
             tab.layout().addWidget(sec)
             self._proj_files_section = sec
@@ -1555,6 +1586,17 @@ class MainWindow(QMainWindow):
         path = item.data(Qt.UserRole)
         if path:
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+
+    def _open_project_folder(self):
+        # A4: "Show in folder" opens the selected file's parent folder.
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        item = self._proj_files_list.currentItem()
+        if item is not None:
+            path = item.data(Qt.UserRole)
+            if path:
+                QDesktopServices.openUrl(
+                    QUrl.fromLocalFile(str(Path(path).parent)))
 
     # ---------------- object panel (phase D4) ----------------
 
@@ -1620,6 +1662,9 @@ class MainWindow(QMainWindow):
         if ctx.get("rate_arcsec_min"):
             parts.append(f"{ctx['rate_arcsec_min']:.1f}″/min")
         self.projects.lbl_context.setText(" · ".join(parts) or "—")
+        # A3: favorite star (☆/★) and tags editor in the header
+        self.projects.btn_favorite.setText("★" if p.get("favorite") else "☆")
+        self.projects.edt_tags.setText(p.get("tags") or "")
         # Button visibility: Close when active, Reopen when done/archived.
         is_active = p["status"] == project.STATUS_ACTIVE
         self.projects.btn_close.setVisible(is_active)
@@ -1628,18 +1673,27 @@ class MainWindow(QMainWindow):
         # for too long. v1: time-based; the evolution signal from track B
         # (B11) plugs into this same label later. Sugiere, nunca decide.
         advisor = self.projects.lbl_advisor
-        if is_active and p.get("updated"):
+        # T10: sugerencia descartable — clic en el banner la descarta para
+        # esta sesión del proyecto (no persiste; reaparece al refrescar)
+        dismissed = self._advisor_dismissed == p["id"]
+        if is_active and p.get("updated") and not dismissed:
             days = int((datetime.datetime.now().timestamp() - p["updated"]) / 86400)
             threshold = int(config.get("close_advisor_days", 30))
             if days >= threshold:
                 advisor.setText(
                     self.tr("This project has been idle for {} days. "
-                            "Consider closing it.").format(days))
+                            "Consider closing it. (click to dismiss)").format(days))
                 advisor.setVisible(True)
             else:
                 advisor.setVisible(False)
         else:
             advisor.setVisible(False)
+
+    def _advisor_dismiss(self):
+        # A2: dismiss the close-advisor banner for the current project.
+        if self._current_project:
+            self._advisor_dismissed = self._current_project["id"]
+            self.projects.lbl_advisor.setVisible(False)
 
     def _wipe_layout(self, layout):
         # Delete every widget and nested layout inside `layout`. setParent(None)
@@ -3198,6 +3252,25 @@ class MainWindow(QMainWindow):
                            project.STATUS_ARCHIVED)
         self.on_refresh_projects()
 
+    def _project_toggle_favorite(self):
+        # A3: star toggle in the header — marks the project as favorite.
+        if not self._current_project:
+            return
+        pid = self._current_project["id"]
+        fav = not self._current_project.get("favorite")
+        project.set_favorite(db, pid, fav)
+        self.on_refresh_projects()
+
+    def _project_tags_edited(self):
+        # A3: tags editor — comma-separated free text, saved on Enter/focus-out.
+        if not self._current_project:
+            return
+        pid = self._current_project["id"]
+        tags = self.projects.edt_tags.text().strip()
+        project.set_tags(db, pid, tags)
+        # refresh the list row (tags appear in the label)
+        self.on_refresh_projects()
+
     def _project_close(self):
         # Close the current active project with an outcome dialog (A2).
         if not self._current_project:
@@ -3211,8 +3284,16 @@ class MainWindow(QMainWindow):
         lay.addWidget(QLabel(self.tr("Final outcome:")))
         cmb = QComboBox()
         cmb.setEditable(True)
+        # A2: show translated labels, store the key; «Other» = free text
+        lang = self._lang()
+        outcome_map = {}
         for oc in project.OUTCOMES.get(p["kind"], project.OUTCOME_DEFAULT):
-            cmb.addItem(oc)
+            lbl = _OUTCOME_LABELS.get(oc, {})
+            label = lbl.get(lang) or oc
+            cmb.addItem(label, oc)
+            outcome_map[label] = oc
+        cmb.addItem(self.tr("Other (free text)"), "")
+        cmb.setCurrentIndex(0)
         lay.addWidget(cmb)
         btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         btns.accepted.connect(dlg.accept)
@@ -3220,7 +3301,11 @@ class MainWindow(QMainWindow):
         lay.addWidget(btns)
         if dlg.exec() != QDialog.Accepted:
             return
-        outcome = cmb.currentText().strip() or None
+        # store the key (data), not the translated label; «Other» (data="")
+        # falls back to the free text the user typed
+        outcome = cmb.currentData()
+        if not outcome:
+            outcome = cmb.currentText().strip() or None
         project.close(db, p["id"], outcome)
         self.on_refresh_projects()
 
@@ -3452,8 +3537,15 @@ class MainWindow(QMainWindow):
         post_w = _load_ui("post_tab")
         layout.addWidget(post_w)
         post_w.edt_object.setText(name)
-        # default save folder: the data dir's posts directory
-        post_w.edt_folder.setText(str(paths.data_dir() / "posts"))
+        # A4: default save folder — the project's own folder when the post
+        # comes from a project, the flat posts dir otherwise
+        default_folder = str(paths.data_dir() / "posts")
+        if self._current_project \
+                and self._current_project["object_name"] == name:
+            default_folder = str(paths.project_dir(
+                self._current_project["id"],
+                self._current_project["object_name"]))
+        post_w.edt_folder.setText(default_folder)
         post_w.btn_folder_browse.clicked.connect(
             lambda: self._dialog_post_browse_folder(post_w))
         post_w.btn_generate.clicked.connect(
@@ -3530,16 +3622,31 @@ class MainWindow(QMainWindow):
         written = post_mod.save_outputs(rendered, outdir, name, e=e,
                                         charts=charts or None, cfg=config,
                                         resources=resources or None)
+        # A4: register every written file (posts + tweet) in the project
+        if self._current_project \
+                and self._current_project["object_name"] == name:
+            pid = self._current_project["id"]
+            for key, p in written.items():
+                if key in ("es", "en", "tweet"):
+                    project.add_file(db, pid, str(p), "post")
         # show the final drafts (with the gallery/resources links) in the tab
         post_w.txt_es.setPlainText(rendered.get("es", ""))
         post_w.txt_en.setPlainText(rendered.get("en", ""))
         post_w.txt_tweet.setPlainText(rendered.get("tweet", ""))
         db.mark_posted(name)
-        if charts and self._current_project \
+        # A4: register every written file (posts + tweet) in the project,
+        # plus charts and resources, and refresh the files list
+        if self._current_project \
                 and self._current_project["object_name"] == name:
             pid = self._current_project["id"]
+            for key, p in written.items():
+                if key in ("es", "en", "tweet"):
+                    project.add_file(db, pid, str(p), "post")
             for p in charts.values():
                 project.add_file(db, pid, str(p), "chart")
+            for p in resources.values():
+                project.add_file(db, pid, str(p), "chart")
+            self._populate_project_files(pid)
         post_w.lbl_files.setText(
             self.tr("Saved to: ") + ", ".join(str(p) for p in written.values()))
         self.statusBar().showMessage(self.tr("Drafts ready"), 5000)

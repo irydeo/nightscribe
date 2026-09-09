@@ -38,6 +38,12 @@
            <property name="placeholderText"><string>Search…</string></property>
           </widget>
          </item>
+         <item>
+          <widget class="QLineEdit" name="edt_tag">
+           <property name="placeholderText"><string>tag…</string></property>
+           <property name="maximumWidth"><number>80</number></property>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>
@@ -97,9 +103,30 @@
          <property name="text"><string></string></property>
          <property name="styleSheet"><string notr="true">background-color: #3a3020; color: #e0c060; border: 1px solid #5a4a20; border-radius: 4px; padding: 6px;</string></property>
         </widget>
-       </item>
-       <item>
-        <widget class="QTabWidget" name="tabs_steps">
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="metaLayout">
+          <item>
+           <widget class="QPushButton" name="btn_favorite">
+            <property name="text"><string>☆</string></property>
+            <property name="toolTip"><string>Mark as favorite</string></property>
+            <property name="maximumWidth"><number>36</number></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lbl_tags">
+            <property name="text"><string>Tags:</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLineEdit" name="edt_tags">
+            <property name="placeholderText"><string>comma-separated tags…</string></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QTabWidget" name="tabs_steps">
          <property name="currentIndex"><number>0</number></property>
          <widget class="QWidget" name="tab_details">
           <attribute name="title"><string>Details</string></attribute>

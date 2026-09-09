@@ -55,6 +55,9 @@ DEFAULTS = {
     "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert"],
     "tonight_kind": "",           # last-used header filter; "" = "All"
     "best_per_kind_n": 5,         # per-kind cap for the Tonight grid
+    # SN follow-up (Track B, B11): cadence threshold in days — the Tonight
+    # chip and the follow-up tab remind when a visit is due
+    "sn_cadence_days": 3,
 }
 
 

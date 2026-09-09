@@ -87,7 +87,10 @@ CHART_LABELS = {
                  "alt_en": "Star field around %s",
                  "es": "Campo estelar", "en": "Star field"},
     "transit":  {"alt_es": "Curva de luz del tránsito de %s",
-                 "alt_en": "Light curve of the %s transit",
+                  "alt_en": "Light curve of the %s transit",
+                  "es": "Curva de luz", "en": "Light curve"},
+    "lightcurve": {"alt_es": "Curva de luz de %s",
+                 "alt_en": "Light curve of %s",
                  "es": "Curva de luz", "en": "Light curve"},
     "sun":      {"alt_es": "Estado del Sol: imagen SDO y regiones activas",
                  "alt_en": "Sun state: SDO image and active regions",
@@ -102,8 +105,14 @@ MEDIA = {
     "mp4":  {"alt_es": "Vídeo blink de %s", "alt_en": "Blink video of %s",
              "es": "Vídeo blink", "en": "Blink video"},
     "pair": {"alt_es": "Antes/después de %s",
-             "alt_en": "Before/after of %s",
-             "es": "Antes/después", "en": "Before/after"},
+              "alt_en": "Before/after of %s",
+              "es": "Antes/después", "en": "Before/after"},
+    "evo_gif":  {"alt_es": "Animación de la evolución de %s",
+                 "alt_en": "Evolution animation of %s",
+                 "es": "Animación", "en": "Evolution"},
+    "evo_mp4":  {"alt_es": "Vídeo de la evolución de %s",
+                 "alt_en": "Evolution video of %s",
+                 "es": "Vídeo evolución", "en": "Evolution video"},
 }
 
 
@@ -214,8 +223,8 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
     sim = d.get("simbad")
     if sim and ra_deg is None:
         try:
-            ra_deg = coords.ra_hms_to_deg(sim["ra"])
-            dec_deg = coords.dec_dms_to_deg(sim["dec"])
+            ra_deg = coords.ra_hms_to_deg(sim.get("ra", ""))
+            dec_deg = coords.dec_dms_to_deg(sim.get("dec", ""))
         except (ValueError, AttributeError):
             pass
     if ra_deg is None and unc and unc.get("ra_deg") is not None:
@@ -274,6 +283,20 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
         transit_view.draw_transit(tr, out=str(p), fmt=fmt, size=size,
                                   lang=lang)
         charts["transit"] = p
+    # B9: SN follow-up light curve (only for SN with photometry data)
+    fu = d.get("followup") or {}
+    fu_points = fu.get("points") or []
+    if fu_points and e.get("type") in ("transient", "sn"):
+        from ..viz import lightcurve_view
+        p = outdir / f"{safe}lightcurve.png"
+        try:
+            lightcurve_view.draw_lightcurve(
+                fu_points, out=str(p), fmt=fmt, size=size, lang=lang,
+                sn_type=(d.get("simbad") or {}).get("otype"),
+                peak_mjd=fu.get("peak_mjd"), peak_mag=fu.get("peak_mag"))
+            charts["lightcurve"] = p
+        except Exception:
+            logger.exception("light curve skipped for %s", e["name"])
     plt.close("all")
     return charts
 

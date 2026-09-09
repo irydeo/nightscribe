@@ -32,38 +32,59 @@ logger = logging.getLogger(__name__)
 
 
 def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
-              n_darks=0, exp_dark=None, n_bias=0):
+              n_darks=0, exp_dark=None, n_bias=0, steps=None):
     # Builds a capture plan dict from parameters + config defaults.
     # Calibration frames are optional: Dark (count + exposure) and Bias
     # (count) steps get appended to the sequence and their wall-clock time
     # is folded into duration_s (each cal frame still pays the overhead).
-    # @args: n_frames - light frame count, exp_s - exposure per light frame,
-    #        filter_name - filter wheel slot name, overhead_s - readout/slew
-    #        per frame (defaults to config), cfg - Config,
-    #        n_darks - dark frame count (0 = none), exp_dark - dark exposure
-    #        (falls back to the light exposure when 0/None),
-    #        n_bias - bias frame count (0 = none)
+    # B8: multi-filter — pass steps=[(filter, n, exp), ...] for interleaved
+    # bands. Retrocompatible: a single-filter call (n_frames, exp_s,
+    # filter_name) is equivalent to steps=[(filter_name, n_frames, exp_s)].
+    # @args: n_frames - light frame count (ignored when steps is given),
+    #        exp_s - exposure per light frame (ignored when steps is given),
+    #        filter_name - filter wheel slot name (ignored when steps),
+    #        overhead_s - readout/slew per frame (defaults to config),
+    #        cfg - Config, n_darks - dark count, exp_dark - dark exp,
+    #        n_bias - bias count,
+    #        steps - list of (filter, n_frames, exp_s) tuples for multi-filter
     # @return: {"n_frames", "exp_s", "filter", "overhead_s", "darks",
-    #           "bias", "duration_s"}
+    #           "bias", "duration_s", "steps"}
     if overhead_s is None:
         overhead_s = float(cfg.get("overhead_s", 15.0)) if cfg else 15.0
-    exp_s = float(exp_s)
+    if steps:
+        light_steps = []
+        total_light = 0.0
+        for filt, n, exp in steps:
+            n = int(n)
+            exp = float(exp)
+            light_steps.append({"filter": filt, "n_frames": n,
+                                 "exp_s": exp})
+            total_light += n * (exp + overhead_s)
+        n_frames = sum(s["n_frames"] for s in light_steps)
+        exp_s = light_steps[0]["exp_s"] if light_steps else 0.0
+        filter_name = light_steps[0]["filter"] if light_steps else filter_name
+    else:
+        exp_s = float(exp_s)
+        n_frames = int(n_frames)
+        light_steps = [{"filter": filter_name, "n_frames": n_frames,
+                            "exp_s": exp_s}]
     exp_dark = float(exp_dark) if exp_dark else exp_s
-    n_frames = int(n_frames)
     n_darks = int(n_darks)
     n_bias = int(n_bias)
-    total = (n_frames * (exp_s + overhead_s)       # light
-             + n_darks * (exp_dark + overhead_s)   # darks
-             + n_bias * overhead_s)                # bias (no exposure)
+    total = (total_light if steps else
+             n_frames * (exp_s + overhead_s))
+    total += n_darks * (exp_dark + overhead_s) + n_bias * overhead_s
     return {"n_frames": n_frames, "exp_s": exp_s,
             "filter": filter_name, "overhead_s": float(overhead_s),
             "darks": {"count": n_darks, "exp_s": exp_dark},
             "bias": {"count": n_bias},
-            "duration_s": total}
+            "duration_s": total,
+            "steps": light_steps}
 
 
 def export_csv(target, plan, out):
     # Generic CSV: one row per frame, readable by any capture software.
+    # B8: multi-filter plans emit rows with the per-step filter.
     # @args: target - dict with name, ra_deg, dec_deg, plan - make_plan dict,
     #        out - output path
     # @return: the output path
@@ -71,30 +92,39 @@ def export_csv(target, plan, out):
     ra = target.get("ra_deg", 0.0)
     dec = target.get("dec_deg", 0.0)
     rows = []
-    for i in range(plan["n_frames"]):
-        rows.append({
-            "frame": i + 1, "target": name,
-            "ra_deg": f"{ra:.6f}", "dec_deg": f"{dec:+.6f}",
-            "exposure_s": plan["exp_s"], "filter": plan["filter"],
-        })
+    for s in plan.get("steps", [{"filter": plan["filter"],
+                                 "n_frames": plan["n_frames"],
+                                 "exp_s": plan["exp_s"]}]):
+        for i in range(s["n_frames"]):
+            rows.append({
+                "frame": len(rows) + 1, "target": name,
+                "ra_deg": f"{ra:.6f}", "dec_deg": f"{dec:+.6f}",
+                "exposure_s": s["exp_s"], "filter": s["filter"],
+            })
     _write_csv(out, ["frame", "target", "ra_deg", "dec_deg",
-                     "exposure_s", "filter"], rows)
+                 "exposure_s", "filter"], rows)
     logger.info("CSV sequence written to %s", out)
     return str(out)
 
 
 def export_nina(target, plan, out):
     # NINA sequence JSON. Basic structure with target coordinates and a
-    # flat list of exposure items. Validate against your NINA version.
+    # flat list of exposure items. B8: multi-filter plans emit
+    # one exposure entry per filter step.
     # @args: target - dict with name, ra_deg, dec_deg, plan - make_plan dict,
     #        out - output path (.json)
     # @return: the output path
     name = target.get("name") or target.get("id") or "target"
     ra_deg = target.get("ra_deg", 0.0)
     dec_deg = target.get("dec_deg", 0.0)
-    # split degrees into HMS/DMS for NINA's coordinate format
     ra_h, ra_m, ra_s = _deg_to_hms(ra_deg)
     sign, dec_d, dec_m, dec_s = _deg_to_dms(dec_deg)
+    exposures = []
+    for s in plan.get("steps", [{"filter": plan["filter"],
+                                 "n_frames": plan["n_frames"],
+                                 "exp_s": plan["exp_s"]}]):
+        exposures += [{"ExposureTime": s["exp_s"], "Filter": s["filter"],
+                        "Binning": 1}] * s["n_frames"]
     seq = {
         "Name": name,
         "Description": f"NightScribe sequence for {name}",
@@ -108,10 +138,7 @@ def export_nina(target, plan, out):
             },
         },
         "Sequence": {
-            "Exposures": [
-                {"ExposureTime": plan["exp_s"], "Filter": plan["filter"],
-                 "Binning": 1}
-            ] * plan["n_frames"],
+            "Exposures": exposures,
         },
         "Metadata": {
             "Generator": "NightScribe",
@@ -244,11 +271,27 @@ def _dec_sex(dec_deg):
     return f"{sign}{s // 3600:02d}d{(s % 3600) // 60:02d}m{s % 60:02d}s"
 
 
+def _light_steps(plan):
+    # @return: list of light-step specs. B8: multi-filter plans carry
+    #         one step per filter in plan["steps"]; single-filter plans
+    #         have a single entry built from the legacy fields.
+    steps = plan.get("steps")
+    if steps:
+        return [{"count": s["n_frames"], "exposure": f"{s['exp_s']:g}",
+                 "filter": s["filter"], "frame_type": "Light",
+                 "description": "Light", "dither": "True",
+                 "autofocus": "True", "autofocus_start": "True",
+                 "dither_count": "25", "autofocus_count": "50"}
+                for s in steps]
+    return [_light_step(plan)]
+
+
 def export_ccdciel(target, plan, out):
-    # CCDciel target-list file ("<CONFIG Version="5">"), the real format the
+    # CCDciel target-list file ("<CONFIG Version="5">), the real format the
     # sequence tool reads and writes; see docs/ccdciel_sequence_sample.targets.
     # The target keeps CCDciel's default rise/set window; the plan becomes a
-    # Light step plus optional Dark/Bias calibration steps.
+    # Light step plus optional Dark/Bias calibration steps. B8: a multi-filter
+    # plan writes one Light step per filter.
     # @args: target - dict with name, ra_deg, dec_deg, safe_window; plan -
     #        make_plan dict; out - output path (.targets)
     # @return: the output path
@@ -256,7 +299,7 @@ def export_ccdciel(target, plan, out):
     ra_deg = target.get("ra_deg", 0.0)
     dec_deg = target.get("dec_deg", 0.0)
     start_t, end_t = _ccdciel_times(target)
-    steps = [_light_step(plan), *_calibration_steps(plan)]
+    steps = [*_light_steps(plan), *_calibration_steps(plan)]
 
     root = ET.Element("CONFIG")
     for k, v in (("Version", "5"), ("ListName", name),

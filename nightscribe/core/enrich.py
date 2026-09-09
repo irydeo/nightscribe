@@ -86,6 +86,24 @@ def _enrich_transient(name, fallback_target=None):
     ident = simbad.query_id(name)
     host = simbad.query_around_galaxy(name)
     out = {"simbad": ident, "host": host}
+    # B7: when SIMBAD does not know the SN, try TNS for the type,
+    # discovery magnitude and discovery date (TNS already has these fields
+    # in parse_object_page — until now only the blink resolver used them).
+    if not (ident and ident.get("otype")):
+        from .sources import tns
+        tns_info = tns.resolve(name)
+        if tns_info:
+            # only set fields TNS actually has (don't let None wipe the
+            # fallback_target's value downstream — setdefault won't fire)
+            if tns_info.get("type"):
+                out.setdefault("otype", tns_info["type"])
+            if tns_info.get("mag") is not None:
+                out.setdefault("mag", tns_info["mag"])
+            if tns_info.get("disc_date"):
+                out.setdefault("disc_date", tns_info["disc_date"])
+            if tns_info.get("ra") is not None:
+                out.setdefault("ra_deg", tns_info["ra"])
+                out.setdefault("dec_deg", tns_info["dec"])
     if host and host.get("z"):
         # light travel time from the host redshift (small z approximation)
         d_mpc = host["z"] * 299792.458 / 70.0

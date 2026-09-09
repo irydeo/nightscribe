@@ -62,10 +62,12 @@ COMET_TARGET = {
 def no_sources(monkeypatch):
     """Fail every external lookup so enrichment leans on the planner context."""
     from nightscribe.core.enrich import simbad, sbdb, neofixer
+    from nightscribe.core.sources import tns
     monkeypatch.setattr(simbad, "query_id", lambda *a, **k: None)
     monkeypatch.setattr(simbad, "query_around_galaxy", lambda *a, **k: None)
     monkeypatch.setattr(sbdb, "get", lambda *a, **k: None)
     monkeypatch.setattr(neofixer, "orbit", lambda *a, **k: None)
+    monkeypatch.setattr(tns, "resolve", lambda *a, **k: None)
 
 
 @pytest.fixture(scope="module")

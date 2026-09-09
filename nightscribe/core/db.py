@@ -176,6 +176,43 @@ def _migrate(conn):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_created"
                      " ON projects(created)")
         conn.execute("PRAGMA user_version = 4")
+    if v < 5:
+        # Track B (project-concept v2): SN multi-night follow-up — sessions
+        # (one per observing night), the stacked images registered per
+        # filter, and photometry points (imported from AIJ/Tycho or
+        # quick-look differential). All cascade with the parent project.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS project_sessions (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  INTEGER NOT NULL REFERENCES projects(id)
+                        ON DELETE CASCADE,
+            obs_date    TEXT,
+            notes       TEXT DEFAULT '',
+            created     REAL NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS session_images (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  INTEGER NOT NULL REFERENCES project_sessions(id)
+                        ON DELETE CASCADE,
+            filter      TEXT,
+            fits_path   TEXT,
+            date_obs    TEXT,
+            exptime_s   REAL
+        );
+        CREATE TABLE IF NOT EXISTS photometry_points (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            project_id  INTEGER NOT NULL REFERENCES projects(id)
+                        ON DELETE CASCADE,
+            session_id  INTEGER REFERENCES project_sessions(id)
+                        ON DELETE SET NULL,
+            mjd        REAL,
+            filter      TEXT,
+            mag         REAL,
+            err         REAL,
+            source      TEXT
+        );
+        """)
+        conn.execute("PRAGMA user_version = 5")
     conn.commit()
 
 

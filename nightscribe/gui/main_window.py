@@ -789,6 +789,7 @@ class MainWindow(QMainWindow):
         self._update_night_header()
         self._build_suggestion_grid()
         self._fill_table()
+        self._show_cadence_hints()
         self.statusBar().showMessage(
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
@@ -855,6 +856,53 @@ class MainWindow(QMainWindow):
         tip = (self.tr("Moon: %1% lit now, %2% by dawn")
                .replace("%1", f"{pct_now:.0f}").replace("%2", f"{pct_by_dawn:.0f}"))
         label.setToolTip(tip + "\n" + self._txt(why))
+
+    def _show_cadence_hints(self):
+        # B11: surface active SN projects that are due for a revisit ("hace
+        # N noches que no la visitas"). Reads the follow-up cadence from the
+        # project_sessions table and shows a chip in the Tonight header.
+        from ..core import followup as fu
+        # remove any previous cadence chip (idempotent across refreshes)
+        old = self.tonight.findChild(QLabel, "ns_cadence_chip")
+        if old is not None:
+            parent = old.parentWidget()
+            if parent and parent.layout():
+                parent.layout().removeWidget(old)
+            old.deleteLater()
+        threshold = int(config.get("sn_cadence_days", 3))
+        # query active SN projects directly (list_projects on this branch
+        # may not support the kind= filter from Track A yet)
+        rows = db.execute(
+            "SELECT id, object_name FROM projects"
+            " WHERE status='active' AND kind='sn'").fetchall()
+        hints = []
+        for pid, name in rows:
+            days = fu.days_since_last_session(db, pid)
+            if days is not None and days >= threshold:
+                hints.append((name, days))
+        if not hints:
+            return
+        hint_text = self.tr("SN follow-up due: ") + ", ".join(
+            f"{name} ({days}d)" for name, days in hints[:3])
+        if len(hints) > 3:
+            hint_text += f" +{len(hints) - 3}"
+        chip = self._chip(hint_text, "#e0c060",
+                          tip=self.tr("Active SN projects due for a revisit"))
+        chip.setObjectName("ns_cadence_chip")
+        # insert the chip in the tonight header's layout (the parent of
+        # lbl_context is a QWidget; find its containing layout)
+        parent = self.tonight.lbl_context.parentWidget()
+        header_layout = parent.layout() if parent else None
+        if header_layout is None:
+            # walk up to find a layout
+            p = parent
+            while p is not None:
+                if p.layout() is not None:
+                    header_layout = p.layout()
+                    break
+                p = p.parentWidget()
+        if header_layout and hasattr(header_layout, "addWidget"):
+            header_layout.addWidget(chip)
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and
@@ -1606,12 +1654,13 @@ class MainWindow(QMainWindow):
         # CCDciel controls of the plan tab) orphaned: they kept painting over
         # the rebuilt tab and piled up across project switches.
         for tab_name in ("tab_plan", "tab_process",
-                         "tab_publish"):
+                         "tab_publish", "tab_followup"):
             tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
             if tab and tab.layout():
                 self._wipe_layout(tab.layout())
         self.projects.lbl_step_status.setText("—")
         self._project_widgets = {}
+        self._fu_current_session = None
 
     def _build_step_tabs(self, p):
         # Populate each step tab with only the content relevant to the
@@ -1631,6 +1680,15 @@ class MainWindow(QMainWindow):
         self._build_plan_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
+        # B2: SN follow-up tab — not a step (like Details), only for kind='sn'
+        followup_tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
+        fu_idx = self.projects.tabs_steps.indexOf(followup_tab)
+        if kind == "sn":
+            self._build_followup_tab(p, ctx)
+            self.projects.tabs_steps.setTabVisible(fu_idx, True)
+        else:
+            self._wipe_layout(followup_tab.layout())
+            self.projects.tabs_steps.setTabVisible(fu_idx, False)
         # "Detalles" stays open (set by _project_selected); the current
         # step is marked ● on its tab and reached with Next →
         self._update_step_status(p)
@@ -1712,6 +1770,32 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_darks"] = spn_darks
         self._project_widgets["spn_darkexp"] = spn_darkexp
         self._project_widgets["spn_bias"] = spn_bias
+        # B8: SN exposure hint by brightness + multi-filter step rows
+        if kind == "sn" and ctx.get("mag") is not None:
+            from ..core import exposure
+            sn_exp = exposure.recommended_sn_exposure(ctx["mag"])
+            if sn_exp:
+                layout.addWidget(QLabel(
+                    f"<small>{self.tr('Recommended exposure')}: "
+                    f"{sn_exp}s · {self.tr('mag')} {ctx['mag']:.1f}"
+                    f" · {self.tr('guía, no SNR — prueba antes de saturar')}"
+                    f"</small>"))
+                spn_exp.setValue(min(sn_exp, 60.0))
+            # multi-filter rows: add/remove (filter × N × exp) steps
+            layout.addWidget(QLabel(self.tr("Filters (add rows for multi-band)")))
+            steps_container = QWidget()
+            steps_vlay = QVBoxLayout(steps_container)
+            steps_vlay.setContentsMargins(2, 2, 2, 2)
+            self._sn_steps = []
+            for filt in ("Clear",):
+                self._sn_add_step_row(steps_vlay, filt, 30, spn_exp.value())
+            add_row = QHBoxLayout()
+            btn_add_filt = QPushButton(self.tr("Add filter"))
+            btn_add_filt.clicked.connect(lambda: self._sn_add_step_row(steps_vlay))
+            add_row.addWidget(btn_add_filt)
+            steps_vlay.addLayout(add_row)
+            layout.addWidget(steps_container)
+            self._project_widgets["sn_steps_container"] = steps_container
         # sequence export (all kinds)
         layout.addWidget(QLabel(self.tr("Export capture sequence")))
         cmb_fmt = QComboBox()
@@ -2292,11 +2376,367 @@ class MainWindow(QMainWindow):
             f"{p['object_name']}</small>"))
         layout.addStretch()
 
+    def _build_followup_tab(self, p, ctx):
+        # B2: SN multi-night follow-up panel. Not a step — like Details, it
+        # holds the session journal (nights, stacked images, notes) and the
+        # cadence reminder ("última visita hace N noches"). All CRUD goes
+        # through core/followup.py; FITS metadata through core/fits_meta.py.
+        from ..core import followup as fu
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
+        layout = tab.layout()
+        pid = p["id"]
+
+        # cadence reminder (T9): "hace N noches que no la visitas"
+        days = fu.days_since_last_session(db, pid)
+        if days is not None:
+            lbl_cadence = QLabel(
+                self.tr("Last visit: {} days ago").format(days))
+            colour = "#e0c060" if days >= 3 else "#8a90a6"
+            lbl_cadence.setStyleSheet(
+                f"color: {colour}; font-size: 13px;")
+            layout.addWidget(lbl_cadence)
+        else:
+            layout.addWidget(QLabel(
+                self.tr("No visits yet. Add one to start the follow-up.")))
+
+        # add visit button
+        btn_add = QPushButton(self.tr("Add visit"))
+        btn_add.clicked.connect(lambda: self._fu_add_session(pid))
+        layout.addWidget(btn_add)
+        # B3: paste bulk photometry + import file
+        fu_btns = QHBoxLayout()
+        btn_paste = QPushButton(self.tr("Paste photometry…"))
+        btn_paste.clicked.connect(lambda: self._fu_paste_dialog(pid))
+        fu_btns.addWidget(btn_paste)
+        btn_file = QPushButton(self.tr("Import file…"))
+        btn_file.clicked.connect(lambda: self._fu_import_file(pid))
+        fu_btns.addWidget(btn_file)
+        layout.addLayout(fu_btns)
+
+        # sessions list
+        grp = QGroupBox(self.tr("Visits"))
+        grp.setLayout(QVBoxLayout())
+        lst = QListWidget()
+        self._fu_populate_sessions(lst, pid)
+        lst.itemSelectionChanged.connect(
+            lambda: self._fu_session_selected(lst, pid))
+        grp.layout().addWidget(lst)
+
+        # session detail area (images + notes for the selected visit)
+        self._fu_detail = QFrame()
+        fu_layout = QVBoxLayout(self._fu_detail)
+        fu_layout.addWidget(QLabel(self.tr("Select a visit to see its images.")))
+        self._fu_notes = QTextEdit()
+        self._fu_notes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
+        self._fu_notes.textChanged.connect(
+            lambda: self._fu_save_notes(pid))
+        fu_layout.addWidget(self._fu_notes)
+        fu_detail_area = QScrollArea()
+        fu_detail_area.setWidgetResizable(True)
+        fu_detail_area.setFrameShape(QFrame.Shape.NoFrame)
+        fu_detail_area.setWidget(self._fu_detail)
+        grp.layout().addWidget(fu_detail_area)
+        layout.addWidget(grp)
+        layout.addStretch()
+        self._project_widgets["fu_sessions"] = lst
+        self._project_widgets["fu_notes"] = self._fu_notes
+
+    def _fu_populate_sessions(self, lst, pid):
+        # @args: lst - QListWidget, pid - project id
+        from ..core import followup as fu
+        lst.clear()
+        sessions = fu.list_sessions(db, pid)
+        for s in sessions:
+            n_img = len(fu.list_images(db, s["id"]))
+            from ..core import followup as fumod
+            pts = fumod.list_points(db, pid)
+            n_pts = sum(1 for p in pts if p.get("session_id") == s["id"])
+            notes_tag = f" · {s['notes'][:20]}" if s["notes"] else ""
+            item = QListWidgetItem(
+                f"{s['obs_date']}  ({n_img} img, {n_pts} mag){notes_tag}")
+            item.setData(Qt.UserRole, s["id"])
+            lst.addItem(item)
+
+    def _fu_session_selected(self, lst, pid):
+        # @args: lst - QListWidget, pid - project id
+        from ..core import followup as fu
+        items = lst.selectedItems()
+        if not items:
+            return
+        sid = items[0].data(Qt.UserRole)
+        self._fu_current_session = sid
+        # rebuild the session detail area: images + measurements + notes
+        detail = self._fu_detail
+        self._wipe_layout(detail.layout())
+        dlay = detail.layout()
+        # add stacked image button
+        btn_img = QPushButton(self.tr("Add stacked image…"))
+        btn_img.clicked.connect(lambda: self._fu_add_image(sid, pid))
+        dlay.addWidget(btn_img)
+        # images list for this session
+        img_lst = QListWidget()
+        self._fu_populate_images(img_lst, sid)
+        dlay.addWidget(img_lst)
+        self._project_widgets["fu_images"] = img_lst
+        # B3: quick measurement entry — just type the magnitude
+        grp_meas = QGroupBox(self.tr("Measurements"))
+        grp_meas.setLayout(QVBoxLayout())
+        meas_row = QHBoxLayout()
+        meas_row.addWidget(QLabel(self.tr("Mag:")))
+        spn_mag = QDoubleSpinBox()
+        spn_mag.setRange(-5.0, 30.0)
+        spn_mag.setDecimals(3)
+        spn_mag.setValue(16.0)
+        meas_row.addWidget(spn_mag)
+        meas_row.addWidget(QLabel(self.tr("Err:")))
+        spn_err = QDoubleSpinBox()
+        spn_err.setRange(0.0, 9.0)
+        spn_err.setDecimals(3)
+        spn_err.setValue(0.0)
+        spn_err.setSpecialValueText("—")
+        meas_row.addWidget(spn_err)
+        meas_row.addWidget(QLabel(self.tr("Filter:")))
+        cmb_filt = QComboBox()
+        cmb_filt.setEditable(True)
+        cmb_filt.addItems(["Clear", "V", "R", "B", "I", "NIR"])
+        meas_row.addWidget(cmb_filt)
+        btn_add_meas = QPushButton(self.tr("Add"))
+        btn_add_meas.clicked.connect(
+            lambda: self._fu_add_measurement(sid, pid, spn_mag,
+                                              spn_err, cmb_filt))
+        grp_meas.layout().addLayout(meas_row)
+        # measurements list for this session
+        meas_lst = QListWidget()
+        self._fu_populate_measurements(meas_lst, pid, sid)
+        grp_meas.layout().addWidget(meas_lst)
+        dlay.addWidget(grp_meas)
+        self._project_widgets["fu_meas_mag"] = spn_mag
+        self._project_widgets["fu_meas_err"] = spn_err
+        self._project_widgets["fu_meas_filt"] = cmb_filt
+        self._project_widgets["fu_measurements"] = meas_lst
+        # notes
+        s = fu.get_session(db, sid)
+        notes = QTextEdit()
+        notes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
+        if s:
+            notes.setText(s["notes"])
+        notes.textChanged.connect(lambda: self._fu_save_notes(pid))
+        dlay.addWidget(notes)
+        self._project_widgets["fu_notes"] = notes
+
+    def _fu_populate_measurements(self, lst, pid, sid):
+        # @args: lst - QListWidget, pid - project id, sid - session id
+        from ..core import followup as fu
+        lst.clear()
+        for pt in fu.list_points(db, pid):
+            if pt.get("session_id") == sid:
+                err_str = f" ±{pt['err']}" if pt["err"] is not None else ""
+                item = QListWidgetItem(
+                    f"[{pt['filter']}] mag {pt['mag']}{err_str}"
+                    f"  ({pt['source']})")
+                item.setData(Qt.UserRole, pt["id"])
+                lst.addItem(item)
+
+    def _fu_add_measurement(self, sid, pid, spn_mag, spn_err, cmb_filt):
+        # B3 quick entry: one click saves a point (date/filter from the session).
+        from ..core import followup as fu
+        mag = spn_mag.value()
+        err = spn_err.value() if spn_err.value() > 0 else None
+        filt = cmb_filt.currentText().strip() or "Clear"
+        # MJD from the session's date (obs_date → approximate MJD)
+        s = fu.get_session(db, sid)
+        mjd = None
+        if s and s["obs_date"]:
+            try:
+                import datetime
+                dt = datetime.datetime.strptime(
+                    s["obs_date"], "%Y-%m-%d").replace(
+                    tzinfo=datetime.timezone.utc)
+                from ..core.coords import jd_from_datetime
+                mjd = jd_from_datetime(dt) - 2400000.5
+            except ValueError:
+                pass
+        if mjd is None:
+            mjd = 0.0   # fallback: the caller can fix it in the paste view
+        fu.add_point(db, pid, mjd, filt, mag, err=err,
+                     source="manual", session_id=sid)
+        self._populate_project_files(pid)
+        meas_lst = self._project_widgets.get("fu_measurements")
+        if meas_lst:
+            self._fu_populate_measurements(meas_lst, pid, sid)
+
+    def _fu_populate_images(self, lst, sid):
+        # @args: lst - QListWidget, sid - session id
+        from ..core import followup as fu
+        lst.clear()
+        for img in fu.list_images(db, sid):
+            filt = img["filter"] or "—"
+            label = f"[{filt}] {Path(img['fits_path']).name}"
+            if img["date_obs"]:
+                label += f"  ({img['date_obs']})"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, img["id"])
+            lst.addItem(item)
+
+    def _fu_add_image(self, sid, pid):
+        # File dialog → fits_meta auto-fill → followup.add_image + project_files
+        from ..core import followup as fu
+        from ..core import fits_meta
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("Choose stacked FITS"), "",
+            "FITS (*.fits *.fit *.fts);;All files (*)")
+        if not path:
+            return
+        try:
+            meta = fits_meta.read_meta(path)
+        except Exception:
+            meta = {"filter": None, "date_obs": None,
+                     "exptime_s": None, "mjd": None}
+        filt = meta["filter"] or "Clear"
+        fu.add_image(db, sid, filt, path,
+                     date_obs=meta["date_obs"], exptime_s=meta["exptime_s"])
+        # T4: register the FITS path in the project
+        project.add_file(db, pid, path, "fits")
+        # refresh images list + files list
+        img_lst = self._project_widgets.get("fu_images")
+        if img_lst:
+            self._fu_populate_images(img_lst, sid)
+        self._populate_project_files(pid)
+
     def _step_key_idx(self, idx):
         # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
-        # step); steps start at 1. Returns None when there is no step key.
+        # step); steps start at 1. The "Follow-up" tab (B2, SN only) sits
+        # after Publish and is also a non-step tab. Returns None when there
+        # is no step key.
         # @args: idx - tab index
-        # @return: position in _STEP_KEYS, or None on the details tab
+        # @return: position in _STEP_KEYS, or None on a non-step tab
+        if idx <= 0:
+            return None
+        n = idx - 1
+        return n if n < len(_STEP_KEYS) else None
+
+    def _fu_save_notes(self, pid):
+        # Persist notes on the current session (B2: "en ocasiones" se guardan).
+        from ..core import followup as fu
+        sid = getattr(self, "_fu_current_session", None)
+        notes = self._project_widgets.get("fu_notes")
+        if sid and notes:
+            fu.update_session_notes(db, sid, notes.toPlainText())
+
+    def _fu_add_session(self, pid):
+        # Create a session for today and refresh the list (B2).
+        from ..core import followup as fu
+        fu.create_session(db, pid)
+        lst = self._project_widgets.get("fu_sessions")
+        if lst:
+            self._fu_populate_sessions(lst, pid)
+            # select the new one (top of the list, ordered DESC)
+            lst.setCurrentRow(0)
+
+    def _populate_project_files(self, pid):
+        # Refresh the project files list in the Details tab. The files list
+        # widget is built by Track A (A4); if it doesn't exist yet this is a
+        # safe no-op so B2/B3 don't crash on branches without A merged.
+        lst = getattr(self, "_proj_files_list", None)
+        if lst is None:
+            return
+        lst.clear()
+        for f in project.list_files(db, pid):
+            name = Path(f["path"]).name
+            dt = datetime.datetime.fromtimestamp(f["created"])
+            item = QListWidgetItem(
+                f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
+            item.setData(Qt.UserRole, str(f["path"]))
+            lst.addItem(item)
+
+    def _fu_paste_dialog(self, pid):
+        # B3: paste bulk photometry — tolerant parser + preview + save.
+        from ..core.photometry_import import parse_photometry
+        from ..core import followup as fu
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Paste photometry"))
+        dlg.setLayout(QVBoxLayout())
+        dlg.layout().addWidget(QLabel(self.tr(
+            "Paste your AIJ / Tycho / CSV measurements.\n"
+            "One per line: date  magnitude  [error]  filter")))
+        edit = QTextEdit()
+        edit.setMinimumSize(400, 200)
+        dlg.layout().addWidget(edit)
+        # default filter for lines without one
+        cmb_def = QComboBox()
+        cmb_def.setEditable(True)
+        cmb_def.addItems(["Clear", "V", "R", "B", "I", "NIR"])
+        dlg.layout().addWidget(QLabel(self.tr("Default filter:")))
+        dlg.layout().addWidget(cmb_def)
+        preview = QListWidget()
+        dlg.layout().addWidget(QLabel(self.tr("Preview:")))
+        dlg.layout().addWidget(preview)
+        btns = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        dlg.layout().addWidget(btns)
+        # live parse as the user types
+        def on_text_changed():
+            pts, skipped = parse_photometry(
+                edit.toPlainText(),
+                default_filter=cmb_def.currentText().strip() or "Clear")
+            preview.clear()
+            for p in pts:
+                err_str = f" ±{p['err']}" if p["err"] else ""
+                preview.addItem(
+                    f"mag {p['mag']}{err_str}  [{p['filter']}]")
+            if skipped:
+                preview.addItem(
+                    self.tr("({} lines skipped)").format(len(skipped)))
+        edit.textChanged.connect(on_text_changed)
+        cmb_def.currentTextChanged.connect(on_text_changed)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        pts, _ = parse_photometry(
+            edit.toPlainText(),
+            default_filter=cmb_def.currentText().strip() or "Clear")
+        for p in pts:
+            fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
+                         err=p["err"], source="paste")
+        self._populate_project_files(pid)
+
+    def _fu_import_file(self, pid):
+        # B3: optional file import — read, parse, preview, save.
+        from ..core.photometry_import import parse_photometry
+        from ..core import followup as fu
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("Import photometry file"), "",
+            "CSV/Text (*.csv *.txt *.tsv);;All files (*)")
+        if not path:
+            return
+        try:
+            text = Path(path).read_text(encoding="utf-8", errors="replace")
+        except OSError as err:
+            self.statusBar().showMessage(
+                self.tr("Cannot read file: %1").replace("%1", str(err)), 6000)
+            return
+        pts, skipped = parse_photometry(text)
+        # quick confirmation with a count
+        msg = self.tr("{} points parsed").format(len(pts))
+        if skipped:
+            msg += self.tr(", {} lines skipped").format(len(skipped))
+        if QMessageBox.question(
+                self, self.tr("Import"), msg,
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        for p in pts:
+            fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
+                         err=p["err"], source="file")
+        self._populate_project_files(pid)
+
+    def _step_key_idx(self, idx):
+        # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
+        # step); steps start at 1. The "Follow-up" tab (B2, SN only) sits
+        # after Publish and is also a non-step tab. Returns None when there
+        # is no step key.
+        # @args: idx - tab index
+        # @return: position in _STEP_KEYS, or None on a non-step tab
         if idx <= 0:
             return None
         n = idx - 1
@@ -2326,15 +2766,16 @@ class MainWindow(QMainWindow):
 
     def _update_step_buttons(self):
         # The step buttons (prev / skip / done / next) only make sense on the
-        # step tabs, not on "Detalles": prev has no target there, skip / done
-        # have no step to act on, next is allowed (it enters step 1).
+        # step tabs, not on "Detalles" or "Follow-up" (non-step tabs):
+        # prev has no target there, skip / done have no step to act on,
+        # next is allowed (it enters step 1).
         idx = self.projects.tabs_steps.currentIndex()
         last = self.projects.tabs_steps.count() - 1
-        on_details = idx == 0
-        self.projects.btn_prev.setEnabled(not on_details)
+        on_non_step = self._step_key_idx(idx) is None
+        self.projects.btn_prev.setEnabled(not on_non_step)
         self.projects.btn_next.setEnabled(idx != last)
-        self.projects.btn_skip.setEnabled(not on_details)
-        self.projects.btn_mark_done.setEnabled(not on_details)
+        self.projects.btn_skip.setEnabled(not on_non_step)
+        self.projects.btn_mark_done.setEnabled(not on_non_step)
 
     def _project_prev(self):
         idx = self.projects.tabs_steps.currentIndex()
@@ -2390,6 +2831,48 @@ class MainWindow(QMainWindow):
             self._render_project_header(p)
             self._build_step_tabs(p)
 
+    def _sn_add_step_row(self, layout, filt="Clear", n=30, exp=60.0):
+        # B8: add a filter×N×exp row to the SN multi-filter step list.
+        row = QHBoxLayout()
+        cmb = QComboBox()
+        cmb.setEditable(True)
+        cmb.addItems(["Clear", "V", "R", "G", "B", "I", "NIR", "L"])
+        cmb.setCurrentText(filt)
+        row.addWidget(cmb)
+        spn_n = QSpinBox()
+        spn_n.setMinimum(1); spn_n.setMaximum(999)
+        spn_n.setValue(n)
+        row.addWidget(spn_n)
+        spn_e = QDoubleSpinBox()
+        spn_e.setMinimum(0.1); spn_e.setMaximum(3600.0)
+        spn_e.setValue(exp)
+        row.addWidget(spn_e)
+        btn_del = QPushButton("✕")
+        btn_del.setFixedWidth(28)
+        entry = {"cmb": cmb, "spn_n": spn_n, "spn_e": spn_e,
+                    "row": row, "btn_del": btn_del}
+        btn_del.clicked.connect(lambda checked, e=entry: self._sn_del_step_row(e))
+        self._sn_steps.append(entry)
+        layout.addLayout(row)
+
+    def _sn_del_step_row(self, entry):
+        # B8: remove a multi-filter step row.
+        layout = entry["row"].parentLayout()
+        for w in (entry["cmb"], entry["spn_n"], entry["spn_e"],
+                    entry["btn_del"]):
+            layout.removeWidget(w)
+            w.deleteLater()
+        self._sn_steps.remove(entry)
+
+    def _sn_collect_steps(self):
+        # B8: gather (filter, n, exp) tuples from the multi-filter rows.
+        # @return: list of (filter, n, exp) tuples
+        steps = []
+        for e in self._sn_steps:
+            filt = e["cmb"].currentText().strip() or "Clear"
+            steps.append((filt, e["spn_n"].value(), e["spn_e"].value()))
+        return steps
+
     def _project_export_sequence(self):
         if not self._current_project:
             return
@@ -2403,11 +2886,24 @@ class MainWindow(QMainWindow):
                 and spn_darkexp and spn_bias):
             return
         n_darks = spn_darks.value()
-        plan = sequence.make_plan(
-            spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
-            n_darks=n_darks,
-            exp_dark=spn_darkexp.value() if n_darks else None,
-            n_bias=spn_bias.value())
+        # B8: SN multi-filter plans use the step rows; other kinds use the
+        # legacy single-filter fields.
+        steps = None
+        if self._current_project["kind"] == "sn" and self._sn_steps:
+            steps = self._sn_collect_steps()
+            # total n_frames for the plan dict (sum of per-step counts)
+            n_total = sum(n for _f, n, _e in steps)
+            plan = sequence.make_plan(
+                n_total, steps[0][2], steps[0][0], cfg=config,
+                n_darks=n_darks,
+                exp_dark=spn_darkexp.value() if n_darks else None,
+                n_bias=spn_bias.value(), steps=steps)
+        else:
+            plan = sequence.make_plan(
+                spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
+                n_darks=n_darks,
+                exp_dark=spn_darkexp.value() if n_darks else None,
+                n_bias=spn_bias.value())
         ctx = self._current_project.get("context") or {}
         target = {"name": self._current_project["object_name"],
                   "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),

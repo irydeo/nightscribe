@@ -2497,8 +2497,187 @@ class MainWindow(QMainWindow):
         fu_detail_area.setWidget(self._fu_detail)
         grp.layout().addWidget(fu_detail_area)
         layout.addWidget(grp)
+        # B5/B6/B10: analysis buttons — quick-look, evolution animation,
+        # annotated FITS export. They operate on the registered stacked
+        # images and the follow-up photometry.
+        ana_row = QHBoxLayout()
+        btn_quicklook = QPushButton(self.tr("Run quick-look"))
+        btn_quicklook.setToolTip(self.tr(
+            "Differential magnitude vs. an automatic comparison ensemble"))
+        btn_quicklook.clicked.connect(lambda: self._fu_run_quicklook(pid))
+        ana_row.addWidget(btn_quicklook)
+        btn_evo = QPushButton(self.tr("Generate animation"))
+        btn_evo.setToolTip(self.tr(
+            "GIF/MP4 of the photometric evolution across visits"))
+        btn_evo.clicked.connect(lambda: self._fu_run_animation(pid))
+        ana_row.addWidget(btn_evo)
+        btn_annot = QPushButton(self.tr("Export annotated FITS"))
+        btn_annot.setToolTip(self.tr(
+            "Copy of the stacked FITS with annotation keywords (NS_)"))
+        btn_annot.clicked.connect(lambda: self._fu_export_annotated(pid))
+        ana_row.addWidget(btn_annot)
+        layout.addLayout(ana_row)
         layout.addStretch()
         self._project_widgets["fu_sessions"] = lst
+
+    def _fu_run_quicklook(self, pid):
+        # B5: run the series engine on the registered stacked images and save
+        # the quick-look points + campaign summary to the project.
+        from ..core import followup as fu
+        from ..core import series
+        p = project.get(db, pid)
+        if not p:
+            return
+        # collect the stacked images (one per session)
+        paths = []
+        for s in fu.list_sessions(db, pid):
+            for img in fu.list_images(db, s["id"]):
+                if img["fits_path"]:
+                    paths.append(img["fits_path"])
+        if not paths:
+            self.statusBar().showMessage(
+                self.tr("No stacked images registered"), 5000)
+            return
+        ctx = p.get("context") or {}
+        sn_ra = ctx.get("ra_deg")
+        sn_dec = ctx.get("dec_deg")
+        if sn_ra is None or sn_dec is None:
+            self.statusBar().showMessage(
+                self.tr("Project has no coordinates"), 5000)
+            return
+        sn_type = (ctx.get("sn_type") or ctx.get("otype") or "")
+        try:
+            result = series.quicklook(paths, sn_ra, sn_dec, sn_type=sn_type)
+        except Exception as err:
+            self.statusBar().showMessage(
+                self.tr("Quick-look failed: %1").replace("%1", str(err)), 8000)
+            return
+        # save quicklook points
+        for pt in result.get("points", []):
+            fu.add_point(db, pid, pt["mjd"], pt["filter"], pt["mag"],
+                         err=pt.get("err"), source="quicklook")
+        summary = result.get("summary", {})
+        verdict = summary.get("verdict", "unknown")
+        slope = summary.get("slope_mag_per_day")
+        delta = summary.get("delta_from_peak")
+        # show the campaign summary in the status bar + as a status label
+        msg = self.tr("Quick-look: {} points — verdict: {}").format(
+            len(result.get("points", [])), verdict)
+        if slope is not None:
+            msg += self.tr(" · slope: {:.2f} mag/d").format(slope)
+        if delta is not None:
+            msg += self.tr(" · Δmag from peak: {:.2f}").format(delta)
+        self.statusBar().showMessage(msg, 10000)
+        # refresh the panel so the new quicklook points show on the curve
+        self._project_selected()
+
+    def _fu_run_animation(self, pid):
+        # B6: generate the evolution GIF/MP4 from the registered stacked images.
+        from ..core import followup as fu
+        from ..viz import evolution_view
+        p = project.get(db, pid)
+        if not p:
+            return
+        paths = []
+        dates = []
+        for s in fu.list_sessions(db, pid):
+            for img in fu.list_images(db, s["id"]):
+                if img["fits_path"]:
+                    paths.append(img["fits_path"])
+                    dates.append(s["obs_date"])
+        if len(paths) < 2:
+            self.statusBar().showMessage(
+                self.tr("Need at least 2 stacked images"), 5000)
+            return
+        ctx = p.get("context") or {}
+        sn_ra = ctx.get("ra_deg")
+        sn_dec = ctx.get("dec_deg")
+        if sn_ra is None or sn_dec is None:
+            self.statusBar().showMessage(
+                self.tr("Project has no coordinates"), 5000)
+            return
+        # align frames by WCS and build the animation
+        try:
+            frames_data = []
+            dates_out = []
+            for path, date in zip(paths, dates):
+                import numpy as np
+                from ..core import fits_io, wcs as wcs_mod
+                header, data = fits_io.read_fits(path)
+                wcs = wcs_mod.Wcs.from_header(header)
+                sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec) if wcs else None
+                img8, sn_crop = evolution_view.align_frame(
+                    data, wcs, wcs, sn_xy or (data.shape[1]//2,
+                                                    data.shape[0]//2))
+                frames_data.append((img8, sn_crop))
+                dates_out.append(date or "")
+            out_gif = paths.project_dir(pid, p["object_name"]) / \
+                f"{p['object_name']}_evo.gif"
+            out_mp4 = out_gif.with_suffix(".mp4")
+            evolution_view.make_evolution_gif(
+                frames_data, dates=dates_out,
+                sn_xy_s=[sn for _, sn in frames_data],
+                out=str(out_gif), names=[p["object_name"]]*len(frames_data))
+            evolution_view.make_evolution_video(
+                frames_data, dates=dates_out,
+                sn_xy_s=[sn for _, sn in frames_data],
+                out=str(out_mp4), names=[p["object_name"]]*len(frames_data))
+            project.add_file(db, pid, str(out_gif), "evo_gif")
+            project.add_file(db, pid, str(out_mp4), "evo_mp4")
+            self._populate_project_files(pid)
+            self.statusBar().showMessage(
+                self.tr("Animation written to %1").replace("%1", str(out_gif)),
+                8000)
+        except Exception as err:
+            self.statusBar().showMessage(
+                self.tr("Animation failed: %1").replace("%1", str(err)), 8000)
+
+    def _fu_export_annotated(self, pid):
+        # B10: export a copy of the first registered stacked FITS with the
+        # annotation keywords injected (NS_SN_X, NS_SCALE, etc.).
+        from ..core import followup as fu
+        from ..core import fits_annotate
+        p = project.get(db, pid)
+        if not p:
+            return
+        paths = []
+        for s in fu.list_sessions(db, pid):
+            for img in fu.list_images(db, s["id"]):
+                if img["fits_path"]:
+                    paths.append(img["fits_path"])
+        if not paths:
+            self.statusBar().showMessage(
+                self.tr("No stacked images registered"), 5000)
+            return
+        ctx = p.get("context") or {}
+        sn_ra = ctx.get("ra_deg")
+        sn_dec = ctx.get("dec_deg")
+        sn_xy = None
+        if sn_ra is not None and sn_dec is not None:
+            try:
+                from ..core import fits_io, wcs as wcs_mod
+                header, _ = fits_io.read_fits(paths[0])
+                wcs = wcs_mod.Wcs.from_header(header)
+                if wcs:
+                    sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec)
+            except Exception:
+                pass
+        out = paths.project_dir(pid, p["object_name"]) / \
+            f"{p['object_name']}_annotated.fits"
+        try:
+            fits_annotate.write_annotated_fits(
+                paths[0], str(out), sn_xy=sn_xy,
+                obj_name=p["object_name"], ra_deg=sn_ra, dec_deg=sn_dec,
+                notes=self.tr("SN follow-up"))
+            project.add_file(db, pid, str(out), "fits")
+            self._populate_project_files(pid)
+            self.statusBar().showMessage(
+                self.tr("Annotated FITS written to %1").replace("%1", str(out)),
+                8000)
+        except Exception as err:
+            self.statusBar().showMessage(
+                self.tr("Annotated FITS failed: %1").replace("%1", str(err)),
+                8000)
 
     def _fu_populate_sessions(self, lst, pid):
         # @args: lst - QListWidget, pid - project id
@@ -3595,6 +3774,15 @@ class MainWindow(QMainWindow):
             post_w.lbl_files.setText(self.tr("Not found: ") + name)
             return
         from ..core import post as post_mod
+        # B9: inject the project's follow-up photometry so the light curve
+        # can be drawn in the post (the panel does this for the Details tab;
+        # the post flow must do it too — the post is the living document)
+        if self._current_project \
+                and self._current_project["object_name"] == name:
+            from ..core import followup as fu
+            pts = fu.list_points(db, self._current_project["id"])
+            if pts:
+                e.setdefault("data", {}).setdefault("followup", {})["points"] = pts
         outdir = self._dialog_post_folder(post_w)
         safe = "".join(c if c.isalnum() or c in "-_" else "_"
                         for c in name)
@@ -3617,6 +3805,10 @@ class MainWindow(QMainWindow):
                     resources.setdefault("mp4", f)
                 elif n.endswith("_before_after.png"):
                     resources.setdefault("pair", f)
+                elif n.endswith("_evo.gif"):
+                    resources.setdefault("evo_gif", f)
+                elif n.endswith("_evo.mp4"):
+                    resources.setdefault("evo_mp4", f)
         except OSError:
             pass
         written = post_mod.save_outputs(rendered, outdir, name, e=e,

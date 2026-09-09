@@ -1,8 +1,13 @@
 # Plan — Track A: ciclo de vida y clasificación de proyectos
 
 > **Abierto (2026-09-09)** — hijo A de
-> [project-concept-v2.md](project-concept-v2.md) (leer primero el padre).
-> Un subplan = un commit.
+> [project-concept-v2.md](project-concept-v2.md) (leer primero el padre;
+> decisiones transversales T1–T10). Un subplan = un commit.
+> **Enmendado 2026-09-09 (post-entrevista)**: el cierre gana **resultado
+> final** (`outcome`), el proyecto gana **etiquetas** y **favoritos**, y nace
+> el **asesor de cierre** (T10: la app sugiere, nunca decide). Reabrir queda
+> confirmado como caso de uso real (revisita «un año después», precedente
+> AT2020sum/sun en irydeo.com).
 
 **rama**: `feature/project-lifecycle` (nace de `feature/object-card` al día; mergea de vuelta a `feature/object-card`)
 **fecha**: 2026-09-09 · **autor**: FJC (con la IA)
@@ -10,10 +15,11 @@
 ## Objetivo
 
 Los proyectos se pueden **cerrar** (hoy solo `archived`/`delete`; `done` solo se
-alcanza por CLI), **reabrir**, y el hub deja de ser una lista plana:
-clasificación por **año**, filtro por **tipo**, **búsqueda** por nombre y
-**orden** configurable. Además, los ficheros que el proyecto genera
-(`project_files`) se **ven** y se abren desde la GUI.
+alcanza por CLI) con **resultado final**, **reabrir** (la revisita al cabo de un
+año es un flujo real), y el hub deja de ser una lista plana: clasificación por
+**año**, filtro por **tipo** y por **etiquetas**, **favoritos**, **búsqueda**
+por nombre y **orden** configurable. Además, los ficheros que el proyecto
+genera (`project_files`) se **ven** y se abren desde la GUI.
 
 ## Contexto clave (exploración 2026-09-09)
 
@@ -32,47 +38,69 @@ clasificación por **año**, filtro por **tipo**, **búsqueda** por nombre y
 - Exports hoy a **carpetas planas**: `data_dir()/exports` y `data_dir()/posts`;
   ADR-022 ya decía «carpeta del proyecto» — nunca se hizo.
 - Blink no registra sus GIF/MP4/PNG; la ruta del FITS de SN no se persiste.
+- **Volumen real declarado** (entrevista): 4-5 proyectos activos a la vez,
+  ~50-100/año → `QListWidget` con cabeceras de año basta; sin virtualización.
 
 ## Subplanes
 
 ### A0 — Migración `user_version 4`
-`core/db.py::_migrate`: `ALTER TABLE projects ADD COLUMN closed_at REAL` (NULL)
-+ índice por `created`. Patrón de las migraciones 1-3.
+`core/db.py::_migrate`:
+- `ALTER TABLE projects ADD COLUMN closed_at REAL` (NULL)
+- `ALTER TABLE projects ADD COLUMN outcome TEXT` (NULL — resultado final)
+- `ALTER TABLE projects ADD COLUMN tags TEXT DEFAULT ''` (separadas por comas)
+- `ALTER TABLE projects ADD COLUMN favorite INTEGER DEFAULT 0`
+- Índice por `created`. Patrón de las migraciones 1-3.
 
-**Tests**: migración 3→4 conserva filas; `closed_at` NULL por defecto; base
-nueva nace en v4.
+**Tests**: migración 3→4 conserva filas; columnas nuevas con valores por
+defecto; base nueva nace en v4.
 
-### A1 — `close()` / `reopen()` en core
-`core/project.py`: `close(pid)` → `status='done'` + `closed_at=now` (idempotente;
-solo desde `active`); `reopen(pid)` → `status='active'` + `closed_at=NULL`.
-`delete` y `set_status('archived')` siguen igual.
+### A1 — `close()` / `reopen()` / metadatos en core
+`core/project.py`:
+- `close(pid, outcome=None)` → `status='done'` + `closed_at=now` + `outcome`
+  (idempotente; solo desde `active`).
+- `reopen(pid)` → `status='active'` + `closed_at=NULL` + `outcome=NULL`
+  (un proyecto reabierto aún no tiene resultado).
+- `set_tags(pid, tags)` / `set_favorite(pid, fav)`.
+- `OUTCOMES` por tipo (p. ej. SN: `confirmed_ia`/`confirmed_other`/
+  `false_positive`/`lost`/`completed`; genérico: `completed`/`abandoned`) —
+  lista cerrada traducible, con «Otro» libre.
 
-**Tests**: ciclo active→done→active; close sobre done no rompe; closed_at se
-limpia al reabrir.
+**Tests**: ciclo active→done→active limpia cierre y resultado; outcome/tags/
+favorite persisten; outcome inválido se rechaza.
 
-### A2 — GUI: cerrar/reabrir
+### A2 — GUI: cerrar/reabrir con resultado + asesor
 `projects_tab.ui` + `main_window.py`:
-- Botón **Cerrar proyecto** (confirmación con `QMessageBox`), **Reabrir** cuando
+- Botón **Cerrar proyecto** → diálogo con confirmación **y selector de
+  resultado** (`outcome`, con «Otro» libre). **Reabrir** cuando
   `status in (done, archived)`.
-- **«Mark done» en el último paso propone cerrar** («¿Cerrar el proyecto?»).
-- Cabecera del proyecto muestra la fecha de cierre cuando exista.
-- Archive pide confirmación (hoy no) y se puede desarchivar con Reabrir.
+- **«Mark done» en el último paso propone cerrar** (mismo diálogo).
+- Cabecera del proyecto muestra fecha de cierre y resultado cuando existan.
+- Archive pide confirmación (hoy no); Reabrir sirve también desde `archived`.
+- **Asesor (T10)**: infraestructura de sugerencia en la cabecera del proyecto
+  (banner ámbar, descartable). v1: sugiere cerrar proyectos `active` sin
+  actividad en `config["close_advisor_days"]` (default 30). El track B (B11)
+  enchufa la señal de evolución SN («evolución normal desde N días») a esta
+  misma infraestructura. **Sugiere, nunca decide.**
 
-**Tests**: offscreen — botones por estado, diálogo de cierre, fecha visible.
+**Tests**: offscreen — botones por estado, diálogo con outcome, banner del
+asesor visible/no según antigüedad, descarte del banner.
 
 ### A3 — Clasificación del hub
-`project.list_projects(status=None, kind=None, search=None, order="updated")`
-(args nuevos, retrocompatible) y hub:
-- **Agrupación por año** de `created` (cabeceras de sección en la lista; el año
-  de creación es el «año del proyecto»).
+`project.list_projects(status=None, kind=None, search=None, tags=None,
+favorites_first=False, order="updated")` (args nuevos, retrocompatible) y hub:
+- **Agrupación por año** de `created` (cabeceras de sección en la lista).
 - Combo **tipo** (All + `VALID_KINDS`).
 - Caja **búsqueda** (nombre contiene, case-insensitive).
+- **Etiquetas**: editor de tags en la cabecera del proyecto (chips editables)
+  + filtro por etiqueta en el hub.
+- **Favoritos**: estrella en la cabecera; opción «favoritos primero».
 - Combo **orden**: actualización / creación / nombre.
 - El combo de estado actual se conserva. Preferencias en `config`
   (`projects_filter_*`) restauradas al arrancar.
 
 **Tests**: unit de `list_projects` con cada arg; offscreen del hub (secciones
-por año, filtro por tipo, búsqueda, orden) con proyectos fake.
+por año, filtros tipo/etiqueta, favoritos primero, búsqueda, orden) con
+proyectos fake.
 
 ### A4 — Ficheros visibles + carpeta por proyecto
 - Pestaña **Detalles**: lista de `project_files` (icono por `kind`, nombre,
@@ -82,7 +110,7 @@ por año, filtro por tipo, búsqueda, orden) con proyectos fake.
 - Los exports nuevos van a `data_dir()/projects/<id>-<slug>/` (creada al vuelo);
   los ficheros ya registrados con rutas planas antiguas siguen funcionando (no
   se migran ficheros, solo se leen rutas).
-- **Los FITS nunca se copian**: solo se registran rutas.
+- **Los FITS nunca se copian**: solo se registran rutas (T4).
 
 **Tests**: offscreen — lista poblada desde `project_files` fake; registro de
 blink/FITS; creación de la subcarpeta.
@@ -100,7 +128,8 @@ A0 → A1 → A2 → A3 → A4 → A5
 ## Fuera de alcance
 
 - Bundle/export del proyecto cerrado a disco (zip) — posible v2.
-- Notas/diario del proyecto y etiquetas libres — posible v2.
+- Diario largo del proyecto (las notas por **sesión** son del track B, B2) —
+  aquí solo etiquetas/resultado.
 - Reescribir `observations.project_id` (código muerto) — se decide al tocar
   Historial, no aquí.
 
@@ -108,5 +137,7 @@ A0 → A1 → A2 → A3 → A4 → A5
 
 - Cambiar el directorio de exports puede despistar al usuario si busca los
   ficheros viejos: la lista de A4 siempre muestra la ruta real registrada.
-- Agrupar por año con muchos proyectos exige lista virtualizada si crece
-  (hoy decenas — `QListWidget` basta; revisar si supera ~500).
+- El asesor de cierre basado en «sin actividad» es tosco para SN (cadencia
+  2-3 días): por eso la señal buena llega en B11; mientras tanto el banner es
+  descartable y nunca bloquea (T10).
+- Etiquetas libres pueden degradarse (typos): autocompletado con las ya usadas.

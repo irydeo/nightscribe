@@ -15,6 +15,16 @@
 > tomas se muestra explícito en la tira de tiempos; (d) el esquema de
 > `inits.json` queda **fijado contra el verificado** en los docs de EXOTIC
 > (`rzellem/EXOTIC`, `docs/inits.json`, revisado 2026-09-09).
+> **Enmendado 2026-09-09 (post-entrevista)**: el observador parte de cero en
+> tránsitos — el norte es **«que cualquiera se atreva»**: (e) el panel de Plan
+> gana una **línea de tiempo visual** y un **checklist pre-vuelo** (toma de
+> prueba bajo saturación, defocus ligero y constante, comparación en el campo,
+> flats por sesión); (f) la tarjeta de selección lidera con **«cabe entero en
+> tu noche» + «detectable con tu telescopio»**, y la prioridad ExoClock se
+> explica didácticamente (analogía NEOfixer); (g) Publicar guía la **subida
+> del fichero de salida de EXOTIC a ExoClock/AAVSO** además del post; (h) el
+> monitor de flujo en vivo queda como v2+ con horizonte en **variables de
+> corto periodo**, condición: *tremendamente simple* (ver padre).
 
 **rama**: `feature/exoplanet-transit-project` (derivada de `feature/object-card`; mergea de vuelta a `feature/object-card`)
 **arranca sobre**: `07a29f8` (feature/object-card al día)
@@ -113,33 +123,57 @@ respeta/redondea; `baseline_fits` verdadero/falso; cadencia para ingress de
   baseline) no cabe en los límites del usuario: el tránsito a medias baja en
   la lista en vez de presentarse como capturable (enmienda 2026-09-09).
   **Sin tocar** `transits.py`; los campos llegan desde el subplan 0.
+- **La tarjeta lidera con la decisión real del observador** (post-entrevista):
+  «cabe entero en tu noche (con baselines)» y «detectable con tu telescopio»
+  (profundidad vs apertura — el veredicto ya existe en `explain_transit`).
+  La **prioridad ExoClock se explica didácticamente** (qué significa, para qué
+  sirve — misma filosofía que el chip/score de NEOfixer en NEOs): quien nunca
+  ha capturado un tránsito no conoce ese número.
 
 **Tests**: frase con hora; aviso cuando la baseline no cabe; penalización en
-el score.
+el score; chip de prioridad con su explicación.
 
 ### Subplan 2 — Panel de tránsito en Plan & Capture
-En `_build_plan_tab`, bloque específico para `kind == "transit"`:
+En `_build_plan_tab`, bloque específico para `kind == "transit"` pensado para
+quien **nunca ha capturado un tránsito** («que cualquiera se atreva» —
+post-entrevista):
 
+- **Línea de tiempo visual** (post-entrevista): barra gráfica con
+  `capture_start · ingress · mid · egress · capture_end` frente a la ventana
+  segura y al crepúsculo — la noche montada de un vistazo (reusar el patrón
+  del `TransitChart`/bandas de `gui/widgets/sky_widget.py`, widget
+  QGraphicsView, ADR-029). La captura **no debe ser compleja**: esta tira es
+  la prueba de ello.
 - **Tira de tiempos**: `capture_start · ingress · mid · egress · capture_end`
   (UTC + local) frente a la ventana segura; aviso si `baseline_fits=False`
   («la parte fuera de tránsito no cabe en tu ventana»).
 - **Exposición heurística v1** (explícita, en `core/exposure.py` como
   `recommended_transit_exposure(v_mag, plate_scale)` — tabla por magnitud
   escalada por escala de placa, sin saturación obvia; capada a un máximo
-  razonable). Preselecciona `spn_exps`.
+  razonable). Preselecciona `spn_exps`. Es el **punto de partida** del método
+  real del observador («probar hasta no saturar»): el checklist de abajo lo
+  hace paso explícito.
 - **Cadencia**: muestra `cadence_max_s`; aviso si
   `exposure + overhead > cadencia_máx` («no resuelves el ingress»). El
   **overhead/pausa entre tomas se muestra explícito** en la tira (p. ej.
   «60 s + 15 s de pausa → punto cada 75 s»), para que el usuario vea la
   cadencia real resultante y no solo la exposición (enmienda 2026-09-09).
-- **Consejos de buena práctica** (Conti/AAVSO + Cloudy Nights), estáticos:
-  defocus pequeño y constante + flats por sesión; estrella de comparación en
-  el FOV, de brillo/color similar y no variable; filtro banda ancha L/R
-  coherente (ExoClock reporta el filtro); mantener el target ≥ 30° y avisar
-  de airmass/Luna (reusar `moon_info`).
+- **Checklist pre-vuelo** (post-entrevista; Conti/AAVSO + Cloudy Nights),
+  pasos marcables antes de iniciar la secuencia:
+  1. **Toma de prueba** y pico de la estrella **bajo saturación** (guía: ~50-70 %
+     del rango del detector) — el ajuste fino de la exposición es manual.
+  2. **Defocus pequeño y constante** (reparte la luz entre más píxeles; no
+     re-enfocar a mitad salvo deriva grande).
+  3. **Estrella de comparación en el FOV**, de brillo/color similar y no
+     variable.
+  4. **Flats de la sesión** con el filtro de los lights (+ darks/bias como
+     siempre).
+  5. Filtro banda ancha L/R coherente (ExoClock reporta el filtro); target
+     ≥ 30° y aviso de airmass/Luna (reusar `moon_info`).
 
-**Tests**: offscreen — tira visible con datos fake; aviso baseline; exposición
-preseleccionada en el spin; aviso de cadencia.
+**Tests**: offscreen — línea de tiempo y tira visibles con datos fake; aviso
+baseline; exposición preseleccionada en el spin; aviso de cadencia; checklist
+marcable y persistente en `project_steps.data`.
 
 ### Subplan 3 — Export con ventana (CCDciel + NINA/CSV)
 En `core/sequence.py` + `core/sources/ccdciel.py`:
@@ -203,6 +237,12 @@ caché** porque el JSON cacheado no trae los campos nuevos).
 usa `ctx` + el `enrich` del proyecto (lo que ya muestra la ficha); QFileDialog
 con el nombre sugerido; registra el fichero en `project_files`; aviso «corre
 EXOTIC en tu entorno Python 3.10».
+**Tras la reducción** (post-entrevista): la pestaña Process muestra además la
+guía de cierre del flujo científico — «sube el fichero de salida de EXOTIC a
+**ExoClock** y/o la **AAVSO Exoplanet Database**» (enlaces directos; el fichero
+de subida lo genera EXOTIC, no NightScribe) — y recuerda que el paso **Publish**
+genera el post propio. El final feliz declarado es **ambos**: reporte +
+divulgación.
 
 **Tests**: unit — plantilla con la estructura EXOTIC; conversiones Rp/Rs y
 a/Rs; `null` cuando falta el dato; campos nuevos del TAP; nombre de salida.
@@ -225,6 +265,10 @@ en el mismo paso Process; 5 cierra.)
 
 - Leer la salida de EXOTIC (Mid-Transit Time → O-C, curva real en el post,
   marca observed): **v2**, mantenida fuera para conservar el handoff limpio.
+- **Monitor de flujo en vivo** durante la captura (v2+): posible sobre
+  `core/series.py` del track B; horizonte declarado = observación de
+  **variables de corto periodo**; condición puesta: *tremendamente simple de
+  usar*. Nunca curva científica — la reducción es EXOTIC (ver padre).
 - Lanzar EXOTIC desde NightScribe (subproceso / conda env Python 3.10):
   requiere validación contra el entorno real; el botón de 4d solo escribe el
   fichero.

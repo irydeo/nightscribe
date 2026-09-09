@@ -191,8 +191,9 @@ def test_select_project_drives_panel(window, panel):
     assert panel.state() == "ready"
     assert panel.lbl_hook.text()
     # step machine and buttons stayed intact ("Details" tab first, then the
-    # three steps — capture merged into plan, ADR-030)
-    assert window.projects.tabs_steps.count() == 4
+    # three steps — capture merged into plan, ADR-030) plus the SN follow-up
+    # tab (B2, hidden for non-SN kinds but still counted by QTabWidget)
+    assert window.projects.tabs_steps.count() == 5
     # a project opens on "Details": prev has no target there, next enters
     # step 1
     assert window.projects.tabs_steps.currentIndex() == 0
@@ -732,3 +733,52 @@ def test_apply_position_updates_context_and_label(window, panel):
     assert c["rate_arcsec_min"] == 5.0
     assert c["coords_source"] == "horizons"
     assert "22:30:00" in window._project_widgets["ccd_coords"].text()
+
+
+# ---------------- B2: SN follow-up tab ----------------
+
+def test_followup_tab_visible_for_sn(window, panel):
+    from PySide6.QtWidgets import QWidget
+    _create_and_select(window, "sn", "SN2026fu", {"kind": "sn"})
+    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    fu_idx = window.projects.tabs_steps.indexOf(fu_tab)
+    assert window.projects.tabs_steps.isTabVisible(fu_idx)
+
+
+def test_followup_tab_hidden_for_non_sn(window, panel):
+    from PySide6.QtWidgets import QWidget
+    _create_and_select(window, "neo", "NEO2026nofu", {"kind": "neo"})
+    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    fu_idx = window.projects.tabs_steps.indexOf(fu_tab)
+    assert not window.projects.tabs_steps.isTabVisible(fu_idx)
+
+
+def test_followup_add_session(window, panel):
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026sess", {"kind": "sn"})
+    assert fu.days_since_last_session(dbmod.db, p["id"]) is None
+    window._fu_add_session(p["id"])
+    sessions = fu.list_sessions(dbmod.db, p["id"])
+    assert len(sessions) == 1
+    lst = window._project_widgets.get("fu_sessions")
+    assert lst is not None
+    assert lst.count() == 1
+
+
+def test_followup_session_notes_persist(window, panel):
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026notes", {"kind": "sn"})
+    window._fu_add_session(p["id"])
+    sessions = fu.list_sessions(dbmod.db, p["id"])
+    sid = sessions[0]["id"]
+    lst = window._project_widgets["fu_sessions"]
+    lst.setCurrentRow(0)
+    window._fu_current_session = sid
+    notes = window._project_widgets.get("fu_notes")
+    if notes:
+        notes.setPlainText("Clear night, good seeing")
+    window._fu_save_notes(p["id"])
+    s = fu.get_session(dbmod.db, sid)
+    assert s["notes"] == "Clear night, good seeing"

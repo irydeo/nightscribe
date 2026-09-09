@@ -70,10 +70,14 @@
           <layout class="QVBoxLayout" name="processLayout"/>
          </widget>
 
-        <widget class="QWidget" name="tab_publish">
-         <attribute name="title"><string>Publish</string></attribute>
-         <layout class="QVBoxLayout" name="publishLayout"/>
-        </widget>
+         <widget class="QWidget" name="tab_publish">
+          <attribute name="title"><string>Publish</string></attribute>
+          <layout class="QVBoxLayout" name="publishLayout"/>
+         </widget>
+         <widget class="QWidget" name="tab_followup">
+          <attribute name="title"><string>Follow-up</string></attribute>
+          <layout class="QVBoxLayout" name="followupLayout"/>
+         </widget>
        </widget>
       </item>
       <item>

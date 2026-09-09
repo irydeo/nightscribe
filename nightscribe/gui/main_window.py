@@ -22,8 +22,9 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
-                                QListWidgetItem, QMainWindow, QMessageBox,
-                                QProgressBar,                                 QPushButton, QScrollArea,
+                                QListWidget, QListWidgetItem, QMainWindow,
+                                QMessageBox, QProgressBar,
+                                QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
                                 QVBoxLayout, QWidget, QTableWidgetItem)
@@ -1496,12 +1497,13 @@ class MainWindow(QMainWindow):
         # CCDciel controls of the plan tab) orphaned: they kept painting over
         # the rebuilt tab and piled up across project switches.
         for tab_name in ("tab_plan", "tab_process",
-                         "tab_publish"):
+                         "tab_publish", "tab_followup"):
             tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
             if tab and tab.layout():
                 self._wipe_layout(tab.layout())
         self.projects.lbl_step_status.setText("—")
         self._project_widgets = {}
+        self._fu_current_session = None
 
     def _build_step_tabs(self, p):
         # Populate each step tab with only the content relevant to the
@@ -1521,6 +1523,15 @@ class MainWindow(QMainWindow):
         self._build_plan_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
+        # B2: SN follow-up tab — not a step (like Details), only for kind='sn'
+        followup_tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
+        fu_idx = self.projects.tabs_steps.indexOf(followup_tab)
+        if kind == "sn":
+            self._build_followup_tab(p, ctx)
+            self.projects.tabs_steps.setTabVisible(fu_idx, True)
+        else:
+            self._wipe_layout(followup_tab.layout())
+            self.projects.tabs_steps.setTabVisible(fu_idx, False)
         # "Detalles" stays open (set by _project_selected); the current
         # step is marked ● on its tab and reached with Next →
         self._update_step_status(p)
@@ -2175,11 +2186,184 @@ class MainWindow(QMainWindow):
             f"{p['object_name']}</small>"))
         layout.addStretch()
 
+    def _build_followup_tab(self, p, ctx):
+        # B2: SN multi-night follow-up panel. Not a step — like Details, it
+        # holds the session journal (nights, stacked images, notes) and the
+        # cadence reminder ("última visita hace N noches"). All CRUD goes
+        # through core/followup.py; FITS metadata through core/fits_meta.py.
+        from ..core import followup as fu
+        tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
+        layout = tab.layout()
+        pid = p["id"]
+
+        # cadence reminder (T9): "hace N noches que no la visitas"
+        days = fu.days_since_last_session(db, pid)
+        if days is not None:
+            lbl_cadence = QLabel(
+                self.tr("Last visit: {} days ago").format(days))
+            colour = "#e0c060" if days >= 3 else "#8a90a6"
+            lbl_cadence.setStyleSheet(
+                f"color: {colour}; font-size: 13px;")
+            layout.addWidget(lbl_cadence)
+        else:
+            layout.addWidget(QLabel(
+                self.tr("No visits yet. Add one to start the follow-up.")))
+
+        # add visit button
+        btn_add = QPushButton(self.tr("Add visit"))
+        btn_add.clicked.connect(lambda: self._fu_add_session(pid))
+        layout.addWidget(btn_add)
+
+        # sessions list
+        grp = QGroupBox(self.tr("Visits"))
+        grp.setLayout(QVBoxLayout())
+        lst = QListWidget()
+        self._fu_populate_sessions(lst, pid)
+        lst.itemSelectionChanged.connect(
+            lambda: self._fu_session_selected(lst, pid))
+        grp.layout().addWidget(lst)
+
+        # session detail area (images + notes for the selected visit)
+        self._fu_detail = QFrame()
+        fu_layout = QVBoxLayout(self._fu_detail)
+        fu_layout.addWidget(QLabel(self.tr("Select a visit to see its images.")))
+        self._fu_notes = QTextEdit()
+        self._fu_notes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
+        self._fu_notes.textChanged.connect(
+            lambda: self._fu_save_notes(pid))
+        fu_layout.addWidget(self._fu_notes)
+        fu_detail_area = QScrollArea()
+        fu_detail_area.setWidgetResizable(True)
+        fu_detail_area.setFrameShape(QFrame.Shape.NoFrame)
+        fu_detail_area.setWidget(self._fu_detail)
+        grp.layout().addWidget(fu_detail_area)
+        layout.addWidget(grp)
+        layout.addStretch()
+        self._project_widgets["fu_sessions"] = lst
+        self._project_widgets["fu_notes"] = self._fu_notes
+
+    def _fu_populate_sessions(self, lst, pid):
+        # @args: lst - QListWidget, pid - project id
+        from ..core import followup as fu
+        lst.clear()
+        sessions = fu.list_sessions(db, pid)
+        for s in sessions:
+            n_img = len(fu.list_images(db, s["id"]))
+            from ..core import followup as fumod
+            pts = fumod.list_points(db, pid)
+            n_pts = sum(1 for p in pts if p.get("session_id") == s["id"])
+            notes_tag = f" · {s['notes'][:20]}" if s["notes"] else ""
+            item = QListWidgetItem(
+                f"{s['obs_date']}  ({n_img} img, {n_pts} mag){notes_tag}")
+            item.setData(Qt.UserRole, s["id"])
+            lst.addItem(item)
+
+    def _fu_session_selected(self, lst, pid):
+        # @args: lst - QListWidget, pid - project id
+        from ..core import followup as fu
+        items = lst.selectedItems()
+        if not items:
+            return
+        sid = items[0].data(Qt.UserRole)
+        self._fu_current_session = sid
+        # rebuild the session detail area: images + notes
+        detail = self._fu_detail
+        self._wipe_layout(detail.layout())
+        dlay = detail.layout()
+        # add stacked image button
+        btn_img = QPushButton(self.tr("Add stacked image…"))
+        btn_img.clicked.connect(lambda: self._fu_add_image(sid, pid))
+        dlay.addWidget(btn_img)
+        # images list for this session
+        img_lst = QListWidget()
+        self._fu_populate_images(img_lst, sid)
+        dlay.addWidget(img_lst)
+        self._project_widgets["fu_images"] = img_lst
+        # notes
+        s = fu.get_session(db, sid)
+        notes = QTextEdit()
+        notes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
+        if s:
+            notes.setText(s["notes"])
+        notes.textChanged.connect(lambda: self._fu_save_notes(pid))
+        dlay.addWidget(notes)
+        self._project_widgets["fu_notes"] = notes
+
+    def _fu_populate_images(self, lst, sid):
+        # @args: lst - QListWidget, sid - session id
+        from ..core import followup as fu
+        lst.clear()
+        for img in fu.list_images(db, sid):
+            filt = img["filter"] or "—"
+            label = f"[{filt}] {Path(img['fits_path']).name}"
+            if img["date_obs"]:
+                label += f"  ({img['date_obs']})"
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, img["id"])
+            lst.addItem(item)
+
+    def _fu_add_image(self, sid, pid):
+        # File dialog → fits_meta auto-fill → followup.add_image + project_files
+        from ..core import followup as fu
+        from ..core import fits_meta
+        path, _ = QFileDialog.getOpenFileName(
+            self, self.tr("Choose stacked FITS"), "",
+            "FITS (*.fits *.fit *.fts);;All files (*)")
+        if not path:
+            return
+        try:
+            meta = fits_meta.read_meta(path)
+        except Exception:
+            meta = {"filter": None, "date_obs": None,
+                     "exptime_s": None, "mjd": None}
+        filt = meta["filter"] or "Clear"
+        fu.add_image(db, sid, filt, path,
+                     date_obs=meta["date_obs"], exptime_s=meta["exptime_s"])
+        # T4: register the FITS path in the project
+        project.add_file(db, pid, path, "fits")
+        # refresh images list + files list
+        img_lst = self._project_widgets.get("fu_images")
+        if img_lst:
+            self._fu_populate_images(img_lst, sid)
+        self._populate_project_files(pid)
+
     def _step_key_idx(self, idx):
         # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
-        # step); steps start at 1. Returns None when there is no step key.
+        # step); steps start at 1. The "Follow-up" tab (B2, SN only) sits
+        # after Publish and is also a non-step tab. Returns None when there
+        # is no step key.
         # @args: idx - tab index
-        # @return: position in _STEP_KEYS, or None on the details tab
+        # @return: position in _STEP_KEYS, or None on a non-step tab
+        if idx <= 0:
+            return None
+        n = idx - 1
+        return n if n < len(_STEP_KEYS) else None
+
+    def _fu_save_notes(self, pid):
+        # Persist notes on the current session (B2: "en ocasiones" se guardan).
+        from ..core import followup as fu
+        sid = getattr(self, "_fu_current_session", None)
+        notes = self._project_widgets.get("fu_notes")
+        if sid and notes:
+            fu.update_session_notes(db, sid, notes.toPlainText())
+
+    def _fu_add_session(self, pid):
+        # Create a session for today and refresh the list (B2).
+        from ..core import followup as fu
+        fu.create_session(db, pid)
+        lst = self._project_widgets.get("fu_sessions")
+        if lst:
+            self._fu_populate_sessions(lst, pid)
+            # select the new one (top of the list, ordered DESC)
+            lst.setCurrentRow(0)
+
+    def _step_key_idx(self, idx):
+        # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
+        # step); steps start at 1. The "Follow-up" tab (B2, SN only) sits
+        # after Publish and is also a non-step tab. Returns None when there
+        # is no step key.
+        # @args: idx - tab index
+        # @return: position in _STEP_KEYS, or None on a non-step tab
         if idx <= 0:
             return None
         n = idx - 1
@@ -2209,15 +2393,16 @@ class MainWindow(QMainWindow):
 
     def _update_step_buttons(self):
         # The step buttons (prev / skip / done / next) only make sense on the
-        # step tabs, not on "Detalles": prev has no target there, skip / done
-        # have no step to act on, next is allowed (it enters step 1).
+        # step tabs, not on "Detalles" or "Follow-up" (non-step tabs):
+        # prev has no target there, skip / done have no step to act on,
+        # next is allowed (it enters step 1).
         idx = self.projects.tabs_steps.currentIndex()
         last = self.projects.tabs_steps.count() - 1
-        on_details = idx == 0
-        self.projects.btn_prev.setEnabled(not on_details)
+        on_non_step = self._step_key_idx(idx) is None
+        self.projects.btn_prev.setEnabled(not on_non_step)
         self.projects.btn_next.setEnabled(idx != last)
-        self.projects.btn_skip.setEnabled(not on_details)
-        self.projects.btn_mark_done.setEnabled(not on_details)
+        self.projects.btn_skip.setEnabled(not on_non_step)
+        self.projects.btn_mark_done.setEnabled(not on_non_step)
 
     def _project_prev(self):
         idx = self.projects.tabs_steps.currentIndex()

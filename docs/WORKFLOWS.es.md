@@ -615,3 +615,24 @@ iteración**: `SolarTracking`/`UpdateCoord=True` en el `.targets` y tasas no
 siderales vía JSON-RPC (necesitan validación contra el CCDciel real); el cap
 anti-traza por exposición (`max_exposure_no_trail` + `rate_arcsec_min`) ya
 protege los frames.
+
+### 7nonies. Track A — Ciclo de vida y clasificación de proyectos (2026-09-09)
+
+Plan: `docs/PLANS/project-lifecycle.md` (hijo A de
+`docs/PLANS/project-concept-v2.md`). Rama `feature/project-lifecycle`.
+
+Los proyectos se pueden **cerrar** (con resultado final) y **reabrir** (la
+revisita «un año después» es un flujo real); el hub clasifica por **año**,
+**tipo**, **etiquetas**, **favoritos**, **búsqueda** y **orden**; y los
+ficheros que el proyecto genera se ven en la pestaña Detalles.
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| A0 | Migración `user_version 4`: `closed_at`, `outcome`, `tags`, `favorite` + índice `created` | **Hecho** |
+| A1 | `core/project.py`: `close()/reopen()/set_tags/set_favorite` + `OUTCOMES` por tipo | **Hecho** |
+| A2 | GUI: botones cerrar/reabrir con diálogo de resultado + asesor de cierre + confirmación de archivar | **Hecho** |
+| A3 | Hub: agrupación por año, filtro por tipo, búsqueda, favoritos primero, orden configurable | **Hecho** |
+| A4 | `project_files` visibles en Detalles + carpeta por proyecto + registro de blink/FITS | **Hecho** |
+| A5 | CLI `project close/reopen/files` + i18n ES/EN (458 cadenas) + esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (643).

@@ -225,8 +225,11 @@ def cmd_project(args):
         for p in projects:
             cur = proj_mod.current_step(db, p["id"])
             step = cur or "done"
-            print(f"  [{p['id']:3d}] [{p['kind']:7s}] {p['object_name']:<24s} "
-                  f"{p['status']:8s} step={step}")
+            star = "★ " if p.get("favorite") else ""
+            outcome = f"  ({p['outcome']})" if p.get("outcome") else ""
+            print(f"  [{p['id']:3d}] {star}[{p['kind']:7s}] "
+                  f"{p['object_name']:<24s} {p['status']:8s} "
+                  f"step={step}{outcome}")
     elif args.action == "create":
         p = proj_mod.create(db, args.kind, args.name)
         if p:
@@ -242,6 +245,21 @@ def cmd_project(args):
         else:
             print(f"Project {args.id} not found")
             return 1
+    elif args.action == "close":
+        p = proj_mod.close(db, args.id, outcome=args.outcome)
+        if p:
+            print(f"Closed project {p['id']}: status={p['status']}"
+                  f" outcome={p.get('outcome')}")
+        else:
+            print(f"Project {args.id} not found or not active")
+            return 1
+    elif args.action == "reopen":
+        p = proj_mod.reopen(db, args.id)
+        if p:
+            print(f"Reopened project {p['id']}: status={p['status']}")
+        else:
+            print(f"Project {args.id} not found")
+            return 1
     elif args.action == "show":
         p = proj_mod.get(db, args.id)
         if not p:
@@ -252,6 +270,13 @@ def cmd_project(args):
             print(f"  {s['status']:8s} {s['step']}")
         for f in p["files"]:
             print(f"  file: {f['kind']:10s} {f['path']}")
+    elif args.action == "files":
+        files = proj_mod.list_files(db, args.id)
+        if not files:
+            print(f"Project {args.id} has no files")
+            return
+        for f in files:
+            print(f"  [{f['kind']:10s}] {f['path']}")
 
 
 def main(argv=None):
@@ -319,6 +344,14 @@ def main(argv=None):
     p_advance.add_argument("id", type=int, help="project id")
     p_show = p_sub.add_parser("show", help="mostrar un proyecto")
     p_show.add_argument("id", type=int, help="project id")
+    p_close = p_sub.add_parser("close", help="cerrar un proyecto")
+    p_close.add_argument("id", type=int, help="project id")
+    p_close.add_argument("--outcome", default=None,
+                         help="resultado final (texto libre)")
+    p_reopen = p_sub.add_parser("reopen", help="reabrir un proyecto")
+    p_reopen.add_argument("id", type=int, help="project id")
+    p_files = p_sub.add_parser("files", help="listar ficheros del proyecto")
+    p_files.add_argument("id", type=int, help="project id")
     p.set_defaults(func=cmd_project)
 
     args = parser.parse_args(argv)

@@ -22,8 +22,9 @@ from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
-                                QListWidgetItem, QMainWindow, QMessageBox,
-                                QProgressBar,                                 QPushButton, QScrollArea,
+                                QListWidget, QListWidgetItem, QMainWindow,
+                                QMessageBox, QProgressBar,
+                                QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
                                 QVBoxLayout, QWidget, QTableWidgetItem)
@@ -1462,6 +1463,44 @@ class MainWindow(QMainWindow):
             panel.cancel()   # switching projects: drop the in-flight load
         ctx = p.get("context") or {}
         panel.explore(p["object_name"], fallback_target=ctx, ctx=ctx)
+        self._ensure_proj_files_list(
+            self.projects.tabs_steps.findChild(QWidget, "tab_details"))
+        self._populate_project_files(p["id"])
+
+    def _ensure_proj_files_list(self, tab):
+        # A4: lazily build the project files list widget in the Details tab.
+        # Called from _project_selected (works whether the panel was built
+        # by _get_proj_panel or injected by a test fixture).
+        if getattr(self, "_proj_files_list", None) is None:
+            grp = QGroupBox(self.tr("Project files"))
+            grp.setLayout(QVBoxLayout())
+            self._proj_files_list = QListWidget()
+            self._proj_files_list.itemDoubleClicked.connect(
+                self._open_project_file)
+            grp.layout().addWidget(self._proj_files_list)
+            tab.layout().addWidget(grp)
+
+    def _populate_project_files(self, pid):
+        # A4: refresh the files list in the Details tab from project_files.
+        lst = getattr(self, "_proj_files_list", None)
+        if lst is None:
+            return
+        lst.clear()
+        for f in project.list_files(db, pid):
+            name = Path(f["path"]).name
+            dt = datetime.datetime.fromtimestamp(f["created"])
+            item = QListWidgetItem(
+                f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
+            item.setData(Qt.UserRole, str(f["path"]))
+            lst.addItem(item)
+
+    def _open_project_file(self, item):
+        # A4: double-click a file row to open it with the OS default.
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        path = item.data(Qt.UserRole)
+        if path:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     # ---------------- object panel (phase D4) ----------------
 
@@ -1489,6 +1528,8 @@ class MainWindow(QMainWindow):
             tab = self.projects.tabs_steps.findChild(
                 QWidget, "tab_details")
             tab.layout().addWidget(area)
+            # A4: project files list below the object panel
+            self._ensure_proj_files_list(tab)
             self._proj_panel = panel
             self._proj_panel_area = area
         return self._proj_panel
@@ -2218,6 +2259,13 @@ class MainWindow(QMainWindow):
             layout.addWidget(lbl_path)
             self._project_widgets["edt_fits"] = edt
             self._project_widgets["lbl_fits_path"] = lbl_path
+            # A4: restore saved FITS path from the process step data
+            step = next((s for s in p["steps"]
+                         if s["step"] == "process"), None)
+            saved = step and step["data"].get("fits_path")
+            if saved:
+                edt.setText(saved)
+                lbl_path.setText(saved)
             # (ADR-019 review 2026-08-28) the old "Analyse" step lived here;
             # its only real action — the blink — moved into this step, so the
             # FITS import and the confirmation are side by side.
@@ -2367,8 +2415,8 @@ class MainWindow(QMainWindow):
         fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
         ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
-        outdir = paths.data_dir() / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
+        outdir = paths.project_dir(self._current_project["id"],
+                                   self._current_project["object_name"])
         default = outdir / f"{target['name']}_sequence{ext}"
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Export capture sequence"), str(default),
@@ -2423,8 +2471,8 @@ class MainWindow(QMainWindow):
         fmt = combo.currentData()
         force = chk_force.isChecked()
 
-        outdir = paths.data_dir() / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
+        outdir = paths.project_dir(self._current_project["id"],
+                                   self._current_project["object_name"])
         base = obj_id
         if fmt == "fo":
             ext, default_name = ".txt", f"{base}_orbit_report.txt"
@@ -2468,6 +2516,13 @@ class MainWindow(QMainWindow):
                 edt.setText(path)
             if lbl:
                 lbl.setText(path)
+            # A4: persist the FITS path in the project
+            if self._current_project:
+                project.update_step_data(
+                    db, self._current_project["id"], "process",
+                    {"fits_path": path})
+                project.add_file(db, self._current_project["id"], path, "fits")
+                self._populate_project_files(self._current_project["id"])
 
     def _project_mpc_validate(self):
         if not self._current_project:
@@ -2508,8 +2563,8 @@ class MainWindow(QMainWindow):
             return
         obs_code = config.get("mpc_code", "")
         obj = self._current_project["object_name"]
-        outdir = paths.data_dir() / "exports"
-        outdir.mkdir(parents=True, exist_ok=True)
+        outdir = paths.project_dir(self._current_project["id"],
+                                   self._current_project["object_name"])
         default = outdir / f"{obj}_mpc_report.txt"
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Save MPC report"), str(default),
@@ -3115,8 +3170,13 @@ class MainWindow(QMainWindow):
         if not self._blink_pair or self._blink_ref8 is None:
             return
         pair = self._blink_pair
-        outdir = paths.data_dir() / "posts"
-        outdir.mkdir(parents=True, exist_ok=True)
+        # A4: per-project folder when opened from a project, flat posts/ otherwise
+        if self._current_project:
+            outdir = paths.project_dir(self._current_project["id"],
+                                       self._current_project["object_name"])
+        else:
+            outdir = paths.data_dir() / "posts"
+            outdir.mkdir(parents=True, exist_ok=True)
         if kind == "gif":
             out, _ = QFileDialog.getSaveFileName(
                 self, self.tr("Export GIF"),
@@ -3133,6 +3193,10 @@ class MainWindow(QMainWindow):
                 "PNG (*.png)")
         if not out:
             return
+        # A4: register the blink export in the project if we came from one
+        if self._current_project:
+            project.add_file(db, self._current_project["id"], out, "chart")
+            self._populate_project_files(self._current_project["id"])
         effect = "blink" if b.rdo_blink.isChecked() else "fade"
         sn = pair["sn_xy"] if b.chk_marker.isChecked() else None
         b.lbl_blink_status.setText(self.tr("Rendering…"))

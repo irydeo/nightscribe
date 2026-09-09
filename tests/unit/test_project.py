@@ -528,3 +528,24 @@ def test_list_projects_combined_filters(tmp_db):
                                      tags="ia", favorites_first=True)
     assert len(results) == 1
     assert results[0]["id"] == p1["id"]
+
+
+# ---------------- Track A / A4: per-project folder ----------------
+
+def test_project_dir_creates_folder(tmp_path, monkeypatch):
+    import nightscribe.paths as pathsmod
+    monkeypatch.setattr(pathsmod, "data_dir", lambda: tmp_path)
+    d = pathsmod.project_dir(42, "SN 2026abc!")
+    assert d.exists()
+    assert d.parent.name == "projects"
+    assert "42" in d.name
+    # the slug is sanitised: spaces and ! become _
+    assert "!" not in d.name
+
+
+def test_project_dir_empty_slug(tmp_path, monkeypatch):
+    import nightscribe.paths as pathsmod
+    monkeypatch.setattr(pathsmod, "data_dir", lambda: tmp_path)
+    d = pathsmod.project_dir(7, "")
+    assert d.exists()
+    assert d.name == "7-"

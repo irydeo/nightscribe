@@ -11,6 +11,7 @@
 #
 ############################################################
 
+import re
 import sys
 from pathlib import Path
 
@@ -54,3 +55,14 @@ def docs_dir():
     if getattr(sys, "frozen", False):
         return Path(sys._MEIPASS) / "docs"
     return Path(__file__).resolve().parent.parent / "docs"
+
+
+def project_dir(project_id, slug=""):
+    # @args: project_id - int, slug - object name (sanitised to a safe folder
+    #        name; non-alphanumeric chars become _, capped at 50 chars)
+    # @return: Path to the per-project export folder (created if missing).
+    #          Exports go here instead of the flat exports/ dir (Track A, A4).
+    safe = re.sub(r'[^a-zA-Z0-9_-]', '_', slug or "")[:50]
+    p = data_dir() / "projects" / f"{project_id}-{safe}"
+    p.mkdir(parents=True, exist_ok=True)
+    return p

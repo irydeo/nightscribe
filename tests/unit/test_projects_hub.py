@@ -908,3 +908,28 @@ def test_hub_favorites_first(window, panel):
     plain_idx = next(i for i, n in enumerate(names) if "plain" in n)
     assert fav_idx < plain_idx
     _reset_filters(window)
+
+
+# ---------------- A4: project files visible ----------------
+
+def test_hub_files_list_populated(window, panel):
+    _reset_filters(window)
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026files", {"kind": "sn"})
+    project.add_file(dbmod.db, p["id"], "/tmp/test_seq.targets", "sequence")
+    project.add_file(dbmod.db, p["id"], "/tmp/test_blink.gif", "chart")
+    _reselect(window, p["id"])
+    lst = window._proj_files_list
+    assert lst.count() == 2
+    texts = [lst.item(i).text() for i in range(lst.count())]
+    assert any("sequence" in t for t in texts)
+    assert any("chart" in t for t in texts)
+
+
+def test_hub_files_list_empty_for_new_project(window, panel):
+    _reset_filters(window)
+    _create_and_select(window, "sn", "SN2026nofiles", {"kind": "sn"})
+    lst = window._proj_files_list
+    assert lst.count() == 0

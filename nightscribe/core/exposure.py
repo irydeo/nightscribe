@@ -65,3 +65,34 @@ def feasible(window_start_dt, window_end_dt, duration_s):
     if not window_start_dt or not window_end_dt:
         return False
     return (window_end_dt - window_start_dt).total_seconds() >= float(duration_s)
+
+
+# ---------------- SN exposure by brightness (Track B, B8) ----------------
+
+# Honest heuristic: a point source of mag M on a typical amateur setup
+# (no SNR model — "guía, no promesa"). The table is a starting point the
+# observer refines with a test shot (interview: "probar hasta no saturar").
+# Exposures are capped at 300 s (5 min) for very faint targets — beyond that,
+# the session duration dominates and a deeper survey is the better call.
+_SN_EXP_TABLE = [
+    (8.0,   30),    # very bright: short to avoid saturation
+    (10.0,  60),
+    (12.0,  90),
+    (14.0, 120),
+    (16.0, 180),
+    (18.0, 240),
+    (20.0, 300),   # faint: cap at 5 min
+]
+
+
+def recommended_sn_exposure(mag):
+    # @args: mag - apparent magnitude of the SN (float)
+    # @return: recommended single-frame exposure in seconds (int), or None
+    #         when the magnitude is unknown
+    if mag is None:
+        return None
+    mag = float(mag)
+    for threshold, exp in _SN_EXP_TABLE:
+        if mag <= threshold:
+            return exp
+    return _SN_EXP_TABLE[-1][1]   # fainter than the last entry: cap

@@ -1613,6 +1613,32 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_darks"] = spn_darks
         self._project_widgets["spn_darkexp"] = spn_darkexp
         self._project_widgets["spn_bias"] = spn_bias
+        # B8: SN exposure hint by brightness + multi-filter step rows
+        if kind == "sn" and ctx.get("mag") is not None:
+            from ..core import exposure
+            sn_exp = exposure.recommended_sn_exposure(ctx["mag"])
+            if sn_exp:
+                layout.addWidget(QLabel(
+                    f"<small>{self.tr('Recommended exposure')}: "
+                    f"{sn_exp}s · {self.tr('mag')} {ctx['mag']:.1f}"
+                    f" · {self.tr('guía, no SNR — prueba antes de saturar')}"
+                    f"</small>"))
+                spn_exp.setValue(min(sn_exp, 60.0))
+            # multi-filter rows: add/remove (filter × N × exp) steps
+            layout.addWidget(QLabel(self.tr("Filters (add rows for multi-band)")))
+            steps_container = QWidget()
+            steps_vlay = QVBoxLayout(steps_container)
+            steps_vlay.setContentsMargins(2, 2, 2, 2)
+            self._sn_steps = []
+            for filt in ("Clear",):
+                self._sn_add_step_row(steps_vlay, filt, 30, spn_exp.value())
+            add_row = QHBoxLayout()
+            btn_add_filt = QPushButton(self.tr("Add filter"))
+            btn_add_filt.clicked.connect(lambda: self._sn_add_step_row(steps_vlay))
+            add_row.addWidget(btn_add_filt)
+            steps_vlay.addLayout(add_row)
+            layout.addWidget(steps_container)
+            self._project_widgets["sn_steps_container"] = steps_container
         # sequence export (all kinds)
         layout.addWidget(QLabel(self.tr("Export capture sequence")))
         cmb_fmt = QComboBox()
@@ -2634,6 +2660,48 @@ class MainWindow(QMainWindow):
             self._render_project_header(p)
             self._build_step_tabs(p)
 
+    def _sn_add_step_row(self, layout, filt="Clear", n=30, exp=60.0):
+        # B8: add a filter×N×exp row to the SN multi-filter step list.
+        row = QHBoxLayout()
+        cmb = QComboBox()
+        cmb.setEditable(True)
+        cmb.addItems(["Clear", "V", "R", "G", "B", "I", "NIR", "L"])
+        cmb.setCurrentText(filt)
+        row.addWidget(cmb)
+        spn_n = QSpinBox()
+        spn_n.setMinimum(1); spn_n.setMaximum(999)
+        spn_n.setValue(n)
+        row.addWidget(spn_n)
+        spn_e = QDoubleSpinBox()
+        spn_e.setMinimum(0.1); spn_e.setMaximum(3600.0)
+        spn_e.setValue(exp)
+        row.addWidget(spn_e)
+        btn_del = QPushButton("✕")
+        btn_del.setFixedWidth(28)
+        entry = {"cmb": cmb, "spn_n": spn_n, "spn_e": spn_e,
+                    "row": row, "btn_del": btn_del}
+        btn_del.clicked.connect(lambda checked, e=entry: self._sn_del_step_row(e))
+        self._sn_steps.append(entry)
+        layout.addLayout(row)
+
+    def _sn_del_step_row(self, entry):
+        # B8: remove a multi-filter step row.
+        layout = entry["row"].parentLayout()
+        for w in (entry["cmb"], entry["spn_n"], entry["spn_e"],
+                    entry["btn_del"]):
+            layout.removeWidget(w)
+            w.deleteLater()
+        self._sn_steps.remove(entry)
+
+    def _sn_collect_steps(self):
+        # B8: gather (filter, n, exp) tuples from the multi-filter rows.
+        # @return: list of (filter, n, exp) tuples
+        steps = []
+        for e in self._sn_steps:
+            filt = e["cmb"].currentText().strip() or "Clear"
+            steps.append((filt, e["spn_n"].value(), e["spn_e"].value()))
+        return steps
+
     def _project_export_sequence(self):
         if not self._current_project:
             return
@@ -2647,11 +2715,24 @@ class MainWindow(QMainWindow):
                 and spn_darkexp and spn_bias):
             return
         n_darks = spn_darks.value()
-        plan = sequence.make_plan(
-            spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
-            n_darks=n_darks,
-            exp_dark=spn_darkexp.value() if n_darks else None,
-            n_bias=spn_bias.value())
+        # B8: SN multi-filter plans use the step rows; other kinds use the
+        # legacy single-filter fields.
+        steps = None
+        if self._current_project["kind"] == "sn" and self._sn_steps:
+            steps = self._sn_collect_steps()
+            # total n_frames for the plan dict (sum of per-step counts)
+            n_total = sum(n for _f, n, _e in steps)
+            plan = sequence.make_plan(
+                n_total, steps[0][2], steps[0][0], cfg=config,
+                n_darks=n_darks,
+                exp_dark=spn_darkexp.value() if n_darks else None,
+                n_bias=spn_bias.value(), steps=steps)
+        else:
+            plan = sequence.make_plan(
+                spn.value(), spn_exp.value(), cmb_f.currentText(), cfg=config,
+                n_darks=n_darks,
+                exp_dark=spn_darkexp.value() if n_darks else None,
+                n_bias=spn_bias.value())
         ctx = self._current_project.get("context") or {}
         target = {"name": self._current_project["object_name"],
                   "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),

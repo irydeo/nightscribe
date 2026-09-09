@@ -157,6 +157,25 @@ def _migrate(conn):
                          pid, "plan"))
             conn.execute("DELETE FROM project_steps WHERE id=?", (sid,))
         conn.execute("PRAGMA user_version = 3")
+    if v < 4:
+        # Track A (project-concept v2): lifecycle & classification — close
+        # date, final outcome, free-form tags and favourites on a project.
+        # Guarded column checks keep it idempotent (a fresh DB already has the
+        # columns when _V1 is extended in a future revision; re-opening a v4
+        # DB is a no-op).
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)")}
+        if "closed_at" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN closed_at REAL")
+        if "outcome" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN outcome TEXT")
+        if "tags" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN tags TEXT DEFAULT ''")
+        if "favorite" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN favorite INTEGER"
+                         " DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_projects_created"
+                     " ON projects(created)")
+        conn.execute("PRAGMA user_version = 4")
     conn.commit()
 
 

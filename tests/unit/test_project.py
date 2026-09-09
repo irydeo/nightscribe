@@ -147,9 +147,9 @@ def test_delete_cascades(tmp_db):
     assert rows[0] == 0
 
 
-def test_migration_user_version_is_three(tmp_db):
+def test_migration_user_version_is_four(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 3
+    assert v == 4
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -184,7 +184,7 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 4
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
@@ -231,7 +231,7 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 4
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",
@@ -261,3 +261,91 @@ def test_mark_observed_with_project_id(tmp_db):
         "SELECT project_id FROM observations WHERE object=?", ("2021EQ3",)
     ).fetchone()
     assert row[0] == p["id"]
+
+
+def _build_v3_db(path):
+    # @return: (path, project_id) of a hand-built user_version=3 database with
+    # one SN project and its three steps — the state right before Track A.
+    import sqlite3
+    import time
+    from nightscribe.core import db as dbmod
+
+    conn = sqlite3.connect(str(path))
+    conn.executescript(dbmod._SCHEMA)
+    conn.executescript(dbmod._V1)
+    conn.execute("ALTER TABLE observations ADD COLUMN project_id INTEGER")
+    now = time.time()
+    cur = conn.execute(
+        "INSERT INTO projects (kind, object_name, status, created, updated,"
+        " context) VALUES ('sn', 'SN2026abc', 'active', ?, ?, '{}')",
+        (now, now))
+    pid = cur.lastrowid
+    for step, status in (("plan", "done"), ("process", "current"),
+                         ("publish", "pending")):
+        conn.execute(
+            "INSERT INTO project_steps (project_id, step, status, data,"
+            " updated) VALUES (?, ?, ?, '{}', ?)", (pid, step, status, now))
+    conn.execute("PRAGMA user_version = 3")
+    conn.commit()
+    conn.close()
+    return path, pid
+
+
+def test_fresh_db_has_lifecycle_columns(tmp_db):
+    # A brand-new database (Track A) must carry the four lifecycle columns and
+    # the created-index straight out of the migration.
+    cols = {r[1] for r in tmp_db.execute(
+        "PRAGMA table_info(projects)").fetchall()}
+    assert {"closed_at", "outcome", "tags", "favorite"} <= cols
+    idx = tmp_db.execute(
+        "SELECT name FROM sqlite_master WHERE type='index'"
+        " AND tbl_name='projects'").fetchall()
+    assert any("idx_projects_created" == r[0] for r in idx)
+
+
+def test_migration_v3_to_v4_preserves_projects(tmp_path):
+    # A pre-Track-A database (user_version 3) with a real project must keep
+    # every row and gain the lifecycle columns with sane defaults.
+    from nightscribe.core.db import Database
+
+    file, pid = _build_v3_db(tmp_path / "v3.db")
+    db = Database(str(file))
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 4
+
+    # the project itself is intact (kind/name/status/context unchanged)
+    row = db.execute(
+        "SELECT kind, object_name, status, context FROM projects WHERE id=?",
+        (pid,)).fetchone()
+    assert row[0] == "sn"
+    assert row[1] == "SN2026abc"
+    assert row[2] == "active"
+    assert row[3] == "{}"
+
+    # the new lifecycle columns exist with their default values
+    row = db.execute(
+        "SELECT closed_at, outcome, tags, favorite FROM projects WHERE id=?",
+        (pid,)).fetchone()
+    assert row[0] is None      # closed_at
+    assert row[1] is None      # outcome
+    assert row[2] == ""        # tags (default '')
+    assert row[3] == 0         # favorite (default 0)
+
+    # the three step rows survived the migration
+    steps = db.execute(
+        "SELECT step FROM project_steps WHERE project_id=? ORDER BY id",
+        (pid,)).fetchall()
+    assert [s[0] for s in steps] == ["plan", "process", "publish"]
+
+
+def test_migration_v4_is_idempotent(tmp_path):
+    # Re-opening a database already at v4 must not error and must not try to
+    # re-add columns (ALTER TABLE ADD COLUMN is not repeatable).
+    from nightscribe.core.db import Database
+
+    file, _pid = _build_v3_db(tmp_path / "v3.db")
+    Database(str(file))               # migrates 3 -> 4
+    db = Database(str(file))          # re-open: no-op
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 4
+    cols = {r[1] for r in db.execute(
+        "PRAGMA table_info(projects)").fetchall()}
+    assert {"closed_at", "outcome", "tags", "favorite"} <= cols

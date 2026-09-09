@@ -1420,3 +1420,84 @@ def test_resize_keeps_full_panel_visible(qapp):
     dlg.deleteLater()
     p.deleteLater()
 
+
+# ---------------- B4: SN light-curve slot + followup injection ----------------
+
+FAKE_SN = {
+    "type": "transient",
+    "name": "SN2026b (NGC 1234)",
+    "data": {"simbad": {"otype": "SN Ia"}},
+}
+
+_SN_POINTS = [
+    {"mjd": 60600.0, "mag": 16.0, "err": 0.02, "filter": "Clear",
+     "source": "manual"},
+    {"mjd": 60603.0, "mag": 16.3, "err": 0.03, "filter": "Clear",
+     "source": "survey:atlas"},
+    {"mjd": 60606.0, "mag": 16.1, "err": None, "filter": "NIR",
+     "source": "quicklook"},
+]
+
+
+def test_lightcurve_slot_renders_with_points(panel, monkeypatch):
+    # followup points already present in the enriched dict -> the panel
+    # puts a live LightCurveChart on its own tab.
+    monkeypatch.setattr(panel, "_inject_followup",
+                        lambda e: None)   # points come from the payload
+    e = dict(FAKE_SN)
+    e["data"] = dict(FAKE_SN["data"],
+                     followup={"points": _SN_POINTS,
+                               "sn_type": "SN Ia"})
+    panel.show(e)
+    from nightscribe.gui.widgets.lightcurve_widget import LightCurveChart
+    tabs = [w for w in _chart_tabs(panel) if isinstance(w, LightCurveChart)]
+    assert tabs, "no LightCurveChart tab"
+    assert "lightcurve" in panel._slot_data
+    assert len(panel._slot_data["lightcurve"]["points"]) == 3
+    # click-rebuild works off the extracted data
+    rebuilt = panel._rebuild_widget("lightcurve", panel._slot_data["lightcurve"])
+    assert isinstance(rebuilt, LightCurveChart)
+    assert len(rebuilt._points) == 3
+
+
+def test_lightcurve_slot_absent_without_points(panel, monkeypatch):
+    # no photometry (and injection neutralised) -> no lightcurve tab.
+    monkeypatch.setattr(panel, "_inject_followup",
+                        lambda e: None)
+    panel.show(dict(FAKE_SN, data=dict(FAKE_SN["data"])))
+    from nightscribe.gui.widgets.lightcurve_widget import LightCurveChart
+    assert not [w for w in _chart_tabs(panel)
+                if isinstance(w, LightCurveChart)]
+    assert "lightcurve" not in panel._slot_data
+
+
+def test_inject_followup_pulls_points_from_db(panel, tmp_db,
+                                              monkeypatch):
+    # project ctx with photometry in the (tmp) database -> the panel
+    # pulls the points into data["followup"]["points"] while rendering.
+    import time
+    from nightscribe.core import followup
+    now = time.time()
+    tmp_db.execute(
+        "INSERT INTO projects (kind, object_name, status, created, updated,"
+        " context) VALUES (?, ?, 'active', ?, ?, '{}')",
+        ("transient", "SN Test", now, now))
+    tmp_db.commit()
+    followup.add_point(tmp_db, 1, 60600.0, "Clear", 16.0, err=0.02)
+    followup.add_point(tmp_db, 1, 60603.0, "Clear", 16.3,
+                       source="survey:atlas")
+    from nightscribe.core import db as _db
+    monkeypatch.setattr(_db, "Database", lambda *a, **k: tmp_db)
+    e = dict(FAKE_SN, data=dict(FAKE_SN["data"]))
+    panel.show(e, ctx={"project_id": 1})
+    pts = (e.get("data") or {}).get("followup", {}).get("points") or []
+    assert len(pts) == 2
+    assert {p["source"] for p in pts} == {"manual", "survey:atlas"}
+
+
+def test_inject_followup_no_ctx_no_points(panel):
+    # no project ctx -> transient renders but no lightcurve data lands.
+    e = dict(FAKE_SN, data=dict(FAKE_SN["data"]))
+    panel.show(e)
+    assert not ((e.get("data") or {}).get("followup") or {}).get("points")
+

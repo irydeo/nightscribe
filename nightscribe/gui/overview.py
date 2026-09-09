@@ -51,16 +51,18 @@ _TITLE = {"orbit": QT_TRANSLATE_NOOP("ObjectPanel", "Orbit"),
           "sky": QT_TRANSLATE_NOOP("ObjectPanel", "Sky tonight"),
           "approach": QT_TRANSLATE_NOOP("ObjectPanel", "Approach"),
           "field": QT_TRANSLATE_NOOP("ObjectPanel", "Reference field"),
-          "transit": QT_TRANSLATE_NOOP("ObjectPanel", "Light curve")}
+          "transit": QT_TRANSLATE_NOOP("ObjectPanel", "Light curve"),
+          "lightcurve": QT_TRANSLATE_NOOP("ObjectPanel", "Light curve")}
 
 # Grid order, left to right; the ones build_charts actually produced are
 # laid out in this order (the rest stay hidden).
-_CHART_SLOTS = ("orbit", "sky", "approach", "field", "transit")
+_CHART_SLOTS = ("orbit", "sky", "approach", "field", "transit",
+                "lightcurve")
 
 # Slots that get a live vector widget (OrbitChart / SkyChart /
-# ApproachChart); the rest keep the QLabel+QPixmap route (light curve
-# / cutout have no widget yet).
-_VECTOR_SLOTS = frozenset({"orbit", "sky", "approach"})
+# ApproachChart / LightCurveChart); the rest keep the QLabel+QPixmap
+# route (the reference-field cutout has no widget yet).
+_VECTOR_SLOTS = frozenset({"orbit", "sky", "approach", "lightcurve"})
 
 
 def _chip(text, color, tip=""):
@@ -447,7 +449,32 @@ class ObjectPanel(QWidget):
             return
         if self._name is None and e.get("name"):
             self._name = str(e["name"])
+        self._inject_followup(e)
         self._state_ready(e)
+
+    def _inject_followup(self, e):
+        # Fills data["followup"]["points"] for SNs with a project context:
+        # core/enrich has no project knowledge, so the GUI layer pulls the
+        # photometry from the project's db (B4, docs/PLANS/sn-followup.md).
+        # @args: e - enriched dict (mutated in place)
+        if e.get("type") not in ("transient", "sn"):
+            return
+        fu = (e.get("data") or {}).get("followup") or {}
+        if fu.get("points"):
+            return
+        pid = (self._ctx or {}).get("project_id")
+        if not pid:
+            return
+        try:
+            from ..core import db, followup
+            conn = db.Database()
+            pts = followup.list_points(conn, pid)
+            conn.close()
+        except Exception:
+            pts = []
+        if pts:
+            d = e.setdefault("data", {})
+            d.setdefault("followup", {}).setdefault("points", pts)
 
     def explore(self, name, fallback_target=None, ctx=None):
         # Kicks off the injected loader; the panel renders whatever lands.
@@ -670,9 +697,9 @@ class ObjectPanel(QWidget):
         self._empty_tabs()
 
         for key in _CHART_SLOTS:
-            # "approach" is a pure-vector slot: build_charts never returns
-            # an "approach" PNG, so gate on orbital elements directly.
-            if key == "approach":
+            # "approach" and "lightcurve" are pure-vector slots: gate on
+            # the underlying data directly (elements / photometry points).
+            if key in ("approach", "lightcurve"):
                 self._slot_titles[key] = self.tr(_TITLE[key])
                 w = self._make_vector(key, e)
                 if w is not None:
@@ -777,6 +804,18 @@ class ObjectPanel(QWidget):
             w = ApproachChart()
             w.set_elements(els, jd, e.get("name", ""))
             return w
+        elif key == "lightcurve":
+            # Pure vector (B4): needs photometry points already injected
+            # into the enriched dict (see _inject_followup_data).
+            data = self._extract("lightcurve", e)
+            if not data or not data.get("points"):
+                return None
+            from .widgets.lightcurve_widget import LightCurveChart
+            w = LightCurveChart()
+            w.set_data(data["points"], sn_type=data.get("sn_type"),
+                       peak_mjd=data.get("peak_mjd"),
+                       peak_mag=data.get("peak_mag"))
+            return w
         return None
 
     def _extract(self, key, e):
@@ -846,6 +885,17 @@ class ObjectPanel(QWidget):
                 datetime.datetime.now(datetime.timezone.utc))
             return {"elements": els, "jd": jd, "name": e.get("name", "")}
 
+        elif key == "lightcurve":
+            fu = d.get("followup") or {}
+            pts = fu.get("points") or []
+            if not pts:
+                return None
+            return {"points": pts,
+                    "sn_type": fu.get("sn_type")
+                    or (d.get("simbad") or {}).get("otype"),
+                    "peak_mjd": fu.get("peak_mjd"),
+                    "peak_mag": fu.get("peak_mag")}
+
         return None
 
     def _rebuild_widget(self, key, data):
@@ -876,6 +926,13 @@ class ObjectPanel(QWidget):
             w = ApproachChart()
             w.set_elements(data["elements"], data["jd"],
                             data.get("name", ""))
+            return w
+        elif key == "lightcurve":
+            from .widgets.lightcurve_widget import LightCurveChart
+            w = LightCurveChart()
+            w.set_data(data["points"], sn_type=data.get("sn_type"),
+                       peak_mjd=data.get("peak_mjd"),
+                       peak_mag=data.get("peak_mag"))
             return w
         return None
 

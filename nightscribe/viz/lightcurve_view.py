@@ -51,6 +51,42 @@ def _filter_label(filt, lang):
     return filt
 
 
+_SURVEY_COLOUR = "#8a90a6"   # B12 survey-catalog points: faint grey
+
+
+def _source_class(src):
+    # @args: src - the point's source (manual|paste|file|quicklook|survey:…)
+    # @return: "manual" | "quicklook" | "survey"
+    src = src or "manual"
+    if src.startswith("survey"):
+        return "survey"
+    if src == "quicklook":
+        return "quicklook"
+    return "manual"
+
+
+def _series_label(filt, src_class, lang):
+    # @args: filt - filter name, src_class - _source_class(), lang - "es"|"en"
+    # @return: the legend label of one (filter, source) series
+    label = _filter_label(filt, lang)
+    if src_class == "quicklook":
+        label += " · " + style.pick(lang, "indicativo", "indicative")
+    elif src_class == "survey":
+        label += " · " + style.pick(lang, "catálogo", "catalog")
+    return label
+
+
+def _series_style(src_class):
+    # @args: src_class - "manual" | "quicklook" | "survey"
+    # @return: (colour, marker face, linestyle); a None colour means
+    #          "use the filter's own colour"
+    if src_class == "survey":
+        return _SURVEY_COLOUR, "none", "--"
+    if src_class == "quicklook":
+        return None, "none", "--"
+    return None, "auto", "-"
+
+
 def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
                     size=None, lang="es", sn_type=None,
                     peak_mjd=None, peak_mag=None):
@@ -67,15 +103,17 @@ def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
     # @return: matplotlib figure (and writes PNG if out is given)
     fig, ax = style.new_fig(fmt, size=size)
 
-    # group points by filter
-    by_filter = {}
+    # group points by (filter, source): a campaign band and a survey
+    # band of the same filter are separate series with their own style
+    by_series = {}
     for p in points:
         f = p.get("filter") or "Clear"
-        by_filter.setdefault(f, []).append(p)
+        key = (f, _source_class(p.get("source")))
+        by_series.setdefault(key, []).append(p)
 
     # find the peak (brightest = lowest mag) for template alignment
     if peak_mjd is None or peak_mag is None:
-        all_pts = [p for pts in by_filter.values() for p in pts]
+        all_pts = list(points)
         if all_pts:
             brightest = min(all_pts, key=lambda p: p["mag"])
             peak_mjd = peak_mjd if peak_mjd is not None else brightest["mjd"]
@@ -91,29 +129,31 @@ def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
                 label=style.pick(lang, "Plantilla típica (esquemática)",
                                   "Typical template (schematic)"))
 
-    # data series per filter
-    for filt in sorted(by_filter):
-        pts = sorted(by_filter[filt], key=lambda p: p["mjd"])
+    # data series per (filter, source)
+    for (filt, src_class) in sorted(by_series):
+        pts = sorted(by_series[(filt, src_class)], key=lambda p: p["mjd"])
         xs = [p["mjd"] for p in pts]
         ys = [p["mag"] for p in pts]
         errs = [p.get("err") for p in pts]
         # matplotlib rejects None in yerr; use NaN to skip a bar
         errs = [e if e is not None else float("nan") for e in errs]
-        colour = _filter_colour(filt)
-        # source style: quicklook = hollow (open marker), others = filled
-        is_quicklook = any(p.get("source") == "quicklook" for p in pts)
-        marker = "o" if not is_quicklook else "o"
-        facecolor = colour if not is_quicklook else "none"
-        ax.errorbar(xs, ys, yerr=errs, color=colour, marker=marker,
-                     markerfacecolor=facecolor, markersize=5, lw=1.5,
-                     capsize=0, label=_filter_label(filt, lang), zorder=3)
+        colour, face, linest = _series_style(src_class)
+        if colour is None:
+            colour = _filter_colour(filt)
+        if face == "auto":
+            face = colour
+        ax.errorbar(xs, ys, yerr=errs, color=colour, marker="o",
+                    markerfacecolor=face, markersize=5, lw=1.5,
+                    ls=linest,
+                    capsize=0, label=_series_label(filt, src_class, lang),
+                    zorder=3)
 
     ax.set_title(style.pick(lang, "Curva de luz", "Light curve"), loc="left")
     ax.set_xlabel(style.pick(lang, "Fecha (MJD)", "Date (MJD)"))
     ax.set_ylabel(style.pick(lang, "Magnitud", "Magnitude"))
     ax.invert_yaxis()   # brighter (lower mag) at the bottom — standard
     ax.grid(True, alpha=0.2)
-    if by_filter or tpl:
+    if by_series or tpl:
         ax.legend(fontsize=9, loc="best")
     style.watermark(fig, watermark)
     if out:

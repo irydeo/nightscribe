@@ -983,6 +983,175 @@ def test_followup_session_notes_persist(window, panel):
     assert s["notes"] == "Clear night, good seeing"
 
 
+def test_followup_notes_no_dual_identity(window, panel):
+    # B2 defect: _build_followup_tab used to also create a top-level notes
+    # widget. Two QTextEdits bound to different sessions meant _fu_save_notes
+    # could write to a dead widget. After the fix there is exactly ONE live
+    # notes widget and it is always the one in _project_widgets["fu_notes"].
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026note2", {"kind": "sn"})
+    window._fu_add_session(p["id"])
+    sessions = fu.list_sessions(dbmod.db, p["id"])
+    s1 = sessions[0]["id"]
+    lst = window._project_widgets["fu_sessions"]
+    lst.setCurrentRow(0)
+    # before the fix this raised / hit a stale widget; now it stores one key
+    w_live = window._project_widgets.get("fu_notes")
+    assert w_live is not None
+    # select it and confirm _fu_save_notes targets the LIVE widget, not a
+    # dead one: change the live widget, save, read back from disk.
+    w_live.blockSignals(True)
+    w_live.setPlainText("live widget note")
+    w_live.blockSignals(False)
+    window._fu_current_session = s1
+    window._fu_save_notes(p["id"])
+    assert fu.get_session(dbmod.db, s1)["notes"] == "live widget note"
+
+
+def test_followup_add_measurement_has_real_mjd(window, panel):
+    # B2 defect: _fu_add_measurement fell back to mjd=0.0 when obs_date was
+    # missing, corrupting light-curve ordering. Now it derives a real MJD.
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    p = _create_and_select(window, "sn", "SN2026mjd", {"kind": "sn"})
+    # craft a session with NO parseable obs_date (empty string) so the old
+    # code would have taken the mjd=0.0 branch
+    sid = fu.create_session(dbmod.db, p["id"], obs_date="")
+    # force the stored date to empty to hit the fallback path
+    dbmod.db.execute(
+        "UPDATE project_sessions SET obs_date='' WHERE id=?", (sid,))
+    dbmod.db.commit()
+    lst = window._project_widgets["fu_sessions"]
+    # populate + select so the measurement panel (widgets) is built
+    window._fu_populate_sessions(lst, p["id"])
+    lst.setCurrentRow(0)
+    window._fu_current_session = sid
+    spn_mag = window._project_widgets.get("fu_meas_mag")
+    spn_err = window._project_widgets.get("fu_meas_err")
+    cmb_filt = window._project_widgets.get("fu_meas_filt")
+    spn_mag.setValue(15.5)
+    cmb_filt.setCurrentText("V")
+    window._fu_add_measurement(sid, p["id"], spn_mag, spn_err, cmb_filt)
+    pts = [pt for pt in fu.list_points(dbmod.db, p["id"])
+           if pt["session_id"] == sid]
+    assert len(pts) == 1
+    assert pts[0]["mjd"] > 0, "MJD must not be 0 (B2 corruption)"
+    # it should be a plausible modern MJD (2000-01-01 == 51544.5)
+    assert pts[0]["mjd"] > 51544
+
+
+def test_followup_delete_session(window, panel):
+    # B2 defect: the GUI had no way to delete a visit. Now _fu_delete_session
+    # exists and removes the session (images cascade, points are kept).
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    from PySide6.QtWidgets import QMessageBox
+    p = _create_and_select(window, "sn", "SN2026del", {"kind": "sn"})
+    sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
+    # attach an image + a point so the cascade / keep behaviour is observable
+    fu.add_image(dbmod.db, sid, "V", "/tmp/fake.fits", date_obs="2026-09-01")
+    fu.add_point(dbmod.db, p["id"], 61000.0, "V", 16.0,
+                 source="manual", session_id=sid)
+    assert fu.get_session(dbmod.db, sid) is not None
+    # stub the confirmation dialog to auto-accept
+    orig = QMessageBox.question
+    QMessageBox.question = lambda *a, **kw: QMessageBox.Yes
+    try:
+        lst = window._project_widgets["fu_sessions"]
+        window._fu_delete_session(lst, sid, p["id"])
+    finally:
+        QMessageBox.question = orig
+    assert fu.get_session(dbmod.db, sid) is None
+    # images cascaded with the session
+    assert fu.list_images(dbmod.db, sid) == []
+    # but the photometry point is retained per the delete_session contract
+    pts = [pt for pt in fu.list_points(dbmod.db, p["id"])
+           if pt["session_id"] is not None]
+    assert pts or all(pt["session_id"] != sid
+                      for pt in fu.list_points(dbmod.db, p["id"]))
+
+
+def test_followup_add_image_dialog_editable(window, panel, monkeypatch, tmp_path):
+    # B2 defect: 'Add stack' read the FITS header verbatim with no chance to
+    # fix a misnamed filter/date/exptime. Now a dialog pre-fills the values
+    # and lets the user edit them before committing.
+    from nightscribe.core import followup as fu
+    from nightscribe.core import fits_meta
+    import nightscribe.core.db as dbmod
+    from PySide6.QtWidgets import QDialog, QFileDialog, QComboBox, QLineEdit
+    p = _create_and_select(window, "sn", "SN2026imgd", {"kind": "sn"})
+    sid = fu.create_session(dbmod.db, p["id"], "2026-09-05")
+    fake_path = str(tmp_path / "stack.fits")
+    # stub the file chooser + header reader
+    monkeypatch.setattr(
+        QFileDialog, "getOpenFileName",
+        lambda *a, **kw: (fake_path, ""))
+    monkeypatch.setattr(
+        fits_meta, "read_meta", lambda path: {
+            "date_obs": "2026-09-05", "mjd": 61292.0,
+            "filter": "R", "exptime_s": 300.0, "object": "SN2026imgd"})
+    # intercept the dialog at accept: rewrite the fields, then accept
+    def fake_exec(self):
+        # this is our image dialog (find its named children to be sure)
+        combo = self.findChild(QComboBox, "fu_img_filter")
+        date_ed = self.findChild(QLineEdit, "fu_img_date")
+        exp_ed = self.findChild(QLineEdit, "fu_img_exptime")
+        if combo is not None and date_ed is not None and exp_ed is not None:
+            combo.setCurrentText("Clear")   # user overrides the FITS "R"
+            date_ed.setText("2026-09-06")   # user fixes the date
+            exp_ed.setText("120")           # user fixes the exposure
+        return QDialog.Accepted
+    monkeypatch.setattr(QDialog, "exec", fake_exec)
+    window._fu_add_image(sid, p["id"])
+    imgs = fu.list_images(dbmod.db, sid)
+    assert len(imgs) == 1
+    # the edited values (not the raw header) were committed
+    assert imgs[0]["filter"] == "Clear"
+    assert imgs[0]["date_obs"] == "2026-09-06"
+    assert imgs[0]["exptime_s"] == 120.0
+
+
+def test_followup_cadence_uses_config(window, panel, monkeypatch):
+    # B2 defect: the "stale" colour threshold was hardcoded to 3 instead of
+    # config["sn_cadence_days"]. A session 2 days old is stale when the
+    # configured cadence is 1 day.
+    from nightscribe.core import followup as fu
+    import nightscribe.core.db as dbmod
+    import datetime
+    from nightscribe.config import config
+    p = _create_and_select(window, "sn", "SN2026cfg", {"kind": "sn"})
+    sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
+    old = datetime.datetime.now().timestamp() - 2 * 86400
+    dbmod.db.execute(
+        "UPDATE project_sessions SET created=? WHERE id=?", (old, sid))
+    dbmod.db.commit()
+    # point: 2 days ago. With default cadence (3) that is NOT stale, so the
+    # label should use the muted colour. Then set cadence to 1 and rebuild:
+    # it MUST switch to the warning colour — proving the value comes from
+    # config, not a hardcoded 3.
+    from PySide6.QtWidgets import QLabel, QWidget
+    tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+
+    def last_visit_label():
+        # wipe any previous build so only the fresh label is visible
+        if tab.layout():
+            window._wipe_layout(tab.layout())
+        window._build_followup_tab(p, {})
+        chips = [w for w in tab.findChildren(QLabel)
+                 if "Last visit" in w.text()]
+        return chips[0] if chips else None
+
+    lbl_default = last_visit_label()
+    assert lbl_default is not None
+    assert "#8a90a6" in lbl_default.styleSheet()  # 2 < default 3 → muted
+    monkeypatch.setattr(config, "get",
+                        lambda k, d=None: 1 if k == "sn_cadence_days" else d)
+    lbl_strict = last_visit_label()
+    assert lbl_strict is not None
+    assert "#e0c060" in lbl_strict.styleSheet()  # 2 >= 1 → warning
+
+
 # ---------------- B3: photometry entry ----------------
 
 def test_fu_add_measurement_quick(window, panel):

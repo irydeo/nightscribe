@@ -27,7 +27,7 @@ from PySide6.QtCore import QPointF, Qt
 from PySide6.QtGui import (QBrush, QColor, QPen, QFont)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout,
                                 QGraphicsEllipseItem, QGraphicsLineItem,
-                                QGraphicsSimpleTextItem)
+                                QGraphicsRectItem, QGraphicsSimpleTextItem)
 
 from ...core import sn_templates
 from ...viz import palette
@@ -48,16 +48,46 @@ _FONT_LABEL = 22
 # the data's actual span. The mapping scales the data into this box.
 _HALF = 500.0
 
+
+def _filter_label(filt):
+    # @args: filt - filter name (None/"Clear"/"None" = the generic band)
+    # @return: the display label for a legend entry
+    return "Sin filtro" if not filt or filt in ("Clear", "None") else filt
+
+
+def _series_style(src_class):
+    # @args: src_class - "manual" | "quicklook" | "survey"
+    # @return: (colour or None for "use the filter colour", filled bool)
+    if src_class == "survey":
+        return "#8a90a6", False
+    if src_class == "quicklook":
+        return None, False
+    return None, True
+
+
+def _point_style(p):
+    # @args: p - a photometry point dict
+    # @return: (QColor, filled) for this point (B4 source styles;
+    #          mirrors _series_style in viz/lightcurve_view.py)
+    src = p.get("source") or "manual"
+    if src.startswith("survey"):
+        src_class = "survey"
+    elif src == "quicklook":
+        src_class = "quicklook"
+    else:
+        src_class = "manual"
+    colour, filled = _series_style(src_class)
+    if colour is None:
+        colour = palette.ACCENT if not p.get("filter") \
+            else _FILTER_COLOURS.get(p.get("filter"), palette.ACCENT)
+    return QColor(colour), filled
+
 # Distinct colours per filter (matching the PNG export)
 _FILTER_COLOURS = {
     "Clear": palette.ACCENT, "None": palette.ACCENT,
     "V": palette.ACCENT2, "R": palette.ACCENT2,
     "B": "#6a9fd8", "I": "#d8a06a", "NIR": "#d86a9f",
 }
-
-
-def _filter_colour(filt):
-    return QColor(_FILTER_COLOURS.get(filt or "Clear", palette.ACCENT))
 
 
 class LightCurveChart(ChartView):
@@ -143,14 +173,11 @@ class LightCurveChart(ChartView):
         for p in self._points:
             x = self._map_x(p["mjd"])
             y = self._map_y(p["mag"])
-            colour = _filter_colour(p.get("filter"))
+            colour, filled = _point_style(p)
             r = 6.0
             dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
-            dot.setBrush(QBrush(colour))
+            dot.setBrush(QBrush(colour if filled else QColor(palette.BG)))
             dot.setPen(QPen(colour, 1.5))
-            is_quicklook = p.get("source") == "quicklook"
-            if is_quicklook:
-                dot.setBrush(QBrush(QColor(palette.BG)))
             dot.setZValue(_Z_DATA)
             self.add_item(dot)
             # error bar
@@ -160,6 +187,78 @@ class LightCurveChart(ChartView):
                 bar.setPen(QPen(colour, 1.0))
                 bar.setZValue(_Z_ERROR)
                 self.add_item(bar)
+        # legend: one entry per (filter, source) series the data has
+        self._add_legend(tpl is not None)
+
+    def _add_legend(self, has_template):
+        # @args: has_template - whether the schematic overlay is drawn
+        # Draws a compact legend in the bottom-right of the data area
+        # (same corner as sky_widget); entries mirror the PNG export so
+        # the two renderers cannot disagree (B4).
+        from PySide6.QtGui import QFontMetricsF
+        entries = []
+        if has_template:
+            entries.append(
+                (self.tr("Plantilla típica"), QColor(palette.MUTED)))
+        seen = set()
+        for p in self._points:
+            src = p.get("source") or "manual"
+            if src.startswith("survey"):
+                cls = "survey"
+            elif src == "quicklook":
+                cls = "quicklook"
+            else:
+                cls = "manual"
+            key = (p.get("filter"), cls)
+            if key in seen:
+                continue
+            seen.add(key)
+            text = _filter_label(p.get("filter"))
+            if cls == "quicklook":
+                text += " · " + self.tr("indicativo")
+            elif cls == "survey":
+                text += " · " + self.tr("catálogo")
+            colour, _filled = _point_style(p)
+            entries.append((text, colour))
+        if not entries:
+            return
+        fmt = QFont(self._label_font) if hasattr(self, "_label_font") else QFont()
+        if not hasattr(self, "_label_font"):
+            fmt.setPointSize(_FONT_TICK)
+        fm = QFontMetricsF(fmt)
+        rows = [(text, color, fm.horizontalAdvance(text))
+                for text, color in entries]
+        text_w = max(row[2] for row in rows)
+        sw = 60            # swatch length
+        gap = 16           # swatch -> text gap
+        pad = 16           # backdrop padding
+        row_h = 44         # vertical pitch between rows
+        right = _HALF - 12
+        text_x = right - text_w
+        sw_x = text_x - gap - sw
+        top = _HALF - 12 - row_h * len(entries)
+        for i, (text, color, _w) in enumerate(rows):
+            cy = top + i * row_h + row_h / 2.0
+            line = QGraphicsLineItem(sw_x, cy, sw_x + sw, cy)
+            line.setPen(QPen(color, 1.8))
+            line.setZValue(_Z_LABEL)
+            self.add_item(line)
+            lb = QGraphicsSimpleTextItem(text)
+            lb.setBrush(QBrush(QColor(palette.FG)))
+            lb.setFont(fmt)
+            lb.setPos(text_x, cy - fm.height() / 2.0)
+            lb.setZValue(_Z_LABEL)
+            self.add_item(lb)
+        # soft dark backdrop above the grid/data, below the swatches
+        x0 = sw_x - pad
+        y0 = top - pad
+        w = (right - sw_x) + 2 * pad
+        h = row_h * len(entries) + 2 * pad
+        bg = QGraphicsRectItem(x0, y0, w, h)
+        bg.setBrush(QBrush(QColor(11, 13, 23, 210)))
+        bg.setPen(Qt.NoPen)
+        bg.setZValue(_Z_LABEL - 0.5)
+        self.add_item(bg)
 
     def _draw_grid(self):
         # Simple grid: a few date ticks on X, a few mag ticks on Y (inverted).

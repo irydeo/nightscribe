@@ -15,7 +15,9 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from nightscribe.viz.lightcurve_view import draw_lightcurve
+from nightscribe.viz import lightcurve_view
+from nightscribe.viz.lightcurve_view import (
+    draw_lightcurve, _source_class, _series_label, _series_style)
 
 
 _POINTS = [
@@ -78,3 +80,57 @@ def test_draw_lightcurve_quicklook_open_marker(tmp_path):
     # without error when mixed sources are present
     fig = draw_lightcurve(_POINTS, sn_type="SN Ia")
     assert fig is not None
+
+
+# ---------------- B4: source styles + legend labels ----------------
+
+def test_survey_source_classification():
+    assert _source_class("survey:atlas") == "survey"
+    assert _source_class("survey:ztf") == "survey"
+    assert _source_class("quicklook") == "quicklook"
+    assert _source_class("manual") == "manual"
+    assert _source_class("paste") == "manual"
+    assert _source_class(None) == "manual"
+
+
+def test_survey_series_style_grey_hollow_dashed():
+    colour, face, ls = _series_style("survey")
+    assert colour == "#8a90a6"
+    assert face == "none"     # hollow
+    assert ls == "--"         # dashed
+    colour, face, ls = _series_style("quicklook")
+    assert colour is None and face == "none" and ls == "--"
+    colour, face, ls = _series_style("manual")
+    assert colour is None and face == "auto" and ls == "-"
+
+
+def test_series_label_suffixes():
+    assert "indicativo" in _series_label("Clear", "quicklook", "es")
+    assert "indicative" in _series_label("Clear", "quicklook", "en")
+    assert "catálogo" in _series_label("Clear", "survey", "es")
+    assert "catalog" in _series_label("Clear", "survey", "en")
+    assert "·" not in _series_label("Clear", "manual", "es")
+
+
+def test_draw_lightcurve_survey_point_grey():
+    # a survey-catalog point must land as a grey (hollow, dashed) series
+    pts = [
+        {"mjd": 60600.0, "mag": 16.0, "err": 0.02,
+         "filter": "Clear", "source": "survey:atlas"},
+        {"mjd": 60602.0, "mag": 16.4, "err": 0.02,
+         "filter": "Clear", "source": "manual"},
+    ]
+    fig = draw_lightcurve(pts)
+    ax = fig.axes[0]
+    leg = ax.get_legend()
+    labels = [t.get_text() for t in leg.get_texts()]
+    assert any("catálogo" in l for l in labels)
+    # the survey series handle carries the grey colour (errorbar →
+    # LineCollection, so get_color() returns a list of rgba tuples)
+    i = next(i for i, l in enumerate(labels) if "catálogo" in l)
+    handle = leg.legend_handles[i]
+    c = handle.get_color()
+    if isinstance(c, (list, tuple)):
+        c = c[0]
+    from matplotlib.colors import to_hex
+    assert to_hex(c) == "#8a90a6"

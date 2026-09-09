@@ -1509,7 +1509,8 @@ class MainWindow(QMainWindow):
         panel = self._get_proj_panel()
         if panel._worker is not None:
             panel.cancel()   # switching projects: drop the in-flight load
-        ctx = p.get("context") or {}
+        ctx = dict(p.get("context") or {})
+        ctx.setdefault("project_id", p["id"])   # B4: light-curve injection
         panel.explore(p["object_name"], fallback_target=ctx, ctx=ctx)
         self._ensure_proj_files_list(
             self.projects.tabs_steps.findChild(QWidget, "tab_details"))
@@ -1520,13 +1521,15 @@ class MainWindow(QMainWindow):
         # Called from _project_selected (works whether the panel was built
         # by _get_proj_panel or injected by a test fixture).
         if getattr(self, "_proj_files_list", None) is None:
-            grp = QGroupBox(self.tr("Project files"))
-            grp.setLayout(QVBoxLayout())
+            from .widgets.collapsible_section import CollapsibleSection
+            sec = CollapsibleSection(self.tr("Project files"))
             self._proj_files_list = QListWidget()
             self._proj_files_list.itemDoubleClicked.connect(
                 self._open_project_file)
-            grp.layout().addWidget(self._proj_files_list)
-            tab.layout().addWidget(grp)
+            sec.setContentWidget(self._proj_files_list)
+            sec.setCollapsed(True)
+            tab.layout().addWidget(sec)
+            self._proj_files_section = sec
 
     def _populate_project_files(self, pid):
         # A4: refresh the files list in the Details tab from project_files.
@@ -1541,6 +1544,9 @@ class MainWindow(QMainWindow):
                 f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
             item.setData(Qt.UserRole, str(f["path"]))
             lst.addItem(item)
+        sec = getattr(self, "_proj_files_section", None)
+        if sec is not None and lst.count() > 0:
+            sec.setCollapsed(False)
 
     def _open_project_file(self, item):
         # A4: double-click a file row to open it with the OS default.
@@ -2388,10 +2394,11 @@ class MainWindow(QMainWindow):
 
         # cadence reminder (T9): "hace N noches que no la visitas"
         days = fu.days_since_last_session(db, pid)
+        threshold = int(config.get("sn_cadence_days", 3))
         if days is not None:
             lbl_cadence = QLabel(
                 self.tr("Last visit: {} days ago").format(days))
-            colour = "#e0c060" if days >= 3 else "#8a90a6"
+            colour = "#e0c060" if days >= threshold else "#8a90a6"
             lbl_cadence.setStyleSheet(
                 f"color: {colour}; font-size: 13px;")
             layout.addWidget(lbl_cadence)
@@ -2422,15 +2429,14 @@ class MainWindow(QMainWindow):
             lambda: self._fu_session_selected(lst, pid))
         grp.layout().addWidget(lst)
 
-        # session detail area (images + notes for the selected visit)
+        # session detail area (rebuilt per session: images, measurements,
+        # notes). The notes widget is created in _fu_session_selected — keep
+        # only a placeholder here so the dual-identity bug (two QTextEdit
+        # bound to different sessions) can't happen.
         self._fu_detail = QFrame()
         fu_layout = QVBoxLayout(self._fu_detail)
-        fu_layout.addWidget(QLabel(self.tr("Select a visit to see its images.")))
-        self._fu_notes = QTextEdit()
-        self._fu_notes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
-        self._fu_notes.textChanged.connect(
-            lambda: self._fu_save_notes(pid))
-        fu_layout.addWidget(self._fu_notes)
+        fu_layout.addWidget(QLabel(
+            self.tr("Select a visit to see its images.")))
         fu_detail_area = QScrollArea()
         fu_detail_area.setWidgetResizable(True)
         fu_detail_area.setFrameShape(QFrame.Shape.NoFrame)
@@ -2439,7 +2445,6 @@ class MainWindow(QMainWindow):
         layout.addWidget(grp)
         layout.addStretch()
         self._project_widgets["fu_sessions"] = lst
-        self._project_widgets["fu_notes"] = self._fu_notes
 
     def _fu_populate_sessions(self, lst, pid):
         # @args: lst - QListWidget, pid - project id
@@ -2469,10 +2474,16 @@ class MainWindow(QMainWindow):
         detail = self._fu_detail
         self._wipe_layout(detail.layout())
         dlay = detail.layout()
-        # add stacked image button
+        # action row: add stacked image + delete this visit
+        fu_row = QHBoxLayout()
         btn_img = QPushButton(self.tr("Add stacked image…"))
         btn_img.clicked.connect(lambda: self._fu_add_image(sid, pid))
-        dlay.addWidget(btn_img)
+        fu_row.addWidget(btn_img)
+        btn_del = QPushButton(self.tr("Delete visit…"))
+        btn_del.setObjectName("fu_btn_delete")
+        btn_del.clicked.connect(lambda: self._fu_delete_session(lst, sid, pid))
+        fu_row.addWidget(btn_del)
+        dlay.addLayout(fu_row)
         # images list for this session
         img_lst = QListWidget()
         self._fu_populate_images(img_lst, sid)
@@ -2537,27 +2548,41 @@ class MainWindow(QMainWindow):
                 item.setData(Qt.UserRole, pt["id"])
                 lst.addItem(item)
 
+    def _session_mjd(self, s):
+        # Turn a session row into a sensible MJD. Prefers the observing date;
+        # falls back to the session's creation timestamp. Never returns 0 — a
+        # zero MJD corrupts the light-curve ordering (B2 defect).
+        # @args: s - session dict from followup.get_session (or None)
+        # @return: MJD as float
+        from ..core.coords import jd_from_datetime
+        if s:
+            date_str = (s.get("obs_date") or "").strip()
+            for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y/%m/%d"):
+                if date_str:
+                    try:
+                        dt = datetime.datetime.strptime(
+                            date_str, fmt).replace(tzinfo=datetime.timezone.utc)
+                        return jd_from_datetime(dt) - 2400000.5
+                    except ValueError:
+                        pass
+            # no parseable date: use the row's creation epoch
+            created = s.get("created")
+            if created:
+                dt = datetime.datetime.fromtimestamp(
+                    created, tz=datetime.timezone.utc)
+                return jd_from_datetime(dt) - 2400000.5
+        # last resort: right now, so the point still plots in order
+        dt = datetime.datetime.now(datetime.timezone.utc)
+        return jd_from_datetime(dt) - 2400000.5
+
     def _fu_add_measurement(self, sid, pid, spn_mag, spn_err, cmb_filt):
         # B3 quick entry: one click saves a point (date/filter from the session).
         from ..core import followup as fu
         mag = spn_mag.value()
         err = spn_err.value() if spn_err.value() > 0 else None
         filt = cmb_filt.currentText().strip() or "Clear"
-        # MJD from the session's date (obs_date → approximate MJD)
         s = fu.get_session(db, sid)
-        mjd = None
-        if s and s["obs_date"]:
-            try:
-                import datetime
-                dt = datetime.datetime.strptime(
-                    s["obs_date"], "%Y-%m-%d").replace(
-                    tzinfo=datetime.timezone.utc)
-                from ..core.coords import jd_from_datetime
-                mjd = jd_from_datetime(dt) - 2400000.5
-            except ValueError:
-                pass
-        if mjd is None:
-            mjd = 0.0   # fallback: the caller can fix it in the paste view
+        mjd = self._session_mjd(s)
         fu.add_point(db, pid, mjd, filt, mag, err=err,
                      source="manual", session_id=sid)
         self._populate_project_files(pid)
@@ -2579,7 +2604,10 @@ class MainWindow(QMainWindow):
             lst.addItem(item)
 
     def _fu_add_image(self, sid, pid):
-        # File dialog → fits_meta auto-fill → followup.add_image + project_files
+        # File dialog → fits_meta auto-fill → editable dialog → save.
+        # The user can correct the filter / date / exptime before committing,
+        # because a misnamed filter breaks the light-curve split (B2 defect).
+        # @args: sid - session id, pid - project id
         from ..core import followup as fu
         from ..core import fits_meta
         path, _ = QFileDialog.getOpenFileName(
@@ -2587,14 +2615,55 @@ class MainWindow(QMainWindow):
             "FITS (*.fits *.fit *.fts);;All files (*)")
         if not path:
             return
+        # auto-detect the header values we can, tolerate a bad/empty file
         try:
             meta = fits_meta.read_meta(path)
         except Exception:
-            meta = {"filter": None, "date_obs": None,
-                     "exptime_s": None, "mjd": None}
-        filt = meta["filter"] or "Clear"
-        fu.add_image(db, sid, filt, path,
-                     date_obs=meta["date_obs"], exptime_s=meta["exptime_s"])
+            meta = {}
+        filt = (meta.get("filter") or "Clear").strip() or "Clear"
+        date_obs = meta.get("date_obs") or ""
+        exptime_s = meta.get("exptime_s")
+        # editable confirmation dialog pre-filled from the FITS header
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Add stacked image"))
+        dlg.setLayout(QFormLayout())
+        lbl_path = QLabel(Path(path).name)
+        lbl_path.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse)
+        dlg.layout().addRow(self.tr("File:"), lbl_path)
+        cmb_f = QComboBox()
+        cmb_f.setObjectName("fu_img_filter")
+        cmb_f.setEditable(True)
+        cmb_f.addItems(["Clear", "V", "R", "B", "I", "NIR"])
+        cmb_f.setCurrentText(filt)
+        dlg.layout().addRow(self.tr("Filter:"), cmb_f)
+        edt_date = QLineEdit(str(date_obs or ""))
+        edt_date.setObjectName("fu_img_date")
+        edt_date.setPlaceholderText(self.tr("e.g. 2026-09-01 (leave blank to skip)"))
+        dlg.layout().addRow(self.tr("Date:"), edt_date)
+        edt_exp = QLineEdit(
+            "" if exptime_s in (None, "") else str(exptime_s))
+        edt_exp.setObjectName("fu_img_exptime")
+        edt_exp.setPlaceholderText(self.tr("exposure seconds (optional)"))
+        dlg.layout().addRow(self.tr("Exptime:"), edt_exp)
+        box = QDialogButtonBox(
+            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        dlg.layout().addWidget(box)
+        box.accepted.connect(dlg.accept)
+        box.rejected.connect(dlg.reject)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        out_filt = cmb_f.currentText().strip() or "Clear"
+        out_date = edt_date.text().strip() or None
+        exp_text = edt_exp.text().strip()
+        out_exp = None
+        if exp_text:
+            try:
+                out_exp = float(exp_text)
+            except ValueError:
+                out_exp = None
+        fu.add_image(db, sid, out_filt, path,
+                     date_obs=out_date, exptime_s=out_exp)
         # T4: register the FITS path in the project
         project.add_file(db, pid, path, "fits")
         # refresh images list + files list
@@ -2633,6 +2702,35 @@ class MainWindow(QMainWindow):
             # select the new one (top of the list, ordered DESC)
             lst.setCurrentRow(0)
 
+    def _fu_delete_session(self, lst, sid, pid):
+        # Delete a visit after confirmation. The cascade removes its stacked
+        # images; photometry points are kept (B2 defect: the GUI had no way to
+        # drop a bad visit at all).
+        # @args: lst - sessions QListWidget, sid - session id, pid - project id
+        from ..core import followup as fu
+        n_img = len(fu.list_images(db, sid))
+        if QMessageBox.question(
+                self, self.tr("Delete visit"),
+                self.tr("Delete this visit? Its measurements are kept."
+                        "  ({} stacked image{})").format(
+                            n_img, "s" if n_img != 1 else ""),
+                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
+            return
+        fu.delete_session(db, sid)
+        self._fu_current_session = None
+        self._project_widgets.pop("fu_notes", None)
+        self._fu_populate_sessions(lst, pid)
+        # re-select the first remaining visit to refresh the detail pane, or
+        # clear the pane if this was the last one
+        if lst.count():
+            lst.setCurrentRow(0)
+        else:
+            dlay = self._fu_detail.layout()
+            self._wipe_layout(dlay)
+            dlay.addWidget(QLabel(
+                self.tr("Select a visit to see its images.")))
+        self._populate_project_files(pid)
+
     def _populate_project_files(self, pid):
         # Refresh the project files list in the Details tab. The files list
         # widget is built by Track A (A4); if it doesn't exist yet this is a
@@ -2648,6 +2746,9 @@ class MainWindow(QMainWindow):
                 f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
             item.setData(Qt.UserRole, str(f["path"]))
             lst.addItem(item)
+        sec = getattr(self, "_proj_files_section", None)
+        if sec is not None and lst.count() > 0:
+            sec.setCollapsed(False)
 
     def _fu_paste_dialog(self, pid):
         # B3: paste bulk photometry — tolerant parser + preview + save.
@@ -2729,18 +2830,6 @@ class MainWindow(QMainWindow):
             fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
                          err=p["err"], source="file")
         self._populate_project_files(pid)
-
-    def _step_key_idx(self, idx):
-        # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
-        # step); steps start at 1. The "Follow-up" tab (B2, SN only) sits
-        # after Publish and is also a non-step tab. Returns None when there
-        # is no step key.
-        # @args: idx - tab index
-        # @return: position in _STEP_KEYS, or None on a non-step tab
-        if idx <= 0:
-            return None
-        n = idx - 1
-        return n if n < len(_STEP_KEYS) else None
 
     def _project_step_changed(self, idx):
         # Update the status label and the step buttons when the tab changes
@@ -3508,6 +3597,14 @@ class MainWindow(QMainWindow):
         self._blink_dialog_widget = blink_w
         dlg.exec()
         self._blink_timer.stop()
+        w = getattr(self, "_blink_worker", None)
+        if w is not None and w.isRunning():
+            try:
+                w.progress.disconnect()
+                w.finished.disconnect()
+            except RuntimeError:
+                pass
+            self._blink_worker = None
 
     # ---- blink dialog helpers ----
 
@@ -3555,6 +3652,7 @@ class MainWindow(QMainWindow):
         b.btn_prepare.setEnabled(False)
         b.lbl_blink_status.setText(self.tr("Reading the FITS image…"))
         w = BlinkWorker(image, sn_name=name or None, ra=ra, dec=dec)
+        self._blink_worker = w
         w.progress.connect(lambda msg: b.lbl_blink_status.setText(
             self._txt(msg)))
         w.finished.connect(lambda pair, errors: self._dialog_blink_done(

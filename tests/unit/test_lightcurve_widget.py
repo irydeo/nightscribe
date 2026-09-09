@@ -17,7 +17,8 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtWidgets import QApplication
 
-from nightscribe.gui.widgets.lightcurve_widget import LightCurveChart
+from nightscribe.gui.widgets.lightcurve_widget import (
+    LightCurveChart, _point_style)
 
 
 _POINTS = [
@@ -108,3 +109,55 @@ def test_widget_template_overlay():
     chart_no_tpl.set_data(_POINTS)  # no sn_type
     # count items via the registered list
     assert len(chart._items_registered) > len(chart_no_tpl._items_registered)
+
+
+# ---------------- B4: source styles + legend labels ----------------
+
+def _legend_texts(chart):
+    # @return: every text item's string on the scene
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    return [i.text() for i in chart._items_registered
+            if isinstance(i, QGraphicsSimpleTextItem)]
+
+
+def test_widget_survey_point_style():
+    # survey points: grey and hollow (manual stays filled)
+    s_color, s_filled = _point_style(
+        {"filter": "Clear", "source": "survey:ztf"})
+    assert s_color.name() == "#8a90a6"
+    assert s_filled is False
+    m_color, m_filled = _point_style(
+        {"filter": "Clear", "source": "manual"})
+    assert m_color.name() != "#8a90a6"
+    assert m_filled is True
+
+
+def test_widget_legend_suffixes():
+    # legend rows carry the "indicativo" / "catálogo" suffixes
+    pts = [
+        {"mjd": 60600.0, "mag": 16.0, "err": 0.02, "filter": "Clear",
+         "source": "survey:atlas"},
+        {"mjd": 60601.0, "mag": 16.2, "err": 0.03, "filter": "Clear",
+         "source": "quicklook"},
+    ]
+    chart = LightCurveChart()
+    chart.set_data(pts)
+    texts = _legend_texts(chart)
+    assert any("catálogo" in t for t in texts)
+    assert any("indicativo" in t for t in texts)
+    # a manual-only set has no suffix at all
+    chart2 = LightCurveChart()
+    chart2.set_data([dict(pts[0], source="manual")])
+    assert not any("·" in t for t in _legend_texts(chart2))
+
+
+def test_widget_survey_point_not_crash():
+    # a survey-catalog point must render without a QPen/colour crash
+    from PySide6.QtGui import QColor
+    p = {"mjd": 60600.0, "mag": 16.0, "err": 0.02,
+         "filter": "Clear", "source": "survey:ztf"}
+    c, filled = _point_style(p)
+    assert isinstance(c, QColor)
+    c2, f2 = _point_style({"mjd": 0, "mag": 1, "filter": "Clear",
+                           "source": "manual"})
+    assert isinstance(c2, QColor) and f2

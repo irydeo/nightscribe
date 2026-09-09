@@ -483,27 +483,70 @@ def explain_neofixer(t):
 # table the small bodies already had)
 
 def _sn_type_text(otype):
-    # @args: otype - SIMBAD/Rochester type string ("SN Ia", "II", ...)
+    # @args: otype - SIMBAD/Rochester/TNS type string ("SN Ia", "II", ...)
     # @return: {"es","en"} explaining the kind of explosion
     t = (otype or "").strip().lower()
     t = t[2:].strip() if t.startswith("sn") else t
-    if t.startswith("ia"):
+    if t.startswith("ia") and not t.startswith(("iax", "iin")):
         return {"es": "una enana blanca que estalló por fusión termonuclear "
                       "descontrolada: su brillo es tan uniforme que las usamos "
                       "de «velas estándar» para medir distancias",
                 "en": "a white dwarf blown up by runaway thermonuclear "
                       "fusion: their brightness is so uniform we use them as "
                       "'standard candles' to measure distances"}
-    if t.startswith("ib") or t.startswith("ic"):
+    if t.startswith("iax"):
+        return {"es": "una prima hermana de la Ia, pero más débil y rápida: "
+                      "su curva de luz sube y baja casi igual, pero no tanto. "
+                      "Puede ser una explosión fallida",
+                "en": "a cousin of Ia but fainter and faster: its light "
+                      "curve rises and falls almost the same, but not quite. "
+                      "Possibly a failed explosion"}
+    if t.startswith("iin"):
+        return {"es": "una supernova de Tipo II con líneas de hidrógeno "
+                      "estrechas en su espectro: la estrella progenitora "
+                      "expulsó una capa de gas poco antes de colapsar",
+                "en": "a Type II supernova with narrow hydrogen lines "
+                      "in its spectrum: the progenitor shed a shell of "
+                      "gas shortly before collapsing"}
+    if t.startswith(("ib", "ic")):
         return {"es": "el colapso de una estrella masiva que ya había perdido "
                       "su envoltura de hidrógeno (y quizá de helio)",
                 "en": "the collapse of a massive star that had already shed "
                       "its hydrogen (and maybe helium) envelope"}
+    if t.startswith(("ii-p", "ii p")):
+        return {"es": "el colapso de una supergigante que conservó su "
+                      "hidrógeno: tras el estallido, su brillo se mantiene "
+                      "estable semanas (la meseta) antes de decaer lentamente",
+                "en": "the collapse of a supergiant that kept its "
+                      "hydrogen: after the explosion, its brightness stays "
+                      "flat for weeks (the plateau) before fading slowly"}
+    if t.startswith(("ii-l", "ii l")):
+        return {"es": "el colapso de una supergigante que conservó su "
+                      "hidrógeno: su brillo decaer de forma lineal desde el "
+                      "principio, sin la meseta de las II-P",
+                "en": "the collapse of a supergiant that kept its "
+                      "hydrogen: its brightness declines linearly from "
+                      "the start, without the II-P plateau"}
     if t.startswith("ii"):
         return {"es": "el colapso de una estrella masiva que conservaba su "
                       "hidrógeno: la muerte clásica de una gigante",
                 "en": "the collapse of a massive star that kept its "
                       "hydrogen: the classic death of a giant"}
+    if t.startswith(("sln", "slsn")):
+        return {"es": "una supernova superluminosa: mucho más "
+                      "brillante que las demás y su curva de luz es "
+                      "ancha y lenta, de meses o años",
+                "en": "a superluminous supernova: far brighter "
+                      "than the rest and its light curve is broad "
+                      "and slow, lasting months or years"}
+    if t.startswith("kilonova"):
+        return {"es": "no la muerte de una estrella sino la "
+                      "fusión de dos estrellas de neutrones: "
+                      "un destello corto y rublicioso que produce "
+                      "oro y platino",
+                "en": "not the death of a star but the merger "
+                      "of two neutron stars: a short bright "
+                      "flash that forges gold and platinum"}
     if t.startswith("i"):
         return {"es": "el colapso de una estrella masiva sin rastro de "
                       "hidrógeno en su luz",
@@ -590,6 +633,26 @@ def explain_transient(d):
             "en": f"Magnitude {mag:.1f}: the lower the number, the easier the "
                   "catch. Supernovae fade away over weeks — every night counts "
                   "for the light curve."})
+
+    # B7: didactic note — why multi-filter matters (the observer's real
+    # workflow uses Clear + NIR because bands can behave differently,
+    # and colour evolution helps classify the type — interview block 2/4).
+    otype = (sim.get("otype") or d.get("otype") or "").strip()
+    if otype and otype.lower().startswith(("sn i", "ii", "ib", "ic")):
+        out.append({
+            "param": {"es": "¿Por qué varios filtros?",
+                      "en": "Why multiple filters?"},
+            "value": "", "level": "didactic",
+            "es": "Cada banda cuenta una historia distinta: el color "
+                      "(p. ej. Clear − NIR) revela cómo cambia la "
+                      "temperatura del estallido con el tiempo, y eso "
+                      "ayuda a clasificar la supernova. "
+                      "Seguirla en dos o más filtros vale la pena.",
+            "en": "Each band tells a different story: the colour "
+                      "(e.g. Clear − NIR) reveals how the explosion's "
+                      "temperature evolves over time, and that helps "
+                      "classify the supernova. Following it in two or more "
+                      "filters is worth the effort."})
 
     disc = (d.get("disc_date") or "").strip()
     if disc:

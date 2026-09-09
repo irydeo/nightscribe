@@ -147,9 +147,9 @@ def test_delete_cascades(tmp_db):
     assert rows[0] == 0
 
 
-def test_migration_user_version_is_three(tmp_db):
+def test_migration_user_version_is_five(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 3
+    assert v == 5
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -184,7 +184,7 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
@@ -231,7 +231,7 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 3
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",

@@ -6,8 +6,17 @@
 > y del hilo de Cloudy Nights «Tips for capturing exoplanet transits».
 > **Enmendado 2026-09-08**: nuevo subplan 4 «Export a EXOTIC (handoff)»; la
 > i18n/docs cierran en el subplan 5.
+> **Enmendado 2026-09-09**: pasa a ser el **hijo D** de
+> [project-concept-v2.md](project-concept-v2.md) (track D, se ejecuta en 4º
+> lugar). Cambios: (a) baseline mínima **30 min** (Conti/CN: «al menos 30 min
+> antes del ingress y 30 min tras el egress»); (b) la selección/score en
+> Tonight **avisa y penaliza** cuando la ventana completa (baseline + tránsito
+> + baseline) no cabe en los límites del usuario; (c) el overhead/pausas entre
+> tomas se muestra explícito en la tira de tiempos; (d) el esquema de
+> `inits.json` queda **fijado contra el verificado** en los docs de EXOTIC
+> (`rzellem/EXOTIC`, `docs/inits.json`, revisado 2026-09-09).
 
-**rama**: `feature/exoplanet-transit-project` (derivada de `feature/object-card`)
+**rama**: `feature/exoplanet-transit-project` (derivada de `feature/object-card`; mergea de vuelta a `feature/object-card`)
 **arranca sobre**: `07a29f8` (feature/object-card al día)
 **fecha**: 2026-09-08 · **autor**: FJC (con la IA)
 
@@ -27,7 +36,7 @@ intérprete de NightScribe). No se importan curvas de luz ni se mide O-C.
 |---|----------|-------|
 | 1 | **Proceso externo concreto** | El paso Process queda externo con **EXOTIC** como la reducción recomendada. NightScribe solo **exporta el `inits.json`** (subplan 4) y el usuario corre EXOTIC aparte. Sin importar su salida ni O-C en esta iteración (v2). `transit_view` sigue dibujando el trapecio ideal. |
 | 2 | **Exposición fotométrica** | **Heurística v1 por magnitud** de la estrella + escala de placa (tabla explícita y testeable, sin config nueva ni parámetros de cámara adicionales). |
-| 3 | **Ventana de captura** | La secuencia pide **baseline + tránsito + baseline**: empezar ≥ `ingress − 0.25·dur` (mín 20 min) y terminar ≥ `egress + 0.25·dur`, para fijar el nivel fuera de tránsito que se compara. Si la baseline no cabe en la ventana segura, aviso en tarjeta y panel. |
+| 3 | **Ventana de captura** | La secuencia pide **baseline + tránsito + baseline**: empezar ≥ `ingress − 0.25·dur` (**mín 30 min**, Conti/CN) y terminar ≥ `egress + 0.25·dur` (mín 30 min), para fijar el nivel fuera de tránsito que se compara. Si la baseline no cabe en la ventana segura, aviso en tarjeta y panel; **Tonight avisa y penaliza** cuando la ventana completa no cabe en los límites del usuario (enmienda 2026-09-09). |
 | 4 | **Granularidad temporal** | Muestrear el ingress (≈15% de `duration_h`) con ≥ 3 puntos: cadencia máx ≈ `ingress/3` (típico 30–60 s). Aviso si `exposure + overhead > cadencia_máx`. |
 | 5 | **Export CCDciel** | Escribir `StartTime = capture_start`, `EndTime = capture_end`, `MandatoryStartTime = True` y **validar contra una exportación real del CCDciel del observatorio** (filosofía ADR-021 con `docs/ccdciel_sequence_sample.targets`). |
 | 6 | **Herramienta de reducción** | **EXOTIC** (`rzellem/EXOTIC`): pipeline NASA/JPL de FITS → curva → Mid-Transit Time. Requiere Python ≤3.10 + astropy → se integra por **handoff de fichero**, nunca embebido (ADR-004 no-astropy). |
@@ -79,9 +88,10 @@ intérprete de NightScribe). No se importan curvas de luz ni se mide O-C.
 ### Subplan 0 — Núcleo de evento: ventana recomendada y cadencia
 En `core/transits.py`:
 
-- `recommended_window(transit, baseline_frac=0.25, baseline_min_min=20)` →
-  `capture_start = ingress − max(0.25·dur, 20 min)` y
-  `capture_end = egress + max(0.25·dur, 20 min)`.
+- `recommended_window(transit, baseline_frac=0.25, baseline_min_min=30)` →
+  `capture_start = ingress − max(0.25·dur, 30 min)` y
+  `capture_end = egress + max(0.25·dur, 30 min)` (mínimo 30 min por Conti/CN —
+  enmienda 2026-09-09; antes 20).
 - `transits_tonight` enriquece cada resultado con:
   - `capture_start` / `capture_end` (datetimes),
   - `baseline_fits` (la ventana de captura cabe entera en la noche segura),
@@ -90,7 +100,7 @@ En `core/transits.py`:
 - El **gate de horizonte se mantiene** en mid-transit (ADR-020): la baseline
   es información de planificación, no un nuevo gate.
 
-**Tests**: unit sin red — campos presentes; baseline mínima de 20 min
+**Tests**: unit sin red — campos presentes; baseline mínima de 30 min
 respeta/redondea; `baseline_fits` verdadero/falso; cadencia para ingress de
 ~0.5 h.
 
@@ -98,9 +108,11 @@ respeta/redondea; `baseline_fits` verdadero/falso; cadencia para ingress de
 - `suggest._fragments` (kind `transit`): frase con la hora de `capture_start`
   («Si quieres la parte fuera de tránsito, empieza a capturar a las HH:MM») y
   aviso ámbar cuando `baseline_fits=False`.
-- Ligera penalización en `_observability` cuando `baseline_fits=False` (el
-  evento queda a medias). **Sin tocar** `transits.py`; los campos llegan desde
-  el subplan 0.
+- Penalización en `_observability` cuando `baseline_fits=False` — Tonight
+  **avisa y penaliza** el evento si la ventana completa (baseline + tránsito +
+  baseline) no cabe en los límites del usuario: el tránsito a medias baja en
+  la lista en vez de presentarse como capturable (enmienda 2026-09-09).
+  **Sin tocar** `transits.py`; los campos llegan desde el subplan 0.
 
 **Tests**: frase con hora; aviso cuando la baseline no cabe; penalización en
 el score.
@@ -116,7 +128,10 @@ En `_build_plan_tab`, bloque específico para `kind == "transit"`:
   escalada por escala de placa, sin saturación obvia; capada a un máximo
   razonable). Preselecciona `spn_exps`.
 - **Cadencia**: muestra `cadence_max_s`; aviso si
-  `exposure + overhead > cadencia_máx` («no resuelves el ingress»).
+  `exposure + overhead > cadencia_máx` («no resuelves el ingress»). El
+  **overhead/pausa entre tomas se muestra explícito** en la tira (p. ej.
+  «60 s + 15 s de pausa → punto cada 75 s»), para que el usuario vea la
+  cadencia real resultante y no solo la exposición (enmienda 2026-09-09).
 - **Consejos de buena práctica** (Conti/AAVSO + Cloudy Nights), estáticos:
   defocus pequeño y constante + flats por sesión; estrella de comparación en
   el FOV, de brillo/color similar y no variable; filtro banda ancha L/R
@@ -154,18 +169,29 @@ extender `_FIELDS` con `pl_orbincl`, `pl_orbeccen`, `st_logg`, `st_metfe`,
 caché** porque el JSON cacheado no trae los campos nuevos).
 
 **4b. `core/exotic.py`** (nuevo, sin red):
-- `make_inits(ctx, d, cfg)` con la estructura exacta de EXOTIC:
-  - `user_info`: lat/lon (config), elevación, tipo de cámara, binning, código
-    AAVSO (Settings, 4c), fecha, notas, «Plate Solution (y/n) = y»; **target y
-    comparison pixels en `null`** (el usuario los marca en el asistente de
-    EXOTIC).
-  - `planetary_parameters`: periodo, T0 publicado (`pl_tranmid`, fallback el
-    `t0` de ExoClock), `Rp/Rs` (`pl_radj × 0.10045`), `a/Rs`
-    (`pl_orbsmax / (st_rad × 0.00465047)`), inclinación, excentricidad, Teff,
-    [Fe/H], log g, RA/Dec; **`null` cuando falte** (EXOTIC admite nulos).
-  - `optional_info`: escala de placa (`exposure.plate_scale`), exposición del
-    plan, filtro (mapeo a los filtros fila AAVSO; L → «N/A» + longitudes de
-    onda si no hay mapeo limpio).
+- `make_inits(ctx, d, cfg)` con la estructura exacta de EXOTIC **fijada contra
+  `docs/inits.json` del repo `rzellem/EXOTIC` (verificada 2026-09-09)**:
+  - `user_info`: «Directory with FITS files», «Directory to Save Plots»,
+    «Directory of Flats/Darks/Biases» (null si no hay), «AAVSO Observer Code
+    (N/A if none)», «Secondary Observer Codes (N/A if none)», «Observation
+    date» (formato «Month DD, YYYY»), «Obs. Latitude»/«Obs. Longitude»
+    (signo + N/E, − S/O; config), «Obs. Elevation (meters)», «Camera Type
+    (CCD or DSLR)», «Pixel Binning» («1x1»), «Filter Name
+    (aavso.org/filters)», «Observing Notes», «Plate Solution? (y/n) = y»;
+    **«Target Star X & Y Pixel» y «Comparison Star(s) X & Y Pixel» en `null`**
+    (el usuario los marca en el asistente de EXOTIC).
+  - `planetary_parameters`: «Target Star RA»/«Dec» (sexagesimal), «Planet
+    Name», «Host Star Name», «Orbital Period (days)», «Published Mid-Transit
+    Time (BJD-UTC)» (`pl_tranmid`, fallback el `t0` de ExoClock), «Ratio of
+    Planet to Stellar Radius (Rp/Rs)» (`pl_radj × 0.10045`), «Ratio of
+    Distance to Stellar Radius (a/Rs)» (`pl_orbsmax / (st_rad × 0.00465047)`),
+    «Orbital Inclination (deg)», «Orbital Eccentricity (0 if null)», «Star
+    Effective Temperature (K)», «Star Metallicity ([FE/H])», «Star Surface
+    Gravity (log(g))»; incertidumbres cuando el TAP las traiga y **`null`
+    cuando falte el dato** (EXOTIC admite nulos).
+  - `optional_info`: «Pixel Scale (Ex: 5.21 arcsecs/pixel)»
+    (`exposure.plate_scale`), «Filter Minimum/Maximum Wavelength (nm)»
+    (null salvo mapeo limpio; L → filtro «N/A»).
 - `export_inits(inits, out)` escribe `inits_MM_DD_YYYY__HH_MM_SS.json`
   (convención de nombres de EXOTIC).
 

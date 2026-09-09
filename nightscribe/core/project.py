@@ -38,6 +38,21 @@ STATUS_ACTIVE = "active"
 STATUS_DONE = "done"
 STATUS_ARCHIVED = "archived"
 
+# Final outcome of a closed project (Track A, project-concept v2). The GUI
+# builds its selector from these; "Other" is free text the caller passes
+# straight through close() — the column is free TEXT, never validated here.
+# SN carries the richest set (follow-up can confirm/reject a candidate); the
+# rest share a generic completed/abandoned pair.
+OUTCOMES = {
+    "sn": ("confirmed_ia", "confirmed_other", "false_positive", "lost",
+           "completed"),
+    "neo": ("completed", "reported_mpc", "abandoned"),
+    "comet": ("completed", "abandoned"),
+    "pccp": ("confirmed", "false_positive", "lost", "completed"),
+    "transit": ("completed", "reported_exoclock", "abandoned"),
+}
+OUTCOME_DEFAULT = ("completed", "abandoned")
+
 
 def _now():
     # @return: current epoch seconds
@@ -54,9 +69,13 @@ def _json_default(obj):
 
 def _row_to_project(row):
     # @return: project dict from a SELECT row
+    # Row order: id, kind, object_name, status, created, updated, context,
+    # closed_at, outcome, tags, favorite (Track A columns 7-10, nullable).
     return {"id": row[0], "kind": row[1], "object_name": row[2],
             "status": row[3], "created": row[4], "updated": row[5],
-            "context": json.loads(row[6] or "{}")}
+            "context": json.loads(row[6] or "{}"),
+            "closed_at": row[7], "outcome": row[8],
+            "tags": row[9] or "", "favorite": bool(row[10])}
 
 
 def _row_to_step(row):
@@ -103,16 +122,16 @@ def create(db, kind, object_name, context=None):
 def list_projects(db, status=None):
     # @args: db - Database, status - filter or None for all
     # @return: list of project dicts (without steps/files)
+    cols = ("id, kind, object_name, status, created, updated, context,"
+            " closed_at, outcome, tags, favorite")
     if status:
         rows = db.execute(
-            "SELECT id, kind, object_name, status, created, updated, context"
-            " FROM projects WHERE status=? ORDER BY updated DESC",
+            f"SELECT {cols} FROM projects WHERE status=? ORDER BY updated DESC",
             (status,),
         ).fetchall()
     else:
         rows = db.execute(
-            "SELECT id, kind, object_name, status, created, updated, context"
-            " FROM projects ORDER BY updated DESC",
+            f"SELECT {cols} FROM projects ORDER BY updated DESC",
         ).fetchall()
     return [_row_to_project(r) for r in rows]
 
@@ -121,8 +140,9 @@ def get(db, project_id):
     # @args: db - Database, project_id - int
     # @return: project dict with steps and files, or None if not found
     row = db.execute(
-        "SELECT id, kind, object_name, status, created, updated, context"
-        " FROM projects WHERE id=?", (project_id,),
+        "SELECT id, kind, object_name, status, created, updated, context,"
+        " closed_at, outcome, tags, favorite FROM projects WHERE id=?",
+        (project_id,),
     ).fetchone()
     if not row:
         return None
@@ -234,6 +254,74 @@ def set_status(db, project_id, status):
     cur = db.execute(
         "UPDATE projects SET status=?, updated=? WHERE id=?",
         (status, _now(), project_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
+def close(db, project_id, outcome=None):
+    # Closes an active project: status -> done, stamps closed_at and stores
+    # the final outcome (free text, or None to close without one). Idempotent:
+    # a project already done/archived is returned unchanged.
+    # @args: outcome - free-text result string or None
+    # @return: updated project dict, or None if not found
+    proj = get(db, project_id)
+    if not proj:
+        return None
+    if proj["status"] != STATUS_ACTIVE:
+        return proj  # already closed — idempotent no-op
+    now = _now()
+    db.execute(
+        "UPDATE projects SET status=?, closed_at=?, outcome=?, updated=?"
+        " WHERE id=?",
+        (STATUS_DONE, now, outcome, now, project_id),
+    )
+    db.commit()
+    return get(db, project_id)
+
+
+def reopen(db, project_id):
+    # Reopens a closed/archived project: status -> active, clears closed_at
+    # and outcome (a reopened project has no final result yet). The "un año
+    # después" revisita is a real flow, so this works from done AND archived.
+    # @return: updated project dict, or None if not found
+    proj = get(db, project_id)
+    if not proj:
+        return None
+    if proj["status"] == STATUS_ACTIVE:
+        return proj  # already open — idempotent no-op
+    now = _now()
+    db.execute(
+        "UPDATE projects SET status=?, closed_at=NULL, outcome=NULL, updated=?"
+        " WHERE id=?",
+        (STATUS_ACTIVE, now, project_id),
+    )
+    db.commit()
+    return get(db, project_id)
+
+
+def set_tags(db, project_id, tags):
+    # Stores free-form tags as a single string (comma-separated by convention;
+    # the GUI builds/splits them). An empty string clears them.
+    # @args: tags - string or iterable of strings
+    # @return: True if the project was found and updated
+    if not isinstance(tags, str):
+        tags = ",".join(t.strip() for t in tags if t.strip())
+    cur = db.execute(
+        "UPDATE projects SET tags=?, updated=? WHERE id=?",
+        (tags, _now(), project_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
+def set_favorite(db, project_id, favorite):
+    # Toggles the favourite flag (star in the hub).
+    # @args: favorite - bool
+    # @return: True if the project was found and updated
+    cur = db.execute(
+        "UPDATE projects SET favorite=?, updated=? WHERE id=?",
+        (1 if favorite else 0, _now(), project_id),
     )
     db.commit()
     return cur.rowcount > 0

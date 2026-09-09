@@ -349,3 +349,115 @@ def test_migration_v4_is_idempotent(tmp_path):
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(projects)").fetchall()}
     assert {"closed_at", "outcome", "tags", "favorite"} <= cols
+
+
+# ---------------- Track A / A1: close, reopen, tags, favorite ----------------
+
+def test_close_sets_done_and_outcome(tmp_db):
+    p = project.create(tmp_db, "sn", "SN2026abc")
+    closed = project.close(tmp_db, p["id"], outcome="confirmed_ia")
+    assert closed["status"] == "done"
+    assert closed["closed_at"] is not None
+    assert closed["outcome"] == "confirmed_ia"
+
+
+def test_close_without_outcome(tmp_db):
+    p = project.create(tmp_db, "neo", "2021EU3")
+    closed = project.close(tmp_db, p["id"])
+    assert closed["status"] == "done"
+    assert closed["outcome"] is None
+    assert closed["closed_at"] is not None
+
+
+def test_close_is_idempotent(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    project.close(tmp_db, p["id"], outcome="completed")
+    first = project.get(tmp_db, p["id"])
+    # second close must not change the stamp or the outcome
+    second = project.close(tmp_db, p["id"], outcome="false_positive")
+    assert second["status"] == "done"
+    assert second["outcome"] == "completed"  # unchanged
+    assert second["closed_at"] == first["closed_at"]
+
+
+def test_reopen_clears_close_and_outcome(tmp_db):
+    p = project.create(tmp_db, "sn", "SN2026abc")
+    project.close(tmp_db, p["id"], outcome="confirmed_ia")
+    reopened = project.reopen(tmp_db, p["id"])
+    assert reopened["status"] == "active"
+    assert reopened["closed_at"] is None
+    assert reopened["outcome"] is None
+
+
+def test_reopen_from_archived(tmp_db):
+    p = project.create(tmp_db, "comet", "29P")
+    project.set_status(tmp_db, p["id"], project.STATUS_ARCHIVED)
+    reopened = project.reopen(tmp_db, p["id"])
+    assert reopened["status"] == "active"
+    assert reopened["closed_at"] is None
+
+
+def test_reopen_active_is_noop(tmp_db):
+    p = project.create(tmp_db, "neo", "2021EU3")
+    reopened = project.reopen(tmp_db, p["id"])
+    assert reopened["status"] == "active"
+    assert reopened["closed_at"] is None
+
+
+def test_close_not_found(tmp_db):
+    assert project.close(tmp_db, 99999) is None
+    assert project.reopen(tmp_db, 99999) is None
+
+
+def test_set_tags_from_string(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    assert project.set_tags(tmp_db, p["id"], "ia, red, bright")
+    assert project.get(tmp_db, p["id"])["tags"] == "ia, red, bright"
+
+
+def test_set_tags_from_list(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    assert project.set_tags(tmp_db, p["id"], ["Ia", "", "favourite"])
+    assert project.get(tmp_db, p["id"])["tags"] == "Ia,favourite"
+
+
+def test_set_tags_clear(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    project.set_tags(tmp_db, p["id"], "ia")
+    project.set_tags(tmp_db, p["id"], "")
+    assert project.get(tmp_db, p["id"])["tags"] == ""
+
+
+def test_set_favorite_toggle(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    assert project.get(tmp_db, p["id"])["favorite"] is False
+    project.set_favorite(tmp_db, p["id"], True)
+    assert project.get(tmp_db, p["id"])["favorite"] is True
+    project.set_favorite(tmp_db, p["id"], False)
+    assert project.get(tmp_db, p["id"])["favorite"] is False
+
+
+def test_outcomes_dict_has_all_kinds():
+    for kind in project.VALID_KINDS:
+        assert kind in project.OUTCOMES
+        assert len(project.OUTCOMES[kind]) >= 2
+
+
+def test_get_returns_lifecycle_fields(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    project.set_tags(tmp_db, p["id"], "ia")
+    project.set_favorite(tmp_db, p["id"], True)
+    got = project.get(tmp_db, p["id"])
+    assert got["tags"] == "ia"
+    assert got["favorite"] is True
+    assert got["closed_at"] is None
+    assert got["outcome"] is None
+
+
+def test_list_projects_returns_lifecycle_fields(tmp_db):
+    p = project.create(tmp_db, "sn", "SNx")
+    project.close(tmp_db, p["id"], outcome="completed")
+    items = project.list_projects(tmp_db)
+    assert items[0]["outcome"] == "completed"
+    assert items[0]["closed_at"] is not None
+    assert items[0]["status"] == "done"

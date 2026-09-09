@@ -92,10 +92,10 @@ Cada rama de track mergea a `feature/object-card` al cerrarse.
 
 | Track | Estado |
 |---|---|
-| A — project-lifecycle | Pendiente |
-| B — sn-followup | **Hecho (2026-09-09)** |
-| C — neo-consistency | Pendiente |
-| D — exoplanet-transit-project | Plan enmendado 2026-09-09 (×2: mañana de diseño + post-entrevista); subplanes 0-5 pendientes |
+| A — project-lifecycle | **Hecho (2026-09-09)** — 6 commits en `feature/project-lifecycle` |
+| B — sn-followup | **Hecho (2026-09-09)** — 14 commits en `feature/sn-followup` |
+| C — neo-consistency | Pendiente — `feature/neo-consistency` desde `object-card`; C0 (análisis + registro FITS/Tycho), C1 (animación movimiento), C2 (ajustes) |
+| D — exoplanet-transit-project | Plan enmendado 2026-09-09 (×2); subplanes 0-5 pendientes — `feature/exoplanet-transit-project` |
 
 ## Fuera de alcance global (v2+)
 
@@ -109,3 +109,20 @@ Cada rama de track mergea a `feature/object-card` al cerrarse.
 - Lanzar EXOTIC/AIJ/Tycho como subproceso.
 - SNR fotométrico real (read noise/gain/cielo en config).
 - `Sequence_start` vía JSON-RPC de CCDciel (ADR-030, requiere instancia real).
+
+## PUNTO DE ENTRADA (para continuar después del Track B)
+
+1. **Track A (hecho)** — mergeado en `feature/object-card`. La rama
+   `feature/project-lifecycle` (6 commits: A0–A5) se mergea a `object-card` por
+   fast-forward. **Track C y D nacen de `object-card` con A ya integrado.**
+2. **Track B (hecho)** — mergeado en `feature/object-card`. La rama
+   `feature/sn-followup` (14 commits: B0–B13) se mergea a `object-card`.
+3. **Track C (pendiente)** — `docs/PLANS/neo-consistency.md`. Rama nueva
+   `feature/neo-consistency` desde `object-card` (con A y B ya mergeados). Subplanes:
+   C0 (análisis de consistencia + registro de FITS/imágenes Tycho), C1 (animación
+   de movimiento reusando el motor de series de B5), C2 (ajustes menores del análisis).
+4. **Track D (pendiente)** — `docs/PLANS/exoplanet-transit-project.md` (ya enmendado).
+   Rama `feature/exoplanet-transit-project` (ya existe, 3 commits de plan). Ejecutar
+   subplanes 0–5 del plan ya redactado: ventana/cadencia → tarjeta → panel Plan → export con ventana → EXOTIC → cierre.
+5. **B12 (opcional, fuera de iteración)** — contexto de surveys ASASSN/ZTF. Posible v2.
+6. Tras cerrar C y D, actualizar WORKFLOWS y el padre con las secciones nuevas.

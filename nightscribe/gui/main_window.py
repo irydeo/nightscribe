@@ -2458,11 +2458,29 @@ class MainWindow(QMainWindow):
         btn_img.clicked.connect(self._neo_register_image)
         row.addWidget(btn_img)
         gl.addLayout(row)
+        # C1: motion animation (the fire test) built from the registered FITS
+        row2 = QHBoxLayout()
+        btn_anim = QPushButton(self.tr("Motion animation"))
+        btn_anim.setToolTip(self.tr(
+            "GIF/MP4 following the predicted position — if a point stays "
+            "under the marker while the stars drift, it is that object"))
+        btn_anim.clicked.connect(self._neo_motion_animation)
+        row2.addWidget(btn_anim)
+        lbl_zoom = QLabel(self.tr("Zoom:"))
+        row2.addWidget(lbl_zoom)
+        spn_zoom = QSpinBox()
+        spn_zoom.setRange(1, 8)
+        spn_zoom.setValue(2)
+        spn_zoom.setToolTip(self.tr("Crop zoom (1 = full frame)"))
+        row2.addWidget(spn_zoom)
+        row2.addStretch()
+        gl.addLayout(row2)
         lst = QListWidget()
         lst.setMaximumHeight(120)
         gl.addWidget(lst)
         layout.addWidget(grp)
         self._project_widgets["neo_products"] = lst
+        self._project_widgets["neo_zoom"] = spn_zoom
         self._neo_populate_products(lst, p)
 
     def _neo_populate_products(self, lst, p):
@@ -2525,6 +2543,63 @@ class MainWindow(QMainWindow):
             project.add_file(db, p["id"], path, "image")
             entries.append({"path": path})
         self._neo_save_products(p, "session_images", entries)
+
+    def _neo_motion_animation(self):
+        # C1: motion GIF/MP4 from the registered session FITS — the fire
+        # test: a point staying under the marker while the stars drift is
+        # *that* object. Prediction: ephemeris.position_at at each DATE-OBS.
+        from ..viz import motion_view
+        p = self._current_project
+        if not p:
+            return
+        step = next((s for s in p.get("steps", []) if s["step"] == "process"),
+                    None)
+        fits = ((step and step.get("data")) or {}).get("session_fits", [])
+        paths_f = [e["path"] for e in fits]
+        if len(paths_f) < 2:
+            self.statusBar().showMessage(
+                self.tr("Register at least 2 session FITS first"), 6000)
+            return
+        ctx = p.get("context") or {}
+        obj_id = ctx.get("id") or ctx.get("packed") or p["object_name"]
+        site = config.get("mpc_code", "Z41")
+        lang = config.get("language", "es")
+        spn = self._project_widgets.get("neo_zoom")
+        zoom = spn.value() if spn else 2
+        try:
+            loaded = motion_view.load_motion_frames(
+                paths_f, obj_id, site, fallback_target=ctx, zoom=zoom,
+                lang=lang)
+        except Exception as err:
+            self.statusBar().showMessage(
+                self.tr("Motion animation failed: %1").replace(
+                    "%1", str(err)), 8000)
+            return
+        frames = loaded["frames_data"]
+        if len(frames) < 2:
+            self.statusBar().showMessage(
+                self.tr("Need at least 2 frames with WCS and ephemeris "
+                        "(skipped: {})").format(len(loaded["skipped"])), 8000)
+            return
+        out_gif = paths.project_dir(p["id"], p["object_name"]) / \
+            f"{p['object_name']}_motion.gif"
+        out_mp4 = out_gif.with_suffix(".mp4")
+        names = [p["object_name"]] * len(frames)
+        xys = [xy for _, xy in frames]
+        motion_view.make_motion_gif(
+            frames, loaded["dates"], xys, out=str(out_gif), names=names,
+            lang=lang)
+        motion_view.make_motion_video(
+            frames, loaded["dates"], xys, out=str(out_mp4), names=names,
+            lang=lang)
+        project.add_file(db, p["id"], str(out_gif), "motion_gif")
+        project.add_file(db, p["id"], str(out_mp4), "motion_mp4")
+        self._populate_project_files(p["id"])
+        msg = self.tr("Motion animation saved ({} frames)").format(len(frames))
+        if loaded["skipped"]:
+            msg += self.tr(" — {} skipped (no WCS/date/ephemeris)").format(
+                len(loaded["skipped"]))
+        self.statusBar().showMessage(msg, 10000)
 
     def _neo_save_products(self, p, key, entries):
         # @args: p - project dict, key - "session_fits" | "session_images",

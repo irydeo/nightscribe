@@ -45,26 +45,31 @@ VIDEO_MIN_S = blink_view.VIDEO_MIN_S
 def _compute_affine(frame_wcs, ref_wcs):
     # @args: frame_wcs - Wcs of the frame to align, ref_wcs - reference Wcs
     # @return: (a, b, c, d, e, f) PIL affine transform coefficients that map
-    #         frame pixels to reference pixels
-    # Sample 3 points in frame space, map them through the WCS chain
-    # (frame pixel → sky → reference pixel), and solve the affine via numpy.
-    h, w = frame_wcs.naxis2, frame_wcs.naxis1
-    pts_frame = np.array([[w * 0.25, h * 0.25],
-                           [w * 0.75, h * 0.25],
-                           [w * 0.5, h * 0.75]], dtype=np.float64)
-    pts_ref = []
-    for px, py in pts_frame:
-        ra, dec = frame_wcs.pixel_to_sky(px, py)
-        rx, ry = ref_wcs.sky_to_pixel(ra, dec)
-        pts_ref.append([rx, ry])
-    pts_ref = np.array(pts_ref, dtype=np.float64)
-    # Augment frame points with a 1 column [x, y, 1] and solve least-squares.
-    frame_aug = np.hstack([pts_frame, np.ones((3, 1))])
-    # solve: ref = A @ frame + t  (affine:2x2 + translation)
-    # lstsq solves A·x = b; here A=frame_aug (3x3), b=pts_ref (3x2) →
-    # coeffs is (3,2): each column is the coefficients for one ref axis.
-    coeffs, *_ = np.linalg.lstsq(frame_aug, pts_ref, rcond=None)
-    # coeffs[:, 0] = (a, b, c) for rx; coeffs[:, 1] = (d, e, f) for ry
+    #         **reference (output) pixels to frame (input) pixels** — the
+    #         direction PIL's Image.transform(AFFINE) samples with: for each
+    #         output pixel (x, y) it reads the input at
+    #         (a·x + b·y + c, d·x + e·y + f).
+    # Sample 3 points in reference space, map them through the inverse WCS
+    # chain (reference pixel → sky → frame pixel), and solve for the 2x3
+    # matrix. (Until the C1 fire-test this sampled the opposite direction,
+    # which warps by the inverse transform — invisible for near-identical
+    # WCS, wrong for shifted fields.)
+    h, w = ref_wcs.naxis2, ref_wcs.naxis1
+    pts_ref = np.array([[w * 0.25, h * 0.25],
+                         [w * 0.75, h * 0.25],
+                         [w * 0.5, h * 0.75]], dtype=np.float64)
+    pts_frame = []
+    for px, py in pts_ref:
+        ra, dec = ref_wcs.pixel_to_sky(px, py)
+        fx, fy = frame_wcs.sky_to_pixel(ra, dec)
+        pts_frame.append([fx, fy])
+    pts_frame = np.array(pts_frame, dtype=np.float64)
+    # Augment ref points with a 1 column [x, y, 1] and solve least-squares.
+    ref_aug = np.hstack([pts_ref, np.ones((3, 1))])
+    # lstsq solves A·x = b; here A=ref_aug (3x3), b=pts_frame (3x2) →
+    # coeffs is (3,2): each column is the coefficients for one frame axis.
+    coeffs, *_ = np.linalg.lstsq(ref_aug, pts_frame, rcond=None)
+    # coeffs[:, 0] = (a, b, c) for fx; coeffs[:, 1] = (d, e, f) for fy
     a, b, c = coeffs[:, 0]
     d, e, f = coeffs[:, 1]
     return (a, b, c, d, e, f)

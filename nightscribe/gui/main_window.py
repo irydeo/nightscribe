@@ -3597,6 +3597,11 @@ class MainWindow(QMainWindow):
         target = {"name": self._current_project["object_name"],
                   "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),
                   "safe_window": ctx.get("safe_window")}
+        # Track D: a transit exports its capture window (baseline included)
+        if self._current_project["kind"] == "transit":
+            tr = ctx.get("transit") or {}
+            target["capture_start"] = tr.get("capture_start")
+            target["capture_end"] = tr.get("capture_end")
         fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
         ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
@@ -3611,8 +3616,15 @@ class MainWindow(QMainWindow):
         try:
             path = sequence.export(target, plan, out, fmt=fmt)
             project.add_file(db, self._current_project["id"], path, "sequence")
-            self.statusBar().showMessage(
-                self.tr("Written to %1").replace("%1", path), 8000)
+            msg = self.tr("Written to %1").replace("%1", path)
+            if fmt == "ccdciel" \
+                    and self._current_project["kind"] == "transit":
+                # Track D: MandatoryStartTime is best-effort until checked
+                # against the observatory's real CCDciel (ADR-021)
+                msg += " · " + self.tr(
+                    "transit start written as mandatory — validate once "
+                    "against your CCDciel")
+            self.statusBar().showMessage(msg, 8000)
         except OSError as err:
             self.statusBar().showMessage(
                 self.tr("Export failed: %1").replace("%1", str(err)), 8000)

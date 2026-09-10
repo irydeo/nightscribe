@@ -85,26 +85,55 @@ def make_plan(n_frames, exp_s, filter_name="L", overhead_s=None, cfg=None,
 def export_csv(target, plan, out):
     # Generic CSV: one row per frame, readable by any capture software.
     # B8: multi-filter plans emit rows with the per-step filter.
+    # Track D: when the target carries a transit capture window, each row
+    # gets its planned UTC `start_time` (capture_start + cumulative
+    # exposure+overhead); the column exists always and stays empty without
+    # a window, so the header is stable for parsers.
     # @args: target - dict with name, ra_deg, dec_deg, plan - make_plan dict,
     #        out - output path
     # @return: the output path
     name = target.get("name") or target.get("id") or "target"
     ra = target.get("ra_deg", 0.0)
     dec = target.get("dec_deg", 0.0)
+    tw = _transit_window(target)
+    overhead = float(plan.get("overhead_s", 15.0))
     rows = []
+    elapsed = 0.0
     for s in plan.get("steps", [{"filter": plan["filter"],
                                  "n_frames": plan["n_frames"],
                                  "exp_s": plan["exp_s"]}]):
         for i in range(s["n_frames"]):
-            rows.append({
+            row = {
                 "frame": len(rows) + 1, "target": name,
                 "ra_deg": f"{ra:.6f}", "dec_deg": f"{dec:+.6f}",
                 "exposure_s": s["exp_s"], "filter": s["filter"],
-            })
+                "start_time": (tw[0] + datetime.timedelta(
+                    seconds=elapsed)).isoformat() if tw else "",
+            }
+            rows.append(row)
+            elapsed += float(s["exp_s"]) + overhead
     _write_csv(out, ["frame", "target", "ra_deg", "dec_deg",
-                 "exposure_s", "filter"], rows)
+                  "exposure_s", "filter", "start_time"], rows)
     logger.info("CSV sequence written to %s", out)
     return str(out)
+
+
+def _transit_window(target):
+    # The transit capture window (baseline + transit + baseline, Track D).
+    # @args: target - dict with optional "capture_start"/"capture_end"
+    #         (ISO strings or datetimes)
+    # @return: (start, end) datetimes, or None when not carried
+    def _dt(v):
+        if isinstance(v, datetime.datetime):
+            return v
+        try:
+            return datetime.datetime.fromisoformat(str(v))
+        except (ValueError, TypeError):
+            return None
+    s, e = _dt(target.get("capture_start")), _dt(target.get("capture_end"))
+    if s is None or e is None:
+        return None
+    return s, e
 
 
 def export_nina(target, plan, out):
@@ -147,6 +176,12 @@ def export_nina(target, plan, out):
             "TotalDuration_s": plan["duration_s"],
         },
     }
+    # Track D: a transit capture window becomes best-effort start/end
+    # metadata (NINA's own scheduler owns the actual clock).
+    tw = _transit_window(target)
+    if tw:
+        seq["Metadata"]["StartTime"] = tw[0].isoformat()
+        seq["Metadata"]["EndTime"] = tw[1].isoformat()
     Path(out).write_text(json.dumps(seq, indent=2, ensure_ascii=False),
                          encoding="utf-8")
     logger.info("NINA sequence written to %s", out)
@@ -164,21 +199,25 @@ def export_nina(target, plan, out):
 
 def _ccdciel_target(attrs):
     # Ordered attribute list for a <TargetN> element. The order mirrors the
-    # sample file so diffs against a real export stay readable.
+    # sample file so diffs against a real export stay readable. Track D: a
+    # transit capture window switches the rise/set defaults for a mandatory
+    # start (attrs "mandatory"/"start_rise").
     return (
         ("PA", "-"), ("RA", attrs["ra"]), ("Dec", attrs["dec"]),
         ("Path", ""), ("Plan", ""), ("Skip", "False"), ("Delay", "0"),
         ("EndSet", "True"), ("EndTime", attrs["end"]),
         ("Preview", "False"), ("FlatBinX", "0"), ("FlatBinY", "0"),
         ("FlatGain", "0"), ("DarkNight", "False"), ("FlatCount", "0"),
-        ("FlatFstop", ""), ("StartRise", "True"), ("StartTime", attrs["start"]),
+        ("FlatFstop", ""), ("StartRise", attrs.get("start_rise", "True")),
+        ("StartTime", attrs["start"]),
         ("FlatOffset", "0"), ("ObjectName", attrs["name"]),
         ("RepeatDone", "0"), ("ScriptArgs", ""), ("EndMeridian", "-9999"),
         ("FlatFilters", ""), ("HFM_Enabled", "True"), ("RepeatCount", "1"),
         ("UpdateCoord", "False"), ("AutofocusTemp", "False"),
         ("SolarTracking", "False"), ("StartMeridian", "-9999"),
         ("PreviewExposure", "0.001"), ("InplaceAutofocus", "True"),
-        ("AstrometryPointing", "True"), ("MandatoryStartTime", "False"),
+        ("AstrometryPointing", "True"),
+        ("MandatoryStartTime", attrs.get("mandatory", "False")),
         ("NoAutoguidingChange", "False"),
     )
 
@@ -232,26 +271,33 @@ def _calibration_steps(plan):
 
 
 def _ccdciel_times(target):
-    # Start/End window for the target, as UTC "HH:MM:SS". CCDciel runs with
-    # StartRise/EndSet anyway (it recomputes rise/set from its own observatory
-    # settings); when NightScribe knows the safe window these are the
-    # informative values written to the file.
-    # @args: target - dict with optional "safe_window" ("ISO|ISO")
-    # @return: (start "HH:MM:SS", end "HH:MM:SS"), defaulting to "0:00:00"
+    # Start/End window for the target, as UTC "HH:MM:SS", and whether the
+    # start is MANDATORY. A transit capture window (Track D) must start on
+    # time — the pre-ingress baseline is what the light curve is compared
+    # against — so it writes the capture window with mandatory start.
+    # Otherwise CCDciel runs with StartRise/EndSet (it recomputes rise/set
+    # from its own observatory settings) and NightScribe's safe window, when
+    # known, is written as informative values.
+    # @args: target - dict with optional "capture_start"/"capture_end"
+    #         (transit) or "safe_window" ("ISO|ISO")
+    # @return: (start "HH:MM:SS", end "HH:MM:SS", mandatory bool)
     def hhmmss(value):
         try:
             return datetime.datetime.fromisoformat(str(value)).strftime(
                 "%H:%M:%S")
         except (ValueError, TypeError):
             return "0:00:00"
+    tw = _transit_window(target)
+    if tw:
+        return tw[0].strftime("%H:%M:%S"), tw[1].strftime("%H:%M:%S"), True
     sw = target.get("safe_window")
     if sw:
         try:
             s0, s1 = str(sw).split("|")
-            return hhmmss(s0), hhmmss(s1)
+            return hhmmss(s0), hhmmss(s1), False
         except ValueError:
             pass
-    return "0:00:00", "0:00:00"
+    return "0:00:00", "0:00:00", False
 
 
 def _ra_sex(ra_deg):
@@ -291,14 +337,18 @@ def export_ccdciel(target, plan, out):
     # sequence tool reads and writes; see docs/ccdciel_sequence_sample.targets.
     # The target keeps CCDciel's default rise/set window; the plan becomes a
     # Light step plus optional Dark/Bias calibration steps. B8: a multi-filter
-    # plan writes one Light step per filter.
-    # @args: target - dict with name, ra_deg, dec_deg, safe_window; plan -
-    #        make_plan dict; out - output path (.targets)
+    # plan writes one Light step per filter. Track D: a transit capture
+    # window writes StartTime/EndTime with MandatoryStartTime=True and
+    # StartRise=False — best-effort until validated against the observatory's
+    # real CCDciel (ADR-021 philosophy).
+    # @args: target - dict with name, ra_deg, dec_deg, safe_window,
+    #        capture_start/capture_end (transit); plan - make_plan dict;
+    #        out - output path (.targets)
     # @return: the output path
     name = target.get("name") or target.get("id") or "target"
     ra_deg = target.get("ra_deg", 0.0)
     dec_deg = target.get("dec_deg", 0.0)
-    start_t, end_t = _ccdciel_times(target)
+    start_t, end_t, mandatory = _ccdciel_times(target)
     steps = [*_light_steps(plan), *_calibration_steps(plan)]
 
     root = ET.Element("CONFIG")
@@ -312,7 +362,9 @@ def export_ccdciel(target, plan, out):
     t1 = ET.SubElement(targets, "Target1")
     for k, v in _ccdciel_target({
             "name": name, "ra": _ra_sex(ra_deg), "dec": _dec_sex(dec_deg),
-            "start": start_t, "end": end_t}):
+            "start": start_t, "end": end_t,
+            "mandatory": "True" if mandatory else "False",
+            "start_rise": "False" if mandatory else "True"}):
         t1.set(k, str(v))
     plan_el = ET.SubElement(t1, "Plan")
     plan_el.set("Name", "")

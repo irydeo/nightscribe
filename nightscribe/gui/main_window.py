@@ -2423,7 +2423,130 @@ class MainWindow(QMainWindow):
         else:
             layout.addWidget(QLabel(
                 self.tr("Process your images with your usual software.")))
+        # C0 (track C): NEO/PCCP/comet sessions produce files the observer
+        # actually keeps (FITS, Tycho annotated images, MPC report) — they
+        # are registered here so the project remembers them.
+        if kind in ("neo", "pccp", "comet"):
+            self._build_products_block(layout, p)
         layout.addStretch()
+
+    def _build_products_block(self, layout, p):
+        # C0: "Session products" group for the NEO/PCCP/comet Process step.
+        # Registration goes to project_files (visible in Details, A4) and a
+        # summary with the FITS metadata is persisted in the process step
+        # data. The MPC report needs no button: it is registered on save.
+        # @args: layout - the process tab layout, p - project dict
+        grp = QGroupBox(self.tr("Session products"))
+        gl = QVBoxLayout(grp)
+        hint = QLabel(self.tr(
+            "Register what you keep from the session: the FITS frames and "
+            "the annotated images (e.g. from Tycho). The MPC report is "
+            "registered automatically when you save it."))
+        hint.setWordWrap(True)
+        gl.addWidget(hint)
+        row = QHBoxLayout()
+        btn_fits = QPushButton(self.tr("Register FITS…"))
+        btn_fits.setToolTip(self.tr(
+            "One or more FITS from the session — date, filter and exposure "
+            "are read from each header"))
+        btn_fits.clicked.connect(self._neo_register_fits)
+        row.addWidget(btn_fits)
+        btn_img = QPushButton(self.tr("Register annotated image…"))
+        btn_img.setToolTip(self.tr(
+            "Annotated image with the object marked (e.g. Tycho-Tracker "
+            "output)"))
+        btn_img.clicked.connect(self._neo_register_image)
+        row.addWidget(btn_img)
+        gl.addLayout(row)
+        lst = QListWidget()
+        lst.setMaximumHeight(120)
+        gl.addWidget(lst)
+        layout.addWidget(grp)
+        self._project_widgets["neo_products"] = lst
+        self._neo_populate_products(lst, p)
+
+    def _neo_populate_products(self, lst, p):
+        # @args: lst - read-only QListWidget, p - project dict
+        # Fills the products summary from the process step data.
+        lst.clear()
+        step = next((s for s in p.get("steps", []) if s["step"] == "process"),
+                    None)
+        data = (step and step.get("data")) or {}
+        for e in data.get("session_fits", []):
+            bits = [b for b in (
+                e.get("date_obs"), e.get("filter"),
+                f"{e['exptime_s']:g} s" if e.get("exptime_s") else None)
+                if b]
+            line = f"FITS  {Path(e['path']).name}"
+            if bits:
+                line += "  —  " + " · ".join(str(b) for b in bits)
+            lst.addItem(QListWidgetItem(line))
+        for e in data.get("session_images", []):
+            lst.addItem(QListWidgetItem(f"IMG  {Path(e['path']).name}"))
+
+    def _neo_register_fits(self):
+        # C0: multi-select the session FITS. Metadata is auto-read from each
+        # header (fits_meta, tolerant); every file lands in project_files
+        # (kind "fits") and a summary in the process step data.
+        p = self._current_project
+        if not p:
+            return
+        paths_sel, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("Choose session FITS"), "",
+            "FITS (*.fits *.fit *.fts);;All files (*)")
+        if not paths_sel:
+            return
+        from ..core import fits_meta
+        entries = []
+        for path in paths_sel:
+            try:
+                meta = fits_meta.read_meta(path)
+            except Exception:
+                meta = {}
+            project.add_file(db, p["id"], path, "fits")
+            entries.append({"path": path,
+                            "date_obs": meta.get("date_obs"),
+                            "filter": meta.get("filter"),
+                            "exptime_s": meta.get("exptime_s")})
+        self._neo_save_products(p, "session_fits", entries)
+
+    def _neo_register_image(self):
+        # C0: annotated images (Tycho-Tracker output etc.) -> kind "image".
+        p = self._current_project
+        if not p:
+            return
+        paths_sel, _ = QFileDialog.getOpenFileNames(
+            self, self.tr("Choose annotated images"), "",
+            self.tr("Images (*.png *.jpg *.jpeg *.bmp);;All files (*)"))
+        if not paths_sel:
+            return
+        entries = []
+        for path in paths_sel:
+            project.add_file(db, p["id"], path, "image")
+            entries.append({"path": path})
+        self._neo_save_products(p, "session_images", entries)
+
+    def _neo_save_products(self, p, key, entries):
+        # @args: p - project dict, key - "session_fits" | "session_images",
+        #        entries - list of dicts to append
+        # Merges into the process step data (keeping the in-memory copy in
+        # sync so consecutive registrations accumulate), then refreshes the
+        # products list and the Details files list.
+        step = next((s for s in p.get("steps", []) if s["step"] == "process"),
+                    None)
+        existing = []
+        if step:
+            existing = list((step.get("data") or {}).get(key, []))
+        existing.extend(entries)
+        project.update_step_data(db, p["id"], "process", {key: existing})
+        if step is not None:
+            step.setdefault("data", {})[key] = existing
+        lst = self._project_widgets.get("neo_products")
+        if lst is not None:
+            self._neo_populate_products(lst, p)
+        self._populate_project_files(p["id"])
+        self.statusBar().showMessage(
+            self.tr("Registered {} file(s)").format(len(entries)), 5000)
 
     def _build_publish_tab(self, p, kind, ctx):
         tab = self.projects.tabs_steps.findChild(QWidget, "tab_publish")

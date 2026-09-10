@@ -42,12 +42,12 @@ FAKE_PROJECT = {
 
 # One copy of every live control per step tab (kind "neo"):
 # plan: sequence + 7 CCDciel + ephemeris + save plan
-# process (neo): validate + save report
+# process (neo): validate + save report + register FITS + register image (C0)
 # publish: generate post
 PLAN_BUTTONS = 10
-PROCESS_BUTTONS = 2
+PROCESS_BUTTONS = 4
 PUBLISH_BUTTONS = 1
-PROJECT_WIDGETS = 23  # 21 from plan + 2 from the MPC process tab
+PROJECT_WIDGETS = 24  # 21 from plan + 2 from MPC + 1 products list (C0)
 
 
 @pytest.fixture(scope="module")

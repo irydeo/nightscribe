@@ -40,6 +40,23 @@ herramienta de verificación y divulgación.
   header (B1, `core/fits_meta.py`).
 - `project_files` acepta `kind='fits'`/`'chart'`; tras A4 la lista es visible.
 
+## Análisis de consistencia (C0, ejecutado 2026-09-10)
+
+Qué tiene la supernova tras el track B que el NEO/cometa no tenía:
+
+| Pieza (SN, track B) | ¿Aplica a NEO/cometa/asteroide? |
+|---|---|
+| Registro de los productos de la sesión (apilados FITS por visita, visibles en Detalles vía `project_files`) | **Sí** — el observador conserva los FITS de la noche, las **imágenes anotadas de Tycho** y el reporte MPC (entrevista). El paso Process NEO no registraba nada → C0 lo añade. |
+| Animación (evolución fotométrica, B6) | **Sí, pero otro eje**: en NEO lo que se mueve es la **posición** — la animación de movimiento es la «prueba de fuego» de que el objeto es *ese* → C1. |
+| Curva de luz / quick-look fotométrico (B4/B5) | **No en v1** — la fotometría de asteroides (rotación) sigue fuera (padre, T1); posible v2 si el motor de series madura. |
+| Cadencia con memoria (B11) | **No** — un NEO/PCCP es «una noche o pocas»; no hay revisita rutinaria. La revisita NEO real es la del track de seguimiento de NEOfixer, externa. |
+| FITS anotado propio (B10) | **No en v1** — el observador ya genera las anotadas con Tycho; C0 las registra (`kind='image'`) en vez de generarlas. |
+
+Huecos menores detectados (alimentan C2): ninguno — las etiquetas de
+fecha/hora entre flujos ya son consistentes (mismo patrón `DATE-OBS` → MJD de
+`core/fits_meta.py` y época visible de ADR-030), y las efemérides exportadas
+ya se registran en `project_files` (`kind='ephemeris'`) desde la fase 5.
+
 ## Subplanes
 
 ### C0 — Análisis de consistencia + registro de los productos de la sesión

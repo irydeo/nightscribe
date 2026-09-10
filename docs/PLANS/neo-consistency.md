@@ -1,14 +1,12 @@
 # Plan — Track C: NEO/cometa/asteroide, consistencia con el resto de flujos
 
-> **Abierto (2026-09-09)** — hijo C de
-> [project-concept-v2.md](project-concept-v2.md) (leer primero el padre).
-> Un subplan = un commit. **Se ejecuta después del track B** (reutiliza su
-> motor de series).
-> **Enmendado 2026-09-09 (post-entrevista)**: lo que el observador conserva de
-> una noche NEO queda explícito (FITS + **imágenes anotadas de Tycho** +
-> reporte MPC → C0 los registra los tres), y la animación de movimiento sube de
-> «extra bonito» a **prueba de fuego**: es como se verifica que el objeto es
-> *ese* (y además divulga).
+> **Cerrado (2026-09-10)** — hijo C de
+> [project-concept-v2.md](project-concept-v2.md). Subplanes C0/C1 hechos;
+> C2 cerrado «sin cambios» (el análisis de C0 no levantó huecos menores).
+> Rama `feature/neo-consistency`, mergeada a `feature/object-card`.
+> **Extra no previsto**: el test del afín de C1 destapó un bug latente de B6
+> (dirección de la transformación invertida en `_compute_affine`) —
+> corregido en el mismo commit de C1.
 
 **rama**: `feature/neo-consistency` (nace de `feature/object-card` al día, tras cerrar el track B; mergea de vuelta a `feature/object-card`)
 **fecha**: 2026-09-09 · **autor**: FJC (con la IA)
@@ -60,6 +58,7 @@ ya se registran en `project_files` (`kind='ephemeris'`) desde la fase 5.
 ## Subplanes
 
 ### C0 — Análisis de consistencia + registro de los productos de la sesión
+**(Hecho 2026-09-10)**
 - Revisión documentada (sección corta en este archivo al ejecutarse): qué tiene
   SN tras el track B que NEO no — registro de imágenes, animación, curva — y
   qué aplica a NEO/cometa/asteroide (la curva fotométrica **no** aplica en v1).
@@ -72,6 +71,7 @@ ya se registran en `project_files` (`kind='ephemeris'`) desde la fase 5.
 visible (patrón A4), persistencia.
 
 ### C1 — Animación de movimiento: la prueba de fuego (GIF/MP4)
+**(Hecho 2026-09-10)**
 Sobre el motor de B5/B6: frames alineados a las **estrellas** (afín por WCS);
 el recorte **sigue la posición predicha** del objeto en el instante de cada
 frame (`DATE-OBS` → `ephemeris.position_at`), con **marcador sobre la posición
@@ -88,6 +88,13 @@ afín correcto, marcador en la posición predicha, GIF/MP4 con frames sintético
 salto de frame sin WCS.
 
 ### C2 — Ajustes derivados del análisis
+**(Cerrado «sin cambios» 2026-09-10)**: el análisis de C0 no levantó huecos
+menores — las etiquetas de fecha/hora entre flujos ya son consistentes
+(`core/fits_meta.py` + época visible de ADR-030) y las efemérides exportadas
+ya se registran en `project_files` desde la fase 5. El commit de cierre lleva
+solo la i18n ES/EN de las cadenas nuevas (C0/C1 + las pendientes del cableado
+B5/B6/B10 en object-card), la corrección de las cadenas fuente españolas del
+widget de curva de luz (regla «código en inglés») y las secciones de docs.
 Lo que C0 documente como huecos menores (p. ej. consistencia de etiquetas de
 fecha/hora entre flujos, registro de efemérides usadas en la captura). Si C0 no
 levanta nada, este subplan se cierra como «sin cambios» con la nota en el

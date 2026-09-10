@@ -199,7 +199,7 @@ class LightCurveChart(ChartView):
         entries = []
         if has_template:
             entries.append(
-                (self.tr("Plantilla típica"), QColor(palette.MUTED)))
+                (self.tr("Typical template"), QColor(palette.MUTED)))
         seen = set()
         for p in self._points:
             src = p.get("source") or "manual"
@@ -215,9 +215,9 @@ class LightCurveChart(ChartView):
             seen.add(key)
             text = _filter_label(p.get("filter"))
             if cls == "quicklook":
-                text += " · " + self.tr("indicativo")
+                text += " · " + self.tr("indicative")
             elif cls == "survey":
-                text += " · " + self.tr("catálogo")
+                text += " · " + self.tr("catalog")
             colour, _filled = _point_style(p)
             entries.append((text, colour))
         if not entries:

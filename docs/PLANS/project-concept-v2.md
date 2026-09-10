@@ -94,7 +94,7 @@ Cada rama de track mergea a `feature/object-card` al cerrarse.
 |---|---|
 | A — project-lifecycle | **Hecho (2026-09-09)** |
 | B — sn-followup | **Hecho (2026-09-09)** — 14 commits en `feature/sn-followup`, mergeado a `object-card` |
-| C — neo-consistency | Pendiente |
+| C — neo-consistency | **Hecho (2026-09-10)** — C0/C1/C2 en `feature/neo-consistency`, mergeado a `object-card`; extra: fix del afín de B6 |
 | D — exoplanet-transit-project | Plan enmendado 2026-09-09 (×2: mañana de diseño + post-entrevista); subplanes 0-5 pendientes |
 
 ## Fuera de alcance global (v2+)

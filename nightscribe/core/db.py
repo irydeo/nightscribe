@@ -80,7 +80,8 @@ CREATE TABLE IF NOT EXISTS projects (
     status      TEXT NOT NULL DEFAULT 'active',
     created     REAL NOT NULL,
     updated     REAL NOT NULL,
-    context     TEXT DEFAULT '{}'
+    context     TEXT DEFAULT '{}',
+    root_dir    TEXT
 );
 CREATE TABLE IF NOT EXISTS project_steps (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -213,6 +214,19 @@ def _migrate(conn):
         );
         """)
         conn.execute("PRAGMA user_version = 5")
+    if v < 6:
+        # ADR-032: every project owns an explicit container folder. The column
+        # stores the root fixed at creation (or on the per-project override);
+        # existing projects are backfilled with the legacy location so their
+        # artefacts never move.
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)")}
+        if "root_dir" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN root_dir TEXT")
+        legacy = str(paths.data_dir() / "projects")
+        conn.execute(
+            "UPDATE projects SET root_dir=? WHERE root_dir IS NULL",
+            (legacy,))
+        conn.execute("PRAGMA user_version = 6")
     conn.commit()
 
 

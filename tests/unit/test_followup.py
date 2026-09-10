@@ -44,7 +44,7 @@ def test_migration_v3_to_v5_preserves_projects(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 6
     # project survived
     row = db.execute(
         "SELECT kind, object_name FROM projects WHERE id=1").fetchone()
@@ -76,7 +76,7 @@ def test_migration_v5_is_idempotent(tmp_path):
 
     Database(str(file))  # 3 -> 5
     db = Database(str(file))  # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 5
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 6
 
 
 # ---------------- sessions CRUD ----------------

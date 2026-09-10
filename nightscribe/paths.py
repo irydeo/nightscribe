@@ -57,12 +57,15 @@ def docs_dir():
     return Path(__file__).resolve().parent.parent / "docs"
 
 
-def project_dir(project_id, slug=""):
+def project_dir(project_id, slug="", root=""):
     # @args: project_id - int, slug - object name (sanitised to a safe folder
-    #        name; non-alphanumeric chars become _, capped at 50 chars)
+    #        name; non-alphanumeric chars become _, capped at 50 chars),
+    #        root - base folder hosting the project container; empty means the
+    #        legacy platformdirs data dir's projects/ folder (ADR-032)
     # @return: Path to the per-project export folder (created if missing).
     #          Exports go here instead of the flat exports/ dir (Track A, A4).
     safe = re.sub(r'[^a-zA-Z0-9_-]', '_', slug or "")[:50]
-    p = data_dir() / "projects" / f"{project_id}-{safe}"
+    base = Path(root) if root else data_dir() / "projects"
+    p = base / f"{project_id}-{safe}"
     p.mkdir(parents=True, exist_ok=True)
     return p

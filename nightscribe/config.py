@@ -36,6 +36,9 @@ DEFAULTS = {
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
+    # Container root for the projects: empty -> platformdirs data dir's
+    # projects/ folder (the legacy location, see ADR-032)
+    "projects_root": "",
     # UX v3 observing constraints (ADR-020 / ADR-021)
     "horizon_file": "",         # TheSkyX-style az/alt file; empty -> flat min_alt
     "horizon_margin_deg": 0.0,  # safety margin added on top of the horizon

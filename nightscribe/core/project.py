@@ -16,6 +16,9 @@ import json
 import logging
 import time
 
+from .. import paths
+from ..config import config
+
 logger = logging.getLogger(__name__)
 
 # A project carries the full context of an observing target through a guided
@@ -70,12 +73,13 @@ def _json_default(obj):
 def _row_to_project(row):
     # @return: project dict from a SELECT row
     # Row order: id, kind, object_name, status, created, updated, context,
-    # closed_at, outcome, tags, favorite (Track A columns 7-10, nullable).
+    # root_dir (ADR-032, the explicit container folder), closed_at, outcome,
+    # tags, favorite (Track A columns, nullable).
     return {"id": row[0], "kind": row[1], "object_name": row[2],
             "status": row[3], "created": row[4], "updated": row[5],
-            "context": json.loads(row[6] or "{}"),
-            "closed_at": row[7], "outcome": row[8],
-            "tags": row[9] or "", "favorite": bool(row[10])}
+            "context": json.loads(row[6] or "{}"), "root_dir": row[7],
+            "closed_at": row[8], "outcome": row[9],
+            "tags": row[10] or "", "favorite": bool(row[11])}
 
 
 def _row_to_step(row):
@@ -101,10 +105,13 @@ def create(db, kind, object_name, context=None):
         return None
     now = _now()
     ctx = json.dumps(context or {}, ensure_ascii=False, default=_json_default)
+    # The container root is frozen at creation: later changes to the
+    # configured projects_root only affect new projects (ADR-032).
+    root = config.get("projects_root") or str(paths.data_dir() / "projects")
     cur = db.execute(
         "INSERT INTO projects (kind, object_name, status, created, updated,"
-        " context) VALUES (?, ?, ?, ?, ?, ?)",
-        (kind, object_name, STATUS_ACTIVE, now, now, ctx),
+        " context, root_dir) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (kind, object_name, STATUS_ACTIVE, now, now, ctx, root),
     )
     pid = cur.lastrowid
     for i, step in enumerate(STEPS):
@@ -119,6 +126,26 @@ def create(db, kind, object_name, context=None):
     return get(db, pid)
 
 
+def storage_dir(p):
+    # @args: p - project dict (with the root_dir the DB row carries)
+    # @return: Path to this project's container folder. The project's own
+    #          root_dir wins; a row without it falls back to the configured
+    #          projects_root and then to the legacy data dir location.
+    root = p.get("root_dir") or config.get("projects_root") or ""
+    return paths.project_dir(p["id"], p["object_name"], root=root)
+
+
+def set_root_dir(db, project_id, path):
+    # Re-homes a project's container folder. Only future exports follow the
+    # new root (project_files keep absolute paths, so history stays intact).
+    # @args: db - Database, project_id - int, path - new directory (absolute)
+    # @return: updated project dict, or None if not found
+    db.execute("UPDATE projects SET root_dir=?, updated=? WHERE id=?",
+               (str(path), _now(), project_id))
+    db.commit()
+    return get(db, project_id)
+
+
 def list_projects(db, status=None, kind=None, search=None, tags=None,
                   favorites_first=False, order="updated"):
     # @args: db - Database, status - active|done|archived or None for all,
@@ -129,7 +156,7 @@ def list_projects(db, status=None, kind=None, search=None, tags=None,
     #        order - "updated" | "created" | "name"
     # @return: list of project dicts (without steps/files)
     cols = ("id, kind, object_name, status, created, updated, context,"
-            " closed_at, outcome, tags, favorite")
+            " root_dir, closed_at, outcome, tags, favorite")
     where, params = [], []
     if status:
         where.append("status=?")
@@ -161,7 +188,8 @@ def get(db, project_id):
     # @return: project dict with steps and files, or None if not found
     row = db.execute(
         "SELECT id, kind, object_name, status, created, updated, context,"
-        " closed_at, outcome, tags, favorite FROM projects WHERE id=?",
+        " root_dir, closed_at, outcome, tags, favorite FROM projects"
+        " WHERE id=?",
         (project_id,),
     ).fetchone()
     if not row:

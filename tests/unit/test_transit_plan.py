@@ -206,6 +206,25 @@ def test_exotic_button_in_process_tab(window):
     assert any("EXOTIC" in t for t in texts)
 
 
+def test_step_tabs_do_not_grow_window(window):
+    # Regression: before the scroll-wrap, the transit plan page set the
+    # QTabWidget's minimum to the full content height, so the window grew
+    # off-screen and could not be resized back down.
+    _select(window, "WASP-991 b", _transit_ctx())
+    assert window.projects.tabs_steps.minimumSizeHint().height() < 700
+
+
+def test_transit_timeline_capped(window):
+    from nightscribe.gui.widgets.timeline_widget import TransitTimeline
+    from PySide6.QtWidgets import QScrollArea, QWidget
+    _select(window, "WASP-990 b", _transit_ctx())
+    plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
+    tl = plan.findChild(TransitTimeline)
+    assert tl is not None and tl.maximumHeight() == 220
+    areas = [c for c in plan.children() if isinstance(c, QScrollArea)]
+    assert len(areas) == 1
+
+
 def test_exotic_write_registers_the_file(window, monkeypatch, tmp_path):
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project

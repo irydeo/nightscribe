@@ -121,6 +121,25 @@ def test_step_tabs_hold_exactly_one_control_set_after_rebuilds(window):
     assert len(window._project_widgets) == PROJECT_WIDGETS
 
 
+def test_step_tabs_scroll_wrapped(window):
+    # Regression: the step pages used to dump their content straight into
+    # the page layout, so the tallest page set the QTabWidget minimum and
+    # the window grew off-screen. Every step page now holds exactly one
+    # resizable scroll area (horizontal off); group boxes clip their
+    # children so nothing paints outside the box.
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QScrollArea
+    _rebuild(window)
+    for name in ("tab_plan", "tab_process", "tab_publish"):
+        tab = _tab(window, name)
+        areas = [c for c in tab.children() if isinstance(c, QScrollArea)]
+        assert len(areas) == 1, f"{name}: expected one scroll area"
+        area = areas[0]
+        assert area.widgetResizable()
+        assert area.horizontalScrollBarPolicy() == \
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+
+
 def test_clickable_frame_swallows_stale_object():
     # The row's C++ object may be deleteLater'd while its click runs a modal
     # dialog (explore) from inside mousePressEvent; the Python wrapper then

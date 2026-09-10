@@ -37,3 +37,5 @@
 | [029](ADR-029-qt-view-widgets.md) | Cartas vectoriales en la GUI (QGraphics, sin matplotlib) / vector chart widgets (QGraphics, no matplotlib) |
 | [030](ADR-030-ccdciel-json-rpc.md) | Integración en vivo con CCDciel (JSON-RPC) / CCDciel live integration (JSON-RPC) |
 | [031](ADR-031-object-card-unification.md) | Ficha de objeto unificada: coords copiables, tabla multilínea y por tipo, «Discovered» en NEOs, filtro de apertura / unified object card: copyable coords, per-type multi-line table, NEO "Discovered", aperture gate |
+| [032](ADR-032-project-container-folder.md) | Carpeta contenedora de proyectos / project container folder |
+| [033](ADR-033-versioning-setuptools-scm.md) | Versionado automático con setuptools-scm / automatic versioning with setuptools-scm |

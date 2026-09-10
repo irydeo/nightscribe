@@ -119,13 +119,24 @@ def _settings_two_columns(dlg):
             v[k].setContentsMargins(0, 0, 0, 0)
             v[k].setSpacing(10)
         col_h = [0, 0]
+        col_w = [0, 0]
         for g in groups:
             k = 0 if col_h[0] <= col_h[1] else 1
             g.setParent(c[k])
             v[k].addWidget(g)
             col_h[k] += max(g.sizeHint().height(), 1)
+            # a group's natural width is the width at which its widest field
+            # row (label + field + button) fits; recording the max per column
+            # lets us floor it below so the wide rows are never squeezed.
+            col_w[k] = max(col_w[k], g.sizeHint().width())
         cols.addWidget(c[0])
         cols.addWidget(c[1])
+        # Floor each column's width at its content's natural width so the
+        # wide field rows are not clipped and the help labels wrap to fewer
+        # (non-overlapping) lines; equal stretch still lets the dialog grow
+        # and share the leftover space between the two.
+        c[0].setMinimumWidth(col_w[0])
+        c[1].setMinimumWidth(col_w[1])
         old.addLayout(cols)
 
 
@@ -484,22 +495,27 @@ class MainWindow(QMainWindow):
         # see ADR-028. The .ui carries structure + text; the 11 px dim
         # styling for the lblH_* labels is applied here so the .ui stays
         # tool-friendly and theme.py untouched.
-        # style every help-below-field label: 11 px, dim, single line.
-        # wordWrap is off by default; we pin to one line of height so the
-        # rows stay tight (the text fits at 720 px width).
+        # style every help-below-field label: 11 px, dim.
+        # The .ui sets wordWrap=true + top-aligned; the label wraps to the
+        # width of its group (~half the dialog after the two-column reflow)
+        # so long texts stay readable.
         from PySide6.QtWidgets import QLabel
-        from PySide6.QtGui import QFontMetrics
         for w in dlg.findChildren(QLabel):
-            n = w.objectName()
-            if n.startswith("lblH_"):
+            if w.objectName().startswith("lblH_"):
                 w.setStyleSheet("font-size: 11px; color: #8a90a6;")
-                w.setWordWrap(False)
-                w.setFixedHeight(QFontMetrics(w.font()).lineSpacing())
+                w.setWordWrap(True)
         # two-column grid per tab: stack the flat QGroupBox children
         # side by side (balanced by cumulative height) so the dialog
-        # stays short instead of a tall single stack.
+        # stays short instead of a tall single stack. Each column is
+        # floored at its content's natural width so wide groups (site,
+        # horizon, storage) keep their label+field+button rows unclipped.
         _settings_two_columns(dlg)
-        dlg.resize(720, dlg.sizeHint().height())
+        # fit the widest tab's two content-floored columns: the dialog's
+        # sizeHint grows with the column minimums, and each column is
+        # already floored at its groups' natural width so the label+field+
+        # button rows are never clipped and the help text wraps to a couple
+        # of non-overlapping lines.
+        dlg.resize(max(820, dlg.sizeHint().width()), dlg.sizeHint().height())
         dlg.edt_mpc_code.setText(config.get("mpc_code", ""))
         dlg.edt_obs_name.setText(config.get("observatory_name", ""))
         dlg.spn_lat.setValue(float(config.get("lat", 0)))
@@ -1822,6 +1838,24 @@ class MainWindow(QMainWindow):
             elif item.layout() is not None:
                 self._wipe_layout(item.layout())
 
+    def _step_tab_layout(self, name):
+        # @args: name - the step tab page objectName ("tab_plan", ...)
+        # @return: the inner QVBoxLayout of a fresh QScrollArea docked into the
+        #          page. Keeps every step page scrollable (same pattern as
+        #          tab_details): the window minimum stops growing with the
+        #          tallest page and content scrolls instead of overflowing or
+        #          painting over its neighbours on shrink.
+        tab = self.projects.tabs_steps.findChild(QWidget, name)
+        area = QScrollArea()
+        area.setWidgetResizable(True)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        inner = QWidget()
+        block = QVBoxLayout(inner)
+        area.setWidget(inner)
+        tab.layout().addWidget(area)
+        return block
+
     def _clear_step_tabs(self):
         # Remove all dynamic content from step tabs. A wipe that only checked
         # item.widget() left the widgets inside nested addLayout rows (the
@@ -1872,8 +1906,7 @@ class MainWindow(QMainWindow):
         # Plan & Captura (ADR-030): the session plan (frames/exposure/filter),
         # the calibration frames, the CCDciel/NINA/CSV export and the NEO
         # ephemeris export all live in this single step.
-        tab = self.projects.tabs_steps.findChild(QWidget, "tab_plan")
-        layout = tab.layout()
+        layout = self._step_tab_layout("tab_plan")
         # common: capture plan inputs
         layout.addWidget(QLabel(self.tr("Capture plan")))
         form = QFrame()
@@ -2486,8 +2519,7 @@ class MainWindow(QMainWindow):
                 self.tr("Capture started in CCDciel."), 5000)
 
     def _build_process_tab(self, p, kind, ctx):
-        tab = self.projects.tabs_steps.findChild(QWidget, "tab_process")
-        layout = tab.layout()
+        layout = self._step_tab_layout("tab_process")
         if kind in ("neo", "pccp"):
             # MPC report: paste + validate + save
             layout.addWidget(QLabel(
@@ -2806,6 +2838,9 @@ class MainWindow(QMainWindow):
                 ctx["ra_deg"], ctx["dec_deg"], config, dur, date=date
             ).get("safe_window")
         timeline = TransitTimeline()
+        # keep the night-view compact on very tall windows (the scene
+        # letterboxes inside the widget, so a hard cap costs nothing)
+        timeline.setMaximumHeight(220)
         timeline.set_data(
             dusk=win[0] if win else None, dawn=win[1] if win else None,
             safe=safe, capture_start=dts["capture_start"],
@@ -2976,8 +3011,7 @@ class MainWindow(QMainWindow):
                     "environment"), 10000)
 
     def _build_publish_tab(self, p, kind, ctx):
-        tab = self.projects.tabs_steps.findChild(QWidget, "tab_publish")
-        layout = tab.layout()
+        layout = self._step_tab_layout("tab_publish")
         btn = QPushButton(self.tr("Generate post…"))
         btn.clicked.connect(self._project_post)
         layout.addWidget(btn)
@@ -2992,8 +3026,7 @@ class MainWindow(QMainWindow):
         # cadence reminder ("última visita hace N noches"). All CRUD goes
         # through core/followup.py; FITS metadata through core/fits_meta.py.
         from ..core import followup as fu
-        tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
-        layout = tab.layout()
+        layout = self._step_tab_layout("tab_followup")
         pid = p["id"]
 
         # cadence reminder (T9): "hace N noches que no la visitas"

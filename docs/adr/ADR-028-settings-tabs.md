@@ -14,17 +14,26 @@
 >    NEOfixer, Astrometry y el bot TNS — misma naturaleza (una integración
 >    externa con credenciales opcionales o endpoint configurable). Así el
 >    diálogo sigue en **tres** pestañas.
-> 3. **Ayuda por grupo**: cada `QGroupBox` del diálogo lleva un
->    `QToolButton` «?» (20×20, auto-raise) anclado a la esquina superior
->    derecha. Al pulsarlo se despliega una `QLabel` (word-wrap,
->    `C_TEXT_DIM`) dentro de la misma caja, debajo de los campos, con una
->    línea por campo ("• Campo — qué hace"); al volver a pulsar (el botón
->    muestra «×») se cierra. Los textos del cuerpo pasan por `self.tr()`
->    en `main_window.py` (contexto MainWindow, ES/EN vía
->    `lupdate`/`lrelease`); NO están en el `.ui` para no duplicar
->    `objectName` ni romper la regla "código inglés, doc en `docs/`".
->    El `eventFilter` de `MainWindow` reancla el botón en
->    `QEvent.Resize` para que no se despegue en pantallas grandes.
+> 3. **Ayuda por campo, por debajo del campo**: cada campo con ayuda
+>    (lat/lon, apertura, magnitud límite, pixel, .hrz, `min_alt`,
+>    `best_pk`, filtro de telescopio ExoClock, directorio de proyectos,
+>    aviso de Luna, auto-connect CCDciel, clave NEOfixer) lleva una
+>    `QLabel` `lblH_*` **debajo** del propio widget, dentro de una fila
+>    `QHBoxLayout` (etiqueta + campo + botón opcional). El estilo —
+>    11 px, color `#8a90a6` (`C_TEXT_DIM`), `wordWrap` activado — se
+>    aplica en `on_open_settings`; los textos viven en el `.ui` y pasan
+>    por `self.tr()` (ES/EN vía `lupdate`/`lrelease`).
+> 4. **Dos columnas por pestaña**: `_settings_two_columns(dlg)`
+>    (`main_window.py`) re-fluye los `QGroupBox` de cada página del
+>    `QTabWidget` en **dos columnas** lado a lado (un `QHBoxLayout` anidado
+>    con dos `QWidget` + `QVBoxLayout`), balanceando por altura acumulada.
+>    Cada columna se fija en su **ancho natural** (el mayor `sizeHint().width()`
+>    de sus cajas) para que las filas anchas —etiqueta mín. 150 px + campo +
+>    botón «Resolve coordinates»— nunca queden recortadas horizontalmente ni
+>    la ayuda de uno o dos renglones se amontone verticalmente. El
+>    `.ui` sigue siendo una sola columna plana (amigable con Qt Designer);
+>    solo la altura visual cambia aquí. El diálogo se ajusta a
+>    `max(820, sizeHint().width()) × sizeHint().height()`.
 >
 > **Actualización (2026-09-04)**: la pestaña **Charts** (`tab_charts` /
 > `chart_zoom`) se ha eliminado — la opción de resolución "re-scale vs.
@@ -115,6 +124,40 @@ una pestaña por cada ajuste futuro — si el diálogo vuelve a crecer,
 se añade una pestaña nueva con el mismo criterio (tarea del usuario).
 
 ## English
+
+**Status / Estado**: Accepted (updated 2026-09-10)
+
+> **Update (2026-09-10)**: three changes on top of this ADR.
+>
+> 1. **Observing content**: tab 2 now carries `grp_kinds` (the kinds
+>    whitelist for Tonight/Explore + `spn_best_pk`, "how many per kind")
+>    and `grp_transits` (the ExoClock aperture filter — "hide transits
+>    that would need a bigger telescope").
+> 2. **CCDciel has no tab of its own** (ADR-030): `grp_ccdciel`
+>    (host/port/auto-connect) lives inside **Integrations**, next to
+>    NEOfixer, Astrometry and the TNS bot — same nature (external
+>    integrations with optional credentials or a configurable endpoint).
+>    The dialog stays at **three** tabs.
+> 3. **Per-field help, below the field**: every field that has help
+>    (lat/lon, aperture, limit magnitude, pixel, .hrz, `min_alt`,
+>    `best_pk`, the ExoClock scope filter, the projects directory, the
+>    moon warning, the CCDciel auto-connect, the NEOfixer key) carries a
+>    `QLabel` `lblH_*` **under** its own widget, inside a `QHBoxLayout`
+>    row (label + field + optional button). The styling — 11 px,
+>    `#8a90a6` (`C_TEXT_DIM`), `wordWrap` on — is applied in
+>    `on_open_settings`; the texts live in the `.ui` and pass through
+>    `self.tr()` (ES/EN via `lupdate`/`lrelease`).
+> 4. **Two columns per tab**: `_settings_two_columns(dlg)`
+>    (`main_window.py`) re-flows each `QTabWidget` page's `QGroupBox`
+>    children into **two columns** side by side (a nested `QHBoxLayout`
+>    with two `QWidget` + `QVBoxLayout`), balanced by cumulative height.
+>    Each column is floored at its **natural width** (the largest
+>    `sizeHint().width()` among its groups) so wide rows — 150 px label +
+>    field + the «Resolve coordinates» button — are never clipped
+>    horizontally and 1–2-line help texts never crowd vertically. The
+>    `.ui` stays a single flat column (Qt-Designer friendly); only the
+>    visual height changes here. The dialog is sized to
+>    `max(820, sizeHint().width()) × sizeHint().height()`.
 
 **Context**: the Settings dialog was a single column of stacked
 `QGroupBox`es (Site, Equipment, Camera, Horizon+Moon+Session, Charts,

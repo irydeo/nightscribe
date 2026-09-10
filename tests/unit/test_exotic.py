@@ -51,8 +51,8 @@ def _d():
             "pl_orbper": 3.2745, "pl_radj": 1.5, "st_rad": 1.2,
             "pl_orbsmax": 0.05, "pl_orbincl": 87.5, "pl_orbeccen": None,
             "pl_tranmid": 2459123.456789, "st_teff": 6100.0,
-            "st_metfe": -0.12, "st_logg": 4.31, "sy_dist": 289.5,
-            "sy_pmra": -9.8, "sy_pmdec": 3.5}
+            "st_met": -0.12, "st_metratio": "[Fe/H]", "st_logg": 4.31,
+            "sy_dist": 289.5, "sy_pmra": -9.8, "sy_pmdec": 3.5}
 
 
 # ---------------- structure ----------------
@@ -127,6 +127,12 @@ def test_planetary_parameter_conversions():
     assert pp["Orbital Eccentricity (0 if null)"] == 0
     assert pp["Star Effective Temperature (K)"] == 6100.0
     assert pp["Star Metallicity ([FE/H])"] == -0.12
+    # the legacy st_metfe key is honoured as a fallback (pscomppars uses
+    # st_met — verified 2026-09-10)
+    d2 = _d()
+    d2["st_metfe"] = d2.pop("st_met")
+    pp2 = exotic.make_inits(_ctx(), d2, _Cfg())["planetary_parameters"]
+    assert pp2["Star Metallicity ([FE/H])"] == -0.12
     assert pp["Star Surface Gravity (log(g))"] == 4.31
     assert pp["Star Distance (pc)"] == 289.5
     # the published mid-transit comes from pl_tranmid (not the fallback)

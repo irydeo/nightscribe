@@ -25,9 +25,11 @@ URL = "https://exoplanetarchive.ipac.caltech.edu/TAP/sync"
 _FIELDS = ("pl_name,hostname,pl_orbper,pl_radj,pl_bmassj,pl_eqt,sy_dist,"
            "st_teff,st_rad,disc_year,discoverymethod,ra,dec,"
            # Track D (EXOTIC handoff): orbital geometry, the published
-           # mid-transit time and the stellar context the inits.json wants
-           "pl_orbincl,pl_orbeccen,st_logg,st_metfe,pl_orbsmax,pl_tranmid,"
-           "sy_pmra,sy_pmdec")
+           # mid-transit time and the stellar context the inits.json wants.
+           # NB: pscomppars metallicity is st_met (+st_metratio="[Fe/H]") —
+           # st_metfe does NOT exist in this table (verified 2026-09-10).
+           "pl_orbincl,pl_orbeccen,st_logg,st_met,st_metratio,pl_orbsmax,"
+           "pl_tranmid,sy_pmra,sy_pmdec")
 
 # Cache namespace bump (Track D): rows cached before the _FIELDS extension
 # lack the new columns, so they must not be served under the old key.

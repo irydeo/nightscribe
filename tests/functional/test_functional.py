@@ -888,8 +888,8 @@ def test_gui_boots_offscreen():
     # table starts collapsed (progressive disclosure)
     assert not w.tonight.grp_list.isVisible()
     # projects step tabs: Details (the object card) + 3 steps (capture ->
-    # plan, ADR-030)
-    assert w.projects.tabs_steps.count() == 4
+    # plan, ADR-030) + Follow-up (Track B, visible for SN projects only)
+    assert w.projects.tabs_steps.count() == 5
     assert w.projects.tabs_steps.tabText(0) == "Details"
     # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]

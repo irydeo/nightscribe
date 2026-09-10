@@ -732,3 +732,24 @@ v2; monitor de flujo en vivo sobre `core/series.py` (horizonte: variables de
 corto periodo, condición *tremendamente simple*); lanzar EXOTIC como
 subproceso; validación del `MandatoryStartTime` y del `inits.json` contra el
 software real del observatorio (pendiente de una corrida del usuario).
+
+### 7terdecies. Carpeta contenedora de proyectos (2026-09-10, ADR-032)
+
+Sin `docs/PLANS/` propio: salto corto decidido en ADR-032. Todo lo que
+genera un proyecto (plan, secuencias, FITS, post, gráficos) caía en
+`data_dir()/projects/<id>-<slug>` (fijo de `platformdirs`): el usuario no
+sabía dónde acababan sus ficheros ni podía llevárselos a su disco de
+trabajo. Se da control sobre la **carpeta contenedora**: raíz global
+configurable y, si hace falta, carpeta distinta por proyecto.
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| P1 | Migración `user_version 6`: `root_dir` en `projects` + backfill a la ruta heredada; `config.projects_root`; `paths.project_dir(root=)` sigue puro; `project.storage_dir()` (root del proyecto → config → defecto), `set_root_dir()` y `create` congela la raíz; tests `test_project_storage.py` | **Hecho** |
+| P2 | 9 call sites de `main_window.py` escribiendo vía `project.storage_dir()` + CLI `project show` imprime `folder:` | **Hecho** |
+| P3 | Ajustes > Observación: grupo «Projects folder» (Browse/Reset de `projects_root`) + botón «Change folder…» en el hub (re-ubica solo exportaciones futuras, v1 no mueve ficheros); tests `test_settings_storage.py` + ampliados | **Hecho** |
+| P4 | Cierre: i18n ES/EN (598 cadenas, 11 nuevas), lrelease, ADR-032, esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (**895**). **Comportamiento**: el cambio de
+raíz global solo afecta a **proyectos nuevos**; los heredados conservan su
+carpeta exacta congelada en `root_dir`; el botón del hub re-ubica únicamente
+lo que se escriba a partir de entonces.

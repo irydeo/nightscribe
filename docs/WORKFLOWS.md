@@ -556,3 +556,29 @@ iteration**: `SolarTracking`/`UpdateCoord=True` in the `.targets` and
 non-sidereal rates via JSON-RPC (they need validation against the real
 CCDciel); the per-exposure no-trail cap (`max_exposure_no_trail` +
 `rate_arcsec_min`) already protects the frames.
+
+### 7terdecies. Project container folder (2026-09-10, ADR-032)
+
+*Note: this English file is behind the Spanish master (`WORKFLOWS.es.md`),
+which already carries the *7nonies*…*7duodecies* sections (Tracks A–D). The
+chunk below matches the ADR-032 slice; a backfill of the missing English
+sections is pending.*
+
+No dedicated `docs/PLANS/` file: a short jump decided in ADR-032. Everything
+a project produces (plan, sequences, FITS, posts, charts) fell under
+`data_dir()/projects/<id>-<slug>` (fixed, `platformdirs`): the user neither
+knew where the files ended up nor could point them at their working disk.
+Give control of the **container folder**: a configurable global root and, when
+needed, a per-project folder.
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| P1 | `user_version` 6 migration: `root_dir` in `projects` + backfill to the legacy path; `config.projects_root`; `paths.project_dir(root=)` stays pure; `project.storage_dir()` (project root → config → default), `set_root_dir()`, and `create` freezes the root; tests `test_project_storage.py` | **Done** |
+| P2 | All 9 `main_window.py` call sites write through `project.storage_dir()`; CLI `project show` prints `folder:` | **Done** |
+| P3 | Settings > Observing: "Projects folder" group (browse/reset of `projects_root`) + a "Change folder…" hub button (re-homes future exports only, v1 never moves files); tests `test_settings_storage.py` + extended | **Done** |
+| P4 | Closure: ES/EN i18n (598 strings, 11 new), lrelease, ADR-032, this section | **Done** |
+
+**Status**: full unit suite green (**895**). **Behaviour**: the global root
+change only affects **new projects**; legacy ones keep their exact folder
+frozen in `root_dir`; the hub button only re-homes what is written from then
+on.

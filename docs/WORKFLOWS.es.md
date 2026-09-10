@@ -666,3 +666,39 @@ iteración**: fotometría absoluta propia (términos de color), sustración de g
 
 *(Restaurada 2026-09-10: esta sección se perdió al resolver el merge
 `50cd6c9` — se recupera verbatim de `d0686e4`.)*
+
+### 7undecies. Track C — NEO/cometa: consistencia con el resto de flujos (2026-09-10)
+
+Plan: `docs/PLANS/neo-consistency.md` (hijo C de
+`docs/PLANS/project-concept-v2.md`). Rama `feature/neo-consistency`.
+
+El flujo NEO/cometa ya era suficiente funcionalmente; este track lo hace
+**consistente** con lo que ganaron las supernovas en el track B: el paso
+Process registra **lo que el observador realmente conserva** de la sesión
+(los FITS con metadatos auto-leídos, las imágenes anotadas de Tycho y el
+reporte MPC — este último ya se registraba) y ofrece la **animación de
+movimiento** como *prueba de fuego*: frames alineados a las estrellas
+(afín por WCS), recorte que **sigue la posición predicha** en el DATE-OBS
+de cada frame (`ephemeris.position_at`), marcador sobre la predicción y
+caption con fecha/hora, tasa/PA previstos y **fuente de efeméride**
+(obligatoria: la prueba solo vale lo que vale la efeméride). Si un punto
+permanece bajo el marcador mientras las estrellas derivan, es *ese* objeto.
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| C0 | Análisis documentado + bloque «Session products» en Process (neo/pccp/comet): registro multi-FITS (metadatos vía `fits_meta`), imágenes anotadas (`kind='image'`), persistencia en `project_steps.data` + `project_files` | **Hecho** |
+| C1 | `viz/motion_view.py`: animación GIF/MP4 siguiendo la posición predicha (alineación estelar por afín WCS, caption con tasa/PA/fuente, salto de frames sin WCS/fecha/efeméride) + botón en Process con zoom configurable | **Hecho** |
+| C2 | **Sin cambios** (C0 no levantó huecos); cierre: i18n ES/EN (545 cadenas, 59 nuevas — incluidas las pendientes del cableado B5/B6/B10), cadenas fuente del widget de curva de luz corregidas a inglés, esta sección | **Hecho** |
+
+**Extra no previsto**: el test «afín correcto» de C1 destapó un bug latente
+de B6 — `_compute_affine` devolvía la transformación frame→referencia, pero
+PIL `Image.transform(AFFINE)` muestrea output→input: la deformación era la
+**inversa** (invisible con WCS casi idénticos, incorrecta con campos
+desplazados/rotados). Corregido muestreando en espacio de referencia y
+verificado con una estrella a posición de cielo fija bajo traslación y
+rotación. La animación de evolución SN (B6) sale igualmente beneficiada.
+
+**Estado**: suite unitaria verde (824). **Fuera de alcance** (del plan):
+curva de luz de asteroides (v2 si el motor de series madura), rediseño del
+flujo de medida MPC (ya validado, ADR-022), secuencias multi-filtro en el
+plan NEO (la capacidad de B8 queda disponible).

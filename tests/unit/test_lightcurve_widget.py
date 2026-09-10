@@ -133,7 +133,8 @@ def test_widget_survey_point_style():
 
 
 def test_widget_legend_suffixes():
-    # legend rows carry the "indicativo" / "catálogo" suffixes
+    # legend rows carry the "indicative" / "catalog" suffixes (English
+    # source strings — no .qm loaded in the test env, tr() passes through)
     pts = [
         {"mjd": 60600.0, "mag": 16.0, "err": 0.02, "filter": "Clear",
          "source": "survey:atlas"},
@@ -143,8 +144,8 @@ def test_widget_legend_suffixes():
     chart = LightCurveChart()
     chart.set_data(pts)
     texts = _legend_texts(chart)
-    assert any("catálogo" in t for t in texts)
-    assert any("indicativo" in t for t in texts)
+    assert any("catalog" in t for t in texts)
+    assert any("indicative" in t for t in texts)
     # a manual-only set has no suffix at all
     chart2 = LightCurveChart()
     chart2.set_data([dict(pts[0], source="manual")])

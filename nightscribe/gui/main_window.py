@@ -451,6 +451,12 @@ class MainWindow(QMainWindow):
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
+        # Track D (EXOTIC handoff): AAVSO code, camera type and binning
+        dlg.edt_aavso_code.setText(config.get("aavso_code", ""))
+        dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
+        dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
+        dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
+        dlg.cmb_binning.setCurrentText(config.get("pixel_binning", "1x1"))
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
         dlg.spn_horizon_margin.setValue(
             float(config.get("horizon_margin_deg", 0)))
@@ -508,6 +514,10 @@ class MainWindow(QMainWindow):
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
+        config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())
+        config.set("camera_type", dlg.cmb_camera_type.currentText())
+        config.set("pixel_binning", dlg.cmb_binning.currentText().strip()
+                   or "1x1")
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
         config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
@@ -1792,6 +1802,11 @@ class MainWindow(QMainWindow):
                     f"{scale:.2f}″/px · {self.tr('rate')}: "
                     f"{ctx['rate_arcsec_min']:.1f}″/min</small>"))
                 spn_exp.setValue(min(t_max, 60.0))
+        # Track D: first-timer transit block (timeline, times, exposure,
+        # cadence, pre-flight checklist). Placed before the plan restore so
+        # a saved plan still overrides the heuristic exposure.
+        if kind == "transit" and (ctx.get("transit") or {}):
+            self._build_transit_block(layout, p, ctx, spn_exp)
         # restore saved plan data
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -2420,6 +2435,26 @@ class MainWindow(QMainWindow):
                 f"<small>{self.tr('Pre-filled with')} {p['object_name']} "
                 f"@ {ctx.get('ra_deg', 0):.4f}, {ctx.get('dec_deg', 0):+.4f}"
                 f"</small>"))
+        elif kind == "transit":
+            # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
+            # NASA/JPL); NightScribe hands over a pre-filled inits.json and
+            # then guides the closing of the scientific loop.
+            layout.addWidget(QLabel(self.tr(
+                "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
+                "Python ≤3.10 environment.")))
+            btn_exotic = QPushButton(
+                self.tr("Export to EXOTIC (inits.json)…"))
+            btn_exotic.setToolTip(self.tr(
+                "Pre-filled EXOTIC initialization file: planet, observatory, "
+                "camera and filter — EXOTIC skips its wizard where it can"))
+            btn_exotic.clicked.connect(self._transit_export_exotic)
+            layout.addWidget(btn_exotic)
+            lbl_exotic = QLabel(self.tr(
+                "After the reduction, upload EXOTIC's output file to "
+                "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
+                "Database — and tell the story in the Publish step."))
+            lbl_exotic.setWordWrap(True)
+            layout.addWidget(lbl_exotic)
         else:
             layout.addWidget(QLabel(
                 self.tr("Process your images with your usual software.")))
@@ -2622,6 +2657,219 @@ class MainWindow(QMainWindow):
         self._populate_project_files(p["id"])
         self.statusBar().showMessage(
             self.tr("Registered {} file(s)").format(len(entries)), 5000)
+
+    def _build_transit_block(self, layout, p, ctx, spn_exp):
+        # Track D (subplan 2): the transit capture block, written for the
+        # observer who has NEVER captured one ("que cualquiera se atreva"):
+        # a visual timeline of the night, the five key times (UTC + local),
+        # the heuristic exposure preselected, the cadence check with the
+        # overhead made explicit, and a persistent pre-flight checklist.
+        # @args: layout - plan tab layout, p - project dict, ctx - project
+        #        context (carries the "transit" event snapshot), spn_exp -
+        #        the capture-plan exposure spin (preselected here)
+        from ..core import coords, planner
+        from .widgets.timeline_widget import TransitTimeline
+        tr = ctx.get("transit") or {}
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        grp = QGroupBox(self.tr("Transit capture plan"))
+        gl = QVBoxLayout(grp)
+
+        def _as_dt(v):
+            # the context crosses the db as JSON: times come back as ISO
+            # strings; accept datetimes too (fresh planner snapshots)
+            if isinstance(v, datetime.datetime):
+                return v
+            if isinstance(v, str):
+                try:
+                    return datetime.datetime.fromisoformat(v)
+                except ValueError:
+                    return None
+            return None
+
+        dts = {k: _as_dt(tr.get(k)) for k in
+               ("ingress", "mid", "egress", "capture_start", "capture_end")}
+        # --- visual timeline: capture window vs darkness vs horizon -------
+        date = (dts["mid"] or datetime.datetime.now(
+            datetime.timezone.utc)).date()
+        win = coords.tonight_window(config.get("lat"), config.get("lon"),
+                                    date)
+        safe = None
+        if ctx.get("ra_deg") is not None and dts["capture_start"] \
+                and dts["capture_end"]:
+            dur = (dts["capture_end"] - dts["capture_start"]).total_seconds()
+            safe = planner.safe_window_for(
+                ctx["ra_deg"], ctx["dec_deg"], config, dur, date=date
+            ).get("safe_window")
+        timeline = TransitTimeline()
+        timeline.set_data(
+            dusk=win[0] if win else None, dawn=win[1] if win else None,
+            safe=safe, capture_start=dts["capture_start"],
+            capture_end=dts["capture_end"], ingress=dts["ingress"],
+            mid=dts["mid"], egress=dts["egress"])
+        gl.addWidget(timeline)
+        # --- the five key times, UTC + local -------------------------------
+        def _hm(dt):
+            return dt.strftime("%H:%M") if dt else "—"
+
+        def _hm_local(dt):
+            return dt.astimezone().strftime("%H:%M") if dt else "—"
+
+        if dts["capture_start"] and dts["capture_end"]:
+            lbl_times = QLabel(self.tr(
+                "Capture (with baselines): {cs} → {ce} UTC  ·  "
+                "({cs_l} → {ce_l} local)\n"
+                "Ingress {i} · Mid {m} · Egress {e} UTC"
+            ).format(cs=_hm(dts["capture_start"]), ce=_hm(dts["capture_end"]),
+                     cs_l=_hm_local(dts["capture_start"]),
+                     ce_l=_hm_local(dts["capture_end"]),
+                     i=_hm(dts["ingress"]), m=_hm(dts["mid"]),
+                     e=_hm(dts["egress"])))
+            lbl_times.setWordWrap(True)
+            gl.addWidget(lbl_times)
+            self._project_widgets["transit_times"] = lbl_times
+        if tr.get("baseline_fits") is False:
+            lbl_warn = QLabel(self.tr(
+                "⚠ The out-of-transit baseline does not fit in your night "
+                "— the light curve will lack a comparison level"))
+            lbl_warn.setWordWrap(True)
+            lbl_warn.setStyleSheet("color: #e0c060;")
+            gl.addWidget(lbl_warn)
+            self._project_widgets["transit_baseline_warn"] = lbl_warn
+        # --- heuristic exposure (guide, not a promise) ---------------------
+        exp_rec = tr.get("exp_recommended_s")
+        if exp_rec:
+            lbl_exp = QLabel(
+                f"<small>{self.tr('Recommended exposure')}: {exp_rec} s · "
+                f"{self.tr('honest guide — confirm with a test shot (peak below saturation)')}"
+                f"</small>")
+            lbl_exp.setWordWrap(True)
+            gl.addWidget(lbl_exp)
+            spn_exp.setValue(float(exp_rec))
+        # --- cadence: resolve the ingress, overhead made explicit ----------
+        cad_max = tr.get("cadence_max_s")
+        if cad_max:
+            lbl_cad = QLabel()
+            gl.addWidget(lbl_cad)
+            self._project_widgets["transit_cadence"] = lbl_cad
+
+            def _refresh_cadence():
+                overhead = float(config.get("overhead_s", 15.0))
+                exp = spn_exp.value()
+                per = exp + overhead
+                txt = self.tr(
+                    "Max cadence to resolve the ingress: {cad:.0f} s · "
+                    "{exp:.0f} s + {ov:.0f} s pause → one point every "
+                    "{per:.0f} s").format(cad=float(cad_max), exp=exp,
+                                          ov=overhead, per=per)
+                if per > float(cad_max):
+                    txt += "  " + self.tr(
+                        "⚠ slower than the ingress — shorten the exposure")
+                    lbl_cad.setStyleSheet("color: #e0c060;")
+                else:
+                    lbl_cad.setStyleSheet("")
+                lbl_cad.setText(txt)
+
+            spn_exp.valueChanged.connect(lambda _v: _refresh_cadence())
+            _refresh_cadence()
+        # --- altitude / Moon context line ----------------------------------
+        bits = []
+        if ctx.get("max_alt") is not None:
+            bits.append(self.tr("Max altitude: {:.0f}°")
+                        .format(float(ctx["max_alt"])))
+        moon = suggest.moon_info(
+            {"ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),
+             "max_time": ctx.get("max_time")}, config)
+        if moon:
+            bits.append(self.tr("Moon: {:.0f}% at {:.0f}°").format(
+                moon["illum"] * 100, moon["sep_deg"])
+                + (" ⚠" if moon["warning"] else ""))
+        if bits:
+            lbl_ctx = QLabel(" · ".join(bits))
+            gl.addWidget(lbl_ctx)
+        # --- pre-flight checklist (persistent) ------------------------------
+        gl.addWidget(QLabel(self.tr("Pre-flight checklist")))
+        saved = plan_data.get("checklist") or []
+        items = [
+            self.tr("Test shot: the star's peak stays below saturation "
+                    "(~50-70% of the detector range)"),
+            self.tr("Small, constant defocus (spread the light over more "
+                    "pixels; do not refocus mid-run)"),
+            self.tr("Comparison star in the FOV: similar brightness and "
+                    "colour, not variable"),
+            self.tr("Session flats with the light filter (+ darks/bias as "
+                    "usual)"),
+            self.tr("Broad-band L/R filter, the same one you will report "
+                    "(ExoClock logs the filter)"),
+        ]
+        cbs = []
+        for i, text in enumerate(items):
+            cb = QCheckBox(text)
+            cb.setChecked(bool(saved[i]) if i < len(saved) else False)
+            cb.stateChanged.connect(
+                lambda _s, pid=p["id"]: self._transit_checklist_save(pid))
+            gl.addWidget(cb)
+            cbs.append(cb)
+        self._project_widgets["transit_checklist"] = cbs
+        layout.addWidget(grp)
+
+    def _transit_checklist_save(self, pid):
+        # Persists the pre-flight checklist into the plan step data, so the
+        # ticks survive a project switch / an app restart.
+        cbs = self._project_widgets.get("transit_checklist") or []
+        if cbs:
+            project.update_step_data(
+                db, pid, "plan",
+                {"checklist": [bool(cb.isChecked()) for cb in cbs]})
+
+    def _transit_export_exotic(self):
+        # 4d: enrich the planet (worker — the GUI never blocks on the
+        # network; the Archive row is cached from the Details tab anyway),
+        # then write the pre-filled inits.json next to a user-chosen path.
+        p = self._current_project
+        if not p:
+            return
+        from .workers import ExploreWorker
+        self.statusBar().showMessage(
+            self.tr("Gathering planet data for EXOTIC…"), 4000)
+        worker = ExploreWorker(config, p["object_name"],
+                               fallback_target=p.get("context") or {})
+        worker.finished.connect(lambda e: self._exotic_write(p["id"], e))
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_write(self, pid, e):
+        # @args: pid - project id, e - enrich result ({} on failure)
+        from ..core import exotic
+        p = project.get(db, pid)
+        if not p:
+            return
+        if not e or not e.get("data"):
+            self.statusBar().showMessage(
+                self.tr("No planet data — check the name and retry"), 8000)
+            return
+        ctx = p.get("context") or {}
+        # the capture plan (filter/exposure) saved in the plan step feeds
+        # the filter name and the exposure time of the handoff file
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        plan = {"filter": plan_data.get("filter", "L"),
+                "exp_s": plan_data.get("exp_s")}
+        outdir = paths.project_dir(pid, p["object_name"])
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export EXOTIC inits.json"),
+            str(outdir / exotic.suggested_name()),
+            "JSON (*.json);;All files (*)")
+        if not out:
+            return
+        inits = exotic.make_inits(ctx, e["data"], config, plan=plan,
+                                  out_dir=str(Path(out).parent))
+        path = exotic.export_inits(inits, out)
+        project.add_file(db, pid, path, "exotic_inits")
+        self._populate_project_files(pid)
+        self.statusBar().showMessage(
+            self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
+                    "environment"), 10000)
 
     def _build_publish_tab(self, p, kind, ctx):
         tab = self.projects.tabs_steps.findChild(QWidget, "tab_publish")
@@ -3428,6 +3676,11 @@ class MainWindow(QMainWindow):
         target = {"name": self._current_project["object_name"],
                   "ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),
                   "safe_window": ctx.get("safe_window")}
+        # Track D: a transit exports its capture window (baseline included)
+        if self._current_project["kind"] == "transit":
+            tr = ctx.get("transit") or {}
+            target["capture_start"] = tr.get("capture_start")
+            target["capture_end"] = tr.get("capture_end")
         fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
         ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
@@ -3442,8 +3695,15 @@ class MainWindow(QMainWindow):
         try:
             path = sequence.export(target, plan, out, fmt=fmt)
             project.add_file(db, self._current_project["id"], path, "sequence")
-            self.statusBar().showMessage(
-                self.tr("Written to %1").replace("%1", path), 8000)
+            msg = self.tr("Written to %1").replace("%1", path)
+            if fmt == "ccdciel" \
+                    and self._current_project["kind"] == "transit":
+                # Track D: MandatoryStartTime is best-effort until checked
+                # against the observatory's real CCDciel (ADR-021)
+                msg += " · " + self.tr(
+                    "transit start written as mandatory — validate once "
+                    "against your CCDciel")
+            self.statusBar().showMessage(msg, 8000)
         except OSError as err:
             self.statusBar().showMessage(
                 self.tr("Export failed: %1").replace("%1", str(err)), 8000)

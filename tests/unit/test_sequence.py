@@ -206,3 +206,92 @@ def test_deg_to_dms():
     assert sign == -1
     assert d == 30
     assert m == 30
+
+
+# ---------------- Track D: transit capture window ----------------
+
+def _transit_target():
+    # A transit target carrying the recommended capture window (baseline +
+    # transit + baseline) as ISO strings — how the project context hands it
+    # over after the JSON round-trip.
+    t = _target()
+    t["name"] = "WASP-999 b"
+    t["capture_start"] = "2026-08-21T22:50:00+00:00"
+    t["capture_end"] = "2026-08-22T01:50:00+00:00"
+    return t
+
+
+def test_ccdciel_transit_window_is_mandatory(tmp_path):
+    # The transit capture window writes StartTime/EndTime with a mandatory
+    # start and StartRise off (the pre-ingress baseline cannot wait for
+    # the rise).
+    t = _transit_target()
+    out = sequence.export_ccdciel(t, sequence.make_plan(4, 60.0, "L"),
+                                  tmp_path / "seq.targets")
+    tgt = _parse_targets(out).getroot().find("Targets/Target1")
+    assert tgt.get("StartTime") == "22:50:00"
+    assert tgt.get("EndTime") == "01:50:00"
+    assert tgt.get("MandatoryStartTime") == "True"
+    assert tgt.get("StartRise") == "False"
+
+
+def test_ccdciel_safe_window_stays_soft(tmp_path):
+    # The pre-existing safe-window path is untouched: informative times,
+    # rise/set still on, start NOT mandatory.
+    t = _target()
+    t["safe_window"] = "2026-09-06T16:52:02+00:00|2026-09-07T12:53:15+00:00"
+    out = sequence.export_ccdciel(t, sequence.make_plan(1, 10.0, "L"),
+                                  tmp_path / "seq.targets")
+    tgt = _parse_targets(out).getroot().find("Targets/Target1")
+    assert tgt.get("StartTime") == "16:52:02"
+    assert tgt.get("StartRise") == "True"
+    assert tgt.get("MandatoryStartTime") == "False"
+
+
+def test_nina_transit_window_metadata(tmp_path):
+    t = _transit_target()
+    out = sequence.export_nina(t, sequence.make_plan(2, 60.0, "L"),
+                               tmp_path / "seq.json")
+    data = json.loads(open(out, encoding="utf-8").read())
+    assert data["Metadata"]["StartTime"] == "2026-08-21T22:50:00+00:00"
+    assert data["Metadata"]["EndTime"] == "2026-08-22T01:50:00+00:00"
+
+
+def test_nina_without_window_has_no_times(tmp_path):
+    out = sequence.export_nina(_target(), sequence.make_plan(1, 60.0, "L"),
+                               tmp_path / "seq.json")
+    data = json.loads(open(out, encoding="utf-8").read())
+    assert "StartTime" not in data["Metadata"]
+
+
+def test_csv_start_time_per_frame(tmp_path):
+    # 3 frames x (60 s + 15 s overhead) from the capture start
+    t = _transit_target()
+    out = sequence.export_csv(t, sequence.make_plan(3, 60.0, "L",
+                                                    overhead_s=15.0),
+                              tmp_path / "seq.csv")
+    with open(out, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert rows[0]["start_time"] == "2026-08-21T22:50:00+00:00"
+    assert rows[1]["start_time"] == "2026-08-21T22:51:15+00:00"
+    assert rows[2]["start_time"] == "2026-08-21T22:52:30+00:00"
+
+
+def test_csv_start_time_empty_without_window(tmp_path):
+    out = sequence.export_csv(_target(), sequence.make_plan(2, 60.0, "L"),
+                              tmp_path / "seq.csv")
+    with open(out, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    # the column exists (stable header) but stays empty
+    assert rows[0]["start_time"] == ""
+
+
+def test_transit_window_helper_tolerates_datetimes_and_junk():
+    import datetime
+    assert sequence._transit_window({}) is None
+    assert sequence._transit_window(
+        {"capture_start": "junk", "capture_end": None}) is None
+    tw = sequence._transit_window(
+        {"capture_start": datetime.datetime(2026, 8, 21, 22, 50),
+         "capture_end": datetime.datetime(2026, 8, 22, 1, 50)})
+    assert tw[0].hour == 22 and tw[1].hour == 1

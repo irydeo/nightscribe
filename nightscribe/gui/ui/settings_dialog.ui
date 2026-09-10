@@ -45,9 +45,11 @@
           <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
           <item row="3" column="0"><widget class="QLabel" name="lbl_lon"><property name="text"><string>Longitude (°, east):</string></property></widget></item>
           <item row="3" column="1"><widget class="QDoubleSpinBox" name="spn_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
-          <item row="4" column="0"><widget class="QLabel" name="lbl_height"><property name="text"><string>Height (m):</string></property></widget></item>
-          <item row="4" column="1"><widget class="QSpinBox" name="spn_height"><property name="maximum"><number>9000</number></property></widget></item>
-         </layout>
+           <item row="4" column="0"><widget class="QLabel" name="lbl_height"><property name="text"><string>Height (m):</string></property></widget></item>
+           <item row="4" column="1"><widget class="QSpinBox" name="spn_height"><property name="maximum"><number>9000</number></property></widget></item>
+           <item row="5" column="0"><widget class="QLabel" name="lbl_aavso"><property name="text"><string>AAVSO code:</string></property></widget></item>
+           <item row="5" column="1"><widget class="QLineEdit" name="edt_aavso_code"><property name="maxLength"><number>6</number></property><property name="maximumSize"><size><width>80</width><height>16777215</height></size></property><property name="toolTip"><string>Your AAVSO observer code (blank if none). Written into the EXOTIC inits.json handoff.</string></property></widget></item>
+          </layout>
         </widget>
        </item>
        <item>
@@ -67,9 +69,13 @@
          <layout class="QFormLayout">
           <item row="0" column="0"><widget class="QLabel" name="lbl_pixel"><property name="text"><string>Pixel size (µm):</string></property></widget></item>
           <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_pixel_um"><property name="decimals"><number>2</number></property><property name="minimum"><double>1.0</double></property><property name="maximum"><double>30.0</double></property><property name="toolTip"><string>Camera pixel size in microns (e.g. 3.76 for a QHY600)</string></property></widget></item>
-          <item row="1" column="0"><widget class="QLabel" name="lbl_focal"><property name="text"><string>Focal length (mm):</string></property></widget></item>
-          <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property><property name="toolTip"><string>Telescope focal length in mm (e.g. 2000 for a 8&quot; f/10 SCT)</string></property></widget></item>
-         </layout>
+           <item row="1" column="0"><widget class="QLabel" name="lbl_focal"><property name="text"><string>Focal length (mm):</string></property></widget></item>
+           <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property><property name="toolTip"><string>Telescope focal length in mm (e.g. 2000 for a 8&quot; f/10 SCT)</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="lbl_camtype"><property name="text"><string>Camera type:</string></property></widget></item>
+           <item row="2" column="1"><widget class="QComboBox" name="cmb_camera_type"><property name="toolTip"><string>CCD, CMOS or DSLR — written into the EXOTIC inits.json handoff</string></property></widget></item>
+           <item row="3" column="0"><widget class="QLabel" name="lbl_binning"><property name="text"><string>Pixel binning:</string></property></widget></item>
+           <item row="3" column="1"><widget class="QComboBox" name="cmb_binning"><property name="editable"><bool>true</bool></property><property name="toolTip"><string>On-chip binning (e.g. 1x1, 2x2) — written into the EXOTIC inits.json handoff</string></property></widget></item>
+          </layout>
         </widget>
        </item>
        <item>

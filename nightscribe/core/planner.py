@@ -15,7 +15,7 @@ import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import coords, dates, horizon, transits
+from . import coords, dates, exposure, horizon, transits
 from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
                       rochester, sbdb)
 
@@ -62,7 +62,8 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
                                session_duration_s)),
         (5, "transit",
          lambda: _transit_targets(lat, lon, date, hor, limit_mag, margin,
-                                  _transit_aperture(cfg))),
+                                  _transit_aperture(cfg),
+                                  _transit_plate_scale(cfg))),
         (6, "approach",
          lambda: _approach_alerts()),
     )
@@ -360,8 +361,18 @@ def _transit_aperture(cfg):
         return None
 
 
+def _transit_plate_scale(cfg):
+    # The camera/telescope plate scale for the transit exposure heuristic
+    # (Track D). Returns None (no correction) when the camera profile is
+    # incomplete — plate_scale() gives 0.0 without a focal length.
+    # @args: cfg - Config instance
+    # @return: arcsec/pixel or None
+    ps = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"))
+    return ps or None
+
+
 def _transit_targets(lat, lon, date, hor, limit_mag=14.0, margin=0.0,
-                     aperture_in=None):
+                     aperture_in=None, plate_scale_arcsec_px=None):
     # Exoplanet transits computed locally from the ExoClock catalogue.
     # The star must clear the local horizon + margin at mid-transit
     # (ADR-020) — the same safety rule as every other family.
@@ -369,7 +380,9 @@ def _transit_targets(lat, lon, date, hor, limit_mag=14.0, margin=0.0,
     for t in transits.transits_tonight(exoclock.planets(), lat, lon, date,
                                         threshold_fn=hor.alt_at,
                                         max_vmag=limit_mag, margin=margin,
-                                        aperture_in=aperture_in):
+                                        aperture_in=aperture_in,
+                                        plate_scale_arcsec_px=
+                                        plate_scale_arcsec_px):
         out.append({
             "id": t["name"], "kind": "transit",
             "name": t["name"], "mag": t.get("v_mag"),

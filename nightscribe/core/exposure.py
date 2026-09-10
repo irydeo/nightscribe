@@ -96,3 +96,50 @@ def recommended_sn_exposure(mag):
         if mag <= threshold:
             return exp
     return _SN_EXP_TABLE[-1][1]   # fainter than the last entry: cap
+
+
+# ---------------- Transit exposure by star brightness (Track D) ----------
+
+# Same philosophy as the SN table: an honest starting point the observer
+# refines with a test shot (the pre-flight checklist demands a peak below
+# saturation — "probar hasta no saturar"). Values at the reference plate
+# scale of 1.0 arcsec/pixel, no defocus. The magnitude of a transit host
+# star is small (V 8-14), so the table lives in the bright regime where
+# saturation — not signal — is the binding constraint.
+_TRANSIT_EXP_TABLE = [
+    (9.0,   15),    # very bright star: short to stay well below saturation
+    (10.0,  25),
+    (11.0,  40),
+    (12.0,  60),
+    (13.0,  90),
+    (14.0, 120),
+    (99.0, 180),   # faintest hosts: cap
+]
+
+# The table scales with the SQUARE of the plate-scale ratio: for a
+# seeing-limited point source the peak pixel flux grows with
+# (arcsec/px)^2, so a finer plate (more px per arcsec) spreads the star
+# over more pixels and tolerates a longer exposure before saturation.
+# The correction is clamped to x0.25..x4 to stay in the sane regime.
+_TRANSIT_REF_SCALE = 1.0
+
+
+def recommended_transit_exposure(v_mag, plate_scale_arcsec_px=None):
+    # @args: v_mag - host star V magnitude (float),
+    #        plate_scale_arcsec_px - camera/telescope plate scale (None or 0
+    #        means "unknown": the reference-scale value is returned)
+    # @return: recommended single-frame exposure in seconds (int, 5..300),
+    #         or None when the magnitude is unknown
+    if v_mag is None:
+        return None
+    v_mag = float(v_mag)
+    exp = _TRANSIT_EXP_TABLE[-1][1]
+    for threshold, e in _TRANSIT_EXP_TABLE:
+        if v_mag <= threshold:
+            exp = e
+            break
+    if plate_scale_arcsec_px:
+        factor = (_TRANSIT_REF_SCALE / float(plate_scale_arcsec_px)) ** 2
+        factor = min(max(factor, 0.25), 4.0)
+        exp = int(round(exp * factor))
+    return min(max(exp, 5), 300)

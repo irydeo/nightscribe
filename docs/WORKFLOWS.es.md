@@ -702,3 +702,33 @@ rotación. La animación de evolución SN (B6) sale igualmente beneficiada.
 curva de luz de asteroides (v2 si el motor de series madura), rediseño del
 flujo de medida MPC (ya validado, ADR-022), secuencias multi-filtro en el
 plan NEO (la capacidad de B8 queda disponible).
+
+### 7duodecies. Track D — Exoplanetas: captura guiada y handoff EXOTIC (2026-09-10)
+
+Plan: `docs/PLANS/exoplanet-transit-project.md` (hijo D de
+`docs/PLANS/project-concept-v2.md`). Rama `feature/exoplanet-transit-project`.
+
+El proyecto de tránsito dice al observador **cuándo empezar a capturar**,
+**cuándo ocurre el tránsito** y **cómo debe ser la secuencia**, pensado para
+quien nunca ha capturado uno («que cualquiera se atreva»). La reducción es
+**100 % externa con EXOTIC** (NASA/JPL): NightScribe exporta el `inits.json`
+pre-rellenado y guía el cierre del flujo científico (subida a ExoClock /
+AAVSO Exoplanet Database) además del post. La selección lidera con la
+decisión real: «cabe entero en tu noche (con baselines)» + «detectable con
+tu telescopio», y la prioridad ExoClock se explica didácticamente.
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| 0 | `core/transits.py`: `recommended_window` (baseline = max(25 % dur, **30 min**) Conti/CN), `capture_start/end`, `baseline_fits` (oscuridad + horizonte en ambos bordes), `cadence_max_s` (≥3 puntos en el ingress), `exp_recommended_s`; gate de horizonte intacto en mid-transit | **Hecho** |
+| 1 | `suggest`: frase «empieza a capturar a las HH:MM UTC», aviso ⚠ + penalización −4 cuando la baseline no cabe, veredicto de apertura y prioridad ExoClock didáctica | **Hecho** |
+| 2 | Bloque transit en Plan & Capture: **línea de tiempo visual** (`TransitTimeline`, widget QGraphicsView ADR-029: noche / sobre el horizonte / captura con baselines y milestones), tira de tiempos UTC+local, exposición heurística preseleccionada, cadencia con overhead explícito + aviso «no resuelves el ingress», línea altura/Luna y **checklist pre-vuelo** de 5 pasos persistente en `project_steps.data` | **Hecho** |
+| 3 | Export con ventana: CCDciel `StartTime/EndTime` + `MandatoryStartTime=True` (StartRise off — best-effort hasta validar contra el CCDciel real), NINA metadata, CSV con `start_time` por frame | **Hecho** |
+| 4 | Handoff EXOTIC: TAP ampliado (`pl_orbincl/pl_orbeccen/st_logg/st_metfe/pl_orbsmax/pl_tranmid/sy_pmra/sy_pmdec`, bump de caché v2), `core/exotic.py` (esquema **re-verificado contra el `inits.json` vivo** de `rzellem/EXOTIC`: claves exactas, fecha «17-December-2017», fórmula Rp/Rs corregida con `st_rad`), Settings (código AAVSO, tipo de cámara, binning — la elevación reutiliza `height`), botón en Process + guía de subida a ExoClock/AAVSO | **Hecho** |
+| 5 | Cierre: i18n ES/EN (582 cadenas, 37 nuevas), revisión de **ADR-015** (ventana + cadencia + heurística + EXOTIC) y **ADR-019** (bloque transit en Plan, EXOTIC en Process), esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (868). **Fuera de esta iteración** (del
+plan): leer la salida de EXOTIC (Mid-Transit Time → O-C, marca observed) —
+v2; monitor de flujo en vivo sobre `core/series.py` (horizonte: variables de
+corto periodo, condición *tremendamente simple*); lanzar EXOTIC como
+subproceso; validación del `MandatoryStartTime` y del `inits.json` contra el
+software real del observatorio (pendiente de una corrida del usuario).

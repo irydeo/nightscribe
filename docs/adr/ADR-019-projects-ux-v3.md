@@ -93,6 +93,16 @@ adelante. El trabajo se ejecuta por fases (ver §7 de WORKFLOWS): primero los AD
 flujos sobre papel, después restricciones → modelo de proyecto → GUI → exportadores →
 reporte MPC.
 
+**Revisión (2026-09-10, Track D)**: el paso **Plan** gana el bloque de tránsito
+(línea de tiempo visual de la noche, tira de tiempos UTC+local con overhead
+explícito, exposición heurística preseleccionada, aviso de cadencia y checklist
+pre-vuelo persistente en `project_steps.data`); el paso **Process** del tránsito
+cita **EXOTIC** como herramienta externa de reducción y exporta su `inits.json`
+(handoff — ADR-015). El esqueleto de 3 pasos no cambia: es contenido por tipo,
+no pasos nuevos. El paso Process de NEO/PCCP/cometa (Track C, misma semana)
+registra los productos de la sesión (FITS, imágenes anotadas, reporte MPC) en
+`project_files` + `project_steps.data`.
+
 ## English
 
 **Context**: after v2 (ADR-017), a product reflection from the user: NightScribe must
@@ -185,3 +195,13 @@ but pre-filled from a project; offscreen GUI tests are rewritten to the new navi
 Comets and transits reuse the 4-step skeleton later. Work runs in phases (see §7 of
 WORKFLOWS): ADRs and flows on paper first, then constraints → project model → GUI →
 exporters → MPC report.
+
+**Review (2026-09-10, Track D)**: the **Plan** step gains the transit block
+(visual night timeline, UTC+local times strip with explicit overhead,
+preselected heuristic exposure, cadence warning and a persistent pre-flight
+checklist in `project_steps.data`); the transit **Process** step names
+**EXOTIC** as the external reduction tool and exports its `inits.json`
+(handoff — ADR-015). The 3-step skeleton is unchanged: this is per-kind
+content, not new steps. The NEO/PCCP/comet Process step (Track C, same week)
+registers the session products (FITS, annotated images, MPC report) in
+`project_files` + `project_steps.data`.

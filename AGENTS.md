@@ -64,7 +64,8 @@ nightscribe/
     suggest.py       # score unificado 0-100 + Top N + frases "por qué esta noche"
     orbits.py        # familias orbitales + parámetros explicados
     solar.py         # estado del Sol agregado
-    transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad)
+    transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
+    exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
     enrich.py        # orquesta fuentes -> datos crudos de un objeto
     narrative.py     # prosa divulgativa ES/EN
     post.py          # plantillas -> post_ES / post_EN / tuit
@@ -76,8 +77,11 @@ nightscribe/
                      #   solo comanda con CCDciel abierto; lecturas cacheadas TTL 60s)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
+                     # + evolution_view (evolución SN) y motion_view (movimiento NEO —
+                     #   la "prueba de fuego", Track C)
    gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer)
-                      # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib)
+                      # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
+                      #   incl. timeline_widget: línea de tiempo del tránsito, Track D)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

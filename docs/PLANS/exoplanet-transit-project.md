@@ -1,7 +1,8 @@
 # Plan — Proyecto de exoplaneta: captura guiada y secuencia con ventana
 
-> **Abierto (2026-09-08)** — documento de diseño, sin implementar aún. Un
-> subplan = un commit cuando se ejecute. Derivado de las buenas prácticas de
+> **Cerrado (2026-09-10)** — ejecutado por completo (subplanes 0-5) en la
+> rama `feature/exoplanet-transit-project`, mergeada a
+> `feature/object-card`. Un subplan = un commit. Derivado de las buenas prácticas de
 > Dennis Conti / AAVSO («Observing Exoplanet Transits with Small Telescopes»)
 > y del hilo de Cloudy Nights «Tips for capturing exoplanet transits».
 > **Enmendado 2026-09-08**: nuevo subplan 4 «Export a EXOTIC (handoff)»; la
@@ -105,6 +106,7 @@ intérprete de NightScribe). No se importan curvas de luz ni se mide O-C.
 ## Subplanes
 
 ### Subplan 0 — Núcleo de evento: ventana recomendada y cadencia
+**(Hecho 2026-09-10)**
 En `core/transits.py`:
 
 - `recommended_window(transit, baseline_frac=0.25, baseline_min_min=30)` →
@@ -124,6 +126,7 @@ respeta/redondea; `baseline_fits` verdadero/falso; cadencia para ingress de
 ~0.5 h.
 
 ### Subplan 1 — Tarjeta y motivo: «empieza a capturar a HH:MM»
+**(Hecho 2026-09-10)**
 - `suggest._fragments` (kind `transit`): frase con la hora de `capture_start`
   («Si quieres la parte fuera de tránsito, empieza a capturar a las HH:MM») y
   aviso ámbar cuando `baseline_fits=False`.
@@ -143,6 +146,7 @@ respeta/redondea; `baseline_fits` verdadero/falso; cadencia para ingress de
 el score; chip de prioridad con su explicación.
 
 ### Subplan 2 — Panel de tránsito en Plan & Capture
+**(Hecho 2026-09-10)**
 En `_build_plan_tab`, bloque específico para `kind == "transit"` pensado para
 quien **nunca ha capturado un tránsito** («que cualquiera se atreva» —
 post-entrevista):
@@ -185,6 +189,7 @@ baseline; exposición preseleccionada en el spin; aviso de cadencia; checklist
 marcable y persistente en `project_steps.data`.
 
 ### Subplan 3 — Export con ventana (CCDciel + NINA/CSV)
+**(Hecho 2026-09-10)**
 En `core/sequence.py` + `core/sources/ccdciel.py`:
 
 - Para `kind == "transit"` el contexto lleva `capture_start/capture_end`; el
@@ -202,6 +207,7 @@ En `core/sequence.py` + `core/sources/ccdciel.py`:
 al comportamiento actual.
 
 ### Subplan 4 — Export a EXOTIC (inits.json, handoff)
+**(Hecho 2026-09-10)**
 La reducción de tránsitos de NightScribe es externa con **EXOTIC**: NightScribe
 solo escribe su `inits.json` pre-rellenado (filosofía ADR-021 de ficheros de
 handover) y el usuario corre EXOTIC en su propio entorno (Python ≤3.10).
@@ -258,6 +264,7 @@ a/Rs; `null` cuando falta el dato; campos nuevos del TAP; nombre de salida.
 Funcional: generación con un `ctx`/`d` fake, sin red.
 
 ### Subplan 5 — Cierre
+**(Hecho 2026-09-10)**
 `lupdate`/`lrelease` (ES/EN, ≈10–12 cadenas) · revisión corta de **ADR-015**
 (ventana recomendada + cadencia + heurística de exposición) y **ADR-019**
 (review del paso Plan: bloque transit; Process cita EXOTIC como herramienta

@@ -2,6 +2,15 @@
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-09-06
 
+> **Nota de ajuste (2026-09-10, ADR-028)**: los campos de conexión
+> (`ccdciel_host`/`ccdciel_port`/`ccdciel_auto_connect`) viven en
+> `grp_ccdciel` dentro de la pestaña **Integrations** del Settings
+> (host/puerto/auto-connect), junto a NEOfixer, Astrometry y el bot TNS
+> — no tienen una pestaña propia. La "pestaña Plan & Captura" de este ADR
+> es la pestaña 1 de la ficha de proyecto (ADR-019), donde vive el botón
+> «Conectar CCDciel», el dashboard de estado y «Ajuste astrométrico»; la
+> conexión en sí se configura en Integrations.
+
 ## Español
 
 **Contexto**: ADR-021 dejó «controlar telescopios» fuera de alcance (solo ficheros) y

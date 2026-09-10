@@ -1,7 +1,31 @@
 # ADR-028: Settings as four tabs — el diálogo deja de crecer en vertical
 
-**Estado / Status**: Accepted (actualizado 2026-09-04) · **Fecha / Date**: 2026-08-29
+**Estado / Status**: Accepted (actualizado 2026-09-10) · **Fecha / Date**: 2026-08-29
 
+> **Actualización (2026-09-10)**: dos cambios de contenido y uno de UX sobre
+> la base de este ADR.
+>
+> 1. **Contenido de Observing**: la pestaña 2 gana `grp_kinds` (el
+>    whitelist de tipos para Tonight/Explore + `spn_best_pk`, el "cuántos
+>    por tipo") y `grp_transits` (el filtro de apertura de ExoClock —
+>    "ocultar tránsitos que exigen un telescopio mayor").
+> 2. **CCDciel no tiene su propia pestaña** (ADR-030): `grp_ccdciel`
+>    (host/port/auto-connect) vive dentro de **Integrations**, junto a
+>    NEOfixer, Astrometry y el bot TNS — misma naturaleza (una integración
+>    externa con credenciales opcionales o endpoint configurable). Así el
+>    diálogo sigue en **tres** pestañas.
+> 3. **Ayuda por grupo**: cada `QGroupBox` del diálogo lleva un
+>    `QToolButton` «?» (20×20, auto-raise) anclado a la esquina superior
+>    derecha. Al pulsarlo se despliega una `QLabel` (word-wrap,
+>    `C_TEXT_DIM`) dentro de la misma caja, debajo de los campos, con una
+>    línea por campo ("• Campo — qué hace"); al volver a pulsar (el botón
+>    muestra «×») se cierra. Los textos del cuerpo pasan por `self.tr()`
+>    en `main_window.py` (contexto MainWindow, ES/EN vía
+>    `lupdate`/`lrelease`); NO están en el `.ui` para no duplicar
+>    `objectName` ni romper la regla "código inglés, doc en `docs/`".
+>    El `eventFilter` de `MainWindow` reancla el botón en
+>    `QEvent.Resize` para que no se despegue en pantallas grandes.
+>
 > **Actualización (2026-09-04)**: la pestaña **Charts** (`tab_charts` /
 > `chart_zoom`) se ha eliminado — la opción de resolución "re-scale vs.
 > re-draw 2×" se retiró al añadir los widgets vectoriales (ADR-029), que

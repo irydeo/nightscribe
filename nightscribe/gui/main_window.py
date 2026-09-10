@@ -15,7 +15,7 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import (QFile, Qt, Signal, QPropertyAnimation,
+from PySide6.QtCore import (QEvent, QFile, Qt, Signal, QPropertyAnimation,
                             QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
@@ -27,7 +27,8 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
-                                QVBoxLayout, QWidget, QTableWidgetItem)
+                                QVBoxLayout, QWidget, QTableWidgetItem,
+                                QToolButton)
 
 from .. import paths
 from ..config import config
@@ -431,8 +432,155 @@ class MainWindow(QMainWindow):
 
     # ---------------- menu: settings / help ----------------
 
+    def _attach_group_help(self, group, items):
+        # @args: group - the QGroupBox, items - list of (field, help) tuples
+        # @return: None — a «?» button docks top-right; it toggles the help
+        # lines (field — what it does) printed inside the box below the fields
+        btn = QToolButton(group)
+        btn.setText("?")
+        btn.setAutoRaise(True)
+        btn.setFixedSize(20, 20)
+        btn.move(group.width() - 28, 4)
+        btn.show()
+        label = QLabel(group)
+        label.setWordWrap(True)
+        label.setStyleSheet(f"color: {theme.C_TEXT_DIM}; font-size: 11px;")
+        txt = "\n".join(f"• {f} — {h}" for f, h in items)
+        label.setText(txt)
+        label.hide()
+        group.layout().addWidget(label)
+        # @args: - click on the «?» button
+        # @return: None
+        def _toggle():
+            open = not label.isVisible()
+            label.setVisible(open)
+            btn.setText("×" if open else "?")
+        btn.clicked.connect(_toggle)
+        # remember which group this button belongs to (eventFilter reposition)
+        btn._ns_group = group
+        btn.installEventFilter(self)
+
+    def _settings_attach_help(self, dlg):
+        # @args: dlg - the freshly loaded SettingsDialog
+        # @return: None — every group box gets its «?» help toggle
+        registry = {
+            "grp_language": [
+                ("Interface language",
+                 self.tr("Interface language; applies when the app restarts")),
+            ],
+            "grp_site": [
+                ("MPC code",
+                 self.tr("Your MPC observatory code — the site "
+                         "coordinates resolve automatically from it")),
+                ("Name", self.tr("Free-text observatory name (posts, reports)")),
+                ("Latitude / Longitude / Height",
+                 self.tr("Site position; east is positive longitude")),
+                ("AAVSO code",
+                 self.tr("Optional; written into the EXOTIC inits.json "
+                         "handoff (transit projects)")),
+            ],
+            "grp_equip": [
+                ("Aperture",
+                 self.tr("Scope aperture in inches — used to size transit "
+                         "targets and scale the 'why tonight' reasons")),
+                ("Limiting magnitude",
+                 self.tr("Faintest object you can realistically detect at "
+                         "your site — caps the Tonight scoring")),
+            ],
+            "grp_camera": [
+                ("Pixel size",
+                 self.tr("Camera pixel size in microns (e.g. 3.76 for a "
+                         "QHY600) — the plate scale for the Blink and "
+                         "transit math")),
+                ("Focal length",
+                 self.tr("Telescope focal length in mm, together with the "
+                         "pixel size it sets the arcsec/pixel scale")),
+                ("Camera type / Pixel binning",
+                 self.tr("CCD · CMOS · DSLR and on-chip binning (1x1, 2x2…)"
+                         " — written into the EXOTIC inits.json handoff")),
+            ],
+            "grp_horizon": [
+                ("Limit file",
+                 self.tr("TheSkyX limits export (.hrz) or plain 'az alt' "
+                         "pairs — when it loads, the file is the safety "
+                         "reference and the flat minimum altitude is "
+                         "ignored")),
+                ("Safety margin",
+                 self.tr("Extra degrees of clearance added on top of the "
+                         "limit, for the Sun and for slew safety")),
+                ("Minimum altitude",
+                 self.tr("Flat altitude floor, used only when no limit file "
+                         "is loaded")),
+            ],
+            "grp_kinds": [
+                ("Object kinds",
+                 self.tr("Which kinds are scored and shown for Tonight and "
+                         "Explore — untick a kind to hide it everywhere")),
+                ("Shown per kind",
+                 self.tr("How many entries of each kind the Tonight grid "
+                         "lists (more in Explore)")),
+            ],
+            "grp_transits": [
+                ("Aperture filter",
+                 self.tr("ExoClock estimates the minimum aperture each "
+                         "transit needs; when checked, Tonight drops the "
+                         "events that are too big for your scope")),
+            ],
+            "grp_moon": [
+                ("Moon warning",
+                 self.tr("Flags targets that sit too close to a bright, "
+                         "high Moon")),
+                ("Min separation",
+                 self.tr("Target-to-Moon angular distance below which the "
+                         "warning fires (degrees)")),
+                ("Max illumination",
+                 self.tr("Fraction of the lunar disk lit above which the "
+                         "warning starts (0.5 = half Moon)")),
+            ],
+            "grp_session": [
+                ("Per-frame overhead",
+                 self.tr("Readout/slew seconds added to every exposure when "
+                         "sizing the transit capture sequence")),
+                ("SN revisit reminder",
+                 self.tr("Nights without a visit after which an active "
+                         "supernova project asks to be revisited")),
+            ],
+            "grp_ccdciel": [
+                ("Host / Port",
+                 self.tr("Where CCDciel is running — localhost by default; "
+                         "control only works while CCDciel is open")),
+                ("Auto-connect",
+                 self.tr("Connect to CCDciel as soon as the app starts "
+                         "(off by default)")),
+            ],
+            "grp_misc": [
+                ("NEOfixer API key",
+                 self.tr("Optional: report your observing status to "
+                         "NEOfixer")),
+                ("Astrometry.net API key",
+                 self.tr("Optional: blind-solve FITS without WCS in the "
+                         "Blink tab (free key from nova.astrometry.net)")),
+            ],
+        }
+        for g in dlg.findChildren(QGroupBox):
+            items = registry.get(g.objectName())
+            if items:
+                self._attach_group_help(g, items)
+
+    def eventFilter(self, obj, event):
+        # @args: obj - the watched widget, event - the QEvent
+        # @return: True when consumed — keeps the Settings «?» button docked
+        # to the top-right of its group box on resize
+        if (isinstance(event, QEvent.Resize)
+                and hasattr(obj, "_ns_group")
+                and event.type() == QEvent.Resize):
+            g = obj._ns_group
+            obj.move(g.width() - 28, 4)
+        return super().eventFilter(obj, event)
+
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
+        self._settings_attach_help(dlg)
         # The Observing tab packs four group boxes; give it room so the
         # kind checkboxes and rows are never crushed (the .ui minimum is
         # the floor; the initial size opens it comfortably).
@@ -1874,8 +2022,8 @@ class MainWindow(QMainWindow):
         # sequence export (all kinds)
         layout.addWidget(QLabel(self.tr("Export capture sequence")))
         cmb_fmt = QComboBox()
-        cmb_fmt.addItem(self.tr("NINA (JSON)"))
         cmb_fmt.addItem(self.tr("CCDciel (targets)"))
+        cmb_fmt.addItem(self.tr("NINA (JSON)"))
         cmb_fmt.addItem(self.tr("CSV (generic)"))
         layout.addWidget(cmb_fmt)
         btn_seq = QPushButton(self.tr("Export sequence…"))
@@ -3681,7 +3829,7 @@ class MainWindow(QMainWindow):
             tr = ctx.get("transit") or {}
             target["capture_start"] = tr.get("capture_start")
             target["capture_end"] = tr.get("capture_end")
-        fmt_map = {0: "nina", 1: "ccdciel", 2: "csv"}
+        fmt_map = {0: "ccdciel", 1: "nina", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
         ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
         outdir = paths.project_dir(self._current_project["id"],

@@ -81,3 +81,20 @@ def test_draw_sky_plain_unchanged():
     assert len(ax.lines) == len(ax2.lines)
     assert len(ax.collections) == len(ax2.collections)
     plt.close("all")
+
+
+def test_draw_sky_transit_iso_strings():
+    # The Exoplanet Archive's transit_times() returns t0/t1 as ISO strings
+    # (enrich.py passes them through to transit["ingress"]/["egress"]).
+    # draw_sky must accept both datetimes and ISO strings.
+    fig = sky_view.draw_sky(RA, DEC, LAT, LON, "t", date=DATE,
+                            transit={"name": "HAT-P-53b",
+                                     "ingress": "2026-09-11T00:30:00+00:00",
+                                     "egress": "2026-09-11T02:30:00+00:00"})
+    ax = fig.axes[0]
+    # the transit band is a Polygon/Patch, drawn only when ingress+egress parsed
+    assert hasattr(ax, "patches") and ax.patches
+    # the "tránsito" text annotation is drawn at the band mid-point
+    texts = [t.get_text() for t in ax.texts]
+    assert any("tránsito" in t or "transit" in t for t in texts)
+    plt.close("all")

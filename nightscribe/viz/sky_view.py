@@ -63,8 +63,11 @@ def draw_sky(ra_deg, dec_deg, lat, lon, obj_name="", date=None,
     # aware-UTC; planner/test callers pass a mix of aware and naive datetimes,
     # so fold everything into aware-UTC before subtracting.
     def _utc(dt):
-        # @args: dt - datetime (aware or naive)
+        # @args: dt - datetime (aware or naive); ISO strings accepted too
+        #        (transits from the Exoplanet Archive arrive as strings)
         # @return: aware-UTC equivalent, naive inputs assumed to be UTC
+        if isinstance(dt, str):
+            dt = datetime.datetime.fromisoformat(dt)
         if dt.tzinfo is None:
             return dt.replace(tzinfo=datetime.timezone.utc)
         return dt.astimezone(datetime.timezone.utc)

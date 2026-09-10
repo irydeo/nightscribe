@@ -546,7 +546,7 @@ def test_plan_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
     assert w["spn_bias"].value() == 100
     assert w["spn_darkexp"].value() > 0.0  # follows the light exposure
     out = tmp_path / "seq-capture-target.targets"
-    w["cmb_seqfmt"].setCurrentIndex(1)   # CCDciel (targets)
+    w["cmb_seqfmt"].setCurrentIndex(0)   # CCDciel (targets) — default
     monkeypatch.setattr(
         QFileDialog, "getSaveFileName",
         lambda *a, **k: (str(out), "*.targets"))

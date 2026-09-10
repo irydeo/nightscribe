@@ -17,13 +17,14 @@ from nightscribe.core import coords, post, suggest, transits
 
 
 def test_transit_times_arithmetic():
-    # t0 + n*P must land inside the window exactly when expected
+    # t0 + n*P must land inside the window exactly when expected — the
+    # contract is mid-times strictly within [from_jd, to_jd]
     from_jd = 2461274.0
     to_jd = 2461275.0
     times = transits.transit_times(2459554.20747, 0.73654635, from_jd, to_jd)
     assert times
     for t in times:
-        assert from_jd - 1 < t < to_jd + 1
+        assert from_jd <= t <= to_jd
         # must sit on the arithmetic grid
         n = round((t - 2459554.20747) / 0.73654635)
         assert abs(t - (2459554.20747 + n * 0.73654635)) < 1e-6
@@ -345,6 +346,47 @@ def test_visible_now(fake_cfg):
     now = planner.visible_now(targets, fake_cfg, when=when)
     assert [t["id"] for t, _a, _z in now] == ["UP"]
     assert now[0][1] > 89  # at the zenith
+
+
+def _exoplanet_enriched(with_transit=False):
+    # Exoplanet Archive shape: ra/dec as plain float degrees (no `ra_deg`
+    # twin) — the regression from commit 3412c3c (ADR-027) dropped the
+    # sky chart for exactly this shape.
+    d = {"ra": 330.795, "dec": 18.884, "pl_orbper": 3.5247,
+         "mag": 7.65, "depth_mmag": 16.4, "duration_h": 3.1}
+    if with_transit:
+        # The Exoplanet Archive's transit_times() returns t0/t1 as ISO
+        # strings; enrich.py passes them through verbatim. Both viz
+        # consumers (sky_view._pos, transit_view) must accept strings.
+        d["transit"] = {
+            "name": "HD 209458 b", "star": "HD 209458",
+            "ingress": "2026-09-07T22:40:00+00:00",
+            "mid": "2026-09-08T00:15:00+00:00",
+            "egress": "2026-09-08T01:50:00+00:00",
+            "depth_mmag": 16.4, "duration_h": 3.1,
+        }
+    return {"name": "HD 209458 b", "type": "exoplanet", "data": d}
+
+
+def test_build_charts_exoplanet_float_ra_dec_gets_sky(tmp_path, fake_cfg):
+    # the Archive branch hands us `ra`/`dec` floats; the sky chart must not
+    # silently disappear because only `ra_deg` was checked before
+    e = _exoplanet_enriched()
+    charts = post.build_charts(e, tmp_path, "HD209458b_", cfg=fake_cfg,
+                               fmt="facebook")
+    assert "sky" in charts, "exoplanet float ra/dec lost the sky slot"
+    assert (tmp_path / "HD209458b_sky.png").exists()
+
+
+def test_build_charts_exoplanet_transit_gets_lightcurve(tmp_path, fake_cfg):
+    # with tonight's transit event merged by enrich, both the sky slot
+    # (ingress/egress shading) and the light-curve slot render
+    e = _exoplanet_enriched(with_transit=True)
+    charts = post.build_charts(e, tmp_path, "HD209458b_", cfg=fake_cfg,
+                               fmt="facebook")
+    assert "sky" in charts and "transit" in charts
+    assert (tmp_path / "HD209458b_sky.png").exists()
+    assert (tmp_path / "HD209458b_transit.png").exists()
 
 
 def test_post_unconfirmed_fallback(fake_cfg):

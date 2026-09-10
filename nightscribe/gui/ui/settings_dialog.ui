@@ -110,21 +110,35 @@
         <item>
          <widget class="QGroupBox" name="grp_kinds">
           <property name="title"><string>Tonight: object kinds</string></property>
-          <layout class="QFormLayout">
-           <item row="0" column="0" colspan="2"><widget class="QLabel" name="lbl_kinds_hint"><property name="text"><string>Enable the kinds that can appear in the Tonight tab and in its header filter (at least one).</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-           <item row="1" column="0" colspan="2"><widget class="QCheckBox" name="chk_kind_neo"><property name="text"><string>NEOs</string></property></widget></item>
-           <item row="2" column="0" colspan="2"><widget class="QCheckBox" name="chk_kind_sn"><property name="text"><string>Supernovae</string></property></widget></item>
-           <item row="3" column="0" colspan="2"><widget class="QCheckBox" name="chk_kind_comet"><property name="text"><string>Comets</string></property></widget></item>
-           <item row="4" column="0" colspan="2"><widget class="QCheckBox" name="chk_kind_pccp"><property name="text"><string>PCCP candidates</string></property></widget></item>
-           <item row="5" column="0" colspan="2"><widget class="QCheckBox" name="chk_kind_transit"><property name="text"><string>Exoplanet transits</string></property></widget></item>
-           <item row="6" column="0" colspan="2"><widget class="QCheckBox" name="chk_kind_alert"><property name="text"><string>Close approaches (alerts)</string></property></widget></item>
-           <item row="7" column="0"><widget class="QLabel" name="lbl_best_pk"><property name="text"><string>Shown per kind (Tonight):</string></property></widget></item>
-           <item row="7" column="1">
-            <widget class="QSpinBox" name="spn_best_pk">
-             <property name="minimum"><number>1</number></property>
-             <property name="maximum"><number>50</number></property>
-             <property name="toolTip"><string>Cap for the Tonight grid: at most this many targets per object kind, best first (the full list stays in the table below).</string></property>
+          <layout class="QVBoxLayout" name="vbox_kinds">
+           <item>
+            <widget class="QLabel" name="lbl_kinds_hint">
+             <property name="text"><string>Enable the kinds that can appear in the Tonight tab and in its header filter (at least one).</string></property>
+             <property name="wordWrap"><bool>true</bool></property>
             </widget>
+           </item>
+           <item>
+            <layout class="QGridLayout" name="grid_kinds">
+             <property name="horizontalSpacing"><number>12</number></property>
+             <item row="0" column="0"><widget class="QCheckBox" name="chk_kind_neo"><property name="text"><string>NEOs</string></property></widget></item>
+             <item row="0" column="1"><widget class="QCheckBox" name="chk_kind_sn"><property name="text"><string>Supernovae</string></property></widget></item>
+             <item row="1" column="0"><widget class="QCheckBox" name="chk_kind_comet"><property name="text"><string>Comets</string></property></widget></item>
+             <item row="1" column="1"><widget class="QCheckBox" name="chk_kind_pccp"><property name="text"><string>PCCP candidates</string></property></widget></item>
+             <item row="2" column="0"><widget class="QCheckBox" name="chk_kind_transit"><property name="text"><string>Exoplanet transits</string></property></widget></item>
+             <item row="2" column="1"><widget class="QCheckBox" name="chk_kind_alert"><property name="text"><string>Close approaches (alerts)</string></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QFormLayout" name="form_best_pk">
+             <item row="0" column="0"><widget class="QLabel" name="lbl_best_pk"><property name="text"><string>Shown per kind (Tonight):</string></property></widget></item>
+             <item row="0" column="1">
+              <widget class="QSpinBox" name="spn_best_pk">
+               <property name="minimum"><number>1</number></property>
+               <property name="maximum"><number>50</number></property>
+               <property name="toolTip"><string>Cap for the Tonight grid: at most this many targets per object kind, best first (the full list stays in the table below).</string></property>
+              </widget>
+             </item>
+            </layout>
            </item>
           </layout>
          </widget>
@@ -167,37 +181,12 @@
        </item>
       </layout>
      </widget>
-      <widget class="QWidget" name="tab_integrations">
-      <attribute name="title"><string>Integrations</string></attribute>
-      <layout class="QVBoxLayout" name="vbox_integrations">
-       <item>
-        <widget class="QGroupBox" name="grp_misc">
-         <property name="title"><string>API keys (all optional)</string></property>
-         <layout class="QFormLayout">
-          <item row="0" column="0"><widget class="QLabel" name="lbl_nfkey"><property name="text"><string>NEOfixer API key:</string></property></widget></item>
-          <item row="0" column="1"><widget class="QLineEdit" name="edt_neofixer_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: report your observing status to NEOfixer</string></property></widget></item>
-          <item row="1" column="0"><widget class="QLabel" name="lbl_astrokey"><property name="text"><string>Astrometry.net API key:</string></property></widget></item>
-          <item row="1" column="1"><widget class="QLineEdit" name="edt_astrometry_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</string></property></widget></item>
-          <item row="2" column="0"><widget class="QLabel" name="lbl_tnsbot"><property name="text"><string>TNS bot name:</string></property></widget></item>
-          <item row="2" column="1"><widget class="QLineEdit" name="edt_tns_bot"><property name="toolTip"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property></widget></item>
-          <item row="3" column="0"><widget class="QLabel" name="lbl_tnskey"><property name="text"><string>TNS bot key:</string></property></widget></item>
-          <item row="3" column="1"><widget class="QLineEdit" name="edt_tns_bot_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property></widget></item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <spacer name="vspacer_integrations">
-         <property name="orientation"><enum>Qt::Vertical</enum></property>
-        </spacer>
-       </item>
-      </layout>
-      </widget>
-      <widget class="QWidget" name="tab_ccdciel">
-       <attribute name="title"><string>CCDciel</string></attribute>
-       <layout class="QVBoxLayout" name="vbox_ccdciel">
+       <widget class="QWidget" name="tab_integrations">
+       <attribute name="title"><string>Integrations</string></attribute>
+       <layout class="QVBoxLayout" name="vbox_integrations">
         <item>
          <widget class="QGroupBox" name="grp_ccdciel">
-          <property name="title"><string>JSON-RPC connection</string></property>
+          <property name="title"><string>CCDciel (JSON-RPC connection)</string></property>
           <layout class="QFormLayout">
            <item row="0" column="0"><widget class="QLabel" name="lbl_ccdhost"><property name="text"><string>Host:</string></property></widget></item>
            <item row="0" column="1"><widget class="QLineEdit" name="edt_ccdciel_host"><property name="toolTip"><string>Address of the computer running CCDciel (usually 127.0.0.1)</string></property></widget></item>
@@ -209,12 +198,27 @@
          </widget>
         </item>
         <item>
-         <spacer name="vspacer_ccdciel">
+         <widget class="QGroupBox" name="grp_misc">
+          <property name="title"><string>API keys (all optional)</string></property>
+          <layout class="QFormLayout">
+           <item row="0" column="0"><widget class="QLabel" name="lbl_nfkey"><property name="text"><string>NEOfixer API key:</string></property></widget></item>
+           <item row="0" column="1"><widget class="QLineEdit" name="edt_neofixer_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: report your observing status to NEOfixer</string></property></widget></item>
+           <item row="1" column="0"><widget class="QLabel" name="lbl_astrokey"><property name="text"><string>Astrometry.net API key:</string></property></widget></item>
+           <item row="1" column="1"><widget class="QLineEdit" name="edt_astrometry_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</string></property></widget></item>
+           <item row="2" column="0"><widget class="QLabel" name="lbl_tnsbot"><property name="text"><string>TNS bot name:</string></property></widget></item>
+           <item row="2" column="1"><widget class="QLineEdit" name="edt_tns_bot"><property name="toolTip"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property></widget></item>
+           <item row="3" column="0"><widget class="QLabel" name="lbl_tnskey"><property name="text"><string>TNS bot key:</string></property></widget></item>
+           <item row="3" column="1"><widget class="QLineEdit" name="edt_tns_bot_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="vspacer_integrations">
           <property name="orientation"><enum>Qt::Vertical</enum></property>
          </spacer>
         </item>
        </layout>
-      </widget>
+       </widget>
     </widget>
    </item>
    <item>

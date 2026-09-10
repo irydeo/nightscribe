@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # Safety (ADR-020): a transit is listed only when the star clears the local
 # horizon + margin AT MID-TRANSIT — the moment the planet crosses. The
 # ingress/egress samples stay as coverage information, not as the gate.
+# The window filter is strict on the mid: a transit whose mid predates the
+# night is a daytime event, even if the star happened to be up at the time.
 
 
 def recommended_window(transit, baseline_frac=0.25, baseline_min_min=30):
@@ -55,7 +57,10 @@ def transit_times(t0_jd, period_days, from_jd, to_jd):
         t = t0_jd + n * period_days
         if t > to_jd:
             break
-        if t >= from_jd - period_days:
+        # keep only transits whose mid falls inside the window: admitting an
+        # earlier half-period leaks mid-day transits the altitude gate alone
+        # (no darkness check) cannot catch
+        if t >= from_jd:
             times.append(t)
         n += 1
     return times

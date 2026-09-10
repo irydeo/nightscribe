@@ -12,6 +12,7 @@
 ############################################################
 
 import logging
+import re
 
 from . import orbits
 
@@ -61,6 +62,17 @@ def hook(e):
             if t.get("perihelion_date"):
                 return {"es": f"Seguimos {t.get('name', 'este cometa')}: llega al perihelio cerca del {t['perihelion_date']}, la época de máximo brillo.",
                         "en": f"We are following {t.get('name', 'this comet')}: perihelion is near {t['perihelion_date']}, the time of peak brightness."}
+            if t.get("kind") in ("exoplanet", "transit"):
+                # a compact ExoClock name (e.g. 55Cnce) fell through detect_type
+                # to small_body, but it is an exoplanet transit — use the
+                # transit hook, not the comet-candidate one
+                return _transit_hook(t.get("name"), t.get("transit") or {})
+            if t.get("kind") == "neo":
+                # an unconfirmed NEO is an asteroid candidate, not a comet
+                full = t.get("name") or "este objeto"
+                full_en = t.get("name") or "this object"
+                return {"es": f"Seguimos {full}: un objeto cercano a la Tierra por confirmar, y sus medidas de esta noche lo definirán.",
+                        "en": f"We are following {full}: a near-Earth object to be confirmed, and tonight's measurements will define it."}
             full = t.get("name") or "este cometa"
             full_en = t.get("name") or "this comet"
             return {"es": f"Seguimos {full}: un candidato a cometa por confirmar, y sus medidas de esta noche lo definirán.",
@@ -79,9 +91,10 @@ def hook(e):
                     "en": f"{sb.get('fullname', 'The comet')} now shines at magnitude {d['mag_now']:.1f}: its nucleus is active."}
         return {"es": f"Seguimiento de {sb.get('fullname', 'este objeto')} desde nuestro observatorio.",
                 "en": f"Follow-up of {sb.get('fullname', 'this object')} from our observatory."}
-    if kind == "exoplanet":
-        return {"es": "Esta noche un planeta de otro sistema eclipsa su estrella, y podemos medirlo.",
-                "en": "Tonight a planet of another system eclipses its star, and we can measure it."}
+    if kind in ("exoplanet", "transit"):
+        t = d.get("unconfirmed") or {}
+        return _transit_hook(t.get("name") or e.get("name"),
+                             d.get("transit") or t.get("transit") or {})
     if kind == "sun":
         return {"es": "Así amanece nuestra estrella esta semana.",
                 "en": "This is how our star looks this week."}
@@ -96,17 +109,33 @@ def hook(e):
             host = str(host).strip() if host else ""
             if host.lower() in ("none", "unknown"):
                 host = ""
-            es = "Investigamos una posible supernova"
-            en = "We are investigating a likely supernova"
+            # AT names are transients awaiting confirmation; SN names are
+            # already supernovae, so we track them. Allow an optional host in
+            # parens (e.g. "SN 2026abc (NGC 1058)").
+            is_at = bool(re.match(r"^AT\s?\d{4}[a-zA-Z]{1,4}\b",
+                                  (t.get("name") or "").strip(), re.I))
+            es = "Investigamos una posible supernova" if is_at else "Estudiamos esta supernova"
+            en = "We are investigating a likely supernova" if is_at else "We are studying this supernova"
             if sn_type:
                 es += f" de tipo {sn_type}"
                 en += f" of type {sn_type}"
             if host:
                 es += f" en {host}"
                 en += f" in {host}"
-            es += ": aún por confirmar, cada medida de esta noche ayuda a decidirla."
-            en += ": still unconfirmed, and every measurement tonight helps settle it."
+            if is_at:
+                es += ": aún por confirmar, cada medida de esta noche ayuda a decidirla."
+                en += ": still unconfirmed, and every measurement tonight helps settle it."
+            else:
+                es += ": seguimos su evolución noche a noche."
+                en += ": we track its evolution night after night."
             return {"es": es, "en": en}
+        if t.get("kind") == "neo":
+            # an unconfirmed NEO is an asteroid candidate, not a comet —
+            # the generic "object" hook below would hide that
+            full = t.get("name") or "este objeto"
+            full_en = t.get("name") or "this object"
+            return {"es": f"Seguimos {full}: un objeto cercano a la Tierra por confirmar, y sus medidas de esta noche lo definirán.",
+                    "en": f"We are following {full_en}: a near-Earth object to be confirmed, and tonight's measurements will define it."}
         if t.get("kind") == "comet":
             full = t.get("name") or "este cometa"
             full_en = t.get("name") or "this comet"
@@ -292,6 +321,43 @@ def _transient_facts(d):
         out.append({"es": f"Detectada el {d['disc_date']}.",
                     "en": f"Reported on {d['disc_date']}."})
     return out
+
+
+def _transit_hook(planet, tr):
+    # The exoplanet-transit hook for a single object.
+    # @args: planet - planet designation (e.g. 55Cnce) or None,
+    #        tr - the ExoClock "transit" sub-dict
+    # @return: {"es": str, "en": str}
+    star = (tr or {}).get("star")
+    detail = _transit_detail(tr or {})
+    detail_es = f" ({detail['es']})" if detail else ""
+    detail_en = f" ({detail['en']})" if detail else ""
+    who_es = f"el exoplaneta {planet}" if planet else "un exoplaneta"
+    who_en = f"the exoplanet {planet}" if planet else "an exoplanet"
+    where_es = f" de {star}" if star else ""
+    where_en = f" of {star}" if star else ""
+    return {"es": f"Esta noche {who_es} transita la estrella{where_es} y podemos medirlo{detail_es}.",
+            "en": f"Tonight {who_en} transits the star{where_en} and we can measure it{detail_en}."}
+
+
+def _transit_detail(tr):
+    # Transit depth and duration in a short bilingual clause, from the
+    # ExoClock "transit" sub-dict. The star goes in the hook sentence, so it
+    # is not repeated here.
+    # @args: tr - the planner target's "transit" sub-dict
+    # @return: {"es": str, "en": str} or None when there is nothing to add
+    bits_es, bits_en = [], []
+    depth = tr.get("depth_mmag")
+    dur = tr.get("duration_h")
+    if depth:
+        bits_es.append(f"profundidad {depth:.0f} miligram")
+        bits_en.append(f"depth {depth:.0f} millimags")
+    if dur:
+        bits_es.append(f"duración {dur:.1f} h")
+        bits_en.append(f"duration {dur:.1f} h")
+    if not bits_es:
+        return None
+    return {"es": ", ".join(bits_es), "en": ", ".join(bits_en)}
 
 
 def _sun_facts(d):

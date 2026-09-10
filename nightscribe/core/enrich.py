@@ -32,7 +32,10 @@ def detect_type(name):
         return "sun"
     if re.match(r"^(SN|AT)\s?\d{4}[a-zA-Z]{1,4}$", n, re.I):
         return "transient"
-    if re.search(r"\s(b|c|d|e|f)$", n) and not re.match(r"^\d{4}", n):
+    # the preceding char is a word char or a dash (HD 209458 b, KELT-9b,
+    # TRAPPIST-1e, 55Cnce, AUMicb); NEO/comet designations end in a digit,
+    # so a trailing planet letter is a safe exoplanet marker
+    if re.search(r"[\w-]\s?(b|c|d|e|f)$", n) and not re.match(r"^\d{4}", n):
         return "exoplanet"
     return "small_body"
 

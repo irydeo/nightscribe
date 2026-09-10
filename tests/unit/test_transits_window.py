@@ -42,9 +42,9 @@ def _tonight_midpoint():
 
 def _event_for(out, mid_dt):
     # @args: out - transits_tonight results, mid_dt - intended mid-transit
-    # @return: the event whose mid matches (the catalogue period makes
-    #          sibling transits from adjacent nights show up too — the gate
-    #          is at mid-transit altitude, not at darkness containment)
+    # @return: the event whose mid matches.  transit_times keeps only mids
+    #          strictly inside the darkness window, so exactly one event
+    #          per (planet, night) pair is expected here.
     for t in out:
         if abs((t["mid"] - mid_dt).total_seconds()) < 60:
             return t
@@ -126,6 +126,30 @@ def test_baseline_fits_false_when_star_sets_during_baseline():
     out = transits.transits_tonight([p], LAT, LON, DATE)
     t = _event_for(out, mid)
     assert t["baseline_fits"] is False
+
+
+def test_transit_mid_in_daylight_excluded():
+    # Regression: a transit whose mid falls at solar noon must be excluded
+    # even when the star is at the zenith (alt ~90 deg) — a situation where
+    # the altitude gate alone cannot reject it. The window filter is the
+    # only mechanism that can exclude it.
+    #
+    # Geometry: mid-transit at 12:00 UTC, star placed at the zenith
+    # (RA = LST at that instant, Dec = site latitude -> meridian altitude
+    # = 90 deg - |Dec - latitude| = 90 deg). Period = 1.0 day so the
+    # transit recurs daily; the night window (evening of day 21 to early
+    # morning of day 22) straddles the noon mid-transit of day 21 and the
+    # next day, which the old `t >= from_jd - period_days` gate would
+    # admit via the pre-window sibling even though the gate's own
+    # altitude check passes at the zenith.
+    mid = datetime.datetime(2026, 8, 21, 12, 0, tzinfo=datetime.timezone.utc)
+    jd = coords.jd_from_datetime(mid)
+    p = {"name": "DAY-1 b", "star": "DAY-1",
+         "ra": coords.lst_degrees(jd, LON), "dec": LAT,
+         "t0": jd, "period": 1.0, "duration_h": 2.0,
+         "v_mag": 10.0, "depth_mmag": 10.0}
+    out = transits.transits_tonight([p], LAT, LON, DATE)
+    assert out == []
 
 
 # ---------------- heuristic exposure ----------------

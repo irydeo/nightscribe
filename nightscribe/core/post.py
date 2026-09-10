@@ -202,6 +202,9 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
     sb = d.get("sbdb")
     els = sb.get("elements") if sb else None
     unc = d.get("unconfirmed")
+    # exoplanet transit event: resolved once, used by both the sky chart
+    # (to shade ingress/egress) and the transit light-curve slot.
+    tr = d.get("transit") or (unc or {}).get("transit")
     charts = {}
     # orbit chart: bound (e<1) and parabolic (e=1) orbits
     if els and els.get("q") and els.get("e", 1) <= 1.0:
@@ -235,6 +238,16 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
         # the planner's coordinates — enough for the sky chart
         ra_deg = float(d["ra_deg"])
         dec_deg = float(d.get("dec_deg") or 0.0)
+    if ra_deg is None and d.get("ra") is not None:
+        # Exoplanet Archive (and the ExoClock planner target) hand us
+        # `ra`/`dec` as plain floats (degrees) — no `ra_deg` twin. A string
+        # slips in the same try as above, so a non-numeric value just
+        # skips the sky slot without crashing the whole chart build.
+        try:
+            ra_deg = float(d["ra"])
+            dec_deg = float(d.get("dec") or 0.0)
+        except (TypeError, ValueError):
+            pass
     if ra_deg is not None:
         p = outdir / f"{safe}sky.png"
         hor = None
@@ -261,7 +274,10 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
                                horizon=hor.alt_at if hor else None,
                                margin=float(cfg.get("horizon_margin_deg", 0))
                                 if cfg else 0.0, safe_window=sw,
-                               best_time=best, size=size, lang=lang)
+                               best_time=best, size=size, lang=lang,
+                               transit=tr
+                                if e.get("type") in ("transit", "exoplanet")
+                                else None)
         except Exception:
             # no site/lat-lon to plot from: omit the slot rather than fail
             logger.exception("sky chart skipped for %s", e["name"])
@@ -275,8 +291,8 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
             sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p),
                                   fmt=fmt, size=size, lang=lang)
             charts["field"] = p
-    # exoplanet transit: light curve of the event (planner target's dict)
-    tr = d.get("transit") or (unc or {}).get("transit")
+    # exoplanet transit: light curve of the event (planner target's dict;
+    # `tr` was resolved once above, shared with the sky chart)
     if tr and tr.get("mid") and e.get("type") in ("transit", "exoplanet"):
         from ..viz import transit_view
         p = outdir / f"{safe}transit.png"

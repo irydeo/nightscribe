@@ -80,6 +80,13 @@ def _observability(t, cfg):
     # and easy objects
     if t.get("kind") in ("neo", "pccp") and mag is not None and mag > limit:
         score -= _clamp((mag - limit) / 2.0 * 3.0, 0, 3.0)
+    # Track D: a transit whose full capture window (baseline + transit +
+    # baseline) does not fit tonight is only capturable in part — sink it
+    # below events the observer can actually bracket
+    if t.get("kind") == "transit":
+        tr = t.get("transit") or {}
+        if tr.get("baseline_fits") is False:
+            score -= 4.0
     score -= _moon_penalty(t, cfg, limit)
     return _clamp(score, 0, 30)
 
@@ -249,7 +256,20 @@ def _as_float(x, default=None):
         return default
 
 
-def _fragments(t):
+def _hm_utc(dt):
+    # @args: dt - datetime or ISO-8601 string
+    # @return: "HH:MM" string, or None
+    if isinstance(dt, str):
+        try:
+            dt = datetime.datetime.fromisoformat(dt)
+        except ValueError:
+            return None
+    if isinstance(dt, datetime.datetime):
+        return dt.strftime("%H:%M")
+    return None
+
+
+def _fragments(t, cfg=None):
     # Object-specific reasons, heaviest first, drawn from the same data the
     # score is built from — so the phrase and the number always agree.
     # Only fragments with real data are emitted; no trailing period (it is
@@ -350,6 +370,30 @@ def _fragments(t):
     elif kind == "transit":
         tr = t.get("transit") or {}
         star = tr.get("star") or ""
+        # Track D: the card leads with the observer's real decision — "fits
+        # entirely in your night (baselines included)" and "detectable with
+        # your telescope" — and the ExoClock priority is explained, because
+        # a first-timer does not know that number.
+        cs_hm = _hm_utc(tr.get("capture_start"))
+        if cs_hm:
+            if tr.get("baseline_fits") is False:
+                frags.append((f"⚠ Empieza a capturar a las {cs_hm} UTC, pero la ventana completa (con baselines) no cabe esta noche",
+                              f"⚠ Start capturing at {cs_hm} UTC, but the full window (baselines included) does not fit tonight"))
+            else:
+                frags.append((f"Cabe entero en tu noche (baselines incluidas): empieza a capturar a las {cs_hm} UTC",
+                              f"Fits entirely in your night (baselines included): start capturing at {cs_hm} UTC"))
+        scope = _as_float(tr.get("min_telescope_in"))
+        aperture = _as_float(cfg.get("aperture_inches")) if cfg else None
+        if scope is not None and aperture:
+            if aperture >= scope:
+                frags.append((f"Detectable con tu telescopio de {aperture:g}″ (ExoClock pide ≥ {scope:g}″)",
+                              f"Detectable with your {aperture:g}-inch telescope (ExoClock asks ≥ {scope:g}″)"))
+            else:
+                frags.append((f"⚠ ExoClock pide un telescopio de ≥ {scope:g}″ y el tuyo es de {aperture:g}″",
+                              f"⚠ ExoClock asks for a ≥ {scope:g}-inch telescope and yours is {aperture:g}″"))
+        if (tr.get("priority") or "").lower() == "high":
+            frags.append(("Prioridad alta en ExoClock: el catálogo que prepara la misión Ariel de la ESA necesita esta medida para afinar el horario del planeta",
+                          "High priority on ExoClock: the catalogue feeding ESA's Ariel mission needs this measurement to refine the planet's schedule"))
         if star and star != t.get("name") and any(s in star for s in FAMOUS_SYSTEMS):
             frags.append((f"Su estrella es {star}",
                           f"Host star {star}"))
@@ -360,14 +404,6 @@ def _fragments(t):
             mid_en = f" for {dur:.0f} h" if dur else ""
             frags.append((f"El planeta oscurece su estrella un {depth:.1f}%{mid_es}: tu curva de luz ayuda a la misión Ariel de la ESA",
                           f"The planet dims its star by {depth:.1f}%{mid_en}: your light curve helps ESA's Ariel mission"))
-        if (tr.get("priority") or "").lower() == "high":
-            scope = _as_float(tr.get("min_telescope_in"))
-            if scope is not None:
-                frags.append((f"Catálogo ESA: telescopio mínimo de {scope:.0f} pulgadas",
-                              f"ESA catalogue: minimum {scope:.0f}-inch telescope"))
-            else:
-                frags.append(("Prioridad high en el catálogo ExoClock",
-                              "High priority in the ExoClock catalogue"))
     elif kind == "alert":
         a = t.get("approach") or {}
         ld, adate = a.get("dist_ld"), a.get("date")
@@ -384,12 +420,13 @@ def _fragments(t):
     return frags
 
 
-def why_phrase(t):
+def why_phrase(t, cfg=None):
     # One-line "why here" for a target: up to three object-specific
     # fragments joined with a middot, in priority order.
-    # @args: t - target dict
+    # @args: t - target dict, cfg - Config (enables the aperture verdict
+    #        on transits, Track D)
     # @return: {"es":..., "en":...}
-    frags = _fragments(t)[:3]
+    frags = _fragments(t, cfg)[:3]
     if not frags:
         return {"es": "Buen objetivo esta noche.", "en": "A good target tonight."}
     return {"es": "  ·  ".join(f[0] for f in frags) + ".",
@@ -405,7 +442,7 @@ def top_n(targets, cfg=None, db=None, n=3):
     scored = []
     for t in targets:
         score, parts = score_target(t, cfg, db)
-        scored.append((t, score, parts, why_phrase(t)))
+        scored.append((t, score, parts, why_phrase(t, cfg)))
     scored.sort(key=lambda x: x[1], reverse=True)
 
     top = []

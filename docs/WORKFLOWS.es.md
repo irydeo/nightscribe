@@ -636,3 +636,33 @@ ficheros que el proyecto genera se ven en la pestaña Detalles.
 | A5 | CLI `project close/reopen/files` + i18n ES/EN (458 cadenas) + esta sección | **Hecho** |
 
 **Estado**: suite unitaria verde (643).
+
+### 7decies. Track B — Supernova: seguimiento fotométrico multi-noche (2026-09-09)
+
+Plan: `docs/PLANS/sn-followup.md` (hijo B de `docs/PLANS/project-concept-v2.md`).
+Rama `feature/sn-followup`.
+
+El proyecto SN deja de ser «una noche» y se convierte en un **seguimiento de semanas o meses** (e incluso años, con reabrirura): cada visita se registran el apilado final por filtro y la fotometría (sin fricción: solo teclear la magnitud), NightScribe calcula un **análisis de campaña indicativo** propio y dibuja la **curva de luz** frente a las **plantillas típicas** del tipo, genera la **animación de la evolución** (GIF/MP4), recomienda la **captura por brillo**, produze el **FITS anotado**, **recuerda la cadencia** («hace N noches que no la visitas») y mantiene el **post vivo**. Referencia real: la página de AT2020sum/AT2020sun en irydeo.com (fotometría AIJ, comparaciones Gaia DR2, tablas por filtro Clear/NIR, revisitas).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| B0 | Migración `user_version 5`: `project_sessions`, `session_images`, `photometry_points` + `core/followup.py` CRUD | **Hecho** |
+| B1 | `core/fits_meta.py`: DATE-OBS/FILTER/EXPTIME del header + MJD | **Hecho** |
+| B2 | Pestaña «Seguimiento» en proyecto SN (visitas, apilados, notas, cadencia) | **Hecho** |
+| B3 | Entrada fotometría sin fricción: rápida (solo magnitud) + pegado tolerante (AIJ/Tycho/CSV) + fichero | **Hecho** |
+| B4 | Curva de luz: PNG + widget QGraphicsView + plantillas típicas esquemáticas (Ia, II-P/L, Ib/c, SLSN, kilonova) | **Hecho** |
+| B5 | `core/series.py`: motor de series — apertura, detección, ensemble automático, Δmag, análisis de campaña con veredicto vs plantilla | **Hecho** |
+| B6 | Animación de evolución: N frames alineados por afín desde WCS, GIF/MP4 | **Hecho** |
+| B7 | Didáctica SN: tipos ampliados + TNS enrich cuando SIMBAD no conoce la SN | **Hecho** |
+| B8 | Captura SN: `recommended_sn_exposure(mag)` + secuencias multi-filtro retrocompatibles + bloque SN en Plan tab | **Hecho** |
+| B9 | Post vivo: curva de luz en `build_charts` + etiquetas de animación | **Hecho** |
+| B10 | FITS anotado: copia con keywords NS_ en cabecera (Python puro, sin astropy) | **Hecho** |
+| B11 | Cadencia con memoria: «hace N noches» en pestaña Seguimiento + chip en Tonight | **Hecho** |
+| B12 | Contexto de surveys ASASSN/ZTF (opcional) | Pendente (opcional) |
+| B13 | Cierre: i18n ES/EN (467 cadenas), ADRs, esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (749). **Fuera de esta
+iteración**: fotometría absoluta propia (términos de color), sustración de galaxia, ajuste PSF; monitor de flujo en vivo para tránsitos/variables de corto periodo (sobre `core/series.py`, tremadamente simple); importar salida de EXOTIC (O-C); lanzar EXOTIC/AIJ como subproceso.
+
+*(Restaurada 2026-09-10: esta sección se perdió al resolver el merge
+`50cd6c9` — se recupera verbatim de `d0686e4`.)*

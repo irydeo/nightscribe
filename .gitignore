@@ -1,4 +1,5 @@
 .venv/
+nightscribe/_version.py
 dist/
 build/
 __pycache__/

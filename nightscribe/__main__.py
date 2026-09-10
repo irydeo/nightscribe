@@ -17,7 +17,7 @@ import logging
 import sys
 from pathlib import Path
 
-from . import __app_name__, __version__, config, paths
+from . import __app_name__, config, paths
 from .config import config as cfg
 from .core.db import db
 
@@ -287,6 +287,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="nightscribe",
         description="Planifica tu noche, entiende cada objeto, cuenta tu ciencia.")
+    from .version import full_version
+    parser.add_argument("--version", action="version",
+                        version=f"{__app_name__} {full_version()}")
     parser.add_argument("--verbose", "-v", action="store_true")
     sub = parser.add_subparsers(dest="cmd", required=True)
 

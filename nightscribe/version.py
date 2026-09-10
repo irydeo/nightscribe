@@ -48,10 +48,28 @@ def git_sha():
     return out.stdout.strip() if out.returncode == 0 else ""
 
 
+def git_dirty():
+    # @args: none
+    # @return: True if the working tree has uncommitted changes.
+    import subprocess
+    here = Path(__file__).resolve().parent
+    try:
+        out = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=str(here), capture_output=True, text=True, timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return bool(out.stdout.strip()) if out.returncode == 0 else False
+
+
 def full_version():
     # @args: none
-    # @return: e.g. "0.1.0 (5c295cb)" — the base version plus the
-    #         commit when one is available.
+    # @return: e.g. "0.1.0 (5c295cb)" or "0.2.0.dev3+g5c295cb (5c295cb)*"
     v = base_version()
     sha = git_sha()
-    return f"{v} ({sha})" if sha else v
+    parts = [v]
+    if sha:
+        parts.append(f"({sha})")
+    if git_dirty():
+        parts.append("*")
+    return " ".join(parts)

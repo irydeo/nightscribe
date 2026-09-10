@@ -141,6 +141,7 @@ def transits_tonight(planets, lat, lon, date=None, threshold_fn=None,
                 "min_telescope_in": p.get("min_telescope_in"),
                 "oc_min": p.get("oc_min"),
                 "max_alt": round(max(a for (a, _az) in pts), 1),
+                "t0": p.get("t0"),   # catalogue mid-transit (EXOTIC handoff)
             }
             # Track D: recommended capture window (baseline + transit +
             # baseline), its feasibility inside the safe night, the maximum

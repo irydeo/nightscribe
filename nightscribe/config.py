@@ -58,6 +58,11 @@ DEFAULTS = {
     # SN follow-up (Track B, B11): cadence threshold in days — the Tonight
     # chip and the follow-up tab remind when a visit is due
     "sn_cadence_days": 3,
+    # EXOTIC handoff (Track D, subplan 4): camera identity and observer code
+    # for the inits.json; height above is reused as "Obs. Elevation (meters)"
+    "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
+    "pixel_binning": "1x1",
+    "aavso_code": "",           # AAVSO observer code; blank when none
 }
 
 

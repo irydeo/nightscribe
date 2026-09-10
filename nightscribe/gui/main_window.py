@@ -451,6 +451,12 @@ class MainWindow(QMainWindow):
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
+        # Track D (EXOTIC handoff): AAVSO code, camera type and binning
+        dlg.edt_aavso_code.setText(config.get("aavso_code", ""))
+        dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
+        dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
+        dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
+        dlg.cmb_binning.setCurrentText(config.get("pixel_binning", "1x1"))
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
         dlg.spn_horizon_margin.setValue(
             float(config.get("horizon_margin_deg", 0)))
@@ -508,6 +514,10 @@ class MainWindow(QMainWindow):
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
+        config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())
+        config.set("camera_type", dlg.cmb_camera_type.currentText())
+        config.set("pixel_binning", dlg.cmb_binning.currentText().strip()
+                   or "1x1")
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
         config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
@@ -2425,6 +2435,26 @@ class MainWindow(QMainWindow):
                 f"<small>{self.tr('Pre-filled with')} {p['object_name']} "
                 f"@ {ctx.get('ra_deg', 0):.4f}, {ctx.get('dec_deg', 0):+.4f}"
                 f"</small>"))
+        elif kind == "transit":
+            # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
+            # NASA/JPL); NightScribe hands over a pre-filled inits.json and
+            # then guides the closing of the scientific loop.
+            layout.addWidget(QLabel(self.tr(
+                "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
+                "Python ≤3.10 environment.")))
+            btn_exotic = QPushButton(
+                self.tr("Export to EXOTIC (inits.json)…"))
+            btn_exotic.setToolTip(self.tr(
+                "Pre-filled EXOTIC initialization file: planet, observatory, "
+                "camera and filter — EXOTIC skips its wizard where it can"))
+            btn_exotic.clicked.connect(self._transit_export_exotic)
+            layout.addWidget(btn_exotic)
+            lbl_exotic = QLabel(self.tr(
+                "After the reduction, upload EXOTIC's output file to "
+                "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
+                "Database — and tell the story in the Publish step."))
+            lbl_exotic.setWordWrap(True)
+            layout.addWidget(lbl_exotic)
         else:
             layout.addWidget(QLabel(
                 self.tr("Process your images with your usual software.")))
@@ -2791,6 +2821,55 @@ class MainWindow(QMainWindow):
             project.update_step_data(
                 db, pid, "plan",
                 {"checklist": [bool(cb.isChecked()) for cb in cbs]})
+
+    def _transit_export_exotic(self):
+        # 4d: enrich the planet (worker — the GUI never blocks on the
+        # network; the Archive row is cached from the Details tab anyway),
+        # then write the pre-filled inits.json next to a user-chosen path.
+        p = self._current_project
+        if not p:
+            return
+        from .workers import ExploreWorker
+        self.statusBar().showMessage(
+            self.tr("Gathering planet data for EXOTIC…"), 4000)
+        worker = ExploreWorker(config, p["object_name"],
+                               fallback_target=p.get("context") or {})
+        worker.finished.connect(lambda e: self._exotic_write(p["id"], e))
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_write(self, pid, e):
+        # @args: pid - project id, e - enrich result ({} on failure)
+        from ..core import exotic
+        p = project.get(db, pid)
+        if not p:
+            return
+        if not e or not e.get("data"):
+            self.statusBar().showMessage(
+                self.tr("No planet data — check the name and retry"), 8000)
+            return
+        ctx = p.get("context") or {}
+        # the capture plan (filter/exposure) saved in the plan step feeds
+        # the filter name and the exposure time of the handoff file
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        plan = {"filter": plan_data.get("filter", "L"),
+                "exp_s": plan_data.get("exp_s")}
+        outdir = paths.project_dir(pid, p["object_name"])
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export EXOTIC inits.json"),
+            str(outdir / exotic.suggested_name()),
+            "JSON (*.json);;All files (*)")
+        if not out:
+            return
+        inits = exotic.make_inits(ctx, e["data"], config, plan=plan,
+                                  out_dir=str(Path(out).parent))
+        path = exotic.export_inits(inits, out)
+        project.add_file(db, pid, path, "exotic_inits")
+        self._populate_project_files(pid)
+        self.statusBar().showMessage(
+            self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
+                    "environment"), 10000)
 
     def _build_publish_tab(self, p, kind, ctx):
         tab = self.projects.tabs_steps.findChild(QWidget, "tab_publish")

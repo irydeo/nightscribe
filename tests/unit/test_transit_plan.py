@@ -184,3 +184,52 @@ def test_timeline_widget_empty_is_safe():
     tl.set_data(mid=_MID)  # a lone milestone still draws
     assert tl._items_registered
     tl.deleteLater()
+
+
+# ---------------- EXOTIC handoff (subplan 4d) ----------------
+
+def _fake_enrich():
+    # an exoplanet enrich result as the ExploreWorker delivers it
+    return {"type": "exoplanet", "name": "WASP-994 b",
+            "data": {"pl_name": "WASP-994 b", "hostname": "WASP-994",
+                     "ra": 330.0, "dec": 40.5, "pl_orbper": 3.27,
+                     "pl_radj": 1.5, "st_rad": 1.2, "pl_orbsmax": 0.05,
+                     "pl_tranmid": 2459123.456789, "st_teff": 6100.0}}
+
+
+def test_exotic_button_in_process_tab(window):
+    from PySide6.QtWidgets import QPushButton
+    from PySide6.QtWidgets import QWidget
+    _select(window, "WASP-994 b", _transit_ctx())
+    tab = window.projects.tabs_steps.findChild(QWidget, "tab_process")
+    texts = [b.text() for b in tab.findChildren(QPushButton)]
+    assert any("EXOTIC" in t for t in texts)
+
+
+def test_exotic_write_registers_the_file(window, monkeypatch, tmp_path):
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    p = _select(window, "WASP-993 b", _transit_ctx())
+    out = tmp_path / "inits_test.json"
+    from PySide6.QtWidgets import QFileDialog
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    window._exotic_write(p["id"], _fake_enrich())
+    assert out.exists()
+    import json
+    data = json.loads(out.read_text(encoding="utf-8"))
+    # the name comes from the Archive row of the enrich, not the project
+    assert data["planetary_parameters"]["Planet Name"] == "WASP-994 b"
+    files = [f for f in project.list_files(mw.db, p["id"])
+             if f["kind"] == "exotic_inits"]
+    assert len(files) == 1
+
+
+def test_exotic_write_without_data_warns_and_stops(window, tmp_path):
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    p = _select(window, "WASP-992 b", _transit_ctx())
+    window._exotic_write(p["id"], {})   # enrich failed -> no file, no crash
+    files = [f for f in project.list_files(mw.db, p["id"])
+             if f["kind"] == "exotic_inits"]
+    assert files == []

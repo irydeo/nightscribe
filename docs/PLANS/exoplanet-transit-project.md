@@ -25,6 +25,15 @@
 > del fichero de salida de EXOTIC a ExoClock/AAVSO** además del post; (h) el
 > monitor de flujo en vivo queda como v2+ con horizonte en **variables de
 > corto periodo**, condición: *tremendamente simple* (ver padre).
+> **Enmendado 2026-09-10 (ejecución 4b)**: el esquema se re-verificó contra el
+> `inits.json` vivo en la raíz de `rzellem/EXOTIC` (el de `docs/` ya no
+> existe). Diferencias adoptadas: claves exactas («AAVSO Observer Code (blank
+> if none)», «Image Scale (Ex: 5.21 arcsecs/pixel)»), fecha de observación
+> «17-December-2017» (mes inglés, es formato de fichero), tres directorios de
+> calibración separados, «Add Comparison Stars from AAVSO? (y/n)» = y,
+> proper motions (`sy_pmra/sy_pmdec` se añaden al TAP), y la fórmula de
+> Rp/Rs corregida a `pl_radj × 0.10045 / st_rad` (la del plan asumía
+> implícitamente una estrella solar).
 
 **rama**: `feature/exoplanet-transit-project` (derivada de `feature/object-card`; mergea de vuelta a `feature/object-card`)
 **arranca sobre**: `07a29f8` (feature/object-card al día)

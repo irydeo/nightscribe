@@ -23,6 +23,14 @@ import os
 import pytest
 
 
+def _contrast(a, b):
+    # WCAG contrast ratio (>=1) between two #rrggbb strings.
+    from nightscribe.gui import theme
+    la, lb = theme._lum(a), theme._lum(b)
+    hi, lo = max(la, lb), min(la, lb)
+    return (hi + 0.05) / (lo + 0.05)
+
+
 @pytest.fixture(scope="module")
 def qapp():
     # One QApplication for the whole module — Qt allows exactly one per
@@ -79,6 +87,37 @@ def test_apply_theme_installs_stylesheet(qapp):
     assert "QTabBar::tab" in qss, "global QSS should style tabs"
     # And the stylesheet references the palette hex (sanity, no regressions)
     assert theme.C_BG in qss
+
+
+def test_style_checkbox_indicator_is_visible_and_checked(qapp):
+    # The Fusion frame was invisible on the dark palette (only size was set);
+    # the indicator must draw an explicit edge and a checked accent + tick.
+    from pathlib import Path
+    from nightscribe.gui import theme
+
+    theme.apply_theme(qapp)
+    qss = qapp.styleSheet()
+    assert "QCheckBox::indicator" in qss
+    assert f"border: 1px solid {theme.C_EDGE}" in qss, \
+        "indicator needs a visible outline (barely-there bug)"
+    assert "::indicator:checked" in qss
+    # The checked state must reference the bundled tick asset and it must exist.
+    assert theme.CHECK_SVG in qss, "checked indicator should paint check.svg"
+    assert Path(theme.CHECK_SVG).is_file(), "check.svg asset missing"
+    # And the boundary must actually read against the input background.
+    assert _contrast(theme.C_EDGE, theme.C_BASE) >= 1.5
+
+
+def test_style_lists_read_as_containers(qapp):
+    from nightscribe.gui import theme
+
+    theme.apply_theme(qapp)
+    qss = qapp.styleSheet()
+    assert "QListView, QListWidget" in qss, "list views should be containers"
+    assert f"border: 1px solid {theme.C_EDGE}" in qss, "lists need a visible edge"
+    assert "::item:hover" in qss, "list items should highlight on hover"
+    assert "::item:selected" in qss
+    assert "QPlainTextEdit" in qss, "plain text edits should join the input chrome"
 
 
 def test_apply_theme_is_idempotent(qapp):

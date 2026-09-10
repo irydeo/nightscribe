@@ -21,6 +21,15 @@
 # own inline styles, which override the global ones — that stays on purpose.
 
 
+from pathlib import Path
+
+# Bundled vector assets live next to moon_disk.png (same loading pattern as
+# moon_icon.py): the QSS references check.svg by URL to paint the tick inside
+# a checked indicator — files, not compiled qrc resources.
+_ASSETS = Path(__file__).resolve().parent.parent / "assets"
+CHECK_SVG = str(_ASSETS / "check.svg")
+
+
 # Per-kind accent colors, shared by cards, icons and table names.
 # Six well-separated hues on the wheel (0/28/140/185/218/268°),
 # none in the amber band (40-65°), all saturated, mid-value.
@@ -51,6 +60,11 @@ C_ACCENT = "#6ab0ff"    # links, focus, interactive accents
 C_WARN = "#f76808"      # warnings (moon, mag-limit) — orange, same as alert
 C_GOOD = "#46a758"      # "up now" state — matches the comet green
 C_OK   = "#4484ef"      # informative (rise times, windows) — matches neo blue
+C_EDGE = "#3a4156"      # borders of interactive containers (checkbox frame,
+                        # input fields, list/table boxes, popups) — reads as
+                        # "this is clickable" against C_BASE/C_PANEL (>=1.5:1)
+C_HOVER = "#212739"     # push-button hover fill (was a hardcoded literal)
+C_DIM_FILL = "#141824"  # disabled button fills, alternate table rows
 # Pills are solid badges (no alpha): the hue *is* the surface, and the label
 # is picked per hue for contrast (near-black on bright hues, white on dark).
 # Transparency over the dark card was exactly what made every chip read dim
@@ -149,9 +163,9 @@ QPushButton {{
     background: {C_PANEL}; color: {C_TEXT}; border: none;
     border-radius: 4px; padding: 6px 16px;
 }}
-QPushButton:hover {{ background: #212739; }}
+QPushButton:hover {{ background: {C_HOVER}; }}
 QPushButton:pressed {{ background: {C_SEL}; }}
-QPushButton:disabled {{ color: {C_TEXT_DIM}; background: #141824; }}
+QPushButton:disabled {{ color: {C_TEXT_DIM}; background: {C_DIM_FILL}; }}
 QPushButton:flat {{ background: transparent; }}
 QPushButton:flat:hover {{ background: rgba(255,255,255,0.06); }}
 QToolButton {{
@@ -186,18 +200,20 @@ QTabBar::tab:selected {{
 QTabBar::tab:hover {{ color: {C_TEXT}; }}
 
 /* ---- inputs -------------------------------------------------------------- */
-QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit, QTextBrowser {{
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit, QTextBrowser,
+QPlainTextEdit {{
     background: {C_BASE}; color: {C_TEXT};
-    border: 1px solid {C_LINE}; border-radius: 4px; padding: 4px 8px;
+    border: 1px solid {C_EDGE}; border-radius: 4px; padding: 4px 8px;
     selection-background-color: {C_SEL};
 }}
-QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {{
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus,
+QTextEdit:focus, QPlainTextEdit:focus {{
     border: 1px solid {C_ACCENT};
 }}
 QComboBox::drop-down {{ border: none; width: 22px; }}
 QComboBox QAbstractItemView {{
     background: {C_PANEL}; color: {C_TEXT};
-    border: 1px solid {C_LINE}; selection-background-color: {C_SEL};
+    border: 1px solid {C_EDGE}; selection-background-color: {C_SEL};
 }}
 QSpinBox::up-button, QSpinBox::down-button,
 QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
@@ -205,7 +221,27 @@ QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
 }}
 QCheckBox, QRadioButton {{ spacing: 8px; color: {C_TEXT}; }}
 QCheckBox::indicator, QRadioButton::indicator {{
-    width: 16px; height: 16px;
+    width: 17px; height: 17px;
+    border: 1px solid {C_EDGE}; border-radius: 4px;
+    background: #0a0d16;
+}}
+QCheckBox::indicator:hover, QRadioButton::indicator:hover {{
+    border: 1px solid {C_ACCENT};
+}}
+QCheckBox::indicator:pressed, QRadioButton::indicator:pressed {{
+    background: {C_SEL};
+}}
+QCheckBox::indicator:disabled, QRadioButton::indicator:disabled {{
+    border: 1px solid {C_LINE}; background: {C_DIM_FILL};
+}}
+QCheckBox::indicator:checked {{
+    background: {C_ACCENT}; border: 1px solid {C_ACCENT};
+    image: url("{CHECK_SVG}");
+}}
+QRadioButton::indicator {{ border-radius: 9px; }}
+QRadioButton::indicator:checked {{
+    /* accent dot with a dark ring: the 4px border hollows the centre */
+    background: {C_ACCENT}; border: 4px solid #0a0d16;
 }}
 QProgressBar {{
     background: {C_BASE}; color: {C_TEXT};
@@ -215,21 +251,31 @@ QProgressBar {{
 QProgressBar::chunk {{ background: {C_ACCENT}; }}
 
 /* ---- tables and lists --------------------------------------------------- */
-QTableWidget, QTableView, QTreeView, QListView, QListView::item {{
+/* Views are explicit containers: a visible edge (C_EDGE) keeps a list from
+   melting into the window, and hover lets you follow the item under the
+   mouse. The selected accent stays as the one "active" surface colour. */
+QTableWidget, QTableView, QTreeView, QListView, QListWidget {{
     background: {C_BASE}; color: {C_TEXT};
-    alternate-background-color: #141824;
+    alternate-background-color: {C_DIM_FILL};
     gridline-color: {C_LINE};
+    border: 1px solid {C_EDGE}; border-radius: 6px;
 }}
-QTableWidget::item:selected, QTreeView::item:selected, QListView::item:selected {{
+QListView::item, QListWidget::item {{ padding: 5px 8px; }}
+QTableWidget::item:hover, QTreeView::item:hover,
+QListView::item:hover, QListWidget::item:hover {{
+    background: {C_PANEL};
+}}
+QTableWidget::item:selected, QTreeView::item:selected,
+QListView::item:selected, QListWidget::item:selected {{
     background: {C_SEL}; color: #ffffff;
 }}
 QHeaderView::section {{
     background: {C_PANEL}; color: {C_TEXT_DIM};
     border: none; border-bottom: 1px solid {C_LINE};
+    border-right: 1px solid {C_EDGE};
     padding: 6px 8px;
 }}
 QTableCornerButton::section {{ background: {C_PANEL}; border: none; }}
-QTableWidget {{ border: 1px solid {C_LINE}; border-radius: 6px; }}
 
 /* ---- groups, toolbars, status ------------------------------------------------ */
 QGroupBox {{
@@ -262,7 +308,7 @@ QScrollBar:vertical {{
 QScrollBar::handle:vertical {{
     background: {C_LINE}; min-height: 30px; border-radius: 4px;
 }}
-QScrollBar::handle:vertical:hover {{ background: #333d55; }}
+QScrollBar::handle:vertical:hover {{ background: {C_EDGE}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QScrollBar:horizontal {{
     background: transparent; height: 10px; margin: 2px;
@@ -270,7 +316,7 @@ QScrollBar:horizontal {{
 QScrollBar::handle:horizontal {{
     background: {C_LINE}; min-width: 30px; border-radius: 4px;
 }}
-QScrollBar::handle:horizontal:hover {{ background: #333d55; }}
+QScrollBar::handle:horizontal:hover {{ background: {C_EDGE}; }}
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 
 /* ---- misc ----------------------------------------------------------------- */

@@ -162,14 +162,11 @@ def test_new_strings_are_translated(qapp):
                 "pico en el azimut %1°",
             },
             "SettingsDialog": {
-                "Flat altitude floor used only when no limit file is "
-                "loaded; the limit file, when present, is the safety "
-                "reference":
-                "Suelo de altitud plano",
-                "Summary of the loaded limit file: min/max altitude, "
-                "peak azimuth and point count. If it cannot be read, "
-                "the flat minimum altitude is used instead.":
-                "Resumen del fichero de límites cargado",
+                # ADR-028: help now lives below the field (lblH_minalt),
+                # not as a tooltip on the stats label.
+                "Flat altitude floor, used only when no limit file is "
+                "loaded":
+                "Piso fijo de altitud",
             },
         }
         for ctx, pairs in checks.items():

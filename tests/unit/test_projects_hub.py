@@ -934,6 +934,32 @@ def test_hub_files_list_empty_for_new_project(window, panel):
     _create_and_select(window, "sn", "SN2026nofiles", {"kind": "sn"})
     lst = window._proj_files_list
     assert lst.count() == 0
+
+
+def test_change_project_folder_rehomes_future_exports(window, panel,
+                                                      monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QFileDialog
+    from nightscribe.core import project
+    import nightscribe.core.db as dbmod
+    _reset_filters(window)
+    p = _create_and_select(window, "sn", "SN2026folder", {"kind": "sn"})
+    prev = project.storage_dir(p)
+    moved = tmp_path / "moved"
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory",
+        staticmethod(lambda *a, **k: str(moved)))
+    window._change_project_folder()
+    updated = project.get(dbmod.db, p["id"])
+    assert updated["root_dir"] == str(moved)
+    assert str(project.storage_dir(updated)).startswith(str(moved))
+    assert window._current_project["root_dir"] == str(moved)
+    # a cancelled dialog leaves the project untouched
+    project.set_root_dir(dbmod.db, p["id"], str(prev))
+    window._current_project = project.get(dbmod.db, p["id"])
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", staticmethod(lambda *a, **k: ""))
+    window._change_project_folder()
+    assert project.get(dbmod.db, p["id"])["root_dir"] == str(prev)
 # ---------------- B2: SN follow-up tab ----------------
 
 def test_followup_tab_visible_for_sn(window, panel):

@@ -100,7 +100,8 @@ def test_observating_tab_widgets(qapp):
     for w in ["edt_horizon_file", "btn_horizon_browse",
               "spn_horizon_margin", "spn_min_alt", "lbl_horizon_stats",
               "chk_moon_enabled", "spn_moon_sep", "spn_moon_illum",
-              "spn_overhead"]:
+              "spn_overhead", "edt_projects_root", "btn_projects_browse",
+              "btn_projects_reset"]:
         assert w in names, f"{w} expected on the Observing tab"
     dlg.deleteLater()
 
@@ -112,6 +113,58 @@ def test_integrations_tab_widgets(qapp):
               "edt_tns_bot", "edt_tns_bot_key"]:
         assert w in names, f"{w} expected on the Integrations tab"
     dlg.deleteLater()
+
+
+def test_help_labels_sit_below_their_field(qapp):
+    # ADR-028: every lblH_* must live in the SAME group as its field and
+    # vertically AFTER it (no overlap). Smoke-check the three tabs.
+    from PySide6.QtWidgets import QWidget
+    dlg = _dlg()
+    dlg.resize(720, dlg.sizeHint().height())
+    qapp.processEvents()
+
+    pairs = [
+        ("grp_language", "cmb_language", "lblH_language"),
+        ("grp_site", "spn_lat", "lblH_lat"),
+        ("grp_equip", "spn_limit_mag", "lblH_limit"),
+        ("grp_camera", "spn_pixel_um", "lblH_pixel"),
+        ("grp_horizon", "spn_min_alt", "lblH_minalt"),
+        ("grp_kinds", "spn_best_pk", "lblH_bestpk"),
+        ("grp_transits", "chk_transit_scope_filter", "lblH_scope_filter"),
+        ("grp_storage", "edt_projects_root", "lblH_storage"),
+        ("grp_moon", "chk_moon_enabled", "lblH_moonwarn"),
+        ("grp_ccdciel", "chk_ccdciel_auto", "lblH_ccdauto"),
+        ("grp_misc", "edt_neofixer_key", "lblH_nfkey"),
+    ]
+    widgets = {w.objectName(): w for w in dlg.findChildren(QWidget)
+               if w.objectName()}
+    for grp_name, field_name, help_name in pairs:
+        grp = widgets.get(grp_name)
+        field = widgets.get(field_name)
+        help_lbl = widgets.get(help_name)
+        assert grp is not None, f"group {grp_name} missing"
+        assert _is_descendant(field, grp), \
+            f"{field_name} not inside {grp_name}"
+        assert _is_descendant(help_lbl, grp), \
+            f"{help_name} not inside {grp_name}"
+        # vertically: the help must be at or below its field (the label
+        # row comes after the field row — no overlap)
+        fy = field.mapTo(dlg, field.pos()).y()
+        hy = help_lbl.mapTo(dlg, help_lbl.pos()).y()
+        assert hy >= fy, \
+            f"help {help_name} must sit below {field_name} ({hy} < {fy})"
+    dlg.deleteLater()
+
+
+def _is_descendant(widget, ancestor):
+    # @args: widget - candidate child, ancestor - expected container
+    # @return: True if widget lives inside ancestor (or is it)
+    node = widget
+    while node is not None:
+        if node is ancestor:
+            return True
+        node = node.parent()
+    return False
 
 
 def test_integrations_tab_contains_ccdciel(qapp):

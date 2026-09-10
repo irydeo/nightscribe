@@ -1,10 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Settings dialog (ADR-028).
+
+  Layout rule: every field is a row — label + widget on one line — and
+  its help (lblH_*.ui labels) sits BELOW the field in its own row,
+  word-wrapped, left-aligned, at the top. The help labels are styled at
+  11 px / dim by on_open_settings (see ADR-028); the .ui only carries
+  the structure and the translatable text.
+-->
 <ui version="4.0">
  <class>SettingsDialog</class>
  <widget class="QDialog" name="SettingsDialog">
   <property name="windowTitle"><string>Settings</string></property>
   <property name="modal"><bool>true</bool></property>
-  <property name="minimumSize"><size><width>800</width><height>720</height></size></property>
+  <property name="minimumSize"><size><width>700</width><height>520</height></size></property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QTabWidget" name="tabWidget">
@@ -17,70 +26,142 @@
        <item>
         <widget class="QGroupBox" name="grp_language">
          <property name="title"><string>Language</string></property>
-         <layout class="QFormLayout">
-          <item row="0" column="0"><widget class="QLabel" name="lbl_language"><property name="text"><string>Interface language:</string></property></widget></item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="cmb_language">
-            <property name="toolTip"><string>Applies after restarting the app</string></property>
-           </widget>
+         <layout class="QVBoxLayout" name="vbox_language">
+          <item>
+           <layout class="QHBoxLayout" name="row_language">
+            <item><widget class="QLabel" name="lbl_language"><property name="text"><string>Interface language:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QComboBox" name="cmb_language"/></item>
+            <item><spacer name="hsp_language"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
           </item>
+          <item><widget class="QLabel" name="lblH_language"><property name="text"><string>Interface language; applies when the app restarts</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
          </layout>
         </widget>
        </item>
        <item>
         <widget class="QGroupBox" name="grp_site">
          <property name="title"><string>Observatory</string></property>
-         <layout class="QGridLayout" name="grid_site">
-          <property name="columnStretch">
-           <number>0</number>
-           <number>0</number>
-           <number>1</number>
-          </property>
-          <item row="0" column="0"><widget class="QLabel" name="lbl_mpc"><property name="text"><string>MPC code:</string></property></widget></item>
-          <item row="0" column="1"><widget class="QLineEdit" name="edt_mpc_code"><property name="maxLength"><number>3</number></property><property name="maximumSize"><size><width>80</width><height>16777215</height></size></property><property name="toolTip"><string>Your MPC observatory code (e.g. Z41). Coordinates resolve automatically.</string></property></widget></item>
-          <item row="0" column="2"><widget class="QPushButton" name="btn_resolve"><property name="text"><string>Resolve coordinates</string></property></widget></item>
-          <item row="1" column="0"><widget class="QLabel" name="lbl_name"><property name="text"><string>Name:</string></property></widget></item>
-          <item row="1" column="1" colspan="2"><widget class="QLineEdit" name="edt_obs_name"/></item>
-          <item row="2" column="0"><widget class="QLabel" name="lbl_lat"><property name="text"><string>Latitude (°):</string></property></widget></item>
-          <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
-          <item row="3" column="0"><widget class="QLabel" name="lbl_lon"><property name="text"><string>Longitude (°, east):</string></property></widget></item>
-          <item row="3" column="1"><widget class="QDoubleSpinBox" name="spn_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
-           <item row="4" column="0"><widget class="QLabel" name="lbl_height"><property name="text"><string>Height (m):</string></property></widget></item>
-           <item row="4" column="1"><widget class="QSpinBox" name="spn_height"><property name="maximum"><number>9000</number></property></widget></item>
-           <item row="5" column="0"><widget class="QLabel" name="lbl_aavso"><property name="text"><string>AAVSO code:</string></property></widget></item>
-           <item row="5" column="1"><widget class="QLineEdit" name="edt_aavso_code"><property name="maxLength"><number>6</number></property><property name="maximumSize"><size><width>80</width><height>16777215</height></size></property><property name="toolTip"><string>Your AAVSO observer code (blank if none). Written into the EXOTIC inits.json handoff.</string></property></widget></item>
-          </layout>
+         <layout class="QVBoxLayout" name="vbox_site_grp">
+          <item>
+           <layout class="QHBoxLayout" name="row_mpc">
+            <item><widget class="QLabel" name="lbl_mpc"><property name="text"><string>MPC code:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_mpc_code"><property name="maxLength"><number>3</number></property><property name="maximumSize"><size><width>80</width><height>16777215</height></size></property></widget></item>
+            <item><widget class="QPushButton" name="btn_resolve"><property name="text"><string>Resolve coordinates</string></property></widget></item>
+            <item><spacer name="hsp_mpc"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_mpc"><property name="text"><string>Your MPC observatory code; the site coordinates resolve automatically from it</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_name">
+            <item><widget class="QLabel" name="lbl_name"><property name="text"><string>Name:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_obs_name"/></item>
+            <item><spacer name="hsp_name"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_name"><property name="text"><string>Free-text observatory name (posts, reports)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_lat">
+            <item><widget class="QLabel" name="lbl_lat"><property name="text"><string>Latitude (°):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
+            <item><spacer name="hsp_lat"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_lat"><property name="text"><string>Decimal degrees; north is positive. Your site latitude.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_lon">
+            <item><widget class="QLabel" name="lbl_lon"><property name="text"><string>Longitude (°, east):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+            <item><spacer name="hsp_lon"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_lon"><property name="text"><string>Decimal degrees; east is positive. Your site longitude.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_height">
+            <item><widget class="QLabel" name="lbl_height"><property name="text"><string>Height (m):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_height"><property name="maximum"><number>9000</number></property></widget></item>
+            <item><spacer name="hsp_height"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_height"><property name="text"><string>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_aavso">
+            <item><widget class="QLabel" name="lbl_aavso"><property name="text"><string>AAVSO code:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_aavso_code"><property name="maxLength"><number>6</number></property><property name="maximumSize"><size><width>80</width><height>16777215</height></size></property></widget></item>
+            <item><spacer name="hsp_aavso"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Optional; written into the EXOTIC inits.json handoff (transit projects)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
         </widget>
        </item>
        <item>
         <widget class="QGroupBox" name="grp_equip">
          <property name="title"><string>Equipment and limits</string></property>
-         <layout class="QFormLayout">
-          <item row="0" column="0"><widget class="QLabel" name="lbl_aperture"><property name="text"><string>Aperture (inches):</string></property></widget></item>
-          <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_aperture"><property name="maximum"><double>100.0</double></property></widget></item>
-          <item row="1" column="0"><widget class="QLabel" name="lbl_limit"><property name="text"><string>Limiting magnitude:</string></property></widget></item>
-          <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_limit_mag"><property name="maximum"><double>25.0</double></property></widget></item>
+         <layout class="QVBoxLayout" name="vbox_equip">
+          <item>
+           <layout class="QHBoxLayout" name="row_aperture">
+            <item><widget class="QLabel" name="lbl_aperture"><property name="text"><string>Aperture (inches):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_aperture"><property name="maximum"><double>100.0</double></property></widget></item>
+            <item><spacer name="hsp_aperture"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_aperture"><property name="text"><string>Scope aperture in inches; used to size transit targets and scale the “why tonight” reasons</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_limit">
+            <item><widget class="QLabel" name="lbl_limit"><property name="text"><string>Limiting magnitude:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_limit_mag"><property name="maximum"><double>25.0</double></property></widget></item>
+            <item><spacer name="hsp_limit"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_limit"><property name="text"><string>Faintest object you can realistically detect at your site; caps the Tonight scoring</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
          </layout>
         </widget>
        </item>
        <item>
         <widget class="QGroupBox" name="grp_camera">
          <property name="title"><string>Camera (plate scale)</string></property>
-         <layout class="QFormLayout">
-          <item row="0" column="0"><widget class="QLabel" name="lbl_pixel"><property name="text"><string>Pixel size (µm):</string></property></widget></item>
-          <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_pixel_um"><property name="decimals"><number>2</number></property><property name="minimum"><double>1.0</double></property><property name="maximum"><double>30.0</double></property><property name="toolTip"><string>Camera pixel size in microns (e.g. 3.76 for a QHY600)</string></property></widget></item>
-           <item row="1" column="0"><widget class="QLabel" name="lbl_focal"><property name="text"><string>Focal length (mm):</string></property></widget></item>
-           <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property><property name="toolTip"><string>Telescope focal length in mm (e.g. 2000 for a 8&quot; f/10 SCT)</string></property></widget></item>
-           <item row="2" column="0"><widget class="QLabel" name="lbl_camtype"><property name="text"><string>Camera type:</string></property></widget></item>
-           <item row="2" column="1"><widget class="QComboBox" name="cmb_camera_type"><property name="toolTip"><string>CCD, CMOS or DSLR — written into the EXOTIC inits.json handoff</string></property></widget></item>
-           <item row="3" column="0"><widget class="QLabel" name="lbl_binning"><property name="text"><string>Pixel binning:</string></property></widget></item>
-           <item row="3" column="1"><widget class="QComboBox" name="cmb_binning"><property name="editable"><bool>true</bool></property><property name="toolTip"><string>On-chip binning (e.g. 1x1, 2x2) — written into the EXOTIC inits.json handoff</string></property></widget></item>
-          </layout>
+         <layout class="QVBoxLayout" name="vbox_camera">
+          <item>
+           <layout class="QHBoxLayout" name="row_pixel">
+            <item><widget class="QLabel" name="lbl_pixel"><property name="text"><string>Pixel size (µm):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_pixel_um"><property name="decimals"><number>2</number></property><property name="minimum"><double>1.0</double></property><property name="maximum"><double>30.0</double></property></widget></item>
+            <item><spacer name="hsp_pixel"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_pixel"><property name="text"><string>Camera pixel size in microns (3.76 for a QHY600); sets arcsec/pixel with focal length</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_focal">
+            <item><widget class="QLabel" name="lbl_focal"><property name="text"><string>Focal length (mm):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_focal_mm"><property name="decimals"><number>0</number></property><property name="minimum"><double>50.0</double></property><property name="maximum"><double>20000.0</double></property></widget></item>
+            <item><spacer name="hsp_focal"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_focal"><property name="text"><string>Telescope focal length in mm; together with the pixel size it sets the arcsec/pixel scale</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_camtype">
+            <item><widget class="QLabel" name="lbl_camtype"><property name="text"><string>Camera type:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QComboBox" name="cmb_camera_type"/></item>
+            <item><spacer name="hsp_camtype"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_camtype"><property name="text"><string>CCD, CMOS or DSLR; written into the EXOTIC inits.json handoff</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_binning">
+            <item><widget class="QLabel" name="lbl_binning"><property name="text"><string>Pixel binning:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QComboBox" name="cmb_binning"><property name="editable"><bool>true</bool></property></widget></item>
+            <item><spacer name="hsp_binning"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_binning"><property name="text"><string>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
         </widget>
        </item>
        <item>
         <spacer name="vspacer_site">
          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0">
+          <size><width>20</width><height>40</height></size>
+         </property>
         </spacer>
        </item>
       </layout>
@@ -91,134 +172,257 @@
        <item>
         <widget class="QGroupBox" name="grp_horizon">
          <property name="title"><string>Local limit</string></property>
-         <layout class="QFormLayout" name="form_horizon">
-          <item row="0" column="0"><widget class="QLabel" name="lbl_hfile"><property name="text"><string>Limit file:</string></property></widget></item>
-          <item row="0" column="1">
-           <layout class="QHBoxLayout">
-            <item><widget class="QLineEdit" name="edt_horizon_file"><property name="toolTip"><string>Limits file: TheSkyX limits export (.hrz) or plain "az alt" pairs. If it loads, the file is the safety reference and the flat minimum altitude is ignored.</string></property></widget></item>
+         <layout class="QVBoxLayout" name="vbox_horizon">
+          <item>
+           <layout class="QHBoxLayout" name="row_hfile">
+            <item><widget class="QLabel" name="lbl_hfile"><property name="text"><string>Limit file:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_horizon_file"/></item>
             <item><widget class="QPushButton" name="btn_horizon_browse"><property name="text"><string>Browse…</string></property></widget></item>
+            <item><spacer name="hsp_hfile"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
            </layout>
           </item>
-          <item row="1" column="0"><widget class="QLabel" name="lbl_hmargin"><property name="text"><string>Safety margin (°):</string></property></widget></item>
-          <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_horizon_margin"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>20.0</double></property><property name="toolTip"><string>Extra clearance added on top of the limit for safety</string></property></widget></item>
-          <item row="2" column="0"><widget class="QLabel" name="lbl_minalt"><property name="text"><string>Minimum altitude (°):</string></property></widget></item>
-          <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_min_alt"><property name="maximum"><double>89.0</double></property><property name="toolTip"><string>Flat altitude floor used only when no limit file is loaded; the limit file, when present, is the safety reference</string></property></widget></item>
-          <item row="3" column="0" colspan="2"><widget class="QLabel" name="lbl_horizon_stats"><property name="wordWrap"><bool>true</bool></property><property name="toolTip"><string>Summary of the loaded limit file: min/max altitude, peak azimuth and point count. If it cannot be read, the flat minimum altitude is used instead.</string></property></widget></item>
+          <item><widget class="QLabel" name="lblH_hfile"><property name="text"><string>TheSkyX .hrz or “az alt” pairs; when it loads, the file is the safety reference</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_hmargin">
+            <item><widget class="QLabel" name="lbl_hmargin"><property name="text"><string>Safety margin (°):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_horizon_margin"><property name="decimals"><number>1</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>20.0</double></property></widget></item>
+            <item><spacer name="hsp_hmargin"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_hmargin"><property name="text"><string>Extra degrees of clearance added on top of the limit, for the Sun and for slew safety</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_minalt">
+            <item><widget class="QLabel" name="lbl_minalt"><property name="text"><string>Minimum altitude (°):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_min_alt"><property name="maximum"><double>89.0</double></property></widget></item>
+            <item><spacer name="hsp_minalt"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_minalt"><property name="text"><string>Flat altitude floor, used only when no limit file is loaded</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item><widget class="QLabel" name="lbl_horizon_stats"><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
          </layout>
         </widget>
        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_kinds">
-          <property name="title"><string>Tonight: object kinds</string></property>
-          <layout class="QVBoxLayout" name="vbox_kinds">
-           <item>
-            <widget class="QLabel" name="lbl_kinds_hint">
-             <property name="text"><string>Enable the kinds that can appear in the Tonight tab and in its header filter (at least one).</string></property>
-             <property name="wordWrap"><bool>true</bool></property>
-            </widget>
-           </item>
-           <item>
-            <layout class="QGridLayout" name="grid_kinds">
-             <property name="horizontalSpacing"><number>12</number></property>
-             <item row="0" column="0"><widget class="QCheckBox" name="chk_kind_neo"><property name="text"><string>NEOs</string></property></widget></item>
-             <item row="0" column="1"><widget class="QCheckBox" name="chk_kind_sn"><property name="text"><string>Supernovae</string></property></widget></item>
-             <item row="1" column="0"><widget class="QCheckBox" name="chk_kind_comet"><property name="text"><string>Comets</string></property></widget></item>
-             <item row="1" column="1"><widget class="QCheckBox" name="chk_kind_pccp"><property name="text"><string>PCCP candidates</string></property></widget></item>
-             <item row="2" column="0"><widget class="QCheckBox" name="chk_kind_transit"><property name="text"><string>Exoplanet transits</string></property></widget></item>
-             <item row="2" column="1"><widget class="QCheckBox" name="chk_kind_alert"><property name="text"><string>Close approaches (alerts)</string></property></widget></item>
-            </layout>
-           </item>
-           <item>
-            <layout class="QFormLayout" name="form_best_pk">
-             <item row="0" column="0"><widget class="QLabel" name="lbl_best_pk"><property name="text"><string>Shown per kind (Tonight):</string></property></widget></item>
-             <item row="0" column="1">
-              <widget class="QSpinBox" name="spn_best_pk">
-               <property name="minimum"><number>1</number></property>
-               <property name="maximum"><number>50</number></property>
-               <property name="toolTip"><string>Cap for the Tonight grid: at most this many targets per object kind, best first (the full list stays in the table below).</string></property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-          </layout>
+       <item>
+        <widget class="QGroupBox" name="grp_kinds">
+         <property name="title"><string>Tonight: object kinds</string></property>
+         <layout class="QVBoxLayout" name="vbox_kinds">
+          <item>
+           <layout class="QGridLayout" name="grid_kinds">
+            <property name="horizontalSpacing"><number>12</number></property>
+            <item row="0" column="0"><widget class="QCheckBox" name="chk_kind_neo"><property name="text"><string>NEOs</string></property></widget></item>
+            <item row="0" column="1"><widget class="QCheckBox" name="chk_kind_sn"><property name="text"><string>Supernovae</string></property></widget></item>
+            <item row="1" column="0"><widget class="QCheckBox" name="chk_kind_comet"><property name="text"><string>Comets</string></property></widget></item>
+            <item row="1" column="1"><widget class="QCheckBox" name="chk_kind_pccp"><property name="text"><string>PCCP candidates</string></property></widget></item>
+            <item row="2" column="0"><widget class="QCheckBox" name="chk_kind_transit"><property name="text"><string>Exoplanet transits</string></property></widget></item>
+            <item row="2" column="1"><widget class="QCheckBox" name="chk_kind_alert"><property name="text"><string>Close approaches (alerts)</string></property></widget></item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblH_kinds">
+            <property name="text"><string>Which kinds are scored and shown for Tonight and Explore; untick a kind to hide it everywhere</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+            <property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="row_bestpk">
+            <item><widget class="QLabel" name="lbl_best_pk"><property name="text"><string>Shown per kind (Tonight):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_best_pk"><property name="minimum"><number>1</number></property><property name="maximum"><number>50</number></property></widget></item>
+            <item><spacer name="hsp_bestpk"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_bestpk"><property name="text"><string>How many entries of each kind the Tonight grid lists (more in Explore)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_transits">
+         <property name="title"><string>Exoplanet transits</string></property>
+         <layout class="QVBoxLayout" name="vbox_transits">
+          <item>
+           <widget class="QCheckBox" name="chk_transit_scope_filter">
+            <property name="text"><string>Hide transits that need a bigger telescope than mine</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblH_scope_filter">
+            <property name="text"><string>ExoClock drops transits too big for your scope when checked</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+            <property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
+           </widget>
+          </item>
+</layout>
          </widget>
         </item>
-         <item>
-          <widget class="QGroupBox" name="grp_transits">
-           <property name="title"><string>Exoplanet transits</string></property>
-           <layout class="QFormLayout">
-            <item row="0" column="0" colspan="2"><widget class="QCheckBox" name="chk_transit_scope_filter"><property name="text"><string>Hide transits that need a bigger telescope than mine</string></property><property name="toolTip"><string>ExoClock estimates the minimum aperture each transit needs; when checked, Tonight drops the events above your aperture (Site tab)</string></property></widget></item>
+       <item>
+        <widget class="QGroupBox" name="grp_storage">
+         <property name="title"><string>Projects folder</string></property>
+         <layout class="QVBoxLayout" name="vbox_storage">
+          <item>
+           <layout class="QHBoxLayout" name="row_proot">
+            <item><widget class="QLabel" name="lbl_proot"><property name="text"><string>Projects folder:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_projects_root"/></item>
+            <item><widget class="QPushButton" name="btn_projects_browse"><property name="text"><string>Browse…</string></property></widget></item>
+            <item><widget class="QPushButton" name="btn_projects_reset"><property name="text"><string>Reset</string></property></widget></item>
+            <item><spacer name="hsp_proot"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
            </layout>
-          </widget>
-         </item>
-        <item>
-         <widget class="QGroupBox" name="grp_moon">
-          <property name="title"><string>Moon constraint</string></property>
-         <layout class="QFormLayout">
-          <item row="0" column="0" colspan="2"><widget class="QCheckBox" name="chk_moon_enabled"><property name="text"><string>Warn when Moon interferes</string></property></widget></item>
-          <item row="1" column="0"><widget class="QLabel" name="lbl_moonsep"><property name="text"><string>Min separation (°):</string></property></widget></item>
-          <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_moon_sep"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
-          <item row="2" column="0"><widget class="QLabel" name="lbl_moonillum"><property name="text"><string>Max illumination:</string></property></widget></item>
-          <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_moon_illum"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property></widget></item>
+          </item>
+          <item><widget class="QLabel" name="lblH_storage"><property name="text"><string>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_moon">
+         <property name="title"><string>Moon constraint</string></property>
+         <layout class="QVBoxLayout" name="vbox_moon">
+          <item>
+           <widget class="QCheckBox" name="chk_moon_enabled">
+            <property name="text"><string>Warn when Moon interferes</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lblH_moonwarn">
+            <property name="text"><string>Flags targets that sit too close to a bright, high Moon</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+            <property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="row_moonsep">
+            <item><widget class="QLabel" name="lbl_moonsep"><property name="text"><string>Min separation (°):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_moon_sep"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+            <item><spacer name="hsp_moonsep"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_moonsep"><property name="text"><string>Target-to-Moon angular distance below which the warning fires (degrees)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_moonillum">
+            <item><widget class="QLabel" name="lbl_moonillum"><property name="text"><string>Max illumination:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_moon_illum"><property name="decimals"><number>2</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1.0</double></property><property name="singleStep"><double>0.05</double></property></widget></item>
+            <item><spacer name="hsp_moonillum"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_moonillum"><property name="text"><string>Fraction of the lunar disk lit above which the warning starts (0.5 = half Moon)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
          </layout>
         </widget>
        </item>
        <item>
         <widget class="QGroupBox" name="grp_session">
          <property name="title"><string>Session defaults</string></property>
-          <layout class="QFormLayout">
-           <item row="0" column="0"><widget class="QLabel" name="lbl_overhead"><property name="text"><string>Per-frame overhead (s):</string></property></widget></item>
-           <item row="0" column="1"><widget class="QDoubleSpinBox" name="spn_overhead"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>120.0</double></property><property name="toolTip"><string>Readout/slew overhead added to every exposure frame</string></property></widget></item>
-           <item row="1" column="0"><widget class="QLabel" name="lbl_sn_cadence"><property name="text"><string>SN revisit reminder (days):</string></property></widget></item>
-           <item row="1" column="1"><widget class="QSpinBox" name="spn_sn_cadence"><property name="minimum"><number>1</number></property><property name="maximum"><number>30</number></property><property name="toolTip"><string>Show a reminder when an active SN project has not been visited in this many nights</string></property></widget></item>
-          </layout>
+         <layout class="QVBoxLayout" name="vbox_session">
+          <item>
+           <layout class="QHBoxLayout" name="row_overhead">
+            <item><widget class="QLabel" name="lbl_overhead"><property name="text"><string>Per-frame overhead (s):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QDoubleSpinBox" name="spn_overhead"><property name="decimals"><number>0</number></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>120.0</double></property></widget></item>
+            <item><spacer name="hsp_overhead"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_overhead"><property name="text"><string>Readout/slew seconds added to every exposure when sizing the transit capture sequence</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_sncadence">
+            <item><widget class="QLabel" name="lbl_sn_cadence"><property name="text"><string>SN revisit reminder (days):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_sn_cadence"><property name="minimum"><number>1</number></property><property name="maximum"><number>30</number></property></widget></item>
+            <item><spacer name="hsp_sncadence"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_sncadence"><property name="text"><string>Nights without a visit after which an active supernova project asks to be revisited</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
         </widget>
        </item>
        <item>
         <spacer name="vspacer_observing">
          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0">
+          <size><width>20</width><height>40</height></size>
+         </property>
         </spacer>
        </item>
       </layout>
      </widget>
-       <widget class="QWidget" name="tab_integrations">
-       <attribute name="title"><string>Integrations</string></attribute>
-       <layout class="QVBoxLayout" name="vbox_integrations">
-        <item>
-         <widget class="QGroupBox" name="grp_ccdciel">
-          <property name="title"><string>CCDciel (JSON-RPC connection)</string></property>
-          <layout class="QFormLayout">
-           <item row="0" column="0"><widget class="QLabel" name="lbl_ccdhost"><property name="text"><string>Host:</string></property></widget></item>
-           <item row="0" column="1"><widget class="QLineEdit" name="edt_ccdciel_host"><property name="toolTip"><string>Address of the computer running CCDciel (usually 127.0.0.1)</string></property></widget></item>
-           <item row="1" column="0"><widget class="QLabel" name="lbl_ccdport"><property name="text"><string>Port:</string></property></widget></item>
-           <item row="1" column="1"><widget class="QSpinBox" name="spn_ccdciel_port"><property name="minimum"><number>1</number></property><property name="maximum"><number>65535</number></property><property name="value"><number>3277</number></property></widget></item>
-           <item row="2" column="0"><widget class="QLabel" name="lbl_ccdauto"><property name="text"><string>Auto-connect on start:</string></property></widget></item>
-           <item row="2" column="1"><widget class="QCheckBox" name="chk_ccdciel_auto"><property name="toolTip"><string>Connect to CCDciel automatically when the app starts (off by default)</string></property></widget></item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_misc">
-          <property name="title"><string>API keys (all optional)</string></property>
-          <layout class="QFormLayout">
-           <item row="0" column="0"><widget class="QLabel" name="lbl_nfkey"><property name="text"><string>NEOfixer API key:</string></property></widget></item>
-           <item row="0" column="1"><widget class="QLineEdit" name="edt_neofixer_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: report your observing status to NEOfixer</string></property></widget></item>
-           <item row="1" column="0"><widget class="QLabel" name="lbl_astrokey"><property name="text"><string>Astrometry.net API key:</string></property></widget></item>
-           <item row="1" column="1"><widget class="QLineEdit" name="edt_astrometry_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</string></property></widget></item>
-           <item row="2" column="0"><widget class="QLabel" name="lbl_tnsbot"><property name="text"><string>TNS bot name:</string></property></widget></item>
-           <item row="2" column="1"><widget class="QLineEdit" name="edt_tns_bot"><property name="toolTip"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property></widget></item>
-           <item row="3" column="0"><widget class="QLabel" name="lbl_tnskey"><property name="text"><string>TNS bot key:</string></property></widget></item>
-           <item row="3" column="1"><widget class="QLineEdit" name="edt_tns_bot_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property><property name="toolTip"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property></widget></item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <spacer name="vspacer_integrations">
-          <property name="orientation"><enum>Qt::Vertical</enum></property>
-         </spacer>
-        </item>
-       </layout>
-       </widget>
+     <widget class="QWidget" name="tab_integrations">
+      <attribute name="title"><string>Integrations</string></attribute>
+      <layout class="QVBoxLayout" name="vbox_integrations">
+       <item>
+        <widget class="QGroupBox" name="grp_ccdciel">
+         <property name="title"><string>CCDciel (JSON-RPC connection)</string></property>
+         <layout class="QVBoxLayout" name="vbox_ccdciel">
+          <item>
+           <layout class="QHBoxLayout" name="row_ccdhost">
+            <item><widget class="QLabel" name="lbl_ccdhost"><property name="text"><string>Host:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_ccdciel_host"/></item>
+            <item><spacer name="hsp_ccdhost"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_ccdhost"><property name="text"><string>Where CCDciel is running; localhost by default. Control only works while CCDciel is open.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_ccdport">
+            <item><widget class="QLabel" name="lbl_ccdport"><property name="text"><string>Port:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QSpinBox" name="spn_ccdciel_port"><property name="minimum"><number>1</number></property><property name="maximum"><number>65535</number></property><property name="value"><number>3277</number></property></widget></item>
+            <item><spacer name="hsp_ccdport"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_ccdport"><property name="text"><string>Junction point on the CCDciel machine. The default (3277) matches the JSON-RPC server.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_ccdauto">
+            <item><widget class="QLabel" name="lbl_ccdauto"><property name="text"><string>Auto-connect on start:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_ccdciel_auto"/></item>
+            <item><spacer name="hsp_ccdauto"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_ccdauto"><property name="text"><string>Connect to CCDciel as soon as the app starts (off by default)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QGroupBox" name="grp_misc">
+         <property name="title"><string>API keys (all optional)</string></property>
+         <layout class="QVBoxLayout" name="vbox_misc">
+          <item>
+           <layout class="QHBoxLayout" name="row_nfkey">
+            <item><widget class="QLabel" name="lbl_nfkey"><property name="text"><string>NEOfixer API key:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_neofixer_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+            <item><spacer name="hsp_nfkey"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_nfkey"><property name="text"><string>Optional: report your observing status to NEOfixer</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_astrokey">
+            <item><widget class="QLabel" name="lbl_astrokey"><property name="text"><string>Astrometry.net API key:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_astrometry_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+            <item><spacer name="hsp_astrokey"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_astrokey"><property name="text"><string>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_tnsbot">
+            <item><widget class="QLabel" name="lbl_tnsbot"><property name="text"><string>TNS bot name:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_tns_bot"/></item>
+            <item><spacer name="hsp_tnsbot"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_tnsbot"><property name="text"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_tnskey">
+            <item><widget class="QLabel" name="lbl_tnskey"><property name="text"><string>TNS bot key:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_tns_bot_key"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+            <item><spacer name="hsp_tnskey"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_tnskey"><property name="text"><string>Optional: TNS bot credentials to fetch discovery images for transients</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="vspacer_integrations">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0">
+          <size><width>20</width><height>40</height></size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
     </widget>
    </item>
    <item>

@@ -15,3 +15,7 @@ Processing
 ----------
 Extracted to a 512 px circular crop, transparent background (one-off dev
 script, run on 2026-08-27). No other third-party data in this asset.
+
+check.svg — white tick glyph used inside checked QCheckBox indicators
+(gui/theme.py). Original graphic drawn by the project, 2026-09-10; no
+third-party data.

@@ -15,7 +15,7 @@ import datetime
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import (QEvent, QFile, Qt, Signal, QPropertyAnimation,
+from PySide6.QtCore import (QFile, Qt, Signal, QPropertyAnimation,
                             QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
@@ -27,8 +27,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
-                                QVBoxLayout, QWidget, QTableWidgetItem,
-                                QToolButton)
+                                QVBoxLayout, QWidget, QTableWidgetItem)
 
 from .. import paths
 from ..config import config
@@ -81,6 +80,53 @@ def _load_ui(name, parent=None):
     widget = QUiLoader().load(file, parent)
     file.close()
     return widget
+
+
+def _settings_two_columns(dlg):
+    # @args: dlg - the settings dialog (holds QTabWidget > pages > QGroupBox)
+    # @return: re-lays every tab page into two side-by-side columns. The
+    #          page keeps its original QVBoxLayout; a nested QHBoxLayout
+    #          of two placeholder widgets is appended to it, and the
+    #          QGroupBox children (original order) are reparented into
+    #          the lighter column. Keeps .ui flat (single column of
+    #          groups) so Qt Designer stays friendly; only visual height
+    #          changes here.
+    from PySide6.QtWidgets import (QTabWidget, QGroupBox, QWidget,
+                                   QHBoxLayout, QVBoxLayout)
+    tw = dlg.findChild(QTabWidget)
+    if tw is None:
+        return
+    for i in range(tw.count()):
+        page = tw.widget(i)
+        groups = [w for w in page.findChildren(QGroupBox)
+                  if w.parent() is page]
+        if len(groups) < 2:
+            continue
+        old = page.layout()          # the page's original QVBoxLayout
+        if old is None:
+            continue
+        # empty the page's vbox (widgets go back to a plain parent state)
+        while old.count():
+            old.takeAt(0)
+        cols = QHBoxLayout()
+        cols.setContentsMargins(0, 0, 0, 0)
+        cols.setSpacing(14)
+        cols.setStretch(0, 1)
+        cols.setStretch(1, 1)
+        c = [QWidget(page), QWidget(page)]
+        v = [QVBoxLayout(c[k]) for k in range(2)]
+        for k in range(2):
+            v[k].setContentsMargins(0, 0, 0, 0)
+            v[k].setSpacing(10)
+        col_h = [0, 0]
+        for g in groups:
+            k = 0 if col_h[0] <= col_h[1] else 1
+            g.setParent(c[k])
+            v[k].addWidget(g)
+            col_h[k] += max(g.sizeHint().height(), 1)
+        cols.addWidget(c[0])
+        cols.addWidget(c[1])
+        old.addLayout(cols)
 
 
 # Per-kind table columns for the full (collapsed) table
@@ -432,159 +478,28 @@ class MainWindow(QMainWindow):
 
     # ---------------- menu: settings / help ----------------
 
-    def _attach_group_help(self, group, items):
-        # @args: group - the QGroupBox, items - list of (field, help) tuples
-        # @return: None — a «?» button docks top-right; it toggles the help
-        # lines (field — what it does) printed inside the box below the fields
-        btn = QToolButton(group)
-        btn.setText("?")
-        btn.setAutoRaise(True)
-        btn.setFixedSize(20, 20)
-        btn.move(group.width() - 28, 4)
-        btn.show()
-        label = QLabel(group)
-        label.setWordWrap(True)
-        label.setStyleSheet(f"color: {theme.C_TEXT_DIM}; font-size: 11px;")
-        txt = "\n".join(f"• {f} — {h}" for f, h in items)
-        label.setText(txt)
-        label.hide()
-        group.layout().addWidget(label)
-        # @args: - click on the «?» button
-        # @return: None
-        def _toggle():
-            open = not label.isVisible()
-            label.setVisible(open)
-            btn.setText("×" if open else "?")
-        btn.clicked.connect(_toggle)
-        # remember which group this button belongs to (eventFilter reposition)
-        btn._ns_group = group
-        btn.installEventFilter(self)
-
-    def _settings_attach_help(self, dlg):
-        # @args: dlg - the freshly loaded SettingsDialog
-        # @return: None — every group box gets its «?» help toggle
-        registry = {
-            "grp_language": [
-                ("Interface language",
-                 self.tr("Interface language; applies when the app restarts")),
-            ],
-            "grp_site": [
-                ("MPC code",
-                 self.tr("Your MPC observatory code — the site "
-                         "coordinates resolve automatically from it")),
-                ("Name", self.tr("Free-text observatory name (posts, reports)")),
-                ("Latitude / Longitude / Height",
-                 self.tr("Site position; east is positive longitude")),
-                ("AAVSO code",
-                 self.tr("Optional; written into the EXOTIC inits.json "
-                         "handoff (transit projects)")),
-            ],
-            "grp_equip": [
-                ("Aperture",
-                 self.tr("Scope aperture in inches — used to size transit "
-                         "targets and scale the 'why tonight' reasons")),
-                ("Limiting magnitude",
-                 self.tr("Faintest object you can realistically detect at "
-                         "your site — caps the Tonight scoring")),
-            ],
-            "grp_camera": [
-                ("Pixel size",
-                 self.tr("Camera pixel size in microns (e.g. 3.76 for a "
-                         "QHY600) — the plate scale for the Blink and "
-                         "transit math")),
-                ("Focal length",
-                 self.tr("Telescope focal length in mm, together with the "
-                         "pixel size it sets the arcsec/pixel scale")),
-                ("Camera type / Pixel binning",
-                 self.tr("CCD · CMOS · DSLR and on-chip binning (1x1, 2x2…)"
-                         " — written into the EXOTIC inits.json handoff")),
-            ],
-            "grp_horizon": [
-                ("Limit file",
-                 self.tr("TheSkyX limits export (.hrz) or plain 'az alt' "
-                         "pairs — when it loads, the file is the safety "
-                         "reference and the flat minimum altitude is "
-                         "ignored")),
-                ("Safety margin",
-                 self.tr("Extra degrees of clearance added on top of the "
-                         "limit, for the Sun and for slew safety")),
-                ("Minimum altitude",
-                 self.tr("Flat altitude floor, used only when no limit file "
-                         "is loaded")),
-            ],
-            "grp_kinds": [
-                ("Object kinds",
-                 self.tr("Which kinds are scored and shown for Tonight and "
-                         "Explore — untick a kind to hide it everywhere")),
-                ("Shown per kind",
-                 self.tr("How many entries of each kind the Tonight grid "
-                         "lists (more in Explore)")),
-            ],
-            "grp_transits": [
-                ("Aperture filter",
-                 self.tr("ExoClock estimates the minimum aperture each "
-                         "transit needs; when checked, Tonight drops the "
-                         "events that are too big for your scope")),
-            ],
-            "grp_moon": [
-                ("Moon warning",
-                 self.tr("Flags targets that sit too close to a bright, "
-                         "high Moon")),
-                ("Min separation",
-                 self.tr("Target-to-Moon angular distance below which the "
-                         "warning fires (degrees)")),
-                ("Max illumination",
-                 self.tr("Fraction of the lunar disk lit above which the "
-                         "warning starts (0.5 = half Moon)")),
-            ],
-            "grp_session": [
-                ("Per-frame overhead",
-                 self.tr("Readout/slew seconds added to every exposure when "
-                         "sizing the transit capture sequence")),
-                ("SN revisit reminder",
-                 self.tr("Nights without a visit after which an active "
-                         "supernova project asks to be revisited")),
-            ],
-            "grp_ccdciel": [
-                ("Host / Port",
-                 self.tr("Where CCDciel is running — localhost by default; "
-                         "control only works while CCDciel is open")),
-                ("Auto-connect",
-                 self.tr("Connect to CCDciel as soon as the app starts "
-                         "(off by default)")),
-            ],
-            "grp_misc": [
-                ("NEOfixer API key",
-                 self.tr("Optional: report your observing status to "
-                         "NEOfixer")),
-                ("Astrometry.net API key",
-                 self.tr("Optional: blind-solve FITS without WCS in the "
-                         "Blink tab (free key from nova.astrometry.net)")),
-            ],
-        }
-        for g in dlg.findChildren(QGroupBox):
-            items = registry.get(g.objectName())
-            if items:
-                self._attach_group_help(g, items)
-
-    def eventFilter(self, obj, event):
-        # @args: obj - the watched widget, event - the QEvent
-        # @return: True when consumed — keeps the Settings «?» button docked
-        # to the top-right of its group box on resize
-        if (isinstance(event, QEvent.Resize)
-                and hasattr(obj, "_ns_group")
-                and event.type() == QEvent.Resize):
-            g = obj._ns_group
-            obj.move(g.width() - 28, 4)
-        return super().eventFilter(obj, event)
-
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
-        self._settings_attach_help(dlg)
-        # The Observing tab packs four group boxes; give it room so the
-        # kind checkboxes and rows are never crushed (the .ui minimum is
-        # the floor; the initial size opens it comfortably).
-        dlg.resize(860, 740)
+        # 3-tab layout with per-field help labels BELOW each widget —
+        # see ADR-028. The .ui carries structure + text; the 11 px dim
+        # styling for the lblH_* labels is applied here so the .ui stays
+        # tool-friendly and theme.py untouched.
+        # style every help-below-field label: 11 px, dim, single line.
+        # wordWrap is off by default; we pin to one line of height so the
+        # rows stay tight (the text fits at 720 px width).
+        from PySide6.QtWidgets import QLabel
+        from PySide6.QtGui import QFontMetrics
+        for w in dlg.findChildren(QLabel):
+            n = w.objectName()
+            if n.startswith("lblH_"):
+                w.setStyleSheet("font-size: 11px; color: #8a90a6;")
+                w.setWordWrap(False)
+                w.setFixedHeight(QFontMetrics(w.font()).lineSpacing())
+        # two-column grid per tab: stack the flat QGroupBox children
+        # side by side (balanced by cumulative height) so the dialog
+        # stays short instead of a tall single stack.
+        _settings_two_columns(dlg)
+        dlg.resize(720, dlg.sizeHint().height())
         dlg.edt_mpc_code.setText(config.get("mpc_code", ""))
         dlg.edt_obs_name.setText(config.get("observatory_name", ""))
         dlg.spn_lat.setValue(float(config.get("lat", 0)))
@@ -630,6 +545,8 @@ class MainWindow(QMainWindow):
                 box.setChecked(k in enabled)
         # K3: the per-kind cap for the Tonight grid (default 5)
         dlg.spn_best_pk.setValue(int(config.get("best_per_kind_n", 5)))
+        # Projects container root (ADR-032): empty = the app data folder
+        dlg.edt_projects_root.setText(config.get("projects_root", ""))
         # interface language: system | es | en (applies on restart)
         dlg.cmb_language.addItems([self.tr("System"), self.tr("Spanish"),
                                    self.tr("English")])
@@ -644,6 +561,10 @@ class MainWindow(QMainWindow):
         dlg.btn_resolve.clicked.connect(lambda: self._resolve_into(dlg))
         dlg.btn_horizon_browse.clicked.connect(
             lambda: self._horizon_browse_into(dlg))
+        dlg.btn_projects_browse.clicked.connect(
+            lambda: self._projects_browse_into(dlg))
+        dlg.btn_projects_reset.clicked.connect(
+            lambda: dlg.edt_projects_root.setText(""))
         dlg.buttonBox.accepted.connect(dlg.accept)
         dlg.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
@@ -678,6 +599,7 @@ class MainWindow(QMainWindow):
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
         config.set("tns_bot_name", dlg.edt_tns_bot.text().strip())
         config.set("tns_bot_key", dlg.edt_tns_bot_key.text().strip())
+        config.set("projects_root", dlg.edt_projects_root.text().strip())
         # Tonight object kinds: keep at least one, else refuse to save
         enabled = [k for k in KIND_ORDER
                    if getattr(dlg, f"chk_kind_{k}", None) is not None
@@ -728,6 +650,15 @@ class MainWindow(QMainWindow):
             ";;Text files (*.txt);;All files (*)")
         if path:
             dlg.edt_horizon_file.setText(path)
+
+    def _projects_browse_into(self, dlg):
+        # @args: dlg - the settings dialog; fills the projects root field
+        #          with a browsed directory (ADR-032)
+        start = dlg.edt_projects_root.text().strip() or str(paths.data_dir())
+        folder = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Choose the projects folder"), start)
+        if folder:
+            dlg.edt_projects_root.setText(folder)
 
     def _horizon_file_preview(self, dlg):
         # Precedence rule made visible (ADR-020): while a horizon file loads
@@ -1716,6 +1647,11 @@ class MainWindow(QMainWindow):
             btn_folder = QPushButton(self.tr("Show in folder"))
             btn_folder.clicked.connect(self._open_project_folder)
             sec.contentLayout().addWidget(btn_folder)
+            # ADR-032: re-home the project's container folder (future
+            # exports only; registered files keep their absolute paths)
+            btn_ch_folder = QPushButton(self.tr("Change folder…"))
+            btn_ch_folder.clicked.connect(self._change_project_folder)
+            sec.contentLayout().addWidget(btn_ch_folder)
             sec.setCollapsed(True)
             tab.layout().addWidget(sec)
             self._proj_files_section = sec
@@ -1735,7 +1671,7 @@ class MainWindow(QMainWindow):
             lst.addItem(item)
         sec = getattr(self, "_proj_files_section", None)
         if sec is not None and lst.count() > 0:
-            sec.setCollapsed(False)
+            sec.setCollapsed(True)
 
     def _open_project_file(self, item):
         # A4: double-click a file row to open it with the OS default.
@@ -1755,6 +1691,26 @@ class MainWindow(QMainWindow):
             if path:
                 QDesktopServices.openUrl(
                     QUrl.fromLocalFile(str(Path(path).parent)))
+
+    def _change_project_folder(self):
+        # ADR-032: re-home the current project's container folder. Future
+        # exports follow the new root; already-registered files keep their
+        # absolute paths, so the history never breaks.
+        p = self._current_project
+        if not p:
+            return
+        start = str(project.storage_dir(p))
+        folder = QFileDialog.getExistingDirectory(
+            self, self.tr("Choose the project folder"), start)
+        if not folder:
+            return
+        updated = project.set_root_dir(db, p["id"], folder)
+        if not updated:
+            return
+        self._current_project = updated
+        self._render_project_header(updated)
+        self.statusBar().showMessage(
+            self.tr("Project folder changed — new files will go there"), 6000)
 
     # ---------------- object panel (phase D4) ----------------
 
@@ -2764,7 +2720,7 @@ class MainWindow(QMainWindow):
                 self.tr("Need at least 2 frames with WCS and ephemeris "
                         "(skipped: {})").format(len(loaded["skipped"])), 8000)
             return
-        out_gif = paths.project_dir(p["id"], p["object_name"]) / \
+        out_gif = project.storage_dir(p) / \
             f"{p['object_name']}_motion.gif"
         out_mp4 = out_gif.with_suffix(".mp4")
         names = [p["object_name"]] * len(frames)
@@ -3003,7 +2959,7 @@ class MainWindow(QMainWindow):
                           if s["step"] == "plan"), {})
         plan = {"filter": plan_data.get("filter", "L"),
                 "exp_s": plan_data.get("exp_s")}
-        outdir = paths.project_dir(pid, p["object_name"])
+        outdir = project.storage_dir(p)
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Export EXOTIC inits.json"),
             str(outdir / exotic.suggested_name()),
@@ -3205,7 +3161,7 @@ class MainWindow(QMainWindow):
                                                     data.shape[0]//2))
                 frames_data.append((img8, sn_crop))
                 dates_out.append(date or "")
-            out_gif = paths.project_dir(pid, p["object_name"]) / \
+            out_gif = project.storage_dir(p) / \
                 f"{p['object_name']}_evo.gif"
             out_mp4 = out_gif.with_suffix(".mp4")
             evolution_view.make_evolution_gif(
@@ -3256,7 +3212,7 @@ class MainWindow(QMainWindow):
                     sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec)
             except Exception:
                 pass
-        out = paths.project_dir(pid, p["object_name"]) / \
+        out = project.storage_dir(p) / \
             f"{p['object_name']}_annotated.fits"
         try:
             fits_annotate.write_annotated_fits(
@@ -3575,7 +3531,7 @@ class MainWindow(QMainWindow):
             lst.addItem(item)
         sec = getattr(self, "_proj_files_section", None)
         if sec is not None and lst.count() > 0:
-            sec.setCollapsed(False)
+            sec.setCollapsed(True)
 
     def _fu_paste_dialog(self, pid):
         # B3: paste bulk photometry — tolerant parser + preview + save.
@@ -3832,8 +3788,7 @@ class MainWindow(QMainWindow):
         fmt_map = {0: "ccdciel", 1: "nina", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
         ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
-        outdir = paths.project_dir(self._current_project["id"],
-                                   self._current_project["object_name"])
+        outdir = project.storage_dir(self._current_project)
         default = outdir / f"{target['name']}_sequence{ext}"
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Export capture sequence"), str(default),
@@ -3895,8 +3850,7 @@ class MainWindow(QMainWindow):
         fmt = combo.currentData()
         force = chk_force.isChecked()
 
-        outdir = paths.project_dir(self._current_project["id"],
-                                   self._current_project["object_name"])
+        outdir = project.storage_dir(self._current_project)
         base = obj_id
         if fmt == "fo":
             ext, default_name = ".txt", f"{base}_orbit_report.txt"
@@ -3987,8 +3941,7 @@ class MainWindow(QMainWindow):
             return
         obs_code = config.get("mpc_code", "")
         obj = self._current_project["object_name"]
-        outdir = paths.project_dir(self._current_project["id"],
-                                   self._current_project["object_name"])
+        outdir = project.storage_dir(self._current_project)
         default = outdir / f"{obj}_mpc_report.txt"
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Save MPC report"), str(default),
@@ -4327,9 +4280,7 @@ class MainWindow(QMainWindow):
         default_folder = str(paths.data_dir() / "posts")
         if self._current_project \
                 and self._current_project["object_name"] == name:
-            default_folder = str(paths.project_dir(
-                self._current_project["id"],
-                self._current_project["object_name"]))
+            default_folder = str(project.storage_dir(self._current_project))
         post_w.edt_folder.setText(default_folder)
         post_w.btn_folder_browse.clicked.connect(
             lambda: self._dialog_post_browse_folder(post_w))
@@ -4671,8 +4622,7 @@ class MainWindow(QMainWindow):
         pair = self._blink_pair
         # A4: per-project folder when opened from a project, flat posts/ otherwise
         if self._current_project:
-            outdir = paths.project_dir(self._current_project["id"],
-                                       self._current_project["object_name"])
+            outdir = project.storage_dir(self._current_project)
         else:
             outdir = paths.data_dir() / "posts"
             outdir.mkdir(parents=True, exist_ok=True)

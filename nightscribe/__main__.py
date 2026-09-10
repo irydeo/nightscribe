@@ -266,6 +266,7 @@ def cmd_project(args):
             print(f"Project {args.id} not found")
             return 1
         print(f"== [{p['kind']}] {p['object_name']} — {p['status']} ==")
+        print(f"  folder: {proj_mod.storage_dir(p)}")
         for s in p["steps"]:
             print(f"  {s['status']:8s} {s['step']}")
         for f in p["files"]:

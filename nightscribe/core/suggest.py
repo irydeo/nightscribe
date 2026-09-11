@@ -41,7 +41,7 @@ def _scientific(t):
         return _clamp((t.get("pccp_score") or 0) / 100.0 * 35, 0, 35)
     if kind == "sn":
         mag = t.get("mag") or 99
-        return _clamp((19 - mag) / 8.0 * 25, 0, 25) + _freshness_days(t) * 0
+        return _clamp((19 - mag) / 8.0 * 25, 0, 25) + (_freshness_days(t) or 0) * 0
     if kind == "comet":
         mag = t.get("mag") or 99
         return _clamp((18 - mag) / 10.0 * 30, 0, 30)
@@ -53,6 +53,13 @@ def _scientific(t):
         # curves); brightness makes the photometry easier
         h = t.get("hads") or {}
         return (_clamp((h.get("amp") or 0.0) / 0.9 * 20, 0, 20) +
+                 _clamp((18 - (t.get("mag") or 99)) / 10.0 * 15, 0, 15))
+    if kind == "variable":
+        # a campaign membership is itself the science signal (someone
+        # with a goal asked for this star); amplitude and brightness make
+        # the measurement easier
+        v = t.get("variable") or {}
+        return (_clamp((v.get("amp") or 0.0) / 3.0 * 15, 0, 15) +
                 _clamp((18 - (t.get("mag") or 99)) / 10.0 * 15, 0, 15))
     return 0
 
@@ -206,6 +213,14 @@ def _urgency(t):
         unobserved = 6 if h.get("observed") is False else 0
         coverage = 10 if h.get("covered_this_month") is False else 0
         score += max(color, unobserved, coverage)
+    c = t.get("campaign") or {}
+    if c:
+        # the group's own commitment (V-h): being in a campaign is itself
+        # urgency, then cadence lapsed grows it, then the event advisor
+        score += 5
+        score += _clamp((c.get("overdue_days") or 0) * 3, 0, 15)
+        if c.get("event"):
+            score += 10
     return _clamp(score, 0, 20)
 
 
@@ -247,6 +262,13 @@ def _hook(t):
         if (h.get("amp") or 0) >= 0.5:
             score += 4
         if h.get("multiperiodic"):
+            score += 3
+    elif kind == "variable":
+        v = t.get("variable") or {}
+        days = (v.get("next_extremum") or {}).get("days")
+        if days is not None and days <= 7:
+            score += 5            # an extremum within the week is a hook
+        if (v.get("amp") or 0) >= 2.0:
             score += 3
     elif kind == "alert":
         ld = (t.get("approach") or {}).get("dist_ld") or 99

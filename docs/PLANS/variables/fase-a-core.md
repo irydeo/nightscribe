@@ -403,7 +403,10 @@ def test_campaign_signals_stack_on_other_kinds():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_suggest_campaign.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: campaign target scoring in suggest (ADR-035, subplan VA.3)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (suite 1035→1040; desviación: a `_urgency` se sumó un
+`score += 5` base por pertenecer a una campaña — el test propio de la tarjeta
+espera `urgency == 20` con `overdue=99`, imposible solo con el clamp 0-15;
+con el +5 base el cap queda 5+15=20 y `test_event_adds_urgency` sigue pasando)
 
 ---
 

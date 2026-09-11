@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 def detect_type(name):
     # @args: name - user-typed identifier
-    # @return: "sun" | "transient" | "exoplanet" | "hads" | "small_body"
+    # @return: "sun" | "transient" | "exoplanet" | "hads" | "variable" | "small_body"
     n = name.strip()
     if n.lower() in ("sol", "sun"):
         return "sun"
@@ -36,12 +36,44 @@ def detect_type(name):
     # "GP And" end in a letter that regex reads as a planet marker
     if hads.lookup(n):
         return "hads"
+    # Variable-star designations (GCVS: "T CrB", "EE Cep", "V1490 Cyg"; NSV
+    # catalogue) — checked BEFORE the exoplanet regex: a name ending in one
+    # letter reads as a planet marker there ("T CrB" would be a false planet).
+    # Exactly two tokens on purpose: "GQ Lup b" (three) stays an exoplanet.
+    if _looks_like_variable(n):
+        return "variable"
     # the preceding char is a word char or a dash (HD 209458 b, KELT-9b,
     # TRAPPIST-1e, 55Cnce, AUMicb); NEO/comet designations end in a digit,
     # so a trailing planet letter is a safe exoplanet marker
     if re.search(r"[\w-]\s?(b|c|d|e|f)$", n) and not re.match(r"^\d{4}", n):
         return "exoplanet"
     return "small_body"
+
+
+# Variable-star designations (GCVS: "T CrB", "EE Cep", "V1490 Cyg"; NSV
+# catalogue) — checked BEFORE the exoplanet regex: a name ending in one
+# letter reads as a planet marker there ("T CrB" would be a false planet).
+# Exactly two tokens on purpose: "GQ Lup b" (three) stays an exoplanet.
+_GCVS_RE = re.compile(r"^(V\d{1,4}|[A-Z]{1,2})\s+[A-Z][a-z][A-Za-z]$")
+_NSV_RE = re.compile(r"^NSV\s?\d{3,5}$", re.I)
+
+
+def _looks_like_variable(n):
+    # @args: n - stripped user-typed identifier
+    # @return: True for GCVS/NSV designations or the name of an active local
+    #          variable project (offline; the local name always wins — it is
+    #          how campaign targets without a catalog entry, e.g. the WeSb 1
+    #          nucleus, get their kind back)
+    if _GCVS_RE.match(n) or _NSV_RE.match(n):
+        return True
+    try:
+        from .db import db as _db
+        row = _db.execute(
+            "SELECT 1 FROM projects WHERE kind='variable'"
+            " AND LOWER(object_name)=LOWER(?) LIMIT 1", (n,)).fetchone()
+        return bool(row)
+    except Exception:
+        return False
 
 
 def enrich(name, date=None, site="Z41", fallback_target=None):

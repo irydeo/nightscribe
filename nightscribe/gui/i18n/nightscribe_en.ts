@@ -1959,7 +1959,7 @@ Ingress {i} · Mid {m} · Egress {e} UTC</translation>
         <translation>Charts</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="753"/>
+        <location filename="../overview.py" line="755"/>
         <source>Click to zoom / export</source>
         <translation>Click to zoom / export</translation>
     </message>
@@ -2010,57 +2010,102 @@ Ingress {i} · Mid {m} · Egress {e} UTC</translation>
         <translation>Copied</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="971"/>
+        <location filename="../overview.py" line="973"/>
         <source>Predicted apparent magnitude tonight</source>
         <translation>Predicted apparent magnitude tonight</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="982"/>
+        <location filename="../overview.py" line="984"/>
         <source>Sky rate tonight — it must outrun the stars</source>
         <translation>Sky rate tonight — it must outrun the stars</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="990"/>
+        <location filename="../overview.py" line="992"/>
         <source>Longest single exposure before the target trails more than a pixel</source>
         <translation>Longest single exposure before the target trails more than a pixel</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1006"/>
+        <location filename="../overview.py" line="1008"/>
         <source>Type of stellar explosion</source>
         <translation>Type of stellar explosion</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1013"/>
+        <location filename="../overview.py" line="1015"/>
         <source>Days since discovery — a young light curve is gold for science</source>
         <translation>Days since discovery — a young light curve is gold for science</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1021"/>
+        <location filename="../overview.py" line="1023"/>
         <source>How much the star dims at mid-transit</source>
         <translation>How much the star dims at mid-transit</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1030"/>
+        <location filename="../overview.py" line="1031"/>
+        <source>Pulsation period — several full cycles fit in one night</source>
+        <translation>Pulsation period — several full cycles fit in one night</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1040"/>
+        <source>Peak-to-peak brightness swing of the pulsation</source>
+        <translation>Peak-to-peak brightness swing of the pulsation</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1044"/>
+        <source>Complete cycles that fit above your limit tonight</source>
+        <translation>Complete cycles that fit above your limit tonight</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1049"/>
+        <source>Period change!</source>
+        <translation>Period change!</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1050"/>
+        <source>The Wils monitoring programme flags period changes — tonight&apos;s curve counts double</source>
+        <translation>The Wils monitoring programme flags period changes — tonight&apos;s curve counts double</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1054"/>
+        <source>Not yet observed</source>
+        <translation>Not yet observed</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1055"/>
+        <source>The monitoring programme has no measurement of this star yet</source>
+        <translation>The monitoring programme has no measurement of this star yet</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1059"/>
+        <source>Multiperiodic</source>
+        <translation>Multiperiodic</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1060"/>
+        <source>Several pulsation modes — observe on consecutive nights</source>
+        <translation>Several pulsation modes — observe on consecutive nights</translation>
+    </message>
+    <message>
+        <location filename="../overview.py" line="1070"/>
         <source>Times the object is safely above the limit</source>
         <translation>Times the object is safely above the limit</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1047"/>
+        <location filename="../overview.py" line="1087"/>
         <source>The capture window that still clears your local limit — the telescope stays in safe altitude through the whole session</source>
         <translation>The capture window that still clears your local limit — the telescope stays in safe altitude through the whole session</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1052"/>
+        <location filename="../overview.py" line="1092"/>
         <source> · ≤ HH:MM is the latest safe start</source>
         <translation> · ≤ HH:MM is the latest safe start</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1062"/>
+        <location filename="../overview.py" line="1102"/>
         <source>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</source>
         <translation>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1040"/>
+        <location filename="../overview.py" line="1080"/>
         <source>How long it stays a valid target</source>
         <translation>How long it stays a valid target</translation>
     </message>

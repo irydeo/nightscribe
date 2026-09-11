@@ -809,6 +809,26 @@ def test_capture_block_transit_depth_chip(panel):
         f"depth chip missing: {chips!r}"
 
 
+def _hads_fixture():
+    # A HADS payload as enrich.enrich builds it (planner values merged)
+    return {"type": "hads", "name": "CY Aqr",
+            "data": {"hads": {"period_h": 1.46, "max": 11.3, "min": 11.8,
+                              "amp": 0.5, "cycles": 4.2, "session_fits": True,
+                              "priority": "period_change", "observed": True,
+                              "multiperiodic": True, "non_radial": False}}}
+
+
+def test_capture_block_hads_chips(panel):
+    # HADS card: period/amplitude/cycles + the programme flags (ADR-034)
+    panel.show(_hads_fixture())
+    chips = _chip_texts(panel)
+    assert any("P 1.46 h" in c for c in chips), f"period chip: {chips!r}"
+    assert any("Δ 0.5 mag" in c for c in chips), f"amp chip: {chips!r}"
+    assert any("×4.2" in c for c in chips), f"cycles chip: {chips!r}"
+    assert any("Period change" in c for c in chips), f"priority: {chips!r}"
+    assert any("Multiperiodic" in c for c in chips), f"multi: {chips!r}"
+
+
 def test_capture_block_extras_omit_missing(panel):
     # bare SN (host name only, no context): no invented chips — the row
     # hides itself entirely, same «omit what is missing» rule

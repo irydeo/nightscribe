@@ -207,4 +207,4 @@ hereda la detección gratis (cmd_explore llama a `enrich.enrich`,
 **Hecho cuando**: suite verde (N→M) + `test_i18n.py`; la ficha de «GP And»
 muestra filas y chips.
 **Commit**: `Gui: HADS object card — explain_hads rows + capture chips (ADR-034, subplan B.4)`
-**Estado**: pendiente
+**Estado**: **Hecho** (959→962)

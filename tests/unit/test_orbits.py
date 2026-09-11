@@ -141,3 +141,35 @@ def test_encounter_velocity():
     # incomplete input -> None
     assert orbits.encounter_velocity((1, 2), (1, 2, 3)) is None
     assert orbits.encounter_velocity(None, (1, 2, 3)) is None
+
+
+def test_explain_hads_full():
+    # every row carries the bilingual contract; the session maths rows lead
+    d = {"hads": {"period_h": 1.89, "max": 10.4, "min": 11.0, "amp": 0.6,
+                  "cycles": 3.5, "session_fits": True,
+                  "priority": "period_change", "observed": False,
+                  "multiperiodic": True, "non_radial": False}}
+    rows = orbits.explain_hads(d)
+    assert len(rows) >= 8
+    for r in rows:
+        assert r["es"] and r["en"] and r["value"] is not None
+        assert r.get("level") in ("basic", "deep")
+        assert isinstance(r["param"], dict) and r["param"]["es"]
+    params = [r["param"]["es"] for r in rows]
+    assert params[0] == "Periodo"
+    assert "Ciclos esta noche" in params and "Prioridad del programa" in params
+    assert "Aún no observada" in params and "Dato histórico" in params
+    per = rows[0]
+    assert per["value"] == "1.89 h"
+
+
+def test_explain_hads_minimal_bundle_shape():
+    # the offline bundle shape (no planner keys) still yields the core rows
+    d = {"hads": {"period_h": 1.46, "max": 11.3, "min": 11.8,
+                  "multiperiodic": False, "non_radial": False}}
+    rows = orbits.explain_hads(d)
+    params = [r["param"]["en"] for r in rows]
+    assert "Period" in params and "Amplitude" in params
+    assert "Brightness range" in params
+    amp = next(r for r in rows if r["param"]["en"] == "Amplitude")
+    assert amp["value"] == "Δ 0.5 mag"          # computed from Max/Min

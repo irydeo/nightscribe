@@ -898,3 +898,132 @@ def explain_transit(d, aperture_in=None):
                   "revision: tonight's measurement is exactly what updates "
                   "it."})
     return out
+
+
+# ---------------- HADS interpreter (ADR-034) ----------------
+
+def explain_hads(d):
+    # Interprets a HADS star: the session maths first (period, amplitude,
+    # range, cycles tonight), then its story (instability strip, dwarf
+    # Cepheids) and the monitoring-programme flags (P. Wils' legend).
+    # @args: d - enriched data dict with a "hads" sub-dict (bundle star or
+    #        tonight's planner values — the shapes differ, read defensively)
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    h = d.get("hads") or {}
+
+    per = h.get("period_h")
+    if per:
+        out.append({
+            "param": {"es": "Periodo", "en": "Period"},
+            "value": f"{per:.2f} h", "level": "basic",
+            "es": f"Cada {per:.2f} horas da un pulso completo de brillo: "
+                  "caben varios ciclos en una sola noche.",
+            "en": f"Every {per:.2f} hours it completes one full brightness "
+                  "pulse: several cycles fit in a single night."})
+
+    amp = h.get("amp")
+    if amp is None and h.get("max") is not None and h.get("min") is not None:
+        amp = h["min"] - h["max"]          # inverted magnitude axis
+    if amp:
+        out.append({
+            "param": {"es": "Amplitud", "en": "Amplitude"},
+            "value": f"Δ {amp:.1f} mag", "level": "basic",
+            "es": f"Cambia {amp:.1f} magnitudes de pico a valle: lo verás "
+                  "variar en tu propia curva de luz de esta noche.",
+            "en": f"It swings {amp:.1f} magnitudes peak to peak: you will "
+                  "watch it vary in your own light curve tonight."})
+
+    if h.get("max") is not None and h.get("min") is not None:
+        out.append({
+            "param": {"es": "Rango de brillo", "en": "Brightness range"},
+            "value": f"{h['max']:.1f}–{h['min']:.1f} mag", "level": "basic",
+            "es": "Del máximo al mínimo. La fase actual es impredecible: "
+                  "cuenta la mediana y la amplitud, no la hora del pico.",
+            "en": "From maximum to minimum. The current phase is "
+                  "unpredictable: the median and the amplitude matter, not "
+                  "when the peak happens."})
+
+    cyc = h.get("cycles")
+    if cyc:
+        fits = h.get("session_fits")
+        fits_es = "" if fits is None else (
+            " Los 2 ciclos recomendados caben de seguida." if fits else
+            " ⚠ Los 2 ciclos recomendados no caben de seguida.")
+        fits_en = "" if fits is None else (
+            " The recommended 2 cycles fit back to back." if fits else
+            " ⚠ The recommended 2 cycles do not fit back to back.")
+        out.append({
+            "param": {"es": "Ciclos esta noche", "en": "Cycles tonight"},
+            "value": f"{cyc:.1f}", "level": "basic",
+            "es": f"Caben {cyc:.1f} ciclos completos sobre tu límite local."
+                  + fits_es,
+            "en": f"{cyc:.1f} full cycles fit above your local limit."
+                  + fits_en})
+
+    modes = []
+    if h.get("multiperiodic"):
+        modes.append({"es": "multiperiódica", "en": "multiperiodic"})
+    if h.get("non_radial"):
+        modes.append({"es": "modos no radiales", "en": "non-radial modes"})
+    if modes:
+        txt = {"es": " + ".join(m["es"] for m in modes),
+               "en": " + ".join(m["en"] for m in modes)}
+        out.append({
+            "param": {"es": "Modos de pulsación", "en": "Pulsation modes"},
+            "value": txt["en"], "level": "basic",
+            "es": f"Es {txt['es']}. Las HADS pulsan en el modo fundamental o "
+                  "el primer armónico (ratio de periodos 0.76–0.78, diagrama "
+                  "de Petersen); si es multiperiódica, obsérvala en noches "
+                  "consecutivas para separar los modos.",
+            "en": f"It is {txt['en']}. HADS pulsate in the fundamental mode "
+                  "or the first overtone (period ratio 0.76–0.78, Petersen "
+                  "diagram); when multiperiodic, observe on consecutive "
+                  "nights to separate the modes."})
+
+    pr = h.get("priority")
+    if pr in ("period_change", "period_change_possible"):
+        found = pr == "period_change"
+        out.append({
+            "param": {"es": "Prioridad del programa", "en": "Programme priority"},
+            "value": "Priority!" if True else "", "level": "basic",
+            "es": ("El seguimiento de Patrick Wils (VVS/AAVSO-VSX) le ha "
+                   "encontrado cambios de periodo" if found else
+                   "El seguimiento de Patrick Wils (VVS/AAVSO-VSX) sospecha "
+                   "cambios de periodo") +
+                  ": tu curva de esta noche cuenta doble.",
+            "en": ("Patrick Wils' monitoring programme (VVS/AAVSO-VSX) has "
+                   "found period changes" if found else
+                   "Patrick Wils' monitoring programme (VVS/AAVSO-VSX) "
+                   "suspects period changes") +
+                  ": tonight's curve counts double."})
+
+    if h.get("observed") is False:
+        out.append({
+            "param": {"es": "Aún no observada", "en": "Not yet observed"},
+            "value": "—", "level": "basic",
+            "es": "El programa de seguimiento aún no tiene ninguna medida de "
+                  "esta estrella: serías de los primeros en registrarla.",
+            "en": "The monitoring programme has no measurement of this star "
+                  "yet: you would be among the first to record it."})
+
+    out.append({
+        "param": {"es": "Qué es", "en": "What it is"}, "level": "basic",
+        "value": "HADS",
+        "es": "Una δ Scuti de gran amplitud: pulsa en la franja de "
+              "inestabilidad del diagrama HR, la misma zona donde reinan las "
+              "cefeidas. La AAVSO las recomienda como primer objetivo de "
+              "fotometría digital.",
+        "en": "A high-amplitude δ Scuti star: it pulsates in the HR "
+              "instability strip, the same region where Cepheids rule. The "
+              "AAVSO recommends them as the first digital-photometry target."})
+    out.append({
+        "param": {"es": "Dato histórico", "en": "Historical note"},
+        "value": "dwarf Cepheid", "level": "deep",
+        "es": "Antes se llamaban «cefeidas enanas»: sus curvas en diente de "
+              "sierra (subida rápida, bajada lenta) recuerdan a las cefeidas "
+              "clásicas, pero pulsan en horas, no en días.",
+        "en": "They were once called 'dwarf Cepheids': their sawtooth light "
+              "curves (fast rise, slow decline) resemble classical Cepheids, "
+              "but they pulsate in hours, not days."})
+    return out

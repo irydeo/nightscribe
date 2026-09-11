@@ -670,6 +670,8 @@ class ObjectPanel(QWidget):
             from ..config import config
             return orbits.explain_transit(
                 d, aperture_in=config.get("aperture_inches"))
+        if e.get("type") == "hads" or d.get("hads"):
+            return orbits.explain_hads(d)
         return []
 
     # ---------------- charts (D2, ADR-029) ----------------
@@ -1019,6 +1021,44 @@ class ObjectPanel(QWidget):
                 chips.append((
                     f"Δ {float(depth):.1f} mmag", theme.C_TEXT,
                     self.tr("How much the star dims at mid-transit")))
+        is_hads = kind == "hads" or bool(d.get("hads"))
+        if is_hads:
+            h = d.get("hads") or ctx.get("hads") or {}
+            per = h.get("period_h")
+            if per:
+                chips.append((
+                    f"P {float(per):.2f} h", theme.KIND_COLORS["hads"],
+                    self.tr("Pulsation period — several full cycles fit in "
+                            "one night")))
+            amp = h.get("amp")
+            if amp is None and h.get("max") is not None \
+                    and h.get("min") is not None:
+                amp = h["min"] - h["max"]   # inverted magnitude axis
+            if amp:
+                chips.append((
+                    f"Δ {float(amp):.1f} mag", theme.C_TEXT,
+                    self.tr("Peak-to-peak brightness swing of the pulsation")))
+            if h.get("cycles"):
+                chips.append((
+                    f"×{float(h['cycles']):.1f}", theme.KIND_COLORS["hads"],
+                    self.tr("Complete cycles that fit above your limit "
+                            "tonight")))
+            if h.get("priority") in ("period_change",
+                                     "period_change_possible"):
+                chips.append((
+                    self.tr("Period change!"), theme.C_WARN,
+                    self.tr("The Wils monitoring programme flags period "
+                            "changes — tonight's curve counts double")))
+            if h.get("observed") is False:
+                chips.append((
+                    self.tr("Not yet observed"), theme.C_OK,
+                    self.tr("The monitoring programme has no measurement of "
+                            "this star yet")))
+            if h.get("multiperiodic"):
+                chips.append((
+                    self.tr("Multiperiodic"), theme.KIND_COLORS["hads"],
+                    self.tr("Several pulsation modes — observe on "
+                            "consecutive nights")))
 
         ws = ctx.get("window_start")
         we = ctx.get("window_end")

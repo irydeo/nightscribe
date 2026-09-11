@@ -1,208 +1,181 @@
 # Plan — HADS: estrellas δ Scuti de alta amplitud, visibles "en directo"
 
-> **Abierto (2026-09-11)** — nuevo tipo de objetivo en NightScribe, inspirado en
-> el programa fotométrico de Patrick Wils (VVS / AAVSO-VSX). Un subplan = un commit.
-> **Documentación de fondo**: [docs/HADS.md](../HADS.md) (inglés) y
-> [docs/HADS.es.md](../HADS.es.md) (español) — lectura obligatoria antes de
-> escribir código nuevo. Decisión registrada en
-> [ADR-034](../adr/ADR-034-hads-stars.md).
+> **Diseño cerrado (2026-09-11), listo para ejecutar.** Un subplan = un commit.
+> Las tarjetas de subplan autocontenidas viven en `docs/PLANS/hads/` (un fichero
+> por fase) — para ejecutar un subplan solo hace falta leer `AGENTS.md`, este
+> maestro y la tarjeta concreta. Anclas `fichero:línea` verificadas a HEAD
+> `c607b81` (si una no coincide: **parar y reportar, no improvisar**).
+> **Documentación de fondo**: [docs/HADS.md](../HADS.md) /
+> [docs/HADS.es.md](../HADS.es.md) — lectura obligatoria. Decisión registrada en
+> [ADR-034](../adr/ADR-034-hads-stars.md) (se revisa en el subplan D.5).
 
-**rama**: `feature/hads` (nace de `feature/object-card` a día, HEAD e6880c3;
+**rama**: `feature/hads` (nace de `feature/object-card`, HEAD `c607b81`;
 mergea de vuelta a `feature/object-card`)
 **fecha**: 2026-09-11 · **autor**: FJC (con la IA)
 
 ## Objetivo
 
 Integrar las **estrellas HADS** (High-Amplitude δ Scuti) como nuevo tipo de
-objetivo de la noche. Son variables pulsantes con periodos de ~1–5 h y
-amplitudes ≥ 0.3 mag en V: **se las puede ver pulsar en directo**. El usuario
-apunta, hace fotometría en continuo durante ~2 periodos y obtiene varias curvas
-de luz completas en una sola noche. AAVSO las recomienda como **primer objetivo**
-de fotometría digital ("Your First Observing Target"). El programa de
-**Patrick Wils** monitoriza el catálogo a largo plazo (cobertura mensual
-verificable), y los datos se reportan a **AAVSO**.
+objetivo de la noche (`kind == "hads"`). Variables pulsantes con periodos de
+~1–5 h y amplitudes ≥ 0.3 mag en V: **se las puede ver pulsar en directo**. El
+usuario apunta, hace fotometría en continuo durante ~2 periodos y obtiene varias
+curvas de luz completas en una sola noche. AAVSO las recomienda como **primer
+objetivo** de fotometría digital. El programa de **Patrick Wils** (VVS /
+AAVSO-VSX) monitoriza el catálogo a largo plazo; los datos se reportan a
+**AAVSO**.
 
 La infraestructura a reutilizar es la de **exoplanetas** (`core/transits.py`,
-el bloque de plan de tránsitos en la GUI, `Outcomes.reported_exoclock`), con
-una diferencia conceptual central: **no hay fase conocida**. Para un tránsito
-sabemos cuándo ocurre (`t0 + n·P`); para una HADS solo sabemos cuánto dura el
-ciclo (`Period_h`), no cuándo es el máximo. Por eso no se recomienda un
-"evento", sino una **captura continua de ≥ 2 ciclos**.
+bloque de plan de la GUI, `OUTCOMES.reported_exoclock`) y la fotométrica del
+Track B de supernovas (`core/followup.py`, `core/photometry_import.py`, widget
+de curva de luz). Diferencia conceptual central: **no hay fase conocida**. Para
+un tránsito sabemos cuándo ocurre (`t0 + n·P`); para una HADS solo sabemos
+cuánto dura el ciclo (`Period_h`). No se recomienda un "evento", sino una
+**captura continua de ≥ 2 ciclos**.
 
-## Referencia real
+**Fuente de verdad de los datos**: el libro de cálculo de Patrick Wils
+<https://docs.google.com/spreadsheets/d/1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/>
+(público, una pestaña por año, **se actualiza a diario**). Leyenda de colores
+del nombre/coordenadas de cada estrella:
 
-- **Patrick Wils** — astrónomo aficionado belga, figura clave mundial en
-  variables: coordina el seguimiento fotométrico HADS vinculado a la VVS
-  (Vereniging Voor Sterrenkunde, Bélgica) y forma parte del equipo técnico del
-  **VSX de AAVSO** (co-compilador del índice junto a Otero, Schmeer y Bernhard).
-  Ref. [1] BAV Hamburg 2016 `04_HADS.pdf`; [2] AAVSO 20 millones de
-  observaciones; [3] VSX «about vartypes»; [4] austriaca.at (VSX/variables);
-  [5] BAA «Short Period Pulsator Program». Detalle completo y URLs verbatim en
-  `docs/HADS.md`.
-- **Catálogo**: `nightscribe/assets/HADS-stars.csv` (168 estrellas,
-  `Name,RA,DEC,Max,Min,Period_h`), copiado del directorio de trabajo del
-  observatorio (programa Wils/VVS).
-- **Cobertura mensual**: `nightscribe/assets/hads-coverage/HADS-Project-YYYY.csv`
-  (2011–2026) — mismas estrellas + 12 columnas mensuales con códigos de
-  observador (quién midió cada estrella cada mes). Dato diferencial para un
-  stretch de «urgencia por falta de cobertura».
-- **Ciencia**: póster de Kotysz (PTA Proc. vol. 10, 180–182, 2020) — se guarda
-  URL + extractos (no el PDF, 9.7 MB); ver `docs/HADS.md`.
+| Color | Significado | Prioridad |
+|---|---|---|
+| Rojo (nombre) | cambios de periodo encontrados | **¡Prioridad!** |
+| Naranja (nombre) | cambios de periodo posibles | **¡Prioridad!** |
+| Azul (coordenadas) | aún no observada en el programa | oportunidad |
+| Morado (nombre) | modos múltiples de pulsación (observar en noches consecutivas) | sin prioridad |
 
-## Contexto científico (resumen)
-
-- Familia δ Scuti en la franja de inestabilidad clásica x secuencia principal.
-- Periodos del orden de 1–3 h (catálogo: 1.03–4.88 h); amplitud V ≥ 0.3 mag.
-- Curvas asimétricas tipo "diente de sierra" (subida rápida, bajada lenta) —
-  "dwarf Cepheids".
-- Modo fundamental (F) y primer overtone (1O), ratio de periodos 0.76–0.78
-  (diagrama de Petersen); raras triple-modo (Wils et al. 2008 listó 4).
-- Algunas son **multiperiódicas** o **no-radiales** (el catálogo las marca).
-- TESS proveyó curvas superbias; Fourier + Petersen = análisis estándar
-  (Kotysz 2020).
-- AAVSO: observación cada ≤ 15 min para seguir la curva; amplitud < 0.5 mag
-  no apta para visual.
-
-## Contexto clave de código (exploración 2026-09-11)
-
-El "kind" se propaga por capas. Todo lugar donde se ramifica por kind necesita
-la rama `"hads"`. Mapa completo:
-
-- **Core**:
-  - `core/planner.py:28` — `PHASES` (añadir `"hads"` antes de `"scoring"`).
-  - `core/suggest.py:35-51` — `_scientific`; `:162-188` `_urgency`;
-    `:191-226` `_hook`; `:272-420` `_fragments`; `_observability:60-91`.
-  - `core/project.py:33` — `VALID_KINDS`; `:49` `OUTCOMES`
-    (par `("completed","reported_aavso","abandoned")`).
-  - `core/enrich.py:27-40` — `detect_type` (rama hads: si el nombre está en el
-    catálogo empaquetado → `data["hads"]`).
-  - `core/narrative.py` — `hook()` y `fact_bullets()` (rama hads).
-  - `core/orbits.py` — `explain_hads()` para la tabla de parámetros.
-- **GUI**:
-  - `gui/theme.py:36-49` — `KIND_COLORS` + `KIND_LABELS`.
-  - `gui/main_window.py:175` — `KIND_ORDER`; `:143-171` `TABLE_COLS`;
-    `:1399-1403` etiqueta en `_table_value`; `:771-835` `_type_pixmap`
-    (icono); `:2797-2953` modelo del bloque de tránsitos para el bloque hads;
-    `:2351-2365` `_ccd_coords_text` y `:2389-2400` `_ccd_point_action`
-    (**hads = coordenadas fijas**, NO entra en "moving");
-    `:4118-4127` whitelist de ctx en `_create_project`;
-    `:1568` filtro de proyectos y `:1603` etiqueta en lista.
-  - `gui/overview.py:648-673` `_orbit_rows`; `:955-1065` `_capture_chips`.
-  - `gui/i18n/*.ts` + `gui/ui/settings_dialog.ui` + `gui/ui/projects_tab.ui`:
-    checkbox, cadena de fase y item de combo.
-- **Config**: `config.py:58` `enabled_kinds` (añadir `"hads"`; migración
-  amable: si el valor guardado es el antiguo default de 6, añadir hads).
-- **CLI**: `__main__.py:345` help de `project --kind`; `cmd_tonight` ya
-  imprime `[kind]` genérico.
-- **Assets**: patrón de carga `Path(__file__).parent.parent / "assets"`
-  (usado por `gui/theme.py:29` y `gui/moon_icon.py:39`). El instalador
-  (`installer/nightscribe.spec:28`) ya recoge `nightscribe/assets/*`;
-  falta `pyproject.toml` `package-data` → `"nightscribe" = ["assets/*"]`.
-- **Exposición**: `core/exposure.py:127` `recommended_transit_exposure`
-  (reutilizable/envoltorio delgado para hads).
-
-## Decisiones pactadas
+## Decisiones (H-a … H-n)
 
 | # | Decisión | Valor |
-|---|----------|-------|
-| H-a | **Sin fase conocida → captura continua** | No existe t0 ni máx predecible con el catálogo actual. La recomendación es **2×P** de captura continua (verlo repetir + plegar). Gate = visibilidad + **ventana contigua con ≥ 1 ciclo** (2 para la recomendación). |
-| H-b | **Catálogo empaquetado, sin red** | `HADS-stars.csv` viaja como `nightscribe/assets/`. Funciona offline (filosofía observatorio). Refresco manual/documentado. |
-| H-c | **métrica clave `cycles`** | `cycles = hours_up / Period_h` (ciclos completos que caben esta noche). Alimenta score, frases y el bloque de plan. |
-| H-d | **Cadencia recomendada** | ≥ 12 puntos/ciclo → `cadence_s = Period_h·3600/12`, cap ≤ 15 min reales (regla AAVSO). |
-| H-e | **mag del target = mediana** | `mag = (Max+Min)/2` para el filtro de magnitud (la fase es desconocida); el **rango Max–Min y la amplitud** siempre visibles en la ficha. |
-| H-f | **Reporte → AAVSO** | Outcome `reported_aavso` (paralelo de `reported_exoclock`). Config ya tiene `aavso_code`. |
-| H-g | **Proyecto = flujo genérico** | `plan → process → publish`; process v1 = enlace/instrucciones a fotometría + AAVSO WebObs. |
-| H-h | **hads = coordenadas fijas** | Epoch ≈ ahora; NO va en los kinds "moving" del CCDciel. |
+|---|---|---|
+| H-a | **Sin fase → captura continua** | Recomendación **2×P** (verlo repetir + plegar). Gate de listado = visibilidad + **ventana contigua ≥ 1 ciclo**. |
+| H-b | **Fuente híbrida** | Google Sheet en runtime (caché SQLite, TTL **12 h**) + snapshot empaquetado (`assets/HADS-stars.csv`) como respaldo offline/first-run y fuente de aliases. Runtime nunca bloquea: si falla red/parseo → snapshot puro. |
+| H-c | **Métrica clave `cycles`** | `cycles = hours_up / Period_h` (ciclos completos que caben esta noche). Alimenta score, frases y el bloque de plan. |
+| H-d | **Cadencia recomendada** | ≥ 12 puntos/ciclo → `cadence_s = min(P·3600/12, 900)` (cap 15 min reales, regla AAVSO). |
+| H-e | **mag del target = mediana** | `mag = (Max+Min)/2` para gate y score (la fase es desconocida); rango Max–Min y amplitud siempre visibles en la ficha. |
+| H-f | **Reporte → AAVSO** | Outcome de proyecto `reported_aavso` (paralelo de `reported_exoclock`); la config ya tiene `aavso_code`. |
+| H-g | **Proyecto = flujo genérico** | `plan → process → publish` + pestaña Follow-up habilitada para `hads`; process = handoff FotoDif/AIJ + AAVSO WebObs. |
+| H-h | **hads = coordenadas fijas** | NO entra en los kinds "moving" del goto CCDciel (cae en la rama `fixed()` sin tocar código: `main_window.py:2389-2407`). |
+| H-i | **Prioridad desde la leyenda de colores** | Extraída del XLSX (color de fuente): rojo → `period_change` (+12 urgencia), naranja → `period_change_possible` (+8), azul coords → `unobserved` (+6), morado → `multiperiodic` (sin urgencia). |
+| H-j | **Refresco automático, sin releases** | `core/sources/hads_sheet.py`: 1 descarga `export?format=xlsx` (workbook completo) vía `db.http_get`, TTL 12 h; parseo **solo stdlib** (`zipfile`+`xml.etree`, sin openpyxl en runtime); caché de dos niveles (XLSX crudo + JSON parseado → parseo 1 vez/día, lecturas ~5 ms). Merge por coordenadas sobre el snapshot. |
+| H-k | **Azul (no observada) = urgencia moderada +6** | Dato estable que no envejece; ser de los primeros en medirla aporta valor real al programa. |
+| H-l | **Fotometría en vivo = handoff FotoDif/AIJ + curva plegada** | FotoDif (modo AUTO) hace el directo y genera informe AAVSO Extended File Format; NightScribe importa su salida (el parser `photometry_import` ya admite «JD - mag»), pliega por fase con el P del catálogo y publica la curva. **Monitor nativo en vivo: aparcado** (FotoDif AUTO ya lo cubre; nota documentada sin compromiso). |
+| H-m | **Cobertura mensual en v1** | Celda vacía del mes actual (pestaña del año en curso) → «nadie la cubre este mes»: +10 urgencia + fragmento. Fresca a diario gratis (mismo workbook). Si enero llega sin pestaña del año nuevo → `None` (sin bonus ni penalización). |
+| H-n | **Generalización futura preparada, no incluida** | Variables de periodo largo/campañas = track posterior independiente (ver § Generalización). HADS v1 respeta los guardarraíles para no bloquearlo. |
 
-## Diseño del módulo núcleo (`core/hads.py`)
+## Arquitectura de datos (híbrida)
 
-Plantilla: `core/transits.py` (visibilidad por `coords.samples_tonight` /
-`planner._visibility`, gate con umbral del horizonte + margen, ADR-020).
+```
+Google Sheet de P. Wils (fuente de verdad; actualización diaria)
+  │  GET export?format=xlsx  (workbook completo, ~100-300 KB, 1 petición)
+  ▼
+core/sources/hads_sheet.py
+  │  db.http_get("hads:workbook", "hads", fetch)   ← TTL 12 h (SOURCE_TTL)
+  │  db.cache_get/put("hads:parsed", ...)          ← JSON parseado (mismo TTL):
+  │      el parseo XLSX (~1-2 s) ocurre 1 vez/día; lecturas posteriores ~5 ms
+  │  error de red/parseo → None (+logger.warning)
+  ▼
+core/hads.py::catalog()
+  │  base = snapshot empaquetado (assets/HADS-stars.csv; lru_cache; aliases)
+  │  overlay online casado por coords.angular_separation < 1'
+  │      (period/max/min/priority/observed/coverage del sheet;
+  │       estrellas nuevas del sheet se añaden; bundle sin pareja se conserva)
+  ▼
+planner._hads_targets → suggest (score + frases) → GUI / CLI / enrich
+```
 
-- `catalog()` → dicts: `{name, alt_names, ra_deg, dec_deg, max, min, amp,
-  period_h, multiperiodic, non_radial}`. Parseo del CSV con `csv`:
-  **CRLF + campos con comillas** (`","` en el Name), `RA`/`DEC` sexagesimales,
-  flags: `multiperiodic`, `Non-radial`, `change in amplitude?` (regex sobre
-  el `Name`). Robustez: filas malformadas se saltan con `logger.debug`.
-- `hads_tonight(stars, lat, lon, date=None, threshold_fn=None, min_alt=None,
-  max_vmag, margin, cycles_needed=2, session_duration_s=None)` → por estrella:
-  `{name, ra_deg, dec_deg, mag(mediana), max, min, amp, period_h, max_alt,
-  hours_up, cycles, window_start/end, session_req_h(2P), session_fits(bool),
-  cadence_s, exp_s, flags}`.
-- `session_fits`: ¿cabe 2×P continua dentro de la franja segura? (mismo
-  espíritu que `baseline_fits` del tránsito).
-- `recommended_hads_exposure(v_mag, plate_scale=None)` → envoltorio de
-  `exposure.recommended_transit_exposure` (fotometría de comparación).
+## Protocolo de ejecución (obligatorio para cada subplan)
 
-## Integración por fases
+1. Lee `AGENTS.md` + este maestro + **solo** tu fichero de fase.
+2. Baseline: `.venv/bin/python -m pytest tests/unit -q` → anota el conteo.
+3. Implementa la tarjeta tal cual. Si un ancla no coincide con la realidad:
+   **para y reporta; no improvises**.
+4. «Hecho» = checklist de la tarjeta completo, incluido: suite unitaria verde
+   (anota N→M), cabecera GPL en todo `.py` nuevo (ver AGENTS.md), código en
+   inglés con comentarios `# @args:` / `# @return:`, cadenas de GUI por
+   `self.tr()`, y pipeline i18n ejecutado si tocaste cadenas:
+   ```bash
+   pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
+       nightscribe/gui/ui/*.ui \
+       -ts nightscribe/gui/i18n/nightscribe_es.ts \
+           nightscribe/gui/i18n/nightscribe_en.ts
+   # traducir los .ts (ES y EN; EN suele ser igual a la fuente)
+   pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts
+   ```
+   (`test_i18n.py` falla si queda alguna traducción `unfinished` o vacía.)
+5. Un commit por subplan, con el mensaje dado en la tarjeta. Marca
+   **Estado: Hecho** en la tarjeta.
+6. Prohibido: TODOs sin resolver, medias implementaciones, agrupar commits.
 
-### Fase A — Núcleo (scoring + planner + tests)
-1. `pyproject.toml`: `package-data` += `"nightscribe" = ["assets/*"]` (el
-   instalador ya los recoge).
-2. `core/hads.py` nuevo + unit tests de parseo/lógica.
-3. `planner.py`: `PHASES` + `"hads"`; `_hads_targets(...)` (rama de
-   `_visibility`, `on_phase` label en GUI).
-4. `suggest.py` ramas:
-   - `_scientific`: `clamp(amp/0.9·20) + clamp((18 − mag_med)/10·15)`.
-   - `_observability`: altitud + horas + mag (genérico) + bonus
-     `clamp(cycles/5·6,0,6)`; si `session_fits is False` → −4 (patrón
-     `baseline_fits`).
-   - `_urgency`: 0 en v1 (sin cobertura; ver stretch).
-   - `_hook`: prototipos famosos en el catálogo (CY Aqr, DY Peg, SZ Lyn, XX Cyg,
-     V2455 Cyg…) + `amp >= 0.5` + `multiperiodic`.
-   - `_fragments`: «periodo P h, amplitud Δ», «cabrán N ciclos esta noche»,
-     «la verás pulsar en directo», «multiperiódica: varias noches», nota
-     no-radial, si `session_fits` falla «no caben 2 ciclos de seguida».
-5. Tests unit: `test_hads.py`, `test_suggest_hads.py`, fixtures
-   `test_tonight_kinds.py`/`test_best_per_kind.py`/`test_tonight_rows.py`
-   (añadir un target `"hads"`). Test funcional del pipeline (sin red).
+## Índice de subplanes
 
-### Fase B — GUI mínima (listable y puntuable)
-1. `theme.py` `KIND_COLORS` + `KIND_LABELS` (`HADS`).
-2. `main_window.py`: `KIND_ORDER`, `TABLE_COLS["hads"]` (Period, Amplitude,
-   Cycles, Alt, Best time), etiqueta `_table_value`, icono `_type_pixmap`
-   (estrella pulsante, estilo del resto), onda de progreso de fase.
-3. `config.py` `enabled_kinds` + migración amable de usuarios existentes.
-4. `.ui` settings checkbox + save/load; `projects_tab.ui` item; `.ts` ES/EN
-   (lupdate/lrelease; strings vía `self.tr()`).
-5. `overview.py`: `orbits.explain_hads` (filas: periodo, amplitud, rango,
-   modos) + chips (amplitud, ciclos, multiperiódica).
+| Sub | Título | Fichero | Depende de | Estado |
+|---|---|---|---|---|
+| H0.1 | Mini-lector XLSX stdlib | [fase-0-data.md](hads/fase-0-data.md) | — | pendiente |
+| H0.2 | Descarga + caché de dos niveles | ídem | H0.1 | pendiente |
+| H0.3 | Workbook → estrellas (colores, cobertura) + test funcional | ídem | H0.1, H0.2 | pendiente |
+| H0.4 | `core/hads.py` (catálogo, merge, derivados) | ídem | H0.3 | pendiente |
+| H0.5 | Docs de datos (HADS.md/es, DATA_SOURCES) | ídem | H0.4 | pendiente |
+| A.1 | package-data + planner (`_hads_targets`, gate 1 ciclo) | [fase-a-core.md](hads/fase-a-core.md) | H0.4 | pendiente |
+| A.2 | Scoring (`_scientific/_observability/_urgency/_hook`) | ídem | A.1 | pendiente |
+| A.3 | Fragmentos ES/EN | ídem | A.2 | pendiente |
+| B.1 | GUI listable (theme, tabla, icono, fase) + i18n | [fase-b-gui.md](hads/fase-b-gui.md) | A.3 | pendiente |
+| B.2 | config + settings checkbox + combos + i18n | ídem | B.1 | pendiente |
+| B.3 | enrich `detect_type` (¡antes de la regex exoplaneta!) | ídem | H0.4 | pendiente |
+| B.4 | Ficha de objeto (`explain_hads` + chips) + i18n | ídem | B.1, B.3 | pendiente |
+| C.1 | Proyectos hads (`VALID_KINDS`/`OUTCOMES`/CLI) + i18n | [fase-c-projects.md](hads/fase-c-projects.md) | B.2 | pendiente |
+| C.2 | Narrativa ES/EN (hook, facts, hashtags) | ídem | B.3 | pendiente |
+| C.3 | Post/tuit (tests) | ídem | C.2 | pendiente |
+| D.1 | Bloque de plan HADS (2P, cadencia, checklist) + i18n | [fase-d-session.md](hads/fase-d-session.md) | C.1 | pendiente |
+| D.2 | Secuencia CCDciel hads | ídem | D.1 | pendiente |
+| D.3 | Follow-up + process (FotoDif/WebObs) + i18n | ídem | C.1 | pendiente |
+| D.4 | Plegado por fase (widget + viz) + i18n | ídem | D.3 | pendiente |
+| D.5 | Post con curva + cierre documental | ídem | D.4 | pendiente |
 
-### Fase C — Proyectos y narrativa
-1. `project.py`: `VALID_KINDS` + `"hads"`, `OUTCOMES`
-   `("completed","reported_aavso","abandoned")`.
-2. `enrich.py` detect_type + `narrative.py` hook/fact_bullets ES/EN
-   (que citan Wils/VVS/AAVSO refs [1]–[5]).
-3. Post/tweet: «mira esta estrella pulsar», curva, amplitud, programa Wils.
+## Riesgos y mitigaciones
 
-### Fase D — Flujo de sesión
-1. Bloque de plan análogo al de tránsitos (modelo `:2797-2953`): duración
-   recomendada 2P, cadencia ≤ P/12 (cap 15 min), exposición, «N ciclos caben
-   esta noche», `session_fits` con aviso si no.
-2. Exportación de secuencia CCDciel con esos campos (reusar patrón
-   `_project_export_sequence`, block de tránsito `:3817-3820`).
-3. process: instrucciones de fotometría + enlace AAVSO WebObs (`aavso_code`).
+- Google cambia el endpoint / la hoja deja de ser pública / el layout cambia →
+  fallback al snapshot empaquetado + `logger.warning` (Tonight nunca se rompe).
+- Color no reconocido en la hoja → se ignora con `logger.debug` (nunca rompe el
+  parseo).
+- La hoja y el bundle derivan (ej. GP And: 1.89 h bundle vs 2.89 h hoja) → el
+  dato online manda en runtime; el test funcional imprime un informe de deriva
+  (informativo, nunca falla) para refrescar el snapshot a mano cuando convenga.
+- Ancla de línea desviada al ejecutar → el protocolo manda parar y reportar.
 
-### Stretch (post v1, documentado)
-- **Cobertura mensual**: parsear `assets/hads-coverage/` → urgencia «nadie ha
-  medido esta estrella este mes» (+ hasta 10 en `_urgency`). Cuidado: dato
-  snapshot que se queda viejo; refresco = sustituir asset + nota en la UI.
-- **Curva sintética esquemática** (reloj de periodo): trazado 2P con forma
-  diente-de-sierra normalizada; etiquetada como esquemática, nunca real.
-- **Epoch vía VSX API** (red): VSX tiene `Epoch` (HJD de máximo) → podría
-  **predecir máximos** como los tránsitos. Requiere `sources/vsx.py` + caché.
-  AAVSO aconseja las ±0.05 mag; el app ya tiene `aavso_code`.
+## Generalización futura: variables y campañas (NO en este plan)
 
-## Preguntas abiertas
+Las HADS abren la puerta a la fotometría de variables, pero son la **excepción
+de corto periodo** (sesión única de 2P). Las variables de largo periodo
+(Miras, simbióticas, novas recurrentes como T CrB, objetos tipo WeSb 1) siguen
+el molde **multi-noche del Track B de supernovas** (sesiones, puntos
+fotométricos, curva, cadencia con memoria) — es un **track posterior
+independiente, en su propia rama** (plan + ADR propios). Dirección pactada:
 
-1. ¿El stretch de cobertura mensual en esta iteración o en una futura?
-   (Recomendado: futura — añade complejidad de refresco de datos.)
-2. ¿mag de gate = mediana (H-e) o gate sobre el máximo (más optimista)?
-   (Recomendado: mediana, consistente con el resto de familias.)
-3. ¿Sesión recomendada 2×P (ver repetir + plegar) o 1×P en v1?
-   (Recomendado: 2×P.)
+- **Campaña = atributo ortogonal del proyecto** (`{grupo/coordinador, objetivo,
+  protocolo: cadencia_noches/filtros/estrellas de comparación, url_reporte,
+  estado activa/finalizada}`) — las campañas reales del grupo obsSN cubren SNs
+  (2017eaw) y variables (T CrB, WeSb 1) por igual.
+- **Nuevo kind `variable`** hermano de `sn`; `series.py` (un apilado por noche)
+  le sirve sin cambios.
+- Bucle de planificación sin red: campañas activas con cadencia vencida →
+  Tonight (patrón B11 «hace N noches»).
+- Reporte: exportar `photometry_points` a CSV/AAVSO EFF (HJD, mag, filtro).
 
-## Docs pendientes en Fase D
-- `docs/DATA_SOURCES.md` (+ es): entrada «HADS catalogue (P. Wils / VVS)».
-- `docs/WORKFLOWS.md` (+ es): nueva fase + tipo de proyecto hads.
-- `INSTALL.md` / README si aplica.
+**Guardarraíles que HADS v1 respeta** (notas en las tarjetas afectadas):
+la pestaña Follow-up se habilita kind-agnóstica (constante `FOLLOWUP_KINDS`,
+no `== "hads"` a pelo); el plegado por fase y la plantilla esquemática se
+implementan agnósticos de kind; `sawtooth_template` con API genérica
+`(period, amp, mag_med)`; narrativa/post como una rama más sin tocar el
+andamiaje genérico.
+
+**Monitor nativo en vivo**: aparcado (H-l) — FotoDif AUTO ya cubre el directo
+en el flujo real del observatorio. La nota queda en `docs/WORKFLOWS` (7decies,
+«fuera de esta iteración») por si algún día cambia el flujo.
+
+## Sin preguntas abiertas
+
+Todas las cuestiones del diseño quedaron resueltas el 2026-09-11 (mag gate =
+mediana; sesión = 2×P; cobertura mensual en v1; prioridades por color en v1;
+azul = +6; refresco online TTL 12 h; handoff FotoDif + plegado; campañas =
+track aparte; monitor en vivo = aparcado).

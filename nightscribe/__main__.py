@@ -342,7 +342,7 @@ def main(argv=None):
                         default=None)
     p_create = p_sub.add_parser("create", help="crear un proyecto")
     p_create.add_argument("--kind", required=True,
-                          help="sn|neo|comet|pccp|transit")
+                          help="sn|neo|comet|pccp|transit|hads")
     p_create.add_argument("--name", required=True, help="object name")
     p_advance = p_sub.add_parser("advance", help="avanzar un paso")
     p_advance.add_argument("id", type=int, help="project id")

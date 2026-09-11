@@ -32,7 +32,8 @@
 **Hecho cuando**: suite verde (N→M) + `test_i18n.py`;
 `python -m nightscribe project create --kind hads "CY Aqr"` funciona.
 **Commit**: `Core/Gui/CLI: HADS projects with the AAVSO outcome (ADR-034, subplan C.1)`
-**Estado**: pendiente
+**Estado**: **Hecho** (962→963). Nota: el mapa `_OUTCOME_LABELS` usa dicts
+bilingües en código (no `tr()`), lupdate reporta 0 cadenas nuevas.
 
 ---
 

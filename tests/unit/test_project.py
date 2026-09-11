@@ -551,3 +551,13 @@ def test_project_dir_empty_slug(tmp_path, monkeypatch):
     d = pathsmod.project_dir(7, "")
     assert d.exists()
     assert d.name == "7-"
+
+def test_create_hads_project(tmp_db):
+    # the seventh project kind (ADR-034): AAVSO outcome pair + close/reopen
+    p = project.create(tmp_db, "hads", "CY Aqr")
+    assert p["kind"] == "hads"
+    assert "reported_aavso" in project.OUTCOMES["hads"]
+    closed = project.close(tmp_db, p["id"], outcome="reported_aavso")
+    assert closed["outcome"] == "reported_aavso"
+    reopened = project.reopen(tmp_db, p["id"])
+    assert reopened["status"] == "active"

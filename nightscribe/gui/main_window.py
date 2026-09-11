@@ -63,6 +63,7 @@ _OUTCOME_LABELS = {
     "completed": {"es": "Completado", "en": "Completed"},
     "reported_mpc": {"es": "Reportado al MPC", "en": "Reported to MPC"},
     "reported_exoclock": {"es": "Reportado a ExoClock", "en": "Reported to ExoClock"},
+    "reported_aavso": {"es": "Reportada a la AAVSO", "en": "Reported to AAVSO"},
     "abandoned": {"es": "Abandonado", "en": "Abandoned"},
 }
 _STEP_TABS = {0: "tab_plan", 1: "tab_process", 2: "tab_publish"}
@@ -4162,7 +4163,7 @@ class MainWindow(QMainWindow):
                  "disc_date",
                  "rate_arcsec_min", "nobs", "moid", "h",
                  "nf_score", "nf_priority", "neocp", "pccp_score",
-                 "perihelion_date", "transit", "approach")
+                 "perihelion_date", "transit", "approach", "hads")
                 if target.get(k) is not None}
         p = project.create(db, kind, name, ctx)
         if p:

@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # the session and exporting/running it against CCDciel is one step now.
 
 STEPS = ("plan", "process", "publish")
-VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit")
+VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit", "hads")
 
 STEP_PENDING = "pending"
 STEP_CURRENT = "current"
@@ -53,6 +53,7 @@ OUTCOMES = {
     "comet": ("completed", "abandoned"),
     "pccp": ("confirmed", "false_positive", "lost", "completed"),
     "transit": ("completed", "reported_exoclock", "abandoned"),
+    "hads": ("completed", "reported_aavso", "abandoned"),
 }
 OUTCOME_DEFAULT = ("completed", "abandoned")
 

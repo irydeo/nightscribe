@@ -1407,11 +1407,11 @@ import — única edición permitida fuera de los tests nuevos.)
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: follow-up tab for variables — quick-look on, campaign protocol + cadence (ADR-035, subplan VC.10)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅
 
 ---
 
 ## Cierre de la fase C
 
 Cuando VC.1–VC.10 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: ______ → ______.
+verde y anota el conteo total aquí: 1074 → 1076 ✅ (VC.1–VC.10 hechas, 2026-09-11).

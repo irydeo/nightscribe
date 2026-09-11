@@ -69,7 +69,8 @@ _OUTCOME_LABELS = {
 _STEP_TABS = {0: "tab_plan", 1: "tab_process", 2: "tab_publish"}
 # Kinds with multi-night photometry follow-up (the tab is kind-agnostic;
 # SN-only analysis buttons hide for the others)
-FOLLOWUP_KINDS = ("sn", "hads")
+# Track V: variables join (V-g: the quick-look engine serves them unchanged)
+FOLLOWUP_KINDS = ("sn", "hads", "variable")
 _STEP_LABELS_ES = {"plan": "Plan & Captura", "process": "Procesado",
                    "publish": "Publicar"}
 _STEP_LABELS_EN = {"plan": "Plan & Capture", "process": "Process",
@@ -3352,9 +3353,19 @@ class MainWindow(QMainWindow):
         layout = self._step_tab_layout("tab_followup")
         pid = p["id"]
 
+        # campaign lookup (ADR-035): used by the cadence override below and
+        # the protocol block
+        camp = None
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            camp = _camp.get(db, p["campaign_id"])
+
         # cadence reminder (T9): "hace N noches que no la visitas"
         days = fu.days_since_last_session(db, pid)
         threshold = int(config.get("sn_cadence_days", 3))
+        if camp is not None:
+            threshold = int((camp.get("protocol") or {}).get(
+                "cadence_nights") or threshold)
         if days is not None:
             text = self.tr("Last visit: {} days ago").format(days)
             if kind == "hads" and (ctx.get("hads") or {}).get("multiperiodic"):
@@ -3368,6 +3379,28 @@ class MainWindow(QMainWindow):
         else:
             layout.addWidget(QLabel(
                 self.tr("No visits yet. Add one to start the follow-up.")))
+
+        # campaign protocol (ADR-035): show the agreed observing protocol
+        if camp is not None:
+            prot = camp.get("protocol") or {}
+            bits = [self.tr("Campaign: %1").replace("%1", camp["name"])]
+            if prot.get("cadence_nights"):
+                bits.append(self.tr("cadence every %1 night(s)").replace(
+                    "%1", str(prot["cadence_nights"])))
+            if prot.get("filters"):
+                bits.append(self.tr("filters: %1").replace(
+                    "%1", ", ".join(prot["filters"])))
+            if prot.get("comp_stars"):
+                bits.append(self.tr("comparison stars: %1").replace(
+                    "%1", ", ".join(prot["comp_stars"])))
+            lbl_prot = QLabel(" · ".join(bits))
+            lbl_prot.setWordWrap(True)
+            layout.addWidget(lbl_prot)
+            if prot.get("notes"):
+                lbl_notes = QLabel("⚠ " + prot["notes"])
+                lbl_notes.setWordWrap(True)
+                lbl_notes.setStyleSheet("color: #e0c060;")
+                layout.addWidget(lbl_notes)
 
         # add visit button
         btn_add = QPushButton(self.tr("Add visit"))
@@ -3429,6 +3462,12 @@ class MainWindow(QMainWindow):
             # SN-only analysis: the quick-look engine measures stacked
             # per-night images, not an intra-night series (ADR-034, D.3)
             for b in (btn_quicklook, btn_evo, btn_annot):
+                b.hide()
+        elif kind == "variable":
+            # variables share the quick-look (the series engine serves
+            # them unchanged, V-g) but not the SN evolution animation or
+            # the annotated FITS
+            for b in (btn_evo, btn_annot):
                 b.hide()
         layout.addLayout(ana_row)
         layout.addStretch()

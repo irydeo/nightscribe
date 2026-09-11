@@ -1484,3 +1484,37 @@ def test_hub_filters_projects_by_campaign(window):
     assert any("V Ceti VC9" in n for n in names)
     assert not any("Wee 9" in n for n in names)
     window.projects.cmb_campaign.setCurrentIndex(0)
+
+
+def test_variable_project_gets_followup_with_protocol(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QLabel, QWidget
+    cid = camp_mod.create(
+        mw.db, "Campaña T CrB",
+        protocol={"cadence_nights": 1, "filters": ["B", "V"],
+                  "comp_stars": ["000-BB0-123"], "notes": "Do not saturate"})
+    p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
+                        campaign_id=cid)
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    fu = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    assert window.projects.tabs_steps.isTabVisible(
+        window.projects.tabs_steps.indexOf(fu))
+    texts = [l.text() for l in fu.findChildren(QLabel)]
+    assert any("Campaña T CrB" in t for t in texts)
+    assert any("B, V" in t for t in texts)
+    assert any("Do not saturate" in t for t in texts)
+
+
+def test_variable_followup_keeps_quicklook_hides_animation(window):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QPushButton, QWidget
+    p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    fu = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    btns = {b.text(): b for b in fu.findChildren(QPushButton)}
+    assert btns["Run quick-look"].isVisibleTo(fu)
+    assert not btns["Generate animation"].isVisibleTo(fu)
+    assert not btns["Export annotated FITS"].isVisibleTo(fu)

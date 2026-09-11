@@ -31,7 +31,34 @@ import logging
 import zipfile
 import xml.etree.ElementTree as ET
 
+import requests
+
+from ..db import db
+
 logger = logging.getLogger(__name__)
+
+# Public Google Sheets workbook of Patrick Wils' HADS monitoring programme
+# (one tab per year; the export carries the whole workbook in one request)
+WORKBOOK_URL = ("https://docs.google.com/spreadsheets/d/"
+                "1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/"
+                "export?format=xlsx")
+
+
+def workbook(force=False):
+    # The raw workbook, cached through db (12 h TTL, decision H-j).
+    # @args: force - True bypasses the cache read (still stores the fresh copy)
+    # @return: xlsx bytes, or None on network failure (Tonight never breaks)
+    def fetch():
+        r = requests.get(WORKBOOK_URL, timeout=60)
+        r.raise_for_status()
+        return (r.content,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    try:
+        body, _ = db.http_get("hads:workbook", "hads", fetch, force=force)
+        return body
+    except requests.RequestException as err:
+        logger.warning("HADS sheet fetch failed: %s", err)
+        return None
 
 # SpreadsheetML namespaces, fully qualified for ElementTree lookups
 _NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"

@@ -37,6 +37,8 @@ SOURCE_TTL = {
     "esa_neo": 6 * HOUR,
     "pccp": 6 * HOUR,
     "exoclock": 24 * HOUR,
+    "hads": 12 * HOUR,     # Wils updates the sheet daily; Tonight is a
+                           # nightly run, so 12 h keeps it fresh both ways
     "silso": 24 * HOUR,
     "sbdb": 7 * DAY,
     "simbad": 7 * DAY,

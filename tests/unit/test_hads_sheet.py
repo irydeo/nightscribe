@@ -15,7 +15,9 @@ import io
 import zipfile
 
 import pytest
+import requests
 
+from nightscribe.core.sources import hads_sheet
 from nightscribe.core.sources.hads_sheet import _read_xlsx
 
 _NS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
@@ -122,3 +124,64 @@ def test_empty_cells_are_skipped():
 def test_garbage_bytes_raise_value_error():
     with pytest.raises(ValueError):
         _read_xlsx(b"this is not a zip file")
+
+
+# ---------------- workbook() fetch + cache (subplan H0.2) ----------------
+
+def _fake_response(content=b"xlsx-bytes"):
+    # @return: a requests.Response look-alike that always succeeds
+    class Resp:
+        def raise_for_status(self):
+            return None
+        @property
+        def content(self):
+            return content
+    return Resp()
+
+
+def test_workbook_caches_the_download(monkeypatch, tmp_db):
+    monkeypatch.setattr(hads_sheet, "db", tmp_db)
+    calls = []
+
+    def fake_get(url, timeout=60):
+        calls.append(url)
+        return _fake_response()
+
+    monkeypatch.setattr(hads_sheet.requests, "get", fake_get)
+    assert hads_sheet.workbook() == b"xlsx-bytes"
+    assert hads_sheet.workbook() == b"xlsx-bytes"
+    assert len(calls) == 1            # second call came from the cache
+    assert calls[0] == hads_sheet.WORKBOOK_URL
+
+
+def test_workbook_force_bypasses_the_cache_read(monkeypatch, tmp_db):
+    monkeypatch.setattr(hads_sheet, "db", tmp_db)
+    calls = []
+    monkeypatch.setattr(hads_sheet.requests, "get",
+                        lambda url, timeout=60: calls.append(url) or _fake_response())
+    hads_sheet.workbook()
+    hads_sheet.workbook(force=True)
+    assert len(calls) == 2
+
+
+def test_workbook_network_failure_returns_none(monkeypatch, tmp_db):
+    monkeypatch.setattr(hads_sheet, "db", tmp_db)
+
+    def boom(url, timeout=60):
+        raise requests.ConnectionError("no network")
+
+    monkeypatch.setattr(hads_sheet.requests, "get", boom)
+    assert hads_sheet.workbook() is None
+
+
+def test_workbook_cache_entry_expires(monkeypatch, tmp_db):
+    monkeypatch.setattr(hads_sheet, "db", tmp_db)
+    calls = []
+    monkeypatch.setattr(hads_sheet.requests, "get",
+                        lambda url, timeout=60: calls.append(url) or _fake_response())
+    hads_sheet.workbook()
+    # age the cached entry beyond the 12 h TTL
+    tmp_db.execute("UPDATE http_cache SET fetched = fetched - 13 * 3600"
+                   " WHERE key = 'hads:workbook'")
+    hads_sheet.workbook()
+    assert len(calls) == 2

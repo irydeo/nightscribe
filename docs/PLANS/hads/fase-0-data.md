@@ -56,11 +56,15 @@ celda, tolerancia a celdas sin estilo.
 **Hecho cuando**: `pytest tests/unit/test_hads_sheet.py -q` verde; suite
 unitaria verde (anota N→M); cabeceras GPL; comentarios `@args/@return`.
 **Commit**: `Core: HADS sheet XLSX reader (stdlib zipfile+xml) + unit tests (ADR-034, subplan H0.1)`
-**Estado**: pendiente
+**Estado**: **Hecho** (898→904)
 
 ---
 
-## H0.2 — Descarga + caché de dos niveles
+## H0.2 — Descarga + caché (workbook crudo)
+
+> **Resecuencia al ejecutar**: `parsed()` (caché de segundo nivel) necesita
+> `_parse_workbook` → se implementa en H0.3 junto al parser. H0.2 entrega
+> `workbook()` completo y testeado; ningún commit queda a medias.
 
 **Lee primero**: `nightscribe/core/db.py` (`SOURCE_TTL` líneas 29-51,
 `http_get` 308-322, `cache_get` 271, `cache_put` 295);
@@ -90,38 +94,22 @@ unitaria verde (anota N→M); cabeceras GPL; comentarios `@args/@return`.
       except requests.RequestException as err:
           logger.warning("HADS sheet fetch failed: %s", err)
           return None
-
-  def parsed(force=False):
-      # @return: parsed workbook dict (H0.3) or None; the JSON cache makes
-      #          the ~1-2 s XLSX parse happen once per TTL, not per call
-      cached = db.cache_get("hads:parsed")
-      if cached:
-          return json.loads(cached[0].decode("utf-8"))
-      data = workbook(force=force)
-      if data is None:
-          return None
-      try:
-          result = _parse_workbook(data)          # H0.3
-      except (ValueError, KeyError, zipfile.BadZipFile) as err:
-          logger.warning("HADS sheet parse failed: %s", err)
-          return None                              # never cache a failure
-      db.cache_put("hads:parsed", "hads", json.dumps(result).encode("utf-8"))
-      return result
   ```
 
-Tests (`test_hads_sheet.py`, fixture `tmp_db` de `tests/conftest.py`):
-inyectar fetch falsa (monkeypatch `requests.get` o factor fetch); cadena
-completa: 1ª llamada descarga+parsea, 2ª lee `hads:parsed` sin red ni parseo;
-fallo de red → `None`; xlsx corrupto → `None` y NO envenena la caché;
-expiración por TTL (reescribir `fetched` antiguo en `http_cache`).
+Tests (`test_hads_sheet.py`, fixture `tmp_db` de `tests/conftest.py`;
+patrón `monkeypatch.setattr(hads_sheet, "db", tmp_db)`):
+fetch falsa vía `monkeypatch.setattr(hads_sheet.requests, "get", ...)`;
+1ª llamada descarga, 2ª lee la caché sin red; `force=True` repite la
+descarga; fallo de red → `None`; expiración por TTL (envejecer `fetched`
+en `http_cache`).
 
 **Hecho cuando**: tests verdes; suite verde (N→M). Sin red en los unitarios.
-**Commit**: `Core: HADS sheet fetch with 12 h TTL + two-level cache (ADR-034, subplan H0.2)`
-**Estado**: pendiente
+**Commit**: `Core: HADS sheet fetch with 12 h TTL (ADR-034, subplan H0.2)`
+**Estado**: **Hecho** (904→908)
 
 ---
 
-## H0.3 — Workbook → estrellas (colores, cobertura) + test funcional
+## H0.3 — Workbook → estrellas (colores, cobertura) + `parsed()` + test funcional
 
 **Lee primero**: la leyenda de colores (maestro §Decisiones, H-i);
 `tests/functional/test_functional.py` línea 21 (`pytestmark`).
@@ -158,6 +146,27 @@ expiración por TTL (reescribir `fetched` antiguo en `http_cache`).
               "multiperiodic_sheet"}],
    "coverage": {year: {sheet_name: [meses 1-12 cubiertos]}}}
   ```
+- `parsed(force=False)` (caché de segundo nivel — el parseo XLSX de ~1-2 s
+  ocurre una vez por TTL, no por llamada):
+  ```python
+  def parsed(force=False):
+      # @return: parsed workbook dict or None
+      cached = db.cache_get("hads:parsed")
+      if cached:
+          return json.loads(cached[0].decode("utf-8"))
+      data = workbook(force=force)
+      if data is None:
+          return None
+      try:
+          result = _parse_workbook(data)
+      except (ValueError, KeyError, zipfile.BadZipFile) as err:
+          logger.warning("HADS sheet parse failed: %s", err)
+          return None                              # never cache a failure
+      db.cache_put("hads:parsed", "hads", json.dumps(result).encode("utf-8"))
+      return result
+  ```
+  Tests: 1ª llamada descarga+parsea, 2ª lee `hads:parsed` sin red ni parseo;
+  xlsx corrupto → `None` y NO envenena la caché.
 
 Test funcional `tests/functional/test_hads_live.py` (**nuevo**, con
 `pytestmark = pytest.mark.network`): descarga real → ≥150 estrellas; existe

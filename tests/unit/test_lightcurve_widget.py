@@ -162,3 +162,62 @@ def test_widget_survey_point_not_crash():
     c2, f2 = _point_style({"mjd": 0, "mag": 1, "filter": "Clear",
                            "source": "manual"})
     assert isinstance(c2, QColor) and f2
+
+
+# ---------------- phase folding (ADR-034, subplan D.4) ----------------
+
+_FOLD_POINTS = [
+    {"mjd": 60600.00, "mag": 11.8, "err": 0.02, "filter": "Clear",
+     "source": "file"},
+    {"mjd": 60600.25, "mag": 11.3, "err": 0.02, "filter": "Clear",
+     "source": "file"},      # half a period later (P = 0.5 d)
+    {"mjd": 60600.50, "mag": 11.8, "err": 0.02, "filter": "Clear",
+     "source": "file"},
+]
+
+
+def test_widget_fold_maps_phases_and_bounds():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_FOLD_POINTS, fold_period_d=0.5)
+    assert chart._bounds[0] == 0.0 and chart._bounds[1] == 2.0
+    # epoch defaults to the first point; half a period later is phase 0.5
+    assert abs(chart._phase(60600.25) - 0.5) < 1e-9
+    # each point is drawn in both cycles
+    assert chart._xs(_FOLD_POINTS[1]) == (0.5, 1.5)
+
+
+def test_widget_fold_probe_reports_phase_and_mjd():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_FOLD_POINTS, fold_period_d=0.5)
+    # hover right on the cycle-1 copy of the middle point
+    x = chart._map_x(1.5)
+    y = chart._map_y(11.3)
+    hit, lines = chart._probe(x, y)
+    assert hit
+    assert lines[0].startswith("phase 0.50")
+    assert any(l.startswith("MJD 60600.25") for l in lines)
+
+
+def test_widget_fold_draws_schematic_and_skips_sn_template():
+    _app()
+    from nightscribe.core import hads
+    chart = LightCurveChart()
+    saw = hads.sawtooth_template(12.0, 0.5, 11.55)
+    chart.set_data(_FOLD_POINTS, fold_period_d=0.5, sn_type="SN Ia",
+                   schematic=saw)
+    assert chart._schematic is saw
+    # the SN template is skipped in fold mode (its days-from-peak
+    # semantics don't fold); the legend shows the schematic entry
+    texts = _legend_texts(chart)
+    assert any("schematic" in t for t in texts)
+    assert not any("Typical template" in t for t in texts)
+
+
+def test_widget_unfolded_unchanged():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_POINTS, sn_type="SN Ia")
+    assert chart._fold_p is None
+    assert chart._xs(_POINTS[0]) == (60600.0,)

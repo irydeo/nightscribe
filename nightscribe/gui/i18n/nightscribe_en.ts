@@ -344,17 +344,22 @@
 <context>
     <name>LightCurveChart</name>
     <message>
-        <location filename="../widgets/lightcurve_widget.py" line="202"/>
+        <location filename="../widgets/lightcurve_widget.py" line="254"/>
+        <source>schematic (sawtooth)</source>
+        <translation>schematic (sawtooth)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/lightcurve_widget.py" line="255"/>
         <source>Typical template</source>
         <translation>Typical template</translation>
     </message>
     <message>
-        <location filename="../widgets/lightcurve_widget.py" line="218"/>
+        <location filename="../widgets/lightcurve_widget.py" line="271"/>
         <source>indicative</source>
         <translation>indicative</translation>
     </message>
     <message>
-        <location filename="../widgets/lightcurve_widget.py" line="220"/>
+        <location filename="../widgets/lightcurve_widget.py" line="273"/>
         <source>catalog</source>
         <translation>catalog</translation>
     </message>
@@ -2130,102 +2135,102 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation>Copied</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="973"/>
+        <location filename="../overview.py" line="992"/>
         <source>Predicted apparent magnitude tonight</source>
         <translation>Predicted apparent magnitude tonight</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="984"/>
+        <location filename="../overview.py" line="1003"/>
         <source>Sky rate tonight — it must outrun the stars</source>
         <translation>Sky rate tonight — it must outrun the stars</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="992"/>
+        <location filename="../overview.py" line="1011"/>
         <source>Longest single exposure before the target trails more than a pixel</source>
         <translation>Longest single exposure before the target trails more than a pixel</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1008"/>
+        <location filename="../overview.py" line="1027"/>
         <source>Type of stellar explosion</source>
         <translation>Type of stellar explosion</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1015"/>
+        <location filename="../overview.py" line="1034"/>
         <source>Days since discovery — a young light curve is gold for science</source>
         <translation>Days since discovery — a young light curve is gold for science</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1023"/>
+        <location filename="../overview.py" line="1042"/>
         <source>How much the star dims at mid-transit</source>
         <translation>How much the star dims at mid-transit</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1031"/>
+        <location filename="../overview.py" line="1050"/>
         <source>Pulsation period — several full cycles fit in one night</source>
         <translation>Pulsation period — several full cycles fit in one night</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1040"/>
+        <location filename="../overview.py" line="1059"/>
         <source>Peak-to-peak brightness swing of the pulsation</source>
         <translation>Peak-to-peak brightness swing of the pulsation</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1044"/>
+        <location filename="../overview.py" line="1063"/>
         <source>Complete cycles that fit above your limit tonight</source>
         <translation>Complete cycles that fit above your limit tonight</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1049"/>
+        <location filename="../overview.py" line="1068"/>
         <source>Period change!</source>
         <translation>Period change!</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1050"/>
+        <location filename="../overview.py" line="1069"/>
         <source>The Wils monitoring programme flags period changes — tonight&apos;s curve counts double</source>
         <translation>The Wils monitoring programme flags period changes — tonight&apos;s curve counts double</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1054"/>
+        <location filename="../overview.py" line="1073"/>
         <source>Not yet observed</source>
         <translation>Not yet observed</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1055"/>
+        <location filename="../overview.py" line="1074"/>
         <source>The monitoring programme has no measurement of this star yet</source>
         <translation>The monitoring programme has no measurement of this star yet</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1059"/>
+        <location filename="../overview.py" line="1078"/>
         <source>Multiperiodic</source>
         <translation>Multiperiodic</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1060"/>
+        <location filename="../overview.py" line="1079"/>
         <source>Several pulsation modes — observe on consecutive nights</source>
         <translation>Several pulsation modes — observe on consecutive nights</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1070"/>
+        <location filename="../overview.py" line="1089"/>
         <source>Times the object is safely above the limit</source>
         <translation>Times the object is safely above the limit</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1087"/>
+        <location filename="../overview.py" line="1106"/>
         <source>The capture window that still clears your local limit — the telescope stays in safe altitude through the whole session</source>
         <translation>The capture window that still clears your local limit — the telescope stays in safe altitude through the whole session</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1092"/>
+        <location filename="../overview.py" line="1111"/>
         <source> · ≤ HH:MM is the latest safe start</source>
         <translation> · ≤ HH:MM is the latest safe start</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1102"/>
+        <location filename="../overview.py" line="1121"/>
         <source>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</source>
         <translation>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</translation>
     </message>
     <message>
-        <location filename="../overview.py" line="1080"/>
+        <location filename="../overview.py" line="1099"/>
         <source>How long it stays a valid target</source>
         <translation>How long it stays a valid target</translation>
     </message>

@@ -1491,6 +1491,30 @@ def test_lightcurve_slot_absent_without_points(panel, monkeypatch):
     assert "lightcurve" not in panel._slot_data
 
 
+def test_lightcurve_slot_folds_for_hads(panel, monkeypatch):
+    # ADR-034 (D.4): a HADS payload with photometry folds its curve by the
+    # catalog period and carries the schematic sawtooth
+    monkeypatch.setattr(panel, "_inject_followup", lambda e: None)
+    pts = [{"mjd": 60600.0 + 0.125 * i, "mag": 11.3 + 0.4 * (i % 2),
+            "err": 0.02, "filter": "Clear", "source": "file"}
+           for i in range(9)]
+    e = {"type": "hads", "name": "CY Aqr",
+         "data": {"hads": {"period_h": 1.46, "max": 11.3, "min": 11.8},
+                  "followup": {"points": pts}}}
+    panel.show(e)
+    from nightscribe.gui.widgets.lightcurve_widget import LightCurveChart
+    tabs = [w for w in _chart_tabs(panel) if isinstance(w, LightCurveChart)]
+    assert tabs, "no LightCurveChart tab for the hads payload"
+    chart = tabs[0]
+    assert abs(chart._fold_p - 1.46 / 24.0) < 1e-9
+    assert chart._schematic is not None          # the sawtooth is drawn
+    # the extracted data rebuilds the same folded chart (click path)
+    data = panel._slot_data["lightcurve"]
+    rebuilt = panel._rebuild_widget("lightcurve", data)
+    assert rebuilt._fold_p == chart._fold_p
+    assert rebuilt._schematic is not None
+
+
 def test_inject_followup_pulls_points_from_db(panel, tmp_db,
                                               monkeypatch):
     # project ctx with photometry in the (tmp) database -> the panel

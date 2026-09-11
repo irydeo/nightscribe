@@ -134,3 +134,27 @@ def test_draw_lightcurve_survey_point_grey():
         c = c[0]
     from matplotlib.colors import to_hex
     assert to_hex(c) == "#8a90a6"
+
+
+def test_draw_lightcurve_folded(tmp_path):
+    # ADR-034 (D.4): the PNG export folds by the period, two cycles wide,
+    # with the schematic sawtooth as the legend reference
+    from nightscribe.core import hads
+    out = tmp_path / "lc_fold.png"
+    saw = hads.sawtooth_template(12.0, 0.5, 11.55)
+    fig = draw_lightcurve(_POINTS[:3], out=str(out), fold_period_d=0.5,
+                          schematic=saw)
+    assert out.exists() and out.stat().st_size > 1000
+    ax = fig.axes[0]
+    assert ax.get_xlim() == (0.0, 2.0)
+    assert ax.get_xlabel() in ("Fase", "Phase")
+    leg = ax.get_legend()
+    assert leg is not None
+    labels = [t.get_text() for t in leg.get_texts()]
+    assert any("esquemática" in l or "schematic" in l for l in labels)
+
+
+def test_draw_lightcurve_unfolded_axis_unchanged(tmp_path):
+    fig = draw_lightcurve(_POINTS[:3])
+    ax = fig.axes[0]
+    assert ax.get_xlabel() in ("Fecha (MJD)", "Date (MJD)")

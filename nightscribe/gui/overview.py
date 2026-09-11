@@ -816,7 +816,9 @@ class ObjectPanel(QWidget):
             w = LightCurveChart()
             w.set_data(data["points"], sn_type=data.get("sn_type"),
                        peak_mjd=data.get("peak_mjd"),
-                       peak_mag=data.get("peak_mag"))
+                       peak_mag=data.get("peak_mag"),
+                       fold_period_d=data.get("fold_period_d"),
+                       schematic=data.get("schematic"))
             return w
         return None
 
@@ -892,11 +894,26 @@ class ObjectPanel(QWidget):
             pts = fu.get("points") or []
             if not pts:
                 return None
-            return {"points": pts,
-                    "sn_type": fu.get("sn_type")
-                    or (d.get("simbad") or {}).get("otype"),
-                    "peak_mjd": fu.get("peak_mjd"),
-                    "peak_mag": fu.get("peak_mag")}
+            out = {"points": pts,
+                   "sn_type": fu.get("sn_type")
+                   or (d.get("simbad") or {}).get("otype"),
+                   "peak_mjd": fu.get("peak_mjd"),
+                   "peak_mag": fu.get("peak_mag")}
+            # ADR-034 (D.4): a HADS star folds its own curve by its catalog
+            # period, with the schematic sawtooth as the shape reference
+            h = d.get("hads") or (self._ctx or {}).get("hads") or {}
+            if h.get("period_h"):
+                out["fold_period_d"] = h["period_h"] / 24.0
+                amp = h.get("amp")
+                if amp is None and h.get("max") is not None \
+                        and h.get("min") is not None:
+                    amp = h["min"] - h["max"]
+                if amp and h.get("max") is not None:
+                    from ..core import hads as hads_mod
+                    med = (h["max"] + h["min"]) / 2
+                    out["schematic"] = hads_mod.sawtooth_template(
+                        h["period_h"], amp, med)
+            return out
 
         return None
 
@@ -934,7 +951,9 @@ class ObjectPanel(QWidget):
             w = LightCurveChart()
             w.set_data(data["points"], sn_type=data.get("sn_type"),
                        peak_mjd=data.get("peak_mjd"),
-                       peak_mag=data.get("peak_mag"))
+                       peak_mag=data.get("peak_mag"),
+                       fold_period_d=data.get("fold_period_d"),
+                       schematic=data.get("schematic"))
             return w
         return None
 

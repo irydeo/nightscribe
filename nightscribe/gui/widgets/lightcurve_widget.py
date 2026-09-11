@@ -101,29 +101,62 @@ class LightCurveChart(ChartView):
         self._sn_type = None
         self._peak_mjd = None
         self._peak_mag = None
-        self._bounds = None   # (mjd_min, mjd_max, mag_min, mag_max)
+        self._fold_p = None      # fold period in days (None = date axis)
+        self._epoch = None
+        self._schematic = None
+        self._bounds = None   # (x_min, x_max, mag_min, mag_max)
         self.set_hover_probe(self._probe)
 
-    def set_data(self, points, sn_type=None, peak_mjd=None, peak_mag=None):
+    def set_data(self, points, sn_type=None, peak_mjd=None, peak_mag=None,
+                 fold_period_d=None, epoch_mjd=None, schematic=None):
         # @args: points - list of {mjd, mag, err, filter, source} dicts,
-        #        sn_type - for the template overlay, peak_mjd/mag - to align it
+        #        sn_type - for the template overlay, peak_mjd/mag - to align
+        #        it, fold_period_d - pulsation period in days: folds the x
+        #        axis to phase 0..2 (two cycles, ADR-034; kind-agnostic so
+        #        future long-period variables reuse it, H-n), epoch_mjd -
+        #        phase-0 reference (default: the first point), schematic -
+        #        [(phase, mag)] reference curve drawn dashed (e.g. the
+        #        hads.sawtooth_template — never real data)
         # Replaces the current data and rebuilds the scene.
         self._points = sorted(points, key=lambda p: p["mjd"])
         self._sn_type = sn_type
         self._peak_mjd = peak_mjd
         self._peak_mag = peak_mag
+        self._fold_p = fold_period_d
+        self._epoch = epoch_mjd
+        self._schematic = schematic
+        if fold_period_d and self._points and self._epoch is None:
+            self._epoch = self._points[0]["mjd"]
         self._compute_bounds()
         self._build_scene()
         self.fit_to_scene()
 
+    def _phase(self, mjd):
+        # @return: the 0..1 phase of an epoch in fold mode
+        return ((mjd - self._epoch) / self._fold_p) % 1.0
+
+    def _xs(self, p):
+        # @args: p - a photometry point dict
+        # @return: the data-x values to draw it at: one mjd normally, the
+        #          phase twice (cycle 0 and cycle 1) when folding
+        if self._fold_p:
+            ph = self._phase(p["mjd"])
+            return (ph, ph + 1.0)
+        return (p["mjd"],)
+
     def _compute_bounds(self):
-        # Finds the data extent (mjd and mag) for the scene mapping. Falls
+        # Finds the data extent (x and mag) for the scene mapping. Falls
         # back to a small default if there's no data.
         if not self._points:
             self._bounds = (0, 1, 10, 20)
             return
-        mjds = [p["mjd"] for p in self._points]
         mags = [p["mag"] for p in self._points]
+        if self._schematic:
+            mags += [m for _ph, m in self._schematic]
+        if self._fold_p:
+            self._bounds = (0.0, 2.0, min(mags), max(mags))
+            return
+        mjds = [p["mjd"] for p in self._points]
         self._bounds = (min(mjds), max(mjds), min(mags), max(mags))
         # auto-peak: brightest point (lowest mag)
         if self._peak_mjd is None or self._peak_mag is None:
@@ -154,8 +187,24 @@ class LightCurveChart(ChartView):
                              2 * _HALF + 120, 2 * _HALF + 100)
         # grid + axes
         self._draw_grid()
-        # template overlay
-        tpl = sn_templates.template(self._sn_type) if self._sn_type else None
+        # template overlay: the schematic reference curve in fold mode
+        # (never real data), the SN type template otherwise
+        has_overlay = False
+        if self._fold_p and self._schematic:
+            pen = QPen(QColor(palette.MUTED), 1.0, Qt.DashLine)
+            for shift in (0.0, 1.0):
+                path_pts = [(self._map_x(ph + shift), self._map_y(m))
+                            for ph, m in self._schematic]
+                for i in range(len(path_pts) - 1):
+                    line = QGraphicsLineItem(path_pts[i][0], path_pts[i][1],
+                                            path_pts[i + 1][0],
+                                            path_pts[i + 1][1])
+                    line.setPen(pen)
+                    line.setZValue(_Z_TEMPLATE)
+                    self.add_item(line)
+            has_overlay = True
+        tpl = None if self._fold_p else (
+            sn_templates.template(self._sn_type) if self._sn_type else None)
         if tpl and self._peak_mjd is not None and self._peak_mag is not None:
             pen = QPen(QColor(palette.MUTED), 1.0,Qt.DashLine)
             path_pts = []
@@ -169,26 +218,29 @@ class LightCurveChart(ChartView):
                 line.setPen(pen)
                 line.setZValue(_Z_TEMPLATE)
                 self.add_item(line)
-        # data points
+            has_overlay = True
+        # data points (drawn twice in fold mode: cycle 0 and cycle 1)
         for p in self._points:
-            x = self._map_x(p["mjd"])
-            y = self._map_y(p["mag"])
-            colour, filled = _point_style(p)
-            r = 6.0
-            dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
-            dot.setBrush(QBrush(colour if filled else QColor(palette.BG)))
-            dot.setPen(QPen(colour, 1.5))
-            dot.setZValue(_Z_DATA)
-            self.add_item(dot)
-            # error bar
-            if p.get("err") is not None:
-                ey = p["err"] / (b[3] - b[2]) * 2 * _HALF if b[3] != b[2] else 0
-                bar = QGraphicsLineItem(x, y - ey, x, y + ey)
-                bar.setPen(QPen(colour, 1.0))
-                bar.setZValue(_Z_ERROR)
-                self.add_item(bar)
+            for xv in self._xs(p):
+                x = self._map_x(xv)
+                y = self._map_y(p["mag"])
+                colour, filled = _point_style(p)
+                r = 6.0
+                dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
+                dot.setBrush(QBrush(colour if filled else QColor(palette.BG)))
+                dot.setPen(QPen(colour, 1.5))
+                dot.setZValue(_Z_DATA)
+                self.add_item(dot)
+                # error bar
+                if p.get("err") is not None:
+                    ey = p["err"] / (b[3] - b[2]) * 2 * _HALF \
+                        if b[3] != b[2] else 0
+                    bar = QGraphicsLineItem(x, y - ey, x, y + ey)
+                    bar.setPen(QPen(colour, 1.0))
+                    bar.setZValue(_Z_ERROR)
+                    self.add_item(bar)
         # legend: one entry per (filter, source) series the data has
-        self._add_legend(tpl is not None)
+        self._add_legend(has_overlay)
 
     def _add_legend(self, has_template):
         # @args: has_template - whether the schematic overlay is drawn
@@ -199,7 +251,8 @@ class LightCurveChart(ChartView):
         entries = []
         if has_template:
             entries.append(
-                (self.tr("Typical template"), QColor(palette.MUTED)))
+                (self.tr("schematic (sawtooth)") if self._fold_p
+                 else self.tr("Typical template"), QColor(palette.MUTED)))
         seen = set()
         for p in self._points:
             src = p.get("source") or "manual"
@@ -272,9 +325,9 @@ class LightCurveChart(ChartView):
             line.setPen(pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            # tick label (MJD)
-            mjd = b[0] + (b[1] - b[0]) * i / 5
-            lbl = QGraphicsSimpleTextItem(f"{mjd:.1f}")
+            # tick label (MJD, or phase 0..2 in fold mode)
+            xv = b[0] + (b[1] - b[0]) * i / 5
+            lbl = QGraphicsSimpleTextItem(f"{xv:.1f}")
             lbl.setPos(x - 20, _HALF + 10)
             lbl.setBrush(QBrush(QColor(palette.MUTED)))
             f = QFont(); f.setPointSize(_FONT_TICK)
@@ -305,15 +358,19 @@ class LightCurveChart(ChartView):
         best = None
         best_dist = 1e9
         for p in self._points:
-            dx = self._map_x(p["mjd"]) - sx
-            dy = self._map_y(p["mag"]) - sy
-            dist = dx * dx + dy * dy
-            if dist < best_dist:
-                best_dist = dist
-                best = p
+            for xv in self._xs(p):
+                dx = self._map_x(xv) - sx
+                dy = self._map_y(p["mag"]) - sy
+                dist = dx * dx + dy * dy
+                if dist < best_dist:
+                    best_dist = dist
+                    best = p
         if best is None or best_dist > 2500:   # ~25 scene units radius
             return False, None
-        lines = [
+        lines = []
+        if self._fold_p:
+            lines.append(f"phase {self._phase(best['mjd']):.2f}")
+        lines += [
             f"MJD {best['mjd']:.2f}",
             f"mag {best['mag']:.2f}",
             f"[{best.get('filter') or 'Clear'}]",

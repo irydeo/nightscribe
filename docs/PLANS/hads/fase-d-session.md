@@ -193,7 +193,9 @@ tests `test_lightcurve_widget.py`, `test_lightcurve_view.py`; i18n.
 **Hecho cuando**: suite verde (N→M) + `test_i18n.py`; la curva de un proyecto
 hads con puntos se pliega en dos ciclos.
 **Commit**: `Gui/Viz: light-curve phase folding + schematic sawtooth for HADS (ADR-034, subplan D.4)`
-**Estado**: pendiente
+**Estado**: **Hecho** (981→988). El plegado es agnóstico de kind
+(`fold_period_d`/`epoch_mjd`/`schematic` en widget y PNG, paridad ADR-029);
+el cableado de overview toma el periodo de `ctx["hads"]` o `data["hads"]`.
 
 ---
 

@@ -256,7 +256,7 @@ fabricada y `when` fijado; sawtooth: máximo de luz (mínimo mag) en
 
 **Hecho cuando**: tests verdes; suite verde (N→M).
 **Commit**: `Core: hads module — bundled catalog, online merge, session math (ADR-034, subplan H0.4)`
-**Estado**: pendiente
+**Estado**: **Hecho** (914→925)
 
 ---
 

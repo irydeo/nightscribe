@@ -61,3 +61,43 @@ def test_next_extremum_real_mira_ephemeris():
                                   var_type="M")
     assert out["kind"] == "max"
     assert out["mjd"] == pytest.approx(epoch_mjd + 9 * 331.3, abs=1e-6)
+
+
+def test_hjd_frozen_reference_wesb1():
+    # Frozen 2026-09-11 against the project Sun (Schlyter): +250.09 s
+    jd = 2459653.44800
+    hjd = variables.jd_to_hjd(jd, 15.2254, 55.0667)
+    assert (hjd - jd) * 86400 == pytest.approx(250.09, abs=30.0)
+
+
+def test_hjd_frozen_reference_tcrb():
+    # Frozen 2026-09-11 against the project Sun (Schlyter): -196.45 s
+    jd = 2459653.44800
+    hjd = variables.jd_to_hjd(jd, 239.87567, 25.92017)
+    assert (hjd - jd) * 86400 == pytest.approx(-196.45, abs=30.0)
+
+
+def test_hjd_is_bounded_by_the_light_time_across_the_earth_sun_distance():
+    # The bound is the light time across that date's real Earth-Sun
+    # distance (r * c), not across a fixed 1 AU: r swings 0.983-1.017 AU
+    # so the cap is ~507 s, not 499 s. The correction is the projection of
+    # the Earth-Sun vector onto the line of sight, hence <= r*c by
+    # definition (dot product of two unit vectors).
+    from nightscribe.core import ephem_minor
+    for month in range(12):
+        jd = 2460000.0 + 30 * month
+        _, _, r = ephem_minor.sun_ra_dec(jd)
+        bound_s = r * 499.004784
+        for ra in (0.0, 90.0, 180.0, 270.0):
+            corr_s = abs(variables.jd_to_hjd(jd, ra, 30.0) - jd) * 86400
+            assert corr_s <= bound_s + 1e-6
+
+
+def test_hjd_sign_towards_and_away_from_the_sun():
+    from nightscribe.core import ephem_minor
+    jd = 2459653.44800
+    sra, sdec, r = ephem_minor.sun_ra_dec(jd)
+    towards = (variables.jd_to_hjd(jd, sra, sdec) - jd) * 86400
+    away = (variables.jd_to_hjd(jd, (sra + 180) % 360, -sdec) - jd) * 86400
+    assert towards == pytest.approx(r * 499.004784, rel=1e-3)
+    assert away == pytest.approx(-r * 499.004784, rel=1e-3)

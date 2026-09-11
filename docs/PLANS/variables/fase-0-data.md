@@ -773,7 +773,15 @@ def test_hjd_sign_towards_and_away_from_the_sun():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_variables.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: heliocentric Julian date (Schlyter Sun, frozen references) (ADR-035, subplan V0.6)`
-**Estado**: Pendiente
+**Nota (2026-09-11)**: el test `bounded` de la spec hardcodeaba la cota en 499.01 s
+(1 AU exacta), pero la corrección HJD es la proyección del vector Tierra-Sol sobre la
+dirección de la estrella, acotada por r · c donde r es la distancia real Tierra-Sol de esa
+fecha (0.983–1.017 AU → máx ~507 s). La propia spec ya usa `r·499.004784` en el test
+`towards/away` (que pasa), así que la implementación (multiplicar por r) es la correcta y
+se mantiene tal cual. Se renombró el test a `..._across_the_earth_sun_distance` y la cota
+pasa a derivarse de `ephem_minor.sun_ra_dec(jd)` (r · 499.004784). Código `variables.py`
+intacto según spec.
+**Estado**: ✅ Hecho (2026-09-11, suite 1014)
 
 ---
 

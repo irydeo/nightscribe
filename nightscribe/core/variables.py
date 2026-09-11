@@ -79,3 +79,27 @@ def next_extremum(period_d, epoch_mjd, now_mjd=None, var_type=""):
     if nmax <= nmin:
         return {"kind": "max", "mjd": nmax, "days": round(nmax - now, 1)}
     return {"kind": "min", "mjd": nmin, "days": round(nmin - now, 1)}
+
+
+# ---------------- heliocentric Julian date ----------------
+
+_LIGHT_TIME_S_PER_AU = 499.004784   # 1 AU / c, in seconds
+
+
+def jd_to_hjd(jd, ra_deg, dec_deg):
+    # Heliocentric Julian Date: the geocentric JD corrected for the light
+    # travel time between Earth and Sun (at most +/-499 s). AAVSO reports
+    # are filed in HJD. The Sun position is Schlyter's (ephem_minor,
+    # ADR-009), good to ~1 arcmin -> <0.2 s here, far below photometric
+    # needs. Convention (checked): a star in the Sun's direction is seen
+    # EARLIER from Earth, so HJD = JD + (n . s) * r * tau.
+    # @args: jd - Julian date (UTC), ra_deg/dec_deg - target (degrees)
+    # @return: HJD (float)
+    from . import ephem_minor
+    sra, sdec, r = ephem_minor.sun_ra_dec(jd)
+    ra, dec = math.radians(ra_deg), math.radians(dec_deg)
+    sra, sdec = math.radians(sra), math.radians(sdec)
+    dot = (math.cos(dec) * math.cos(ra) * math.cos(sdec) * math.cos(sra)
+           + math.cos(dec) * math.sin(ra) * math.cos(sdec) * math.sin(sra)
+           + math.sin(dec) * math.sin(sdec))
+    return jd + dot * r * _LIGHT_TIME_S_PER_AU / 86400.0

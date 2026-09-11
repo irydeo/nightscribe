@@ -15,7 +15,7 @@ import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import coords, dates, exposure, horizon, transits
+from . import coords, dates, exposure, hads, horizon, transits
 from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
                       rochester, sbdb)
 
@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 # the GUI progress bar total). Scoring is the final phase, emitted by the
 # worker after build_tonight returns. The GUI keeps the human labels (they
 # must be literal tr() strings so lupdate sees them).
-PHASES = ("neo", "sn", "comet", "pccp", "transit", "approach", "scoring")
+PHASES = ("neo", "sn", "comet", "pccp", "transit", "hads", "approach",
+          "scoring")
 
 # Builds the raw list of tonight's targets from every source. Each target is
 # a flat dict; scoring lives in suggest.py. A source that fails simply
@@ -64,7 +65,10 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
          lambda: _transit_targets(lat, lon, date, hor, limit_mag, margin,
                                   _transit_aperture(cfg),
                                   _transit_plate_scale(cfg))),
-        (6, "approach",
+        (6, "hads",
+         lambda: _hads_targets(lat, lon, date, hor, limit_mag, margin,
+                               _transit_plate_scale(cfg))),
+        (7, "approach",
          lambda: _approach_alerts()),
     )
     for idx, key, fetch in stages:
@@ -396,8 +400,48 @@ def _transit_targets(lat, lon, date, hor, limit_mag=14.0, margin=0.0,
     return out
 
 
-def _approach_alerts():
-    # Upcoming close approaches from ESA NEOCC (outreach alerts pillar).
+def _hads_targets(lat, lon, date, hor, limit_mag=20.0, margin=0.0,
+                  plate_scale_arcsec_px=None):
+    # HADS stars from the hybrid catalog (bundled snapshot + Wils' live
+    # sheet, core/hads.py). No phase is known for these pulsators, so the
+    # gate is not an event but a contiguous above-horizon span holding at
+    # least one full pulsation cycle; the recommended session (2P) is passed
+    # as the planned duration so safe_window/best_time answer "can I watch
+    # it repeat twice?" (ADR-020 safety stays in _visibility).
+    out = []
+    for star in hads.catalog():
+        if not star.get("period_h") or star.get("max") is None:
+            continue
+        mag_med = (star["max"] + star["min"]) / 2     # H-e: median gate
+        if mag_med > limit_mag:
+            continue
+        vis = _visibility(star["ra_deg"], star["dec_deg"], lat, lon, date,
+                          hor, margin, star["period_h"] * 2 * 3600)
+        span = hads.span_hours(vis["window_start"], vis["window_end"])
+        if span is None or span < star["period_h"]:
+            continue                                  # not even one cycle
+        d = hads.derive(star, vis["hours_up"], plate_scale_arcsec_px)
+        d["session_fits"] = vis["safe_window"] is not None
+        d["covered_this_month"] = hads.covered_this_month(star)
+        out.append({
+            "id": star["name"], "kind": "hads", "name": star["name"],
+            "mag": mag_med, "ra_deg": star["ra_deg"], "dec_deg": star["dec_deg"],
+            **vis,
+            "hads": {"period_h": star["period_h"], "max": star["max"],
+                     "min": star["min"], "amp": d["amp"],
+                     "cycles": d["cycles"], "cadence_s": d["cadence_s"],
+                     "session_req_h": d["session_req_h"],
+                     "session_fits": d["session_fits"], "exp_s": d["exp_s"],
+                     "priority": star.get("priority"),
+                     "observed": star.get("observed"),
+                     "multiperiodic": star.get("multiperiodic"),
+                     "non_radial": star.get("non_radial"),
+                     "covered_this_month": d["covered_this_month"]},
+        })
+    return out
+
+
+def _approach_alerts():    # Upcoming close approaches from ESA NEOCC (outreach alerts pillar).
     out = []
     for a in esa_neo.close_approaches(20.0)[:10]:
         out.append({

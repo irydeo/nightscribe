@@ -87,7 +87,7 @@ hours_up / P`.
 `python -c "from nightscribe.core import planner; print(planner.PHASES)"`
 muestra `hads`.
 **Commit**: `Core: HADS night-planner phase + 1-cycle visibility gate + assets packaging (ADR-034, subplan A.1)`
-**Estado**: pendiente
+**Estado**: **Hecho** (925→932)
 
 ---
 

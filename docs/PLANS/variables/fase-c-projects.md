@@ -822,7 +822,7 @@ def test_save_without_name_is_refused(qapp, db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign create/edit form with protocol fields (ADR-035, subplan VC.5)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1064 → 1067)
 
 ---
 

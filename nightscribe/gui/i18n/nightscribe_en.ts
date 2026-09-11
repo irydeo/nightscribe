@@ -258,6 +258,69 @@
     </message>
 </context>
 <context>
+    <name>CampaignEditDialog</name>
+    <message>
+        <location filename="../campaigns_dialog.py" line="146"/>
+        <source>Edit campaign</source>
+        <translation>Edit campaign</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="147"/>
+        <source>New campaign</source>
+        <translation>New campaign</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="151"/>
+        <source>Name:</source>
+        <translation>Name:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="153"/>
+        <source>Group:</source>
+        <translation>Group:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="155"/>
+        <source>Coordinator:</source>
+        <translation>Coordinator:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="157"/>
+        <source>Science goal:</source>
+        <translation>Science goal:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="162"/>
+        <source>Cadence (nights):</source>
+        <translation>Cadence (nights):</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="164"/>
+        <source>Filters:</source>
+        <translation>Filters:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="166"/>
+        <source>Comparison stars:</source>
+        <translation>Comparison stars:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="168"/>
+        <source>Report URL:</source>
+        <translation>Report URL:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="170"/>
+        <source>Data URL:</source>
+        <translation>Data URL:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="172"/>
+        <source>Protocol notes:</source>
+        <translation>Protocol notes:</translation>
+    </message>
+</context>
+<context>
     <name>CampaignsDialog</name>
     <message>
         <location filename="../campaigns_dialog.py" line="38"/>

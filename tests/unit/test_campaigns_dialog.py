@@ -66,3 +66,38 @@ def test_empty_dialog_buttons_disabled(qapp, db):
     dlg = CampaignsDialog(db_obj=db)
     assert not dlg.btn_finish.isEnabled()
     assert not dlg.btn_reopen.isEnabled()
+
+
+# ---------------- VC.5: create / edit form ----------------
+
+
+def test_new_campaign_via_form(qapp, db):
+    from nightscribe.gui.campaigns_dialog import CampaignEditDialog
+    dlg = CampaignEditDialog(db_obj=db)
+    dlg.edt_name.setText("Campaña T CrB")
+    dlg.edt_group.setText("obsSN")
+    dlg.edt_filters.setText("B, V")
+    dlg.edt_comps.setText("000-BB0-123, 000-BB0-124")
+    assert dlg.spn_cadence.value() == 1          # V-l default
+    dlg._save()
+    c = campaign.list_campaigns(db)[0]
+    assert c["name"] == "Campaña T CrB"
+    assert c["protocol"]["filters"] == ["B", "V"]
+    assert c["protocol"]["comp_stars"] == ["000-BB0-123", "000-BB0-124"]
+
+
+def test_edit_campaign_via_form(qapp, db):
+    from nightscribe.gui.campaigns_dialog import CampaignEditDialog
+    cid = campaign.create(db, "A", protocol={"cadence_nights": 5})
+    dlg = CampaignEditDialog(camp=campaign.get(db, cid), db_obj=db)
+    assert dlg.spn_cadence.value() == 5
+    dlg.edt_name.setText("A2")
+    dlg._save()
+    assert campaign.get(db, cid)["name"] == "A2"
+
+
+def test_save_without_name_is_refused(qapp, db):
+    from nightscribe.gui.campaigns_dialog import CampaignEditDialog
+    dlg = CampaignEditDialog(db_obj=db)
+    dlg._save()
+    assert campaign.list_campaigns(db) == []

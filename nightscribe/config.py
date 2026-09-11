@@ -56,12 +56,15 @@ DEFAULTS = {
     # Tonight filter (WORKFLOWS 7quater): the enabled object kinds are the
     # whitelist shown in the header combo and in Settings; missing means all.
     "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert",
-                      "hads"],
+                      "hads", "variable"],
     "tonight_kind": "",           # last-used header filter; "" = "All"
     "best_per_kind_n": 5,         # per-kind cap for the Tonight grid
     # SN follow-up (Track B, B11): cadence threshold in days — the Tonight
     # chip and the follow-up tab remind when a visit is due
     "sn_cadence_days": 3,
+    # Track V (ADR-035, V-h): brightness-jump threshold for the variable
+    # event advisor (dip/outburst vs. the median of the previous points)
+    "event_mag_threshold": 0.5,
     # EXOTIC handoff (Track D, subplan 4): camera identity and observer code
     # for the inits.json; height above is reused as "Obs. Elevation (meters)"
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
@@ -89,10 +92,13 @@ class Config:
             pass
         except (json.JSONDecodeError, OSError) as err:
             logger.warning("Could not read config %s: %s", self._file, err)
-        # HADS rollout: a stored whitelist equal to the pre-HADS default gets
-        # the new kind for free; a customised list is never touched
-        if self._data.get("enabled_kinds") == ["neo", "sn", "comet", "pccp",
-                                               "transit", "alert"]:
+        # HADS/Track V rollout: a stored whitelist equal to any previous
+        # default gets the new kind(s) for free; a customised list is
+        # never touched
+        if self._data.get("enabled_kinds") in (
+                ["neo", "sn", "comet", "pccp", "transit", "alert"],
+                ["neo", "sn", "comet", "pccp", "transit", "alert",
+                 "hads"]):
             self._data["enabled_kinds"] = list(DEFAULTS["enabled_kinds"])
 
     def save(self):

@@ -130,7 +130,10 @@ permitida en ese fichero).
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_tonight_kinds.py tests/unit/test_tonight_rows.py -q` + pipeline i18n (LEEME §3)
 **Hecho cuando**: verde; suite verde (N→M); `pyside6-lrelease` sin errores.
 **Commit**: `Gui: variable kind listable — icon, table columns, phase label (ADR-035, subplan VB.2)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11)
+**Desviación del fixture** (necesaria para consistencia interna, la tarjeta solo permitía :139-144):
+- `window` fixture (:78-89): `enabled_kinds` → 8 kinds (añade `"variable"`).
+- `:224`: `count() == 8` → `count() == 9` (All + 8 kinds).
 
 ---
 
@@ -226,7 +229,7 @@ def test_event_mag_threshold_default():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_config.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core/Config: variable in enabled_kinds with friendly migration + event threshold (ADR-035, subplan VB.3)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11)
 
 ---
 

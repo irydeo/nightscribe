@@ -453,11 +453,11 @@ class ObjectPanel(QWidget):
         self._state_ready(e)
 
     def _inject_followup(self, e):
-        # Fills data["followup"]["points"] for SNs with a project context:
-        # core/enrich has no project knowledge, so the GUI layer pulls the
-        # photometry from the project's db (B4, docs/PLANS/sn-followup.md).
+        # Fills data["followup"]["points"] for SNs and HADS stars with a
+        # project context: core/enrich has no project knowledge, so the GUI
+        # layer pulls the photometry from the project's db (B4/D3).
         # @args: e - enriched dict (mutated in place)
-        if e.get("type") not in ("transient", "sn"):
+        if e.get("type") not in ("transient", "sn", "hads"):
             return
         fu = (e.get("data") or {}).get("followup") or {}
         if fu.get("points"):

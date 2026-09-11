@@ -67,6 +67,9 @@ _OUTCOME_LABELS = {
     "abandoned": {"es": "Abandonado", "en": "Abandoned"},
 }
 _STEP_TABS = {0: "tab_plan", 1: "tab_process", 2: "tab_publish"}
+# Kinds with multi-night photometry follow-up (the tab is kind-agnostic;
+# SN-only analysis buttons hide for the others)
+FOLLOWUP_KINDS = ("sn", "hads")
 _STEP_LABELS_ES = {"plan": "Plan & Captura", "process": "Procesado",
                    "publish": "Publicar"}
 _STEP_LABELS_EN = {"plan": "Plan & Capture", "process": "Process",
@@ -1928,10 +1931,12 @@ class MainWindow(QMainWindow):
         self._build_plan_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
-        # B2: SN follow-up tab — not a step (like Details), only for kind='sn'
+        # B2/D3: follow-up tab — not a step (like Details), for the kinds
+        # with multi-night photometry (FOLLOWUP_KINDS; guardrail H-n: the
+        # future variables track joins this list, nothing else changes)
         followup_tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
         fu_idx = self.projects.tabs_steps.indexOf(followup_tab)
-        if kind == "sn":
+        if kind in FOLLOWUP_KINDS:
             self._build_followup_tab(p, ctx)
             self.projects.tabs_steps.setTabVisible(fu_idx, True)
         else:
@@ -2634,6 +2639,41 @@ class MainWindow(QMainWindow):
                 "Database — and tell the story in the Publish step."))
             lbl_exotic.setWordWrap(True)
             layout.addWidget(lbl_exotic)
+        elif kind == "hads":
+            # ADR-034 (D.3): publication photometry is external — FotoDif
+            # (its AUTO mode watches the capture folder live) or AIJ.
+            # NightScribe registers the measurements (Follow-up tab) and
+            # points to the AAVSO submission.
+            lbl = QLabel(self.tr(
+                "Reduce the series with FotoDif (its AUTO mode follows the "
+                "capture live) or AIJ. FotoDif writes the AAVSO Extended "
+                "File Format report directly; the cadence and exposure are "
+                "in the Plan step."))
+            lbl.setWordWrap(True)
+            layout.addWidget(lbl)
+            code = config.get("aavso_code", "")
+            if code:
+                layout.addWidget(QLabel(
+                    self.tr("Your AAVSO observer code: %1").replace(
+                        "%1", code)))
+            else:
+                lbl_code = QLabel(self.tr(
+                    "No AAVSO observer code yet — set it in Settings"))
+                lbl_code.setWordWrap(True)
+                lbl_code.setStyleSheet("color: #e0c060;")
+                layout.addWidget(lbl_code)
+            btn_webobs = QPushButton(self.tr("Open AAVSO WebObs…"))
+            btn_webobs.setToolTip(self.tr(
+                "Submit the FotoDif/AAVSO report to the AAVSO database"))
+            btn_webobs.clicked.connect(
+                lambda: self._open_url("https://www.aavso.org/webobs/"))
+            layout.addWidget(btn_webobs)
+            lbl_imp = QLabel(self.tr(
+                "Import the FotoDif measurements («JD mag …» text) with "
+                "«Import file…» in the Follow-up tab — the light curve and "
+                "the phase-folded view update themselves."))
+            lbl_imp.setWordWrap(True)
+            layout.addWidget(lbl_imp)
         else:
             layout.addWidget(QLabel(
                 self.tr("Process your images with your usual software.")))
@@ -3229,7 +3269,12 @@ class MainWindow(QMainWindow):
         # holds the session journal (nights, stacked images, notes) and the
         # cadence reminder ("última visita hace N noches"). All CRUD goes
         # through core/followup.py; FITS metadata through core/fits_meta.py.
+        # D3 (ADR-034): shared with HADS projects — the tab's journal and the
+        # photometry import are kind-agnostic; only the SN analysis buttons
+        # (quick-look on per-night stacks, evolution animation, annotated
+        # FITS) are hidden for hads.
         from ..core import followup as fu
+        kind = p["kind"]
         layout = self._step_tab_layout("tab_followup")
         pid = p["id"]
 
@@ -3237,8 +3282,11 @@ class MainWindow(QMainWindow):
         days = fu.days_since_last_session(db, pid)
         threshold = int(config.get("sn_cadence_days", 3))
         if days is not None:
-            lbl_cadence = QLabel(
-                self.tr("Last visit: {} days ago").format(days))
+            text = self.tr("Last visit: {} days ago").format(days)
+            if kind == "hads" and (ctx.get("hads") or {}).get("multiperiodic"):
+                text += " · " + self.tr(
+                    "multiperiodic stars want consecutive nights")
+            lbl_cadence = QLabel(text)
             colour = "#e0c060" if days >= threshold else "#8a90a6"
             lbl_cadence.setStyleSheet(
                 f"color: {colour}; font-size: 13px;")
@@ -3303,6 +3351,11 @@ class MainWindow(QMainWindow):
             "Copy of the stacked FITS with annotation keywords (NS_)"))
         btn_annot.clicked.connect(lambda: self._fu_export_annotated(pid))
         ana_row.addWidget(btn_annot)
+        if kind == "hads":
+            # SN-only analysis: the quick-look engine measures stacked
+            # per-night images, not an intra-night series (ADR-034, D.3)
+            for b in (btn_quicklook, btn_evo, btn_annot):
+                b.hide()
         layout.addLayout(ana_row)
         layout.addStretch()
         self._project_widgets["fu_sessions"] = lst

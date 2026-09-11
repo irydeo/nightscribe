@@ -151,7 +151,10 @@ FotoDif).
 
 **Hecho cuando**: suite verde (N→M) + `test_i18n.py`.
 **Commit**: `Gui: HADS follow-up tab + FotoDif/WebObs process block (ADR-034, subplan D.3)`
-**Estado**: pendiente
+**Estado**: **Hecho** (977→981). Nota: la constante de módulo
+`FOLLOWUP_KINDS = ("sn", "hads")` deja la puerta kind-agnóstica (H-n); la
+importación FotoDif queda cubierta por un test de integración (JD mag err →
+`photometry_import` → `followup`).
 
 ---
 

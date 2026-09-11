@@ -138,3 +138,52 @@ def test_checklist_persists_across_rebuild(window):
     cbs2 = window._project_widgets["hads_checklist"]
     assert cbs2[0].isChecked() and cbs2[3].isChecked()
     assert not cbs2[1].isChecked()
+
+
+# ---------------- follow-up + process (subplan D.3) ----------------
+
+def _tab(window, name):
+    from PySide6.QtWidgets import QWidget
+    return window.projects.tabs_steps.findChild(QWidget, name)
+
+
+def test_followup_tab_visible_for_hads(window):
+    _select(window, "T UMa", _hads_ctx())
+    tab = _tab(window, "tab_followup")
+    idx = window.projects.tabs_steps.indexOf(tab)
+    assert window.projects.tabs_steps.isTabVisible(idx)
+
+
+def test_followup_hides_sn_analysis_buttons_for_hads(window):
+    from PySide6.QtWidgets import QPushButton
+    _select(window, "V0392 UMa", _hads_ctx())
+    buttons = {b.text(): b for b in _tab(window, "tab_followup")
+               .findChildren(QPushButton)}
+    assert buttons["Run quick-look"].isHidden()
+    assert buttons["Generate animation"].isHidden()
+    assert buttons["Export annotated FITS"].isHidden()
+    assert not buttons["Add visit"].isHidden()
+    assert not buttons["Import file…"].isHidden()
+
+
+def test_process_tab_fotodif_webobs_block(window):
+    from PySide6.QtWidgets import QPushButton
+    _select(window, "DY Her", _hads_ctx())
+    buttons = [b.text() for b in _tab(window, "tab_process")
+               .findChildren(QPushButton)]
+    assert any("WebObs" in t for t in buttons)
+
+
+def test_fotodif_output_imports_into_the_project(window):
+    # FotoDif hands over «JD mag err» text — the tolerant parser (B3) reads
+    # it unchanged and the points land on the hads project
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import followup, photometry_import
+    p = _select(window, "V1116 Her", _hads_ctx())
+    text = "2459653.44800 11.42 0.02\n2459653.45500 11.45 0.02\n"
+    pts, skipped = photometry_import.parse_photometry(text)
+    assert not skipped and len(pts) == 2
+    for pt in pts:
+        followup.add_point(mw.db, p["id"], pt["mjd"], pt["filter"],
+                           pt["mag"], pt.get("err"), source="file")
+    assert len(followup.list_points(mw.db, p["id"])) == 2

@@ -60,7 +60,12 @@ i18n.
 **Hecho cuando**: suite verde (N→M) + `test_i18n.py`; proyecto hads muestra
 su bloque de plan.
 **Commit**: `Gui: HADS capture plan block — 2P session, cadence, checklist (ADR-034, subplan D.1)`
-**Estado**: pendiente
+**Estado**: **Hecho** (969→974). Hallazgo al ejecutar: `lupdate` NO extrae
+`self.tr()` dentro de llaves de f-string — las cadenas nuevas del bloque se
+escribieron como `self.tr("...")` plano + concat; el bloque de tránsitos
+tiene dos cadenas preexistentes («Recommended exposure», «honest guide…»)
+con ese mismo agujero de extracción (nunca fueron traducibles): **reportado
+para una corrección futura fuera de este plan**.
 
 ---
 

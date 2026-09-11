@@ -1984,6 +1984,9 @@ class MainWindow(QMainWindow):
         # a saved plan still overrides the heuristic exposure.
         if kind == "transit" and (ctx.get("transit") or {}):
             self._build_transit_block(layout, p, ctx, spn_exp)
+        # HADS: the 2P continuous-capture block (no event, no timeline)
+        if kind == "hads" and (ctx.get("hads") or {}):
+            self._build_hads_block(layout, p, ctx, spn_exp)
         # restore saved plan data
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -2996,6 +2999,160 @@ class MainWindow(QMainWindow):
         # Persists the pre-flight checklist into the plan step data, so the
         # ticks survive a project switch / an app restart.
         cbs = self._project_widgets.get("transit_checklist") or []
+        if cbs:
+            project.update_step_data(
+                db, pid, "plan",
+                {"checklist": [bool(cb.isChecked()) for cb in cbs]})
+
+    def _build_hads_block(self, layout, p, ctx, spn_exp):
+        # The HADS capture block (ADR-034): no transit-style event exists
+        # (the phase is unknown), so the plan is a CONTINUOUS 2-period
+        # session — see it repeat, then fold. Shows the period/amplitude,
+        # the safe 2P window, the cycles that fit tonight, the heuristic
+        # exposure, the cadence check (>=12 points per cycle, 15-min cap)
+        # and a persistent pre-flight checklist.
+        # @args: layout - plan tab layout, p - project dict, ctx - project
+        #        context (carries the "hads" snapshot + window keys),
+        #        spn_exp - the capture-plan exposure spin (preselected here)
+        h = ctx.get("hads") or {}
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        grp = QGroupBox(self.tr("HADS capture plan"))
+        gl = QVBoxLayout(grp)
+
+        def _hm(v):
+            # @return: "HH:MM" UTC from an ISO string/datetime, or "—"
+            if isinstance(v, str):
+                try:
+                    v = datetime.datetime.fromisoformat(v)
+                except ValueError:
+                    return "—"
+            return v.strftime("%H:%M") if isinstance(v, datetime.datetime) \
+                else "—"
+
+        def _hm_local(v):
+            if isinstance(v, str):
+                try:
+                    v = datetime.datetime.fromisoformat(v)
+                except ValueError:
+                    return "—"
+            return v.astimezone().strftime("%H:%M") if \
+                isinstance(v, datetime.datetime) else "—"
+
+        # --- summary: period, amplitude, the 2P session -------------------
+        per = h.get("period_h")
+        amp = h.get("amp")
+        if per:
+            lbl_sum = QLabel(self.tr(
+                "Period {p:.2f} h · amplitude Δ{a:.1f} mag\n"
+                "Recommended session: {s:.1f} h continuous (2 periods — "
+                "watch it repeat, then fold)").format(
+                    p=float(per), a=float(amp or 0.0),
+                    s=float(h.get("session_req_h") or 2 * per)))
+            lbl_sum.setWordWrap(True)
+            gl.addWidget(lbl_sum)
+            self._project_widgets["hads_summary"] = lbl_sum
+        # --- safe 2P window (UTC + local) + cycles tonight -----------------
+        bits = []
+        if ctx.get("best_time"):
+            bits.append(self.tr("Start around {bt} UTC ({bl} local)").format(
+                bt=_hm(ctx.get("best_time")), bl=_hm_local(ctx.get("best_time"))))
+        if ctx.get("latest_safe_start"):
+            bits.append(self.tr("latest safe start {ls} UTC").format(
+                ls=_hm(ctx.get("latest_safe_start"))))
+        if h.get("cycles"):
+            bits.append(self.tr("{n:.1f} full cycles fit tonight").format(
+                n=float(h["cycles"])))
+        if bits:
+            lbl_win = QLabel(" · ".join(bits))
+            lbl_win.setWordWrap(True)
+            gl.addWidget(lbl_win)
+            self._project_widgets["hads_window"] = lbl_win
+        if h.get("session_fits") is False:
+            lbl_warn = QLabel(self.tr(
+                "⚠ Two full cycles don't fit back to back tonight — capture "
+                "the longest contiguous run you can"))
+            lbl_warn.setWordWrap(True)
+            lbl_warn.setStyleSheet("color: #e0c060;")
+            gl.addWidget(lbl_warn)
+            self._project_widgets["hads_fits_warn"] = lbl_warn
+        # --- heuristic exposure (guide, not a promise) ---------------------
+        exp_rec = h.get("exp_s")
+        if exp_rec:
+            lbl_exp = QLabel(
+                "<small>" + self.tr("Recommended exposure")
+                + f": {exp_rec} s · "
+                + self.tr("honest guide — confirm with a test shot at MAXIMUM brightness")
+                + "</small>")
+            lbl_exp.setWordWrap(True)
+            gl.addWidget(lbl_exp)
+            spn_exp.setValue(float(exp_rec))
+        # --- cadence: >= 12 points per cycle, 15 min cap (AAVSO) -----------
+        cad = h.get("cadence_s")
+        if cad:
+            lbl_cad = QLabel()
+            lbl_cad.setWordWrap(True)
+            gl.addWidget(lbl_cad)
+            self._project_widgets["hads_cadence"] = lbl_cad
+
+            def _refresh_cadence():
+                overhead = float(config.get("overhead_s", 15.0))
+                exp = spn_exp.value()
+                per_point = exp + overhead
+                txt = self.tr(
+                    "Cadence to resolve the pulsation: one point every "
+                    "≤{cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one "
+                    "point every {per:.0f} s").format(
+                        cad=float(cad), exp=exp, ov=overhead, per=per_point)
+                if per_point > float(cad):
+                    txt += "  " + self.tr(
+                        "⚠ slower than P/12 — shorten the exposure")
+                    lbl_cad.setStyleSheet("color: #e0c060;")
+                else:
+                    lbl_cad.setStyleSheet("")
+                lbl_cad.setText(txt)
+
+            spn_exp.valueChanged.connect(lambda _v: _refresh_cadence())
+            _refresh_cadence()
+        # --- altitude / Moon context line ----------------------------------
+        bits = []
+        if ctx.get("max_alt") is not None:
+            bits.append(self.tr("Max altitude: {:.0f}°")
+                        .format(float(ctx["max_alt"])))
+        moon = suggest.moon_info(
+            {"ra_deg": ctx.get("ra_deg"), "dec_deg": ctx.get("dec_deg"),
+             "max_time": ctx.get("max_time")}, config)
+        if moon:
+            bits.append(self.tr("Moon: {:.0f}% at {:.0f}°").format(
+                moon["illum"] * 100, moon["sep_deg"])
+                + (" ⚠" if moon["warning"] else ""))
+        if bits:
+            gl.addWidget(QLabel(" · ".join(bits)))
+        # --- pre-flight checklist (persistent) ------------------------------
+        gl.addWidget(QLabel(self.tr("Pre-flight checklist")))
+        saved = plan_data.get("checklist") or []
+        items = [
+            self.tr("Focus locked at imaging temperature"),
+            self.tr("Comparison stars identified (VSX chart)"),
+            self.tr("Cadence ≤ P/12 set in the capture sequence"),
+            self.tr("Exposure checked at MAXIMUM brightness (no saturation)"),
+            self.tr("Continuous run covering 2 periods planned"),
+        ]
+        cbs = []
+        for i, text in enumerate(items):
+            cb = QCheckBox(text)
+            cb.setChecked(bool(saved[i]) if i < len(saved) else False)
+            cb.stateChanged.connect(
+                lambda _s, pid=p["id"]: self._hads_checklist_save(pid))
+            gl.addWidget(cb)
+            cbs.append(cb)
+        self._project_widgets["hads_checklist"] = cbs
+        layout.addWidget(grp)
+
+    def _hads_checklist_save(self, pid):
+        # Persists the HADS pre-flight checklist (same plan-data "checklist"
+        # key as the transit block: one project carries one kind).
+        cbs = self._project_widgets.get("hads_checklist") or []
         if cbs:
             project.update_step_data(
                 db, pid, "plan",

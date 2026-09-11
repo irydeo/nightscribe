@@ -148,7 +148,7 @@ famosa/amp≥0.5/multi; caps 35/30/20/15.
 
 **Hecho cuando**: tests verdes; suite verde (N→M).
 **Commit**: `Core: HADS scoring branches in suggest (ADR-034, subplan A.2)`
-**Estado**: pendiente
+**Estado**: **Hecho** (932→940)
 
 ---
 

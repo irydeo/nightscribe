@@ -14,7 +14,7 @@
 import datetime
 import logging
 
-from . import coords, dates, ephem_minor
+from . import coords, dates, ephem_minor, hads
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,12 @@ def _scientific(t):
     if kind == "transit":
         return {"high": 28, "medium": 18, "low": 10}.get(
             (t.get("transit") or {}).get("priority") or "", 12)
+    if kind == "hads":
+        # amplitude is the science draw (period changes need well-sampled
+        # curves); brightness makes the photometry easier
+        h = t.get("hads") or {}
+        return (_clamp((h.get("amp") or 0.0) / 0.9 * 20, 0, 20) +
+                _clamp((18 - (t.get("mag") or 99)) / 10.0 * 15, 0, 15))
     return 0
 
 
@@ -86,6 +92,13 @@ def _observability(t, cfg):
     if t.get("kind") == "transit":
         tr = t.get("transit") or {}
         if tr.get("baseline_fits") is False:
+            score -= 4.0
+    # HADS: the more complete cycles fit tonight, the better the fold; a
+    # star whose 2-period session doesn't fit only gets a partial capture
+    if t.get("kind") == "hads":
+        h = t.get("hads") or {}
+        score += _clamp((h.get("cycles") or 0) / 5.0 * 6, 0, 6)
+        if h.get("session_fits") is False:
             score -= 4.0
     score -= _moon_penalty(t, cfg, limit)
     return _clamp(score, 0, 30)
@@ -185,6 +198,14 @@ def _urgency(t):
     elif kind == "transit":
         oc = abs((t.get("transit") or {}).get("oc_min") or 0)
         score += _clamp(oc / 30.0 * 12, 0, 12)
+    elif kind == "hads":
+        # the legend signals don't stack: the strongest one rules (H-i/k/m)
+        h = t.get("hads") or {}
+        color = {"period_change": 12,
+                 "period_change_possible": 8}.get(h.get("priority"), 0)
+        unobserved = 6 if h.get("observed") is False else 0
+        coverage = 10 if h.get("covered_this_month") is False else 0
+        score += max(color, unobserved, coverage)
     return _clamp(score, 0, 20)
 
 
@@ -218,6 +239,14 @@ def _hook(t):
         if any(s in star for s in FAMOUS_SYSTEMS):
             score += 6
         if (t.get("transit") or {}).get("full"):
+            score += 3
+    elif kind == "hads":
+        h = t.get("hads") or {}
+        if t.get("name") in hads.FAMOUS_HADS:
+            score += 6
+        if (h.get("amp") or 0) >= 0.5:
+            score += 4
+        if h.get("multiperiodic"):
             score += 3
     elif kind == "alert":
         ld = (t.get("approach") or {}).get("dist_ld") or 99

@@ -672,6 +672,8 @@ class ObjectPanel(QWidget):
                 d, aperture_in=config.get("aperture_inches"))
         if e.get("type") == "hads" or d.get("hads"):
             return orbits.explain_hads(d)
+        if e.get("type") == "variable" or d.get("variable"):
+            return orbits.explain_variable(d)
         return []
 
     # ---------------- charts (D2, ADR-029) ----------------

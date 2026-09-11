@@ -1027,3 +1027,140 @@ def explain_hads(d):
               "curves (fast rise, slow decline) resemble classical Cepheids, "
               "but they pulsate in hours, not days."})
     return out
+
+
+# ---------------- variable star interpreter (ADR-035) ----------------
+
+def _variable_family_text(var_type):
+    # Didactic one-liner per variability family. The FIRST component of a
+    # composite VSX type decides (same rule as the epoch, V-e).
+    # @args: var_type - VSX type, e.g. "M", "NR+ELL", "E-DO", "UGSS"
+    # @return: ({"es","en"}, epoch_is_minimum: bool)
+    first = (var_type or "").split("+")[0].strip().upper()
+    if first == "E" or first.startswith(("EA", "EB", "EW", "E/", "E-")):
+        return ({"es": "Binaria eclipsante: una estrella pasa delante de la "
+                       "otra en cada vuelta, y el brillo cae en cada eclipse.",
+                 "en": "Eclipsing binary: one star passes in front of the "
+                       "other every orbit, and the brightness dips at each "
+                       "eclipse."}), True
+    if first == "M":
+        return ({"es": "Mira: una gigante roja que pulsa en meses — late "
+                       "como un corazón lento, con cambios de varias "
+                       "magnitudes.",
+                 "en": "Mira: a red giant pulsating over months — a slow "
+                       "heartbeat swinging several magnitudes."}), False
+    if first == "NR":
+        return ({"es": "Nova recurrente: un sistema binario que estalla "
+                       "cada pocas décadas (esta clase ha llegado a mag 2).",
+                 "en": "Recurrent nova: a binary system erupting every few "
+                       "decades (members of this class have reached mag 2)."}), False
+    if first == "N":
+        return ({"es": "Nova: un estallido termonuclear sobre una enana "
+                       "blanca en un sistema binario.",
+                 "en": "Nova: a thermonuclear outburst on a white dwarf in "
+                       "a binary system."}), False
+    if first.startswith("UG"):
+        return ({"es": "Nova enana: la acreción sobre la enana blanca se "
+                       "vuelve inestable y erupciona cada pocas semanas.",
+                 "en": "Dwarf nova: accretion onto the white dwarf turns "
+                       "unstable and erupts every few weeks."}), False
+    if first == "RCB":
+        return ({"es": "R Coronae Borealis: una supergigante que se apaga "
+                       "de golpe, ahogada por su propio hollín de carbono.",
+                 "en": "R Coronae Borealis: a supergiant suddenly fading, "
+                       "smothered by its own carbon soot."}), False
+    if first == "ELL":
+        return ({"es": "Elipsoidal: una estrella deformada por su compañera "
+                       "que gira mostrando distinta superficie.",
+                 "en": "Ellipsoidal: a star stretched by its companion, "
+                       "rotating and showing different surface."}), False
+    if first in ("DSCT", "HADS", "GDOR", "SXPHE"):
+        return ({"es": "Pulsante de la franja de inestabilidad (familia de "
+                       "las δ Scuti / Doradus).",
+                 "en": "Pulsating star of the instability strip (the "
+                       "δ Scuti / γ Doradus family."}), False
+    return ({"es": "Estrella variable: su brillo cambia con el tiempo.",
+             "en": "Variable star: its brightness changes with time."}), False
+
+
+def explain_variable(d):
+    # Interprets a variable star: variability family first, then the cycle
+    # (period, next extremum), the brightness range and the campaign it
+    # belongs to. Read defensively: the "variable" sub-dict may come from
+    # VSX (full), SIMBAD (coords only) or manual entry (nearly empty).
+    # @args: d - enriched data dict with a "variable" sub-dict
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    v = d.get("variable") or {}
+    c = d.get("campaign") or {}
+
+    vt = v.get("var_type") or ""
+    fam, epoch_min = _variable_family_text(vt)
+    out.append({
+        "param": {"es": "Tipo de variable", "en": "Variable type"},
+        "value": vt or "—", "level": "basic",
+        "es": fam["es"], "en": fam["en"]})
+
+    per = v.get("period_d")
+    if per:
+        out.append({
+            "param": {"es": "Periodo", "en": "Period"},
+            "value": f"{per:.2f} d", "level": "basic",
+            "es": f"Cada {per:.1f} días repite su ciclo: la curva se "
+                  "construye noche a noche, no en una sesión.",
+            "en": f"Every {per:.1f} days it repeats its cycle: the light "
+                  "curve is built night after night, not in one session."})
+
+    nxt = v.get("next_extremum") or {}
+    if nxt.get("days") is not None:
+        lab_es = "Máximo" if nxt.get("kind") == "max" else "Mínimo"
+        lab_en = "Maximum" if nxt.get("kind") == "max" else "Minimum"
+        out.append({
+            "param": {"es": "Próximo extremo", "en": "Next extremum"},
+            "value": f"~{nxt['days']:.0f} d", "level": "basic",
+            "es": f"{lab_es} esperado en ~{nxt['days']:.0f} días (época del "
+                  "VSX). Planifica la noche en torno a él.",
+            "en": f"{lab_en} expected in ~{nxt['days']:.0f} days (VSX "
+                  "epoch). Plan the night around it."})
+
+    if v.get("max") is not None and v.get("min") is not None:
+        out.append({
+            "param": {"es": "Rango de brillo", "en": "Brightness range"},
+            "value": f"{v['max']:.1f}–{v['min']:.1f} mag", "level": "basic",
+            "es": "Del máximo al mínimo histórico del catálogo. Recuerda "
+                  "que en magnitudes el número mayor es el más débil.",
+            "en": "From catalogued maximum to minimum. Mind the inverted "
+                  "scale: the bigger number is the fainter one."})
+
+    amp = v.get("amp")
+    if amp is None and v.get("max") is not None and v.get("min") is not None:
+        amp = v["min"] - v["max"]              # inverted magnitude axis
+    if amp:
+        out.append({
+            "param": {"es": "Amplitud", "en": "Amplitude"},
+            "value": f"Δ {amp:.1f} mag", "level": "basic",
+            "es": f"Cambia {amp:.1f} magnitudes de pico a valle.",
+            "en": f"It swings {amp:.1f} magnitudes peak to peak."})
+
+    if v.get("spectral"):
+        out.append({
+            "param": {"es": "Tipo espectral", "en": "Spectral type"},
+            "value": v["spectral"], "level": "deep",
+            "es": "La firma del espectro: temperatura y clases de "
+                  "compañeras si las hay.",
+            "en": "The spectrum's signature: temperature and companion "
+                  "classes when present."})
+
+    if c.get("name"):
+        goal_es = f" Objetivo: {c['goal']}" if c.get("goal") else ""
+        goal_en = f" Goal: {c['goal']}" if c.get("goal") else ""
+        out.append({
+            "param": {"es": "Campaña", "en": "Campaign"},
+            "value": c["name"], "level": "basic",
+            "es": f"La observas dentro de la campaña «{c['name']}»"
+                  + (f" del grupo {c['group_name']}" if c.get("group_name")
+                     else "") + "." + goal_es,
+            "en": f"You observe it inside the “{c['name']}” campaign"
+                  + (f" by {c['group_name']}" if c.get("group_name") else "")
+                  + "." + goal_en})
+    return out

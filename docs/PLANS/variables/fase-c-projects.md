@@ -230,7 +230,7 @@ def test_campaign_row():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_explain_variable.py tests/unit/test_overview_panel.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core/Gui: explain_variable rows ES/EN for the object card (ADR-035, subplan VC.1)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1053 → 1057)
 
 ---
 

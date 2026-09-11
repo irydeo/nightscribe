@@ -19,3 +19,18 @@ script, run on 2026-08-27). No other third-party data in this asset.
 check.svg — white tick glyph used inside checked QCheckBox indicators
 (gui/theme.py). Original graphic drawn by the project, 2026-09-10; no
 third-party data.
+
+HADS-stars.csv — catalogue of 168 high-amplitude delta Scuti (HADS) stars,
+from Patrick Wils' HADS monitoring programme (Vereniging Voor Sterrenkunde /
+AAVSO-VSX technical team). Columns: Name, RA, DEC, Max, Min, Period_h.
+Copied on 2026-09-11 from the observatory workspace
+(/home/boreal/Develop/astronomy/ns-hads/HADS-stars.csv) for the HADS feature
+(see docs/HADS.md and docs/adr/ADR-034-hads-stars.md). Reference for the
+programme: BAV Hamburg 2016, https://www.bav-astro.eu/images/BAV_Tagungen/Hamburg_2016/04_HADS.pdf
+
+hads-coverage/HADS-Project-YYYY.csv (2011-2026) — same star list plus monthly
+observer-coverage columns from Wils' monitoring programme. Bundled as
+reference data for a future "coverage gap" feature (not consumed at runtime in
+v1). Science reference for the feature:
+Kotysz, K. 2020, "Variability of HADS stars in TESS", PTA Proceedings 10,
+180-182, https://pta.edu.pl/proc/v10p180

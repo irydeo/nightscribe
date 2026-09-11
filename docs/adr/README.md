@@ -39,3 +39,4 @@
 | [031](ADR-031-object-card-unification.md) | Ficha de objeto unificada: coords copiables, tabla multilínea y por tipo, «Discovered» en NEOs, filtro de apertura / unified object card: copyable coords, per-type multi-line table, NEO "Discovered", aperture gate |
 | [032](ADR-032-project-container-folder.md) | Carpeta contenedora de proyectos / project container folder |
 | [033](ADR-033-versioning-setuptools-scm.md) | Versionado automático con setuptools-scm / automatic versioning with setuptools-scm |
+| [034](ADR-034-hads-stars.md) | Estrellas HADS: catálogo empaquetado, observación continua sin fase / HADS stars: bundled catalogue, phase-free continuous observation |

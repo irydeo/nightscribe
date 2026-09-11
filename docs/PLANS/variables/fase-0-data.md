@@ -871,7 +871,7 @@ def test_detect_event_ignores_survey_points_and_splits_filters():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_variables.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: brightness-event advisor (dip/outburst detection) (ADR-035, subplan V0.7)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 1018)
 
 ---
 

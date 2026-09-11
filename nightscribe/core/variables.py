@@ -103,3 +103,39 @@ def jd_to_hjd(jd, ra_deg, dec_deg):
            + math.cos(dec) * math.sin(ra) * math.cos(sdec) * math.sin(sra)
            + math.sin(dec) * math.sin(sdec))
     return jd + dot * r * _LIGHT_TIME_S_PER_AU / 86400.0
+
+
+# ---------------- brightness-event advisor (V-h) ----------------
+
+# Only the observer's OWN points count; survey context (source="survey:*")
+# has a different zero point and would fake events.
+_EVENT_SOURCES = ("manual", "paste", "file", "quicklook")
+
+
+def detect_event(points, threshold=0.5):
+    # Spots a brightness jump (the WeSb 1 protocol: "if a drop is seen,
+    # raise the cadence"). Per filter, the latest point is compared with
+    # the median of the previous ones; a filter needs >= 4 points. Mind the
+    # inverted magnitude axis: a brightness DROP is a POSITIVE delta.
+    # @args: points - followup.list_points() dicts, threshold - min |Δmag|
+    # @return: {"direction": "drop"|"rise", "delta_mag": float, "filter":
+    #          str} for the strongest jump across filters, or None
+    by_filter = {}
+    for p in points:
+        if (p.get("source") or "manual") not in _EVENT_SOURCES:
+            continue
+        if p.get("mag") is None or p.get("mjd") is None:
+            continue
+        by_filter.setdefault(p.get("filter") or "?", []).append(p)
+    best = None
+    for filt, pts in by_filter.items():
+        pts = sorted(pts, key=lambda p: p["mjd"])
+        if len(pts) < 4:
+            continue
+        med = statistics.median(p["mag"] for p in pts[:-1])
+        delta = pts[-1]["mag"] - med
+        if abs(delta) >= threshold and \
+                (best is None or abs(delta) > best["delta_mag"]):
+            best = {"direction": "drop" if delta > 0 else "rise",
+                    "delta_mag": round(abs(delta), 2), "filter": filt}
+    return best

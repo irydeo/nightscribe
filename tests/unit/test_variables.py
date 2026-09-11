@@ -101,3 +101,35 @@ def test_hjd_sign_towards_and_away_from_the_sun():
     away = (variables.jd_to_hjd(jd, (sra + 180) % 360, -sdec) - jd) * 86400
     assert towards == pytest.approx(r * 499.004784, rel=1e-3)
     assert away == pytest.approx(-r * 499.004784, rel=1e-3)
+
+
+def _pts(mags, filt="V", source="manual"):
+    return [{"mjd": 1000.0 + i, "filter": filt, "mag": m, "err": None,
+             "source": source} for i, m in enumerate(mags)]
+
+
+def test_detect_event_drop():
+    # flat 12.0, last point fades to 12.8 -> brightness drop (dip)
+    ev = variables.detect_event(_pts([12.0, 12.1, 11.9, 12.0, 12.8]))
+    assert ev["direction"] == "drop"
+    assert ev["delta_mag"] == pytest.approx(0.8, abs=0.05)
+    assert ev["filter"] == "V"
+
+
+def test_detect_event_rise():
+    # T CrB erupting: last point much BRIGHTER (mag down)
+    ev = variables.detect_event(_pts([10.1, 10.0, 10.1, 10.0, 8.5]))
+    assert ev["direction"] == "rise"
+
+
+def test_detect_event_needs_four_points_and_threshold():
+    assert variables.detect_event(_pts([12.0, 12.0, 13.0])) is None
+    assert variables.detect_event(_pts([12.0, 12.1, 11.9, 12.0, 12.3])) \
+        is None                               # 0.3 < 0.5 threshold
+
+
+def test_detect_event_ignores_survey_points_and_splits_filters():
+    pts = _pts([12.0, 12.0, 12.0, 12.0], source="survey:ztf")
+    pts += _pts([12.0, 12.1, 11.9, 12.0, 12.9], filt="B")
+    ev = variables.detect_event(pts)
+    assert ev["filter"] == "B"                # the survey run never fires

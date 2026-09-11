@@ -1986,7 +1986,7 @@ class MainWindow(QMainWindow):
             self._build_transit_block(layout, p, ctx, spn_exp)
         # HADS: the 2P continuous-capture block (no event, no timeline)
         if kind == "hads" and (ctx.get("hads") or {}):
-            self._build_hads_block(layout, p, ctx, spn_exp)
+            self._build_hads_block(layout, p, ctx, spn_exp, spn)
         # restore saved plan data
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -3004,7 +3004,7 @@ class MainWindow(QMainWindow):
                 db, pid, "plan",
                 {"checklist": [bool(cb.isChecked()) for cb in cbs]})
 
-    def _build_hads_block(self, layout, p, ctx, spn_exp):
+    def _build_hads_block(self, layout, p, ctx, spn_exp, spn_frames=None):
         # The HADS capture block (ADR-034): no transit-style event exists
         # (the phase is unknown), so the plan is a CONTINUOUS 2-period
         # session — see it repeat, then fold. Shows the period/amplitude,
@@ -3013,7 +3013,8 @@ class MainWindow(QMainWindow):
         # and a persistent pre-flight checklist.
         # @args: layout - plan tab layout, p - project dict, ctx - project
         #        context (carries the "hads" snapshot + window keys),
-        #        spn_exp - the capture-plan exposure spin (preselected here)
+        #        spn_exp - the capture-plan exposure spin (preselected here),
+        #        spn_frames - the frames spin (defaulted to fill 2P)
         h = ctx.get("hads") or {}
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -3087,6 +3088,12 @@ class MainWindow(QMainWindow):
             lbl_exp.setWordWrap(True)
             gl.addWidget(lbl_exp)
             spn_exp.setValue(float(exp_rec))
+            # default the frames count so the run covers the 2P session
+            if spn_frames is not None and h.get("session_req_h"):
+                overhead = float(config.get("overhead_s", 15.0))
+                n = int(float(h["session_req_h"]) * 3600
+                        / (float(exp_rec) + overhead))
+                spn_frames.setValue(max(1, n))
         # --- cadence: >= 12 points per cycle, 15 min cap (AAVSO) -----------
         cad = h.get("cadence_s")
         if cad:
@@ -4015,6 +4022,21 @@ class MainWindow(QMainWindow):
             tr = ctx.get("transit") or {}
             target["capture_start"] = tr.get("capture_start")
             target["capture_end"] = tr.get("capture_end")
+        # HADS: the 2P session starting at the recommended (horizon-safe)
+        # time — advisory only: any contiguous 2P run inside the safe span
+        # works, nothing is mandatory here (ADR-034)
+        if self._current_project["kind"] == "hads":
+            h = ctx.get("hads") or {}
+            bt = ctx.get("best_time")
+            if bt and h.get("session_req_h"):
+                try:
+                    start = datetime.datetime.fromisoformat(str(bt))
+                    target["capture_start"] = start
+                    target["capture_end"] = start + datetime.timedelta(
+                        hours=float(h["session_req_h"]))
+                    target["capture_advisory"] = True
+                except (TypeError, ValueError):
+                    pass
         fmt_map = {0: "ccdciel", 1: "nina", 2: "csv"}
         fmt = fmt_map[self._project_widgets["cmb_seqfmt"].currentIndex()]
         ext = {"nina": ".json", "ccdciel": ".targets", "csv": ".csv"}[fmt]
@@ -4036,6 +4058,13 @@ class MainWindow(QMainWindow):
                 msg += " · " + self.tr(
                     "transit start written as mandatory — validate once "
                     "against your CCDciel")
+            if fmt == "ccdciel" \
+                    and self._current_project["kind"] == "hads":
+                # ADR-034: the 2P window is advisory — any contiguous run
+                # of two periods inside the safe span captures the science
+                msg += " · " + self.tr(
+                    "HADS window is advisory — any contiguous 2-period run "
+                    "inside the safe span works")
             self.statusBar().showMessage(msg, 8000)
         except OSError as err:
             self.statusBar().showMessage(

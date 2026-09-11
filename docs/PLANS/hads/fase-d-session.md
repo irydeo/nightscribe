@@ -101,7 +101,12 @@ para una corrección futura fuera de este plan**.
 
 **Hecho cuando**: suite verde (N→M).
 **Commit**: `Gui: HADS CCDciel sequence export — 2P advisory window (ADR-034, subplan D.2)`
-**Estado**: pendiente
+**Estado**: **Hecho** (974→977). Hallazgo al ejecutar: una ventana de captura
+en el export CCDciel escribía siempre `MandatoryStartTime=True` (semántica de
+tránsito) — semántica equivocada para HADS. Cambio mínimo: flag
+`capture_advisory` en el target → tiempos escritos, inicio blando
+(`_ccdciel_times`, sequence.py). El default de frames (2P/(exp+overhead)) se
+fija en `_build_hads_block` (nuevo parámetro `spn_frames`).
 
 ---
 

@@ -295,3 +295,31 @@ def test_transit_window_helper_tolerates_datetimes_and_junk():
         {"capture_start": datetime.datetime(2026, 8, 21, 22, 50),
          "capture_end": datetime.datetime(2026, 8, 22, 1, 50)})
     assert tw[0].hour == 22 and tw[1].hour == 1
+
+def test_ccdciel_hads_window_is_written_but_advisory(tmp_path):
+    # ADR-034: the HADS 2P session window exports StartTime/EndTime, but the
+    # start is NOT mandatory and StartRise stays on (soft semantics)
+    t = _target()
+    t["name"] = "CY Aqr"
+    t["capture_start"] = "2026-09-12T00:28:00+00:00"
+    t["capture_end"] = "2026-09-12T03:23:00+00:00"
+    t["capture_advisory"] = True
+    out = sequence.export_ccdciel(t, sequence.make_plan(4, 60.0, "L"),
+                                  tmp_path / "seq.targets")
+    tgt = _parse_targets(out).getroot().find("Targets/Target1")
+    assert tgt.get("StartTime") == "00:28:00"
+    assert tgt.get("EndTime") == "03:23:00"
+    assert tgt.get("MandatoryStartTime") == "False"
+    assert tgt.get("StartRise") == "True"
+
+
+def test_ccdciel_hads_window_duration_covers_two_periods(tmp_path):
+    # 2.92 h between the advisory bounds (the CY Aqr 2P session)
+    t = _target()
+    t["capture_start"] = "2026-09-12T00:28:00+00:00"
+    t["capture_end"] = "2026-09-12T03:23:12+00:00"
+    t["capture_advisory"] = True
+    out = sequence.export_csv(t, sequence.make_plan(4, 60.0, "L"),
+                              tmp_path / "seq.csv")
+    text = open(out, encoding="utf-8").read()
+    assert "00:28" in text

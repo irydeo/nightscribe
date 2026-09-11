@@ -289,7 +289,11 @@ def _ccdciel_times(target):
             return "0:00:00"
     tw = _transit_window(target)
     if tw:
-        return tw[0].strftime("%H:%M:%S"), tw[1].strftime("%H:%M:%S"), True
+        # a capture_advisory window (HADS, ADR-034) writes the times but
+        # keeps the start soft: any contiguous run inside the safe span is
+        # scientifically fine, so CCDciel is free to schedule around it
+        mandatory = not target.get("capture_advisory", False)
+        return tw[0].strftime("%H:%M:%S"), tw[1].strftime("%H:%M:%S"), mandatory
     sw = target.get("safe_window")
     if sw:
         try:

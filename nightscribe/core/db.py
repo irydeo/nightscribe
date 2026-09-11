@@ -229,6 +229,32 @@ def _migrate(conn):
             "UPDATE projects SET root_dir=? WHERE root_dir IS NULL",
             (legacy,))
         conn.execute("PRAGMA user_version = 6")
+    if v < 7:
+        # Track V (ADR-035): observation campaigns — a first-class entity a
+        # project hangs from (1:N, any kind: campaigns are orthogonal, V-b).
+        # The protocol rides as JSON: {cadence_nights, filters[],
+        # comp_stars[], notes}. The ALTER is guarded so re-opening an
+        # already-migrated DB is a no-op (pattern of v4/v6).
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS campaigns (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            name        TEXT NOT NULL,
+            group_name  TEXT DEFAULT '',
+            coordinator TEXT DEFAULT '',
+            goal        TEXT DEFAULT '',
+            protocol    TEXT DEFAULT '{}',
+            report_url  TEXT DEFAULT '',
+            data_url    TEXT DEFAULT '',
+            status      TEXT NOT NULL DEFAULT 'active',
+            created     REAL NOT NULL,
+            closed_at   REAL
+        );
+        """)
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(projects)")}
+        if "campaign_id" not in cols:
+            conn.execute("ALTER TABLE projects ADD COLUMN campaign_id INTEGER"
+                         " REFERENCES campaigns(id) ON DELETE SET NULL")
+        conn.execute("PRAGMA user_version = 7")
     conn.commit()
 
 

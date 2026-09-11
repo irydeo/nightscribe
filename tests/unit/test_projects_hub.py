@@ -1518,3 +1518,44 @@ def test_variable_followup_keeps_quicklook_hides_animation(window):
     assert btns["Run quick-look"].isVisibleTo(fu)
     assert not btns["Generate animation"].isVisibleTo(fu)
     assert not btns["Export annotated FITS"].isVisibleTo(fu)
+
+
+def test_cadence_chip_ignores_campaign_projects(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    import time
+    from PySide6.QtWidgets import QLabel
+    # campaign-less stale SN -> chip
+    p1 = proj_mod.create(mw.db, "sn", "SN 2026zzz", {"mag": 14.0})
+    fu.create_session(mw.db, p1["id"])
+    # campaign SN equally stale -> NO chip (it surfaces in the list instead)
+    cid = camp_mod.create(mw.db, "Campaña SN")
+    p2 = proj_mod.create(mw.db, "sn", "SN 2026yyy", {"mag": 14.0},
+                         campaign_id=cid)
+    fu.create_session(mw.db, p2["id"])
+    for pid in (p1["id"], p2["id"]):
+        sid = fu.list_sessions(mw.db, pid)[0]["id"]
+        mw.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
+                      (time.time() - 9 * 86400, sid))
+        mw.db.commit()
+    window._show_cadence_hints()
+    chip = window.tonight.findChild(QLabel, "ns_cadence_chip")
+    assert chip is not None
+    assert "SN 2026zzz" in chip.text()
+    assert "SN 2026yyy" not in chip.text()
+
+
+def test_followup_event_advisor_label(window):
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QLabel, QWidget
+    p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
+    for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
+        fu.add_point(mw.db, p["id"], 61000.0 + i, "V", m)
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    texts = [l.text() for l in fu_tab.findChildren(QLabel)]
+    assert any("brightness drop" in t or "descenso" in t for t in texts)

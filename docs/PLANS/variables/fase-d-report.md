@@ -103,7 +103,7 @@ def test_followup_event_advisor_label(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: cadence chip generalised + event advisor in follow-up (ADR-035, subplan VD.1)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅
 
 ---
 

@@ -1065,11 +1065,13 @@ class MainWindow(QMainWindow):
                 parent.layout().removeWidget(old)
             old.deleteLater()
         threshold = int(config.get("sn_cadence_days", 3))
-        # query active SN projects directly (list_projects on this branch
-        # may not support the kind= filter from Track A yet)
+        # campaign projects already surface in Tonight via the planner's
+        # "campaigns" phase (ADR-035, V-d): the chip only watches
+        # campaign-less SN projects
         rows = db.execute(
             "SELECT id, object_name FROM projects"
-            " WHERE status='active' AND kind='sn'").fetchall()
+            " WHERE status='active' AND kind='sn'"
+            " AND (campaign_id IS NULL)").fetchall()
         hints = []
         for pid, name in rows:
             days = fu.days_since_last_session(db, pid)
@@ -3401,6 +3403,22 @@ class MainWindow(QMainWindow):
                 lbl_notes.setWordWrap(True)
                 lbl_notes.setStyleSheet("color: #e0c060;")
                 layout.addWidget(lbl_notes)
+
+        # event advisor (V-h): warn when the latest own point jumped
+        from ..core import variables as _vars
+        ev = _vars.detect_event(
+            fu.list_points(db, pid),
+            threshold=float(config.get("event_mag_threshold", 0.5)))
+        if ev:
+            if ev["direction"] == "drop":
+                msg = self.tr("⚠ Possible brightness drop (Δ≈+%1 mag, filter %2): consider raising the cadence tonight")
+            else:
+                msg = self.tr("⚠ Possible outburst (Δ≈−%1 mag, filter %2): top priority tonight")
+            lbl_ev = QLabel(msg.replace("%1", f"{ev['delta_mag']:.2f}")
+                            .replace("%2", ev["filter"]))
+            lbl_ev.setWordWrap(True)
+            lbl_ev.setStyleSheet("color: #e0c060;")
+            layout.addWidget(lbl_ev)
 
         # add visit button
         btn_add = QPushButton(self.tr("Add visit"))

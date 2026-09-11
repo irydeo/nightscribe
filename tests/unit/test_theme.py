@@ -46,7 +46,7 @@ def qapp():
 
 def test_kind_accent_colors_cover_all_kinds(qapp):
     from nightscribe.gui import theme
-    expected = {"sn", "neo", "comet", "pccp", "transit", "alert"}
+    expected = {"sn", "neo", "comet", "pccp", "transit", "alert", "hads"}
     assert expected == set(theme.KIND_COLORS), "KIND_COLORS lost a kind"
     assert expected == set(theme.KIND_LABELS), "KIND_LABELS lost a kind"
     for kind in expected:

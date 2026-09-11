@@ -66,7 +66,9 @@
 **Hecho cuando**: suite verde (N→M) incluido `test_i18n.py`; la tabla Tonight
 muestra la entrada hads con sus columnas.
 **Commit**: `Gui: HADS kind listable — color, icon, table columns, phase label (ADR-034, subplan B.1)`
-**Estado**: pendiente
+**Estado**: **Hecho** (946→947). Notas: la columna «Best time (UTC)» reusa la
+clave genérica `best_time` (ISO→HH:MM ya existente); solo 2 cadenas nuevas
+(《HADS star》, fase de progreso) — las cabeceras ya existían de otros kinds.
 
 ---
 

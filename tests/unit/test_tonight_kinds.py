@@ -47,6 +47,11 @@ TARGETS = [
       "max_alt": 25,
       "transit": {"star": "TRAPPIST-1 b", "depth_mmag": 40}}, 66.0, {},
      {"es": "Tránsito.", "en": "Transit."}),
+    ({"id": "had1", "kind": "hads", "name": "CY Aqr", "mag": 11.65,
+      "max_alt": 60, "best_time": "2026-09-12T01:12:00",
+      "hads": {"period_h": 1.46, "amp": 0.5, "cycles": 4.2,
+               "session_fits": True}}, 60.0, {},
+     {"es": "HADS.", "en": "HADS."}),
     ({"id": "al1", "kind": "alert", "name": "Apogee 2027 bd1", "mag": 19.0,
       "max_alt": 50,
       "approach": {"date": "2027-02-01", "dist_ld": 3.1, "diameter_m": 120,
@@ -71,7 +76,7 @@ def window():
     real = cfgmod.config.is_configured
     cfgmod.config.is_configured = lambda: False
     cfgmod.config._data["enabled_kinds"] = list(
-        ["neo", "sn", "comet", "pccp", "transit", "alert"])
+        ["neo", "sn", "comet", "pccp", "transit", "alert", "hads"])
     cfgmod.config._data["tonight_kind"] = ""
     w = MainWindow()
     cfgmod.config.is_configured = real
@@ -79,7 +84,7 @@ def window():
     yield w
     # leave the suite in the default state
     cfgmod.config._data["enabled_kinds"] = list(
-        ["neo", "sn", "comet", "pccp", "transit", "alert"])
+        ["neo", "sn", "comet", "pccp", "transit", "alert", "hads"])
     cfgmod.config._data["tonight_kind"] = ""
     w.close()
 
@@ -131,11 +136,12 @@ def test_combo_lives_in_the_header_and_lists_the_kinds(window):
     # direct child of the tab (in the header row)
     assert window.tonight.cmb_filter.parentWidget() is window.tonight
     from nightscribe.gui import theme
-    # items: "All" + the six enabled kinds, in KIND_ORDER, theme labels
+    # items: "All" + the seven enabled kinds, in KIND_ORDER, theme labels
     items = [window.tonight.cmb_filter.itemText(i)
              for i in range(window.tonight.cmb_filter.count())]
     expected = ["All"] + [theme.KIND_LABELS[k] for k in
-                          ["neo", "sn", "comet", "pccp", "transit", "alert"]]
+                          ["neo", "sn", "comet", "pccp", "transit", "alert",
+                           "hads"]]
     assert items == expected, f"combo items {items} != {expected}"
 
 
@@ -213,11 +219,25 @@ def test_whitelist_limits_the_combo(window):
         # grow the whitelist back: the combo (and both views) grow with it
         cfgmod.config._data["enabled_kinds"] = list(old)
         window._apply_kind_filter()
-        assert window.tonight.cmb_filter.count() == 7
+        assert window.tonight.cmb_filter.count() == 8
         assert len(_row_names(window)) == len(TARGETS)
     finally:
         cfgmod.config._data["enabled_kinds"] = old
         _set_kind(window, None)
+
+
+def test_hads_columns_render_period_amp_cycles(window):
+    _set_kind(window, "hads")
+    tbl = window.tonight.tbl_targets
+    assert tbl.rowCount() == 1
+    labels = [tbl.horizontalHeaderItem(c).text()
+              for c in range(tbl.columnCount())]
+    row = {h: tbl.item(0, c).text() for c, h in enumerate(labels)}
+    assert row["Period"] == "1.46 h"
+    assert row["Amp"] == "Δ 0.5"
+    assert row["Cycles"] == "4.2"
+    assert row["Best time (UTC)"] == "01:12"
+    _set_kind(window, None)
 
 
 def test_fallback_to_all_when_active_kind_is_removed(window):

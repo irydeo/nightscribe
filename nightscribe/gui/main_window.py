@@ -159,6 +159,10 @@ TABLE_COLS = {
                 ("Star mag", "mag"), ("Window (UTC)", "window"),
                 ("Depth", "depth"), ("Max alt", "max_alt"),
                 ("Observed", "obs")],
+    "hads": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
+             ("Period", "period"), ("Amp", "amp"), ("Cycles", "cycles"),
+             ("Max alt", "max_alt"), ("Best time (UTC)", "best_time"),
+             ("Observed", "obs")],
     "alert": [("Object", "name"), ("Approach date", "adate"),
               ("Distance (LD)", "ald"), ("Diameter (m)", "adiam"),
               ("Max mag", "amag"), ("Velocity (km/s)", "avel"),
@@ -172,7 +176,7 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
 
 # Canonical kind order (theme.KIND_LABELS order, ADR-026): the tonight filter
 # combo and the settings whitelist stay in the same order wherever shown.
-KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert"]
+KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads"]
 
 
 class _ClickableFrame(QFrame):
@@ -831,6 +835,28 @@ class MainWindow(QMainWindow):
             p.drawPath(path)
             p.setPen(QPen(QColor("#e8eaf2"), 1.5))
             p.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, "!")
+        elif kind == "hads":
+            # pulsating star: small 4-point star + a sine wave underneath
+            p.setBrush(QBrush(color))
+            path = QPainterPath()
+            path.moveTo(QPointF(cx, 4))
+            path.lineTo(QPointF(cx + 3, cy - 5))
+            path.lineTo(QPointF(size - 4, cy - 5))
+            path.lineTo(QPointF(cx + 3, cy - 5 + 3))
+            path.lineTo(QPointF(cx, cy + 1))
+            path.lineTo(QPointF(cx - 3, cy - 2))
+            path.lineTo(QPointF(4, cy - 5))
+            path.lineTo(QPointF(cx - 3, cy - 5))
+            path.closeSubpath()
+            p.drawPath(path)
+            p.setPen(QPen(color, 1.5))
+            wave = QPainterPath()
+            wave.moveTo(QPointF(3, size - 6))
+            wave.cubicTo(QPointF(cx - 4, size - 6), QPointF(cx - 6, size - 11),
+                         QPointF(cx, size - 11))
+            wave.cubicTo(QPointF(cx + 6, size - 11), QPointF(cx + 4, size - 6),
+                         QPointF(size - 3, size - 6))
+            p.drawPath(wave)
         p.end()
         return pix
 
@@ -857,6 +883,7 @@ class MainWindow(QMainWindow):
             "comet": self.tr("Locating comets…"),
             "pccp": self.tr("Checking PCCP candidates…"),
             "transit": self.tr("Scanning exoplanet transits…"),
+            "hads": self.tr("Checking HADS variables…"),
             "approach": self.tr("Fetching close approaches…"),
             "scoring": self.tr("Scoring targets…"),
         }
@@ -1400,7 +1427,8 @@ class MainWindow(QMainWindow):
                     "comet": self.tr("Comet"),
                     "pccp": self.tr("Possible comet"),
                     "transit": self.tr("Transit"),
-                    "alert": self.tr("Close approach")}.get(t["kind"], t["kind"])
+                    "alert": self.tr("Close approach"),
+                    "hads": self.tr("HADS star")}.get(t["kind"], t["kind"])
         if key == "score":
             return float(score)
         if key == "mag":
@@ -1450,6 +1478,15 @@ class MainWindow(QMainWindow):
             tr = t.get("transit") or {}
             d = tr.get("depth_mmag")
             return float(d) if d else None
+        if key == "period":
+            p = (t.get("hads") or {}).get("period_h")
+            return f"{p:.2f} h" if p else "—"
+        if key == "amp":
+            a = (t.get("hads") or {}).get("amp")
+            return f"Δ {a:.1f}" if a else "—"
+        if key == "cycles":
+            c = (t.get("hads") or {}).get("cycles")
+            return f"{c:.1f}" if c else "—"
         if key == "adate":
             return (t.get("approach") or {}).get("date", "—")
         if key == "ald":

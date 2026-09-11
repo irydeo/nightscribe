@@ -1,13 +1,13 @@
 # Plan — HADS: estrellas δ Scuti de alta amplitud, visibles "en directo"
 
-> **Diseño cerrado (2026-09-11), listo para ejecutar.** Un subplan = un commit.
-> Las tarjetas de subplan autocontenidas viven en `docs/PLANS/hads/` (un fichero
-> por fase) — para ejecutar un subplan solo hace falta leer `AGENTS.md`, este
-> maestro y la tarjeta concreta. Anclas `fichero:línea` verificadas a HEAD
-> `c607b81` (si una no coincide: **parar y reportar, no improvisar**).
+> **Ejecutado completo (2026-09-11): los 20 subplanes cerrados, suite
+> unitaria 989 verde + funcional `test_hads_live` verde.** Un subplan = un
+> commit. Las tarjetas de subplan viven en `docs/PLANS/hads/` (un fichero
+> por fase). Anclas verificadas a HEAD `c607b81`.
 > **Documentación de fondo**: [docs/HADS.md](../HADS.md) /
-> [docs/HADS.es.md](../HADS.es.md) — lectura obligatoria. Decisión registrada en
-> [ADR-034](../adr/ADR-034-hads-stars.md) (se revisa en el subplan D.5).
+> [docs/HADS.es.md](../HADS.es.md). Decisión registrada en
+> [ADR-034](../adr/ADR-034-hads-stars.md) (revisada en D.5: fuente híbrida,
+> prioridades por color, cobertura en v1, H-i…H-n).
 
 **rama**: `feature/hads` (nace de `feature/object-card`, HEAD `c607b81`;
 mergea de vuelta a `feature/object-card`)
@@ -111,26 +111,26 @@ planner._hads_targets → suggest (score + frases) → GUI / CLI / enrich
 
 | Sub | Título | Fichero | Depende de | Estado |
 |---|---|---|---|---|
-| H0.1 | Mini-lector XLSX stdlib | [fase-0-data.md](hads/fase-0-data.md) | — | pendiente |
-| H0.2 | Descarga + caché de dos niveles | ídem | H0.1 | pendiente |
-| H0.3 | Workbook → estrellas (colores, cobertura) + test funcional | ídem | H0.1, H0.2 | pendiente |
-| H0.4 | `core/hads.py` (catálogo, merge, derivados) | ídem | H0.3 | pendiente |
-| H0.5 | Docs de datos (HADS.md/es, DATA_SOURCES) | ídem | H0.4 | pendiente |
-| A.1 | package-data + planner (`_hads_targets`, gate 1 ciclo) | [fase-a-core.md](hads/fase-a-core.md) | H0.4 | pendiente |
-| A.2 | Scoring (`_scientific/_observability/_urgency/_hook`) | ídem | A.1 | pendiente |
-| A.3 | Fragmentos ES/EN | ídem | A.2 | pendiente |
-| B.1 | GUI listable (theme, tabla, icono, fase) + i18n | [fase-b-gui.md](hads/fase-b-gui.md) | A.3 | pendiente |
-| B.2 | config + settings checkbox + combos + i18n | ídem | B.1 | pendiente |
-| B.3 | enrich `detect_type` (¡antes de la regex exoplaneta!) | ídem | H0.4 | pendiente |
-| B.4 | Ficha de objeto (`explain_hads` + chips) + i18n | ídem | B.1, B.3 | pendiente |
-| C.1 | Proyectos hads (`VALID_KINDS`/`OUTCOMES`/CLI) + i18n | [fase-c-projects.md](hads/fase-c-projects.md) | B.2 | pendiente |
-| C.2 | Narrativa ES/EN (hook, facts, hashtags) | ídem | B.3 | pendiente |
-| C.3 | Post/tuit (tests) | ídem | C.2 | pendiente |
-| D.1 | Bloque de plan HADS (2P, cadencia, checklist) + i18n | [fase-d-session.md](hads/fase-d-session.md) | C.1 | pendiente |
-| D.2 | Secuencia CCDciel hads | ídem | D.1 | pendiente |
-| D.3 | Follow-up + process (FotoDif/WebObs) + i18n | ídem | C.1 | pendiente |
-| D.4 | Plegado por fase (widget + viz) + i18n | ídem | D.3 | pendiente |
-| D.5 | Post con curva + cierre documental | ídem | D.4 | pendiente |
+| H0.1 | Mini-lector XLSX stdlib | [fase-0-data.md](hads/fase-0-data.md) | — | **Hecho** |
+| H0.2 | Descarga + caché de dos niveles | ídem | H0.1 | **Hecho** |
+| H0.3 | Workbook → estrellas (colores, cobertura) + test funcional | ídem | H0.1, H0.2 | **Hecho** |
+| H0.4 | `core/hads.py` (catálogo, merge, derivados) | ídem | H0.3 | **Hecho** |
+| H0.5 | Docs de datos (HADS.md/es, DATA_SOURCES) | ídem | H0.4 | **Hecho** |
+| A.1 | package-data + planner (`_hads_targets`, gate 1 ciclo) | [fase-a-core.md](hads/fase-a-core.md) | H0.4 | **Hecho** |
+| A.2 | Scoring (`_scientific/_observability/_urgency/_hook`) | ídem | A.1 | **Hecho** |
+| A.3 | Fragmentos ES/EN | ídem | A.2 | **Hecho** |
+| B.1 | GUI listable (theme, tabla, icono, fase) + i18n | [fase-b-gui.md](hads/fase-b-gui.md) | A.3 | **Hecho** |
+| B.2 | config + settings checkbox + combos + i18n | ídem | B.1 | **Hecho** |
+| B.3 | enrich `detect_type` (¡antes de la regex exoplaneta!) | ídem | H0.4 | **Hecho** |
+| B.4 | Ficha de objeto (`explain_hads` + chips) + i18n | ídem | B.1, B.3 | **Hecho** |
+| C.1 | Proyectos hads (`VALID_KINDS`/`OUTCOMES`/CLI) + i18n | [fase-c-projects.md](hads/fase-c-projects.md) | B.2 | **Hecho** |
+| C.2 | Narrativa ES/EN (hook, facts, hashtags) | ídem | B.3 | **Hecho** |
+| C.3 | Post/tuit (tests) | ídem | C.2 | **Hecho** |
+| D.1 | Bloque de plan HADS (2P, cadencia, checklist) + i18n | [fase-d-session.md](hads/fase-d-session.md) | C.1 | **Hecho** |
+| D.2 | Secuencia CCDciel hads | ídem | D.1 | **Hecho** |
+| D.3 | Follow-up + process (FotoDif/WebObs) + i18n | ídem | C.1 | **Hecho** |
+| D.4 | Plegado por fase (widget + viz) + i18n | ídem | D.3 | **Hecho** |
+| D.5 | Post con curva + cierre documental | ídem | D.4 | **Hecho** |
 
 ## Riesgos y mitigaciones
 

@@ -582,3 +582,37 @@ needed, a per-project folder.
 change only affects **new projects**; legacy ones keep their exact folder
 frozen in `root_dir`; the hub button only re-homes what is written from then
 on.
+
+### 7quaterdecies. HADS track — high-amplitude variable stars (2026-09-11, ADR-034)
+
+*Note: the Spanish master (`WORKFLOWS.es.md`) carries the authoritative
+version of this section.*
+
+Plan: `docs/PLANS/hads-stars.md` (master) + `docs/PLANS/hads/fase-*.md`
+(20 self-contained subplans). Branch `feature/hads`.
+
+New `hads` target kind: high-amplitude δ Scuti stars (1–5 h periods,
+ΔV ≥ 0.3 mag) — **you watch them pulsate live**. No known phase → the
+recommendation is a **continuous 2×P capture** (not an event); the listing
+gate demands a contiguous ≥ 1-cycle window. The data source is **hybrid**:
+Patrick Wils' Google Sheets workbook (updated daily) is downloaded at runtime
+with a 12 h cache (`core/sources/hads_sheet.py`, stdlib-only XLSX parsing,
+two levels: raw + parsed JSON) and merged over the bundled snapshot
+(`assets/HADS-stars.csv`, offline fallback + aliases). The sheet's color
+legend feeds the score: red/orange (period changes!) +12/+8 urgency, blue
+(not yet observed) +6, monthly coverage gap +10 — never stacked (max wins).
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| H0.1–H0.5 | stdlib XLSX reader, 12 h TTL cache, color+coverage parsing, `core/hads.py` (catalog/merge/derived/sawtooth), data docs | **Done** |
+| A.1–A.3 | `hads` planner phase (1-cycle gate, 2P session in `_visibility`), scoring (4 families), ES/EN fragments | **Done** |
+| B.1–B.4 | listable GUI (magenta, icon, columns, phase), config + friendly migration + combos, `enrich` (before the exoplanet regex), object card with `explain_hads` + chips | **Done** |
+| C.1–C.3 | hads projects (`reported_aavso`), ES/EN narrative citing Wils/VVS/VSX, post/tweet | **Done** |
+| D.1–D.5 | plan block (2P, cadence ≤ P/12, checklist), CCDciel sequence (advisory window), Follow-up + process (FotoDif/WebObs), **phase folding** (widget + PNG) | **Done** |
+
+**Status**: unit suite green (**989**) + network functional green
+(`test_hads_live`). **Out of this iteration**: the native live monitor
+(**parked** — FotoDif AUTO already covers live watching); the
+generalisation to long-period variables and campaigns (agreed model:
+campaign = orthogonal project attribute + `variable` kind) is the **next
+track, on its own branch** (see "Generalización futura" in the master plan).

@@ -230,4 +230,5 @@ ES+EN).
 **Hecho cuando**: suites verdes y documentación al día; rama lista para
 merge a `feature/object-card`.
 **Commit**: `Docs/i18n: HADS track close — WORKFLOWS 7quaterdecies, ADR-034 rev, AGENTS.md (subplan D.5)`
-**Estado**: pendiente
+**Estado**: **Hecho** (988→989; funcional verde salvo `test_astrometry_solve_live`,
+fallo ambiental preexistente por apikey de Astrometry.net, sin relación).

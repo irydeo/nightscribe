@@ -753,3 +753,35 @@ configurable y, si hace falta, carpeta distinta por proyecto.
 raíz global solo afecta a **proyectos nuevos**; los heredados conservan su
 carpeta exacta congelada en `root_dir`; el botón del hub re-ubica únicamente
 lo que se escriba a partir de entonces.
+
+### 7quaterdecies. Track HADS — estrellas variables de alta amplitud (2026-09-11, ADR-034)
+
+Plan: `docs/PLANS/hads-stars.md` (maestro) + `docs/PLANS/hads/fase-*.md`
+(20 subplanes autocontenidos). Rama `feature/hads`.
+
+Nuevo tipo de objetivo `hads`: δ Scuti de gran amplitud (periodos 1–5 h,
+ΔV ≥ 0.3 mag) — se **ven pulsar en directo**. Sin fase conocida → la
+recomendación es una **captura continua de 2×P** (no un evento); el gate de
+listado exige una ventana contigua ≥ 1 ciclo. La fuente es **híbrida**: el
+libro de Google Sheets de Patrick Wils (se actualiza a diario) se descarga en
+runtime con caché de 12 h (`core/sources/hads_sheet.py`, XLSX parseado solo
+con la stdlib, doble nivel: crudo + JSON) y se fusiona con el snapshot
+empaquetado (`assets/HADS-stars.csv`, respaldo offline + aliases). La leyenda
+de colores del libro alimenta el score: rojo/naranja (¡cambios de periodo!)
++12/+8 de urgencia, azul (no observada) +6, cobertura del mes en hueco +10 —
+nunca apiladas (manda la mayor).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| H0.1–H0.5 | Lector XLSX stdlib, caché TTL 12 h, parseo de colores + cobertura, `core/hads.py` (catálogo/merge/derivados/diente de sierra), docs de datos | **Hecho** |
+| A.1–A.3 | Fase `hads` en el planner (gate 1 ciclo, sesión 2P en `_visibility`), scoring (4 familias), fragmentos ES/EN | **Hecho** |
+| B.1–B.4 | GUI listable (color magenta, icono, columnas, fase), config + migración amable + combos, `enrich` (antes de la regex exoplaneta), ficha con `explain_hads` + chips | **Hecho** |
+| C.1–C.3 | Proyectos hads (`reported_aavso`), narrativa ES/EN citando a Wils/VVS/VSX, post/tuit | **Hecho** |
+| D.1–D.5 | Bloque de plan (2P, cadencia ≤ P/12, checklist), secuencia CCDciel (ventana advisory), Follow-up + process (FotoDif/WebObs), **plegado por fase** (widget + PNG) | **Hecho** |
+
+**Estado**: suite unitaria verde (**989**) + funcional con red verde
+(`test_hads_live`). **Fuera de esta iteración**: monitor nativo en vivo
+(**aparcado** — FotoDif AUTO ya cubre el directo); la generalización a
+variables de largo periodo y campañas (modelo pactado: campaña = atributo
+ortogonal del proyecto + kind `variable`) será el **siguiente track, en su
+propia rama** (ver «Generalización futura» en el plan maestro).

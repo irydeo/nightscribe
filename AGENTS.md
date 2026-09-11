@@ -63,6 +63,7 @@ nightscribe/
     planner.py       # construye la lista de objetivos de la noche
     suggest.py       # score unificado 0-100 + Top N + frases "por qué esta noche"
     orbits.py        # familias orbitales + parámetros explicados
+    hads.py          # HADS: catálogo híbrido (snapshot+sheet), merge, mat. de sesión
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
@@ -73,6 +74,8 @@ nightscribe/
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
     blink.py         # blink de SN: resuelve nombre->coords, pareja alineada PS1-g
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
+                     # + hads_sheet.py: libro HADS de P. Wils (Google Sheets XLSX,
+                     #   TTL 12 h, parseo stdlib; ver ADR-034)
                      # + ccdciel.py: cliente JSON-RPC local del observatorio (ADR-030,
                      #   solo comanda con CCDciel abierto; lecturas cacheadas TTL 60s)
   viz/               # matplotlib: style, orbit_view, sky_view,
@@ -100,7 +103,7 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-031, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-034, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
 **Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
@@ -132,7 +135,7 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-031, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-034, bilingual). Read the ADR before
 changing a decision; update it if you do.
 
 **Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow

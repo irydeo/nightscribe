@@ -41,3 +41,15 @@ def test_render_post_tweet_fits_and_carries_the_tags(fake_cfg):
     out = post.render_post(_hads_e(), cfg=fake_cfg)
     assert len(out["tweet"]) <= 280
     assert "#VariableStars" in out["tweet"] or "#VariableStars" in out["es"]
+
+
+def test_post_chart_folds_the_curve(tmp_path, fake_cfg):
+    # D.5: a hads post with photometry ships the phase-folded PNG
+    e = _hads_e()
+    e["data"]["followup"] = {"points": [
+        {"mjd": 60600.0 + 0.125 * i, "mag": 11.3 + 0.4 * (i % 2),
+         "err": 0.02, "filter": "Clear", "source": "file"}
+        for i in range(9)]}
+    charts = post.build_charts(e, tmp_path, "", cfg=fake_cfg)
+    lc = charts.get("lightcurve")
+    assert lc is not None and lc.exists() and lc.stat().st_size > 1000

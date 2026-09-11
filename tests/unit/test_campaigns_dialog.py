@@ -151,3 +151,11 @@ def test_add_target_without_coordinates_is_refused(qapp, db):
     dlg.edt_name.setText("X")
     dlg._save()
     assert proj_mod.list_projects(db) == []
+
+
+def test_detach_with_no_members_is_a_noop(qapp, db):
+    from nightscribe.gui.campaigns_dialog import CampaignsDialog
+    campaign.create(db, "C")
+    dlg = CampaignsDialog(db_obj=db)
+    dlg.lst_active.setCurrentRow(0)
+    dlg._detach_project()          # no members: nothing happens, no crash

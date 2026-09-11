@@ -1189,7 +1189,7 @@ def test_detach_with_no_members_is_a_noop(qapp, db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_project_variable.py tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core/Gui: attach/detach existing projects to campaigns (ADR-035, subplan VC.8)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1071 → 1073)
 
 ---
 

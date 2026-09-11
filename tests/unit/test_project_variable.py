@@ -49,3 +49,12 @@ def test_variable_outcomes_include_caught_not_caught(db):
     # "not_caught" is in the variable-star outcome list
     assert "not_caught" in project.OUTCOMES["variable"]
     assert "caught" in project.OUTCOMES["variable"]
+
+
+def test_set_campaign_link_and_unlink(db):
+    cid = campaign.create(db, "C")
+    p = project.create(db, "sn", "SN 2026abc")
+    assert project.set_campaign(db, p["id"], cid) is True
+    assert project.get(db, p["id"])["campaign_id"] == cid
+    assert project.set_campaign(db, p["id"], None) is True
+    assert project.get(db, p["id"])["campaign_id"] is None

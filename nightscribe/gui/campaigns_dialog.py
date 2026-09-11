@@ -54,9 +54,12 @@ class CampaignsDialog(QDialog):
         self.btn_finish = QPushButton(self.tr("Finish"))
         self.btn_reopen = QPushButton(self.tr("Reopen"))
         self.btn_target = QPushButton(self.tr("Add target…"))
+        self.btn_attach = QPushButton(self.tr("Attach project…"))
+        self.btn_detach = QPushButton(self.tr("Detach…"))
         self.btn_close = QPushButton(self.tr("Close"))
         for b in (self.btn_new, self.btn_edit, self.btn_finish,
-                  self.btn_reopen, self.btn_target):
+                  self.btn_reopen, self.btn_target, self.btn_attach,
+                  self.btn_detach):
             row.addWidget(b)
         row.addStretch()
         row.addWidget(self.btn_close)
@@ -67,6 +70,8 @@ class CampaignsDialog(QDialog):
         self.btn_finish.clicked.connect(self._finish_selected)
         self.btn_reopen.clicked.connect(self._reopen_selected)
         self.btn_target.clicked.connect(self._add_target)
+        self.btn_attach.clicked.connect(self._attach_project)
+        self.btn_detach.clicked.connect(self._detach_project)
         self.lst_active.itemSelectionChanged.connect(self._sync_buttons)
         self.lst_finished.itemSelectionChanged.connect(self._sync_buttons)
         self._reload()
@@ -103,6 +108,10 @@ class CampaignsDialog(QDialog):
         self.btn_edit.setEnabled(self._selected_id(self.lst_active)
                                   is not None)
         self.btn_target.setEnabled(self._selected_id(self.lst_active)
+                                   is not None)
+        self.btn_attach.setEnabled(self._selected_id(self.lst_active)
+                                   is not None)
+        self.btn_detach.setEnabled(self._selected_id(self.lst_active)
                                    is not None)
 
     def _finish_selected(self):
@@ -141,6 +150,45 @@ class CampaignsDialog(QDialog):
             return
         AddTargetDialog(self, campaign_id=cid, db_obj=self._db).exec()
         self._reload()
+
+    def _attach_project(self):
+        # Links an existing active project to the selected campaign.
+        cid = self._selected_id(self.lst_active)
+        if cid is None:
+            return
+        from PySide6.QtWidgets import QInputDialog
+        from ..core import project
+        actives = project.list_projects(self._db, status="active")
+        choices = [p for p in actives if not p.get("campaign_id")]
+        if not choices:
+            return
+        names = [f"[{p['kind']}] {p['object_name']}" for p in choices]
+        sel, ok = QInputDialog.getItem(
+            self, self.tr("Attach project"), self.tr("Project:"),
+            names, 0, False)
+        if ok:
+            idx = names.index(sel)
+            project.set_campaign(self._db, choices[idx]["id"], cid)
+            self._reload()
+
+    def _detach_project(self):
+        # Unlinks a project of the selected campaign (chosen by name).
+        cid = self._selected_id(self.lst_active)
+        if cid is None:
+            return
+        from PySide6.QtWidgets import QInputDialog
+        members = campaign.projects_of(self._db, cid, status=None)
+        if not members:
+            return
+        names = [p["object_name"] for p in members]
+        sel, ok = QInputDialog.getItem(
+            self, self.tr("Detach project"), self.tr("Project:"),
+            names, 0, False)
+        if ok:
+            from ..core import project
+            project.set_campaign(self._db, members[names.index(sel)]["id"],
+                                 None)
+            self._reload()
 
 
 class CampaignEditDialog(QDialog):

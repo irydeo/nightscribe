@@ -4,52 +4,52 @@
 <context>
     <name>AddTargetDialog</name>
     <message>
-        <location filename="../campaigns_dialog.py" line="238"/>
+        <location filename="../campaigns_dialog.py" line="286"/>
         <source>Add campaign target</source>
         <translation>Add campaign target</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="242"/>
+        <location filename="../campaigns_dialog.py" line="290"/>
         <source>Object:</source>
         <translation>Object:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="243"/>
+        <location filename="../campaigns_dialog.py" line="291"/>
         <source>Resolve (VSX/SIMBAD)</source>
         <translation>Resolve (VSX/SIMBAD)</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="245"/>
+        <location filename="../campaigns_dialog.py" line="293"/>
         <source>— not resolved yet —</source>
         <translation>— not resolved yet —</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="249"/>
+        <location filename="../campaigns_dialog.py" line="297"/>
         <source>RA (deg):</source>
         <translation>RA (deg):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="251"/>
+        <location filename="../campaigns_dialog.py" line="299"/>
         <source>Dec (deg):</source>
         <translation>Dec (deg):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="253"/>
+        <location filename="../campaigns_dialog.py" line="301"/>
         <source>Mag (approx):</source>
         <translation>Mag (approx):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="275"/>
+        <location filename="../campaigns_dialog.py" line="323"/>
         <source>VSX: type %1, period %2 d</source>
         <translation>VSX: type %1, period %2 d</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="292"/>
+        <location filename="../campaigns_dialog.py" line="340"/>
         <source>SIMBAD: %1</source>
         <translation>SIMBAD: %1</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="296"/>
+        <location filename="../campaigns_dialog.py" line="344"/>
         <source>Not found — fill the coordinates by hand</source>
         <translation>Not found — fill the coordinates by hand</translation>
     </message>
@@ -313,62 +313,62 @@
 <context>
     <name>CampaignEditDialog</name>
     <message>
-        <location filename="../campaigns_dialog.py" line="158"/>
+        <location filename="../campaigns_dialog.py" line="206"/>
         <source>Edit campaign</source>
         <translation>Edit campaign</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="159"/>
+        <location filename="../campaigns_dialog.py" line="207"/>
         <source>New campaign</source>
         <translation>New campaign</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="163"/>
+        <location filename="../campaigns_dialog.py" line="211"/>
         <source>Name:</source>
         <translation>Name:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="165"/>
+        <location filename="../campaigns_dialog.py" line="213"/>
         <source>Group:</source>
         <translation>Group:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="167"/>
+        <location filename="../campaigns_dialog.py" line="215"/>
         <source>Coordinator:</source>
         <translation>Coordinator:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="169"/>
+        <location filename="../campaigns_dialog.py" line="217"/>
         <source>Science goal:</source>
         <translation>Science goal:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="174"/>
+        <location filename="../campaigns_dialog.py" line="222"/>
         <source>Cadence (nights):</source>
         <translation>Cadence (nights):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="176"/>
+        <location filename="../campaigns_dialog.py" line="224"/>
         <source>Filters:</source>
         <translation>Filters:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="178"/>
+        <location filename="../campaigns_dialog.py" line="226"/>
         <source>Comparison stars:</source>
         <translation>Comparison stars:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="180"/>
+        <location filename="../campaigns_dialog.py" line="228"/>
         <source>Report URL:</source>
         <translation>Report URL:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="182"/>
+        <location filename="../campaigns_dialog.py" line="230"/>
         <source>Data URL:</source>
         <translation>Data URL:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="184"/>
+        <location filename="../campaigns_dialog.py" line="232"/>
         <source>Protocol notes:</source>
         <translation>Protocol notes:</translation>
     </message>
@@ -417,8 +417,34 @@
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="57"/>
+        <source>Attach project…</source>
+        <translation>Attach project…</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="58"/>
+        <source>Detach…</source>
+        <translation>Detach…</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="59"/>
         <source>Close</source>
         <translation>Close</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="167"/>
+        <source>Attach project</source>
+        <translation>Attach project</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="167"/>
+        <location filename="../campaigns_dialog.py" line="185"/>
+        <source>Project:</source>
+        <translation>Project:</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="185"/>
+        <source>Detach project</source>
+        <translation>Detach project</translation>
     </message>
 </context>
 <context>

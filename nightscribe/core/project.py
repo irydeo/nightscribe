@@ -316,6 +316,18 @@ def set_status(db, project_id, status):
     return cur.rowcount > 0
 
 
+def set_campaign(db, project_id, campaign_id):
+    # Links the project to a campaign (or unlinks it with None) — the
+    # campaign is an orthogonal attribute, any kind can join (ADR-035, V-b).
+    # @return: True if the project was found and updated
+    cur = db.execute(
+        "UPDATE projects SET campaign_id=?, updated=? WHERE id=?",
+        (campaign_id, _now(), project_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
 def close(db, project_id, outcome=None):
     # Closes an active project: status -> done, stamps closed_at and stores
     # the final outcome (free text, or None to close without one). Idempotent:

@@ -31,11 +31,12 @@ CHECK_SVG = str(_ASSETS / "check.svg")
 
 
 # Per-kind accent colors, shared by cards, icons and table names.
-# Seven well-separated hues on the wheel (0/24/140/185/216/268/320°),
+# Eight well-separated hues on the wheel (0/24/100/140/185/216/268/320°),
 # none in the amber band (40-65°), all saturated, mid-value.
 KIND_COLORS = {
     "sn":      "#e5484d",   # 0°   red
     "alert":   "#f76808",   # 24°  orange (NOT yellow)
+    "variable": "#65cf30",  # 100° yellow-green (the last free arc)
     "comet":   "#46a758",   # 140° green
     "pccp":    "#39c5cf",   # 185° cyan (clearly away from green AND blue)
     "neo":     "#4484ef",   # 216° blue
@@ -47,6 +48,7 @@ KIND_COLORS = {
 KIND_LABELS = {
     "neo": "NEO", "sn": "SN", "comet": "CMT",
     "pccp": "PCCP", "transit": "TRN", "alert": "ALT", "hads": "HADS",
+    "variable": "VAR",
 }
 
 # Core palette — one warm-black blue family, no pure black.

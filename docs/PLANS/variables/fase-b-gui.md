@@ -36,7 +36,7 @@ puntual, la única permitida en este fichero).
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_theme.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui/Theme: variable kind color (yellow-green 100°) + label (ADR-035, subplan VB.1)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11)
 
 ---
 

@@ -106,6 +106,17 @@ def test_observating_tab_widgets(qapp):
     dlg.deleteLater()
 
 
+def test_kinds_grid_includes_hads(qapp):
+    # the enabled-kinds whitelist checkboxes follow the chk_kind_<kind>
+    # naming convention; HADS is the seventh (ADR-034)
+    dlg = _dlg()
+    names = set(_tab_widgets(dlg, 1))
+    for k in ("neo", "sn", "comet", "pccp", "transit", "alert", "hads"):
+        assert f"chk_kind_{k}" in names, f"chk_kind_{k} missing"
+    assert dlg.chk_kind_hads.text() == "HADS variable stars"
+    dlg.deleteLater()
+
+
 def test_integrations_tab_widgets(qapp):
     dlg = _dlg()
     names = set(_tab_widgets(dlg, 2))

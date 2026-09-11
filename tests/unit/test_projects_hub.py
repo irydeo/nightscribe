@@ -862,6 +862,17 @@ def test_hub_kind_filter(window, panel):
     assert not any("NEO2026kf" in n for n in names)
 
 
+def test_hub_kind_combo_includes_hads_aligned_with_the_tuple(window, panel):
+    # the combo is positional: .ui item order must match the kinds tuple in
+    # on_refresh_projects (HADS is index 6, ADR-034)
+    _reset_filters(window)
+    assert window.projects.cmb_kind.itemText(6) == "HADS"
+    # selecting it must not crash the refresh even with no hads projects
+    window.projects.cmb_kind.setCurrentIndex(6)
+    window.on_refresh_projects()
+    _reset_filters(window)
+
+
 def test_hub_search(window, panel):
     _reset_filters(window)
     from PySide6.QtCore import Qt

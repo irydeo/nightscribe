@@ -109,7 +109,10 @@ nombre** `chk_kind_<kind>`), filtro de proyectos (:1567-1569, :1603-1605);
 **Hecho cuando**: suite verde (N→M) + `test_i18n.py`; migración cubierta por
 test.
 **Commit**: `Gui/Config: HADS in enabled_kinds with friendly migration + settings/projects combos (ADR-034, subplan B.2)`
-**Estado**: pendiente
+**Estado**: **Hecho** (947→953). Nota: el test de «crear proyecto hads y
+filtrarlo» queda en C.1 (necesita `VALID_KINDS`); aquí se cubre el combo
+posicional (.ui índice 6 ⇆ tupla de `on_refresh_projects`) y la migración
+con `tests/unit/test_config.py` nuevo.
 
 ---
 

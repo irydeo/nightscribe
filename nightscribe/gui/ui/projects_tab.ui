@@ -31,6 +31,7 @@
            <item><property name="text"><string>Comet</string></property></item>
            <item><property name="text"><string>PCCP</string></property></item>
            <item><property name="text"><string>Transit</string></property></item>
+           <item><property name="text"><string>HADS</string></property></item>
           </widget>
          </item>
          <item>

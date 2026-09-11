@@ -1602,7 +1602,7 @@ class MainWindow(QMainWindow):
         status = statuses[idx] if idx < len(statuses) else None
         # A3: classification — kind, search, favorites, sort
         kind_idx = self.projects.cmb_kind.currentIndex()
-        kinds = (None, "sn", "neo", "comet", "pccp", "transit")
+        kinds = (None, "sn", "neo", "comet", "pccp", "transit", "hads")
         kind = kinds[kind_idx] if kind_idx < len(kinds) else None
         search = self.projects.edt_search.text().strip() or None
         tag = self.projects.edt_tag.text().strip() or None
@@ -1638,7 +1638,8 @@ class MainWindow(QMainWindow):
                 header.setTextAlignment(Qt.AlignCenter)
                 lst.addItem(header)
             kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
-                          "pccp": "PCCP", "transit": self.tr("Transit")}.get(
+                          "pccp": "PCCP", "transit": self.tr("Transit"),
+                          "hads": "HADS"}.get(
                           p["kind"], p["kind"])
             cur = project.current_step(db, p["id"]) or "done"
             step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
@@ -1806,7 +1807,8 @@ class MainWindow(QMainWindow):
     def _render_project_header(self, p):
         kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",
                       "pccp": "Possible comet",
-                      "transit": "Exoplanet transit"}.get(p["kind"], p["kind"])
+                      "transit": "Exoplanet transit",
+                      "hads": "HADS"}.get(p["kind"], p["kind"])
         cur = project.current_step(db, p["id"])
         step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
         header = f"<b>[{kind_label}] {p['object_name']}</b>"

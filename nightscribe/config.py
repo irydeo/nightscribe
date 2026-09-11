@@ -55,7 +55,8 @@ DEFAULTS = {
     "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
     # Tonight filter (WORKFLOWS 7quater): the enabled object kinds are the
     # whitelist shown in the header combo and in Settings; missing means all.
-    "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert"],
+    "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert",
+                      "hads"],
     "tonight_kind": "",           # last-used header filter; "" = "All"
     "best_per_kind_n": 5,         # per-kind cap for the Tonight grid
     # SN follow-up (Track B, B11): cadence threshold in days — the Tonight
@@ -88,6 +89,11 @@ class Config:
             pass
         except (json.JSONDecodeError, OSError) as err:
             logger.warning("Could not read config %s: %s", self._file, err)
+        # HADS rollout: a stored whitelist equal to the pre-HADS default gets
+        # the new kind for free; a customised list is never touched
+        if self._data.get("enabled_kinds") == ["neo", "sn", "comet", "pccp",
+                                               "transit", "alert"]:
+            self._data["enabled_kinds"] = list(DEFAULTS["enabled_kinds"])
 
     def save(self):
         # Writes the current configuration to disk

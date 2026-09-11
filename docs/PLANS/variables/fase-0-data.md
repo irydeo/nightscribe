@@ -688,7 +688,13 @@ def test_next_extremum_real_mira_ephemeris():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_variables.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: variable star cycle maths — next extremum + phase (ADR-035, subplan V0.5)`
-**Estado**: Pendiente
+**Nota (2026-09-11)**: el test `real_mira_ephemeris` de la spec traía un `now_mjd=61239.0`
+caído justo ANTES de la 8ª mínima, así que la regla "whichever first" (la que fijan los
+otros dos tests y el código spec) devolvía la mínima, no la máxima. Se subió `now` a
+61300.0 (justo después de la 8ª mínima) para que el máximo (9P) gane la carrera, que es
+lo que el test quería fijar. Las aserciones (`max`, 9·P) y el código de `variables.py`
+se mantienen tal cual spec.
+**Estado**: ✅ Hecho (2026-09-11, suite 1010)
 
 ---
 

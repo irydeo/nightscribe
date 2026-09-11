@@ -33,9 +33,9 @@ def _var(**over):
          "variable": {"var_type": "NR", "period_d": 227.55,
                       "epoch_mjd": 55828.4, "max": 2.0, "min": 10.8,
                       "amp": 8.8, "next_extremum": None},
-         "campaign": {"id": 1, "name": "Campaña T CrB", "overdue_days": 0,
-                      "cadence_nights": 1, "never_visited": False,
-                      "event": None}}
+          "campaign": {"id": 1, "name": "T CrB", "overdue_days": 0,
+                       "cadence_nights": 1, "never_visited": False,
+                       "event": None}}
     t.update(over)
     return t
 
@@ -87,3 +87,46 @@ def test_campaign_signals_stack_on_other_kinds():
     plain = dict(sn)
     plain.pop("campaign")
     assert _parts(sn)["urgency"] > _parts(plain)["urgency"]
+
+
+def _frags(t):
+    return suggest._fragments(t, _Cfg())
+
+
+def test_campaign_fragments_lead():
+    t = _var(campaign=dict(_var()["campaign"], overdue_days=4))
+    frags = _frags(t)
+    assert frags and "Campaña T CrB" in frags[0][0]
+    assert "4 noches sin medida" in frags[0][0]
+    assert "Campaign T CrB" in frags[0][1]
+
+
+def test_event_fragment_goes_first():
+    c = dict(_var()["campaign"], overdue_days=4,
+             event={"direction": "drop", "delta_mag": 0.8, "filter": "V"})
+    frags = _frags(_var(campaign=c))
+    assert frags[0][0].startswith("¡Posible descenso")
+    assert frags[1][0].startswith("Campaña")
+
+
+def test_never_visited_fragment():
+    c = dict(_var()["campaign"], never_visited=True)
+    assert "sin ninguna visita" in _frags(_var(campaign=c))[0][0]
+
+
+def test_extremum_and_period_fragments():
+    v = dict(_var()["variable"])
+    v["next_extremum"] = {"kind": "max", "mjd": 61250.0, "days": 3.0}
+    txt = " · ".join(f[0] for f in _frags(_var(variable=v)))
+    assert "Máximo esperado en ~3 días" in txt
+    assert "periodo de 227.6 días" in txt
+
+
+def test_why_phrase_keeps_at_most_three_and_ends_with_period():
+    c = dict(_var()["campaign"], overdue_days=4,
+             event={"direction": "rise", "delta_mag": 1.2, "filter": "V"})
+    v = dict(_var()["variable"])
+    v["next_extremum"] = {"kind": "min", "mjd": 61252.0, "days": 5.0}
+    phrase = suggest.why_phrase(_var(campaign=c, variable=v), _Cfg())
+    assert phrase["es"].endswith(".") and phrase["en"].endswith(".")
+    assert phrase["es"].count("·") <= 2

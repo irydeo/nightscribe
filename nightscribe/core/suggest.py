@@ -501,6 +501,45 @@ def _fragments(t, cfg=None):
         if mag <= 10:
             frags.append((f"Visible a magnitud {mag:.1f}",
                           f"Visible at magnitude {mag:.1f}"))
+    return _campaign_fragments(t) + frags
+
+
+def _campaign_fragments(t):
+    # Campaign signals, heaviest first (ADR-035). They lead the why-phrase:
+    # the campaign is the reason the target is listed at all (V-d).
+    # @args: t - target dict with a "campaign" sub-dict (maybe empty)
+    # @return: list of (es, en) fragment pairs
+    c = t.get("campaign") or {}
+    if not c:
+        return []
+    frags = []
+    ev = c.get("event") or {}
+    if ev:
+        d = ev.get("delta_mag") or 0.0
+        if ev.get("direction") == "drop":
+            frags.append((f"¡Posible descenso de brillo (Δ≈+{d:.1f} mag en tu última medida)! El protocolo pide subir la cadencia",
+                          f"Possible brightness drop (Δ≈+{d:.1f} mag on your latest point)! The protocol calls for a higher cadence"))
+        else:
+            frags.append((f"¡Posible erupción o subida de brillo (Δ≈−{d:.1f} mag)! Máxima prioridad esta noche",
+                          f"Possible outburst (Δ≈−{d:.1f} mag)! Top priority tonight"))
+    if c.get("never_visited"):
+        frags.append((f"Campaña {c['name']}: sin ninguna visita todavía — la primera medida abre la serie",
+                      f"Campaign {c['name']}: no visits yet — the first measurement opens the series"))
+    elif c.get("overdue_days"):
+        frags.append((f"Campaña {c['name']}: {c['overdue_days']} noches sin medida (cadencia: {c['cadence_nights']})",
+                      f"Campaign {c['name']}: {c['overdue_days']} nights without a measurement (cadence: {c['cadence_nights']})"))
+    v = t.get("variable") or {}
+    nxt = v.get("next_extremum") or {}
+    if nxt.get("days") is not None:
+        if nxt.get("kind") == "max":
+            frags.append((f"Máximo esperado en ~{nxt['days']:.0f} días",
+                          f"Maximum expected in ~{nxt['days']:.0f} days"))
+        else:
+            frags.append((f"Mínimo esperado en ~{nxt['days']:.0f} días",
+                          f"Minimum expected in ~{nxt['days']:.0f} days"))
+    if v.get("period_d"):
+        frags.append((f"Varía con un periodo de {v['period_d']:.1f} días",
+                      f"It varies with a {v['period_d']:.1f}-day period"))
     return frags
 
 

@@ -178,7 +178,16 @@ bundle vs hoja) — informativo, **nunca falla** por deriva.
 **Hecho cuando**: unitarios verdes (N→M) + `pytest tests/functional -k hads_live`
 verde con red.
 **Commit**: `Core: HADS workbook parsing — color priorities + monthly coverage (ADR-034, subplan H0.3)`
-**Estado**: pendiente
+**Estado**: **Hecho** (908→914). Hallazgos al inspeccionar el workbook real:
+colores de la leyenda = FF0000/FF9900/9900FF/0000FF puros (mapeo por tono
+con guarda de saturación/valor: el negro explícito 000000 daría hue=0=rojo
+falso); las pestañas-año tienen sección «Southern stars» tras la leyenda →
+fila de datos = A+B+C no vacías (nunca «parar en Legend»); las claves de
+`coverage` son strings para que el JSON de la caché no cambie la forma;
+coordenadas azules **hoy no hay ninguna** (todas observadas alguna vez) —
+el mecanismo queda listo para cuando Wils marque una; el GP And del bundle
+(1.89 h) **coincide con la pestaña 2026** (el 2.89 solo vive en la pestaña
+2010): el informe de deriva sale vacío.
 
 ---
 

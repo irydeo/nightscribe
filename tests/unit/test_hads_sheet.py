@@ -185,3 +185,104 @@ def test_workbook_cache_entry_expires(monkeypatch, tmp_db):
                    " WHERE key = 'hads:workbook'")
     hads_sheet.workbook()
     assert len(calls) == 2
+
+
+# ---------------- workbook -> catalog mapping (subplan H0.3) ----------------
+
+# style indices: s=1 red, s=2 orange, s=3 purple, s=4 blue, s=5 black
+_FLAG_FONTS = (None, "FF0000", "FF9900", "9900FF", "0000FF", "000000")
+
+
+def _star_row(name, ra, dec, period, name_style=None, ra_style=None,
+              months=()):
+    # @return: one catalog row as cell-xml list (months: 1-based Jan..Dec)
+    cells = [_cell("A1", name, style=name_style, kind="inlineStr"),
+             _cell("B1", ra, style=ra_style, kind="inlineStr"),
+             _cell("C1", dec, kind="inlineStr"),
+             _cell("D1", "10.4"), _cell("E1", "11.0"), _cell("F1", str(period))]
+    for m in months:
+        cells.append(_cell("GHIJKLMNOPQR"[m - 1] + "1", "JH",
+                           kind="inlineStr"))
+    return cells
+
+
+def _catalog_xlsx():
+    header = [_cell("A1", "vvs", kind="inlineStr"),
+              _cell("B1", "RA", kind="inlineStr"),
+              _cell("C1", "DEC", kind="inlineStr")]
+    rows_2026 = [
+        header,
+        _star_row("RED One", "00 55 18.1", "+23 09 49", 1.89,
+                  name_style=1, months=(3, 9)),
+        _star_row("BLUE One", "01 05 47.3", "+44 35 04", 2.27,
+                  ra_style=4),
+        _star_row("PLAIN One", "01 23 49.0", "-68 43 06", 2.20,
+                  name_style=5),                    # explicit black = no flag
+        [_cell("A1", "Legend", kind="inlineStr")],   # legend: not a star
+        [_cell("A1", "Southern stars", kind="inlineStr")],
+        _star_row("PURPLE One", "23 08 51.2", "+17 12 56", 1.75,
+                  name_style=3),
+    ]
+    rows_2025 = [header,
+                 _star_row("OLD One", "22 37 47.8", "+01 32 05", 1.46,
+                           name_style=2, months=(1,))]
+    return _make_xlsx([("2025", rows_2025), ("2026", rows_2026),
+                       ("Sheet13", [])],
+                      font_colors=_FLAG_FONTS)
+
+
+def test_parse_workbook_reads_catalog_from_the_latest_year_tab():
+    out = hads_sheet._parse_workbook(_catalog_xlsx())
+    assert out["fetched_year"] == 2026
+    names = [s["sheet_name"] for s in out["stars"]]
+    assert names == ["RED One", "BLUE One", "PLAIN One", "PURPLE One"]
+
+
+def test_parse_workbook_maps_legend_colors():
+    out = hads_sheet._parse_workbook(_catalog_xlsx())
+    by_name = {s["sheet_name"]: s for s in out["stars"]}
+    assert by_name["RED One"]["priority"] == "period_change"
+    assert by_name["BLUE One"]["observed"] is False
+    assert by_name["PURPLE One"]["multiperiodic_sheet"] is True
+    plain = by_name["PLAIN One"]           # black font carries no flag
+    assert plain["priority"] is None and plain["observed"] is True
+    assert by_name["RED One"]["period_h"] == 1.89
+
+
+def test_parse_workbook_coverage_counts_non_blank_months():
+    out = hads_sheet._parse_workbook(_catalog_xlsx())
+    assert out["coverage"]["2026"]["RED One"] == [3, 9]
+    assert out["coverage"]["2025"]["OLD One"] == [1]
+    assert "Legend" not in out["coverage"]["2026"]
+
+
+def test_parse_workbook_rejects_a_workbook_without_year_tabs():
+    data = _make_xlsx([("Only", [[_cell("A1", "x", kind="inlineStr")]])])
+    with pytest.raises(ValueError):
+        hads_sheet._parse_workbook(data)
+
+
+def test_parsed_uses_the_json_second_level_cache(monkeypatch, tmp_db):
+    monkeypatch.setattr(hads_sheet, "db", tmp_db)
+    calls = []
+    real_parse = hads_sheet._parse_workbook
+
+    def counting_parse(data):
+        calls.append(1)
+        return real_parse(data)
+
+    monkeypatch.setattr(hads_sheet, "_parse_workbook", counting_parse)
+    monkeypatch.setattr(hads_sheet, "workbook",
+                        lambda force=False: _catalog_xlsx())
+    first = hads_sheet.parsed()
+    second = hads_sheet.parsed()
+    assert first["fetched_year"] == 2026
+    assert second == first
+    assert len(calls) == 1                 # second call read the JSON cache
+
+
+def test_parsed_corrupt_workbook_never_poisons_the_cache(monkeypatch, tmp_db):
+    monkeypatch.setattr(hads_sheet, "db", tmp_db)
+    monkeypatch.setattr(hads_sheet, "workbook", lambda force=False: b"junk")
+    assert hads_sheet.parsed() is None
+    assert tmp_db.cache_get("hads:parsed") is None

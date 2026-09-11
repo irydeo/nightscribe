@@ -26,8 +26,11 @@ would do it too, but a runtime dependency just to read a handful of
 font colors is not worth it (decision H-j).
 """
 
+import colorsys
 import io
+import json
 import logging
+import re
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -185,3 +188,133 @@ def _cell_color(c, fonts, xfs):
     except (ValueError, IndexError):
         return None
     return fonts[font_id] if font_id < len(fonts) else None
+
+
+# ---------------- workbook → catalog mapping (decision H-i) ----------------
+
+# Legend colors as found in the real workbook (verified 2026-09-11 against
+# the live export): red FF0000 = period changes found, orange FF9900 =
+# possible changes, purple 9900FF = multiperiodic, blue 0000FF on the
+# COORDINATES = not yet observed. Cells explicitly black/gray (000000,
+# 1F1F1F, 999999) carry no flag, so the hue mapping below only applies to
+# saturated, non-dark colors.
+
+_YEAR_TAB = re.compile(r"^\d{4}$")
+_MONTH_COLS = "GHIJKLMNOPQR"          # G..R = Jan..Dec (position-based)
+
+
+def _to_float(text):
+    # @return: tolerant float (comma decimal, blanks) or None
+    if text is None:
+        return None
+    try:
+        return float(text.strip().replace(",", "."))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _flag_hue(rgb):
+    # @args: rgb - 6-hex font color or None
+    # @return: the color hue in degrees (0-360) for saturated, non-dark
+    #          colors; None for black/gray/unstyled cells (hue is
+    #          meaningless there — rgb_to_hsv reports 0 = red for black!)
+    if not rgb:
+        return None
+    try:
+        r, g, b = (int(rgb[i:i + 2], 16) / 255 for i in (0, 2, 4))
+    except ValueError:
+        return None
+    h, s, v = colorsys.rgb_to_hsv(r, g, b)
+    if s < 0.4 or v < 0.3:
+        return None
+    return h * 360
+
+
+def _is_data_row(row):
+    # A star row has a name AND coordinates; header rows (vvs/Ster/Star with
+    # B == "RA"), legend rows and section titles ("Southern stars") don't.
+    a = (row.get("A") or ("", None))[0]
+    b = (row.get("B") or ("", None))[0]
+    c = (row.get("C") or ("", None))[0]
+    return bool(a and a.strip() and b and b.strip() and b.strip() != "RA"
+                and c and c.strip())
+
+
+def _parse_star_row(row):
+    # One catalog row -> a star dict with the legend flags resolved.
+    # @return: dict or None when the row is not a data row
+    if not _is_data_row(row):
+        return None
+    name = row["A"][0].strip()
+    out = {"sheet_name": name,
+           "ra": row["B"][0].strip(), "dec": row["C"][0].strip(),
+           "max": _to_float((row.get("D") or (None,))[0]),
+           "min": _to_float((row.get("E") or (None,))[0]),
+           "period_h": _to_float((row.get("F") or (None,))[0]),
+           "priority": None, "observed": True, "multiperiodic_sheet": False}
+    hue = _flag_hue(row["A"][1])
+    if hue is not None:
+        if hue < 15 or hue > 340:
+            out["priority"] = "period_change"            # red: Priority!
+        elif 15 <= hue <= 45:
+            out["priority"] = "period_change_possible"   # orange: Priority!
+        elif 260 <= hue <= 320:
+            out["multiperiodic_sheet"] = True            # purple
+        else:
+            logger.debug("HADS: unknown name color #%s on %s",
+                         row["A"][1], name)
+    hue_b = _flag_hue(row["B"][1])
+    if hue_b is not None and 200 <= hue_b <= 260:
+        out["observed"] = False                          # blue coords
+    return out
+
+
+def _parse_workbook(data):
+    # Maps the workbook onto catalog + coverage.
+    # @args: data - raw xlsx bytes
+    # @return: {"fetched_year": int, "stars": [...], "coverage": {year_str: {
+    #          sheet_name: [covered months 1-12]}}}. The catalog comes from
+    #          the LATEST year tab (freshest periods and colors); coverage
+    #          is read from every year tab. Coverage years are strings so the
+    #          shape survives the JSON cache round-trip unchanged
+    sheets = _read_xlsx(data)
+    years = sorted(int(n) for n in sheets if _YEAR_TAB.match(n))
+    if not years:
+        raise ValueError("no year tabs found in the workbook")
+    stars = []
+    for row in sheets[str(years[-1])]:
+        star = _parse_star_row(row)
+        if star:
+            stars.append(star)
+    coverage = {}
+    for year in years:
+        cov = {}
+        for row in sheets[str(year)]:
+            if not _is_data_row(row):
+                continue
+            name = row["A"][0].strip()
+            cov[name] = [m for m, col in enumerate(_MONTH_COLS, 1)
+                         if (row.get(col) or ("", None))[0]
+                         and row[col][0].strip()]
+        coverage[str(year)] = cov
+    return {"fetched_year": years[-1], "stars": stars, "coverage": coverage}
+
+
+def parsed(force=False):
+    # The parsed workbook, JSON-cached so the ~1-2 s XLSX parse happens once
+    # per TTL, not per Tonight run (two-level cache, decision H-j).
+    # @args: force - True bypasses both cache reads (still stores fresh)
+    # @return: the _parse_workbook dict, or None on network/parse failure
+    cached = None if force else db.cache_get("hads:parsed")
+    if cached:
+        return json.loads(cached[0].decode("utf-8"))
+    data = workbook(force=force)
+    if data is None:
+        return None
+    try:
+        result = _parse_workbook(data)
+    except (ValueError, KeyError, zipfile.BadZipFile) as err:
+        logger.warning("HADS sheet parse failed: %s", err)
+        return None                              # never cache a failure
+    db.cache_put("hads:parsed", "hads", json.dumps(result).encode("utf-8"))
+    return result

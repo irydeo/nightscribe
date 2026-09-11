@@ -89,4 +89,4 @@ periodo y «pulsa»/«pulsat»; el tuit ≤ 280 caracteres; hashtags incluyen
 
 **Hecho cuando**: tests verdes; suite verde (N→M).
 **Commit**: `Tests: HADS post/tweet rendering (ADR-034, subplan C.3)`
-**Estado**: pendiente
+**Estado**: **Hecho** (967→969; `post.py` intacto, como mandaba la tarjeta)

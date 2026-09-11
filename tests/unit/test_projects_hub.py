@@ -1426,3 +1426,18 @@ def _write_simple_fits(path, data):
     from pathlib import Path
     Path(path).write_bytes(hdr_bytes + body)
     return path
+
+
+def test_create_project_keeps_variable_and_campaign_context(window):
+    from nightscribe.gui import main_window as mw
+    from nightscribe.core import project as proj_mod
+    t = {"kind": "variable", "name": "T CrB", "mag": 10.1,
+         "ra_deg": 239.9, "dec_deg": 25.9, "project_id": 7,
+         "variable": {"period_d": 227.55, "var_type": "NR"},
+         "campaign": {"id": 1, "name": "Campaña T CrB"}}
+    p = window._create_project(t)
+    assert p is not None and p["kind"] == "variable"
+    ctx = proj_mod.get(mw.db, p["id"])["context"]
+    assert ctx["variable"]["period_d"] == 227.55
+    assert ctx["campaign"]["name"] == "Campaña T CrB"
+    assert ctx["project_id"] == 7

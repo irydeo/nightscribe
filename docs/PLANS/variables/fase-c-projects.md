@@ -424,7 +424,7 @@ donde `window_db(window)` no existe: usa directamente el patrón del fichero
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: variable/campaign keys in the project context snapshot (ADR-035, subplan VC.3)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1060 → 1061)
 
 ---
 

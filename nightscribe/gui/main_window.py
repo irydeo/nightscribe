@@ -4447,8 +4447,9 @@ class MainWindow(QMainWindow):
                  "disc_date",
                  "rate_arcsec_min", "nobs", "moid", "h",
                  "nf_score", "nf_priority", "neocp", "pccp_score",
-                 "perihelion_date", "transit", "approach", "hads")
-                if target.get(k) is not None}
+                  "perihelion_date", "transit", "approach", "hads",
+                  "variable", "campaign", "project_id")
+                 if target.get(k) is not None}
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()

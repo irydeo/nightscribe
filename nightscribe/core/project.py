@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 # the session and exporting/running it against CCDciel is one step now.
 
 STEPS = ("plan", "process", "publish")
-VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit", "hads")
+VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit", "hads", "variable")
 
 STEP_PENDING = "pending"
 STEP_CURRENT = "current"
@@ -54,6 +54,7 @@ OUTCOMES = {
     "pccp": ("confirmed", "false_positive", "lost", "completed"),
     "transit": ("completed", "reported_exoclock", "abandoned"),
     "hads": ("completed", "reported_aavso", "abandoned"),
+    "variable": ("caught", "not_caught", "completed", "abandoned"),
 }
 OUTCOME_DEFAULT = ("completed", "abandoned")
 
@@ -75,12 +76,14 @@ def _row_to_project(row):
     # @return: project dict from a SELECT row
     # Row order: id, kind, object_name, status, created, updated, context,
     # root_dir (ADR-032, the explicit container folder), closed_at, outcome,
-    # tags, favorite (Track A columns, nullable).
+    # tags, favorite (Track A columns, nullable), campaign_id (ADR-035, the
+    # observation campaign the project hangs from; NULL if none).
     return {"id": row[0], "kind": row[1], "object_name": row[2],
             "status": row[3], "created": row[4], "updated": row[5],
             "context": json.loads(row[6] or "{}"), "root_dir": row[7],
             "closed_at": row[8], "outcome": row[9],
-            "tags": row[10] or "", "favorite": bool(row[11])}
+            "tags": row[10] or "", "favorite": bool(row[11]),
+            "campaign_id": row[12]}
 
 
 def _row_to_step(row):
@@ -96,10 +99,11 @@ def _row_to_file(row):
             "kind": row[3], "created": row[4]}
 
 
-def create(db, kind, object_name, context=None):
+def create(db, kind, object_name, context=None, campaign_id=None):
     # Creates a project with all steps initialised; the first step is current.
     # @args: db - Database, kind - one of VALID_KINDS, object_name - target,
-    #        context - dict snapshot from the planner (coords, mag, rate...)
+    #        context - dict snapshot from the planner (coords, mag, rate...),
+    #        campaign_id - int or None (ADR-035, the campaign it hangs from)
     # @return: full project dict (with steps and files), or None on bad kind
     if kind not in VALID_KINDS:
         logger.warning("unknown project kind: %s", kind)
@@ -111,8 +115,8 @@ def create(db, kind, object_name, context=None):
     root = config.get("projects_root") or str(paths.data_dir() / "projects")
     cur = db.execute(
         "INSERT INTO projects (kind, object_name, status, created, updated,"
-        " context, root_dir) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (kind, object_name, STATUS_ACTIVE, now, now, ctx, root),
+        " context, root_dir, campaign_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (kind, object_name, STATUS_ACTIVE, now, now, ctx, root, campaign_id),
     )
     pid = cur.lastrowid
     for i, step in enumerate(STEPS):
@@ -147,17 +151,18 @@ def set_root_dir(db, project_id, path):
     return get(db, project_id)
 
 
-def list_projects(db, status=None, kind=None, search=None, tags=None,
-                  favorites_first=False, order="updated"):
+def list_projects(db, status=None, kind=None, campaign_id=None, search=None,
+                  tags=None, favorites_first=False, order="updated"):
     # @args: db - Database, status - active|done|archived or None for all,
     #        kind - filter by VALID_KINDS entry or None,
+    #        campaign_id - int or None (filter by observation campaign),
     #        search - case-insensitive substring on object_name or None,
     #        tags - substring to match against the tags column or None,
     #        favorites_first - ORDER BY favorite DESC before the chosen order,
     #        order - "updated" | "created" | "name"
     # @return: list of project dicts (without steps/files)
     cols = ("id, kind, object_name, status, created, updated, context,"
-            " root_dir, closed_at, outcome, tags, favorite")
+            " root_dir, closed_at, outcome, tags, favorite, campaign_id")
     where, params = [], []
     if status:
         where.append("status=?")
@@ -165,6 +170,9 @@ def list_projects(db, status=None, kind=None, search=None, tags=None,
     if kind:
         where.append("kind=?")
         params.append(kind)
+    if campaign_id:
+        where.append("campaign_id=?")
+        params.append(campaign_id)
     if search:
         where.append("LOWER(object_name) LIKE ?")
         params.append(f"%{search.lower()}%")
@@ -189,8 +197,8 @@ def get(db, project_id):
     # @return: project dict with steps and files, or None if not found
     row = db.execute(
         "SELECT id, kind, object_name, status, created, updated, context,"
-        " root_dir, closed_at, outcome, tags, favorite FROM projects"
-        " WHERE id=?",
+        " root_dir, closed_at, outcome, tags, favorite, campaign_id"
+        " FROM projects WHERE id=?",
         (project_id,),
     ).fetchone()
     if not row:

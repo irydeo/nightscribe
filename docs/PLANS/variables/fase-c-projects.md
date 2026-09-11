@@ -1286,7 +1286,7 @@ def test_hub_filters_projects_by_campaign(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign filter in the projects hub (ADR-035, subplan VC.9)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1073 → 1074)
 
 ---
 

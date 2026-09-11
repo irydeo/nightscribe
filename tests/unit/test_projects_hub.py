@@ -1452,3 +1452,35 @@ def test_project_header_shows_campaign_badge(window):
                         campaign_id=cid)
     window._render_project_header(proj_mod.get(mw.db, p["id"]))
     assert "Campaña T CrB" in window.projects.lbl_header.text()
+
+
+def test_hub_filters_projects_by_campaign(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+
+    from PySide6.QtCore import Qt
+
+    def _project_names(w):
+        out = []
+        for i in range(w.projects.lst_projects.count()):
+            item = w.projects.lst_projects.item(i)
+            if item.flags() != Qt.NoItemFlags:      # skip year headers
+                out.append(item.text())
+        return out
+
+    cid = camp_mod.create(mw.db, "Campaña VC9")
+    proj_mod.create(mw.db, "variable", "V Ceti VC9", {}, campaign_id=cid)
+    proj_mod.create(mw.db, "variable", "Wee 9", {})
+    window.on_refresh_projects()
+    names = _project_names(window)
+    assert any("V Ceti VC9" in n for n in names)
+    assert any("Wee 9" in n for n in names)
+    idx = window.projects.cmb_campaign.findText("Campaña VC9")
+    assert idx >= 1
+    window.projects.cmb_campaign.setCurrentIndex(idx)
+    window.on_refresh_projects()
+    names = _project_names(window)
+    assert any("V Ceti VC9" in n for n in names)
+    assert not any("Wee 9" in n for n in names)
+    window.projects.cmb_campaign.setCurrentIndex(0)

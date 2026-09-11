@@ -466,6 +466,8 @@ class MainWindow(QMainWindow):
         p.btn_refresh.clicked.connect(self.on_refresh_projects)
         p.cmb_filter.currentIndexChanged.connect(self.on_refresh_projects)
         p.btn_campaigns.clicked.connect(self._tools_campaigns)
+        p.cmb_campaign.currentIndexChanged.connect(
+            lambda _i: self.on_refresh_projects())
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
         p.tabs_steps.currentChanged.connect(self._project_step_changed)
         p.btn_prev.clicked.connect(self._project_prev)
@@ -1645,7 +1647,23 @@ class MainWindow(QMainWindow):
         if index == 1:
             self.on_refresh_projects()
 
+    def _rebuild_campaign_filter(self):
+        # Refills the hub's campaign combo, keeping the current selection.
+        # @return: None
+        from ..core import campaign as _camp
+        cmb = self.projects.cmb_campaign
+        current = cmb.currentData()
+        cmb.blockSignals(True)
+        cmb.clear()
+        cmb.addItem(self.tr("All campaigns"), None)
+        for c in _camp.list_campaigns(db):
+            cmb.addItem(c["name"], c["id"])
+        idx = cmb.findData(current)
+        cmb.setCurrentIndex(idx if idx >= 0 else 0)
+        cmb.blockSignals(False)
+
     def on_refresh_projects(self):
+        self._rebuild_campaign_filter()
         idx = self.projects.cmb_filter.currentIndex()
         statuses = ("active", None, "done", "archived")
         status = statuses[idx] if idx < len(statuses) else None
@@ -1656,6 +1674,7 @@ class MainWindow(QMainWindow):
         kind = kinds[kind_idx] if kind_idx < len(kinds) else None
         search = self.projects.edt_search.text().strip() or None
         tag = self.projects.edt_tag.text().strip() or None
+        camp_id = self.projects.cmb_campaign.currentData()
         sort_idx = self.projects.cmb_sort.currentIndex()
         orders = ("updated", "created", "name")
         order = orders[sort_idx] if sort_idx < len(orders) else "updated"
@@ -1666,6 +1685,7 @@ class MainWindow(QMainWindow):
         config.set("projects_filter_fav", favorites)
         projects_list = project.list_projects(
             db, status, kind=kind, search=search, tags=tag,
+            campaign_id=camp_id,
             favorites_first=favorites, order=order)
         lst = self.projects.lst_projects
         # preserve the selected project across the refresh (the list reloads

@@ -47,6 +47,11 @@
            <property name="maximumWidth"><number>80</number></property>
           </widget>
          </item>
+         <item>
+          <widget class="QComboBox" name="cmb_campaign">
+           <item><property name="text"><string>All campaigns</string></property></item>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>

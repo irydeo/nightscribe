@@ -185,7 +185,7 @@ def test_no_campaigns_no_targets(db):
 en VB.2; mientras tanto cae al fallback `phases.get(key, key)` —
 `main_window.py:894` — aceptable en rama.)
 **Commit**: `Core: campaigns night-planner phase — due projects as Tonight targets (ADR-035, subplan VA.1)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 1025→1032)
 
 ---
 

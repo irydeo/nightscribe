@@ -15,7 +15,7 @@ import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import coords, dates, exposure, hads, horizon, transits
+from . import campaign, coords, dates, exposure, hads, horizon, transits
 from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
                       rochester, sbdb)
 
@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 # the GUI progress bar total). Scoring is the final phase, emitted by the
 # worker after build_tonight returns. The GUI keeps the human labels (they
 # must be literal tr() strings so lupdate sees them).
-PHASES = ("neo", "sn", "comet", "pccp", "transit", "hads", "approach",
-          "scoring")
+PHASES = ("neo", "sn", "comet", "pccp", "transit", "hads", "campaigns",
+          "approach", "scoring")
 
 # Builds the raw list of tonight's targets from every source. Each target is
 # a flat dict; scoring lives in suggest.py. A source that fails simply
@@ -68,7 +68,9 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
         (6, "hads",
          lambda: _hads_targets(lat, lon, date, hor, limit_mag, margin,
                                _transit_plate_scale(cfg))),
-        (7, "approach",
+        (7, "campaigns",
+         lambda: _campaign_targets(cfg, lat, lon, date, hor, margin)),
+        (8, "approach",
          lambda: _approach_alerts()),
     )
     for idx, key, fetch in stages:
@@ -437,6 +439,49 @@ def _hads_targets(lat, lon, date, hor, limit_mag=20.0, margin=0.0,
                      "multiperiodic": star.get("multiperiodic"),
                      "non_radial": star.get("non_radial"),
                      "covered_this_month": d["covered_this_month"]},
+        })
+    return out
+
+
+def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
+    # Tonight from the observer's own commitments (ADR-035, V-d): the due
+    # projects of the active campaigns. Fully local (SQLite + sky maths) —
+    # no network, and nothing breaks without one. Each target re-surfaces
+    # an EXISTING project, so the Explore CTA will offer "Continue
+    # project" (phase E machinery, gui/main_window.py).
+    # @args: db_obj - Database (tests inject a temp one; default: shared)
+    if db_obj is None:
+        from .db import db as db_obj
+    limit_mag = float(cfg.get("limit_mag", 20.0))
+    out = []
+    for due in campaign.due_campaigns(db_obj):
+        camp, proj = due["campaign"], due["project"]
+        ctx = proj.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None or dec is None:
+            logger.debug("campaign %s: project %s has no coordinates",
+                         camp["name"], proj["object_name"])
+            continue
+        mag = ctx.get("mag")
+        try:
+            mag = float(mag) if mag is not None else None
+        except (TypeError, ValueError):
+            mag = None
+        if mag is not None and mag > limit_mag:
+            continue           # known brightness: hard gate (SN-style, ADR-025)
+        vis = _visibility(ra, dec, lat, lon, date, hor, margin)
+        if vis.get("window_start") is None:
+            continue           # not up tonight
+        out.append({
+            "id": proj["object_name"], "kind": proj["kind"],
+            "name": proj["object_name"], "mag": mag,
+            "ra_deg": ra, "dec_deg": dec, "project_id": proj["id"],
+            **vis,
+            "campaign": {"id": camp["id"], "name": camp["name"],
+                         "overdue_days": due["overdue_days"],
+                         "cadence_nights": due["cadence_nights"],
+                         "never_visited": due["never_visited"],
+                         "event": None},
         })
     return out
 

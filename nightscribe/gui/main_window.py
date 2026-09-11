@@ -1648,7 +1648,8 @@ class MainWindow(QMainWindow):
         status = statuses[idx] if idx < len(statuses) else None
         # A3: classification — kind, search, favorites, sort
         kind_idx = self.projects.cmb_kind.currentIndex()
-        kinds = (None, "sn", "neo", "comet", "pccp", "transit", "hads")
+        kinds = (None, "sn", "neo", "comet", "pccp", "transit", "hads",
+                 "variable")
         kind = kinds[kind_idx] if kind_idx < len(kinds) else None
         search = self.projects.edt_search.text().strip() or None
         tag = self.projects.edt_tag.text().strip() or None

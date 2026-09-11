@@ -215,8 +215,9 @@
             <item row="1" column="1"><widget class="QCheckBox" name="chk_kind_pccp"><property name="text"><string>PCCP candidates</string></property></widget></item>
             <item row="2" column="0"><widget class="QCheckBox" name="chk_kind_transit"><property name="text"><string>Exoplanet transits</string></property></widget></item>
             <item row="2" column="1"><widget class="QCheckBox" name="chk_kind_alert"><property name="text"><string>Close approaches (alerts)</string></property></widget></item>
-            <item row="3" column="0"><widget class="QCheckBox" name="chk_kind_hads"><property name="text"><string>HADS variable stars</string></property></widget></item>
-           </layout>
+             <item row="3" column="0"><widget class="QCheckBox" name="chk_kind_hads"><property name="text"><string>HADS variable stars</string></property></widget></item>
+             <item row="3" column="1"><widget class="QCheckBox" name="chk_kind_variable"><property name="text"><string>Variable stars</string></property></widget></item>
+            </layout>
           </item>
           <item>
            <widget class="QLabel" name="lblH_kinds">

@@ -278,7 +278,8 @@ ver abajo).
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_settings_tabs.py tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui/Config: variable checkbox in Settings + project filter combo (ADR-035, subplan VB.4)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11)
+**Nota**: `test_settings_tabs.py` no falló (el wiring genérico por `KIND_ORDER` cubre el checkbox nuevo), así que no hizo falta la edición puntual prevista en el paso 4.
 
 ---
 

@@ -81,6 +81,33 @@ proviene de su programa de monitorización.
 
 ## 3. Ficheros de datos en el repo
 
+### Fuente de verdad y refresco (2026-09-11, decisión H-b/H-j)
+
+El **catálogo vivo es el libro de Google Sheets de Patrick Wils**:
+<https://docs.google.com/spreadsheets/d/1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/>
+— público, una pestaña por año (2010…hoy), actualizado a diario. NightScribe lo
+descarga en runtime como `.xlsx` (el único export que trae los colores de
+fuente), lo cachea 12 h vía `core/db.py` y lo parsea solo con la stdlib en
+`core/sources/hads_sheet.py` (caché de dos niveles: XLSX crudo + JSON parseado
+— el parseo de ~1-2 s ocurre una vez al día). El CSV empaquetado de abajo es el
+**respaldo offline y fuente de aliases**; el merge vive en `core/hads.py`
+(`catalog()`).
+
+**Leyenda de colores** (color de fuente del nombre / coordenadas en el libro):
+
+| Color | Significado | Prioridad |
+|---|---|---|
+| Nombre rojo | cambios de periodo encontrados | **¡Prioridad!** |
+| Nombre naranja | cambios de periodo posibles | **¡Prioridad!** |
+| Coordenadas azules | aún no observada en el programa | oportunidad (+6) |
+| Nombre morado | modos múltiples de pulsación (observar en noches consecutivas) | ninguna |
+
+Para refrescar el snapshot empaquetado cuando derive: ejecuta el test funcional
+y lee su informe de deriva informativo —
+`.venv/bin/python -m pytest tests/functional -k hads_live -s` — y edita a mano
+las pocas filas que hayan derivado (periodos/magnitudes; los colores nunca
+viven en el CSV, llegan de la hoja viva en runtime).
+
 ### `nightscribe/assets/HADS-stars.csv` (catálogo runtime, v1)
 
 168 estrellas. **ASCII, saltos de línea CRLF, algunos campos `Name` entre
@@ -98,8 +125,9 @@ comillas** (contienen comas dentro de los alias `(=…=…)`). Columnas:
 Derivados: `amp = Max − Min`, `mag_median = (Max+Min)/2`.
 
 Origen de la copia: el espacio de trabajo del observatorio
-`/home/boreal/Develop/astronomy/ns-hads`. Atribución añadida a
-`nightscribe/assets/ATTRIBUTION.txt`.
+`/home/boreal/Develop/astronomy/ns-hads` (snapshot; la hoja viva de arriba está
+más al día y manda en runtime — ver §Fuente de verdad y refresco). Atribución
+añadida a `nightscribe/assets/ATTRIBUTION.txt`.
 
 ### `nightscribe/assets/hads-coverage/HADS-Project-YYYY.csv` (2011–2026, dato stretch)
 

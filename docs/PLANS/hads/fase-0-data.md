@@ -282,4 +282,4 @@ fabricada y `when` fijado; sawtooth: máximo de luz (mínimo mag) en
 **Hecho cuando**: enlaces correctos, bilingüe ES/EN; suite verde (sin cambios
 de código).
 **Commit**: `Docs: HADS source-of-truth sheet + refresh procedure + DATA_SOURCES entry (ADR-034, subplan H0.5)`
-**Estado**: pendiente
+**Estado**: **Hecho** (suite 925, sin cambios de código)

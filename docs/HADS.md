@@ -80,6 +80,32 @@ monitoring programme.
 
 ## 3. Data files in the repo
 
+### Source of truth & refresh (2026-09-11, decision H-b/H-j)
+
+The **live catalog is Patrick Wils' Google Sheets workbook**:
+<https://docs.google.com/spreadsheets/d/1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/>
+— public, one tab per year (2010…now), updated daily. NightScribe downloads it
+at runtime as `.xlsx` (the only export carrying the font colors), caches it
+12 h via `core/db.py` and parses it stdlib-only in `core/sources/hads_sheet.py`
+(two-level cache: raw XLSX + parsed JSON, so the ~1-2 s parse happens once a
+day). The bundled CSV below is the **offline fallback and alias source**; the
+merge lives in `core/hads.py` (`catalog()`).
+
+**Color legend** (star name / coordinates font color in the workbook):
+
+| Color | Meaning | Priority |
+|---|---|---|
+| Red name | period changes found | **Priority!** |
+| Orange name | period changes possible | **Priority!** |
+| Blue coordinates | not yet observed in the programme | opportunity (+6) |
+| Purple name | multiple pulsation modes (observe on consecutive nights) | none |
+
+To refresh the bundled snapshot when it drifts: run the functional test and
+read its informational drift report —
+`.venv/bin/python -m pytest tests/functional -k hads_live -s` — then hand-edit
+the few drifted rows (periods/magnitudes; the colors never live in the CSV,
+they come from the live sheet at runtime).
+
 ### `nightscribe/assets/HADS-stars.csv` (runtime catalog, v1)
 
 168 stars. **ASCII, CRLF line endings, some `Name` fields are quoted** (they
@@ -96,7 +122,9 @@ contain commas inside `(=…=…)` aliases). Columns:
 
 Derived: `amp = Max − Min`, `mag_median = (Max+Min)/2`.
 
-Copy source: the observatory workspace `/home/boreal/Develop/astronomy/ns-hads`.
+Copy source: the observatory workspace `/home/boreal/Develop/astronomy/ns-hads`
+(snapshot; the live sheet above is fresher and wins at runtime — see
+§Source of truth & refresh).
 Attribution added to `nightscribe/assets/ATTRIBUTION.txt`.
 
 ### `nightscribe/assets/hads-coverage/HADS-Project-YYYY.csv` (2011–2026, stretch data)

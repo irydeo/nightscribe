@@ -62,6 +62,19 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   priority, `min_telescope_inches`, O-C drift, star magnitude, coordinates.
 - TTL: 24 h. Transit times are computed locally (t0 + n·P) — see `core/transits.py`.
 
+### HADS catalogue (P. Wils / VVS) — `hads_sheet.py` — high-amplitude δ Scuti stars
+
+- `https://docs.google.com/spreadsheets/d/1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/export?format=xlsx`
+  — public Google Sheets workbook (one tab per year, updated daily by the
+  programme coordinator): star name (with aliases), RA/Dec, Max/Min magnitudes,
+  period (h), **font-color priorities** (red/orange name = period changes
+  found/possible — priority!; blue coordinates = not yet observed; purple name
+  = multiperiodic) and the monthly observer-coverage cells.
+- TTL: 12 h, two-level cache (raw XLSX + parsed JSON). Parsed with stdlib
+  `zipfile`+`xml.etree` (no openpyxl at runtime). The bundled snapshot
+  `assets/HADS-stars.csv` (168 stars, rich aliases) is the offline fallback;
+  the merge lives in `core/hads.py` (ADR-034).
+
 ## Object data sources (feed "Explore" and "Post")
 
 ### JPL SBDB — `sbdb.py` — small-body identity and physical data

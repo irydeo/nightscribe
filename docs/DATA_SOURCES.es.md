@@ -65,6 +65,20 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
 - TTL: 24 h. Los instantes de tránsito se calculan en local (t0 + n·P) — ver
   `core/transits.py`.
 
+### Catálogo HADS (P. Wils / VVS) — `hads_sheet.py` — δ Scuti de alta amplitud
+
+- `https://docs.google.com/spreadsheets/d/1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/export?format=xlsx`
+  — libro público de Google Sheets (una pestaña por año, actualizado a diario
+  por el coordinador del programa): nombre (con aliases), RA/Dec, magnitudes
+  Max/Min, periodo (h), **prioridades por color de fuente** (nombre rojo/naranja
+  = cambios de periodo encontrados/posibles — ¡prioridad!; coordenadas azules =
+  aún no observada; nombre morado = multiperiódica) y las celdas mensuales de
+  cobertura por observador.
+- TTL: 12 h, caché de dos niveles (XLSX crudo + JSON parseado). Parseo con
+  `zipfile`+`xml.etree` de la stdlib (sin openpyxl en runtime). El snapshot
+  empaquetado `assets/HADS-stars.csv` (168 estrellas, aliases ricos) es el
+  respaldo offline; el merge vive en `core/hads.py` (ADR-034).
+
 ## Fuentes de datos de objeto (alimentan «Explora» y «Post»)
 
 ### JPL SBDB — `sbdb.py` — identidad y datos físicos de cuerpos menores

@@ -167,6 +167,10 @@ TABLE_COLS = {
              ("Period", "period"), ("Amp", "amp"), ("Cycles", "cycles"),
              ("Max alt", "max_alt"), ("Best time (UTC)", "best_time"),
              ("Observed", "obs")],
+    "variable": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
+                 ("Period (d)", "vperiod"), ("Next extremum", "vext"),
+                 ("Campaign", "camp"), ("Max alt", "max_alt"),
+                 ("Best time (UTC)", "best_time"), ("Observed", "obs")],
     "alert": [("Object", "name"), ("Approach date", "adate"),
               ("Distance (LD)", "ald"), ("Diameter (m)", "adiam"),
               ("Max mag", "amag"), ("Velocity (km/s)", "avel"),
@@ -180,7 +184,8 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
 
 # Canonical kind order (theme.KIND_LABELS order, ADR-026): the tonight filter
 # combo and the settings whitelist stay in the same order wherever shown.
-KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads"]
+KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
+              "variable"]
 
 
 class _ClickableFrame(QFrame):
@@ -861,6 +866,27 @@ class MainWindow(QMainWindow):
             wave.cubicTo(QPointF(cx + 6, size - 11), QPointF(cx + 4, size - 6),
                          QPointF(size - 3, size - 6))
             p.drawPath(wave)
+        elif kind == "variable":
+            # long-period variable: 4-point star + a slow wave underneath
+            p.setBrush(QBrush(color))
+            path = QPainterPath()
+            path.moveTo(QPointF(cx, 4))
+            path.lineTo(QPointF(cx + 3, cy - 5))
+            path.lineTo(QPointF(size - 4, cy - 5))
+            path.lineTo(QPointF(cx + 3, cy - 5 + 3))
+            path.lineTo(QPointF(cx, cy + 1))
+            path.lineTo(QPointF(cx - 3, cy - 2))
+            path.lineTo(QPointF(4, cy - 5))
+            path.lineTo(QPointF(cx - 3, cy - 5))
+            path.closeSubpath()
+            p.drawPath(path)
+            p.setPen(QPen(color, 1.5))
+            wave = QPainterPath()
+            wave.moveTo(QPointF(3, size - 8))
+            wave.cubicTo(QPointF(cx - 2, size - 2),
+                         QPointF(cx + 2, size - 12),
+                         QPointF(size - 3, size - 7))
+            p.drawPath(wave)
         p.end()
         return pix
 
@@ -888,6 +914,7 @@ class MainWindow(QMainWindow):
             "pccp": self.tr("Checking PCCP candidates…"),
             "transit": self.tr("Scanning exoplanet transits…"),
             "hads": self.tr("Checking HADS variables…"),
+            "campaigns": self.tr("Checking campaign targets…"),
             "approach": self.tr("Fetching close approaches…"),
             "scoring": self.tr("Scoring targets…"),
         }
@@ -1432,7 +1459,9 @@ class MainWindow(QMainWindow):
                     "pccp": self.tr("Possible comet"),
                     "transit": self.tr("Transit"),
                     "alert": self.tr("Close approach"),
-                    "hads": self.tr("HADS star")}.get(t["kind"], t["kind"])
+                    "hads": self.tr("HADS star"),
+                    "variable": self.tr("Variable star")
+                    }.get(t["kind"], t["kind"])
         if key == "score":
             return float(score)
         if key == "mag":
@@ -1491,6 +1520,19 @@ class MainWindow(QMainWindow):
         if key == "cycles":
             c = (t.get("hads") or {}).get("cycles")
             return f"{c:.1f}" if c else "—"
+        if key == "vperiod":
+            per = (t.get("variable") or {}).get("period_d")
+            return f"{per:.1f} d" if per else "—"
+        if key == "vext":
+            nxt = (t.get("variable") or {}).get("next_extremum") or {}
+            days = nxt.get("days")
+            if days is None:
+                return "—"
+            lab = self.tr("max") if nxt.get("kind") == "max" \
+                else self.tr("min")
+            return f"{lab} ~{days:.0f} d"
+        if key == "camp":
+            return (t.get("campaign") or {}).get("name") or "—"
         if key == "adate":
             return (t.get("approach") or {}).get("date", "—")
         if key == "ald":
@@ -1643,7 +1685,8 @@ class MainWindow(QMainWindow):
                 lst.addItem(header)
             kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
                           "pccp": "PCCP", "transit": self.tr("Transit"),
-                          "hads": "HADS"}.get(
+                          "hads": "HADS",
+                          "variable": self.tr("Variable")}.get(
                           p["kind"], p["kind"])
             cur = project.current_step(db, p["id"]) or "done"
             step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
@@ -1812,7 +1855,8 @@ class MainWindow(QMainWindow):
         kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",
                       "pccp": "Possible comet",
                       "transit": "Exoplanet transit",
-                      "hads": "HADS"}.get(p["kind"], p["kind"])
+                      "hads": "HADS", "variable": self.tr("Variable star")
+                      }.get(p["kind"], p["kind"])
         cur = project.current_step(db, p["id"])
         step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
         header = f"<b>[{kind_label}] {p['object_name']}</b>"

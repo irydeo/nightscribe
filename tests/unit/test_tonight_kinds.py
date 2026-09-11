@@ -76,7 +76,8 @@ def window():
     real = cfgmod.config.is_configured
     cfgmod.config.is_configured = lambda: False
     cfgmod.config._data["enabled_kinds"] = list(
-        ["neo", "sn", "comet", "pccp", "transit", "alert", "hads"])
+        ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
+         "variable"])
     cfgmod.config._data["tonight_kind"] = ""
     w = MainWindow()
     cfgmod.config.is_configured = real
@@ -84,7 +85,8 @@ def window():
     yield w
     # leave the suite in the default state
     cfgmod.config._data["enabled_kinds"] = list(
-        ["neo", "sn", "comet", "pccp", "transit", "alert", "hads"])
+        ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
+         "variable"])
     cfgmod.config._data["tonight_kind"] = ""
     w.close()
 
@@ -136,12 +138,12 @@ def test_combo_lives_in_the_header_and_lists_the_kinds(window):
     # direct child of the tab (in the header row)
     assert window.tonight.cmb_filter.parentWidget() is window.tonight
     from nightscribe.gui import theme
-    # items: "All" + the seven enabled kinds, in KIND_ORDER, theme labels
+    # items: "All" + the eight enabled kinds, in KIND_ORDER, theme labels
     items = [window.tonight.cmb_filter.itemText(i)
              for i in range(window.tonight.cmb_filter.count())]
     expected = ["All"] + [theme.KIND_LABELS[k] for k in
                           ["neo", "sn", "comet", "pccp", "transit", "alert",
-                           "hads"]]
+                           "hads", "variable"]]
     assert items == expected, f"combo items {items} != {expected}"
 
 
@@ -219,7 +221,8 @@ def test_whitelist_limits_the_combo(window):
         # grow the whitelist back: the combo (and both views) grow with it
         cfgmod.config._data["enabled_kinds"] = list(old)
         window._apply_kind_filter()
-        assert window.tonight.cmb_filter.count() == 8
+        # "All" + the eight enabled kinds
+        assert window.tonight.cmb_filter.count() == 9
         assert len(_row_names(window)) == len(TARGETS)
     finally:
         cfgmod.config._data["enabled_kinds"] = old

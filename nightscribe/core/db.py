@@ -38,7 +38,9 @@ SOURCE_TTL = {
     "pccp": 6 * HOUR,
     "exoclock": 24 * HOUR,
     "hads": 12 * HOUR,     # Wils updates the sheet daily; Tonight is a
-                           # nightly run, so 12 h keeps it fresh both ways
+                            # nightly run, so 12 h keeps it fresh both ways
+    "vsx": 7 * DAY,      # AAVSO VSX object data: stable for weeks
+    "surveys": 30 * DAY,  # survey light-curve context (ALeRCE/ZTF)
     "silso": 24 * HOUR,
     "sbdb": 7 * DAY,
     "simbad": 7 * DAY,

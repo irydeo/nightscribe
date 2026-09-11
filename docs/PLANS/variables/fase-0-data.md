@@ -1052,7 +1052,7 @@ def test_lookup_uses_the_cache_and_swallows_network_errors(monkeypatch):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_vsx.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core/Sources: AAVSO VSX client with cache + frozen fixtures (ADR-035, subplan V0.8)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 1022)
 
 ---
 

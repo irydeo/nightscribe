@@ -14,7 +14,7 @@
 import logging
 import re
 
-from . import orbits
+from . import hads, orbits
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,8 @@ def hook(e):
         t = d.get("unconfirmed") or {}
         return _transit_hook(t.get("name") or e.get("name"),
                              d.get("transit") or t.get("transit") or {})
+    if kind == "hads":
+        return _hads_hook(e.get("name") or "", d.get("hads") or {})
     if kind == "sun":
         return {"es": "Así amanece nuestra estrella esta semana.",
                 "en": "This is how our star looks this week."}
@@ -163,6 +165,8 @@ def fact_bullets(e):
         return _unconfirmed_facts(d["unconfirmed"]) + _safe_window_bullets(d)
     if kind in ("small_body", "comet"):
         return _small_body_facts(d) + _safe_window_bullets(d)
+    if kind == "hads":
+        return _hads_facts(d) + _safe_window_bullets(d)
     return _safe_window_bullets(d)
 
 
@@ -360,6 +364,110 @@ def _transit_detail(tr):
     return {"es": ", ".join(bits_es), "en": ", ".join(bits_en)}
 
 
+def _hads_hook(name, h):
+    # The HADS hook: a star you can watch pulsate live (ADR-034).
+    # @args: name - object name, h - the "hads" sub-dict (catalog + tonight)
+    # @return: {"es": str, "en": str}
+    per = h.get("period_h")
+    amp = h.get("amp")
+    if amp is None and h.get("max") is not None and h.get("min") is not None:
+        amp = h["min"] - h["max"]
+    who_es = f"la estrella {name}" if name else "esta estrella"
+    who_en = f"the star {name}" if name else "this star"
+    if per and amp:
+        txt = {"es": f"Esta noche {who_es} pulsa ante nosotros: cada {per:.2f} h "
+                     f"completa un latido y cambia {amp:.1f} mag de brillo — la "
+                     "verás latir en directo.",
+               "en": f"Tonight {who_en} pulsates in front of us: every {per:.2f} h "
+                     f"it completes one beat and swings {amp:.1f} mag — you will "
+                     "watch it beat live."}
+    else:
+        txt = {"es": f"Esta noche seguimos {who_es}, una variable pulsante de "
+                     "gran amplitud.",
+               "en": f"Tonight we follow {who_en}, a high-amplitude pulsating "
+                     "variable."}
+    if h.get("priority") in ("period_change", "period_change_possible"):
+        txt["es"] += " El programa de P. Wils la marca como prioritaria."
+        txt["en"] += " P. Wils' monitoring programme flags it as a priority."
+    if name in hads.FAMOUS_HADS:
+        txt["es"] += " Es un prototipo de su clase."
+        txt["en"] += " It is a prototype of its class."
+    return txt
+
+
+def _hads_facts(d):
+    # @args: d - data dict of a HADS star (with the "hads" sub-dict)
+    # @return: bullet list ES/EN
+    out = []
+    h = d.get("hads") or {}
+    per = h.get("period_h")
+    amp = h.get("amp")
+    if amp is None and h.get("max") is not None and h.get("min") is not None:
+        amp = h["min"] - h["max"]
+    if per and amp is not None:
+        out.append({"es": f"Pulsa con un periodo de {per:.2f} h y una amplitud "
+                          f"de {amp:.1f} mag: una curva de luz completa cabe en "
+                          "una sola noche.",
+                    "en": f"It pulsates with a {per:.2f}-hour period and a "
+                          f"{amp:.1f}-mag amplitude: a full light curve fits in "
+                          "a single night."})
+    out.append({"es": "Es una δ Scuti de gran amplitud (HADS): late en la franja "
+                      "de inestabilidad, donde reinan las cefeidas. Antes se "
+                      "llamaban «cefeidas enanas».",
+                "en": "It is a high-amplitude δ Scuti star (HADS): it beats in "
+                      "the instability strip, where Cepheids rule. They were "
+                      "once called 'dwarf Cepheids'."})
+    out.append({"es": "La AAVSO las recomienda como primer objetivo de "
+                      "fotometría digital: una imagen cada 15 minutos como "
+                      "máximo sigue la curva entera.",
+                "en": "The AAVSO recommends them as the first digital "
+                      "photometry target: one image every 15 minutes at most "
+                      "follows the whole curve."})
+    if h.get("multiperiodic"):
+        out.append({"es": "Es multiperiódica: late en varios modos a la vez "
+                          "(ratio de periodos 0.76–0.78, diagrama de Petersen). "
+                          "Obsérvala en noches consecutivas para separarlos.",
+                    "en": "It is multiperiodic: it beats in several modes at "
+                          "once (period ratio 0.76–0.78, Petersen diagram). "
+                          "Observe it on consecutive nights to separate them."})
+    if h.get("priority") in ("period_change", "period_change_possible"):
+        found = h["priority"] == "period_change"
+        out.append({"es": ("El programa de seguimiento de Patrick Wils (VVS / "
+                           "AAVSO-VSX) le ha encontrado cambios de periodo" if found
+                           else "El programa de Patrick Wils (VVS / AAVSO-VSX) "
+                           "sospecha cambios de periodo") +
+                          ": tu curva de esta noche cuenta doble.",
+                    "en": ("Patrick Wils' monitoring programme (VVS / AAVSO-VSX) "
+                           "has found period changes" if found
+                           else "Patrick Wils' programme (VVS / AAVSO-VSX) "
+                           "suspects period changes") +
+                          ": tonight's curve counts double."})
+    if h.get("observed") is False:
+        out.append({"es": "El programa de seguimiento aún no la ha medido "
+                          "nunca: serías de los primeros.",
+                    "en": "The monitoring programme has never measured it: "
+                          "you would be among the first."})
+    return out
+
+    # Transit depth and duration in a short bilingual clause, from the
+    # ExoClock "transit" sub-dict. The star goes in the hook sentence, so it
+    # is not repeated here.
+    # @args: tr - the planner target's "transit" sub-dict
+    # @return: {"es": str, "en": str} or None when there is nothing to add
+    bits_es, bits_en = [], []
+    depth = tr.get("depth_mmag")
+    dur = tr.get("duration_h")
+    if depth:
+        bits_es.append(f"profundidad {depth:.0f} miligram")
+        bits_en.append(f"depth {depth:.0f} millimags")
+    if dur:
+        bits_es.append(f"duración {dur:.1f} h")
+        bits_en.append(f"duration {dur:.1f} h")
+    if not bits_es:
+        return None
+    return {"es": ", ".join(bits_es), "en": ", ".join(bits_en)}
+
+
 def _sun_facts(d):
     # @args: d - data dict of the Sun
     # @return: bullet list ES/EN
@@ -427,6 +535,7 @@ def hashtags(kind):
         "sn": "#supernova",
         "exoplanet": "#exoplanet #exoplaneta",
         "transit": "#exoplanet #exoplaneta",
+        "hads": "#VariableStars #HADS #AAVSO",
         "sun": "#Sol #Sun #SpaceWeather",
     }
     return base + " " + per_kind.get(kind, "")

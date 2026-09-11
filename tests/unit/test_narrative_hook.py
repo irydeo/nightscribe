@@ -120,3 +120,45 @@ def test_hook_comet_candidate_still_reads_as_comet():
     es = _es(e)
     assert "candidato a cometa" in es.lower() and "C/2026 F1000 (example)" in es
     assert "cercana a la Tierra" not in es  # it is not an NEO
+
+
+# ---- HADS narrative (ADR-034, subplan C.2) ----
+
+def _hads_e(name="CY Aqr", **over):
+    h = {"period_h": 1.46, "max": 11.3, "min": 11.8, "amp": 0.5,
+         "cycles": 4.2, "session_fits": True, "priority": None,
+         "observed": True, "multiperiodic": False, "non_radial": False}
+    h.update(over)
+    return {"type": "hads", "name": name, "data": {"hads": h}}
+
+
+def test_hook_hads_pulsates_live():
+    e = _hads_e()
+    es, en = _es(e), _en(e)
+    assert "1.46" in es and "pulsa" in es and "en directo" in es
+    assert "1.46" in en and "pulsates" in en and "live" in en
+
+
+def test_hook_hads_priority_and_prototype():
+    es = _es(_hads_e(priority="period_change"))
+    assert "Wils" in es and "prioritaria" in es
+    es = _es(_hads_e(name="CY Aqr"))
+    assert "prototipo" in es                        # CY Aqr is a class prototype
+    assert "prototipo" not in _es(_hads_e(name="V1040 Cas"))
+
+
+def test_facts_hads_cite_wils_and_teach():
+    facts = narrative.fact_bullets(_hads_e(priority="period_change",
+                                           multiperiodic=True))
+    es = " ".join(f["es"] for f in facts)
+    en = " ".join(f["en"] for f in facts)
+    assert "Wils" in es and "AAVSO" in es
+    assert "cefeidas enanas" in es and "dwarf Cepheids" in en
+    assert "Petersen" in es
+    for f in facts:
+        assert f["es"] and f["en"]
+
+
+def test_hashtags_hads():
+    tags = narrative.hashtags("hads")
+    assert "#VariableStars" in tags and "#HADS" in tags and "#AAVSO" in tags

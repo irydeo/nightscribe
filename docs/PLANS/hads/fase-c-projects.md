@@ -68,7 +68,7 @@ bilingües en código (no `tr()`), lupdate reporta 0 cadenas nuevas.
 
 **Hecho cuando**: tests verdes; suite verde (N→M).
 **Commit**: `Core: HADS narrative — hook, fact bullets, hashtags ES/EN (ADR-034, subplan C.2)`
-**Estado**: pendiente
+**Estado**: **Hecho** (963→967)
 
 ---
 

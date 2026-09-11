@@ -156,7 +156,7 @@ rama exoplanet :58-65, `_copy_window_context` :120-132);
 hereda la detección gratis (cmd_explore llama a `enrich.enrich`,
 `__main__.py:69`).
 **Commit**: `Core: HADS detection in enrich (alias-aware, before the exoplanet regex) (ADR-034, subplan B.3)`
-**Estado**: pendiente
+**Estado**: **Hecho** (953→959)
 
 ---
 

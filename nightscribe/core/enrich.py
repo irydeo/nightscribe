@@ -15,7 +15,7 @@ import datetime
 import logging
 import re
 
-from . import coords, ephem_minor, orbits
+from . import coords, ephem_minor, hads, orbits
 from .sources import cad, exoplanet_archive, horizons, neofixer, sbdb, simbad
 
 logger = logging.getLogger(__name__)
@@ -26,12 +26,16 @@ logger = logging.getLogger(__name__)
 
 def detect_type(name):
     # @args: name - user-typed identifier
-    # @return: "sun" | "transient" | "exoplanet" | "small_body"
+    # @return: "sun" | "transient" | "exoplanet" | "hads" | "small_body"
     n = name.strip()
     if n.lower() in ("sol", "sun"):
         return "sun"
     if re.match(r"^(SN|AT)\s?\d{4}[a-zA-Z]{1,4}$", n, re.I):
         return "transient"
+    # HADS membership BEFORE the exoplanet regex: catalog names like
+    # "GP And" end in a letter that regex reads as a planet marker
+    if hads.lookup(n):
+        return "hads"
     # the preceding char is a word char or a dash (HD 209458 b, KELT-9b,
     # TRAPPIST-1e, 55Cnce, AUMicb); NEO/comet designations end in a digit,
     # so a trailing planet letter is a safe exoplanet marker
@@ -63,6 +67,15 @@ def enrich(name, date=None, site="Z41", fallback_target=None):
         if fallback_target:
             _merge_transit_context(data, fallback_target)
         return {"type": "exoplanet", "name": name, "data": data}
+    if kind == "hads":
+        # the bundled catalog knows the star; the planner target knows
+        # TONIGHT's session (cycles, session_fits) — planner values win
+        data = {"hads": hads.lookup(name) or {}}
+        if fallback_target:
+            _copy_window_context(data, fallback_target)
+            if fallback_target.get("hads"):
+                data["hads"] = fallback_target["hads"]
+        return {"type": "hads", "name": name, "data": data}
     data = _enrich_small_body(name, date, site)
     if not data and fallback_target is not None:
         # unconfirmed object: NEOfixer may still know a preliminary

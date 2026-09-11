@@ -106,3 +106,55 @@ def test_score_target_total_and_caps():
     assert 0 < score <= 100
     assert parts["scientific"] <= 35 and parts["observability"] <= 30
     assert parts["urgency"] <= 20 and parts["hook"] <= 15
+
+
+# ---------------- why-tonight fragments (subplan A.3) ----------------
+
+def _frags(t):
+    return [f[0] for f in suggest._fragments(t)], \
+           [f[1] for f in suggest._fragments(t)]
+
+
+def test_fragments_lead_with_the_priority_signal():
+    es, en = _frags(_hads(priority="period_change"))
+    assert "cambios de periodo" in es[0] and "Wils" in es[0]
+    assert "Period changes detected" in en[0]
+    es, en = _frags(_hads(priority="period_change_possible"))
+    assert "Posible cambio de periodo" in es[0]
+
+
+def test_fragments_unobserved_and_coverage_gap():
+    es, en = _frags(_hads(observed=False))
+    assert any("no observada" in f for f in es)
+    assert any("Not yet observed" in f for f in en)
+    es, _ = _frags(_hads(covered=False))
+    assert any("Nadie la ha medido este mes" in f for f in es)
+
+
+def test_fragments_cycles_period_amplitude_and_modes():
+    es, en = _frags(_hads(cycles=2.6, period_h=1.89, amp=0.6,
+                          multiperiodic=True))
+    assert any("2.6 ciclos" in f and "en directo" in f for f in es)
+    assert any("watch it pulsate live" in f for f in en)
+    assert any("periodo de 1.89 h" in f and "0.6 mag" in f for f in es)
+    assert any("noches consecutivas" in f for f in es)
+
+
+def test_fragments_non_radial_and_session_warning():
+    # rebuild with the rare-mode flag via the factory's sub-dict
+    t = _hads()
+    t["hads"]["non_radial"] = True
+    t["hads"]["session_fits"] = False
+    es_txt = [f[0] for f in suggest._fragments(t)]
+    assert any("no radiales" in f for f in es_txt)
+    assert any("⚠" in f and "2 ciclos" in f for f in es_txt)
+
+
+def test_why_phrase_caps_at_three_and_ends_with_a_period():
+    t = _hads(priority="period_change", observed=False, covered=False,
+              cycles=4.0)
+    ph = suggest.why_phrase(t)
+    assert ph["es"].endswith(".") and ph["en"].endswith(".")
+    assert ph["es"].count("·") <= 2
+    # the priority fragment wins over the rest
+    assert "cambios de periodo" in ph["es"]

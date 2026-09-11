@@ -92,3 +92,15 @@ def test_empty_scored_is_empty():
     grid, best = suggest.best_per_kind([], n=5)
     assert grid == []
     assert best == set()
+
+
+def test_hads_is_its_own_group():
+    # the seventh kind: a HADS target neither drowns nor is drowned by the
+    # other six kinds in the per-kind cap
+    scored = [
+        _t("n1", "neo", 90), _t("h1", "hads", 85), _t("h2", "hads", 80),
+        _t("t1", "transit", 70),
+    ]
+    grid, best = suggest.best_per_kind(scored, n=1)
+    assert [t[0]["id"] for t in grid] == ["n1", "h1", "t1"]
+    assert best == {"n1", "h1", "t1"}

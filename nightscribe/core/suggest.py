@@ -433,6 +433,39 @@ def _fragments(t, cfg=None):
             mid_en = f" for {dur:.0f} h" if dur else ""
             frags.append((f"El planeta oscurece su estrella un {depth:.1f}%{mid_es}: tu curva de luz ayuda a la misión Ariel de la ESA",
                           f"The planet dims its star by {depth:.1f}%{mid_en}: your light curve helps ESA's Ariel mission"))
+    elif kind == "hads":
+        # priority/coverage signals lead: why_phrase keeps the first three
+        h = t.get("hads") or {}
+        pr = h.get("priority")
+        if pr == "period_change":
+            frags.append(("Se le han detectado cambios de periodo: cada curva nueva cuenta (programa de P. Wils)",
+                           "Period changes detected: every new light curve counts (P. Wils' programme)"))
+        elif pr == "period_change_possible":
+            frags.append(("Posible cambio de periodo: el programa de seguimiento de P. Wils la marca como prioritaria",
+                           "Possible period change: P. Wils' monitoring programme flags it as a priority"))
+        if h.get("observed") is False:
+            frags.append(("Aún no observada en el programa de seguimiento: serías de los primeros en medirla",
+                           "Not yet observed in the monitoring programme: you'd be among the first to measure it"))
+        if h.get("covered_this_month") is False:
+            frags.append(("Nadie la ha medido este mes: tu curva cubre el hueco",
+                           "Nobody has measured it this month: your curve fills the gap"))
+        cyc = _as_float(h.get("cycles"))
+        if cyc is not None and cyc >= 1:
+            frags.append((f"Caben {cyc:.1f} ciclos completos esta noche: la verás pulsar en directo",
+                           f"{cyc:.1f} full cycles fit tonight: you'll watch it pulsate live"))
+        per, amp = _as_float(h.get("period_h")), _as_float(h.get("amp"))
+        if per and amp:
+            frags.append((f"Pulsa con un periodo de {per:.2f} h y una amplitud de {amp:.1f} mag",
+                           f"It pulsates with a {per:.2f}-hour period and a {amp:.1f}-mag amplitude"))
+        if h.get("multiperiodic"):
+            frags.append(("Multiperiódica: obsérvala en noches consecutivas para separar los modos",
+                           "Multiperiodic: observe it on consecutive nights to separate the modes"))
+        if h.get("non_radial"):
+            frags.append(("Muestra modos no radiales, un caso raro entre las HADS",
+                           "It shows non-radial modes, a rare case among HADS stars"))
+        if h.get("session_fits") is False:
+            frags.append(("⚠ No caben 2 ciclos completos de seguida esta noche: captura lo máximo posible",
+                           "⚠ Two full consecutive cycles don't fit tonight: capture as much as possible"))
     elif kind == "alert":
         a = t.get("approach") or {}
         ld, adate = a.get("dist_ld"), a.get("date")

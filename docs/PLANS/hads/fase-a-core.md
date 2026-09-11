@@ -206,4 +206,4 @@ ciclos); pares ES/EN; `why_phrase` ≤ 3 fragmentos y termina en punto. En
 
 **Hecho cuando**: tests verdes; suite verde (N→M).
 **Commit**: `Core: HADS why-tonight phrases ES/EN (ADR-034, subplan A.3)`
-**Estado**: pendiente
+**Estado**: **Hecho** (940→946)

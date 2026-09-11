@@ -867,7 +867,7 @@ def test_project_header_shows_campaign_badge(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign badge in the project header (ADR-035, subplan VC.6)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1067 → 1068; desviación: `self.tr()` dentro de f-strings no lo extrae `pyside6-lupdate` — patrón heredado del header preexistente; fallback EN aplicado igual que `closed`/`step` de las líneas contiguas)
 
 ---
 

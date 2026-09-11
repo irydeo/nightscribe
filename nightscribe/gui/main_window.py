@@ -1871,6 +1871,12 @@ class MainWindow(QMainWindow):
                 header += f" <span style='color:#8a90a6'>({p['outcome']})</span>"
         else:
             header += f" — {self.tr('step')} {step_n}/3"
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            c = _camp.get(db, p["campaign_id"])
+            if c:
+                header += (f" · <span style='color:#65cf30'>"
+                           f"{self.tr('campaign')}: {c['name']}</span>")
         self.projects.lbl_header.setText(header)
         ctx = p["context"]
         parts = []

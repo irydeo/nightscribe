@@ -1441,3 +1441,14 @@ def test_create_project_keeps_variable_and_campaign_context(window):
     assert ctx["variable"]["period_d"] == 227.55
     assert ctx["campaign"]["name"] == "Campaña T CrB"
     assert ctx["project_id"] == 7
+
+
+def test_project_header_shows_campaign_badge(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Campaña T CrB")
+    p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
+                        campaign_id=cid)
+    window._render_project_header(proj_mod.get(mw.db, p["id"]))
+    assert "Campaña T CrB" in window.projects.lbl_header.text()

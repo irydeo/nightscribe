@@ -13,7 +13,7 @@
 
 import pytest
 
-from nightscribe.core import campaign
+from nightscribe.core import campaign, followup, project
 from nightscribe.core.db import Database
 
 
@@ -76,3 +76,44 @@ def test_delete_keeps_projects(db):
     assert campaign.delete(db, cid) is True
     assert campaign.get(db, cid) is None
     assert db.execute("SELECT campaign_id FROM projects").fetchone()[0] is None
+
+
+def _var_project(db, name, campaign_id=None):
+    return project.create(db, "variable", name,
+                          {"ra_deg": 10.0, "dec_deg": 20.0, "mag": 12.0},
+                          campaign_id=campaign_id)
+
+
+def test_due_campaigns_never_visited_is_due(db):
+    cid = campaign.create(db, "C", protocol={"cadence_nights": 3})
+    p = _var_project(db, "T CrB", campaign_id=cid)
+    due = campaign.due_campaigns(db)
+    assert len(due) == 1
+    assert due[0]["never_visited"] is True
+    assert due[0]["overdue_days"] == 3          # the cadence itself
+    assert due[0]["project"]["object_name"] == "T CrB"
+
+
+def test_due_campaigns_respects_cadence(db):
+    cid = campaign.create(db, "C", protocol={"cadence_nights": 3})
+    p = _var_project(db, "T CrB", campaign_id=cid)
+    followup.create_session(db, p["id"])        # visited today: not due
+    assert campaign.due_campaigns(db) == []
+    # fake an old visit: 5 days ago
+    sid = followup.list_sessions(db, p["id"])[0]["id"]
+    import time as _t
+    db.execute("UPDATE project_sessions SET created=? WHERE id=?",
+               (_t.time() - 5 * 86400, sid))
+    db.commit()
+    due = campaign.due_campaigns(db)
+    assert len(due) == 1 and due[0]["overdue_days"] == 5
+
+
+def test_due_campaigns_skips_finished_and_done_projects(db):
+    cid = campaign.create(db, "C", protocol={"cadence_nights": 1})
+    p = _var_project(db, "T CrB", campaign_id=cid)
+    project.close(db, p["id"], outcome="completed")
+    campaign.finish(db, cid)
+    assert campaign.due_campaigns(db) == []
+    campaign.reopen(db, cid)
+    assert campaign.due_campaigns(db) == []     # the project is still done

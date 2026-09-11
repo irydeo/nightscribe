@@ -144,3 +144,52 @@ def delete(db, campaign_id):
     cur = db.execute("DELETE FROM campaigns WHERE id=?", (campaign_id,))
     db.commit()
     return cur.rowcount > 0
+
+
+# ---------------- protocol and the Tonight loop ----------------
+
+
+def protocol_get(camp, key, default=None):
+    # @args: camp - campaign dict, key - cadence_nights | filters |
+    #        comp_stars | notes, default - when absent
+    # @return: the protocol value
+    return (camp.get("protocol") or {}).get(key, default)
+
+
+def projects_of(db, campaign_id, status="active"):
+    # The projects hanging from a campaign (any kind — V-b).
+    # @return: [{id, object_name, kind, context}]
+    sql = ("SELECT id, object_name, kind, context FROM projects"
+           " WHERE campaign_id=?")
+    params = [campaign_id]
+    if status:
+        sql += " AND status=?"
+        params.append(status)
+    rows = db.execute(sql, params).fetchall()
+    return [{"id": r[0], "object_name": r[1], "kind": r[2],
+             "context": json.loads(r[3] or "{}")} for r in rows]
+
+
+def due_campaigns(db):
+    # The Tonight loop (V-d): every DUE project of every active campaign —
+    # a project is due when its last visit is >= the campaign cadence in
+    # nights, or when it was never visited at all.
+    # @return: [{"campaign", "project", "overdue_days", "cadence_nights",
+    #          "never_visited"}] — one row per due project
+    from . import followup
+    out = []
+    for camp in list_campaigns(db, status=CAMPAIGN_ACTIVE):
+        cad = int(protocol_get(camp, "cadence_nights", 1) or 1)
+        for proj in projects_of(db, camp["id"], status="active"):
+            days = followup.days_since_last_session(db, proj["id"])
+            never = days is None
+            if never:
+                overdue = cad      # as due as it gets: no visit at all
+            elif days >= cad:
+                overdue = days
+            else:
+                continue
+            out.append({"campaign": camp, "project": proj,
+                        "overdue_days": overdue, "cadence_nights": cad,
+                        "never_visited": never})
+    return out

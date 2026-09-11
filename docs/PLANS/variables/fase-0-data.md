@@ -106,7 +106,7 @@ def test_campaign_delete_sets_project_campaign_null(tmp_path):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_db_v7.py -q`
 **Hecho cuando**: los 4 tests pasan y `tests/unit` sigue verde (anota N→M).
 **Commit**: `Core: DB migration v7 — campaigns table + projects.campaign_id (ADR-035, subplan V0.1)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 993)
 
 ---
 
@@ -332,7 +332,7 @@ def test_delete_keeps_projects(db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaign.py -q`
 **Hecho cuando**: tests verdes; suite verde (N→M).
 **Commit**: `Core: campaign CRUD model (ADR-035, subplan V0.2)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 998)
 
 ---
 
@@ -441,12 +441,7 @@ def test_due_campaigns_skips_finished_and_done_projects(db):
     assert campaign.due_campaigns(db) == []     # the project is still done
 ```
 
-**Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaign.py -q`
-**Hecho cuando**: tests verdes; suite verde (N→M). **Ojo**: si
-`project.create(..., campaign_id=...)` aún no existe (V0.4 no hecha),
-**haz V0.4 antes** y vuelve.
-**Commit**: `Core: campaign protocol + due-campaigns Tonight loop (ADR-035, subplan V0.3)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 1004)
 
 ---
 
@@ -549,8 +544,8 @@ def test_every_valid_kind_still_has_outcomes(db):
 
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_project_variable.py tests/unit/test_project.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
-**Commit**: `Core: variable project kind + campaign link in projects (ADR-035, subplan V0.4)`
-**Estado**: Pendiente
+**Commit**: `Core: kind 'variable' + campaign_id on projects (ADR-035, V0.4)`
+**Estado**: ✅ Hecho (2026-09-11, suite 1001)
 
 ---
 

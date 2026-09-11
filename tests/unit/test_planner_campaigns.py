@@ -102,3 +102,27 @@ def test_missing_coordinates_are_skipped(db):
 
 def test_no_campaigns_no_targets(db):
     assert _targets(db) == []
+
+
+def test_variable_subdict_with_fresh_extremum(db):
+    _make_due(db, ctx={"variable": {"var_type": "M", "period_d": 300.0,
+                                    "epoch_mjd": 60000.0, "max": 9.0,
+                                    "min": 13.5, "spectral": "M6e"}})
+    t = _targets(db)[0]
+    v = t["variable"]
+    assert v["amp"] == 4.5                       # min - max (inverted axis)
+    assert v["next_extremum"]["kind"] in ("max", "min")
+    assert v["next_extremum"]["days"] >= 0
+
+
+def test_event_flag_from_own_points(db):
+    _cid, pid = _make_due(db)
+    for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
+        followup.add_point(db, pid, 61000.0 + i, "V", m)
+    t = _targets(db)[0]
+    assert t["campaign"]["event"]["direction"] == "drop"
+
+
+def test_no_variable_no_subdict(db):
+    _make_due(db)
+    assert "variable" not in _targets(db)[0]

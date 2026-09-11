@@ -15,7 +15,8 @@ import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import campaign, coords, dates, exposure, hads, horizon, transits
+from . import campaign, coords, dates, exposure, followup, hads, horizon
+from . import transits, variables
 from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
                       rochester, sbdb)
 
@@ -472,7 +473,7 @@ def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
         vis = _visibility(ra, dec, lat, lon, date, hor, margin)
         if vis.get("window_start") is None:
             continue           # not up tonight
-        out.append({
+        t = {
             "id": proj["object_name"], "kind": proj["kind"],
             "name": proj["object_name"], "mag": mag,
             "ra_deg": ra, "dec_deg": dec, "project_id": proj["id"],
@@ -482,7 +483,26 @@ def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
                          "cadence_nights": due["cadence_nights"],
                          "never_visited": due["never_visited"],
                          "event": None},
-        })
+        }
+        # variable sub-dict: the context snapshot + tonight's fresh values
+        # (the next extremum is computed nightly — pure local maths)
+        v = dict(ctx.get("variable") or {})
+        if v:
+            if v.get("amp") is None and v.get("max") is not None \
+                    and v.get("min") is not None:
+                v["amp"] = round(v["min"] - v["max"], 2)  # inverted axis
+            v["next_extremum"] = variables.next_extremum(
+                v.get("period_d"), v.get("epoch_mjd"),
+                var_type=v.get("var_type", ""))
+            t["variable"] = v
+        # event advisor (V-h): a dip/outburst in the observer's own points
+        # rides on the target so suggest can boost and phrase it
+        ev = variables.detect_event(
+            followup.list_points(db_obj, proj["id"]),
+            threshold=float(cfg.get("event_mag_threshold", 0.5)))
+        if ev:
+            t["campaign"]["event"] = ev
+        out.append(t)
     return out
 
 

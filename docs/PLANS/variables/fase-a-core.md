@@ -270,7 +270,7 @@ def test_no_variable_no_subdict(db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_planner_campaigns.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: campaign targets carry variable sub-dict + event flag (ADR-035, subplan VA.2)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 1032→1035)
 
 ---
 

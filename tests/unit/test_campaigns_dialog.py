@@ -101,3 +101,53 @@ def test_save_without_name_is_refused(qapp, db):
     dlg = CampaignEditDialog(db_obj=db)
     dlg._save()
     assert campaign.list_campaigns(db) == []
+
+
+def test_add_target_resolves_vsx_and_creates_project(qapp, db, monkeypatch):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.core.sources import vsx
+    from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    monkeypatch.setattr(vsx, "lookup", lambda name: {
+        "name": "T CrB", "auid": "000-BBW-825", "ra_deg": 239.87567,
+        "dec_deg": 25.92017, "var_type": "NR+ELL", "period_d": 227.5528,
+        "epoch_mjd": 55828.4, "max": 2.0, "min": 10.8, "max_band": "V",
+        "min_band": "V", "spectral": "M3III+WD", "constellation": "CrB"})
+    cid = campaign.create(db, "Campaña T CrB")
+    dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
+    dlg.edt_name.setText("T CrB")
+    dlg._resolve()
+    assert dlg.edt_ra.text().startswith("239.875")
+    dlg._save()
+    p = proj_mod.list_projects(db, campaign_id=cid)[0]
+    assert p["kind"] == "variable" and p["object_name"] == "T CrB"
+    assert p["context"]["variable"]["period_d"] == 227.5528
+
+
+def test_add_target_manual_when_nothing_knows_it(qapp, db, monkeypatch):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.core.sources import simbad, vsx
+    from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    monkeypatch.setattr(vsx, "lookup", lambda name: None)
+    monkeypatch.setattr(simbad, "query_id", lambda name: None)
+    cid = campaign.create(db, "Campaña WeSb 1")
+    dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
+    dlg.edt_name.setText("WeSb 1")
+    dlg._resolve()
+    assert "Not found" in dlg.lbl_resolved.text()
+    dlg.edt_ra.setText("15.2254")
+    dlg.edt_dec.setText("55.0667")
+    dlg.edt_mag.setText("15.0")
+    dlg._save()
+    p = proj_mod.list_projects(db, campaign_id=cid)[0]
+    assert p["context"]["ra_deg"] == 15.2254
+    assert p["context"]["mag"] == 15.0
+
+
+def test_add_target_without_coordinates_is_refused(qapp, db):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    cid = campaign.create(db, "C")
+    dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
+    dlg.edt_name.setText("X")
+    dlg._save()
+    assert proj_mod.list_projects(db) == []

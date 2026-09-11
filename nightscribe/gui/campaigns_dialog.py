@@ -53,9 +53,10 @@ class CampaignsDialog(QDialog):
         self.btn_edit = QPushButton(self.tr("Edit…"))
         self.btn_finish = QPushButton(self.tr("Finish"))
         self.btn_reopen = QPushButton(self.tr("Reopen"))
+        self.btn_target = QPushButton(self.tr("Add target…"))
         self.btn_close = QPushButton(self.tr("Close"))
         for b in (self.btn_new, self.btn_edit, self.btn_finish,
-                  self.btn_reopen):
+                  self.btn_reopen, self.btn_target):
             row.addWidget(b)
         row.addStretch()
         row.addWidget(self.btn_close)
@@ -65,6 +66,7 @@ class CampaignsDialog(QDialog):
         self.btn_edit.clicked.connect(self._edit_selected)
         self.btn_finish.clicked.connect(self._finish_selected)
         self.btn_reopen.clicked.connect(self._reopen_selected)
+        self.btn_target.clicked.connect(self._add_target)
         self.lst_active.itemSelectionChanged.connect(self._sync_buttons)
         self.lst_finished.itemSelectionChanged.connect(self._sync_buttons)
         self._reload()
@@ -99,7 +101,9 @@ class CampaignsDialog(QDialog):
         self.btn_reopen.setEnabled(self._selected_id(self.lst_finished)
                                    is not None)
         self.btn_edit.setEnabled(self._selected_id(self.lst_active)
-                                 is not None)
+                                  is not None)
+        self.btn_target.setEnabled(self._selected_id(self.lst_active)
+                                   is not None)
 
     def _finish_selected(self):
         # @return: None — moves the picked active campaign to finished
@@ -129,6 +133,14 @@ class CampaignsDialog(QDialog):
         if camp is not None and \
                 CampaignEditDialog(self, camp=camp, db_obj=self._db).exec():
             self._reload()
+
+    def _add_target(self):
+        # @return: None — opens the target form for the active-list selection
+        cid = self._selected_id(self.lst_active)
+        if cid is None:
+            return
+        AddTargetDialog(self, campaign_id=cid, db_obj=self._db).exec()
+        self._reload()
 
 
 class CampaignEditDialog(QDialog):
@@ -207,4 +219,102 @@ class CampaignEditDialog(QDialog):
                 goal=self.edt_goal.text().strip(), protocol=prot,
                 report_url=self.edt_report.text().strip(),
                 data_url=self.edt_data.text().strip())
+        self.accept()
+
+
+class AddTargetDialog(QDialog):
+    # Adds a target to a campaign as a `variable` project. Resolution chain
+    # (V-c): VSX (cached) -> SIMBAD (coords anchor) -> fully manual. The
+    # lookups are one tiny cached GET each and run synchronously; the form
+    # tells the user while it resolves.
+    # @args: parent, campaign_id - int, db_obj - Database
+    def __init__(self, parent=None, campaign_id=None, db_obj=None):
+        super().__init__(parent)
+        from PySide6.QtWidgets import (QDialogButtonBox, QFormLayout,
+                                       QLineEdit)
+        self._db = db_obj or db
+        self._campaign_id = campaign_id
+        self._resolved = {}
+        self.setWindowTitle(self.tr("Add campaign target"))
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        self.edt_name = QLineEdit()
+        form.addRow(self.tr("Object:"), self.edt_name)
+        self.btn_resolve = QPushButton(self.tr("Resolve (VSX/SIMBAD)"))
+        form.addRow("", self.btn_resolve)
+        self.lbl_resolved = QLabel(self.tr("— not resolved yet —"))
+        self.lbl_resolved.setWordWrap(True)
+        form.addRow(self.lbl_resolved)
+        self.edt_ra = QLineEdit()
+        form.addRow(self.tr("RA (deg):"), self.edt_ra)
+        self.edt_dec = QLineEdit()
+        form.addRow(self.tr("Dec (deg):"), self.edt_dec)
+        self.edt_mag = QLineEdit()
+        form.addRow(self.tr("Mag (approx):"), self.edt_mag)
+        layout.addLayout(form)
+        self.btn_resolve.clicked.connect(self._resolve)
+        box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        box.accepted.connect(self._save)
+        box.rejected.connect(self.reject)
+        layout.addWidget(box)
+
+    def _resolve(self):
+        # Fills the form from VSX, then SIMBAD; leaves it editable always.
+        from ..core.sources import simbad, vsx
+        name = self.edt_name.text().strip()
+        if not name:
+            return
+        v = vsx.lookup(name)
+        if v:
+            self._resolved = {"variable": v}
+            self.edt_ra.setText(str(v.get("ra_deg") or ""))
+            self.edt_dec.setText(str(v.get("dec_deg") or ""))
+            if v.get("max") is not None:
+                self.edt_mag.setText(str(v["max"]))
+            self.lbl_resolved.setText(self.tr(
+                "VSX: type %1, period %2 d").replace(
+                    "%1", v.get("var_type") or "?").replace(
+                    "%2", str(v.get("period_d") or "?")))
+            return
+        ident = simbad.query_id(name)
+        if ident:
+            from ..core import coords
+            try:
+                self.edt_ra.setText(str(round(
+                    coords.ra_hms_to_deg(ident["ra"]), 5)))
+                self.edt_dec.setText(str(round(
+                    coords.dec_dms_to_deg(ident["dec"]), 5)))
+            except (ValueError, TypeError, KeyError):
+                pass
+            if ident.get("vmag") is not None:
+                self.edt_mag.setText(str(ident["vmag"]))
+            self._resolved = {"simbad": ident}
+            self.lbl_resolved.setText(self.tr("SIMBAD: %1").replace(
+                "%1", ident.get("otype") or "?"))
+            return
+        self.lbl_resolved.setText(self.tr(
+            "Not found — fill the coordinates by hand"))
+
+    def _save(self):
+        # Creates the variable project linked to the campaign.
+        name = self.edt_name.text().strip()
+        if not name or self._campaign_id is None:
+            return
+        from ..core import project
+        try:
+            ra = float(self.edt_ra.text())
+            dec = float(self.edt_dec.text())
+        except ValueError:
+            return
+        mag = None
+        try:
+            mag = float(self.edt_mag.text())
+        except ValueError:
+            pass
+        ctx = {"kind": "variable", "ra_deg": ra, "dec_deg": dec}
+        if mag is not None:
+            ctx["mag"] = mag
+        ctx.update(self._resolved)
+        project.create(self._db, "variable", name, ctx,
+                       campaign_id=self._campaign_id)
         self.accept()

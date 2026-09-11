@@ -1077,7 +1077,7 @@ def test_add_target_without_coordinates_is_refused(qapp, db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign target creation — VSX/SIMBAD resolution chain + manual fallback (ADR-035, subplan VC.7)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1068 → 1071)
 
 ---
 

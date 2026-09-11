@@ -42,9 +42,10 @@
     <property name="title"><string>Tools</string></property>
     <addaction name="action_settings"/>
     <addaction name="separator"/>
-    <addaction name="action_explore"/>
-    <addaction name="action_blink"/>
-   </widget>
+     <addaction name="action_explore"/>
+     <addaction name="action_blink"/>
+     <addaction name="action_campaigns"/>
+    </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
      <addaction name="action_docs"/>
@@ -67,6 +68,9 @@
   </action>
   <action name="action_blink">
    <property name="text"><string>Blink (ad-hoc)…</string></property>
+  </action>
+  <action name="action_campaigns">
+   <property name="text"><string>Campaigns…</string></property>
   </action>
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>

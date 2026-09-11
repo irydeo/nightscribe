@@ -441,6 +441,8 @@ class MainWindow(QMainWindow):
         self._menus.action_docs.triggered.connect(self.on_docs)
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
+        self._menus.action_campaigns.triggered.connect(
+            self._tools_campaigns)
 
     def _connect(self):
         t = self.tonight
@@ -463,6 +465,7 @@ class MainWindow(QMainWindow):
         p = self.projects
         p.btn_refresh.clicked.connect(self.on_refresh_projects)
         p.cmb_filter.currentIndexChanged.connect(self.on_refresh_projects)
+        p.btn_campaigns.clicked.connect(self._tools_campaigns)
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
         p.tabs_steps.currentChanged.connect(self._project_step_changed)
         p.btn_prev.clicked.connect(self._project_prev)
@@ -4500,6 +4503,12 @@ class MainWindow(QMainWindow):
 
     def _tools_blink(self):
         self._open_blink_dialog()
+
+    def _tools_campaigns(self):
+        # The campaign manager (ADR-035, V-j). Modal; the Tonight cadence
+        # and the hub refresh themselves on the next visit.
+        from .campaigns_dialog import CampaignsDialog
+        CampaignsDialog(self).exec()
 
     def _open_explore_dialog(self, name):
         # E (docs/WORKFLOWS.es.md §7ses, corrected 2026-09-02): the

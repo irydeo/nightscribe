@@ -652,7 +652,7 @@ def test_empty_dialog_buttons_disabled(qapp, db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign manager dialog skeleton + Tools/hub access (ADR-035, subplan VC.4)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1061 → 1064)
 
 ---
 

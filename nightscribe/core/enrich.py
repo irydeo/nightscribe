@@ -108,6 +108,12 @@ def enrich(name, date=None, site="Z41", fallback_target=None):
             if fallback_target.get("hads"):
                 data["hads"] = fallback_target["hads"]
         return {"type": "hads", "name": name, "data": data}
+    if kind == "variable":
+        # The variable-star branch (ADR-035, V-c): VSX knows the star
+        # (cached); SIMBAD anchors the coordinates when VSX does not;
+        # the planner/project snapshot wins when present.
+        return {"type": "variable", "name": name,
+                "data": _enrich_variable(name, fallback_target)}
     data = _enrich_small_body(name, date, site)
     if not data and fallback_target is not None:
         # unconfirmed object: NEOfixer may still know a preliminary
@@ -220,6 +226,50 @@ def _merge_transient_context(out, t):
     if t.get("disc_date"):
         out.setdefault("disc_date", t["disc_date"])
     return out
+
+
+def _enrich_variable(name, fallback_target=None):
+    # The variable-star branch (ADR-035, V-c): VSX knows the star (cached);
+    # SIMBAD anchors the coordinates when VSX does not (WeSb 1 is not in
+    # VSX); the planner/project snapshot wins when present (it carries the
+    # campaign-curated fields and tonight's values).
+    # @args: name - identifier, fallback_target - planner target dict
+    # @return: data dict with "variable" (+ "simbad", "campaign", window)
+    from .sources import vsx
+    from . import variables
+    v = vsx.lookup(name) or {}
+    data = {"variable": v}
+    if v.get("ra_deg") is None:
+        ident = simbad.query_id(name)
+        if ident:
+            data["simbad"] = ident
+            try:
+                v["ra_deg"] = coords.ra_hms_to_deg(ident["ra"])
+                v["dec_deg"] = coords.dec_dms_to_deg(ident["dec"])
+            except (ValueError, TypeError, KeyError):
+                pass
+            if v.get("max") is None and ident.get("vmag") is not None:
+                v["max"] = ident["vmag"]
+    if fallback_target:
+        _copy_window_context(data, fallback_target)
+        if fallback_target.get("variable"):
+            v.update(fallback_target["variable"])     # planner values win
+        if fallback_target.get("campaign"):
+            data["campaign"] = fallback_target["campaign"]
+        if fallback_target.get("mag") is not None:
+            data.setdefault("mag", fallback_target["mag"])
+    if v.get("amp") is None and v.get("max") is not None \
+            and v.get("min") is not None:
+        v["amp"] = round(v["min"] - v["max"], 2)      # inverted axis
+    if v.get("period_d") and v.get("next_extremum") is None:
+        v["next_extremum"] = variables.next_extremum(
+            v.get("period_d"), v.get("epoch_mjd"),
+            var_type=v.get("var_type", ""))
+    if v.get("ra_deg") is not None:
+        data["ra_deg"] = v["ra_deg"]
+        data["dec_deg"] = v.get("dec_deg")
+    data["variable"] = v
+    return data
 
 
 def _enrich_preliminary_orbit(target, date, site):

@@ -24,6 +24,8 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtWidgets import QLabel  # noqa: E402
+
 from nightscribe.core import narrative  # noqa: E402
 
 # A small body with a full story: family, size, distances, MOID, a
@@ -1545,3 +1547,53 @@ def test_inject_followup_no_ctx_no_points(panel):
     panel.show(e)
     assert not ((e.get("data") or {}).get("followup") or {}).get("points")
 
+
+
+# ------------------------------------------------- VC.2: variable star
+
+FAKE_VARIABLE = {
+    "type": "variable", "name": "T CrB",
+    "data": {"variable": {"var_type": "NR+ELL", "period_d": 227.5528,
+                          "epoch_mjd": 55828.4, "max": 2.0, "min": 10.8,
+                          "amp": 8.8, "spectral": "M3III+WD",
+                          "next_extremum": {"kind": "max", "mjd": 61250.0,
+                                            "days": 3.0}},
+             "campaign": {"name": "Campaña T CrB"}},
+}
+
+
+def test_variable_params_table(panel):
+    panel.show(FAKE_VARIABLE)
+    texts = []
+    for r in range(panel.tbl_params.rowCount()):
+        p = panel.tbl_params.item(r, 0)
+        if p:
+            texts.append(p.text())
+    assert any("Period" in t or "Periodo" in t for t in texts)
+    assert any("Variable type" in t or "Tipo de variable" in t
+               for t in texts)
+
+
+def test_variable_chips(panel):
+    panel.show(FAKE_VARIABLE)
+    labels = [c.text() for c in panel.grp_chips.findChildren(QLabel)] \
+        if hasattr(panel, "grp_chips") else []
+    # fallback: walk the whole panel for chip labels
+    if not labels:
+        labels = [l.text() for l in panel.findChildren(QLabel)]
+    assert any("P 227.6 d" in t for t in labels)
+    assert any("Campaña T CrB" in t for t in labels)
+
+
+def test_variable_lightcurve_extract_folds_with_epoch(panel):
+    e = {"type": "variable", "name": "T CrB",
+         "data": {"variable": dict(FAKE_VARIABLE["data"]["variable"]),
+                  "followup": {"points": [
+                      {"mjd": 61000.0, "filter": "V", "mag": 10.1,
+                       "err": None, "source": "manual"},
+                      {"mjd": 61010.0, "filter": "V", "mag": 10.3,
+                       "err": None, "source": "manual"}]}}}
+    out = panel._extract("lightcurve", e)
+    assert out["fold_period_d"] == 227.5528
+    assert out["epoch_mjd"] == 55828.4
+    assert out["schematic"]

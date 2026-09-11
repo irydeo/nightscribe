@@ -370,7 +370,7 @@ def test_detect_local_variable_project_name(monkeypatch):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_enrich_variable.py tests/unit/test_enrich_hads.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: variable detection in enrich (GCVS/NSV + local projects, before the exoplanet regex) (ADR-035, subplan VB.5)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅
 
 ---
 
@@ -495,11 +495,11 @@ def test_enrich_variable_planner_snapshot_wins(monkeypatch):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_enrich_variable.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: variable enrich branch — VSX cached, SIMBAD anchor, planner wins (ADR-035, subplan VB.6)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅
 
 ---
 
 ## Cierre de la fase B
 
 Cuando VB.1–VB.6 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: ______ → ______.
+verde y anota el conteo total aquí: **1045** → **1053**.

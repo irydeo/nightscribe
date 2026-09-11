@@ -457,7 +457,7 @@ class ObjectPanel(QWidget):
         # project context: core/enrich has no project knowledge, so the GUI
         # layer pulls the photometry from the project's db (B4/D3).
         # @args: e - enriched dict (mutated in place)
-        if e.get("type") not in ("transient", "sn", "hads"):
+        if e.get("type") not in ("transient", "sn", "hads", "variable"):
             return
         fu = (e.get("data") or {}).get("followup") or {}
         if fu.get("points"):
@@ -915,6 +915,24 @@ class ObjectPanel(QWidget):
                     med = (h["max"] + h["min"]) / 2
                     out["schematic"] = hads_mod.sawtooth_template(
                         h["period_h"], amp, med)
+            # ADR-035: a long-period variable folds by its VSX period
+            # with the real epoch, and reuses the schematic sawtooth
+            v = d.get("variable") or (self._ctx or {}).get("variable") \
+                or {}
+            if "fold_period_d" not in out and v.get("period_d"):
+                out["fold_period_d"] = v["period_d"]
+                if v.get("epoch_mjd") is not None:
+                    out["epoch_mjd"] = v["epoch_mjd"]
+                amp = v.get("amp")
+                if amp is None and v.get("max") is not None \
+                        and v.get("min") is not None:
+                    amp = v["min"] - v["max"]
+                if amp and v.get("max") is not None \
+                        and v.get("min") is not None:
+                    from ..core import hads as hads_mod
+                    med = (v["max"] + v["min"]) / 2
+                    out["schematic"] = hads_mod.sawtooth_template(
+                        v["period_d"] * 24.0, amp, med)
             return out
 
         return None
@@ -1080,6 +1098,36 @@ class ObjectPanel(QWidget):
                     self.tr("Multiperiodic"), theme.KIND_COLORS["hads"],
                     self.tr("Several pulsation modes — observe on "
                             "consecutive nights")))
+        is_var = kind == "variable" or bool(d.get("variable"))
+        if is_var:
+            v = d.get("variable") or ctx.get("variable") or {}
+            per = v.get("period_d")
+            if per:
+                chips.append((
+                    f"P {float(per):.1f} d", theme.KIND_COLORS["variable"],
+                    self.tr("Variability period, in days")))
+            amp = v.get("amp")
+            if amp is None and v.get("max") is not None \
+                    and v.get("min") is not None:
+                amp = v["min"] - v["max"]
+            if amp:
+                chips.append((
+                    f"Δ {float(amp):.1f} mag", theme.C_TEXT,
+                    self.tr("Peak-to-peak brightness swing")))
+            nxt = v.get("next_extremum") or {}
+            if nxt.get("days") is not None:
+                lab = self.tr("max") if nxt.get("kind") == "max" \
+                    else self.tr("min")
+                chips.append((
+                    f"{lab} ~{float(nxt['days']):.0f} d",
+                    theme.KIND_COLORS["variable"],
+                    self.tr("Next expected extremum (VSX epoch)")))
+            camp = d.get("campaign") or ctx.get("campaign") or {}
+            if camp.get("name"):
+                chips.append((
+                    self.tr("Campaign: %1").replace("%1", camp["name"]),
+                    theme.C_OK,
+                    self.tr("This object belongs to an observing campaign")))
 
         ws = ctx.get("window_start")
         we = ctx.get("window_end")

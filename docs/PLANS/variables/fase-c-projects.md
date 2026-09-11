@@ -376,7 +376,7 @@ de arriba — es la única edición permitida fuera de los tests nuevos.)
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_overview_panel.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: variable chips + epoch-folding light curve in the object card (ADR-035, subplan VC.2)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1057 → 1060)
 
 ---
 

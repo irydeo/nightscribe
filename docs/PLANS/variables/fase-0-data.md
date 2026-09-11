@@ -1208,11 +1208,14 @@ def test_to_points_falls_back_to_raw_psf_when_corr_invalid():
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_surveys.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core/Sources: ALeRCE ZTF survey context client (ADR-035, subplan V0.9)`
-**Estado**: Pendiente
+**Estado**: ✅ Hecho (2026-09-11, suite 1025)
 
 ---
 
 ## Cierre de la fase 0
 
 Cuando V0.1–V0.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: ______ → ______.
+verde y anota el conteo total aquí: 989 → 1025.
+
+**Cierre (2026-09-11)**: ✅ Fase 0 completa. V0.1–V0.9 hechas en 9 commits,
+suite `tests/unit` verde: **1025 passed** (de 989, +36).

@@ -907,7 +907,7 @@ def test_render_post_tells_the_variable_story(fake_cfg):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_narrative_variable.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: variable narrative — hook, fact bullets, hashtags ES/EN (ADR-035, subplan VD.8)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (4 tests en test_narrative_variable.py; suite 1094 passed)
 
 ---
 

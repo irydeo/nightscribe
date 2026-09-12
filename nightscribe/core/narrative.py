@@ -97,6 +97,9 @@ def hook(e):
                              d.get("transit") or t.get("transit") or {})
     if kind == "hads":
         return _hads_hook(e.get("name") or "", d.get("hads") or {})
+    if kind == "variable":
+        return _variable_hook(e.get("name") or "", d.get("variable") or {},
+                              d.get("campaign") or {})
     if kind == "sun":
         return {"es": "Así amanece nuestra estrella esta semana.",
                 "en": "This is how our star looks this week."}
@@ -167,6 +170,8 @@ def fact_bullets(e):
         return _small_body_facts(d) + _safe_window_bullets(d)
     if kind == "hads":
         return _hads_facts(d) + _safe_window_bullets(d)
+    if kind == "variable":
+        return _variable_facts(d) + _safe_window_bullets(d)
     return _safe_window_bullets(d)
 
 
@@ -468,6 +473,54 @@ def _hads_facts(d):
     return {"es": ", ".join(bits_es), "en": ", ".join(bits_en)}
 
 
+def _variable_hook(name, v, camp):
+    # The variable hook: the campaign that watches it and its next extremum.
+    # @args: name - object name, v - "variable" sub-dict, camp - "campaign"
+    # @return: {"es": str, "en": str}
+    who_es = f"la estrella {name}" if name else "esta estrella"
+    who_en = f"the star {name}" if name else "this star"
+    if camp.get("name"):
+        es = f"Seguimos {who_es} dentro de la campaña «{camp['name']}»."
+        en = (f"We are following {who_en} inside the “{camp['name']}” "
+              "campaign.")
+    else:
+        es = f"Seguimos {who_es}, una estrella variable."
+        en = f"We are following {who_en}, a variable star."
+    nxt = v.get("next_extremum") or {}
+    if nxt.get("days") is not None:
+        lab_es = "máximo" if nxt.get("kind") == "max" else "mínimo"
+        lab_en = "maximum" if nxt.get("kind") == "max" else "minimum"
+        es += f" Su próximo {lab_es} se espera en ~{nxt['days']:.0f} días."
+        en += f" Its next {lab_en} is expected in ~{nxt['days']:.0f} days."
+    return {"es": es, "en": en}
+
+
+def _variable_facts(d):
+    # @args: d - data dict of a variable star
+    # @return: bullet list ES/EN
+    out = []
+    v = d.get("variable") or {}
+    fam, _epoch_min = orbits._variable_family_text(v.get("var_type"))
+    out.append({"es": fam["es"], "en": fam["en"]})
+    per, amp = v.get("period_d"), v.get("amp")
+    if amp is None and v.get("max") is not None and v.get("min") is not None:
+        amp = v["min"] - v["max"]
+    if per:
+        out.append({"es": f"Varía con un periodo de {per:.1f} días"
+                          + (f" y una amplitud de {amp:.1f} mag."
+                             if amp else "."),
+                    "en": f"It varies with a {per:.1f}-day period"
+                          + (f" and a {amp:.1f}-mag amplitude."
+                             if amp else ".")})
+    c = d.get("campaign") or {}
+    if c.get("name"):
+        out.append({"es": f"Forma parte de la campaña «{c['name']}»: "
+                          "cada noche cuenta.",
+                    "en": f"It belongs to the “{c['name']}” campaign: "
+                          "every night counts."})
+    return out
+
+
 def _sun_facts(d):
     # @args: d - data dict of the Sun
     # @return: bullet list ES/EN
@@ -536,6 +589,7 @@ def hashtags(kind):
         "exoplanet": "#exoplanet #exoplaneta",
         "transit": "#exoplanet #exoplaneta",
         "hads": "#VariableStars #HADS #AAVSO",
+        "variable": "#VariableStars #AAVSO",
         "sun": "#Sol #Sun #SpaceWeather",
     }
     return base + " " + per_kind.get(kind, "")

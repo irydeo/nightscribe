@@ -452,10 +452,10 @@ def test_csv_without_coordinates_leaves_hjd_empty(db, tmp_path):
     assert row[1] == ""
 ```
 
-**Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_photometry_export.py -q`
-**Hecho cuando**: verde; suite verde (N→M).
-**Commit**: `Core: photometry CSV export with in-app HJD (ADR-035, subplan VD.4)`
-**Estado**: Pendiente
+ **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_photometry_export.py -q`
+ **Hecho cuando**: verde; suite verde (N→M).
+ **Commit**: `Core: photometry CSV export with in-app HJD (ADR-035, subplan VD.4)`
+ **Estado**: Hecho ✅ (3 tests en test_photometry_export.py; suite 1085 passed)
 
 ---
 
@@ -984,4 +984,4 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3).
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4).

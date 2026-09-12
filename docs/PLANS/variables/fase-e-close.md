@@ -36,9 +36,9 @@ frecuentes); `tests/unit/test_i18n.py` (lo que exige).
 **Ejecuta**: el pipeline completo + `tests/unit/test_i18n.py` + suite
 unitaria.
 **Hecho cuando**: `test_i18n.py` verde; suite verde (N→M). Anota el número
-total de cadenas (lo dice `lrelease` o el propio test): ______ cadenas.
+total de cadenas (lo dice `lrelease` o el propio test): **714** cadenas.
 **Commit**: `Gui/i18n: full ES/EN pass for the variables & campaigns track (ADR-035, subplan VE.1)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (2 tests en test_i18n.py; suite 1096 passed; 714 cadenas ES y EN, 0 unfinished)
 
 ---
 

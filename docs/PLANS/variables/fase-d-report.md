@@ -313,10 +313,10 @@ def test_variable_without_campaign_keeps_clear_default(window):
     assert filters == ["Clear"]
 ```
 
-**Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py tests/unit/test_sequence.py -q`
-**Hecho cuando**: verde; suite verde (N→M). **No hay cadenas nuevas.**
-**Commit**: `Gui: protocol filters pre-fill the multi-filter capture plan for variables (ADR-035, subplan VD.3)`
-**Estado**: Pendiente
+ **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py tests/unit/test_sequence.py -q`
+ **Hecho cuando**: verde; suite verde (N→M). **No hay cadenas nuevas.**
+ **Commit**: `Gui: protocol filters pre-fill the multi-filter capture plan for variables (ADR-035, subplan VD.3)`
+ **Estado**: Hecho ✅ (92 tests en hub+sequence; suite 1082 passed; sin cadenas nuevas)
 
 ---
 
@@ -984,4 +984,4 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2).
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3).

@@ -1593,3 +1593,26 @@ def test_variable_plan_block_saturation_warning(window):
     plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
     texts = [l.text() for l in plan.findChildren(QLabel)]
     assert any("aturat" in t for t in texts)
+
+
+def test_variable_plan_prefills_protocol_filters(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Campaña T CrB",
+                          protocol={"cadence_nights": 1,
+                                    "filters": ["B", "V"]})
+    p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
+                        campaign_id=cid)
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    filters = [e["cmb"].currentText() for e in window._sn_steps]
+    assert filters == ["B", "V"]
+
+
+def test_variable_without_campaign_keeps_clear_default(window):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    filters = [e["cmb"].currentText() for e in window._sn_steps]
+    assert filters == ["Clear"]

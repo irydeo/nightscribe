@@ -2110,8 +2110,9 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_darks"] = spn_darks
         self._project_widgets["spn_darkexp"] = spn_darkexp
         self._project_widgets["spn_bias"] = spn_bias
-        # B8: SN exposure hint by brightness + multi-filter step rows
-        if kind == "sn" and ctx.get("mag") is not None:
+        # B8/Track V: SN and variable exposure hint
+        # by brightness + multi-filter step rows
+        if kind in ("sn", "variable") and ctx.get("mag") is not None:
             from ..core import exposure
             sn_exp = exposure.recommended_sn_exposure(ctx["mag"])
             if sn_exp:
@@ -2127,7 +2128,15 @@ class MainWindow(QMainWindow):
             steps_vlay = QVBoxLayout(steps_container)
             steps_vlay.setContentsMargins(2, 2, 2, 2)
             self._sn_steps = []
-            for filt in ("Clear",):
+            default_filters = ("Clear",)
+            if kind == "variable" and p.get("campaign_id"):
+                from ..core import campaign as _camp
+                camp = _camp.get(db, p["campaign_id"])
+                prot_filters = ((camp or {}).get("protocol") or {}).get(
+                    "filters") or []
+                if prot_filters:
+                    default_filters = tuple(prot_filters)
+            for filt in default_filters:
                 self._sn_add_step_row(steps_vlay, filt, 30, spn_exp.value())
             add_row = QHBoxLayout()
             btn_add_filt = QPushButton(self.tr("Add filter"))
@@ -4247,7 +4256,8 @@ class MainWindow(QMainWindow):
         # B8: SN multi-filter plans use the step rows; other kinds use the
         # legacy single-filter fields.
         steps = None
-        if self._current_project["kind"] == "sn" and self._sn_steps:
+        if self._current_project["kind"] in ("sn", "variable") \
+                and self._sn_steps:
             steps = self._sn_collect_steps()
             # total n_frames for the plan dict (sum of per-step counts)
             n_total = sum(n for _f, n, _e in steps)

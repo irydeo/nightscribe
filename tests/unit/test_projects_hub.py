@@ -1628,3 +1628,21 @@ def test_followup_has_export_report_button(window):
     texts = [b.text() for b in fu_tab.findChildren(QPushButton)]
     assert any("Export photometry report" in t or "Exportar" in t
                for t in texts)
+
+
+def test_download_survey_points_are_stored_and_deduped(window, monkeypatch):
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.core.sources import surveys
+    from nightscribe.gui import main_window as mw
+    fake = [{"mjd": 59000.0 + i, "filter": "g", "mag": 15.5 + i * 0.01,
+             "err": 0.02, "source": "survey:ztf"} for i in range(5)]
+    monkeypatch.setattr(surveys, "fetch_points", lambda ra, dec: fake)
+    p = proj_mod.create(mw.db, "variable", "WeSb 1",
+                        {"ra_deg": 15.2254, "dec_deg": 55.0667})
+    window._fu_download_survey(p["id"])
+    pts = fu.list_points(mw.db, p["id"])
+    assert len(pts) == 5
+    assert all(q["source"] == "survey:ztf" for q in pts)
+    window._fu_download_survey(p["id"])          # again: no duplicates
+    assert len(fu.list_points(mw.db, p["id"])) == 5

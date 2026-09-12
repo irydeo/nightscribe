@@ -3512,6 +3512,14 @@ class MainWindow(QMainWindow):
             "form / WebObs"))
         btn_export.clicked.connect(lambda: self._fu_export_report(pid))
         fu_btns.addWidget(btn_export)
+        if kind in ("sn", "variable"):
+            btn_survey = QPushButton(self.tr("Download survey photometry…"))
+            btn_survey.setToolTip(self.tr(
+                "ASAS-SN/ZTF context points, drawn in grey and never "
+                "mixed with your own measurements"))
+            btn_survey.clicked.connect(
+                lambda: self._fu_download_survey(pid))
+            fu_btns.addWidget(btn_survey)
         layout.addLayout(fu_btns)
 
         # sessions list
@@ -4171,6 +4179,38 @@ class MainWindow(QMainWindow):
         project.add_file(db, pid, str(path), "report")
         self.statusBar().showMessage(
             self.tr("Written to %1").replace("%1", str(path)), 8000)
+
+    def _fu_download_survey(self, pid):
+        # Pulls the survey context points (V-f; closes the B12 option) into
+        # photometry_points as source="survey:ztf". Idempotent: a point with
+        # the same mjd+filter+source is not duplicated.
+        from ..core import followup as fu
+        from ..core.sources import surveys
+        p = project.get(db, pid)
+        ctx = p.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None or dec is None:
+            self.statusBar().showMessage(
+                self.tr("The project has no coordinates"), 6000)
+            return
+        pts = surveys.fetch_points(ra, dec)
+        if not pts:
+            self.statusBar().showMessage(
+                self.tr("No survey data for this position"), 6000)
+            return
+        existing = {(q["mjd"], q["filter"]) for q in fu.list_points(db, pid)
+                    if (q.get("source") or "").startswith("survey:")}
+        n = 0
+        for pt in pts:
+            if (pt["mjd"], pt["filter"]) in existing:
+                continue
+            fu.add_point(db, pid, pt["mjd"], pt["filter"], pt["mag"],
+                         err=pt.get("err"), source=pt["source"])
+            n += 1
+        self.statusBar().showMessage(
+            self.tr("Added %1 survey points").replace("%1", str(n)), 8000)
+        # rebuild the tab so the curve/points update in place
+        self._build_step_tabs(project.get(db, pid))
 
     def _project_step_changed(self, idx):
         # Update the status label and the step buttons when the tab changes

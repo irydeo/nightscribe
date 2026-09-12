@@ -778,7 +778,7 @@ def test_download_survey_points_are_stored_and_deduped(window, monkeypatch):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: survey context download in follow-up (closes the B12 option) (ADR-035, subplan VD.7)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1090)
 
 ---
 
@@ -988,4 +988,4 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5) → 1089 (tras VD.6).
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5) → 1089 (tras VD.6) → 1090 (tras VD.7).

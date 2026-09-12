@@ -303,7 +303,8 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
     # gets its curve folded by the catalog period + the schematic sawtooth
     fu = d.get("followup") or {}
     fu_points = fu.get("points") or []
-    if fu_points and e.get("type") in ("transient", "sn", "hads"):
+    if fu_points and e.get("type") in ("transient", "sn", "hads",
+                                       "variable"):
         from ..viz import lightcurve_view
         p = outdir / f"{safe}lightcurve.png"
         try:
@@ -320,6 +321,21 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
                     if amp and h.get("max") is not None:
                         kw["schematic"] = hads_mod.sawtooth_template(
                             h["period_h"], amp, (h["max"] + h["min"]) / 2)
+            if e.get("type") == "variable":
+                v = d.get("variable") or {}
+                if v.get("period_d"):
+                    kw["fold_period_d"] = v["period_d"]
+                    if v.get("epoch_mjd") is not None:
+                        kw["epoch_mjd"] = v["epoch_mjd"]
+                    amp = v.get("amp")
+                    if amp is None and v.get("max") is not None \
+                            and v.get("min") is not None:
+                        amp = v["min"] - v["max"]     # inverted axis
+                    if amp and v.get("max") is not None:
+                        from . import hads as hads_mod
+                        kw["schematic"] = hads_mod.sawtooth_template(
+                            v["period_d"] * 24.0, amp,
+                            (v["max"] + v["min"]) / 2)
             lightcurve_view.draw_lightcurve(
                 fu_points, out=str(p), fmt=fmt, size=size, lang=lang,
                 sn_type=(d.get("simbad") or {}).get("otype"),

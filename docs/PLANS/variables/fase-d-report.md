@@ -981,11 +981,11 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_variable_post.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core/Post: variable posts ship the epoch-folded light curve (ADR-035, subplan VD.9)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (2 tests en test_variable_post.py; suite 1096 passed)
 
 ---
 
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5) → 1089 (tras VD.6) → 1090 (tras VD.7).
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5) → 1089 (tras VD.6) → 1090 (tras VD.7) → 1094 (tras VD.8) → 1096 (tras VD.9).

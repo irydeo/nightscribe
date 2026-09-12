@@ -66,3 +66,46 @@ def export_csv(points, out, name, ra_deg=None, dec_deg=None, observer="",
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("photometry CSV written: %s (%d points)", out, len(points))
     return Path(out)
+
+
+# ---------------- AAVSO Extended File Format ----------------
+
+EFF_FIELDS = ("NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,"
+              "AMASS,GROUP,CHART,NOTES")
+
+
+def export_eff(points, out, name, ra_deg=None, dec_deg=None, obscode=""):
+    # AAVSO Extended File Format (the WebObs/FotoDif interchange): header
+    # lines starting with '#', then one line per point. Dates are HJD
+    # (#DATE=HJD). Points without a full HJD are skipped — EFF has no
+    # empty-date concept.
+    # @args: obscode - the AAVSO observer code (config aavso_code)
+    # @return: Path written
+    lines = ["#TYPE=EXTENDED",
+             f"#OBSCODE={obscode or 'UNKNOWN'}",
+             "#SOFTWARE=NightScribe",
+             "#DELIM=,",
+             "#DATE=HJD",
+             "#OBSTYPE=CCD",
+             EFF_FIELDS]
+    n = 0
+    for p in points:
+        hjd = hjd_of(p, ra_deg, dec_deg)
+        if hjd is None:
+            continue
+        merr = f"{p['err']:.3f}" if p.get("err") is not None else "0.000"
+        filt = p.get("filter") or "Clear"
+        lines.append(f"{name.upper()},{hjd:.5f},{p['mag']:.3f},{merr},"
+                     f"{filt},NA,STD,na,na,na,na,na,na,na,")
+        n += 1
+    Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    logger.info("photometry EFF written: %s (%d points)", out, n)
+    return Path(out)
+
+
+def export_report(points, out, fmt="csv", **meta):
+    # Single entry point for the GUI.
+    # @args: fmt - "csv" | "eff", meta - export_csv/export_eff keywords
+    if fmt == "eff":
+        return export_eff(points, out, **meta)
+    return export_csv(points, out, **meta)

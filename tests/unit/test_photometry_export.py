@@ -67,3 +67,40 @@ def test_csv_without_coordinates_leaves_hjd_empty(db, tmp_path):
     photometry_export.export_csv(pts, out, "WeSb 1")
     row = out.read_text().splitlines()[3].split(",")
     assert row[1] == ""
+
+
+def test_eff_header_and_rows(db, tmp_path):
+    pid = _pid_with_points(db)
+    pts = photometry_export.collect_points(db, pid)
+    out = tmp_path / "report.txt"
+    photometry_export.export_eff(pts, out, "WeSb 1", ra_deg=15.2254,
+                                 dec_deg=55.0667, obscode="ZABC")
+    lines = out.read_text().splitlines()
+    assert lines[:6] == ["#TYPE=EXTENDED", "#OBSCODE=ZABC",
+                         "#SOFTWARE=NightScribe", "#DELIM=,", "#DATE=HJD",
+                         "#OBSTYPE=CCD"]
+    assert lines[6] == photometry_export.EFF_FIELDS
+    row = lines[7].split(",")
+    assert row[0] == "WESB 1"                    # upper-cased
+    assert row[2] == "15.100" and row[3] == "0.020" and row[4] == "V"
+    assert row[5] == "NA" and row[6] == "STD"
+    assert len(row) == 15
+    assert len(lines) == 10                       # 7 header + 3 rows
+
+
+def test_eff_skips_points_without_hjd(db, tmp_path):
+    pid = _pid_with_points(db)
+    pts = photometry_export.collect_points(db, pid)
+    out = tmp_path / "report.txt"
+    photometry_export.export_eff(pts, out, "WeSb 1")   # no coords
+    assert len(out.read_text().splitlines()) == 7      # header only
+
+
+def test_export_report_dispatch(db, tmp_path):
+    pid = _pid_with_points(db)
+    pts = photometry_export.collect_points(db, pid)
+    o1 = photometry_export.export_report(pts, tmp_path / "a.csv", fmt="csv",
+                                         name="WeSb 1")
+    o2 = photometry_export.export_report(pts, tmp_path / "a.txt", fmt="eff",
+                                         name="WeSb 1", obscode="ZABC")
+    assert o1.exists() and o2.exists()

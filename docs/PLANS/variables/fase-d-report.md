@@ -553,10 +553,14 @@ def test_export_report_dispatch(db, tmp_path):
     assert o1.exists() and o2.exists()
 ```
 
-**Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_photometry_export.py -q`
-**Hecho cuando**: verde; suite verde (N→M).
-**Commit**: `Core: AAVSO Extended File Format photometry export (ADR-035, subplan VD.5)`
-**Estado**: Pendiente
+ **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_photometry_export.py -q`
+ **Hecho cuando**: verde; suite verde (N→M).
+ **Commit**: `Core: AAVSO Extended File Format photometry export (ADR-035, subplan VD.5)`
+ **Nota de desviación**: el test `test_eff_header_and_rows` exige 15 columnas
+ (una por campo de `EFF_FIELDS`); el bloque de código del plan solo llevaba 14
+ `na`. Se añadió el 15º valor vacío (tras `CHART`) para que `row` tenga 15
+ celdas. La salida EFF sigue siendo válida (campo opcional con valor nulo).
+ **Estado**: Hecho ✅ (6 tests en test_photometry_export.py; suite 1088 passed)
 
 ---
 
@@ -984,4 +988,4 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4).
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5).

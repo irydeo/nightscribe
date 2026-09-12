@@ -2069,6 +2069,9 @@ class MainWindow(QMainWindow):
         # HADS: the 2P continuous-capture block (no event, no timeline)
         if kind == "hads" and (ctx.get("hads") or {}):
             self._build_hads_block(layout, p, ctx, spn_exp, spn)
+        # Track V: variable/campaign block (protocol, extremum, exposure)
+        if kind == "variable":
+            self._build_variable_block(layout, p, ctx, spn_exp)
         # restore saved plan data
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -3272,6 +3275,68 @@ class MainWindow(QMainWindow):
             cbs.append(cb)
         self._project_widgets["hads_checklist"] = cbs
         layout.addWidget(grp)
+
+    def _build_variable_block(self, layout, p, ctx, spn_exp):
+        # The variable/campaign plan block (ADR-035): the campaign protocol
+        # reminder, the next expected extremum, tonight's safe window and
+        # the heuristic exposure (the SN brightness table, B8) with a
+        # saturation warning for bright stars (the T CrB lesson).
+        # @args: layout - plan tab layout, p - project dict, ctx - context,
+        #        spn_exp - the capture-plan exposure spin (preselected here)
+        v = ctx.get("variable") or {}
+        grp = QGroupBox(self.tr("Variable star plan"))
+        gl = QVBoxLayout(grp)
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            camp = _camp.get(db, p["campaign_id"])
+            if camp:
+                prot = camp.get("protocol") or {}
+                bits = [self.tr("Campaign: %1").replace("%1", camp["name"])]
+                if prot.get("cadence_nights"):
+                    bits.append(self.tr(
+                        "one measurement every %1 night(s) per filter"
+                    ).replace("%1", str(prot["cadence_nights"])))
+                if prot.get("filters"):
+                    bits.append(self.tr("filters: %1").replace(
+                        "%1", ", ".join(prot["filters"])))
+                lbl = QLabel(" · ".join(bits))
+                lbl.setWordWrap(True)
+                gl.addWidget(lbl)
+        nxt = v.get("next_extremum") or {}
+        if nxt.get("days") is not None:
+            lab = self.tr("Maximum") if nxt.get("kind") == "max" \
+                else self.tr("Minimum")
+            gl.addWidget(QLabel(self.tr("%1 expected in ~%2 days").replace(
+                "%1", lab).replace("%2", f"{nxt['days']:.0f}")))
+        from ..core import narrative
+        swt = narrative.safe_window_text(ctx)
+        if swt:
+            lbl_win = QLabel(self._txt(swt))
+            lbl_win.setWordWrap(True)
+            gl.addWidget(lbl_win)
+        if ctx.get("mag") is not None:
+            from ..core import exposure
+            exp_rec = exposure.recommended_sn_exposure(ctx["mag"])
+            if exp_rec:
+                lbl_exp = QLabel(
+                    "<small>" + self.tr("Recommended exposure")
+                    + f": {exp_rec} s · " + self.tr("guide, not SNR — confirm with a test shot")
+                    + "</small>")
+                lbl_exp.setWordWrap(True)
+                gl.addWidget(lbl_exp)
+                spn_exp.setValue(float(exp_rec))
+            try:
+                if float(ctx["mag"]) <= 10.0:
+                    lbl_sat = QLabel(self.tr(
+                        "⚠ Bright star: watch the saturation — a slight "
+                        "defocus helps (T CrB lesson)"))
+                    lbl_sat.setWordWrap(True)
+                    lbl_sat.setStyleSheet("color: #e0c060;")
+                    gl.addWidget(lbl_sat)
+            except (TypeError, ValueError):
+                pass
+        layout.addWidget(grp)
+        self._project_widgets["variable_block"] = grp
 
     def _hads_checklist_save(self, pid):
         # Persists the HADS pre-flight checklist (same plan-data "checklist"

@@ -240,10 +240,10 @@ def test_variable_plan_block_saturation_warning(window):
 | guide, not SNR — confirm with a test shot | guía, no SNR — confirma con una toma de prueba | guide, not SNR — confirm with a test shot |
 | ⚠ Bright star: watch the saturation — a slight defocus helps (T CrB lesson) | ⚠ Estrella brillante: cuidado con la saturación — un ligero desenfoque ayuda (lección de T CrB) | ⚠ Bright star: watch the saturation — a slight defocus helps (T CrB lesson) |
 
-**Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
-**Hecho cuando**: verde; suite verde (N→M).
-**Commit**: `Gui: variable/campaign plan block — protocol, extremum, exposure, saturation warning (ADR-035, subplan VD.2)`
-**Estado**: Pendiente
+ **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
+ **Hecho cuando**: verde; suite verde (N→M).
+ **Commit**: `Gui: variable/campaign plan block — protocol, extremum, exposure, saturation warning (ADR-035, subplan VD.2)`
+ **Estado**: Hecho ✅ (66 tests en test_projects_hub.py; i18n 702/702; suite 1080 passed)
 
 ---
 
@@ -984,4 +984,4 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: ______ → ______.
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2).

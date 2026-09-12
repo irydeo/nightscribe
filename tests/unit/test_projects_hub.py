@@ -1559,3 +1559,37 @@ def test_followup_event_advisor_label(window):
     fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
     texts = [l.text() for l in fu_tab.findChildren(QLabel)]
     assert any("brightness drop" in t or "descenso" in t for t in texts)
+
+
+def test_variable_plan_block_shows_protocol_and_extremum(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QLabel, QWidget
+    cid = camp_mod.create(mw.db, "Campaña T CrB",
+                          protocol={"cadence_nights": 1,
+                                    "filters": ["B", "V"]})
+    ctx = {"mag": 10.1,
+           "variable": {"period_d": 227.55,
+                        "next_extremum": {"kind": "max", "mjd": 61250.0,
+                                          "days": 3.0}},
+           "safe_window": "2026-09-11T22:00|2026-09-12T04:00"}
+    p = proj_mod.create(mw.db, "variable", "T CrB", ctx, campaign_id=cid)
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
+    texts = [l.text() for l in plan.findChildren(QLabel)]
+    assert any("Campaña T CrB" in t for t in texts)
+    assert any("3" in t and ("ays" in t or "ías" in t) for t in texts)
+    # the saturation warning does NOT fire at mag 10.1
+    assert not any("aturat" in t for t in texts)
+
+
+def test_variable_plan_block_saturation_warning(window):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QLabel, QWidget
+    p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 9.0})
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
+    texts = [l.text() for l in plan.findChildren(QLabel)]
+    assert any("aturat" in t for t in texts)

@@ -3506,6 +3506,12 @@ class MainWindow(QMainWindow):
         btn_file = QPushButton(self.tr("Import file…"))
         btn_file.clicked.connect(lambda: self._fu_import_file(pid))
         fu_btns.addWidget(btn_file)
+        btn_export = QPushButton(self.tr("Export photometry report…"))
+        btn_export.setToolTip(self.tr(
+            "CSV or AAVSO EFF with heliocentric dates, for the campaign "
+            "form / WebObs"))
+        btn_export.clicked.connect(lambda: self._fu_export_report(pid))
+        fu_btns.addWidget(btn_export)
         layout.addLayout(fu_btns)
 
         # sessions list
@@ -4106,8 +4112,65 @@ class MainWindow(QMainWindow):
             return
         for p in pts:
             fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
-                         err=p["err"], source="file")
+                          err=p["err"], source="file")
         self._populate_project_files(pid)
+
+    def _fu_export_report(self, pid):
+        # Exports the project's photometry to CSV or AAVSO EFF (HJD in-app,
+        # ADR-035 V-i) and registers the file in the project.
+        from ..core import photometry_export
+        p = project.get(db, pid)
+        ctx = p.get("context") or {}
+        # quick-look inclusion is an explicit choice (T6)
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Export photometry report"))
+        form = QFormLayout(dlg)
+        cmb_fmt = QComboBox()
+        cmb_fmt.addItem(self.tr("CSV (group format)"), "csv")
+        cmb_fmt.addItem(self.tr("AAVSO EFF (WebObs)"), "eff")
+        form.addRow(self.tr("Format:"), cmb_fmt)
+        chk_ql = QCheckBox(self.tr("Include quick-look (indicative) points"))
+        form.addRow(chk_ql)
+        box = QDialogButtonBox(QDialogButtonBox.Save
+                               | QDialogButtonBox.Cancel)
+        box.accepted.connect(dlg.accept)
+        box.rejected.connect(dlg.reject)
+        form.addRow(box)
+        if dlg.exec() != QDialog.Accepted:
+            return
+        pts = photometry_export.collect_points(db, pid,
+                                               include_quicklook=
+                                               chk_ql.isChecked())
+        if not pts:
+            self.statusBar().showMessage(
+                self.tr("No photometry points to export"), 6000)
+            return
+        # comparison stars and observer code come from the campaign/config
+        comps, observer = [], config.get("aavso_code", "")
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            camp = _camp.get(db, p["campaign_id"])
+            if camp:
+                comps = (camp.get("protocol") or {}).get("comp_stars") or []
+        ext = ".txt" if cmb_fmt.currentData() == "eff" else ".csv"
+        outdir = project.storage_dir(p)
+        default = outdir / f"{p['object_name']}_photometry{ext}"
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Export photometry report"), str(default),
+            f"*{ext};;All files (*)")
+        if not out:
+            return
+        meta = {"name": p["object_name"], "ra_deg": ctx.get("ra_deg"),
+                "dec_deg": ctx.get("dec_deg")}
+        if cmb_fmt.currentData() == "eff":
+            path = photometry_export.export_eff(pts, out, obscode=observer,
+                                                **meta)
+        else:
+            path = photometry_export.export_csv(pts, out, observer=observer,
+                                                comp_stars=comps, **meta)
+        project.add_file(db, pid, str(path), "report")
+        self.statusBar().showMessage(
+            self.tr("Written to %1").replace("%1", str(path)), 8000)
 
     def _project_step_changed(self, idx):
         # Update the status label and the step buttons when the tab changes

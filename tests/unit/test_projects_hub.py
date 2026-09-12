@@ -1616,3 +1616,15 @@ def test_variable_without_campaign_keeps_clear_default(window):
     window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["Clear"]
+
+
+def test_followup_has_export_report_button(window):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QPushButton, QWidget
+    p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1})
+    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    texts = [b.text() for b in fu_tab.findChildren(QPushButton)]
+    assert any("Export photometry report" in t or "Exportar" in t
+               for t in texts)

@@ -681,7 +681,7 @@ def test_followup_has_export_report_button(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: photometry report export dialog + project file registration (ADR-035, subplan VD.6)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (suite 1089)
 
 ---
 
@@ -988,4 +988,4 @@ def test_post_mentions_the_campaign(tmp_path, fake_cfg):
 ## Cierre de la fase D
 
 Cuando VD.1–VD.9 estén hechas: `.venv/bin/python -m pytest tests/unit -q`
-verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5).
+verde y anota el conteo total aquí: 1076 → 1078 (tras VD.1) → 1080 (tras VD.2) → 1082 (tras VD.3) → 1085 (tras VD.4) → 1088 (tras VD.5) → 1089 (tras VD.6).

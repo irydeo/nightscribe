@@ -117,3 +117,39 @@ def test_due_campaigns_skips_finished_and_done_projects(db):
     assert campaign.due_campaigns(db) == []
     campaign.reopen(db, cid)
     assert campaign.due_campaigns(db) == []     # the project is still done
+
+
+def test_status_report_health_per_member(db):
+    from nightscribe.core import followup, project
+    cid = campaign.create(db, "Campaña WeSb 1",
+                          protocol={"cadence_nights": 2})
+    p_new = project.create(db, "variable", "WeSb 1",
+                           {"ra_deg": 15.2, "dec_deg": 55.0},
+                           campaign_id=cid)
+    p_ok = project.create(db, "sn", "SN 2099aa", {}, campaign_id=cid)
+    followup.create_session(db, p_ok["id"])        # visited today
+    rep = campaign.status_report(db, cid)
+    assert rep["campaign"]["name"] == "Campaña WeSb 1"
+    by_name = {m["object_name"]: m for m in rep["members"]}
+    assert by_name["WeSb 1"]["due"] is True        # never visited
+    assert by_name["WeSb 1"]["days_since"] is None
+    assert by_name["SN 2099aa"]["due"] is False    # visited today
+    assert by_name["SN 2099aa"]["days_since"] == 0
+    assert by_name["SN 2099aa"]["event"] is None
+
+
+def test_status_report_flags_events(db):
+    from nightscribe.core import followup, project
+    cid = campaign.create(db, "C")
+    p = project.create(db, "variable", "R CrB", {}, campaign_id=cid)
+    # >= 4 own points, latest one a >0.5 mag jump (inverted axis: mag up
+    # = brightness drop)
+    for i, mag in enumerate((11.0, 11.1, 11.0, 11.05, 12.0)):
+        followup.add_point(db, p["id"], 60100.0 + i, "V", mag,
+                           source="manual")
+    rep = campaign.status_report(db, cid)
+    assert rep["members"][0]["event"]["direction"] == "drop"
+
+
+def test_status_report_unknown_campaign(db):
+    assert campaign.status_report(db, 9999) is None

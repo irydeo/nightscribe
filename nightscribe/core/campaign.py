@@ -193,3 +193,34 @@ def due_campaigns(db):
                         "overdue_days": overdue, "cadence_nights": cad,
                         "never_visited": never})
     return out
+
+
+def status_report(db, campaign_id):
+    # The Campaigns tab data (UX-b): EVERY member project with its cadence
+    # health and event flag, so the tab shows the whole campaign at a
+    # glance — due_campaigns' narrower job is the Tonight loop (due only).
+    # @args: db - Database, campaign_id - int
+    # @return: {"campaign": camp, "members": [{"id", "object_name", "kind",
+    #          "status", "days_since", "due", "overdue_days", "event"}]},
+    #          or None when the campaign does not exist
+    from . import followup, variables
+    camp = get(db, campaign_id)
+    if not camp:
+        return None
+    cad = int(protocol_get(camp, "cadence_nights", 1) or 1)
+    rows = db.execute(
+        "SELECT id, object_name, kind, status FROM projects"
+        " WHERE campaign_id=? ORDER BY object_name COLLATE NOCASE",
+        (campaign_id,)).fetchall()
+    members = []
+    for pid, name, kind, pstatus in rows:
+        days = followup.days_since_last_session(db, pid)
+        due = pstatus == "active" and (days is None or days >= cad)
+        ev = None
+        if kind in ("variable", "sn"):
+            ev = variables.detect_event(followup.list_points(db, pid))
+        members.append({"id": pid, "object_name": name, "kind": kind,
+                        "status": pstatus, "days_since": days, "due": due,
+                        "overdue_days": days if days is not None else cad,
+                        "event": ev})
+    return {"campaign": camp, "members": members}

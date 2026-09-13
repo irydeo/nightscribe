@@ -103,7 +103,7 @@ reporta**.)
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaign.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: campaign.status_report — members with cadence health and event flag (UX, subplan UA.1)`
-**Estado**: Pendiente
+**Estado**: Hecho (1107→1110)
 
 ---
 

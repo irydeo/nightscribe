@@ -96,10 +96,17 @@ def test_edit_campaign_via_form(qapp, db):
     assert campaign.get(db, cid)["name"] == "A2"
 
 
-def test_save_without_name_is_refused(qapp, db):
+def test_save_without_name_warns(qapp, db, monkeypatch):
+    # UX-e: the silent refusal becomes a warning (replaces
+    # test_save_without_name_is_refused)
+    from PySide6.QtWidgets import QMessageBox
     from nightscribe.gui.campaigns_dialog import CampaignEditDialog
+    seen = {}
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: seen.setdefault("warned", True))
     dlg = CampaignEditDialog(db_obj=db)
     dlg._save()
+    assert seen.get("warned")
     assert campaign.list_campaigns(db) == []
 
 
@@ -143,19 +150,31 @@ def test_add_target_manual_when_nothing_knows_it(qapp, db, monkeypatch):
     assert p["context"]["mag"] == 15.0
 
 
-def test_add_target_without_coordinates_is_refused(qapp, db):
+def test_add_target_without_coordinates_warns(qapp, db, monkeypatch):
+    # UX-e: replaces test_add_target_without_coordinates_is_refused
+    from PySide6.QtWidgets import QMessageBox
     from nightscribe.core import project as proj_mod
     from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    seen = {}
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: seen.setdefault("warned", True))
     cid = campaign.create(db, "C")
     dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
     dlg.edt_name.setText("X")
     dlg._save()
+    assert seen.get("warned")
     assert proj_mod.list_projects(db) == []
 
 
-def test_detach_with_no_members_is_a_noop(qapp, db):
+def test_detach_with_no_members_informs(qapp, db, monkeypatch):
+    # UX-e: replaces test_detach_with_no_members_is_a_noop
+    from PySide6.QtWidgets import QMessageBox
     from nightscribe.gui.campaigns_dialog import CampaignsDialog
+    seen = {}
+    monkeypatch.setattr(QMessageBox, "information",
+                        lambda *a, **k: seen.setdefault("told", True))
     campaign.create(db, "C")
     dlg = CampaignsDialog(db_obj=db)
     dlg.lst_active.setCurrentRow(0)
-    dlg._detach_project()          # no members: nothing happens, no crash
+    dlg._detach_project()
+    assert seen.get("told")

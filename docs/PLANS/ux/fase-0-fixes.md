@@ -370,7 +370,7 @@ def test_detach_with_no_members_informs(qapp, db, monkeypatch):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign dialogs never fail silently — validation warnings + empty-list info (UX, subplan U0.3)`
-**Estado**: Pendiente
+**Estado**: Hecho (1099 stable — 3 tests renamed in-place)
 
 ---
 

@@ -161,6 +161,10 @@ class CampaignsDialog(QDialog):
         actives = project.list_projects(self._db, status="active")
         choices = [p for p in actives if not p.get("campaign_id")]
         if not choices:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self, self.tr("Attach project"),
+                self.tr("No active project without a campaign."))
             return
         names = [f"[{p['kind']}] {p['object_name']}" for p in choices]
         sel, ok = QInputDialog.getItem(
@@ -179,6 +183,10 @@ class CampaignsDialog(QDialog):
         from PySide6.QtWidgets import QInputDialog
         members = campaign.projects_of(self._db, cid, status=None)
         if not members:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(
+                self, self.tr("Detach project"),
+                self.tr("This campaign has no projects yet."))
             return
         names = [p["object_name"] for p in members]
         sel, ok = QInputDialog.getItem(
@@ -242,10 +250,15 @@ class CampaignEditDialog(QDialog):
         return [x.strip() for x in text.split(",") if x.strip()]
 
     def _save(self):
-        # Validates the name and persists (create or update).
-        # @return: None
+        # Validates the name and persists (create or update). Never
+        # silent (UX-e): an empty name tells the user why nothing
+        # happened.
         name = self.edt_name.text().strip()
         if not name:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, self.windowTitle(),
+                self.tr("The campaign needs a name."))
             return
         prot = {"cadence_nights": self.spn_cadence.value(),
                 "filters": self._csv(self.edt_filters.text()),
@@ -347,12 +360,20 @@ class AddTargetDialog(QDialog):
         # Creates the variable project linked to the campaign.
         name = self.edt_name.text().strip()
         if not name or self._campaign_id is None:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, self.windowTitle(),
+                self.tr("The target needs a name."))
             return
         from ..core import project
         try:
             ra = float(self.edt_ra.text())
             dec = float(self.edt_dec.text())
         except ValueError:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, self.windowTitle(),
+                self.tr("RA and Dec must be numbers, in degrees."))
             return
         mag = None
         try:

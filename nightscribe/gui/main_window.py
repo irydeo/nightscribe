@@ -66,7 +66,6 @@ _OUTCOME_LABELS = {
     "reported_aavso": {"es": "Reportada a la AAVSO", "en": "Reported to AAVSO"},
     "abandoned": {"es": "Abandonado", "en": "Abandoned"},
 }
-_STEP_TABS = {0: "tab_plan", 1: "tab_process", 2: "tab_publish"}
 # Kinds with multi-night photometry follow-up (the tab is kind-agnostic;
 # SN-only analysis buttons hide for the others)
 # Track V: variables join (V-g: the quick-look engine serves them unchanged)
@@ -2119,7 +2118,7 @@ class MainWindow(QMainWindow):
                 layout.addWidget(QLabel(
                     f"<small>{self.tr('Recommended exposure')}: "
                     f"{sn_exp}s · {self.tr('mag')} {ctx['mag']:.1f}"
-                    f" · {self.tr('guía, no SNR — prueba antes de saturar')}"
+                    f" · {self.tr('guide, not SNR — confirm with a test shot')}"
                     f"</small>"))
                 spn_exp.setValue(min(sn_exp, 60.0))
             # multi-filter rows: add/remove (filter × N × exp) steps
@@ -4999,13 +4998,6 @@ class MainWindow(QMainWindow):
         written = post_mod.save_outputs(rendered, outdir, name, e=e,
                                         charts=charts or None, cfg=config,
                                         resources=resources or None)
-        # A4: register every written file (posts + tweet) in the project
-        if self._current_project \
-                and self._current_project["object_name"] == name:
-            pid = self._current_project["id"]
-            for key, p in written.items():
-                if key in ("es", "en", "tweet"):
-                    project.add_file(db, pid, str(p), "post")
         # show the final drafts (with the gallery/resources links) in the tab
         post_w.txt_es.setPlainText(rendered.get("es", ""))
         post_w.txt_en.setPlainText(rendered.get("en", ""))

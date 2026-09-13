@@ -92,7 +92,7 @@ def test_post_files_registered_exactly_once(window, tmp_path, monkeypatch):
 + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: micro-fixes — tonight tooltip, dead constant, ES source string, post files registered once (UX, subplan U0.1)`
-**Estado**: Pendiente
+**Estado**: Hecho (1096→1097)
 
 ---
 

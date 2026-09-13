@@ -1677,3 +1677,40 @@ def test_post_files_registered_exactly_once(window, tmp_path, monkeypatch):
              if f["kind"] == "post"]
     assert len(files) == 3
     window._current_project = None
+
+
+def test_detail_cleared_when_selection_vanishes(window):
+    # U0.2: closing a project under the Active filter must clear the detail
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "sn", "SN 2099aa", {"mag": 15.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            lst.setCurrentRow(i)
+            break
+    assert window._current_project is not None
+    lst.clearSelection()
+    window._project_selected()
+    assert window._current_project is None
+    assert "SN 2099aa" not in window.projects.lbl_header.text()
+
+
+def test_reclick_selected_project_retries_load(window):
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "sn", "SN 2099ab", {"mag": 15.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    item = next(lst.item(i) for i in range(lst.count())
+                if lst.item(i).data(Qt.UserRole) == p["id"])
+    lst.setCurrentItem(item)
+    calls = []
+    orig = window._render_project_header
+    window._render_project_header = lambda p: calls.append(p["id"]) or orig(p)
+    window._project_reclicked(item)          # same row: must reload
+    assert calls == [p["id"]]
+    window._render_project_header = orig

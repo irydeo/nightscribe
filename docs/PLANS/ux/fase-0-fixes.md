@@ -233,7 +233,7 @@ Tonight.» ya existe en `projects_tab.ui`).
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: Explore CTA stays open on failure, stale project detail cleared, re-click retries (UX, subplan U0.2)`
-**Estado**: Pendiente
+**Estado**: Hecho (1097→1099)
 
 ---
 

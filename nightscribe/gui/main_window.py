@@ -469,6 +469,10 @@ class MainWindow(QMainWindow):
         p.cmb_campaign.currentIndexChanged.connect(
             lambda _i: self.on_refresh_projects())
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
+        # U0.2: itemSelectionChanged is not re-emitted for the row that
+        # is already selected, so a click on it used to be a no-op. It
+        # now retries the detail load (e.g. after a failed enrich).
+        p.lst_projects.itemClicked.connect(self._project_reclicked)
         p.tabs_steps.currentChanged.connect(self._project_step_changed)
         p.btn_prev.clicked.connect(self._project_prev)
         p.btn_next.clicked.connect(self._project_next)
@@ -1734,12 +1738,12 @@ class MainWindow(QMainWindow):
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()
         if not items:
-            self._reset_proj_panel()
+            self._clear_project_detail()
             return
         pid = items[0].data(Qt.UserRole)
         p = project.get(db, pid)
         if not p:
-            self._reset_proj_panel()
+            self._clear_project_detail()
             return
         self._current_project = p
         self._render_project_header(p)
@@ -1758,6 +1762,14 @@ class MainWindow(QMainWindow):
         self._ensure_proj_files_list(
             self.projects.tabs_steps.findChild(QWidget, "tab_details"))
         self._populate_project_files(p["id"])
+
+    def _project_reclicked(self, item):
+        # @args: item - the QListWidgetItem just clicked
+        # @return: None — reloads the detail when the clicked row is the
+        #          already-selected project
+        if item is not None and item.data(Qt.UserRole) == \
+                (self._current_project or {}).get("id"):
+            self._project_selected()
 
     def _ensure_proj_files_list(self, tab):
         # A4: lazily build the project files list widget in the Details tab.
@@ -1876,6 +1888,20 @@ class MainWindow(QMainWindow):
         # selection or the project list goes away).
         if self._proj_panel is not None:
             self._proj_panel.cancel()
+
+    def _clear_project_detail(self):
+        # Empties the whole detail side when the selection goes away
+        # (closed under the Active filter, filtered out, deleted): header,
+        # context, step tabs and the panel worker. Before U0.2 the header
+        # and tabs kept showing the vanished project (stale detail).
+        self._current_project = None
+        self._reset_proj_panel()
+        self._clear_step_tabs()
+        self.projects.lbl_header.setText(
+            self.tr("Select a project or create one from Tonight."))
+        self.projects.lbl_context.setText("—")
+        self.projects.lbl_step_status.setText("")
+        self.projects.lbl_advisor.setVisible(False)
 
     def _render_project_header(self, p):
         kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",
@@ -4817,18 +4843,23 @@ class MainWindow(QMainWindow):
             # the CTA said "create a fresh project on this object". `fb`
             # is the planner target (Tonight) or None for an ad-hoc
             # Tools-menu name. PySide6 passes only the declared args.
-            self._create_project(_target(nm, fb))
-            dlg.accept()
+            # Only close the dialog when the project was really created
+            # (UX, U0.2): otherwise the status-bar error would be lost.
+            if self._create_project(_target(nm, fb)) is not None:
+                dlg.accept()
 
         def _on_continue(nm, fb):
             # the CTA said "resume the active project". When nothing
             # matches the ad-hoc name (Tools menu), create it — same
-            # intent as the card's green "Continue" button.
+            # intent as the card's green "Continue" button. Only close
+            # on success (UX, U0.2).
             fb = fb if isinstance(fb, dict) else None
             name_or_id = nm or (fb.get("id") if fb else None)
-            if not self._goto_active_project(name_or_id, fb):
-                self._create_project(_target(nm, fb))
-            dlg.accept()
+            ok = self._goto_active_project(name_or_id, fb)
+            if not ok:
+                ok = self._create_project(_target(nm, fb)) is not None
+            if ok:
+                dlg.accept()
 
         panel.project_create.connect(_on_create)
         panel.project_continue.connect(_on_continue)

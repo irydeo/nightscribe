@@ -1714,3 +1714,18 @@ def test_reclick_selected_project_retries_load(window):
     window._project_reclicked(item)          # same row: must reload
     assert calls == [p["id"]]
     window._render_project_header = orig
+
+
+def test_campaign_filter_persists_in_config(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    from nightscribe.config import config
+    cid = camp_mod.create(mw.db, "Campaña persist")
+    window.on_refresh_projects()
+    cmb = window.projects.cmb_campaign
+    idx = cmb.findData(cid)
+    assert idx >= 0
+    cmb.setCurrentIndex(idx)                 # fires on_refresh_projects
+    assert config.get("projects_filter_campaign") == cid
+    cmb.setCurrentIndex(0)
+    assert config.get("projects_filter_campaign") == ""

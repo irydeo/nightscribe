@@ -899,4 +899,4 @@ def test_campaign_filter_persists_in_config(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py tests/unit/test_config.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui/Config: event_mag_threshold in Settings + persisted campaign filter (UX, subplan U0.6)`
-**Estado**: Pendiente
+**Estado**: Hecho (1106→1107)

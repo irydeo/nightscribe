@@ -567,6 +567,8 @@ class MainWindow(QMainWindow):
         dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
         dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
         dlg.spn_sn_cadence.setValue(int(config.get("sn_cadence_days", 3)))
+        dlg.spn_event_mag.setValue(
+            float(config.get("event_mag_threshold", 0.5)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
                                                      "127.0.0.1")))
         dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
@@ -632,6 +634,7 @@ class MainWindow(QMainWindow):
         config.set("moon_max_illum", dlg.spn_moon_illum.value())
         config.set("overhead_s", dlg.spn_overhead.value())
         config.set("sn_cadence_days", dlg.spn_sn_cadence.value())
+        config.set("event_mag_threshold", dlg.spn_event_mag.value())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
@@ -1665,6 +1668,12 @@ class MainWindow(QMainWindow):
         for c in _camp.list_campaigns(db):
             cmb.addItem(c["name"], c["id"])
         idx = cmb.findData(current)
+        if idx < 0 and not getattr(self, "_campaign_filter_restored", False):
+            # restore the persisted campaign filter once per session (U0.6)
+            self._campaign_filter_restored = True
+            saved = config.get("projects_filter_campaign", "")
+            if saved != "":
+                idx = cmb.findData(saved)
         cmb.setCurrentIndex(idx if idx >= 0 else 0)
         cmb.blockSignals(False)
 
@@ -1689,6 +1698,7 @@ class MainWindow(QMainWindow):
         config.set("projects_filter_kind", kind_idx)
         config.set("projects_filter_sort", sort_idx)
         config.set("projects_filter_fav", favorites)
+        config.set("projects_filter_campaign", camp_id or "")
         projects_list = project.list_projects(
             db, status, kind=kind, search=search, tags=tag,
             campaign_id=camp_id,

@@ -813,3 +813,15 @@ EFF con **HJD calculado en la app** (Sol de Schlyter).
 **Estado**: suite unitaria verde (**1096**). **Fuera de esta iteración**:
 ventana horaria de eclipses, compartir campañas, AAVSO Alert Notices,
 ASAS-SN Sky Patrol, monitor en vivo.
+
+**Siguiente track**: la auditoría de usabilidad (2026-09-13) encontró las
+funciones del Track V correctas pero escondidas (el gestor de campañas es
+un selector sin vista de detalle) y el flujo de proyecto con dos modelos
+de navegación apilados (pestañas + wizard). La corrección es su propio
+track — plan escrito, pendiente de ejecutar en la rama **independiente**
+`feature/campaigns-ux`: `docs/PLANS/ux-variables-campaigns.md` (maestro) +
+`docs/PLANS/ux/fase-*.md` (23 subplanes: la pestaña Campaigns, enlaces
+bidireccionales, un solo lenguaje de gestos, el proyecto como página única
+con tarjeta «Siguiente acción», y CCDciel en su propia pestaña
+Observatory). También pendiente, aprobado el 2026-09-12: el add-on de
+descubrimiento de variables (extremos predecibles + vigilias T CrB/R CrB).

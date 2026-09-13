@@ -645,3 +645,16 @@ reports with **in-app HJD** (Schlyter Sun).
 **Status**: unit suite green (**1096**). **Out of this iteration**:
 eclipse hour windows, campaign sharing, AAVSO Alert Notices, ASAS-SN
 Sky Patrol, live monitor.
+
+**Next track**: the usability audit (2026-09-13) found Track V's features
+correct but hidden (the campaign manager is a selector with no detail
+view) and the project flow stacked two navigation models (tabs + wizard).
+The fix is its own track — plan written, pending execution on the
+**independent** branch `feature/campaigns-ux`:
+`docs/PLANS/ux-variables-campaigns.md` (master) +
+`docs/PLANS/ux/fase-*.md` (23 subplans: the Campaigns fifth tab,
+bidirectional links, one gesture language, the project as a single
+checklist page with a Next-action card, and CCDciel moved to its own
+Observatory tab). Also pending, approved 2026-09-12: the
+featured-variables discovery add-on (predictable extrema + T CrB/R CrB
+watch lists).

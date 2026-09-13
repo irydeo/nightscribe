@@ -3545,6 +3545,7 @@ class MainWindow(QMainWindow):
             btn_survey.clicked.connect(
                 lambda: self._fu_download_survey(pid))
             fu_btns.addWidget(btn_survey)
+            self._project_widgets["fu_survey"] = btn_survey
         layout.addLayout(fu_btns)
 
         # sessions list
@@ -4207,10 +4208,10 @@ class MainWindow(QMainWindow):
 
     def _fu_download_survey(self, pid):
         # Pulls the survey context points (V-f; closes the B12 option) into
-        # photometry_points as source="survey:ztf". Idempotent: a point with
-        # the same mjd+filter+source is not duplicated.
-        from ..core import followup as fu
-        from ..core.sources import surveys
+        # photometry_points as source="survey:ztf". The download runs in a
+        # SurveyWorker (UX-f): the GUI never blocks on the network.
+        # Idempotent: a point with the same mjd+filter+source is not
+        # duplicated.
         p = project.get(db, pid)
         ctx = p.get("context") or {}
         ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
@@ -4218,7 +4219,20 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("The project has no coordinates"), 6000)
             return
-        pts = surveys.fetch_points(ra, dec)
+        from .workers import SurveyWorker
+        btn = self._project_widgets.get("fu_survey")
+        if btn is not None:
+            btn.setEnabled(False)
+        w = SurveyWorker(ra, dec)
+        w.finished.connect(lambda pts: self._fu_survey_done(pid, pts))
+        self._keep(w)
+
+    def _fu_survey_done(self, pid, pts):
+        # Merges the worker's survey points and rebuilds the tab in place.
+        from ..core import followup as fu
+        btn = self._project_widgets.get("fu_survey")
+        if btn is not None:
+            btn.setEnabled(True)
         if not pts:
             self.statusBar().showMessage(
                 self.tr("No survey data for this position"), 6000)

@@ -324,6 +324,7 @@ class AddTargetDialog(QDialog):
         self._db = db_obj or db
         self._campaign_id = campaign_id
         self._resolved = {}
+        self._resolve_worker = None
         self.setWindowTitle(self.tr("Add campaign target"))
         layout = QVBoxLayout(self)
         form = QFormLayout()
@@ -348,12 +349,26 @@ class AddTargetDialog(QDialog):
         layout.addWidget(box)
 
     def _resolve(self):
-        # Fills the form from VSX, then SIMBAD; leaves it editable always.
-        from ..core.sources import simbad, vsx
+        # Kicks the VSX->SIMBAD chain off the GUI thread (UX-f); the form
+        # stays editable while it resolves.
         name = self.edt_name.text().strip()
-        if not name:
+        if not name or self._resolve_worker is not None:
             return
-        v = vsx.lookup(name)
+        from .workers import ResolveWorker
+        self.btn_resolve.setEnabled(False)
+        self.lbl_resolved.setText(self.tr("Resolving…"))
+        self._resolve_worker = ResolveWorker(name)
+        self._resolve_worker.finished.connect(self._resolve_done)
+        self._resolve_worker.finished.connect(
+            self._resolve_worker.deleteLater)
+        self._resolve_worker.start()
+
+    def _resolve_done(self, result):
+        # Fills the form from the worker payload; leaves it editable always.
+        from ..core import coords
+        self._resolve_worker = None
+        self.btn_resolve.setEnabled(True)
+        v = result.get("vsx")
         if v:
             self._resolved = {"variable": v}
             self.edt_ra.setText(str(v.get("ra_deg") or ""))
@@ -365,9 +380,8 @@ class AddTargetDialog(QDialog):
                     "%1", v.get("var_type") or "?").replace(
                     "%2", str(v.get("period_d") or "?")))
             return
-        ident = simbad.query_id(name)
+        ident = result.get("simbad")
         if ident:
-            from ..core import coords
             try:
                 self.edt_ra.setText(str(round(
                     coords.ra_hms_to_deg(ident["ra"]), 5)))

@@ -110,19 +110,20 @@ def test_save_without_name_warns(qapp, db, monkeypatch):
     assert campaign.list_campaigns(db) == []
 
 
-def test_add_target_resolves_vsx_and_creates_project(qapp, db, monkeypatch):
+def test_add_target_resolves_vsx_and_creates_project(qapp, db):
+    # U0.5: resolution runs in a ResolveWorker; tests feed the payload
+    # straight into _resolve_done
     from nightscribe.core import project as proj_mod
-    from nightscribe.core.sources import vsx
     from nightscribe.gui.campaigns_dialog import AddTargetDialog
-    monkeypatch.setattr(vsx, "lookup", lambda name: {
-        "name": "T CrB", "auid": "000-BBW-825", "ra_deg": 239.87567,
-        "dec_deg": 25.92017, "var_type": "NR+ELL", "period_d": 227.5528,
-        "epoch_mjd": 55828.4, "max": 2.0, "min": 10.8, "max_band": "V",
-        "min_band": "V", "spectral": "M3III+WD", "constellation": "CrB"})
     cid = campaign.create(db, "Campaña T CrB")
     dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
     dlg.edt_name.setText("T CrB")
-    dlg._resolve()
+    dlg._resolve_done({"vsx": {
+        "name": "T CrB", "auid": "000-BBW-825", "ra_deg": 239.87567,
+        "dec_deg": 25.92017, "var_type": "NR+ELL", "period_d": 227.5528,
+        "epoch_mjd": 55828.4, "max": 2.0, "min": 10.8, "max_band": "V",
+        "min_band": "V", "spectral": "M3III+WD", "constellation": "CrB"},
+        "simbad": None})
     assert dlg.edt_ra.text().startswith("239.875")
     dlg._save()
     p = proj_mod.list_projects(db, campaign_id=cid)[0]
@@ -130,16 +131,13 @@ def test_add_target_resolves_vsx_and_creates_project(qapp, db, monkeypatch):
     assert p["context"]["variable"]["period_d"] == 227.5528
 
 
-def test_add_target_manual_when_nothing_knows_it(qapp, db, monkeypatch):
+def test_add_target_manual_when_nothing_knows_it(qapp, db):
     from nightscribe.core import project as proj_mod
-    from nightscribe.core.sources import simbad, vsx
     from nightscribe.gui.campaigns_dialog import AddTargetDialog
-    monkeypatch.setattr(vsx, "lookup", lambda name: None)
-    monkeypatch.setattr(simbad, "query_id", lambda name: None)
     cid = campaign.create(db, "Campaña WeSb 1")
     dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
     dlg.edt_name.setText("WeSb 1")
-    dlg._resolve()
+    dlg._resolve_done({"vsx": None, "simbad": None})
     assert "Not found" in dlg.lbl_resolved.text()
     dlg.edt_ra.setText("15.2254")
     dlg.edt_dec.setText("55.0667")

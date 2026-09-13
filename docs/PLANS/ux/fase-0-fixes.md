@@ -807,7 +807,7 @@ def test_add_target_manual_when_nothing_knows_it(qapp, db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_workers.py tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: ResolveWorker + SurveyWorker — no network on the GUI thread (UX, subplan U0.5)`
-**Estado**: Pendiente
+**Estado**: Hecho (1101→1106)
 
 ---
 

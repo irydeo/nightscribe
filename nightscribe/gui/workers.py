@@ -261,3 +261,44 @@ class CcdcielWorker(QThread):
                 return
             self.msleep(900)
             slept += 0.9
+
+
+class ResolveWorker(QThread):
+    # Resolves a target name against VSX, then SIMBAD (ADR-035, V-c), off
+    # the GUI thread (UX-f) — the campaign Add-target dialog used to freeze
+    # on these two network calls.
+    finished = Signal(dict)     # {"vsx": dict|None, "simbad": dict|None}
+
+    def __init__(self, name):
+        super().__init__()
+        self._name = name
+
+    def run(self):
+        from ..core.sources import simbad, vsx
+        out = {"vsx": None, "simbad": None}
+        try:
+            out["vsx"] = vsx.lookup(self._name)
+            if not out["vsx"]:
+                out["simbad"] = simbad.query_id(self._name)
+        except Exception as err:      # never crash the dialog on network
+            logger.warning("resolve worker failed: %s", err)
+        self.finished.emit(out)
+
+
+class SurveyWorker(QThread):
+    # Downloads the ALeRCE/ZTF context points for one position, off the GUI
+    # thread (UX-f) — the Follow-up survey button used to freeze on it.
+    finished = Signal(list)     # photometry point dicts ([] on failure)
+
+    def __init__(self, ra_deg, dec_deg):
+        super().__init__()
+        self._ra, self._dec = ra_deg, dec_deg
+
+    def run(self):
+        from ..core.sources import surveys
+        try:
+            self.finished.emit(surveys.fetch_points(self._ra, self._dec)
+                               or [])
+        except Exception as err:
+            logger.warning("survey worker failed: %s", err)
+            self.finished.emit([])

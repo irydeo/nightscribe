@@ -4,62 +4,62 @@
 <context>
     <name>AddTargetDialog</name>
     <message>
-        <location filename="../campaigns_dialog.py" line="299"/>
+        <location filename="../campaigns_dialog.py" line="327"/>
         <source>Add campaign target</source>
         <translation>Añadir objetivo a la campaña</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="303"/>
+        <location filename="../campaigns_dialog.py" line="331"/>
         <source>Object:</source>
         <translation>Objeto:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="304"/>
+        <location filename="../campaigns_dialog.py" line="332"/>
         <source>Resolve (VSX/SIMBAD)</source>
         <translation>Resolver (VSX/SIMBAD)</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="306"/>
+        <location filename="../campaigns_dialog.py" line="334"/>
         <source>— not resolved yet —</source>
         <translation>— sin resolver aún —</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="310"/>
+        <location filename="../campaigns_dialog.py" line="338"/>
         <source>RA (deg):</source>
         <translation>AR (°):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="312"/>
+        <location filename="../campaigns_dialog.py" line="340"/>
         <source>Dec (deg):</source>
         <translation>Dec (°):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="314"/>
+        <location filename="../campaigns_dialog.py" line="342"/>
         <source>Mag (approx):</source>
         <translation>Mag (aprox):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="336"/>
+        <location filename="../campaigns_dialog.py" line="364"/>
         <source>VSX: type %1, period %2 d</source>
         <translation>VSX: tipo %1, periodo %2 d</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="353"/>
+        <location filename="../campaigns_dialog.py" line="381"/>
         <source>SIMBAD: %1</source>
         <translation>SIMBAD: %1</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="357"/>
+        <location filename="../campaigns_dialog.py" line="385"/>
         <source>Not found — fill the coordinates by hand</source>
         <translation>No encontrado — rellena las coordenadas a mano</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="366"/>
+        <location filename="../campaigns_dialog.py" line="394"/>
         <source>The target needs a name.</source>
         <translation>El objetivo necesita un nombre.</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="376"/>
+        <location filename="../campaigns_dialog.py" line="404"/>
         <source>RA and Dec must be numbers, in degrees.</source>
         <translation>AR y Dec deben ser números, en grados.</translation>
     </message>
@@ -323,67 +323,67 @@
 <context>
     <name>CampaignEditDialog</name>
     <message>
-        <location filename="../campaigns_dialog.py" line="214"/>
+        <location filename="../campaigns_dialog.py" line="242"/>
         <source>Edit campaign</source>
         <translation>Editar campaña</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="215"/>
+        <location filename="../campaigns_dialog.py" line="243"/>
         <source>New campaign</source>
         <translation>Nueva campaña</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="219"/>
+        <location filename="../campaigns_dialog.py" line="247"/>
         <source>Name:</source>
         <translation>Nombre:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="221"/>
+        <location filename="../campaigns_dialog.py" line="249"/>
         <source>Group:</source>
         <translation>Grupo:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="223"/>
+        <location filename="../campaigns_dialog.py" line="251"/>
         <source>Coordinator:</source>
         <translation>Coordinador:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="225"/>
+        <location filename="../campaigns_dialog.py" line="253"/>
         <source>Science goal:</source>
         <translation>Objetivo científico:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="230"/>
+        <location filename="../campaigns_dialog.py" line="258"/>
         <source>Cadence (nights):</source>
         <translation>Cadencia (noches):</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="232"/>
+        <location filename="../campaigns_dialog.py" line="260"/>
         <source>Filters:</source>
         <translation>Filtros:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="234"/>
+        <location filename="../campaigns_dialog.py" line="262"/>
         <source>Comparison stars:</source>
         <translation>Estrellas de comparación:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="236"/>
+        <location filename="../campaigns_dialog.py" line="264"/>
         <source>Report URL:</source>
         <translation>URL de reporte:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="238"/>
+        <location filename="../campaigns_dialog.py" line="266"/>
         <source>Data URL:</source>
         <translation>URL de datos:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="240"/>
+        <location filename="../campaigns_dialog.py" line="268"/>
         <source>Protocol notes:</source>
         <translation>Notas del protocolo:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="261"/>
+        <location filename="../campaigns_dialog.py" line="289"/>
         <source>The campaign needs a name.</source>
         <translation>La campaña necesita un nombre.</translation>
     </message>
@@ -427,49 +427,64 @@
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="56"/>
+        <source>Delete…</source>
+        <translation>Eliminar…</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="57"/>
         <source>Add target…</source>
         <translation>Añadir objetivo…</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="57"/>
+        <location filename="../campaigns_dialog.py" line="58"/>
         <source>Attach project…</source>
         <translation>Adjuntar proyecto…</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="58"/>
+        <location filename="../campaigns_dialog.py" line="59"/>
         <source>Detach…</source>
         <translation>Quitar…</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="59"/>
+        <location filename="../campaigns_dialog.py" line="60"/>
         <source>Close</source>
         <translation>Cerrar</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="166"/>
-        <location filename="../campaigns_dialog.py" line="171"/>
+        <source>Delete campaign</source>
+        <translation>Eliminar campaña</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="167"/>
+        <source>Delete the campaign “%1”? Its projects are kept, only the link is removed.</source>
+        <translation>¿Eliminar la campaña «%1»? Sus proyectos se conservan, solo se quita el enlace.</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="194"/>
+        <location filename="../campaigns_dialog.py" line="199"/>
         <source>Attach project</source>
         <translation>Adjuntar proyecto</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="167"/>
+        <location filename="../campaigns_dialog.py" line="195"/>
         <source>No active project without a campaign.</source>
         <translation>No hay ningún proyecto activo sin campaña.</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="171"/>
-        <location filename="../campaigns_dialog.py" line="193"/>
+        <location filename="../campaigns_dialog.py" line="199"/>
+        <location filename="../campaigns_dialog.py" line="221"/>
         <source>Project:</source>
         <translation>Proyecto:</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="188"/>
-        <location filename="../campaigns_dialog.py" line="193"/>
+        <location filename="../campaigns_dialog.py" line="216"/>
+        <location filename="../campaigns_dialog.py" line="221"/>
         <source>Detach project</source>
         <translation>Quitar proyecto</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="189"/>
+        <location filename="../campaigns_dialog.py" line="217"/>
         <source>This campaign has no projects yet.</source>
         <translation>Esta campaña aún no tiene proyectos.</translation>
     </message>

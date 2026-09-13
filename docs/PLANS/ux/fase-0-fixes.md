@@ -491,7 +491,7 @@ def test_finished_campaign_is_editable(qapp, db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_dialog.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign delete + edit finished campaigns + single selection across both lists (UX, subplan U0.4)`
-**Estado**: Pendiente
+**Estado**: Hecho — suite 1099→1101 (2 tests nuevos); i18n 720→723, 0 unfinished
 
 ---
 

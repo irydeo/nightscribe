@@ -53,13 +53,14 @@ class CampaignsDialog(QDialog):
         self.btn_edit = QPushButton(self.tr("Edit…"))
         self.btn_finish = QPushButton(self.tr("Finish"))
         self.btn_reopen = QPushButton(self.tr("Reopen"))
+        self.btn_delete = QPushButton(self.tr("Delete…"))
         self.btn_target = QPushButton(self.tr("Add target…"))
         self.btn_attach = QPushButton(self.tr("Attach project…"))
         self.btn_detach = QPushButton(self.tr("Detach…"))
         self.btn_close = QPushButton(self.tr("Close"))
         for b in (self.btn_new, self.btn_edit, self.btn_finish,
-                  self.btn_reopen, self.btn_target, self.btn_attach,
-                  self.btn_detach):
+                  self.btn_reopen, self.btn_delete, self.btn_target,
+                  self.btn_attach, self.btn_detach):
             row.addWidget(b)
         row.addStretch()
         row.addWidget(self.btn_close)
@@ -69,11 +70,19 @@ class CampaignsDialog(QDialog):
         self.btn_edit.clicked.connect(self._edit_selected)
         self.btn_finish.clicked.connect(self._finish_selected)
         self.btn_reopen.clicked.connect(self._reopen_selected)
+        self.btn_delete.clicked.connect(self._delete_selected)
         self.btn_target.clicked.connect(self._add_target)
         self.btn_attach.clicked.connect(self._attach_project)
         self.btn_detach.clicked.connect(self._detach_project)
         self.lst_active.itemSelectionChanged.connect(self._sync_buttons)
         self.lst_finished.itemSelectionChanged.connect(self._sync_buttons)
+        # U0.4: one selection at a time across the two lists; picking a
+        # row in one clears the other (no more ambiguous double-selection).
+        # Harmless to fire _sync_buttons twice.
+        self.lst_active.itemSelectionChanged.connect(
+            lambda: self.lst_finished.clearSelection())
+        self.lst_finished.itemSelectionChanged.connect(
+            lambda: self.lst_active.clearSelection())
         self._reload()
         self._sync_buttons()
 
@@ -100,19 +109,18 @@ class CampaignsDialog(QDialog):
     # ---------------- actions ----------------
 
     def _sync_buttons(self):
-        # @return: None — enables each action only for its own list
-        self.btn_finish.setEnabled(self._selected_id(self.lst_active)
-                                   is not None)
-        self.btn_reopen.setEnabled(self._selected_id(self.lst_finished)
-                                   is not None)
-        self.btn_edit.setEnabled(self._selected_id(self.lst_active)
-                                  is not None)
-        self.btn_target.setEnabled(self._selected_id(self.lst_active)
-                                   is not None)
-        self.btn_attach.setEnabled(self._selected_id(self.lst_active)
-                                   is not None)
-        self.btn_detach.setEnabled(self._selected_id(self.lst_active)
-                                   is not None)
+        # @return: None — enables each action for the relevant list.
+        # Finish/Reopen: only their own list. Edit/Delete: whichever
+        # list has a selection (U0.4 — finished campaigns are editable).
+        act = self._selected_id(self.lst_active) is not None
+        fin = self._selected_id(self.lst_finished) is not None
+        self.btn_finish.setEnabled(act)
+        self.btn_reopen.setEnabled(fin)
+        self.btn_edit.setEnabled(act or fin)
+        self.btn_delete.setEnabled(act or fin)
+        self.btn_target.setEnabled(act)
+        self.btn_attach.setEnabled(act)
+        self.btn_detach.setEnabled(act)
 
     def _finish_selected(self):
         # @return: None — moves the picked active campaign to finished
@@ -134,13 +142,33 @@ class CampaignsDialog(QDialog):
             self._reload()
 
     def _edit_selected(self):
-        # @return: None — opens the edit form for the active-list selection
-        cid = self._selected_id(self.lst_active)
+        # @return: None — opens the edit form for the campaign under the
+        #          selection, in whichever list (U0.4 — finished
+        #          campaigns are editable too; no Reopen→Edit→Finish).
+        cid = self._selected_id(self.lst_active) or \
+                self._selected_id(self.lst_finished)
         if cid is None:
             return
         camp = campaign.get(self._db, cid)
-        if camp is not None and \
-                CampaignEditDialog(self, camp=camp, db_obj=self._db).exec():
+        if CampaignEditDialog(self, camp=camp, db_obj=self._db).exec():
+            self._reload()
+
+    def _delete_selected(self):
+        # Deletes the campaign after a confirmation; its projects keep
+        # going (campaign_id -> NULL, migration v7).
+        cid = self._selected_id(self.lst_active) or \
+                self._selected_id(self.lst_finished)
+        if cid is None:
+            return
+        from PySide6.QtWidgets import QMessageBox
+        camp = campaign.get(self._db, cid)
+        ans = QMessageBox.question(
+            self, self.tr("Delete campaign"),
+            self.tr("Delete the campaign “%1”? Its projects are kept, "
+                    "only the link is removed.").replace(
+                        "%1", camp["name"]))
+        if ans == QMessageBox.Yes:
+            campaign.delete(self._db, cid)
             self._reload()
 
     def _add_target(self):

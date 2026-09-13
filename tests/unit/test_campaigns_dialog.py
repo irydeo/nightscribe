@@ -178,3 +178,31 @@ def test_detach_with_no_members_informs(qapp, db, monkeypatch):
     dlg.lst_active.setCurrentRow(0)
     dlg._detach_project()
     assert seen.get("told")
+
+
+def test_delete_campaign_keeps_projects(qapp, db, monkeypatch):
+    # U0.4: deleting a campaign removes only the link, projects survive.
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui.campaigns_dialog import CampaignsDialog
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.Yes)
+    cid = campaign.create(db, "Campaña X")
+    proj_mod.create(db, "variable", "T CrB", {"ra_deg": 1.0, "dec_deg": 2.0},
+                    campaign_id=cid)
+    dlg = CampaignsDialog(db_obj=db)
+    dlg.lst_active.setCurrentRow(0)
+    dlg.btn_delete.click()
+    assert campaign.list_campaigns(db) == []
+    p = proj_mod.list_projects(db)[0]
+    assert p["campaign_id"] is None            # ON DELETE SET NULL
+
+
+def test_finished_campaign_is_editable(qapp, db):
+    # U0.4: Edit works on a finished campaign (no Reopen→Edit needed).
+    from nightscribe.gui.campaigns_dialog import CampaignsDialog
+    cid = campaign.create(db, "Vieja")
+    campaign.finish(db, cid)
+    dlg = CampaignsDialog(db_obj=db)
+    dlg.lst_finished.setCurrentRow(0)
+    assert dlg.btn_edit.isEnabled()

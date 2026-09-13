@@ -64,6 +64,9 @@ nightscribe/
     suggest.py       # score unificado 0-100 + Top N + frases "por qué esta noche"
     orbits.py        # familias orbitales + parámetros explicados
     hads.py          # HADS: catálogo híbrido (snapshot+sheet), merge, mat. de sesión
+    variables.py     # variables: extremos VSX, HJD (Sol Schlyter), asesor de eventos
+    campaign.py      # campañas 1:N ortogonales (CRUD, protocolo, due_campaigns)
+    photometry_export.py  # reporte fotométrico: CSV + AAVSO EFF (TTL n/a, local)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
@@ -76,8 +79,10 @@ nightscribe/
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
                      # + hads_sheet.py: libro HADS de P. Wils (Google Sheets XLSX,
                      #   TTL 12 h, parseo stdlib; ver ADR-034)
-                     # + ccdciel.py: cliente JSON-RPC local del observatorio (ADR-030,
-                     #   solo comanda con CCDciel abierto; lecturas cacheadas TTL 60s)
+                      # + ccdciel.py: cliente JSON-RPC local del observatorio (ADR-030,
+                      #   solo comanda con CCDciel abierto; lecturas cacheadas TTL 60s)
+                      # + vsx.py: AAVSO VSX (subdominio vsx.aavso.org, TTL 7 d; ADR-035)
+                      # + surveys.py: contexto ALeRCE/ZTF en curvas (TTL 30 d; ADR-035)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —

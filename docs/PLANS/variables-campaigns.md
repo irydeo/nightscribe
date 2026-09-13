@@ -1,7 +1,7 @@
 # Plan — Variables de largo periodo y campañas de observación (Track V)
 
-> **Pendiente de ejecutar (2026-09-11): plan escrito, 40 subplanes
-> autocontenidos.** Un subplan = un commit. Las tarjetas de subplan viven en
+> **Executado (plan escrito 2026-09-11; cerrado 2026-09-13): 40 subplanes
+> autocontenidos, todos hechos, suite unitaria 1096.** Un subplan = un commit. Las tarjetas de subplan viven en
 > `docs/PLANS/variables/` (un fichero por fase). Anclas verificadas a HEAD
 > `4b7635a`. **El ejecutor es un modelo local pequeño (qwen3.8)**: las tarjetas
 > llevan todo el código y los tests ya escritos para copiar; leer antes

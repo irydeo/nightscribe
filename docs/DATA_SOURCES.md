@@ -75,6 +75,28 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   `assets/HADS-stars.csv` (168 stars, rich aliases) is the offline fallback;
   the merge lives in `core/hads.py` (ADR-034).
 
+### AAVSO VSX — `vsx.py` — variable stars (Track V, ADR-035)
+
+- `GET https://vsx.aavso.org/index.php?view=api.object&ident=<name>&format=json`
+  — public Variable Star Index API. **Note: the `www.aavso.org` domain sits
+  behind a Cloudflare challenge that blocks plain clients; the
+  `vsx.aavso.org` subdomain answers a clean 200** (verified 2026-09-11).
+  Extracted: name + AUID, RA/Dec, variable type, period (d), epoch (JD→MJD in
+  the parser), Max/Min with band, spectral class, constellation.
+- TTL: 7 d. **Degradation**: `lookup()` returns `None` on unknown/failure →
+  card via SIMBAD (coordinates) → manual entry; Tonight is local and never
+  breaks.
+
+### ALeRCE ZTF API v1 — `surveys.py` — light-curve context (V-f)
+
+- `GET https://api.alerce.online/ztf/v1/conesearch?_ra=..&_dec=..&_radius=..`
+  and `GET .../lightcurve?oid=<oid>` — two cached calls per object (oid →
+  light curve). Grey reference points `source="survey:ztf"` under the
+  observer's own, never mixed (ZTF g/r/i bands mapped to filters). Verified
+  2026-09-11.
+- TTL: 30 d (survey photometry does not change). Failure → `[]`; the survey
+  button warns and nothing else breaks.
+
 ## Object data sources (feed "Explore" and "Post")
 
 ### JPL SBDB — `sbdb.py` — small-body identity and physical data

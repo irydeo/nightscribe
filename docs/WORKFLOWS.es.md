@@ -785,3 +785,31 @@ nunca apiladas (manda la mayor).
 variables de largo periodo y campañas (modelo pactado: campaña = atributo
 ortogonal del proyecto + kind `variable`) será el **siguiente track, en su
 propia rama** (ver «Generalización futura» en el plan maestro).
+
+### 7quindecies. Track V — Variables de largo periodo y campañas (2026-09-11, ADR-035)
+
+Plan: `docs/PLANS/variables-campaigns.md` (maestro) +
+`docs/PLANS/variables/fase-*.md` (40 subplanes). Rama
+`feature/variables-campaigns`.
+
+Nuevo kind `variable` (molde multi-noche del Track B; las HADS eran la
+excepción) y entidad **campaña** 1:N ortogonal (migración v7), tomada de las
+campañas reales del grupo obsSN (WeSb 1, T CrB). Tonight gana la fase local
+`campaigns` (solo vencidas, V-d); ficha con VSX (subdominio `vsx.aavso.org`,
+el www está tras Cloudflare) → SIMBAD → manual; predicción de extremos con la
+época VSX; asesor de eventos (dip/erupción, umbral configurable); contexto de
+surveys ZTF/ALeRCE en la curva (cierra la opción B12); reporte CSV + AAVSO
+EFF con **HJD calculado en la app** (Sol de Schlyter).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| V0.1–V0.9 | `core/variables.py`, `core/campaign.py`, `core/sources/vsx.py` (TTL 7 d), `core/sources/surveys.py` (ALeRCE ZTF, TTL 30 d), migración v7 | **Hecho** |
+| VA.1–VA.4 | Fase planner `campaigns` (vencidas + visibilidad), sub-dict `variable`, scoring de campaña, fragmentos ES/EN | **Hecho** |
+| VB.1–VB.6 | GUI listable `variable`, ficha VSX→SIMBAD→manual, plegado por época, contextos | **Hecho** |
+| VC.1–VC.10 | Proyectos variable, gestor de campañas (crear/editar/finalizar, objetivos, adjuntar), hub por campaña, Follow-up | **Hecho** |
+| VD.1–VD.9 | Chip Tonight generalizado + aviso de evento, plan, secuencia multi-filtro, `photometry_export.py` (CSV + AAVSO EFF), diálogo export, botón surveys, narrativa, post con curva plegada | **Hecho** |
+| VE.1–VE.2 | i18n completo (714 cadenas, 0 unfinished), cierre documental (este track) | **Hecho** |
+
+**Estado**: suite unitaria verde (**1096**). **Fuera de esta iteración**:
+ventana horaria de eclipses, compartir campañas, AAVSO Alert Notices,
+ASAS-SN Sky Patrol, monitor en vivo.

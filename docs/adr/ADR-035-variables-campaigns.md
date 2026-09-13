@@ -1,6 +1,6 @@
 # ADR-035: Variables de largo periodo y campañas de observación — kind `variable`, campaña 1:N ortogonal, VSX/SIMBAD/manual, reporte con HJD
 
-**Estado / Status**: Proposed · **Fecha / Date**: 2026-09-11
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-11 · **rev. 2026-09-13**: ejecutado completo — suite unitaria 1096
 
 **Ver / See**: [docs/PLANS/variables-campaigns.md](../PLANS/variables-campaigns.md)
 (maestro) · [docs/PLANS/variables/](../PLANS/variables/) (40 subplanes) ·
@@ -138,3 +138,7 @@ guarded idempotent migration, the Tonight cadence chip narrows to
 campaign-less SNs. The plan is executed by a small local model: subplans
 carry complete code and tests, and the "anchor mismatch → stop and report"
 rule applies.
+
+**Revisión / Revision**: rev. 2026-09-13 — ejecutado completo (40
+subplanes, fases V0→VE); suite unitaria verde (**1096**); i18n 714 cadenas
+ES/EN sin pendientes.

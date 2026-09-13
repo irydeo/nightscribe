@@ -104,7 +104,7 @@ Patrol, monitor en vivo.
 `.venv/bin/python -m pytest tests/functional -k vsx -q`
 **Hecho cuando**: suite verde (anota N→M); docs consistentes.
 **Commit**: `Docs: Track V close — ADR-035 executed, WORKFLOWS 7quindecies, AGENTS.md, DATA_SOURCES (subplan VE.2)`
-**Estado**: Pendiente
+**Estado**: Hecho ✅ (2026-09-13; suite 1096; ADR-035 → Accepted; WORKFLOWS 7quindecies ES/EN; AGENTS.md estructura; DATA_SOURCES VSX + ALeRCE; tarjetas y maestro marcados)
 
 ---
 

@@ -616,3 +616,32 @@ legend feeds the score: red/orange (period changes!) +12/+8 urgency, blue
 generalisation to long-period variables and campaigns (agreed model:
 campaign = orthogonal project attribute + `variable` kind) is the **next
 track, on its own branch** (see "Generalización futura" in the master plan).
+
+### 7quindecies. Track V — long-period variables and campaigns (2026-09-11, ADR-035)
+
+Plan: `docs/PLANS/variables-campaigns.md` (master) +
+`docs/PLANS/variables/fase-*.md` (40 subplans). Branch
+`feature/variables-campaigns`.
+
+New `variable` kind (the multi-night Track B mould; HADS was the
+exception) and a **campaign** entity, orthogonal 1:N (migration v7),
+taken from the obsSN group's real campaigns (WeSb 1, T CrB). Tonight
+gains the local `campaigns` phase (due only, V-d); the object card
+resolves VSX (the `vsx.aavso.org` subdomain — www sits behind
+Cloudflare) → SIMBAD → manual; extremum prediction from the VSX epoch;
+event advisor (dip/eruption, configurable threshold); ZTF/ALeRCE survey
+context in the light curve (closes the B12 option); CSV + AAVSO EFF
+reports with **in-app HJD** (Schlyter Sun).
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| V0.1–V0.9 | `core/variables.py`, `core/campaign.py`, `core/sources/vsx.py` (TTL 7 d), `core/sources/surveys.py` (ALeRCE ZTF, TTL 30 d), migration v7 | **Done** |
+| VA.1–VA.4 | `campaigns` planner phase (due + visibility), `variable` sub-dict, campaign scoring, ES/EN fragments | **Done** |
+| VB.1–VB.6 | listable `variable` GUI, VSX→SIMBAD→manual card, epoch folding, contexts | **Done** |
+| VC.1–VC.10 | variable projects, campaign manager (create/edit/close, targets, attach), hub filter, Follow-up | **Done** |
+| VD.1–VD.9 | generalised Tonight chip + event warning, plan tab, multi-filter sequence, `photometry_export.py` (CSV + AAVSO EFF), export dialog, survey button, narrative, folded post chart | **Done** |
+| VE.1–VE.2 | full i18n (714 strings, 0 unfinished), documentation close (this track) | **Done** |
+
+**Status**: unit suite green (**1096**). **Out of this iteration**:
+eclipse hour windows, campaign sharing, AAVSO Alert Notices, ASAS-SN
+Sky Patrol, live monitor.

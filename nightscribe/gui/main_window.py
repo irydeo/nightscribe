@@ -479,6 +479,15 @@ class MainWindow(QMainWindow):
         c.lst_campaigns.itemSelectionChanged.connect(
             self._campaign_selected)
         c.lbl_urls.linkActivated.connect(self._open_url)
+        c.tbl_members.cellDoubleClicked.connect(self._campaign_member_opened)
+        c.lst_campaigns.setContextMenuPolicy(Qt.CustomContextMenu)
+        c.lst_campaigns.customContextMenuRequested.connect(
+            self._campaign_context_menu)
+        c.tbl_members.setContextMenuPolicy(Qt.CustomContextMenu)
+        c.tbl_members.customContextMenuRequested.connect(
+            self._campaign_member_menu)
+        c.lst_campaigns.viewport().setCursor(Qt.PointingHandCursor)
+        c.tbl_members.viewport().setCursor(Qt.PointingHandCursor)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
@@ -4902,13 +4911,197 @@ class MainWindow(QMainWindow):
         if p:
             self.on_refresh_projects()
             self._goto_tab(TAB_PROJECTS)
-            for i in range(self.projects.lst_projects.count()):
-                if self.projects.lst_projects.item(i).data(Qt.UserRole) == p["id"]:
-                    self.projects.lst_projects.setCurrentRow(i)
-                    break
+            self._select_project_row(p["id"])
             self.statusBar().showMessage(
                 self.tr("Project created: %1").replace("%1", name), 8000)
         return p
+
+    def _select_project_row(self, pid):
+        # @args: pid - project id
+        # @return: True when the hub list holds the project and selects it
+        for i in range(self.projects.lst_projects.count()):
+            if self.projects.lst_projects.item(i).data(Qt.UserRole) == pid:
+                self.projects.lst_projects.setCurrentRow(i)
+                return True
+        return False
+
+    def _goto_project_by_id(self, pid):
+        # Jumps to the Projects hub with this project selected (UX-d).
+        # @return: True when the project was found in the list
+        self.on_refresh_projects()
+        self._goto_tab(TAB_PROJECTS)
+        return self._select_project_row(pid)
+
+    def _goto_campaigns(self, cid=None):
+        # Jumps to the Campaigns tab, optionally selecting a campaign
+        # (the landing spot of every campaign link, UX-d).
+        self._goto_tab(TAB_CAMPAIGNS)
+        self._refresh_campaigns_tab()
+        if cid is not None:
+            lst = self.campaigns.lst_campaigns
+            for i in range(lst.count()):
+                if lst.item(i).data(Qt.UserRole) == cid:
+                    lst.setCurrentRow(i)
+                    break
+
+    def _camp_after_action(self):
+        # Refresh both master-detail tabs after any campaign mutation.
+        self._refresh_campaigns_tab()
+        self.on_refresh_projects()
+
+    def _camp_new(self):
+        from .campaigns_dialog import CampaignEditDialog
+        if CampaignEditDialog(self, db_obj=db).exec():
+            self._camp_after_action()
+
+    def _camp_edit(self):
+        # Finished campaigns are editable too (UX, ex U0.4).
+        from .campaigns_dialog import CampaignEditDialog
+        from ..core import campaign as _camp
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        if CampaignEditDialog(self, camp=_camp.get(db, cid),
+                              db_obj=db).exec():
+            self._camp_after_action()
+
+    def _camp_delete(self):
+        # Deletes the campaign after confirmation; its projects keep
+        # going (campaign_id -> NULL, migration v7).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import campaign as _camp
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        c = _camp.get(db, cid)
+        ans = QMessageBox.question(
+            self, self.tr("Delete campaign"),
+            self.tr("Delete the campaign “%1”? Its projects are kept, "
+                    "only the link is removed.").replace("%1", c["name"]))
+        if ans == QMessageBox.Yes:
+            _camp.delete(db, cid)
+            self._camp_after_action()
+
+    def _camp_finish(self):
+        from ..core import campaign as _camp
+        cid = self._selected_campaign_id()
+        if cid is not None:
+            _camp.finish(db, cid)
+            self._camp_after_action()
+
+    def _camp_reopen(self):
+        from ..core import campaign as _camp
+        cid = self._selected_campaign_id()
+        if cid is not None:
+            _camp.reopen(db, cid)
+            self._camp_after_action()
+
+    def _camp_add_target(self):
+        from .campaigns_dialog import AddTargetDialog
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        if AddTargetDialog(self, campaign_id=cid, db_obj=db).exec():
+            self._camp_after_action()
+
+    def _camp_attach(self):
+        # Links an existing active project to the selected campaign.
+        # Never silent (UX-e): an empty candidate list says so.
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+        from ..core import project
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        actives = project.list_projects(db, status="active")
+        choices = [p for p in actives if not p.get("campaign_id")]
+        if not choices:
+            QMessageBox.information(
+                self, self.tr("Attach project"),
+                self.tr("No active project without a campaign."))
+            return
+        names = [f"[{p['kind']}] {p['object_name']}" for p in choices]
+        sel, ok = QInputDialog.getItem(
+            self, self.tr("Attach project"), self.tr("Project:"),
+            names, 0, False)
+        if ok:
+            project.set_campaign(db, choices[names.index(sel)]["id"], cid)
+            self._camp_after_action()
+
+    def _camp_detach(self):
+        # Unlinks a member of the selected campaign (chosen by name).
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+        from ..core import campaign as _camp
+        from ..core import project
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        members = _camp.projects_of(db, cid, status=None)
+        if not members:
+            QMessageBox.information(
+                self, self.tr("Detach project"),
+                self.tr("This campaign has no projects yet."))
+            return
+        names = [p["object_name"] for p in members]
+        sel, ok = QInputDialog.getItem(
+            self, self.tr("Detach project"), self.tr("Project:"),
+            names, 0, False)
+        if ok:
+            project.set_campaign(db, members[names.index(sel)]["id"], None)
+            self._camp_after_action()
+
+    def _camp_detach_member(self, pid):
+        # Detaches one member project straight from the members table.
+        from ..core import project
+        project.set_campaign(db, pid, None)
+        self._camp_after_action()
+
+    def _campaign_member_opened(self, row, _col):
+        # Double-click on a member row: open its project in the hub.
+        item = self.campaigns.tbl_members.item(row, 0)
+        if item is not None and item.data(Qt.UserRole) is not None:
+            self._goto_project_by_id(item.data(Qt.UserRole))
+
+    def _campaign_context_menu(self, pos):
+        # Right-click on the campaign list (UX-c): the row's actions.
+        item = self.campaigns.lst_campaigns.itemAt(pos)
+        if item is None or item.data(Qt.UserRole) is None:
+            return
+        self.campaigns.lst_campaigns.setCurrentItem(item)
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        for label, slot in (
+                (self.tr("Edit…"), self._camp_edit),
+                (self.tr("Finish"), self._camp_finish),
+                (self.tr("Reopen"), self._camp_reopen),
+                (self.tr("Delete…"), self._camp_delete),
+                (self.tr("Add target…"), self._camp_add_target),
+                (self.tr("Attach…"), self._camp_attach),
+                (self.tr("Detach…"), self._camp_detach)):
+            act = menu.addAction(label)
+            act.triggered.connect(slot)
+        menu.exec(self.campaigns.lst_campaigns.viewport()
+                  .mapToGlobal(pos))
+
+    def _campaign_member_menu(self, pos):
+        # Right-click on a member row (UX-c): open its project or detach.
+        tbl = self.campaigns.tbl_members
+        item = tbl.itemAt(pos)
+        if item is None:
+            return
+        row = item.row()
+        pid_item = tbl.item(row, 0)
+        if pid_item is None or pid_item.data(Qt.UserRole) is None:
+            return
+        tbl.selectRow(row)
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        act_open = menu.addAction(self.tr("Open project"))
+        act_detach = menu.addAction(self.tr("Detach from campaign"))
+        chosen = menu.exec(tbl.viewport().mapToGlobal(pos))
+        if chosen is act_open:
+            self._goto_project_by_id(pid_item.data(Qt.UserRole))
+        elif chosen is act_detach:
+            self._camp_detach_member(pid_item.data(Qt.UserRole))
 
     def _goto_active_project(self, name, fallback=None):
         # Jumps to the existing active project that matches `name` (or the
@@ -4932,11 +5125,7 @@ class MainWindow(QMainWindow):
         if not match:
             return False
         self._goto_tab(TAB_PROJECTS)
-        for i in range(self.projects.lst_projects.count()):
-            if self.projects.lst_projects.item(i).data(Qt.UserRole) == match["id"]:
-                self.projects.lst_projects.setCurrentRow(i)
-                break
-        return True
+        return self._select_project_row(match["id"])
 
     # ---------------- Contextual dialogs (Explore / Post / Blink) --------
 

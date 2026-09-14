@@ -130,3 +130,51 @@ def test_empty_campaign_detail_is_clean(window):
     window._campaign_selected()
     assert window.campaigns.tbl_members.rowCount() == 0
     assert window.campaigns.lbl_cname.text() != ""
+
+
+def test_member_double_click_jumps_to_project(window):
+    from PySide6.QtCore import Qt
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from nightscribe.gui.main_window import TAB_PROJECTS
+    cid = camp_mod.create(mw.db, "Campaña salto")
+    p = proj_mod.create(mw.db, "variable", "R CrB",
+                        {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
+    window._refresh_campaigns_tab()
+    lst = window.campaigns.lst_campaigns
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == cid:
+            lst.setCurrentRow(i)
+    window._campaign_member_opened(0, 0)
+    from PySide6.QtWidgets import QTabWidget
+    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
+    assert tabs.currentIndex() == TAB_PROJECTS
+    cur = window.projects.lst_projects.currentItem()
+    assert cur is not None and cur.data(Qt.UserRole) == p["id"]
+
+
+def test_goto_campaigns_selects_the_campaign(window):
+    from PySide6.QtCore import Qt
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    from nightscribe.gui.main_window import TAB_CAMPAIGNS
+    cid = camp_mod.create(mw.db, "Campaña destino")
+    window._goto_campaigns(cid)
+    from PySide6.QtWidgets import QTabWidget
+    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
+    assert tabs.currentIndex() == TAB_CAMPAIGNS
+    cur = window.campaigns.lst_campaigns.currentItem()
+    assert cur is not None and cur.data(Qt.UserRole) == cid
+
+
+def test_camp_detach_member_unlinks(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Campaña quita")
+    p = proj_mod.create(mw.db, "variable", "SS Cyg",
+                        {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
+    window._goto_campaigns(cid)
+    window._camp_detach_member(p["id"])
+    assert proj_mod.get(mw.db, p["id"])["campaign_id"] is None

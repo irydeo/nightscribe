@@ -888,7 +888,12 @@ Attach/Detach ya existen de U0.3/U0.4 — no las dupliques en los `.ts`.)
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_tab.py tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign tab navigation + camp actions — member double-click, context menus, goto helpers (UX, subplan UA.4)`
-**Estado**: Pendiente
+**Estado**: Hecho (1115→1118 tests; i18n 763→779, 0 sin traducir ES+EN).
+Helper `_select_project_row` extraído (usado en `_create_project` y
+`_goto_active_project`); `_goto_project_by_id` / `_goto_campaigns`;
+acciones `_camp_*` (new/edit/delete/finish/reopen/add_target/attach/detach/
+detach_member); dobles clic en tabla de miembros + menús contextuales en lista
+y tabla; `linkActivated` conectado. 3 tests nuevos.
 
 ---
 

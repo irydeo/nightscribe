@@ -1022,7 +1022,7 @@ def test_attach_without_candidates_informs(window, monkeypatch):
 `grep -rn "CampaignsDialog" nightscribe/ tests/` que no quedan referencias
 en código vivo.
 **Commit**: `Gui: campaign actions live in the Campaigns tab — the modal manager retires (UX, subplan UA.5; supersedes ADR-035 V-j)`
-**Estado**: Pendiente
+**Estado**: Hecho (1118→1116 tests; i18n 779→760, 0 sin traducir ES+EN).
 
 ---
 

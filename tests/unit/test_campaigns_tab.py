@@ -178,3 +178,68 @@ def test_camp_detach_member_unlinks(window):
     window._goto_campaigns(cid)
     window._camp_detach_member(p["id"])
     assert proj_mod.get(mw.db, p["id"])["campaign_id"] is None
+
+
+# --- UX-a UA.5: the tab's equivalents of the old manager tests -----------
+
+
+def test_tab_lists_active_and_finished(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    camp_mod.create(mw.db, "Activa UA.5")
+    cid = camp_mod.create(mw.db, "Vieja UA.5")
+    camp_mod.finish(mw.db, cid)
+    window._refresh_campaigns_tab()
+    texts = [window.campaigns.lst_campaigns.item(i).text()
+             for i in range(window.campaigns.lst_campaigns.count())]
+    assert any(t.startswith("Activa UA.5") for t in texts)
+    assert any("Vieja UA.5" in t and ("finalizada" in t or "finished" in t)
+               for t in texts)
+
+
+def test_tab_finish_and_reopen(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "FinRe UA.5")
+    window._goto_campaigns(cid)
+    window._camp_finish()
+    assert camp_mod.get(mw.db, cid)["status"] == camp_mod.CAMPAIGN_FINISHED
+    window._camp_reopen()
+    assert camp_mod.get(mw.db, cid)["status"] == camp_mod.CAMPAIGN_ACTIVE
+
+
+def test_tab_delete_keeps_projects(window, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    monkeypatch.setattr(QMessageBox, "question",
+                        lambda *a, **k: QMessageBox.Yes)
+    cid = camp_mod.create(mw.db, "Campaña X UA.5")
+    proj_mod.create(mw.db, "variable", "T CrB UA.5",
+                    {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
+    window._goto_campaigns(cid)
+    window._camp_delete()
+    assert camp_mod.get(mw.db, cid) is None
+    p = proj_mod.list_projects(mw.db, campaign_id=None)
+    assert any(pr["object_name"] == "T CrB UA.5" for pr in p)
+
+
+def test_attach_without_candidates_informs(window, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    seen = {}
+    monkeypatch.setattr(QMessageBox, "information",
+                        lambda *a, **k: seen.setdefault("told", True))
+    # The shared module DB still holds unlinked active projects from the
+    # earlier tests (e.g. the detached member above); a non-empty candidate
+    # list would open a real QInputDialog modal and block the run.
+    from nightscribe.core import project as proj_mod
+    for p in proj_mod.list_projects(mw.db, status="active"):
+        if p.get("campaign_id") is None:
+            proj_mod.delete(mw.db, p["id"])
+    cid = camp_mod.create(mw.db, "Campaña sola UA.5")
+    window._goto_campaigns(cid)
+    window._camp_attach()
+    assert seen.get("told")

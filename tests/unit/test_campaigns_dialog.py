@@ -11,8 +11,8 @@
 #
 ############################################################
 
-"""Offscreen smoke tests for the campaign manager dialog (ADR-035, VC.4):
-the list, and the finish / reopen buttons driving core/campaign.py.
+"""Offscreen smoke tests for the campaign sub-dialogs (UX-a, supersedes
+ADR-035 V-j): the create/edit form and the add-target resolution chain.
 """
 
 import os
@@ -35,40 +35,6 @@ def qapp():
 @pytest.fixture
 def db(tmp_path):
     return Database(str(tmp_path / "t.db"))
-
-
-def test_dialog_lists_active_and_finished(qapp, db):
-    from nightscribe.gui.campaigns_dialog import CampaignsDialog
-    campaign.create(db, "Activa")
-    cid = campaign.create(db, "Vieja")
-    campaign.finish(db, cid)
-    dlg = CampaignsDialog(db_obj=db)
-    assert dlg.lst_active.count() == 1
-    assert dlg.lst_finished.count() == 1
-    assert dlg.lst_active.item(0).text().startswith("Activa")
-
-
-def test_finish_and_reopen_from_the_buttons(qapp, db):
-    from nightscribe.gui.campaigns_dialog import CampaignsDialog
-    campaign.create(db, "A")
-    dlg = CampaignsDialog(db_obj=db)
-    dlg.lst_active.setCurrentRow(0)
-    dlg.btn_finish.click()
-    assert dlg.lst_active.count() == 0
-    assert dlg.lst_finished.count() == 1
-    dlg.lst_finished.setCurrentRow(0)
-    dlg.btn_reopen.click()
-    assert dlg.lst_active.count() == 1
-
-
-def test_empty_dialog_buttons_disabled(qapp, db):
-    from nightscribe.gui.campaigns_dialog import CampaignsDialog
-    dlg = CampaignsDialog(db_obj=db)
-    assert not dlg.btn_finish.isEnabled()
-    assert not dlg.btn_reopen.isEnabled()
-
-
-# ---------------- VC.5: create / edit form ----------------
 
 
 def test_new_campaign_via_form(qapp, db):
@@ -162,45 +128,3 @@ def test_add_target_without_coordinates_warns(qapp, db, monkeypatch):
     dlg._save()
     assert seen.get("warned")
     assert proj_mod.list_projects(db) == []
-
-
-def test_detach_with_no_members_informs(qapp, db, monkeypatch):
-    # UX-e: replaces test_detach_with_no_members_is_a_noop
-    from PySide6.QtWidgets import QMessageBox
-    from nightscribe.gui.campaigns_dialog import CampaignsDialog
-    seen = {}
-    monkeypatch.setattr(QMessageBox, "information",
-                        lambda *a, **k: seen.setdefault("told", True))
-    campaign.create(db, "C")
-    dlg = CampaignsDialog(db_obj=db)
-    dlg.lst_active.setCurrentRow(0)
-    dlg._detach_project()
-    assert seen.get("told")
-
-
-def test_delete_campaign_keeps_projects(qapp, db, monkeypatch):
-    # U0.4: deleting a campaign removes only the link, projects survive.
-    from PySide6.QtWidgets import QMessageBox
-    from nightscribe.core import project as proj_mod
-    from nightscribe.gui.campaigns_dialog import CampaignsDialog
-    monkeypatch.setattr(QMessageBox, "question",
-                        lambda *a, **k: QMessageBox.Yes)
-    cid = campaign.create(db, "Campaña X")
-    proj_mod.create(db, "variable", "T CrB", {"ra_deg": 1.0, "dec_deg": 2.0},
-                    campaign_id=cid)
-    dlg = CampaignsDialog(db_obj=db)
-    dlg.lst_active.setCurrentRow(0)
-    dlg.btn_delete.click()
-    assert campaign.list_campaigns(db) == []
-    p = proj_mod.list_projects(db)[0]
-    assert p["campaign_id"] is None            # ON DELETE SET NULL
-
-
-def test_finished_campaign_is_editable(qapp, db):
-    # U0.4: Edit works on a finished campaign (no Reopen→Edit needed).
-    from nightscribe.gui.campaigns_dialog import CampaignsDialog
-    cid = campaign.create(db, "Vieja")
-    campaign.finish(db, cid)
-    dlg = CampaignsDialog(db_obj=db)
-    dlg.lst_finished.setCurrentRow(0)
-    assert dlg.btn_edit.isEnabled()

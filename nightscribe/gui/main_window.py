@@ -213,6 +213,24 @@ class _ClickableFrame(QFrame):
             pass
 
 
+class _LinkChip(QLabel):
+    # A chip that behaves like a link (UX-c): hand cursor + clicked
+    # signal that CONSUMES the event, so a clickable parent row never
+    # fires when the chip is the real target.
+    clicked = Signal()
+
+    def __init__(self, text, color, tip=""):
+        super().__init__(text)
+        self.setStyleSheet(theme.chip_style(color))
+        if tip:
+            self.setToolTip(tip)
+        self.setCursor(Qt.PointingHandCursor)
+
+    def mousePressEvent(self, ev):
+        ev.accept()
+        self.clicked.emit()
+
+
 class _ScoreBar(QFrame):
     # The 4-segment score meter: scientific / observability / urgency / hook.
     # Each segment is 25% of the width, filled proportionally to the part
@@ -488,6 +506,14 @@ class MainWindow(QMainWindow):
             self._campaign_member_menu)
         c.lst_campaigns.viewport().setCursor(Qt.PointingHandCursor)
         c.tbl_members.viewport().setCursor(Qt.PointingHandCursor)
+        c.btn_new.clicked.connect(self._camp_new)
+        c.btn_edit.clicked.connect(self._camp_edit)
+        c.btn_delete.clicked.connect(self._camp_delete)
+        c.btn_finish.clicked.connect(self._camp_finish)
+        c.btn_reopen.clicked.connect(self._camp_reopen)
+        c.btn_add_target.clicked.connect(self._camp_add_target)
+        c.btn_attach.clicked.connect(self._camp_attach)
+        c.btn_detach.clicked.connect(self._camp_detach)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
@@ -1345,6 +1371,20 @@ class MainWindow(QMainWindow):
                 self.tr("Moon %1 · %2").replace("%1", sep)
                 .replace("%2", illum),
                 theme.C_WARN, tip))
+        # campaign chip (UX-c): the target belongs to a campaign — the ⚑
+        # chip jumps to the Campaigns tab on that campaign (and, unlike
+        # the plain label, does not also fire the row's explore click)
+        camp = t.get("campaign") or {}
+        if camp.get("name"):
+            chip = _LinkChip(
+                "⚑ " + camp["name"], theme.KIND_COLORS["variable"],
+                self.tr("Part of this observing campaign — click to "
+                        "open it"))
+            cid = camp.get("id")
+            if cid is not None:
+                chip.clicked.connect(
+                    lambda _c=cid: self._goto_campaigns(_c))
+            head.addWidget(chip)
         # soft-limit warning (ADR-025): predicted-mag kinds beyond the limit
         beyond, delta = suggest.beyond_limit(t, config)
         if beyond:
@@ -2077,8 +2117,12 @@ class MainWindow(QMainWindow):
             from ..core import campaign as _camp
             c = _camp.get(db, p["campaign_id"])
             if c:
-                header += (f" · <span style='color:#65cf30'>"
-                           f"{self.tr('campaign')}: {c['name']}</span>")
+                lab = self.tr("campaign")
+                header += (" · <a href='campaign://%1' "
+                           "style='color:#65cf30; text-decoration:none'>"
+                           "⚑ %2: %3</a>").replace(
+                               "%1", str(c["id"])).replace(
+                               "%2", lab).replace("%3", c["name"])
         self.projects.lbl_header.setText(header)
         ctx = p["context"]
         parts = []
@@ -5139,10 +5183,9 @@ class MainWindow(QMainWindow):
         self._open_blink_dialog()
 
     def _tools_campaigns(self):
-        # The campaign manager (ADR-035, V-j). Modal; the Tonight cadence
-        # and the hub refresh themselves on the next visit.
-        from .campaigns_dialog import CampaignsDialog
-        CampaignsDialog(self).exec()
+        # Campaigns live in their own top-level tab (UX-a; supersedes
+        # the modal manager of ADR-035 V-j). Also the hub button.
+        self._goto_campaigns()
 
     def _open_explore_dialog(self, name):
         # E (docs/WORKFLOWS.es.md §7ses, corrected 2026-09-02): the

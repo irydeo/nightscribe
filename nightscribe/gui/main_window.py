@@ -187,6 +187,11 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
 KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
               "variable"]
 
+# Top-level tab indices (ui/main_window.ui order, UX track): never
+# use literals for the main tabs.
+TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_SOLAR, TAB_HISTORY = \
+    range(5)
+
 
 class _ClickableFrame(QFrame):
     # A frame that re-emits a plain mouse click anywhere over it (the
@@ -392,10 +397,11 @@ class MainWindow(QMainWindow):
     def _build_tabs(self):
         from PySide6.QtWidgets import QTabWidget
         tabs = self.centralWidget().findChild(QTabWidget, "tabs")
-        widgets = (self.tonight, self.projects, self.solar,
-                   self.history) = (
+        widgets = (self.tonight, self.projects, self.campaigns,
+                   self.solar, self.history) = (
             _load_ui("tonight_tab"), _load_ui("projects_tab"),
-            _load_ui("solar_tab"), _load_ui("history_tab"))
+            _load_ui("campaigns_tab"), _load_ui("solar_tab"),
+            _load_ui("history_tab"))
         for i, w in enumerate(widgets):
             title = tabs.tabText(i)
             tabs.removeTab(i)
@@ -469,6 +475,9 @@ class MainWindow(QMainWindow):
         p.cmb_campaign.currentIndexChanged.connect(
             lambda _i: self.on_refresh_projects())
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
+        c = self.campaigns
+        c.lst_campaigns.itemSelectionChanged.connect(
+            self._campaign_selected)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
@@ -1648,13 +1657,14 @@ class MainWindow(QMainWindow):
 
     def _on_main_tab_changed(self, index):
         # @args: index - the newly selected top-level tab index
-        #        (1 == the Projects hub, per main_window.ui order)
+        #        (TAB_PROJECTS == the hub, TAB_CAMPAIGNS == the
+        #        campaigns manager, per main_window.ui order)
         # @return: None
-        # Keep the Projects hub list always fresh: refresh on every visit,
-        # so projects appear without pressing "Refresh" (which stays as a
-        # just-in-case fallback). Only the Projects tab triggers a reload.
-        if index == 1:
+        # Keep both master-detail tabs always fresh on every visit.
+        if index == TAB_PROJECTS:
             self.on_refresh_projects()
+        elif index == TAB_CAMPAIGNS:
+            self._refresh_campaigns_tab()
 
     def _rebuild_campaign_filter(self):
         # Refills the hub's campaign combo, keeping the current selection.
@@ -1676,6 +1686,68 @@ class MainWindow(QMainWindow):
                 idx = cmb.findData(saved)
         cmb.setCurrentIndex(idx if idx >= 0 else 0)
         cmb.blockSignals(False)
+
+    # ---------------- campaigns tab (UX-a) ----------------
+
+    def _refresh_campaigns_tab(self):
+        # Refills the single campaign list (UX-g: finished ones dimmed
+        # and suffixed), keeping the selection. Each row carries the
+        # health summary from status_report (UX-b).
+        from ..core import campaign as _camp
+        lst = self.campaigns.lst_campaigns
+        sel = lst.currentItem()
+        keep_id = sel.data(Qt.UserRole) if sel is not None else None
+        lst.clear()
+        for c in _camp.list_campaigns(db):
+            rep = _camp.status_report(db, c["id"])
+            members = rep["members"] if rep else []
+            due = sum(1 for m in members if m["due"])
+            text = c["name"]
+            if c.get("group_name"):
+                text += f"  ({c['group_name']})"
+            text += "  —  " + self.tr("%1 targets · %2 due")\
+                .replace("%1", str(len(members))).replace("%2", str(due))
+            if any(m.get("event") for m in members):
+                text += "  ⚡"
+            if c["status"] == _camp.CAMPAIGN_FINISHED:
+                text += "  " + self.tr("(finished)")
+            item = QListWidgetItem(text)
+            item.setData(Qt.UserRole, c["id"])
+            if c["status"] == _camp.CAMPAIGN_FINISHED:
+                item.setForeground(QColor(theme.C_TEXT_DIM))
+            lst.addItem(item)
+            if c["id"] == keep_id:
+                lst.setCurrentItem(item)
+        if lst.count() == 0:
+            self._campaign_selected()     # clears the detail side
+
+    def _selected_campaign_id(self):
+        # @return: campaign id selected in the tab's list, or None
+        item = self.campaigns.lst_campaigns.currentItem()
+        return item.data(Qt.UserRole) if item is not None else None
+
+    def _campaign_selected(self):
+        # Fills the detail header (name, meta, goal); UA.3 fills the
+        # protocol block, the URLs and the members table.
+        w = self.campaigns
+        cid = self._selected_campaign_id()
+        from ..core import campaign as _camp
+        c = _camp.get(db, cid) if cid is not None else None
+        if c is None:
+            w.lbl_cname.setText(self.tr("Select a campaign."))
+            w.lbl_cmeta.setText("—")
+            w.lbl_cgoal.setText("")
+            return
+        w.lbl_cname.setText(c["name"])
+        status = self.tr("active") if c["status"] == \
+            _camp.CAMPAIGN_ACTIVE else self.tr("finished")
+        meta = [status]
+        if c.get("group_name"):
+            meta.append(c["group_name"])
+        if c.get("coordinator"):
+            meta.append(c["coordinator"])
+        w.lbl_cmeta.setText(" · ".join(meta))
+        w.lbl_cgoal.setText(c.get("goal") or "")
 
     def on_refresh_projects(self):
         self._rebuild_campaign_filter()
@@ -4766,7 +4838,7 @@ class MainWindow(QMainWindow):
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
-            self._goto_tab(1)
+            self._goto_tab(TAB_PROJECTS)
             for i in range(self.projects.lst_projects.count()):
                 if self.projects.lst_projects.item(i).data(Qt.UserRole) == p["id"]:
                     self.projects.lst_projects.setCurrentRow(i)
@@ -4796,7 +4868,7 @@ class MainWindow(QMainWindow):
                       if p["object_name"] == c), None)
         if not match:
             return False
-        self._goto_tab(1)
+        self._goto_tab(TAB_PROJECTS)
         for i in range(self.projects.lst_projects.count()):
             if self.projects.lst_projects.item(i).data(Qt.UserRole) == match["id"]:
                 self.projects.lst_projects.setCurrentRow(i)

@@ -107,7 +107,13 @@ reporta**.)
 
 ---
 
-## UA.2 — Pestaña Campaigns: `.ui`, registro y lista con salud
+ ## UA.2 — Pestaña Campaigns: `.ui`, registro y lista con salud
+
+ **Estado**: Hecho (1110→1113 tests; i18n 726→749, 0 sin traducir ES+EN).
+ Nueva `campaigns_tab.ui`, quinta pestaña `TAB_CAMPAIGNS`, `_refresh_campaigns_tab`
+ (lista con `status_report`: nº objetivos · vencidos · ⚡ evento), `_selected_campaign_id`,
+ `_campaign_selected` (encabezado: nombre, estado, grupo, coordinación, objetivo),
+ botón `New campaign…` ya visible, `test_gui_boots_offscreen` actualizado a 5 pestañas.
 
 **Contexto a leer (solo esto)**: `nightscribe/gui/ui/main_window.ui:14-28`
 (los 4 tabs); `nightscribe/gui/main_window.py:186-190` (KIND_ORDER — sitio

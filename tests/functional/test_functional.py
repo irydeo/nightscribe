@@ -880,9 +880,11 @@ def test_gui_boots_offscreen():
     from nightscribe.gui.main_window import MainWindow
     w = MainWindow()
     tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 4  # UX v3: Tonight · Projects · Solar · History (ADR-019)
+    # UX v3 + campaigns tab: Tonight · Projects · Campaigns · Solar · History
+    assert tabs.count() == 5
     assert tabs.tabText(0) == "Tonight"
     assert tabs.tabText(1) == "Projects"
+    assert tabs.tabText(2) == "Campaigns"
     # suggestion grid container exists
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)

@@ -553,6 +553,7 @@ class MainWindow(QMainWindow):
         self._advisor_dismissed = None
         self.projects.lbl_advisor.mouseReleaseEvent = \
             lambda _e: self._advisor_dismiss()
+        self.projects.lbl_advisor.setCursor(Qt.PointingHandCursor)
         self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
         self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
         self.solar.btn_raben.clicked.connect(

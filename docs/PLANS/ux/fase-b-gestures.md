@@ -340,4 +340,9 @@ def test_year_headers_never_open(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py tests/unit/test_campaigns_tab.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: gesture-language sweep — advisor cursor, consistency tests (UX, subplan UB.3)`
-**Estado**: Pendiente
+**Estado**: Hecho (1124→1126 tests; sin cadenas nuevas)
+
+> Nota de ejecución: `test_year_headers_never_open` importa `Qt`
+> localmente (no hay `from PySide6.QtCore import Qt` a nivel de módulo en
+> `tests/unit/test_projects_hub.py`; el test de barrido lo importa ya
+> dentro de su cuerpo).

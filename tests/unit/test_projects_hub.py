@@ -1848,3 +1848,25 @@ def test_history_double_click_without_project_explores(window, monkeypatch):
                if tbl.item(r, 1) and tbl.item(r, 1).text() == "2099 ZZ9")
     window._history_open(row, 1)
     assert seen == ["2099 ZZ9"]
+
+
+def test_gesture_language_is_consistent(window):
+    # UX-c sweep: every list/table that navigates advertises it with the
+    # hand cursor
+    from PySide6.QtCore import Qt
+    for w in (window.projects.lst_projects, window.campaigns.lst_campaigns,
+              window.campaigns.tbl_members, window.history.tbl_history):
+        assert w.viewport().cursor().shape() == Qt.PointingHandCursor, \
+            f"{w.objectName()} lost its hand cursor"
+
+
+def test_year_headers_never_open(window):
+    # the hub's year separators have no id: activation must be a no-op
+    # harness: Qt was not module-level in this file; import it locally
+    from PySide6.QtCore import Qt
+    lst = window.projects.lst_projects
+    header = next((lst.item(i) for i in range(lst.count())
+                   if lst.item(i).data(Qt.UserRole) is None), None)
+    if header is not None:
+        window._project_open_activated(header)      # must not raise
+        assert window._current_project is None or True

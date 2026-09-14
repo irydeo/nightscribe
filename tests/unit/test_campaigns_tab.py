@@ -88,3 +88,45 @@ def test_finished_campaign_is_dimmed(window):
     item = next(lst.item(i) for i in range(lst.count())
                 if lst.item(i).data(Qt.UserRole) == cid)
     assert "finished" in item.text() or "finalizada" in item.text()
+
+
+def test_campaign_detail_shows_protocol_and_members(window):
+    from PySide6.QtCore import Qt
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(
+        mw.db, "Campaña WeSb 1", group_name="obsSN",
+        goal="Catch the fade",
+        protocol={"cadence_nights": 1, "filters": ["B", "V"],
+                  "comp_stars": ["000-BB0-123"], "notes": "HJD report"},
+        report_url="https://example.org/report")
+    proj_mod.create(mw.db, "variable", "WeSb 1",
+                    {"ra_deg": 15.2, "dec_deg": 55.0}, campaign_id=cid)
+    window._refresh_campaigns_tab()
+    lst = window.campaigns.lst_campaigns
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == cid:
+            lst.setCurrentRow(i)
+    w = window.campaigns
+    assert w.lbl_cname.text() == "Campaña WeSb 1"
+    assert "obsSN" in w.lbl_cmeta.text()
+    assert "Catch the fade" in w.lbl_cgoal.text()
+    assert "B, V" in w.lbl_protocol.text()
+    assert "000-BB0-123" in w.lbl_protocol.text()
+    assert "https://example.org/report" in w.lbl_urls.text()
+    tbl = w.tbl_members
+    assert tbl.rowCount() == 1
+    assert tbl.item(0, 0).text() == "WeSb 1"
+    assert "never" in tbl.item(0, 3).text() or \
+        "visitar" in tbl.item(0, 3).text()
+
+
+def test_empty_campaign_detail_is_clean(window):
+    # clearSelection() alone does not reset currentItem() in QListWidget;
+    # setCurrentRow(-1) is the Qt-idiomatic "no current selection".
+    window.campaigns.lst_campaigns.setCurrentRow(-1)
+    window.campaigns.lst_campaigns.clearSelection()
+    window._campaign_selected()
+    assert window.campaigns.tbl_members.rowCount() == 0
+    assert window.campaigns.lbl_cname.text() != ""

@@ -478,6 +478,7 @@ class MainWindow(QMainWindow):
         c = self.campaigns
         c.lst_campaigns.itemSelectionChanged.connect(
             self._campaign_selected)
+        c.lbl_urls.linkActivated.connect(self._open_url)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
@@ -1727,17 +1728,24 @@ class MainWindow(QMainWindow):
         return item.data(Qt.UserRole) if item is not None else None
 
     def _campaign_selected(self):
-        # Fills the detail header (name, meta, goal); UA.3 fills the
-        # protocol block, the URLs and the members table.
+        # Fills the whole campaign detail: header, protocol, URLs and the
+        # members table with the per-target cadence health (UX-b).
+        from PySide6.QtWidgets import QAbstractItemView
         w = self.campaigns
         cid = self._selected_campaign_id()
         from ..core import campaign as _camp
-        c = _camp.get(db, cid) if cid is not None else None
-        if c is None:
+        rep = _camp.status_report(db, cid) if cid is not None else None
+        tbl = w.tbl_members
+        if rep is None:
             w.lbl_cname.setText(self.tr("Select a campaign."))
             w.lbl_cmeta.setText("—")
             w.lbl_cgoal.setText("")
+            w.lbl_urls.setText("")
+            w.lbl_protocol.setText("—")
+            tbl.setRowCount(0)
+            tbl.setColumnCount(0)
             return
+        c = rep["campaign"]
         w.lbl_cname.setText(c["name"])
         status = self.tr("active") if c["status"] == \
             _camp.CAMPAIGN_ACTIVE else self.tr("finished")
@@ -1748,6 +1756,61 @@ class MainWindow(QMainWindow):
             meta.append(c["coordinator"])
         w.lbl_cmeta.setText(" · ".join(meta))
         w.lbl_cgoal.setText(c.get("goal") or "")
+        # protocol block (plain readable text; the fields are free text)
+        prot = c.get("protocol") or {}
+        cad = int(prot.get("cadence_nights", 1) or 1)
+        lines = [self.tr("One measurement every %1 night(s) per filter"
+                         ).replace("%1", str(cad))]
+        if prot.get("filters"):
+            lines.append(self.tr("Filters: %1").replace(
+                "%1", ", ".join(prot["filters"])))
+        if prot.get("comp_stars"):
+            lines.append(self.tr("Comparison stars: %1").replace(
+                "%1", ", ".join(prot["comp_stars"])))
+        if prot.get("notes"):
+            lines.append(prot["notes"])
+        w.lbl_protocol.setText("\n".join(lines))
+        # clickable URLs (linkActivated is connected once in _connect)
+        links = []
+        if c.get("report_url"):
+            links.append("<a href='%1'>%2</a>".replace(
+                "%1", c["report_url"]).replace("%2", self.tr("Report form")))
+        if c.get("data_url"):
+            links.append("<a href='%1'>%2</a>".replace(
+                "%1", c["data_url"]).replace("%2", self.tr("Data")))
+        w.lbl_urls.setText(" · ".join(links))
+        # members table: object | kind | last visit | status
+        tbl.setColumnCount(4)
+        tbl.setHorizontalHeaderLabels([
+            self.tr("Object"), self.tr("Kind"), self.tr("Last visit"),
+            self.tr("Status")])
+        tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
+        tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        tbl.verticalHeader().setVisible(False)
+        tbl.setRowCount(0)
+        for m in rep["members"]:
+            row = tbl.rowCount()
+            tbl.insertRow(row)
+            name_item = QTableWidgetItem(m["object_name"])
+            name_item.setData(Qt.UserRole, m["id"])
+            tbl.setItem(row, 0, name_item)
+            tbl.setItem(row, 1, QTableWidgetItem(
+                theme.KIND_LABELS.get(m["kind"], m["kind"])))
+            last = "—" if m["days_since"] is None else \
+                self.tr("%1 d ago").replace("%1", str(m["days_since"]))
+            tbl.setItem(row, 2, QTableWidgetItem(last))
+            if m["event"]:
+                st, col = self.tr("⚡ brightness event"), theme.C_WARN
+            elif m["due"] and m["days_since"] is None:
+                st, col = self.tr("● never visited"), theme.C_WARN
+            elif m["due"]:
+                st, col = self.tr("⚠ %1 d overdue").replace(
+                    "%1", str(m["overdue_days"])), theme.C_WARN
+            else:
+                st, col = self.tr("✓ up to date"), theme.C_GOOD
+            st_item = QTableWidgetItem(st)
+            st_item.setForeground(QColor(col))
+            tbl.setItem(row, 3, st_item)
 
     def on_refresh_projects(self):
         self._rebuild_campaign_filter()

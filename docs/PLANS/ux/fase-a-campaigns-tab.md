@@ -582,7 +582,11 @@ def test_empty_campaign_detail_is_clean(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_campaigns_tab.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: campaign detail — protocol, clickable URLs and members table with cadence health (UX, subplan UA.3)`
-**Estado**: Pendiente
+**Estado**: Hecho (1113→1115 tests; i18n 749→763, 0 sin traducir ES+EN).
+`_campaign_selected` completo: encabezado, bloque de protocolo, URLs clicables
+(`linkActivated` → `_open_url` existente), tabla de miembros con salud de cadencia
+(evento / sin visitar / en retraso / al día, coloreadas). Test de detalle vacío usa
+`setCurrentRow(-1)` (clearSelection() no limpia currentItem() en QListWidget).
 
 ---
 

@@ -176,7 +176,8 @@ TABLE_COLS = {
               ("Max mag", "amag"), ("Velocity (km/s)", "avel"),
               ("Observed", "obs")],
 }
-TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"), ("Score", "score"),
+TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
+                      ("Campaign", "camp"), ("Score", "score"),
                       ("Mag", "mag"), ("Max alt", "max_alt"),
                       ("Best time (UTC)", "best_time"), ("NEOfixer", "nf"),
                       ("NObs", "nobs"), ("Discovered", "disc"),
@@ -1906,6 +1907,8 @@ class MainWindow(QMainWindow):
             db, status, kind=kind, search=search, tags=tag,
             campaign_id=camp_id,
             favorites_first=favorites, order=order)
+        from ..core import campaign as _camp
+        camp_names = {c["id"]: c["name"] for c in _camp.list_campaigns(db)}
         lst = self.projects.lst_projects
         # preserve the selected project across the refresh (the list reloads
         # on every visit to the tab and at startup, so we must not drop the
@@ -1937,6 +1940,10 @@ class MainWindow(QMainWindow):
             item = QListWidgetItem(
                 f"{star}[{kind_label}] {p['object_name']}  {step_n}/3")
             item.setData(Qt.UserRole, p["id"])
+            if p.get("campaign_id"):
+                item.setText(item.text() + " ⚑")
+                item.setToolTip(self.tr("Campaign: %1").replace(
+                    "%1", camp_names.get(p["campaign_id"], "?")))
             lst.addItem(item)
             if p["id"] == keep_id:
                 lst.setCurrentItem(item)

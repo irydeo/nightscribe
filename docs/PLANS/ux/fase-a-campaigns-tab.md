@@ -1321,4 +1321,4 @@ def test_hub_item_marks_campaign_membership(window):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py tests/unit/test_tonight_kinds.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: hub items flag campaign membership + Campaign column in the All table (UX, subplan UA.7)`
-**Estado**: Pendiente
+**Estado**: Hecho (1119→1120 tests; i18n 762→763, 0 sin traducir ES+EN).

@@ -1728,3 +1728,22 @@ def test_campaign_filter_persists_in_config(window):
     assert config.get("projects_filter_campaign") == cid
     cmb.setCurrentIndex(0)
     assert config.get("projects_filter_campaign") == ""
+
+
+def test_hub_item_marks_campaign_membership(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Campaña marca")
+    proj_mod.create(mw.db, "variable", "EE Cep", {"mag": 11.0},
+                    campaign_id=cid)
+    proj_mod.create(mw.db, "sn", "SN 2099cc", {"mag": 15.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    texts = {lst.item(i).text(): lst.item(i)
+             for i in range(lst.count())}
+    marked = [t for t in texts if "⚑" in t]
+    assert any("EE Cep" in t for t in marked)
+    assert not any("SN 2099cc" in t for t in marked)
+    ee = next(it for t, it in texts.items() if "EE Cep" in t)
+    assert "Campaña marca" in (ee.toolTip() or "")

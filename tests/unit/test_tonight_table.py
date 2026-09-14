@@ -134,10 +134,15 @@ def test_top3_get_the_podium_tint(window):
 def test_name_and_score_bold_others_plain(window):
     _fill(window)
     tbl = window.tonight.tbl_targets
-    # column 0 = Object (bold), 1 = Type (plain), 2 = Score (bold)
+    # Object is always column 0 (bold); Score sits wherever the column
+    # config puts it — resolve it by header so new columns don't break it
     assert tbl.item(0, 0).font().bold()
-    assert not tbl.item(0, 1).font().bold()
-    assert tbl.item(0, 2).font().bold()
+    headers = [tbl.horizontalHeaderItem(c).text()
+               for c in range(tbl.columnCount())]
+    score = headers.index("Score")
+    for c in range(1, score):
+        assert not tbl.item(0, c).font().bold(), f"column {c} must stay plain"
+    assert tbl.item(0, score).font().bold()
 
 
 def test_name_foreground_is_the_kind_color(window):

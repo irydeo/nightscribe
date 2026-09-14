@@ -20,6 +20,7 @@
          </item>
           <item><widget class="QPushButton" name="btn_refresh"><property name="text"><string>Refresh</string></property></widget></item>
           <item><widget class="QPushButton" name="btn_campaigns"><property name="text"><string>Campaigns…</string></property></widget></item>
+          <item><widget class="QPushButton" name="btn_new_project"><property name="text"><string>New project…</string></property></widget></item>
         </layout>
        </item>
        <item>

@@ -1747,3 +1747,69 @@ def test_hub_item_marks_campaign_membership(window):
     assert not any("SN 2099cc" in t for t in marked)
     ee = next(it for t, it in texts.items() if "EE Cep" in t)
     assert "Campaña marca" in (ee.toolTip() or "")
+
+
+def test_project_activated_jumps_to_current_step(window, panel):
+    # panel: the harness convention — a FakeWorker loader stands in for the
+    # real ExploreWorker, so the offscreen run never touches the network.
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "sn", "SN 2099dd", {"mag": 15.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    item = next(lst.item(i) for i in range(lst.count())
+                if lst.item(i).data(Qt.UserRole) == p["id"])
+    window._project_open_activated(item)
+    # a fresh project sits at step "plan" -> tab index 1 (Details is 0)
+    assert window.projects.tabs_steps.currentIndex() == 1
+
+
+def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
+    # panel: FakeWorker loader, no real network in this offscreen run.
+    from PySide6 import QtWidgets
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "sn", "SN 2099ee", {"mag": 15.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    item = next(lst.item(i) for i in range(lst.count())
+                if lst.item(i).data(Qt.UserRole) == p["id"])
+    seen = {}
+
+    class _Act:
+        def __init__(self, text):
+            self._t = text
+        def text(self):
+            return self._t
+        def setEnabled(self, b):
+            pass
+
+    class _RecordingMenu:
+        # PySide6 6.11: patching the non-virtual C++ QMenu.exec via a
+        # class attribute is ignored by Shiboken — the real event loop
+        # blocks the test. The handler imports QMenu at call time, so we
+        # swap the class on the module itself (same capture/assert as the
+        # card's fake_exec).
+        def __init__(self, *a, **k):
+            self._acts = []
+        def addAction(self, text):
+            act = _Act(text)
+            self._acts.append(act)
+            return act
+        def addSeparator(self):
+            pass
+        def actions(self):
+            return list(self._acts)
+        def exec(self, *a, **k):
+            seen["actions"] = [x.text() for x in self._acts]
+            return None
+
+    monkeypatch.setattr(QtWidgets, "QMenu", _RecordingMenu)
+    window._project_context_menu(
+        lst.visualItemRect(item).center())
+    texts = seen["actions"]
+    assert any("Open" in t or "Abrir" in t for t in texts)
+    assert any("Follow" in t or "Seguimiento" in t for t in texts)
+    assert any("Delete" in t or "Eliminar" in t for t in texts)

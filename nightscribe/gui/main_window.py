@@ -494,6 +494,16 @@ class MainWindow(QMainWindow):
         p.cmb_campaign.currentIndexChanged.connect(
             lambda _i: self.on_refresh_projects())
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
+        # UX-c: one gesture language — double-click/Enter opens the
+        # project at its current step, right-click offers every action,
+        # the hand cursor advertises clickability.
+        p.btn_new_project.clicked.connect(self._tools_explore)
+        p.lst_projects.itemActivated.connect(
+            self._project_open_activated)
+        p.lst_projects.setContextMenuPolicy(Qt.CustomContextMenu)
+        p.lst_projects.customContextMenuRequested.connect(
+            self._project_context_menu)
+        p.lst_projects.viewport().setCursor(Qt.PointingHandCursor)
         # UX-d: the project header campaign badge is a link to the tab
         self.projects.lbl_header.linkActivated.connect(
             self._campaign_link_clicked)
@@ -1982,6 +1992,68 @@ class MainWindow(QMainWindow):
         self._ensure_proj_files_list(
             self.projects.tabs_steps.findChild(QWidget, "tab_details"))
         self._populate_project_files(p["id"])
+
+    def _project_open_activated(self, item):
+        # Double-click / Enter on a project row (UX-c): jump straight to
+        # its current step (single click stays at the Details card).
+        if item is None or item.data(Qt.UserRole) is None:
+            return
+        self.projects.lst_projects.setCurrentItem(item)
+        p = self._current_project
+        if not p or p["status"] != project.STATUS_ACTIVE:
+            return
+        cur = project.current_step(db, p["id"])
+        if cur in _STEP_KEYS:
+            self.projects.tabs_steps.setCurrentIndex(
+                _STEP_KEYS.index(cur) + 1)          # Details is index 0
+
+    def _project_context_menu(self, pos):
+        # Right-click on the projects list (UX-c): all the row actions,
+        # with state-aware enablement.
+        item = self.projects.lst_projects.itemAt(pos)
+        if item is None or item.data(Qt.UserRole) is None:
+            return
+        self.projects.lst_projects.setCurrentItem(item)
+        p = self._current_project
+        if not p:
+            return
+        from PySide6.QtWidgets import QMenu
+        menu = QMenu(self)
+        act_open = menu.addAction(self.tr("Open"))
+        act_fu = menu.addAction(self.tr("Follow-up"))
+        act_fu.setEnabled(
+            p["kind"] in FOLLOWUP_KINDS
+            and self.projects.tabs_steps.isTabVisible(4))
+        act_fav = menu.addAction(
+            self.tr("Unstar") if p.get("favorite")
+            else self.tr("Star as favorite"))
+        menu.addSeparator()
+        act_close = menu.addAction(self.tr("Close project…"))
+        act_close.setEnabled(p["status"] == project.STATUS_ACTIVE)
+        act_reopen = menu.addAction(self.tr("Reopen"))
+        act_reopen.setEnabled(p["status"] != project.STATUS_ACTIVE)
+        act_archive = menu.addAction(self.tr("Archive…"))
+        act_delete = menu.addAction(self.tr("Delete…"))
+        menu.addSeparator()
+        act_folder = menu.addAction(self.tr("Show in folder"))
+        chosen = menu.exec(
+            self.projects.lst_projects.viewport().mapToGlobal(pos))
+        if chosen is act_open:
+            self._project_open_activated(item)
+        elif chosen is act_fu:
+            self.projects.tabs_steps.setCurrentIndex(4)
+        elif chosen is act_fav:
+            self._project_toggle_favorite()
+        elif chosen is act_close:
+            self._project_close()
+        elif chosen is act_reopen:
+            self._project_reopen()
+        elif chosen is act_archive:
+            self._project_archive()
+        elif chosen is act_delete:
+            self._project_delete()
+        elif chosen is act_folder:
+            self._open_project_folder()
 
     def _project_reclicked(self, item):
         # @args: item - the QListWidgetItem just clicked

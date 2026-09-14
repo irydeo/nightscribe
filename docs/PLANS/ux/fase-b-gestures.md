@@ -184,7 +184,12 @@ añádela aquí y no la dupliques allí.)
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: projects list gestures — open at current step, context menu, hand cursor, New project button (UX, subplan UB.1)`
-**Estado**: Pendiente
+**Estado**: Hecho (1120→1122 tests; i18n 763→769, 0 sin traducir ES+EN)
+> Nota de ejecución: en PySide6 6.11 el `monkeypatch` de `QMenu.exec` de la
+> tarjeta queda anulado por Shiboken (el C++ gana y bloquea offscreen); el test
+> intercambia `QtWidgets.QMenu` por un doble que registra `actions()` — mismo
+> contrato (captura + mismas asserts). Fijado también un `panel` FakeWorker
+> (contrato del harness del módulo).
 
 ---
 

@@ -74,3 +74,7 @@ class CollapsibleSection(QWidget):
         self._expanded = not collapsed
         self._content.setVisible(self._expanded)
         self._update_arrow()
+
+    # @return: True while the section's content is shown
+    def isExpanded(self):
+        return self._expanded

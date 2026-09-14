@@ -1,7 +1,7 @@
 ############################################################
 # -*- coding: utf-8 -*-
 #
-# NightScribe - project step tabs tests (offscreen)
+# NightScribe - project page sections tests (offscreen)
 # Python  v3.12
 #
 # Francisco José Calvo Fernández
@@ -11,15 +11,22 @@
 #
 ############################################################
 
-"""Offscreen tests for the project step tabs (UX v3, Plan & Captura).
+"""Unit tests: project page sections (UX, UD.3).
 
-The step tabs are rebuilt on every project switch (_build_step_tabs →
-_clear_step_tabs). The plan tab mixes plain widgets with nested layout rows
-(the CCDciel controls), and a wipe that only handled top-level widgets used
-to leave those nested controls orphaned but still painted on top of the brand
-new tab — the "lighter rectangle / piled buttons" bug. These tests drive a
-throwaway MainWindow offscreen and assert the tabs hold exactly one copy of
-every control after repeated rebuilds.
+The project page's step tabs and wizard were replaced by collapsible
+sections (docs/PLANS/ux/fase-d-project-flow.md, UD.3). These tests drive a
+throwaway MainWindow offscreen and check the new contracts:
+
+  * the page is a scroll area wrapping one content widget, and selecting a
+    project builds every section (details first, then the three steps, and
+    follow-up for the kinds that keep a multi-night journal)
+  * rebuilds wipe the previous control set (no piled "Mark done" buttons)
+  * the per-section toggle row drives the core step machine (done /
+    reopen flip the current step exactly as core/project.py promises)
+
+Same harness as test_projects_hub.py: a fake loader keeps the real
+ExploreWorker out, and the db singleton is pointed at a temp file so no
+test ever touches the real database.
 """
 
 import os
@@ -28,135 +35,183 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-# The Qt headers mark the 3-arg QMouseEvent ctor (no device) as deprecated;
-# it is still the right tool for a synthetic press test.
-pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
+from PySide6.QtCore import Qt  # noqa: E402
 
-FAKE_PROJECT = {
-    "id": "prj-1",
-    "object_name": "2016 XYZ",
-    "kind": "neo",
-    "context": {},
-    "steps": [],
+# A bounded orbit with an ephemeris: orbit / sky render to real PNGs
+# offline, and the "field" cutout slot stays hidden.
+FAKE_ELEMENT = {
+    "type": "small_body",
+    "name": "2026 QK (443089)",
+    "data": {
+        "family": "Apollo",
+        "sbdb": {
+            "fullname": "2026 QK (443089) — example asteroid",
+            "elements": {"a": 1.350, "e": 0.400, "i": 6.2,
+                         "q": 0.810, "Q": 1.890, "n": None, "per": 560.0},
+            "phys": {"H": 20.5, "diameter": 1.1, "spec_B": "S-type",
+                     "albedo": 0.18, "rot_per": 12.3},
+            "moid": 0.028,
+            "sigmas": {"a": 0.0012, "e": 0.008, "i": 0.4},
+            "n_resids": 21,
+            "arc_days": 14,
+        },
+        "ephem": {"ra": "12 00 00.000", "dec": "+30 00 00.000",
+                  "r": 1.3, "delta": 0.5},
+        "mag_now": 19.8,
+        "dist_now_km": 74_800_000,
+    },
 }
 
-# One copy of every live control per step tab (kind "neo"):
-# plan: sequence + capture row (filter, send, start) + Observatory link +
-#       ephemeris + save plan (the CCDciel connection controls moved to the
-#       Observatory tab in UD.2)
-# process (neo): validate + save report + register FITS + register image +
-#                motion animation (C0/C1)
-# publish: generate post
-PLAN_BUTTONS = 6
-PROCESS_BUTTONS = 5
-PUBLISH_BUTTONS = 1
-PROJECT_WIDGETS = 15  # 11 plan + 2 MPC + products list + zoom spin (C0/C1)
+
+class FakeWorker:
+    # A stand-in for ExploreWorker: the panel connects to `finished`, calls
+    # start(), and whatever lands there is delivered synchronously (or not,
+    # when `deliver=False` — used to simulate a still-running worker).
+    def __init__(self, payload, deliver=True):
+        self.payload = payload
+        self.deliver = deliver
+        self._cbs = []
+
+    class _finished:
+        # just the connect / disconnect / emit surface the panel needs
+        def __init__(self, w):
+            self._w = w
+
+        def connect(self, cb):
+            self._w._cbs.append(cb)
+
+        def disconnect(self, cb=None):
+            if cb is None:
+                self._w._cbs = []
+            else:
+                self._w._cbs = [c for c in self._w._cbs if c is not cb]
+
+        def emit(self, p):
+            for cb in list(self._w._cbs):
+                cb(p)
+
+    @property
+    def finished(self):
+        return self._finished(self)
+
+    def start(self):
+        if self.deliver:
+            self._finished(self).emit(self.payload)
+
+
+# ---------------- harness ----------------
+
+@pytest.fixture(scope="module", autouse=True)
+def _point_db_at_tmpdir(tmp_path_factory):
+    # main_window imports the shared `db` singleton; redirect it to a throw
+    # away file so the hub's project CRUD never touches the real database.
+    # The module-scoped window is torn down before the redirect is undone.
+    import nightscribe.core.db as dbmod
+    import nightscribe.gui.main_window as mw
+    old_dbmod, old_mw = dbmod.db, mw.db
+    tmp = dbmod.Database(tmp_path_factory.mktemp("ud3db") / "t.db")
+    dbmod.db = tmp
+    mw.db = tmp
+    yield
+    dbmod.db = old_dbmod
+    mw.db = old_mw
 
 
 @pytest.fixture(scope="module")
-def window():
+def window(_point_db_at_tmpdir):
     from PySide6.QtWidgets import QApplication
-    app = QApplication.instance() or QApplication([])
+    from nightscribe.config import config
     from nightscribe.gui import theme
+    app = QApplication.instance() or QApplication([])
     theme.apply_theme(app)
-    from nightscribe import config as cfgmod
     from nightscribe.gui.main_window import MainWindow
-    # Hide the configured flag so __init__ never schedules the network worker.
-    real = cfgmod.config.is_configured
-    cfgmod.config.is_configured = lambda: False
+    # keep the tests hermetic: no auto-compute network worker on startup
+    orig_cfg = config.is_configured
+    config.is_configured = lambda: False
     w = MainWindow()
-    cfgmod.config.is_configured = real
+    w._now_timer.stop()
+    w._blink_timer.stop()
+    w._blink_render_timer.stop()
     yield w
+    config.is_configured = orig_cfg
     w.close()
 
 
-def _rebuild(window):
-    # Simulates a project switch: rebuild every step tab from scratch and let
-    # the pending deleteLater() calls apply, so only live widgets remain.
-    window._build_step_tabs(FAKE_PROJECT)
-    from PySide6.QtWidgets import QApplication
-    QApplication.processEvents()
+@pytest.fixture()
+def panel(window, tmp_path):
+    # A ready-made ObjectPanel (fake loader, temp chart dir) slotted into
+    # the hub's lazy slot, so the real ExploreWorker is never built.
+    from nightscribe.gui.overview import ObjectPanel
+    p = ObjectPanel(loader=lambda name, fallback_target=None:
+                    FakeWorker(FAKE_ELEMENT),
+                    chart_dir=tmp_path / "charts")
+    window._proj_panel = p
+    yield p
+    window._proj_panel = None
+    p.deleteLater()
 
 
-def _tab(window, name):
-    from PySide6.QtWidgets import QWidget
-    return window.projects.tabs_steps.findChild(QWidget, name)
+def _mk_project(window, kind="sn", name="SN 2099pg"):
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, kind, name, {"mag": 15.0})
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            lst.setCurrentRow(i)
+            break
+    return p
 
 
-def _buttons(tab):
+def test_page_has_sections_instead_of_tabs(window, panel):
+    _mk_project(window)
+    assert hasattr(window.projects, "scroll_page")
+    assert set(window._page_sections) >= {"details", "plan", "process",
+                                          "publish", "followup"}
+
+
+def test_sections_hold_exactly_one_control_set_after_rebuilds(window, panel):
+    p = _mk_project(window)
+    window._build_project_page(window._current_project)
+    window._build_project_page(window._current_project)
     from PySide6.QtWidgets import QPushButton
-    return tab.findChildren(QPushButton)
+    names = [b.text() for b in window.projects.page_container
+             .findChildren(QPushButton)]
+    assert names.count("Mark done") + names.count("Marcar hecho") == 3
 
 
-def _child_widgets(tab):
-    # QWidget.children() includes the layout QObjects; keep only widgets, so
-    # stray orphaned controls (parent still the tab) show up in the count.
-    from PySide6.QtWidgets import QWidget as QWidgetClass
-    return [c for c in tab.children() if isinstance(c, QWidgetClass)]
+def test_page_is_scroll_wrapped(window, panel):
+    _mk_project(window)
+    assert window.projects.scroll_page.widget() is \
+        window.projects.page_container
 
 
-def test_step_tabs_hold_exactly_one_control_set_after_rebuilds(window):
-    # Regression for the "lighter rectangle / piled buttons": orphaned CCDciel
-    # buttons used to survive _clear_step_tabs and stack over the fresh tab,
-    # gaining one extra copy on every project switch.
-    _rebuild(window)
-    plan = _tab(window, "tab_plan")
-    first_texts = {b.text() for b in _buttons(plan)}
-    assert len(first_texts) == len(_buttons(plan)), (
-        "duplicated buttons in one build")
-    # rebuild twice more: the control set must stay identical, never growing.
-    _rebuild(window)
-    _rebuild(window)
-    for name, expected in (("tab_plan", PLAN_BUTTONS),
-                           ("tab_process", PROCESS_BUTTONS),
-                           ("tab_publish", PUBLISH_BUTTONS)):
-        tab = _tab(window, name)
-        btns = _buttons(tab)
-        assert len(btns) == expected, (
-            f"{name}: expected {expected} buttons, got {len(btns)}")
-        texts = [b.text() for b in btns]
-        assert len(texts) == len(set(texts)), f"{name}: duplicated buttons"
-    # the plan-tab child list must not accumulate either
-    assert len(_child_widgets(plan)) == len(
-        _child_widgets(_tab(window, "tab_plan")))
-    # the widgets dict holds one live set of handles (no stale ones)
-    assert len(window._project_widgets) == PROJECT_WIDGETS
+def test_followup_section_only_for_followup_kinds(window, panel):
+    _mk_project(window, kind="neo", name="2099 PG1")
+    assert "followup" not in window._page_sections
+    _mk_project(window, kind="sn", name="SN 2099pg2")
+    assert "followup" in window._page_sections
 
 
-def test_step_tabs_scroll_wrapped(window):
-    # Regression: the step pages used to dump their content straight into
-    # the page layout, so the tallest page set the QTabWidget minimum and
-    # the window grew off-screen. Every step page now holds exactly one
-    # resizable scroll area (horizontal off); group boxes clip their
-    # children so nothing paints outside the box.
-    from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QScrollArea
-    _rebuild(window)
-    for name in ("tab_plan", "tab_process", "tab_publish"):
-        tab = _tab(window, name)
-        areas = [c for c in tab.children() if isinstance(c, QScrollArea)]
-        assert len(areas) == 1, f"{name}: expected one scroll area"
-        area = areas[0]
-        assert area.widgetResizable()
-        assert area.horizontalScrollBarPolicy() == \
-            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+def test_step_toggle_marks_done(window, panel):
+    p = _mk_project(window)
+    window._step_done("plan")
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    steps = {s["step"]: s["status"]
+             for s in proj_mod.get(mw.db, p["id"])["steps"]}
+    assert steps["plan"] == "done"
+    assert steps["process"] == "current"
 
 
-def test_clickable_frame_swallows_stale_object():
-    # The row's C++ object may be deleteLater'd while its click runs a modal
-    # dialog (explore) from inside mousePressEvent; the Python wrapper then
-    # outlives the C++ frame. Pressing such a stale frame must not raise.
-    from PySide6.QtCore import QEvent, QPointF, Qt
-    from PySide6.QtGui import QMouseEvent
-    from PySide6.QtWidgets import QApplication
-    from nightscribe.gui.main_window import _ClickableFrame
-
-    app = QApplication.instance() or QApplication([])
-    frame = _ClickableFrame()
-    # Kill the C++ object while the Python wrapper stays reachable.
-    frame.deleteLater()
-    app.processEvents()
-    ev = QMouseEvent(QEvent.Type.MouseButtonPress, QPointF(5, 5),
-                     Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton,
-                     Qt.KeyboardModifier.NoModifier)
-    frame.mousePressEvent(ev)  # must not raise RuntimeError
+def test_step_reopen(window, panel):
+    p = _mk_project(window)
+    window._step_done("plan")
+    window._step_reopen("plan")
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    steps = {s["step"]: s["status"]
+             for s in proj_mod.get(mw.db, p["id"])["steps"]}
+    assert steps["plan"] == "current"
+    assert steps["process"] == "pending"

@@ -291,6 +291,7 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self._project_widgets = {}
         self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
+        self._page_sections = {}  # key -> CollapsibleSection of the project page
         self._advisor_dismissed = None  # A2: id of the project whose advisor
         #                                the user dismissed this session
 
@@ -535,11 +536,6 @@ class MainWindow(QMainWindow):
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
         p.lst_projects.itemClicked.connect(self._project_reclicked)
-        p.tabs_steps.currentChanged.connect(self._project_step_changed)
-        p.btn_prev.clicked.connect(self._project_prev)
-        p.btn_next.clicked.connect(self._project_next)
-        p.btn_skip.clicked.connect(self._project_skip)
-        p.btn_mark_done.clicked.connect(self._project_mark_done)
         p.btn_archive.clicked.connect(self._project_archive)
         p.btn_delete.clicked.connect(self._project_delete)
         p.btn_close.clicked.connect(self._project_close)
@@ -1194,13 +1190,13 @@ class MainWindow(QMainWindow):
             header_layout.addWidget(more)
 
     def _goto_project_followup(self, pid):
-        # Opens the project's Follow-up tab (the cadence chips land
-        # here, UX-d). Follow-up is tab index 4 of tabs_steps.
+        # Opens the project's Follow-up section (the cadence chips land
+        # here, UX-d). The section is expanded, not navigated by index.
         if not self._goto_project_by_id(pid):
             return
-        tabs = self.projects.tabs_steps
-        if tabs.isTabVisible(4):
-            tabs.setCurrentIndex(4)
+        sec = self._page_sections.get("followup")
+        if sec is not None:
+            sec.setCollapsed(False)
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and
@@ -1982,7 +1978,7 @@ class MainWindow(QMainWindow):
                 self.tr("No projects yet. Create one from Tonight."))
             self.projects.lbl_context.setText("—")
             self._reset_proj_panel()
-            self._clear_step_tabs()
+            self._clear_project_page()
             self._current_project = None
         # the Observatory tab's target combo follows the active projects
         self._refresh_obs_targets()
@@ -1999,25 +1995,17 @@ class MainWindow(QMainWindow):
             return
         self._current_project = p
         self._render_project_header(p)
-        self._build_step_tabs(p)
-        # "Detalles" first: the object's business card is what you open a
-        # project for; the current step is marked ● on its own tab and
-        # reached with Next →
-        self.projects.tabs_steps.setCurrentIndex(0)
-        self._update_step_buttons()
+        self._build_project_page(p)
         panel = self._get_proj_panel()
         if panel._worker is not None:
             panel.cancel()   # switching projects: drop the in-flight load
         ctx = dict(p.get("context") or {})
         ctx.setdefault("project_id", p["id"])   # B4: light-curve injection
         panel.explore(p["object_name"], fallback_target=ctx, ctx=ctx)
-        self._ensure_proj_files_list(
-            self.projects.tabs_steps.findChild(QWidget, "tab_details"))
-        self._populate_project_files(p["id"])
 
     def _project_open_activated(self, item):
         # Double-click / Enter on a project row (UX-c): jump straight to
-        # its current step (single click stays at the Details card).
+        # its current step's section (single click stays near the top).
         if item is None or item.data(Qt.UserRole) is None:
             return
         self.projects.lst_projects.setCurrentItem(item)
@@ -2026,8 +2014,9 @@ class MainWindow(QMainWindow):
             return
         cur = project.current_step(db, p["id"])
         if cur in _STEP_KEYS:
-            self.projects.tabs_steps.setCurrentIndex(
-                _STEP_KEYS.index(cur) + 1)          # Details is index 0
+            sec = self._page_sections.get(cur)
+            if sec is not None:
+                sec.setCollapsed(False)
 
     def _project_context_menu(self, pos):
         # Right-click on the projects list (UX-c): all the row actions,
@@ -2043,9 +2032,7 @@ class MainWindow(QMainWindow):
         menu = QMenu(self)
         act_open = menu.addAction(self.tr("Open"))
         act_fu = menu.addAction(self.tr("Follow-up"))
-        act_fu.setEnabled(
-            p["kind"] in FOLLOWUP_KINDS
-            and self.projects.tabs_steps.isTabVisible(4))
+        act_fu.setEnabled(p["kind"] in FOLLOWUP_KINDS)
         act_fav = menu.addAction(
             self.tr("Unstar") if p.get("favorite")
             else self.tr("Star as favorite"))
@@ -2063,7 +2050,9 @@ class MainWindow(QMainWindow):
         if chosen is act_open:
             self._project_open_activated(item)
         elif chosen is act_fu:
-            self.projects.tabs_steps.setCurrentIndex(4)
+            sec = self._page_sections.get("followup")
+            if sec is not None:
+                sec.setCollapsed(False)
         elif chosen is act_fav:
             self._project_toggle_favorite()
         elif chosen is act_close:
@@ -2085,10 +2074,10 @@ class MainWindow(QMainWindow):
                 (self._current_project or {}).get("id"):
             self._project_selected()
 
-    def _ensure_proj_files_list(self, tab):
-        # A4: lazily build the project files list widget in the Details tab.
-        # Called from _project_selected (works whether the panel was built
-        # by _get_proj_panel or injected by a test fixture).
+    def _ensure_proj_files_list_section(self, det):
+        # A4: lazily build the project files list inside the Object card
+        # section (UX-i): same content as before, re-targeted at the
+        # section layout instead of the old Details tab.
         if getattr(self, "_proj_files_list", None) is None:
             from .widgets.collapsible_section import CollapsibleSection
             sec = CollapsibleSection(self.tr("Project files"))
@@ -2106,7 +2095,7 @@ class MainWindow(QMainWindow):
             btn_ch_folder.clicked.connect(self._change_project_folder)
             sec.contentLayout().addWidget(btn_ch_folder)
             sec.setCollapsed(True)
-            tab.layout().addWidget(sec)
+            det.addWidget(sec)
             self._proj_files_section = sec
 
     def _populate_project_files(self, pid):
@@ -2177,24 +2166,12 @@ class MainWindow(QMainWindow):
         return worker
 
     def _get_proj_panel(self):
-        # Builds the reusable panel on first use and docks it into the
-        # «Detalles» tab (index 0), so the object's business card owns the
-        # whole panel height with the step tabs next to it.
+        # Reusable object card (lazy): built once, then re-parented into
+        # whatever section asks for it on each project-page build (UX-i).
         if self._proj_panel is None:
             from .overview import ObjectPanel
             panel = ObjectPanel(loader=self._proj_panel_loader)
-            area = QScrollArea()
-            area.setWidgetResizable(True)
-            area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-            area.setFrameShape(QFrame.Shape.NoFrame)
-            area.setWidget(panel)
-            tab = self.projects.tabs_steps.findChild(
-                QWidget, "tab_details")
-            tab.layout().addWidget(area)
-            # A4: project files list below the object panel
-            self._ensure_proj_files_list(tab)
             self._proj_panel = panel
-            self._proj_panel_area = area
         return self._proj_panel
 
     def _reset_proj_panel(self):
@@ -2210,11 +2187,10 @@ class MainWindow(QMainWindow):
         # and tabs kept showing the vanished project (stale detail).
         self._current_project = None
         self._reset_proj_panel()
-        self._clear_step_tabs()
+        self._clear_project_page()
         self.projects.lbl_header.setText(
             self.tr("Select a project or create one from Tonight."))
         self.projects.lbl_context.setText("—")
-        self.projects.lbl_step_status.setText("")
         self.projects.lbl_advisor.setVisible(False)
 
     def _render_project_header(self, p):
@@ -2301,77 +2277,149 @@ class MainWindow(QMainWindow):
             elif item.layout() is not None:
                 self._wipe_layout(item.layout())
 
-    def _step_tab_layout(self, name):
-        # @args: name - the step tab page objectName ("tab_plan", ...)
-        # @return: the inner QVBoxLayout of a fresh QScrollArea docked into the
-        #          page. Keeps every step page scrollable (same pattern as
-        #          tab_details): the window minimum stops growing with the
-        #          tallest page and content scrolls instead of overflowing or
-        #          painting over its neighbours on shrink.
-        tab = self.projects.tabs_steps.findChild(QWidget, name)
-        area = QScrollArea()
-        area.setWidgetResizable(True)
-        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        area.setFrameShape(QFrame.Shape.NoFrame)
+    def _section_layout(self, key, title):
+        # One collapsible section of the project page (UX-i).
+        # @args: key - "details"|"plan"|"process"|"publish"|"followup",
+        #        title - the visible header
+        # @return: the section's content QLayout (where the per-kind
+        #          builders add their widgets, exactly as before)
+        from .widgets.collapsible_section import CollapsibleSection
+        sec = CollapsibleSection(title)
+        page_container = self.projects.page_container
+        page_container.layout().addWidget(sec)
+        self._page_sections[key] = sec
         inner = QWidget()
-        block = QVBoxLayout(inner)
-        area.setWidget(inner)
-        tab.layout().addWidget(area)
-        return block
+        v = QVBoxLayout(inner)
+        v.setContentsMargins(0, 0, 0, 0)
+        sec.setContentWidget(inner)
+        return v
 
-    def _clear_step_tabs(self):
-        # Remove all dynamic content from step tabs. A wipe that only checked
-        # item.widget() left the widgets inside nested addLayout rows (the
-        # CCDciel controls of the plan tab) orphaned: they kept painting over
-        # the rebuilt tab and piled up across project switches.
-        for tab_name in ("tab_plan", "tab_process",
-                         "tab_publish", "tab_followup"):
-            tab = self.projects.tabs_steps.findChild(QWidget, tab_name)
-            if tab and tab.layout():
-                self._wipe_layout(tab.layout())
-        self.projects.lbl_step_status.setText("—")
-        self._project_widgets = {}
-        self._fu_current_session = None
+    def _clear_project_page(self):
+        # Wipes the project page sections (one rebuild per project
+        # selection, same discipline as the old step tabs).
+        self._page_sections = {}
+        self._wipe_layout(self.projects.page_container.layout())
 
-    def _build_step_tabs(self, p):
-        # Populate each step tab with only the content relevant to the
-        # project kind. Steps are clickable (the QTabWidget handles that).
-        self._clear_step_tabs()
-        kind = p["kind"]
-        ctx = p["context"]
-        # update tab labels with status icons (steps start at index 1;
-        # index 0 is "Detalles", which keeps its plain title)
-        for i, key in enumerate(_STEP_KEYS):
-            step = next((s for s in p["steps"] if s["step"] == key), None)
-            icon = {"done": "✔", "current": "●", "pending": "○",
-                    "skipped": "–"}.get(step["status"] if step else "○", "○")
-            label = self._step_label(key)
-            self.projects.tabs_steps.setTabText(i + 1, f"{icon} {label}")
-        # build content per step
+    def _build_project_page(self, p):
+        # The project page (UX-i): one scroll with collapsible
+        # sections instead of step tabs + wizard. Same per-kind
+        # content builders, new container; the step state shows in
+        # words and its toggle lives INSIDE each step section.
+        self._clear_project_page()
+        kind, ctx = p["kind"], p["context"]
+        # section 0: the object card + project files (not a step)
+        det = self._section_layout("details", self.tr("Object card"))
+        panel = self._get_proj_panel()
+        det.addWidget(panel)
+        self._ensure_proj_files_list_section(det)
+        self._populate_project_files(p["id"])
+        # step sections keep the old builders: each one's first line
+        # now asks for a section instead of a tab page
         self._build_plan_tab(p, kind, ctx)
         self._build_process_tab(p, kind, ctx)
         self._build_publish_tab(p, kind, ctx)
-        # B2/D3: follow-up tab — not a step (like Details), for the kinds
-        # with multi-night photometry (FOLLOWUP_KINDS; guardrail H-n: the
-        # future variables track joins this list, nothing else changes)
-        followup_tab = self.projects.tabs_steps.findChild(QWidget, "tab_followup")
-        fu_idx = self.projects.tabs_steps.indexOf(followup_tab)
         if kind in FOLLOWUP_KINDS:
             self._build_followup_tab(p, ctx)
-            self.projects.tabs_steps.setTabVisible(fu_idx, True)
+
+    def _step_section(self, key):
+        # Builds one step section with its state line + toggle inside
+        # (UX-i). @return: the section's content layout
+        labels = {"plan": self._step_label("plan"),
+                  "process": self._step_label("process"),
+                  "publish": self._step_label("publish"),
+                  "followup": self.tr("Follow-up")}
+        layout = self._section_layout(key, labels[key])
+        p = self._current_project
+        if p and key in _STEP_KEYS:
+            layout.addLayout(self._step_toggle_row(p, key))
+        return layout
+
+    def _step_toggle_row(self, p, key):
+        # The step's own controls, in words (no more ✔/●/○/– icons):
+        # "done on <date>" / "skipped" / pending with its buttons.
+        # @args: p - the project dict, key - step key ("plan"|...)
+        # @return: the QHBox row to add inside the step section
+        row = QHBoxLayout()
+        step = next((s for s in p["steps"] if s["step"] == key), None)
+        status = step["status"] if step else "pending"
+        lbl = QLabel()
+        row.addWidget(lbl)
+        if status in ("done", "skipped"):
+            when = datetime.datetime.fromtimestamp(
+                step["updated"]).strftime("%Y-%m-%d") \
+                if step and step.get("updated") else ""
+            lbl.setText(
+                self.tr("✔ done on %1").replace("%1", when)
+                if status == "done" else self.tr("– skipped"))
+            btn_reopen = QPushButton(self.tr("Reopen step"))
+            btn_reopen.setFlat(True)
+            btn_reopen.clicked.connect(
+                lambda _=False, k=key: self._step_reopen(k))
+            row.addWidget(btn_reopen)
         else:
-            self._wipe_layout(followup_tab.layout())
-            self.projects.tabs_steps.setTabVisible(fu_idx, False)
-        # "Detalles" stays open (set by _project_selected); the current
-        # step is marked ● on its tab and reached with Next →
-        self._update_step_status(p)
-        self._update_step_buttons()
+            lbl.setText(self.tr("pending"))
+            btn_done = QPushButton(self.tr("Mark done"))
+            btn_done.clicked.connect(
+                lambda _=False, k=key: self._step_done(k))
+            row.addWidget(btn_done)
+            btn_skip = QPushButton(self.tr("Skip step"))
+            btn_skip.setFlat(True)
+            btn_skip.clicked.connect(
+                lambda _=False, k=key: self._step_skip(k))
+            row.addWidget(btn_skip)
+        row.addStretch()
+        return row
+
+    def _step_done(self, key):
+        # Marks the step done and rebuilds (advance() keeps the
+        # single-current invariant); the close prompt at the last
+        # step survives from the old wizard.
+        # @args: key - step key
+        # @return: None
+        p = self._current_project
+        if not p:
+            return
+        cur = project.current_step(db, p["id"])
+        if cur != key:
+            project.set_step_status(db, p["id"], key,
+                                    project.STEP_CURRENT)
+        project.advance(db, p["id"])
+        p = project.get(db, p["id"])
+        self._current_project = p
+        self.on_refresh_projects()
+        self._build_project_page(p)
+        self._render_project_header(p)
+        if p["status"] != project.STATUS_ACTIVE:
+            ans = QMessageBox.question(
+                self, self.tr("Close project"),
+                self.tr("All steps are done. Close this project?"))
+            if ans == QMessageBox.Yes:
+                self._project_close()
+
+    def _step_skip(self, key):
+        # Marks the step skipped and rebuilds the page.
+        # @args: key - step key
+        # @return: None
+        project.set_step_status(db, self._current_project["id"], key,
+                                project.STEP_SKIPPED)
+        p = project.get(db, self._current_project["id"])
+        self._current_project = p
+        self._build_project_page(p)
+
+    def _step_reopen(self, key):
+        # Reopens a done/skipped step (moves it back to current) + rebuild.
+        # @args: key - step key
+        # @return: None
+        project.reopen_step(db, self._current_project["id"], key)
+        p = project.get(db, self._current_project["id"])
+        self._current_project = p
+        self._build_project_page(p)
 
     def _build_plan_tab(self, p, kind, ctx):
         # Plan & Captura (ADR-030): the session plan (frames/exposure/filter),
         # the calibration frames, the CCDciel/NINA/CSV export and the NEO
         # ephemeris export all live in this single step.
-        layout = self._step_tab_layout("tab_plan")
+        layout = self._step_section("plan")
         # common: capture plan inputs
         layout.addWidget(QLabel(self.tr("Capture plan")))
         form = QFrame()
@@ -3040,7 +3088,7 @@ class MainWindow(QMainWindow):
                 self.tr("Capture started in CCDciel."), 5000)
 
     def _build_process_tab(self, p, kind, ctx):
-        layout = self._step_tab_layout("tab_process")
+        layout = self._step_section("process")
         if kind in ("neo", "pccp"):
             # MPC report: paste + validate + save
             layout.addWidget(QLabel(
@@ -3790,7 +3838,7 @@ class MainWindow(QMainWindow):
                     "environment"), 10000)
 
     def _build_publish_tab(self, p, kind, ctx):
-        layout = self._step_tab_layout("tab_publish")
+        layout = self._step_section("publish")
         btn = QPushButton(self.tr("Generate post…"))
         btn.clicked.connect(self._project_post)
         layout.addWidget(btn)
@@ -3810,7 +3858,7 @@ class MainWindow(QMainWindow):
         # FITS) are hidden for hads.
         from ..core import followup as fu
         kind = p["kind"]
-        layout = self._step_tab_layout("tab_followup")
+        layout = self._step_section("followup")
         pid = p["id"]
 
         # campaign lookup (ADR-035): used by the cadence override below and
@@ -4349,18 +4397,6 @@ class MainWindow(QMainWindow):
             self._fu_populate_images(img_lst, sid)
         self._populate_project_files(pid)
 
-    def _step_key_idx(self, idx):
-        # Tab index -> _STEP_KEYS index. Index 0 is the "Detalles" tab (no
-        # step); steps start at 1. The "Follow-up" tab (B2, SN only) sits
-        # after Publish and is also a non-step tab. Returns None when there
-        # is no step key.
-        # @args: idx - tab index
-        # @return: position in _STEP_KEYS, or None on a non-step tab
-        if idx <= 0:
-            return None
-        n = idx - 1
-        return n if n < len(_STEP_KEYS) else None
-
     def _fu_save_notes(self, pid):
         # Persist notes on the current session (B2: "en ocasiones" se guardan).
         from ..core import followup as fu
@@ -4607,97 +4643,8 @@ class MainWindow(QMainWindow):
             n += 1
         self.statusBar().showMessage(
             self.tr("Added %1 survey points").replace("%1", str(n)), 8000)
-        # rebuild the tab so the curve/points update in place
-        self._build_step_tabs(project.get(db, pid))
-
-    def _project_step_changed(self, idx):
-        # Update the status label and the step buttons when the tab changes
-        self._update_step_buttons()
-        if not self._current_project:
-            return
-        self._update_step_status(self._current_project)
-
-    def _update_step_status(self, p):
-        idx = self.projects.tabs_steps.currentIndex()
-        n = self._step_key_idx(idx)
-        if n is None:
-            self.projects.lbl_step_status.setText("—")
-            return
-        key = _STEP_KEYS[n]
-        step = next((s for s in p["steps"] if s["step"] == key), None)
-        status = step["status"] if step else "—"
-        status_txt = {"done": self.tr("done"), "current": self.tr("current"),
-                      "pending": self.tr("pending"),
-                      "skipped": self.tr("skipped")}.get(status, status)
-        self.projects.lbl_step_status.setText(
-            f"{self._step_label(key)} — {status_txt}")
-
-    def _update_step_buttons(self):
-        # The step buttons (prev / skip / done / next) only make sense on the
-        # step tabs, not on "Detalles" or "Follow-up" (non-step tabs):
-        # prev has no target there, skip / done have no step to act on,
-        # next is allowed (it enters step 1).
-        idx = self.projects.tabs_steps.currentIndex()
-        last = self.projects.tabs_steps.count() - 1
-        on_non_step = self._step_key_idx(idx) is None
-        self.projects.btn_prev.setEnabled(not on_non_step)
-        self.projects.btn_next.setEnabled(idx != last)
-        self.projects.btn_skip.setEnabled(not on_non_step)
-        self.projects.btn_mark_done.setEnabled(not on_non_step)
-
-    def _project_prev(self):
-        idx = self.projects.tabs_steps.currentIndex()
-        if not self.projects.btn_prev.isEnabled():
-            return
-        self.projects.tabs_steps.setCurrentIndex(idx - 1)
-
-    def _project_next(self):
-        idx = self.projects.tabs_steps.currentIndex()
-        if not self.projects.btn_next.isEnabled():
-            return
-        self.projects.tabs_steps.setCurrentIndex(idx + 1)
-
-    def _project_skip(self):
-        if not self._current_project:
-            return
-        if not self.projects.btn_skip.isEnabled():
-            return
-        n = self._step_key_idx(self.projects.tabs_steps.currentIndex())
-        if n is None:
-            return
-        project.set_step_status(db, self._current_project["id"],
-                                _STEP_KEYS[n], project.STEP_SKIPPED)
-        self._project_next()
-        self._refresh_current_project()
-
-    def _project_mark_done(self):
-        if not self._current_project:
-            return
-        if not self.projects.btn_mark_done.isEnabled():
-            return
-        n = self._step_key_idx(self.projects.tabs_steps.currentIndex())
-        if n is None:
-            return
-        project.set_step_status(db, self._current_project["id"],
-                                _STEP_KEYS[n], project.STEP_DONE)
-        self._project_next()
-        self._refresh_current_project()
-        # A2: marking the last step done proposes closing the project.
-        if n == len(_STEP_KEYS) - 1:
-            if QMessageBox.question(
-                    self, self.tr("Close project"),
-                    self.tr("All steps are done. Close this project?"),
-                    QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes:
-                self._project_close()
-
-    def _refresh_current_project(self):
-        if not self._current_project:
-            return
-        p = project.get(db, self._current_project["id"])
-        if p:
-            self._current_project = p
-            self._render_project_header(p)
-            self._build_step_tabs(p)
+        # rebuild the page so the curve/points update in place
+        self._build_project_page(project.get(db, pid))
 
     def _sn_add_step_row(self, layout, filt="Clear", n=30, exp=60.0):
         # B8: add a filter×N×exp row to the SN multi-filter step list.

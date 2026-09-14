@@ -867,7 +867,23 @@ def test_step_reopen(window, panel):
 **Hecho cuando**: verde. (La suite completa NO estará verde aún: quedan
 los retargets de UD.4/UD.5 — anótalo en el estado como «verde parcial».)
 **Commit**: `Gui: the project page — collapsible sections replace step tabs (UX, subplan UD.3)`
-**Estado**: Pendiente
+> **Nota de ejecución**:
+> - `test_campaigns_tab.py::test_cadence_chip_navigates_to_followup` ya NO queda en rojo: su
+>   asserts obsoleto sobre `tabs_steps.currentIndex()==4` se retargeteó a la nueva API de
+>   secciones (el chip navega a la sección «Follow-up»: existe y está expandida). Se añadió
+>   `isExpanded()` a `CollapsibleSection` como contrapunto público de `setCollapsed()`.
+> - El bucket de rojos «verde parcial» (retargets aplazados a UD.4/UD.5) son ahora
+>   **4 ficheros** que invocan la API eliminada (`tabs_steps` / `_build_step_tabs`):
+>   `test_projects_hub`, `test_hads_plan`, `test_transit_plan`, `test_neo_process`.
+> - El harness de `test_project_tabs` **suelta** `window._proj_panel_area` (el atributo ya no
+>   existe: UD.3 deja de envolver el panel en `QScrollArea`; `_get_proj_panel` lo
+>   crea/reutiliza y lo re-encadena dentro de la sección «details»).
+> - Flake preexistente en `tests/unit/test_series.py` (Track B, módulo aparte): un fallo
+>   ocasional en la suite completa por posición de la corriente global `np.random` sin
+>   sembrar (p. ej. `test_detect_sources_ignores_noise` depende de que un blob de ruido
+>   no supere `sky + 5σ`). Verificado en HEAD limpio (977d7b2): suite verde 1140/1140;
+>   el fichero solo importa numpy + `core/series.py` → sin relación con UD.3.
+**Estado**: Hecho (verde parcial — ver nota de ejecución)
 
 ---
 

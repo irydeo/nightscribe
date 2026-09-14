@@ -134,47 +134,39 @@
           </item>
          </layout>
         </item>
-        <item>
-         <widget class="QTabWidget" name="tabs_steps">
-         <property name="currentIndex"><number>0</number></property>
-         <widget class="QWidget" name="tab_details">
-          <attribute name="title"><string>Details</string></attribute>
-          <layout class="QVBoxLayout" name="detailsLayout"/>
-         </widget>
-         <widget class="QWidget" name="tab_plan">
-          <attribute name="title"><string>Plan</string></attribute>
-          <layout class="QVBoxLayout" name="planLayout"/>
-         </widget>
-        <widget class="QWidget" name="tab_process">
-          <attribute name="title"><string>Process</string></attribute>
-          <layout class="QVBoxLayout" name="processLayout"/>
-         </widget>
-
-         <widget class="QWidget" name="tab_publish">
-          <attribute name="title"><string>Publish</string></attribute>
-          <layout class="QVBoxLayout" name="publishLayout"/>
-         </widget>
-         <widget class="QWidget" name="tab_followup">
-          <attribute name="title"><string>Follow-up</string></attribute>
-          <layout class="QVBoxLayout" name="followupLayout"/>
-         </widget>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="lbl_step_status">
-        <property name="wordWrap"><bool>true</bool></property>
-        <property name="text"><string>—</string></property>
-       </widget>
-      </item>
-      <item>
-       <layout class="QHBoxLayout" name="navBtns">
-        <item><widget class="QPushButton" name="btn_prev"><property name="text"><string>← Previous</string></property></widget></item>
-        <item><widget class="QPushButton" name="btn_skip"><property name="text"><string>Skip step</string></property></widget></item>
-        <item><widget class="QPushButton" name="btn_mark_done"><property name="text"><string>Mark done</string></property></widget></item>
-        <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-        <item><widget class="QPushButton" name="btn_next"><property name="text"><string>Next →</string></property></widget></item>
-       </layout>
-      </item>
+         <item>
+          <widget class="QGroupBox" name="grp_next">
+           <property name="title"><string>Next</string></property>
+           <layout class="QHBoxLayout" name="nextLayout">
+            <item>
+             <widget class="QLabel" name="lbl_next">
+              <property name="text"><string>—</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+              <property name="styleSheet"><string notr="true">font-size: 13px; font-weight: bold;</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btn_next_go">
+              <property name="text"><string>Go →</string></property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_steps_line">
+           <property name="text"><string/></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QScrollArea" name="scroll_page">
+           <property name="widgetResizable"><bool>true</bool></property>
+           <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+           <widget class="QWidget" name="page_container">
+            <layout class="QVBoxLayout" name="pageLayout"/>
+           </widget>
+          </widget>
+         </item>
      </layout>
     </widget>
    </item>

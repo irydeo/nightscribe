@@ -276,4 +276,8 @@ def test_cadence_chip_navigates_to_followup(window):
     window._goto_project_followup(p["id"])
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
-    assert window.projects.tabs_steps.currentIndex() == 4
+    # UD.3: no more step tabs — "navigate to Follow-up" means the
+    # Follow-up section exists in the rebuilt page and is expanded.
+    sec = window._page_sections.get("followup")
+    assert sec is not None, "the Follow-up section was not built"
+    assert sec.isExpanded(), "the Follow-up section should be expanded"

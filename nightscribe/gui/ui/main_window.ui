@@ -25,6 +25,9 @@
       <widget class="QWidget" name="tab_solar">
        <attribute name="title"><string>Solar system</string></attribute>
       </widget>
+      <widget class="QWidget" name="tab_observatory">
+       <attribute name="title"><string>Observatory</string></attribute>
+      </widget>
       <widget class="QWidget" name="tab_history">
        <attribute name="title"><string>History</string></attribute>
       </widget>

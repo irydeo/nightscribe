@@ -61,7 +61,7 @@ def test_campaigns_tab_exists(window):
     from PySide6.QtWidgets import QTabWidget
     from nightscribe.gui.main_window import TAB_CAMPAIGNS
     tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 5
+    assert tabs.count() == 6
     assert tabs.widget(TAB_CAMPAIGNS) is window.campaigns
 
 

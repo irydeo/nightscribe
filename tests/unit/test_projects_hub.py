@@ -584,14 +584,16 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
     # line says so; the connect button is the one enabled thing.
     _create_and_select(window, "neo", "ccd-section-target",
                        {"kind": "neo", "mag": 19.0})
-    w = window._project_widgets
-    assert w["ccd_connect"].isEnabled()
+    obs = window._obs_widgets          # connection + mount: Observatory tab
+    w = window._project_widgets        # capture: still per project
+    assert obs["ccd_connect"].isEnabled()
     assert window._ccd_connected is False
-    for key in ("ccd_disconnect", "ccd_refresh", "ccd_push", "ccd_start",
-                "ccd_goto", "ccd_sync"):
+    for key in ("ccd_disconnect", "ccd_refresh", "ccd_goto", "ccd_sync"):
+        assert not obs[key].isEnabled(), f"{key} should start disabled"
+    for key in ("ccd_push", "ccd_start"):
         assert not w[key].isEnabled(), f"{key} should start disabled"
     assert not w["cmb_ccd_filter"].isEnabled()
-    assert w["ccd_status"].text() == window.tr("CCDciel: not connected")
+    assert obs["ccd_status"].text() == window.tr("CCDciel: not connected")
 
 
 def test_plan_tab_ccdciel_filter_fallback_list(window, panel):

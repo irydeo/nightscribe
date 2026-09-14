@@ -41,14 +41,16 @@ FAKE_PROJECT = {
 }
 
 # One copy of every live control per step tab (kind "neo"):
-# plan: sequence + 7 CCDciel + ephemeris + save plan
+# plan: sequence + capture row (filter, send, start) + Observatory link +
+#       ephemeris + save plan (the CCDciel connection controls moved to the
+#       Observatory tab in UD.2)
 # process (neo): validate + save report + register FITS + register image +
 #                motion animation (C0/C1)
 # publish: generate post
-PLAN_BUTTONS = 10
+PLAN_BUTTONS = 6
 PROCESS_BUTTONS = 5
 PUBLISH_BUTTONS = 1
-PROJECT_WIDGETS = 25  # 21 plan + 2 MPC + products list + zoom spin (C0/C1)
+PROJECT_WIDGETS = 15  # 11 plan + 2 MPC + products list + zoom spin (C0/C1)
 
 
 @pytest.fixture(scope="module")

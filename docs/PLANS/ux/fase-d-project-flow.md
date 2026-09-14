@@ -518,7 +518,21 @@ sus tooltips — ya existen; `lupdate` las reubica solo.)
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_observatory_tab.py tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: Observatory tab — CCDciel control leaves the project Plan step (UX, subplan UD.2)`
-**Estado**: Pendiente
+**Estado**: Hecho (1136→1140 tests, suite verde)
+
+> Nota de ejecución: `tests/unit/test_projects_hub.py:582` se parte en
+> dos lecturas (clúster de conexión en `_obs_widgets`; fila de captura
+> `cmb_ccd_filter`/`ccd_push`/`ccd_start` sigue en `_project_widgets`),
+> como dice el propio punto 4 de la tarjeta. `test_campaigns_tab.py:64`
+> pasa de `tabs.count() == 5` a `== 6`. `test_project_tabs.py` también
+> se adapta — la tarjeta no lo nombra, pero el paso Plan perdió sus 7
+> controles de conexión: `PLAN_BUTTONS` 10 → 6 (queda la fila de captura
+> + el enlace a la pestaña Observatory) y `PROJECT_WIDGETS` 25 → 15
+> (11 plan + 2 MPC + products + zoom). Además: el destino al que se aplica
+> la posición leída es el último proyecto enviado por Goto
+> (`self._ccd_point_target`), porque el combo de la pestaña Observatory
+> lista los proyectos activos y no significa «el proyecto abierto»; en los
+> tests fijos (llamada directa) aterriza en el proyecto del hub.
 
 ---
 

@@ -190,8 +190,8 @@ KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
 
 # Top-level tab indices (ui/main_window.ui order, UX track): never
 # use literals for the main tabs.
-TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_SOLAR, TAB_HISTORY = \
-    range(5)
+TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_SOLAR, TAB_OBSERVATORY, \
+    TAB_HISTORY = range(6)
 
 
 class _ClickableFrame(QFrame):
@@ -301,6 +301,7 @@ class MainWindow(QMainWindow):
         self._ccd_filter_names = []
         self._ccd_version = ""
         self._ccd_worker = None
+        self._ccd_point_target = None  # last project a goto/astrometry aimed at
         self._ccd_timer = QTimer(self)
         self._ccd_timer.setInterval(1500)
         self._ccd_timer.timeout.connect(self._ccd_poll_tick)
@@ -417,10 +418,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QTabWidget
         tabs = self.centralWidget().findChild(QTabWidget, "tabs")
         widgets = (self.tonight, self.projects, self.campaigns,
-                   self.solar, self.history) = (
+                   self.solar, self.observatory, self.history) = (
             _load_ui("tonight_tab"), _load_ui("projects_tab"),
             _load_ui("campaigns_tab"), _load_ui("solar_tab"),
-            _load_ui("history_tab"))
+            _load_ui("observatory_tab"), _load_ui("history_tab"))
         for i, w in enumerate(widgets):
             title = tabs.tabText(i)
             tabs.removeTab(i)
@@ -445,6 +446,8 @@ class MainWindow(QMainWindow):
             int(config.get("projects_filter_sort", 0)))
         self.projects.chk_favorites.setChecked(
             bool(config.get("projects_filter_fav", False)))
+        # window-owned Observatory tab: build its controls once (UX, UD.2)
+        self._build_observatory_tab()
 
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
@@ -564,7 +567,7 @@ class MainWindow(QMainWindow):
             lambda: self._open_url("https://sidc.be/uset"))
         self.history.btn_refresh_hist.clicked.connect(self.on_refresh_history)
         # UX-c/UX-d: the history rows are links to their project (or to
-        # Explore when there is none), and Ctrl+1..5 switches main tabs.
+        # Explore when there is none), and Ctrl+1..6 switches main tabs.
         self.history.tbl_history.cellDoubleClicked.connect(
             self._history_open)
         self.history.tbl_history.viewport().setCursor(
@@ -575,7 +578,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtGui import QKeySequence, QShortcut
         for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
                                      TAB_CAMPAIGNS, TAB_SOLAR,
-                                     TAB_HISTORY)):
+                                     TAB_OBSERVATORY, TAB_HISTORY)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
             sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
@@ -1981,6 +1984,8 @@ class MainWindow(QMainWindow):
             self._reset_proj_panel()
             self._clear_step_tabs()
             self._current_project = None
+        # the Observatory tab's target combo follows the active projects
+        self._refresh_obs_targets()
 
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()
@@ -2493,35 +2498,15 @@ class MainWindow(QMainWindow):
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
         layout.addWidget(btn_seq)
-        # CCDciel control (ADR-030): dashboard, filter wheel and slew/capture
-        # buttons. The connection itself lives on the window, not per project.
+        # UX-j: connection and mount live in the Observatory tab now; the
+        # plan section keeps only its capture buttons + a jump link
         layout.addWidget(QLabel(""))
-        layout.addWidget(QLabel(self.tr("CCDciel control")))
-        ccd_row = QHBoxLayout()
-        btn_ccd_connect = QPushButton(self.tr("Connect CCDciel"))
-        btn_ccd_connect.clicked.connect(self._ccd_connect)
-        ccd_row.addWidget(btn_ccd_connect)
-        btn_ccd_disconnect = QPushButton(self.tr("Disconnect"))
-        btn_ccd_disconnect.clicked.connect(self._ccd_disconnect)
-        ccd_row.addWidget(btn_ccd_disconnect)
-        btn_ccd_refresh = QPushButton(self.tr("Refresh"))
-        btn_ccd_refresh.clicked.connect(self._ccd_refresh)
-        ccd_row.addWidget(btn_ccd_refresh)
-        lbl_ccd_status = QLabel(self.tr("CCDciel: not connected"))
-        ccd_row.addWidget(lbl_ccd_status)
-        ccd_row.addStretch()
-        layout.addLayout(ccd_row)
-        grp_ccd = QGroupBox(self.tr("Observatory status"))
-        ccd_form = QFormLayout(grp_ccd)
-        lbl_ccd_version = QLabel(self.tr("—"))
-        ccd_form.addRow(self.tr("Version:"), lbl_ccd_version)
-        lbl_ccd_temp = QLabel(self.tr("—"))
-        ccd_form.addRow(self.tr("CCD temperature:"), lbl_ccd_temp)
-        lbl_ccd_tracking = QLabel(self.tr("—"))
-        ccd_form.addRow(self.tr("Tracking:"), lbl_ccd_tracking)
-        lbl_ccd_slew = QLabel(self.tr("—"))
-        ccd_form.addRow(self.tr("Slew:"), lbl_ccd_slew)
-        layout.addWidget(grp_ccd)
+        btn_ccd_jump = QPushButton(
+            self.tr("Not connected — open the Observatory tab →"))
+        btn_ccd_jump.setFlat(True)
+        btn_ccd_jump.setCursor(Qt.PointingHandCursor)
+        btn_ccd_jump.clicked.connect(lambda: self._goto_tab(TAB_OBSERVATORY))
+        layout.addWidget(btn_ccd_jump)
         # filter wheel feeding the staged capture plan
         f_row = QHBoxLayout()
         f_row.addWidget(QLabel(self.tr("Filter on wheel:")))
@@ -2537,42 +2522,14 @@ class MainWindow(QMainWindow):
         f_row.addWidget(btn_ccd_start)
         f_row.addStretch()
         layout.addLayout(f_row)
-        m_row = QHBoxLayout()
-        btn_ccd_goto = QPushButton(self.tr("Point telescope"))
-        btn_ccd_goto.setToolTip(self.tr(
-            "Quick slew to the freshly-computed position of a moving "
-            "target: J2000_to_Apparent + Telescope_slewasync, no "
-            "plate-solve. Fast, but assumes the ephemeris is already "
-            "accurate."))
-        btn_ccd_goto.clicked.connect(self._ccd_goto)
-        m_row.addWidget(btn_ccd_goto)
-        btn_ccd_astrometry = QPushButton(self.tr("Astrometric Goto"))
-        btn_ccd_astrometry.setToolTip(self.tr(
-            "Slew + capture + plate-solve and correct to the true sky "
-            "position. Absorbs residual ephemeris error; the reliable "
-            "route for NEOCPs and preliminary orbits."))
-        btn_ccd_astrometry.clicked.connect(self._ccd_astrometry_goto)
-        m_row.addWidget(btn_ccd_astrometry)
-        m_row.addStretch()
-        layout.addLayout(m_row)
         lbl_ccd_coords = QLabel(self._ccd_coords_text(ctx, kind))
         lbl_ccd_coords.setStyleSheet("color: #9aa0a6;")
         lbl_ccd_coords.setWordWrap(True)
         layout.addWidget(lbl_ccd_coords)
         self._project_widgets.update({
-            "ccd_connect": btn_ccd_connect,
-            "ccd_disconnect": btn_ccd_disconnect,
-            "ccd_refresh": btn_ccd_refresh,
-            "ccd_status": lbl_ccd_status,
-            "ccd_version": lbl_ccd_version,
-            "ccd_temp": lbl_ccd_temp,
-            "ccd_tracking": lbl_ccd_tracking,
-            "ccd_slew": lbl_ccd_slew,
             "cmb_ccd_filter": cmb_ccd_filter,
             "ccd_push": btn_ccd_push,
             "ccd_start": btn_ccd_start,
-            "ccd_goto": btn_ccd_goto,
-            "ccd_sync": btn_ccd_astrometry,
             "ccd_coords": lbl_ccd_coords,
         })
         self._ccd_apply_state()
@@ -2638,17 +2595,82 @@ class MainWindow(QMainWindow):
 
     # -- CCDciel control (ADR-030) -----------------------------------------
 
+    def _build_observatory_tab(self):
+        # The CCDciel control, window-owned (UX-j): it used to be
+        # rebuilt inside every project's Plan step (and orphaned on
+        # rebuild). Built ONCE here; the Plan section keeps only the
+        # capture buttons (send/start), which read this connection.
+        o = self.observatory
+        self._obs_widgets = {
+            "ccd_connect": o.btn_obs_connect,
+            "ccd_disconnect": o.btn_obs_disconnect,
+            "ccd_refresh": o.btn_obs_refresh,
+            "ccd_status": o.lbl_obs_status,
+            "ccd_version": o.lbl_obs_version,
+            "ccd_temp": o.lbl_obs_temp,
+            "ccd_tracking": o.lbl_obs_tracking,
+            "ccd_slew": o.lbl_obs_slew,
+            "ccd_goto": o.btn_obs_goto,
+            "ccd_sync": o.btn_obs_sync,
+            "obs_target": o.cmb_obs_target,
+        }
+        o.btn_obs_connect.clicked.connect(self._ccd_connect)
+        o.btn_obs_disconnect.clicked.connect(self._ccd_disconnect)
+        o.btn_obs_refresh.clicked.connect(self._ccd_refresh)
+        o.btn_obs_goto.clicked.connect(self._ccd_goto)
+        o.btn_obs_sync.clicked.connect(self._ccd_astrometry_goto)
+        o.cmb_obs_target.currentIndexChanged.connect(
+            lambda _i: self._ccd_apply_state())
+        self._ccd_apply_state()
+        self._refresh_obs_targets()
+
+    def _ccd_widgets(self):
+        # @return: one merged view of the CCDciel widgets — the
+        # window-owned Observatory tab ones plus the per-project
+        # capture ones (filter combo, send/start) when a project is
+        # open. All _ccd_* methods read through here.
+        w = dict(getattr(self, "_obs_widgets", {}) or {})
+        w.update(self._project_widgets or {})
+        return w
+
+    def _obs_target_project(self):
+        # @return: the active project dict chosen in the Observatory
+        #          tab's target combo, or None
+        from ..core import project as _p
+        pid = self.observatory.cmb_obs_target.currentData()
+        return _p.get(db, pid) if pid else None
+
+    def _refresh_obs_targets(self):
+        # Refills the Observatory tab's target combo with the active
+        # projects, keeping the selection (same keep-id pattern as
+        # the campaigns list).
+        cmb = self.observatory.cmb_obs_target
+        current = cmb.currentData()
+        cmb.blockSignals(True)
+        cmb.clear()
+        for p in project.list_projects(db, "active"):
+            cmb.addItem(f"[{p['kind']}] {p['object_name']}", p["id"])
+        idx = cmb.findData(current)
+        cmb.setCurrentIndex(idx if idx >= 0 else 0)
+        cmb.blockSignals(False)
+
     def _ccd_apply_state(self):
         # Enable/disable the CCDciel widgets after a connection change and
         # refresh the status line. Safe to call even before the widgets exist.
-        w = self._project_widgets
+        w = self._ccd_widgets()
         if not w.get("ccd_connect"):
             return
         on = self._ccd_connected
+        # the per-project capture widgets are only present when a project is
+        # open — skip whatever is missing
         for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
                     "ccd_start", "ccd_goto", "ccd_sync"):
-            w[key].setEnabled(on)
-        w["cmb_ccd_filter"].setEnabled(on)
+            widget = w.get(key)
+            if widget is not None:
+                widget.setEnabled(on)
+        cb = w.get("cmb_ccd_filter")
+        if cb is not None:
+            cb.setEnabled(on)
         w["ccd_connect"].setEnabled(not on)
         if not on:
             w["ccd_status"].setText(self.tr("CCDciel: not connected"))
@@ -2696,7 +2718,7 @@ class MainWindow(QMainWindow):
             return
         self._ccd_connected = True
         self._ccd_version = str(result.get("version", self.tr("—")))
-        w = self._project_widgets
+        w = self._ccd_widgets()
         if w.get("ccd_version"):
             w["ccd_version"].setText(self._ccd_version)
         self._ccd_filter_names = list(result.get("filters") or [])
@@ -2753,7 +2775,7 @@ class MainWindow(QMainWindow):
         # @args: dash - sections dict from the "status" method,
         #        slewing/tracking - live mount state (may override the
         #                          dashboard when the server hides them there)
-        w = self._project_widgets
+        w = self._ccd_widgets()
         if not w.get("ccd_temp"):
             return
         cam = dash.get("camera") or {}
@@ -2791,20 +2813,20 @@ class MainWindow(QMainWindow):
             w["ccd_slew"].setText(self.tr("Idle"))
 
     def _ccd_poll_tick(self):
-        # QTimer tick while a project is open: the read runs on the CCD worker
+        # QTimer tick while connected: the read runs on the CCD worker
         # thread (ADR-030: no network on the GUI thread); the cache keeps it
         # cheap once the dashboard is warm. _ccd_run itself refuses to queue a
         # second worker, so a busy refresh is simply skipped.
-        if not (self._ccd_connected and self._current_project):
+        if not self._ccd_connected:
             return
-        if not self._project_widgets.get("ccd_temp"):
+        if not self._ccd_widgets().get("ccd_temp"):
             return
         self._ccd_refresh()
 
     def _ccd_fill_filters(self):
         # @return: fills the wheel combo from CCDciel (fallback labels when
         #          the wheel is disconnected or slots are unnamed)
-        w = self._project_widgets
+        w = self._ccd_widgets()
         cmb = w.get("cmb_ccd_filter")
         if not cmb:
             return
@@ -2857,9 +2879,12 @@ class MainWindow(QMainWindow):
         # @args: slew_fn - c.slew_target or c.astrometry_goto,
         #        ctx - project context dict
         # @return: callable(Client) -> position dict
-        kind = self._current_project.get("kind")
+        # kind/object may come via ctx (the Observatory-tab target
+        # project); otherwise fall back to the project open in the hub
+        p = self._current_project or {}
+        kind = ctx.get("kind") or p.get("kind")
         obj_id = (ctx.get("id") or ctx.get("packed")
-                  or self._current_project["object_name"])
+                  or p.get("object_name") or ctx.get("object_name"))
         site = config.get("mpc_code", "Z41")
         if kind in ("neo", "comet", "pccp"):
             def action(c):
@@ -2886,9 +2911,12 @@ class MainWindow(QMainWindow):
         # coords/epoch label. The context is the single source the overview,
         # sky chart and re-pointing all read.
         # @args: pos - dict from position_at / the worker action
-        if not pos or not self._current_project:
+        # the project the last goto/astrometry aimed at; if none (or a
+        # direct call) the project open in the Projects hub
+        p = self._ccd_point_target or self._current_project
+        self._ccd_point_target = None
+        if not pos or not p:
             return
-        p = self._current_project
         upd = {"ra_deg": pos["ra_deg"], "dec_deg": pos["dec_deg"]}
         if pos.get("epoch_iso"):
             upd["coords_epoch"] = pos["epoch_iso"]
@@ -2908,20 +2936,29 @@ class MainWindow(QMainWindow):
         # Point the mount at the current object. Moving kinds get a fresh
         # position resolved inside the worker (network off the GUI thread);
         # the async slew then waits for Telescope_slewing to settle.
-        ctx = self._current_project.get("context") or {}
+        p = self._obs_target_project()
+        if not p:
+            self.statusBar().showMessage(
+                self.tr("Pick a target project in the Observatory tab"),
+                6000)
+            return
+        ctx = dict(p.get("context") or {})
+        ctx["kind"] = p.get("kind")
+        ctx["object_name"] = p.get("object_name")
         if ctx.get("ra_deg") is None:
             self.statusBar().showMessage(
                 self.tr("This object has no coordinates yet."), 5000)
             return
-        w = self._project_widgets
+        w = self._ccd_widgets()
         w["ccd_slew"].setText(self.tr("Slewing…"))
         w["ccd_goto"].setEnabled(False)
         action = self._ccd_point_action(
             lambda c, ra, dec: c.slew_target(ra, dec), ctx)
+        self._ccd_point_target = p
         self._ccd_run(self._ccd_on_goto, action, poll=True)
 
     def _ccd_on_goto(self, result, error):
-        w = self._project_widgets
+        w = self._ccd_widgets()
         if w.get("ccd_goto"):
             w["ccd_goto"].setEnabled(True)
         if error:
@@ -2939,13 +2976,22 @@ class MainWindow(QMainWindow):
         # first (the plate solve absorbs any residual ephemeris error as
         # long as the prediction lands inside the solve field). The client
         # polls the running flag, so no mount-state polling is needed here.
-        ctx = self._current_project.get("context") or {}
+        p = self._obs_target_project()
+        if not p:
+            self.statusBar().showMessage(
+                self.tr("Pick a target project in the Observatory tab"),
+                6000)
+            return
+        ctx = dict(p.get("context") or {})
+        ctx["kind"] = p.get("kind")
+        ctx["object_name"] = p.get("object_name")
         if ctx.get("ra_deg") is None:
             self.statusBar().showMessage(
                 self.tr("This object has no coordinates yet."), 5000)
             return
         action = self._ccd_point_action(
             lambda c, ra, dec: c.astrometry_goto(ra, dec), ctx)
+        self._ccd_point_target = p
         self._ccd_run(self._ccd_on_astrometry, action, poll=False)
 
     def _ccd_on_astrometry(self, result, error):

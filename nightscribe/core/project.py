@@ -32,6 +32,10 @@ logger = logging.getLogger(__name__)
 STEPS = ("plan", "process", "publish")
 VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit", "hads", "variable")
 
+# Kinds with multi-night photometry follow-up (moved here from
+# gui/main_window.py for UX-i: next_action() needs it in core)
+FOLLOWUP_KINDS = ("sn", "hads", "variable")
+
 STEP_PENDING = "pending"
 STEP_CURRENT = "current"
 STEP_DONE = "done"
@@ -425,3 +429,74 @@ def delete(db, project_id):
     cur = db.execute("DELETE FROM projects WHERE id=?", (project_id,))
     db.commit()
     return cur.rowcount > 0
+
+
+def reopen_step(db, project_id, step):
+    # Reopens a done/skipped step (the checklist's "reopen" toggle, UX-i):
+    # the chosen step becomes current and any other current step goes back
+    # to pending, keeping the single-current invariant.
+    # @return: True if the step was found
+    proj = get(db, project_id)
+    if not proj:
+        return False
+    found = False
+    for s in proj["steps"]:
+        if s["step"] == step:
+            found = True
+        elif s["status"] == STEP_CURRENT:
+            set_step_status(db, project_id, s["step"], STEP_PENDING)
+    if not found:
+        return False
+    return set_step_status(db, project_id, step, STEP_CURRENT)
+
+
+def next_action(db, proj):
+    # The project's voice (UX-i): ONE next action derived from the real
+    # state, never from a manual "where was I". Rule order:
+    #   1. follow-up cadence due (only once observing has started: a first
+    #      visit exists or the plan step is done) — the campaign does not
+    #      care about step bookkeeping, but "measure tonight" with no plan
+    #      is not actionable;
+    #   2. plan not passed -> "plan";
+    #   3. plan passed, process not passed -> "process";
+    #   4. process passed, publish not passed -> "publish";
+    #   5. everything passed -> "close".
+    # @args: db - Database, proj - project dict from get()
+    # @return: {"key": "followup"|"plan"|"process"|"publish"|"close",
+    #          "overdue_days": int|None, "never_visited": bool}
+    from . import campaign as _camp
+    from . import followup as _fu
+    steps = {s["step"]: s["status"] for s in proj.get("steps", [])}
+    passed = {k: steps.get(k) in (STEP_DONE, STEP_SKIPPED)
+              for k in ("plan", "process", "publish")}
+    out = {"key": None, "overdue_days": None, "never_visited": False}
+    if proj.get("status") == STATUS_ACTIVE \
+            and proj.get("kind") in FOLLOWUP_KINDS \
+            and (passed["plan"] or _fu.days_since_last_session(
+                db, proj["id"]) is not None):
+        cad = 3
+        if proj.get("campaign_id"):
+            c = _camp.get(db, proj["campaign_id"])
+            if c:
+                cad = int(_camp.protocol_get(c, "cadence_nights", 1) or 1)
+        days = _fu.days_since_last_session(db, proj["id"])
+        if days is None:
+            # First-visit prompt only for the campaign-style kinds
+            # (hads, variable): their project is created *before* the
+            # first data is taken. An SN project is born from its
+            # detection, so it already holds first light and the step
+            # flow (plan -> process -> publish) leads until it has
+            # sessions.
+            if proj.get("kind") in ("hads", "variable"):
+                out.update(key="followup", overdue_days=cad,
+                           never_visited=True)
+                return out
+        if days is not None and days >= cad:
+            out.update(key="followup", overdue_days=days)
+            return out
+    for key in ("plan", "process", "publish"):
+        if not passed[key]:
+            out["key"] = key
+            return out
+    out["key"] = "close"
+    return out

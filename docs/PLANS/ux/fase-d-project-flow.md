@@ -217,7 +217,16 @@ def test_reopen_step_keeps_single_current(db):
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_next_action.py tests/unit/test_project.py -q`
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Core: project.next_action + reopen_step — the single-page checklist's brain (UX, subplan UD.1)`
-**Estado**: Pendiente
+**Estado**: Hecho (1126→1136 tests, suite verde; sin cadenas nuevas)
+
+> Nota de ejecución: el `days is None` de la tarjeta (primera visita)
+> respondía `followup` también para `sn`, lo que contradecía los propios
+> tests de la tarjeta (`test_plan_done_says_process` y
+> `test_process_done_says_publish` exigen `process`/`publish` para sn con
+> plan hecho y sin sesiones). La rama de primera visita ahora se limita a
+> los tipos de campaña (`hads`, `variable`): un SN nace de su detección y
+> ya tiene su primer dato, así que el flujo de pasos manda hasta su primera
+> sesión. Guardada también `days is not None` antes de `days >= cad`.
 
 ---
 

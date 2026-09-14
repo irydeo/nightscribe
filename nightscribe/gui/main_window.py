@@ -69,7 +69,7 @@ _OUTCOME_LABELS = {
 # Kinds with multi-night photometry follow-up (the tab is kind-agnostic;
 # SN-only analysis buttons hide for the others)
 # Track V: variables join (V-g: the quick-look engine serves them unchanged)
-FOLLOWUP_KINDS = ("sn", "hads", "variable")
+FOLLOWUP_KINDS = project.FOLLOWUP_KINDS
 _STEP_LABELS_ES = {"plan": "Plan & Captura", "process": "Procesado",
                    "publish": "Publicar"}
 _STEP_LABELS_EN = {"plan": "Plan & Capture", "process": "Process",

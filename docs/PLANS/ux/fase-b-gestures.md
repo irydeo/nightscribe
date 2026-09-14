@@ -280,7 +280,12 @@ el objeto», EN igual a la fuente.
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit/test_projects_hub.py -q` + pipeline i18n
 **Hecho cuando**: verde; suite verde (N→M).
 **Commit**: `Gui: history rows navigate to their project or Explore + Ctrl+1..5 tab shortcuts (UX, subplan UB.2)`
-**Estado**: Pendiente
+**Estado**: Hecho (1122→1124 tests; i18n 769→770, 0 sin traducir ES+EN)
+
+> Nota de ejecución: el test 1 recibe `panel` y una llamada a
+> `window.on_refresh_projects()` previa (contrato de testigo del harness:
+> nunca construir `ExploreWorker` real, y la lista del hub debe contener la
+> fila nueva para poder seleccionarla).
 
 ---
 

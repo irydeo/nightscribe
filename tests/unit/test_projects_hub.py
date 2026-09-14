@@ -1813,3 +1813,38 @@ def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
     assert any("Open" in t or "Abrir" in t for t in texts)
     assert any("Follow" in t or "Seguimiento" in t for t in texts)
     assert any("Delete" in t or "Eliminar" in t for t in texts)
+
+
+def test_history_double_click_opens_project(window, panel):
+    # A double-click on a history row opens the active project of the
+    # same object (hub row + step).
+    # harness: `panel` slots the fake loader (the hub contract, the real
+    # ExploreWorker is never built); the hub list is refreshed first so
+    # _goto_active_project can select the new row.
+    from PySide6.QtCore import Qt
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "sn", "SN 2099ff", {"mag": 15.0})
+    mw.db.mark_observed("SN 2099ff", "sn", "2026-09-13")
+    window.on_refresh_projects()
+    window.on_refresh_history()
+    tbl = window.history.tbl_history
+    row = next(r for r in range(tbl.rowCount())
+               if tbl.item(r, 1) and tbl.item(r, 1).text() == "SN 2099ff")
+    window._history_open(row, 1)
+    cur = window.projects.lst_projects.currentItem()
+    assert cur is not None and cur.data(Qt.UserRole) == p["id"]
+
+
+def test_history_double_click_without_project_explores(window, monkeypatch):
+    from nightscribe.gui import main_window as mw
+    mw.db.mark_observed("2099 ZZ9", "neo", "2026-09-13")
+    seen = []
+    monkeypatch.setattr(window, "_open_explore_dialog",
+                        lambda name: seen.append(name))
+    window.on_refresh_history()
+    tbl = window.history.tbl_history
+    row = next(r for r in range(tbl.rowCount())
+               if tbl.item(r, 1) and tbl.item(r, 1).text() == "2099 ZZ9")
+    window._history_open(row, 1)
+    assert seen == ["2099 ZZ9"]

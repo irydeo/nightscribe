@@ -2646,6 +2646,11 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
         <source>Archive…</source>
         <translation>Archivar…</translation>
     </message>
+    <message>
+        <location filename="../main_window.py" line="572"/>
+        <source>Double-click a row to open its project or explore the object</source>
+        <translation>Doble-clic en una fila para abrir su proyecto o explorar el objeto</translation>
+    </message>
 </context>
 <context>
     <name>ObjectPanel</name>

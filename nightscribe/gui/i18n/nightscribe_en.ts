@@ -2646,6 +2646,11 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <source>Archive…</source>
         <translation>Archive…</translation>
     </message>
+    <message>
+        <location filename="../main_window.py" line="572"/>
+        <source>Double-click a row to open its project or explore the object</source>
+        <translation>Double-click a row to open its project or explore the object</translation>
+    </message>
 </context>
 <context>
     <name>ObjectPanel</name>

@@ -562,6 +562,22 @@ class MainWindow(QMainWindow):
         self.solar.btn_sidc.clicked.connect(
             lambda: self._open_url("https://sidc.be/uset"))
         self.history.btn_refresh_hist.clicked.connect(self.on_refresh_history)
+        # UX-c/UX-d: the history rows are links to their project (or to
+        # Explore when there is none), and Ctrl+1..5 switches main tabs.
+        self.history.tbl_history.cellDoubleClicked.connect(
+            self._history_open)
+        self.history.tbl_history.viewport().setCursor(
+            Qt.PointingHandCursor)
+        self.history.tbl_history.setToolTip(
+            self.tr("Double-click a row to open its project or explore "
+                    "the object"))
+        from PySide6.QtGui import QKeySequence, QShortcut
+        for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
+                                     TAB_CAMPAIGNS, TAB_SOLAR,
+                                     TAB_HISTORY)):
+            sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
+            sc.setContext(Qt.ApplicationShortcut)
+            sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
 
     def _open_url(self, url):
         from PySide6.QtGui import QDesktopServices
@@ -6004,6 +6020,16 @@ class MainWindow(QMainWindow):
                 tbl.setItem(row, col, QTableWidgetItem(val))
         tbl.setSortingEnabled(True)
         tbl.sortItems(0, Qt.DescendingOrder)
+
+    def _history_open(self, row, _col):
+        # Double-click on a history row: open the object's active project,
+        # or explore the object when there is none (UX-c/UX-d).
+        name_item = self.history.tbl_history.item(row, 1)
+        name = name_item.text().strip() if name_item is not None else ""
+        if not name:
+            return
+        if not self._goto_active_project(name):
+            self._open_explore_dialog(name)
 
     # ---------------- housekeeping ----------------
 

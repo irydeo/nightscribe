@@ -274,3 +274,25 @@ def test_fallback_to_all_when_active_kind_is_removed(window):
         cfgmod.config._data["enabled_kinds"] = old
         _set_kind(window, None)
         _set_kind(window, None)
+
+
+def test_campaign_chip_opens_campaign(window, monkeypatch):
+    # UX-d: the ⚑ chip on a campaign target jumps to the Campaigns tab
+    from nightscribe.gui import main_window as mw
+    seen = []
+    monkeypatch.setattr(mw.MainWindow, "_goto_campaigns",
+                        lambda self, cid=None: seen.append(cid))
+    window._tonight_all = [
+        ({"id": "X", "name": "T CrB", "kind": "variable", "mag": 10.0,
+          "campaign": {"id": 42, "name": "Campaña T CrB"}}, 50.0, {}, "")]
+    try:
+        window._apply_kind_filter()
+        from nightscribe.gui.main_window import _LinkChip
+        chips = (window.tonight.scroll_suggestions
+                 .findChildren(_LinkChip))
+        assert chips and chips[0].text().endswith("Campaña T CrB")
+        chips[0].clicked.emit()
+        assert seen == [42]
+    finally:
+        window._tonight_all = TARGETS
+        window._apply_kind_filter()

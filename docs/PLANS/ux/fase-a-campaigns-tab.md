@@ -1250,7 +1250,7 @@ existe nada parecido, **para y reporta**.)
 `test_project_header_shows_campaign_badge` debe seguir verde (el nombre
 sigue en el HTML).
 **Commit**: `Gui: every campaign mention is a link — header badge, ⚑ card chip, clickable cadence chips (UX, subplan UA.6)`
-**Estado**: Pendiente
+**Estado**: Hecho (1116→1119 tests; i18n 760→762, 0 sin traducir ES+EN).
 
 ---
 

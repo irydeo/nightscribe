@@ -14,6 +14,8 @@
 import os
 
 import pytest
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -243,3 +245,35 @@ def test_attach_without_candidates_informs(window, monkeypatch):
     window._goto_campaigns(cid)
     window._camp_attach()
     assert seen.get("told")
+
+
+def test_header_badge_is_a_link(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Campaña enlace")
+    p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
+                        campaign_id=cid)
+    window._render_project_header(proj_mod.get(mw.db, p["id"]))
+    text = window.projects.lbl_header.text()
+    assert f"campaign://{cid}" in text and "Campaña enlace" in text
+
+
+def test_cadence_chip_navigates_to_followup(window):
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    p = proj_mod.create(mw.db, "sn", "SN 2099zz", {"mag": 15.0})
+    fu.create_session(mw.db, p["id"])
+    # age the session beyond the cadence threshold
+    old = 1_700_000_000
+    mw.db.execute("UPDATE project_sessions SET created=? WHERE project_id=?",
+                  (old, p["id"]))
+    mw.db.commit()
+    window._show_cadence_hints()
+    chips = window.tonight.findChildren(QLabel, "ns_cadence_chip")
+    assert chips, "no cadence chip was created"
+    window._goto_project_followup(p["id"])
+    cur = window.projects.lst_projects.currentItem()
+    assert cur is not None and cur.data(Qt.UserRole) == p["id"]
+    assert window.projects.tabs_steps.currentIndex() == 4

@@ -493,6 +493,9 @@ class MainWindow(QMainWindow):
         p.cmb_campaign.currentIndexChanged.connect(
             lambda _i: self.on_refresh_projects())
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
+        # UX-d: the project header campaign badge is a link to the tab
+        self.projects.lbl_header.linkActivated.connect(
+            self._campaign_link_clicked)
         c = self.campaigns
         c.lst_campaigns.itemSelectionChanged.connect(
             self._campaign_selected)
@@ -1108,9 +1111,8 @@ class MainWindow(QMainWindow):
         # N noches que no la visitas"). Reads the follow-up cadence from the
         # project_sessions table and shows a chip in the Tonight header.
         from ..core import followup as fu
-        # remove any previous cadence chip (idempotent across refreshes)
-        old = self.tonight.findChild(QLabel, "ns_cadence_chip")
-        if old is not None:
+        # remove every previous cadence chip (several now, idempotent)
+        for old in self.tonight.findChildren(QLabel, "ns_cadence_chip"):
             parent = old.parentWidget()
             if parent and parent.layout():
                 parent.layout().removeWidget(old)
@@ -1127,30 +1129,47 @@ class MainWindow(QMainWindow):
         for pid, name in rows:
             days = fu.days_since_last_session(db, pid)
             if days is not None and days >= threshold:
-                hints.append((name, days))
+                hints.append((pid, name, days))
         if not hints:
             return
-        hint_text = self.tr("SN follow-up due: ") + ", ".join(
-            f"{name} ({days}d)" for name, days in hints[:3])
-        if len(hints) > 3:
-            hint_text += f" +{len(hints) - 3}"
-        chip = self._chip(hint_text, "#e0c060",
-                          tip=self.tr("Active SN projects due for a revisit"))
-        chip.setObjectName("ns_cadence_chip")
-        # insert the chip in the tonight header's layout (the parent of
+        # insert the chips in the tonight header's layout (the parent of
         # lbl_context is a QWidget; find its containing layout)
         parent = self.tonight.lbl_context.parentWidget()
         header_layout = parent.layout() if parent else None
         if header_layout is None:
-            # walk up to find a layout
             p = parent
             while p is not None:
                 if p.layout() is not None:
                     header_layout = p.layout()
                     break
                 p = p.parentWidget()
-        if header_layout and hasattr(header_layout, "addWidget"):
+        if not (header_layout and hasattr(header_layout, "addWidget")):
+            return
+        for pid, name, days in hints[:3]:
+            chip = _LinkChip(
+                self.tr("SN due: %1 (%2 d)").replace(
+                    "%1", name).replace("%2", str(days)),
+                "#e0c060",
+                self.tr("Due for a revisit — click to open its "
+                        "Follow-up"))
+            chip.setObjectName("ns_cadence_chip")
+            chip.clicked.connect(
+                lambda _p=pid: self._goto_project_followup(_p))
             header_layout.addWidget(chip)
+        if len(hints) > 3:
+            more = QLabel(f"+{len(hints) - 3}")
+            more.setObjectName("ns_cadence_chip")
+            more.setStyleSheet(theme.chip_style("#e0c060"))
+            header_layout.addWidget(more)
+
+    def _goto_project_followup(self, pid):
+        # Opens the project's Follow-up tab (the cadence chips land
+        # here, UX-d). Follow-up is tab index 4 of tabs_steps.
+        if not self._goto_project_by_id(pid):
+            return
+        tabs = self.projects.tabs_steps
+        if tabs.isTabVisible(4):
+            tabs.setCurrentIndex(4)
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and
@@ -4987,6 +5006,11 @@ class MainWindow(QMainWindow):
                 if lst.item(i).data(Qt.UserRole) == cid:
                     lst.setCurrentRow(i)
                     break
+
+    def _campaign_link_clicked(self, url):
+        # The project header campaign badge is a link (UX-d).
+        if url.startswith("campaign://"):
+            self._goto_campaigns(int(url.split("://", 1)[1]))
 
     def _camp_after_action(self):
         # Refresh both master-detail tabs after any campaign mutation.

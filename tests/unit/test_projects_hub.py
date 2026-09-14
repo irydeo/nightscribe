@@ -1258,10 +1258,9 @@ def test_cadence_hint_shows_for_stale_sn(window, panel):
     window._tonight_all = []
     window._show_cadence_hints()
     from PySide6.QtWidgets import QLabel
-    chips = window.tonight.findChildren(QLabel)
-    texts = [c.text() for c in chips if "follow" in c.text().lower()
-                or "seguimiento" in c.text().lower()]
-    assert len(texts) >= 1
+    chips = [c for c in window.tonight.findChildren(QLabel)
+             if c.objectName() == "ns_cadence_chip"]
+    assert len(chips) >= 1
 
 
 def test_cadence_hint_no_active_projects(window, panel):

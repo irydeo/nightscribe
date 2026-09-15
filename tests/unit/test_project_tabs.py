@@ -21,14 +21,18 @@ throwaway MainWindow offscreen and check the new contracts:
     project builds every section (details first, then the three steps, and
     follow-up for the kinds that keep a multi-night journal)
   * rebuilds wipe the previous control set (no piled "Mark done" buttons)
-  * the per-section toggle row drives the core step machine (done /
-    reopen flip the current step exactly as core/project.py promises)
+  * the page accordion: a header click opening any section (object card
+    included) closes the other open section, all-closed is a legal state,
+    every deep link lands on the sole open section
+  * the chip on each step header mirrors the step state (done <date> /
+    skipped / pending); follow-up carries no chip at all
 
 Same harness as test_projects_hub.py: a fake loader keeps the real
 ExploreWorker out, and the db singleton is pointed at a temp file so no
 test ever touches the real database.
 """
 
+import datetime
 import os
 
 import pytest
@@ -221,8 +225,12 @@ def test_next_card_points_at_pending_section(window, panel):
     _mk_project(window)
     assert "Plan" in window.projects.lbl_next.text() or \
         "Planifica" in window.projects.lbl_next.text()
-    assert window._page_sections["plan"].isCollapsed() is False
-    assert window._page_sections["process"].isCollapsed() is True
+    secs = window._page_sections
+    # fresh project: the next-action section (plan) is the only one open,
+    # the object card starts folded like everything else
+    assert secs["plan"].isCollapsed() is False
+    for key in ("details", "process", "publish", "followup"):
+        assert secs[key].isCollapsed() is True
 
 
 def test_next_card_followup_when_cadence_due(window, panel):
@@ -245,3 +253,159 @@ def test_go_button_expands_target(window, panel):
     window._page_sections["plan"].setCollapsed(True)
     window.projects.btn_next_go.click()
     assert window._page_sections["plan"].isCollapsed() is False
+
+
+# ------- page accordion: at most one section open at a time --------------
+
+
+def test_header_click_closes_other_open_section(window, panel):
+    # Opening a step closes the other open section (exclusive accordion),
+    # object card included — one landing spot, no matter which one the
+    # user clicks.
+    _mk_project(window)
+    secs = window._page_sections
+    assert secs["plan"].isExpanded()
+    assert secs["details"].isCollapsed()
+    secs["process"]._btn.click()
+    assert secs["process"].isExpanded()
+    for key in ("plan", "details", "publish", "followup"):
+        assert secs[key].isCollapsed()
+    secs["publish"]._btn.click()
+    assert secs["publish"].isExpanded()
+    assert secs["process"].isCollapsed()
+    assert secs["details"].isCollapsed()
+
+
+def test_opening_object_card_closes_open_step(window, panel):
+    # The object card belongs to the same accordion: clicking its header
+    # while a step is open folds that step before expanding the card.
+    _mk_project(window)
+    secs = window._page_sections
+    assert secs["plan"].isExpanded()
+    secs["details"]._btn.click()
+    assert secs["details"].isExpanded()
+    for key in ("plan", "process", "publish", "followup"):
+        assert secs[key].isCollapsed()
+
+
+def test_all_sections_can_be_closed(window, panel):
+    # Closing the only open section by hand is legal: nothing is forced
+    # open again (a 0-section state is a resting state, not an error).
+    _mk_project(window)
+    secs = window._page_sections
+    secs["plan"]._btn.click()
+    for key in ("details", "plan", "process", "publish", "followup"):
+        assert secs[key].isCollapsed()
+
+
+def test_followup_deep_link_is_the_sole_open_section(window, panel):
+    # Cadence chips and the follow-up entry point land on Follow-up
+    # with every other section closed (the plan opened by the build
+    # and the object card are silenced, not echoed).
+    p = _mk_project(window)
+    window._page_sections["process"].setCollapsed(False)
+    window._page_sections["details"].setCollapsed(False)
+    window._goto_project_followup(p["id"])
+    secs = window._page_sections
+    assert secs["followup"].isExpanded()
+    for key in ("plan", "process", "publish", "details"):
+        assert secs[key].isCollapsed()
+
+
+def test_go_button_closes_accidental_siblings(window, panel):
+    # Leaving several sections open by hand and then pressing Go for
+    # the next action enforces the invariant before landing.
+    _mk_project(window)
+    secs = window._page_sections
+    secs["process"].setCollapsed(False)
+    secs["details"].setCollapsed(False)
+    assert secs["plan"].isExpanded() and secs["process"].isExpanded()
+    window.projects.btn_next_go.click()
+    assert secs["plan"].isExpanded()
+    assert secs["process"].isCollapsed()
+    assert secs["details"].isCollapsed()
+
+
+def test_opening_files_closes_open_step(window, panel):
+    # The nested "Project files" section joins the same accordion: a
+    # click opens it and folds the open step, but its parent object
+    # card stays open — the files list lives inside it.
+    _mk_project(window)
+    secs = window._page_sections
+    assert secs["plan"].isExpanded()
+    secs["details"].setCollapsed(False)  # files is visible once the card opens
+    secs["files"]._btn.click()
+    assert secs["files"].isExpanded()
+    assert secs["details"].isExpanded()
+    for key in ("plan", "process", "publish", "followup"):
+        assert secs[key].isCollapsed()
+
+
+def test_opening_a_step_closes_files(window, panel):
+    # The other way round: leaving the files section opened and clicking
+    # any other header (step or card) folds the files again.
+    _mk_project(window)
+    secs = window._page_sections
+    secs["details"].setCollapsed(False)
+    secs["files"]._btn.click()
+    assert secs["files"].isExpanded()
+    secs["process"]._btn.click()
+    assert secs["process"].isExpanded()
+    assert secs["files"].isCollapsed()
+    assert secs["details"].isCollapsed()
+
+
+def test_step_toggled_signal_fires_only_on_user_click(window, panel):
+    # setCollapsed() stays silent (programmatic); a real header click
+    # emits the new state. The accordion recursion guard rests on this.
+    _mk_project(window)
+    sec = window._page_sections["process"]
+    fires = []
+    sec.sectionToggled.connect(fires.append)
+    try:
+        sec.setCollapsed(False)
+        sec.setCollapsed(True)
+        assert fires == []
+        sec._btn.click()
+        sec._btn.click()
+        assert fires == [True, False]
+    finally:
+        sec.sectionToggled.disconnect(fires.append)
+
+
+# ---------------- header chip: the step state on the accordion header ---
+
+
+def test_chips_fresh_project(window, panel):
+    # pending on the three real steps, nothing on the follow-up section.
+    _mk_project(window)
+    secs = window._page_sections
+    for key in ("plan", "process", "publish"):
+        assert secs[key].headerBadge() == window.tr("pending")
+    assert secs["followup"].headerBadge() == ""
+    assert secs["followup"]._badge.isHidden()
+
+
+def test_done_chip_carries_the_date(window, panel):
+    p = _mk_project(window)
+    window._step_done("plan")
+    secs = window._page_sections  # the step action rebuilds the page
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    step = next(s for s in proj_mod.get(mw.db, p["id"])["steps"]
+                if s["step"] == "plan")
+    date = datetime.datetime.fromtimestamp(step["updated"]).strftime(
+        "%Y-%m-%d")
+    assert secs["plan"].headerBadge() == \
+        window.tr("done %1").replace("%1", date)
+    assert secs["process"].headerBadge() == window.tr("pending")
+    assert secs["publish"].headerBadge() == window.tr("pending")
+
+
+def test_skipped_chip(window, panel):
+    _mk_project(window)
+    window._step_skip("process")
+    secs = window._page_sections
+    assert secs["process"].headerBadge() == window.tr("skipped")
+    assert secs["plan"].headerBadge() == window.tr("pending")
+    assert secs["publish"].headerBadge() == window.tr("pending")

@@ -209,11 +209,15 @@ def test_select_project_drives_panel(window, panel):
     assert panel.lbl_hook.text()
     # the project page built its sections ("details" + the three
     # steps - capture merged into plan, ADR-030, no follow-up for a
-    # NEO) and the Next card took over the old wizard buttons
-    assert len(window._page_sections) == 4
-    # a project opens on its details, plus the section the Next card
-    # points at (a fresh project is at "plan"); the rest stays folded
-    assert not window._page_sections["details"].isCollapsed()
+    # NEO - plus the nested "Project files" section inside the card)
+    # and the Next card took over the old wizard buttons
+    assert len(window._page_sections) == 5
+    assert window._page_sections["files"].isCollapsed()
+    # the page is one exclusive accordion: a fresh project opens on its
+    # next-action section (a fresh project is at "plan") and the object
+    # card stays folded until the user opens it
+    assert not window._page_sections["plan"].isCollapsed()
+    assert window._page_sections["details"].isCollapsed()
     assert window._next_target == "plan"
     assert not window.projects.btn_next_go.isHidden()
     assert window.projects.lbl_next.text()
@@ -1771,9 +1775,10 @@ def test_project_activated_jumps_to_current_step(window, panel):
                 if lst.item(i).data(Qt.UserRole) == p["id"])
     window._project_open_activated(item)
     # a fresh project sits at step "plan" -> that section is the only
-    # expanded one (everything besides "details" starts collapsed)
+    # expanded one (everything, object card included, starts collapsed)
     assert "plan" in window._page_sections
     assert not window._page_sections["plan"].isCollapsed()
+    assert window._page_sections["details"].isCollapsed()
 
 
 def test_projects_context_menu_offers_actions(window, panel, monkeypatch):

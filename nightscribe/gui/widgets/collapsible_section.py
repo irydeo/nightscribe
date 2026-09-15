@@ -11,12 +11,25 @@
 #
 ############################################################
 
-from PySide6.QtWidgets import QFrame, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QPushButton,
+                               QVBoxLayout, QWidget)
+
+from .. import theme
 
 
 class CollapsibleSection(QWidget):
     # A header + togglable content area. Clicking the header toggles
     # the content visibility; a small triangle indicates the state.
+    # A small status chip may ride the header on the right
+    # (setHeaderBadge): the project page uses it to mirror the step
+    # state (done / skipped / pending) in the accordion header.
+
+    # fired only from _toggle() — i.e. a real user click on the header —
+    # with the NEW expanded state. setCollapsed() stays silent on purpose:
+    # the step-accordion closing siblings is programmatic and must not
+    # fire back (no recursion, no double scroll).
+    sectionToggled = Signal(bool)
 
     def __init__(self, title="", parent=None):
         super().__init__(parent)
@@ -32,6 +45,18 @@ class CollapsibleSection(QWidget):
         self._btn.clicked.connect(self._toggle)
         self._update_arrow()
 
+        # status chip on the right — hidden until a caller gives it text
+        self._badge = QLabel()
+        self._badge.setStyleSheet(theme.chip_style(theme.C_PANEL))
+        self._badge.setVisible(False)
+
+        # header row: [toggle button .........] [status chip]
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(8)
+        header.addWidget(self._btn, 1)
+        header.addWidget(self._badge)
+
         # content container
         self._content = QFrame()
         self._content_layout = QVBoxLayout(self._content)
@@ -40,7 +65,7 @@ class CollapsibleSection(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
-        layout.addWidget(self._btn)
+        layout.addLayout(header)
         layout.addWidget(self._content)
 
         self._set_title(title)
@@ -60,6 +85,7 @@ class CollapsibleSection(QWidget):
         self._expanded = not self._expanded
         self._content.setVisible(self._expanded)
         self._update_arrow()
+        self.sectionToggled.emit(self._expanded)
 
     # @args: widget - the widget to show/hide inside the section
     def setContentWidget(self, widget):
@@ -74,6 +100,15 @@ class CollapsibleSection(QWidget):
         self._expanded = not collapsed
         self._content.setVisible(self._expanded)
         self._update_arrow()
+
+    # @args: text - the chip label (an empty string hides the chip)
+    def setHeaderBadge(self, text):
+        self._badge.setText(text)
+        self._badge.setVisible(bool(text))
+
+    # @return: the current chip label ("" while hidden)
+    def headerBadge(self):
+        return self._badge.text()
 
     # @return: True while the section's content is shown
     def isExpanded(self):

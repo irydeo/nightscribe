@@ -55,6 +55,12 @@ UI_DIR = Path(__file__).parent / "ui"
 # is one step — Plan & Captura.
 _STEP_KEYS = ("plan", "process", "publish")
 
+# The whole project page is one exclusive accordion: the object card,
+# the three steps and follow-up — at most one section open at a time
+# (opening one closes every other open section; the Go button, cadence
+# chips and the other deep links land on it the same way).
+_PAGE_ACCORDION = ("details",) + _STEP_KEYS + ("followup", "files")
+
 # A2: outcome keys (from project.OUTCOMES) → human labels, by language.
 # The editable combo stores the key (English) and shows the label; «Otro»
 # is free text that passes through close() untouched.
@@ -2095,6 +2101,14 @@ class MainWindow(QMainWindow):
             sec.setCollapsed(True)
             det.addWidget(sec)
             self._proj_files_section = sec
+            # page accordion: the nested files section joins the
+            # exclusivity group — clicking it opens it and closes the
+            # other open sections (its parent card stays open: it lives
+            # inside it), clicking anywhere else closes it.
+            self._page_sections["files"] = sec
+            sec.sectionToggled.connect(
+                lambda expanded: self._on_page_toggled("files",
+                                                       expanded))
 
     def _populate_project_files(self, pid):
         # A4: refresh the files list in the Details tab from project_files.
@@ -2299,6 +2313,13 @@ class MainWindow(QMainWindow):
         page_container = self.projects.page_container
         page_container.layout().addWidget(sec)
         self._page_sections[key] = sec
+        # page accordion: a real header click drives the exclusivity
+        # (see _on_page_toggled); sectionToggled only fires from user
+        # clicks, so the initial collapse below stays silent and the
+        # programmatic sibling-closes never echo back (no recursion).
+        if key in _PAGE_ACCORDION:
+            sec.sectionToggled.connect(
+                lambda expanded, k=key: self._on_page_toggled(k, expanded))
         inner = QWidget()
         v = QVBoxLayout(inner)
         v.setContentsMargins(0, 0, 0, 0)
@@ -2364,13 +2385,36 @@ class MainWindow(QMainWindow):
         self._next_target = target
         self.projects.btn_next_go.setVisible(target is not None)
 
+    def _on_page_toggled(self, key, expanded):
+        # Page accordion: a genuine click opening ANY section (the
+        # object card or a step) closes the other open section (single
+        # landing spot, with the auto-scroll). A click that *closes* a
+        # section is left alone — 0 sections open is a perfectly legal
+        # state, nothing is force-opened.
+        # @args: key - the section key, expanded - the new state
+        # @return: None
+        if expanded:
+            self._scroll_to_section(key)
+
     def _scroll_to_section(self, key):
         # Expands the section and scrolls the page to it (the landing
-        # spot of every deep link after UD.4, UX-i).
+        # spot of every deep link after UD.4, UX-i). It keeps the whole
+        # page accordion invariant: at most one section (object card or
+        # step) is open, so the other open ones close first (silent
+        # setCollapsed — no signal echo).
         # @args: key - section key, e.g. "followup"|"plan"|None
         # @return: None
         if not key or key not in getattr(self, "_page_sections", {}):
             return
+        if key in _PAGE_ACCORDION:
+            for other_key, other in self._page_sections.items():
+                if other_key != key and other_key in _PAGE_ACCORDION \
+                        and other.isExpanded():
+                    # "files" is nested INSIDE the object card: opening
+                    # it must not close its own parent
+                    if key == "files" and other_key == "details":
+                        continue
+                    other.setCollapsed(True)
         sec = self._page_sections[key]
         sec.setCollapsed(False)
         from PySide6.QtCore import QTimer
@@ -2397,12 +2441,15 @@ class MainWindow(QMainWindow):
         self._build_publish_tab(p, kind, ctx)
         if kind in FOLLOWUP_KINDS:
             self._build_followup_tab(p, ctx)
-        # the Next card drives which sections start expanded:
-        # the next-action section open, the rest collapsed (except details)
+        # the Next card drives which section starts expanded: only the
+        # next-action one, everything else collapsed (object card too —
+        # the whole page is one exclusive accordion). A finished
+        # project (no target) opens with all sections collapsed, the
+        # user expands what they want to read.
         self._refresh_next_card(p)
         target = self._next_target_key(p)
         for key, sec in self._page_sections.items():
-            sec.setCollapsed(key not in ("details", target))
+            sec.setCollapsed(key != target)
 
     def _step_section(self, key):
         # Builds one step section with its state line + toggle inside
@@ -2415,7 +2462,28 @@ class MainWindow(QMainWindow):
         p = self._current_project
         if p and key in _STEP_KEYS:
             layout.addLayout(self._step_toggle_row(p, key))
+            # step state as a chip in the section header ("done <date>" /
+            # "skipped" / "pending"). Real step sections only — follow-up
+            # has no step row and shows nothing.
+            self._page_sections[key].setHeaderBadge(
+                self._step_chip_text(p, key))
         return layout
+
+    def _step_chip_text(self, p, key):
+        # @args: p - the project dict, key - step key
+        # @return: the chip text on the section header. Same words as
+        #          the toggle row, minus the icon: "done <date>" when
+        #          the step is done, "skipped" or "pending" (a "current"
+        #          step reads as pending to its owner).
+        step = next((s for s in p.get("steps", []) if s["step"] == key),
+                    None)
+        if not step or step["status"] not in ("done", "skipped"):
+            return self.tr("pending")
+        if step["status"] == "skipped":
+            return self.tr("skipped")
+        when = (datetime.datetime.fromtimestamp(step["updated"])
+                .strftime("%Y-%m-%d") if step.get("updated") else "")
+        return self.tr("done %1").replace("%1", when)
 
     def _step_toggle_row(self, p, key):
         # The step's own controls, in words (no more ✔/●/○/– icons):

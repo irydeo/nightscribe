@@ -228,3 +228,20 @@ its states (`pending/current/done/skipped`) remain the source of truth; the
 auto-close on the last completed step is kept. The CCDciel control leaves the
 Plan step for the **Observatory** tab (6th): the connection was already
 window-level, now so is its UI.
+
+**Review 2026-09 (accordion + state chip)**: the project page gains the
+missing "one landing spot" rule — the whole page is one exclusive
+accordion where at most one of **Object card / plan / process / publish /
+follow-up** is open at a time (0 open is a legal resting state; nothing
+is force-opened). A real header click drives it (`sectionToggled`, fired
+only from the user click; programmatic `setCollapsed()` stays silent, so
+sibling-closes never echo back), and every deep link (the "Go" button,
+cadence chips, context actions) routes through the same scroll-to-section
+path that enforces the invariant. A fresh project opens with only its
+next-action section expanded — the object card starts folded like the
+rest (an earlier draft kept the card and the project-files list immune to
+the group; that was revoked: the card participates so the page never
+shows two open sections at once). The *states* already lived in words on
+each step's toggle row ("done on <date>" / "skipped" / "pending"); the
+same words now ride the section header as a chip so the step status
+survives even when a step is collapsed.

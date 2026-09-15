@@ -80,6 +80,14 @@ heliocéntrica (HJD) vía formulario del grupo.
    y adjuntar proyectos existentes. ~~Sin pestaña nueva~~ Campañas
    **personales** (sin export/import en v1).
 
+**Terminología (2026-09-15)**: en la pestaña «Campañas» un miembro de la
+campaña es un **proyecto** — «target» queda reservado para los candidatos de
+la pestaña «Esta noche» (la primera maqueta usaba «Add target…» para ambos,
+y el solapamiento es la fuente de la confusión de usabilidad). Botones:
+«New project… / Attach project… / Detach project…» (ES: «Nuevo proyecto… /
+Vincular proyecto… / Quitar proyecto…»). Documentado y razonado en
+[docs/CAMPAIGNS.es.md](../CAMPAIGNS.es.md).
+
 **Alternativas consideradas**:
 
 - *VSX en el dominio www*: descartado — Cloudflare challenge (403) para
@@ -144,6 +152,13 @@ heliocentric Julian dates via the group's form.
    Still in force (Tools menu + hub button): personal campaigns, no
    sharing in v1.
 
+**Terminology (2026-09-15)**: in the "Campaigns" tab a campaign member is a
+**project** — "target" is reserved for the candidates of the "Tonight" tab
+(the first mock used "Add target…" for both, and that overload is the
+source of the usability confusion). Buttons: "New project… / Attach
+project… / Detach project…". Documented and reasoned in
+[docs/CAMPAIGNS.md](../CAMPAIGNS.md).
+
 **Alternatives considered**: www-hosted VSX API (Cloudflare-blocked),
 campaign as context JSON (not queryable), generic variable catalogue with
 scoring (out of v1), transit-style eclipse windows (v2), live flux monitor
@@ -158,3 +173,7 @@ rule applies.
 **Revisión / Revision**: rev. 2026-09-13 — ejecutado completo (40
 subplanes, fases V0→VE); suite unitaria verde (**1096**); i18n 714 cadenas
 ES/EN sin pendientes.
+rev. 2026-09-15 — claridad de UX: explicaciones en-app (ES/EN), terminología
+*target → project* codificada en la pestaña, documentación
+[`docs/CAMPAIGNS.es.md`](../CAMPAIGNS.es.md) / [`docs/CAMPAIGNS.md`](../CAMPAIGNS.md);
+suite unitaria verde (**1167**); i18n 783 cadenas ES/EN sin pendientes.

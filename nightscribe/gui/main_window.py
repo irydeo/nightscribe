@@ -538,7 +538,7 @@ class MainWindow(QMainWindow):
         c.btn_delete.clicked.connect(self._camp_delete)
         c.btn_finish.clicked.connect(self._camp_finish)
         c.btn_reopen.clicked.connect(self._camp_reopen)
-        c.btn_add_target.clicked.connect(self._camp_add_target)
+        c.btn_new_project.clicked.connect(self._camp_new_project)
         c.btn_attach.clicked.connect(self._camp_attach)
         c.btn_detach.clicked.connect(self._camp_detach)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
@@ -1012,7 +1012,7 @@ class MainWindow(QMainWindow):
             "pccp": self.tr("Checking PCCP candidates…"),
             "transit": self.tr("Scanning exoplanet transits…"),
             "hads": self.tr("Checking HADS variables…"),
-            "campaigns": self.tr("Checking campaign targets…"),
+            "campaigns": self.tr("Checking campaigns…"),
             "approach": self.tr("Fetching close approaches…"),
             "scoring": self.tr("Scoring targets…"),
         }
@@ -1810,7 +1810,7 @@ class MainWindow(QMainWindow):
             text = c["name"]
             if c.get("group_name"):
                 text += f"  ({c['group_name']})"
-            text += "  —  " + self.tr("%1 targets · %2 due")\
+            text += "  —  " + self.tr("%1 projects · %2 due")\
                 .replace("%1", str(len(members))).replace("%2", str(due))
             if any(m.get("event") for m in members):
                 text += "  ⚡"
@@ -5285,12 +5285,15 @@ class MainWindow(QMainWindow):
             _camp.reopen(db, cid)
             self._camp_after_action()
 
-    def _camp_add_target(self):
-        from .campaigns_dialog import AddTargetDialog
+    def _camp_new_project(self):
+        # Creates a project for a new object and links it to the selected
+        # campaign (terminology: a campaign member is a *project*; "target"
+        # is reserved for tonight's candidates).
+        from .campaigns_dialog import NewProjectDialog
         cid = self._selected_campaign_id()
         if cid is None:
             return
-        if AddTargetDialog(self, campaign_id=cid, db_obj=db).exec():
+        if NewProjectDialog(self, campaign_id=cid, db_obj=db).exec():
             self._camp_after_action()
 
     def _camp_attach(self):
@@ -5363,9 +5366,9 @@ class MainWindow(QMainWindow):
                 (self.tr("Finish"), self._camp_finish),
                 (self.tr("Reopen"), self._camp_reopen),
                 (self.tr("Delete…"), self._camp_delete),
-                (self.tr("Add target…"), self._camp_add_target),
-                (self.tr("Attach…"), self._camp_attach),
-                (self.tr("Detach…"), self._camp_detach)):
+                (self.tr("New project…"), self._camp_new_project),
+                (self.tr("Attach project…"), self._camp_attach),
+                (self.tr("Detach project…"), self._camp_detach)):
             act = menu.addAction(label)
             act.triggered.connect(slot)
         menu.exec(self.campaigns.lst_campaigns.viewport()

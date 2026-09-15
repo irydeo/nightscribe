@@ -2,11 +2,16 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="es_ES">
 <context>
-    <name>AddTargetDialog</name>
+    <name>NewProjectDialog</name>
     <message>
-        <location filename="../campaigns_dialog.py" line="129"/>
-        <source>Add campaign target</source>
-        <translation>Añadir objetivo a la campaña</translation>
+        <location filename="../campaigns_dialog.py" line="138"/>
+        <source>New project</source>
+        <translation>Nuevo proyecto</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="141"/>
+        <source>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</source>
+        <translation>Crea un proyecto nuevo para este objeto y lo vincula a la campaña seleccionada. Si el proyecto ya existe, usa «Vincular proyecto…» en la pestaña de campañas.</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="133"/>
@@ -59,9 +64,9 @@
         <translation>No encontrado — rellena las coordenadas a mano</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="209"/>
-        <source>The target needs a name.</source>
-        <translation>El objetivo necesita un nombre.</translation>
+        <location filename="../campaigns_dialog.py" line="222"/>
+        <source>The object needs a name.</source>
+        <translation>El objeto necesita un nombre.</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="219"/>
@@ -333,12 +338,17 @@
         <translation>Editar campaña</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="44"/>
+        <location filename="../campaigns_dialog.py" line="46"/>
         <source>New campaign</source>
         <translation>Nueva campaña</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="48"/>
+        <location filename="../campaigns_dialog.py" line="49"/>
+        <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</source>
+        <translation>Una campaña agrupa los proyectos de un esfuerzo de observación común — varias noches, varios observatorios, un objetivo. Nómbrala por el objetivo, p. ej. «erupción de T CrB 2026» o «curva de luz de WeSb 1».</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="55"/>
         <source>Name:</source>
         <translation>Nombre:</translation>
     </message>
@@ -401,6 +411,11 @@
         <translation>Campañas</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="14"/>
+        <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</source>
+        <translation>Una campaña agrupa los proyectos de un esfuerzo de observación común — varias noches, varios observatorios, un objetivo (p. ej. «erupción de T CrB 2026»). Un proyecto es un objeto con sus tres pasos: planificar, procesar, publicar.</translation>
+    </message>
+    <message>
         <location filename="../ui/campaigns_tab.ui" line="13"/>
         <source>Select a campaign to see its detail</source>
         <translation>Selecciona una campaña para ver su detalle</translation>
@@ -432,18 +447,18 @@
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="27"/>
-        <source>Add target…</source>
-        <translation>Añadir objetivo…</translation>
+        <source>New project…</source>
+        <translation>Nuevo proyecto…</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="32"/>
-        <source>Attach…</source>
-        <translation>Vincular…</translation>
+        <location filename="../ui/campaigns_tab.ui" line="36"/>
+        <source>Attach project…</source>
+        <translation>Vincular proyecto…</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="33"/>
-        <source>Detach…</source>
-        <translation>Quitar…</translation>
+        <location filename="../ui/campaigns_tab.ui" line="37"/>
+        <source>Detach project…</source>
+        <translation>Quitar proyecto…</translation>
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="41"/>
@@ -472,9 +487,9 @@
         <translation>Protocolo</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="77"/>
-        <source>Targets</source>
-        <translation>Objetivos</translation>
+        <location filename="../ui/campaigns_tab.ui" line="88"/>
+        <source>Projects in this campaign</source>
+        <translation>Proyectos de esta campaña</translation>
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="81"/>
@@ -1515,9 +1530,9 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation>Comprobando variables HADS…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1006"/>
-        <source>Checking campaign targets…</source>
-        <translation>Comprobando objetivos de campaña…</translation>
+        <location filename="../main_window.py" line="1015"/>
+        <source>Checking campaigns…</source>
+        <translation>Comprobando campañas…</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="1179"/>
@@ -1567,8 +1582,8 @@ One per line: date  magnitude  [error]  filter</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="1804"/>
-        <source>%1 targets · %2 due</source>
-        <translation>%1 objetivos · %2 vencidos</translation>
+        <source>%1 projects · %2 due</source>
+        <translation>%1 proyectos · %2 vencidos</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="1809"/>
@@ -2488,19 +2503,19 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
         <translation>Eliminar…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5271"/>
-        <source>Add target…</source>
-        <translation>Añadir objetivo…</translation>
+        <location filename="../main_window.py" line="5310"/>
+        <source>New project…</source>
+        <translation>Nuevo proyecto…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5272"/>
-        <source>Attach…</source>
-        <translation>Vincular…</translation>
+        <location filename="../main_window.py" line="5311"/>
+        <source>Attach project…</source>
+        <translation>Vincular proyecto…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5273"/>
-        <source>Detach…</source>
-        <translation>Quitar…</translation>
+        <location filename="../main_window.py" line="5312"/>
+        <source>Detach project…</source>
+        <translation>Quitar proyecto…</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="5292"/>

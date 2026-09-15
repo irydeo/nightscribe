@@ -2,11 +2,16 @@
 <!DOCTYPE TS>
 <TS version="2.1" language="en_US">
 <context>
-    <name>AddTargetDialog</name>
+    <name>NewProjectDialog</name>
     <message>
-        <location filename="../campaigns_dialog.py" line="129"/>
-        <source>Add campaign target</source>
-        <translation>Add campaign target</translation>
+        <location filename="../campaigns_dialog.py" line="138"/>
+        <source>New project</source>
+        <translation>New project</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="141"/>
+        <source>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</source>
+        <translation>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="133"/>
@@ -59,9 +64,9 @@
         <translation>Not found — fill the coordinates by hand</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="209"/>
-        <source>The target needs a name.</source>
-        <translation>The target needs a name.</translation>
+        <location filename="../campaigns_dialog.py" line="222"/>
+        <source>The object needs a name.</source>
+        <translation>The object needs a name.</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="219"/>
@@ -333,12 +338,17 @@
         <translation>Edit campaign</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="44"/>
+        <location filename="../campaigns_dialog.py" line="46"/>
         <source>New campaign</source>
         <translation>New campaign</translation>
     </message>
     <message>
-        <location filename="../campaigns_dialog.py" line="48"/>
+        <location filename="../campaigns_dialog.py" line="49"/>
+        <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</source>
+        <translation>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</translation>
+    </message>
+    <message>
+        <location filename="../campaigns_dialog.py" line="55"/>
         <source>Name:</source>
         <translation>Name:</translation>
     </message>
@@ -401,6 +411,11 @@
         <translation>Campaigns</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="14"/>
+        <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</source>
+        <translation>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</translation>
+    </message>
+    <message>
         <location filename="../ui/campaigns_tab.ui" line="13"/>
         <source>Select a campaign to see its detail</source>
         <translation>Select a campaign to see its detail</translation>
@@ -432,18 +447,18 @@
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="27"/>
-        <source>Add target…</source>
-        <translation>Add target…</translation>
+        <source>New project…</source>
+        <translation>New project…</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="32"/>
-        <source>Attach…</source>
-        <translation>Attach…</translation>
+        <location filename="../ui/campaigns_tab.ui" line="36"/>
+        <source>Attach project…</source>
+        <translation>Attach project…</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="33"/>
-        <source>Detach…</source>
-        <translation>Detach…</translation>
+        <location filename="../ui/campaigns_tab.ui" line="37"/>
+        <source>Detach project…</source>
+        <translation>Detach project…</translation>
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="41"/>
@@ -472,9 +487,9 @@
         <translation>Protocol</translation>
     </message>
     <message>
-        <location filename="../ui/campaigns_tab.ui" line="77"/>
-        <source>Targets</source>
-        <translation>Targets</translation>
+        <location filename="../ui/campaigns_tab.ui" line="88"/>
+        <source>Projects in this campaign</source>
+        <translation>Projects in this campaign</translation>
     </message>
     <message>
         <location filename="../ui/campaigns_tab.ui" line="81"/>
@@ -1463,9 +1478,9 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation>Checking HADS variables…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1006"/>
-        <source>Checking campaign targets…</source>
-        <translation>Checking campaign targets…</translation>
+        <location filename="../main_window.py" line="1015"/>
+        <source>Checking campaigns…</source>
+        <translation>Checking campaigns…</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="1581"/>
@@ -1976,8 +1991,8 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
     </message>
     <message>
         <location filename="../main_window.py" line="1804"/>
-        <source>%1 targets · %2 due</source>
-        <translation>%1 targets · %2 due</translation>
+        <source>%1 projects · %2 due</source>
+        <translation>%1 projects · %2 due</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="1809"/>
@@ -2483,19 +2498,19 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation>Delete…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5271"/>
-        <source>Add target…</source>
-        <translation>Add target…</translation>
+        <location filename="../main_window.py" line="5310"/>
+        <source>New project…</source>
+        <translation>New project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5272"/>
-        <source>Attach…</source>
-        <translation>Attach…</translation>
+        <location filename="../main_window.py" line="5311"/>
+        <source>Attach project…</source>
+        <translation>Attach project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5273"/>
-        <source>Detach…</source>
-        <translation>Detach…</translation>
+        <location filename="../main_window.py" line="5312"/>
+        <source>Detach project…</source>
+        <translation>Detach project…</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="5292"/>

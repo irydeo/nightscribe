@@ -9,6 +9,13 @@
      <property name="maximumWidth"><number>360</number></property>
      <layout class="QVBoxLayout" name="listLayout">
       <item>
+       <widget class="QLabel" name="lbl_what">
+        <property name="text"><string>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</string></property>
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="styleSheet"><string>color: #8a90a6; font-style: italic; font-size: 11px;</string></property>
+       </widget>
+      </item>
+      <item>
        <widget class="QListWidget" name="lst_campaigns">
         <property name="toolTip"><string>Select a campaign to see its detail</string></property>
        </widget>
@@ -21,16 +28,16 @@
        </layout>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="rowTargets">
+       <layout class="QHBoxLayout" name="rowProjects">
         <item><widget class="QPushButton" name="btn_finish"><property name="text"><string>Finish</string></property></widget></item>
         <item><widget class="QPushButton" name="btn_reopen"><property name="text"><string>Reopen</string></property></widget></item>
-        <item><widget class="QPushButton" name="btn_add_target"><property name="text"><string>Add target…</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_new_project"><property name="text"><string>New project…</string></property></widget></item>
        </layout>
       </item>
       <item>
        <layout class="QHBoxLayout" name="rowLink">
-        <item><widget class="QPushButton" name="btn_attach"><property name="text"><string>Attach…</string></property></widget></item>
-        <item><widget class="QPushButton" name="btn_detach"><property name="text"><string>Detach…</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_attach"><property name="text"><string>Attach project…</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_detach"><property name="text"><string>Detach project…</string></property></widget></item>
        </layout>
       </item>
      </layout>
@@ -74,7 +81,7 @@
       </item>
       <item>
        <widget class="QGroupBox" name="grp_members">
-        <property name="title"><string>Targets</string></property>
+        <property name="title"><string>Projects in this campaign</string></property>
         <layout class="QVBoxLayout" name="membersLayout">
          <item>
           <widget class="QTableWidget" name="tbl_members">

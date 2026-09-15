@@ -12,9 +12,11 @@
 ############################################################
 
 """Sub-dialogs of the Campaigns tab (UX-a): the create/edit form and the
-add-target dialog with its VSX/SIMBAD resolution chain. The manager
-itself is the top-level Campaigns tab (supersedes the modal dialog of
-ADR-035 V-j). All persistence goes through core/campaign.py.
+new-project dialog with its VSX/SIMBAD resolution chain. A campaign member
+is a *project* — "target" is reserved for tonight's candidates (see
+docs/CAMPAIGNS). The manager itself is the top-level Campaigns tab
+(supersedes the modal dialog of ADR-035 V-j). All persistence goes through
+core/campaign.py.
 """
 
 import logging
@@ -43,6 +45,11 @@ class CampaignEditDialog(QDialog):
         self.setWindowTitle(self.tr("Edit campaign") if camp
                             else self.tr("New campaign"))
         layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(self.tr(
+            "A campaign groups the projects of one shared observation "
+            "effort — several nights, several observatories, one goal. "
+            "Name it after the goal, e.g. “T CrB 2026 eruption” or "
+            "“WeSb 1 light curve”.")))
         form = QFormLayout()
         self.edt_name = QLineEdit((camp or {}).get("name", ""))
         form.addRow(self.tr("Name:"), self.edt_name)
@@ -112,11 +119,14 @@ class CampaignEditDialog(QDialog):
         self.accept()
 
 
-class AddTargetDialog(QDialog):
-    # Adds a target to a campaign as a `variable` project. Resolution chain
-    # (V-c): VSX (cached) -> SIMBAD (coords anchor) -> fully manual. The
-    # lookups are one tiny cached GET each and run synchronously; the form
-    # tells the user while it resolves.
+class NewProjectDialog(QDialog):
+    # Creates a `variable` project for one object and links it to the
+    # selected campaign (the member IS the project — the early draft's
+    # "Add target…" wording was the source of the confusion, so the copy
+    # now says "project" everywhere). Resolution chain (V-c): VSX
+    # (cached) -> SIMBAD (coords anchor) -> fully manual. The lookups are
+    # one tiny cached GET each and run synchronously; the form tells the
+    # user while it resolves.
     # @args: parent, campaign_id - int, db_obj - Database
     def __init__(self, parent=None, campaign_id=None, db_obj=None):
         super().__init__(parent)
@@ -126,8 +136,12 @@ class AddTargetDialog(QDialog):
         self._campaign_id = campaign_id
         self._resolved = {}
         self._resolve_worker = None
-        self.setWindowTitle(self.tr("Add campaign target"))
+        self.setWindowTitle(self.tr("New project"))
         layout = QVBoxLayout(self)
+        layout.addWidget(QLabel(self.tr(
+            "Creates a new project for this object and links it to the "
+            "selected campaign. If the project already exists, use "
+            "“Attach project…” in the campaigns tab instead.")))
         form = QFormLayout()
         self.edt_name = QLineEdit()
         form.addRow(self.tr("Object:"), self.edt_name)
@@ -206,7 +220,7 @@ class AddTargetDialog(QDialog):
             from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(
                 self, self.windowTitle(),
-                self.tr("The target needs a name."))
+                self.tr("The object needs a name."))
             return
         from ..core import project
         try:

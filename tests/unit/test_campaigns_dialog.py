@@ -12,7 +12,7 @@
 ############################################################
 
 """Offscreen smoke tests for the campaign sub-dialogs (UX-a, supersedes
-ADR-035 V-j): the create/edit form and the add-target resolution chain.
+ADR-035 V-j): the create/edit form and the new-project resolution chain.
 """
 
 import os
@@ -76,13 +76,13 @@ def test_save_without_name_warns(qapp, db, monkeypatch):
     assert campaign.list_campaigns(db) == []
 
 
-def test_add_target_resolves_vsx_and_creates_project(qapp, db):
+def test_new_project_resolves_vsx_and_creates_project(qapp, db):
     # U0.5: resolution runs in a ResolveWorker; tests feed the payload
     # straight into _resolve_done
     from nightscribe.core import project as proj_mod
-    from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    from nightscribe.gui.campaigns_dialog import NewProjectDialog
     cid = campaign.create(db, "Campaña T CrB")
-    dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
+    dlg = NewProjectDialog(campaign_id=cid, db_obj=db)
     dlg.edt_name.setText("T CrB")
     dlg._resolve_done({"vsx": {
         "name": "T CrB", "auid": "000-BBW-825", "ra_deg": 239.87567,
@@ -97,11 +97,11 @@ def test_add_target_resolves_vsx_and_creates_project(qapp, db):
     assert p["context"]["variable"]["period_d"] == 227.5528
 
 
-def test_add_target_manual_when_nothing_knows_it(qapp, db):
+def test_new_project_manual_when_nothing_knows_it(qapp, db):
     from nightscribe.core import project as proj_mod
-    from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    from nightscribe.gui.campaigns_dialog import NewProjectDialog
     cid = campaign.create(db, "Campaña WeSb 1")
-    dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
+    dlg = NewProjectDialog(campaign_id=cid, db_obj=db)
     dlg.edt_name.setText("WeSb 1")
     dlg._resolve_done({"vsx": None, "simbad": None})
     assert "Not found" in dlg.lbl_resolved.text()
@@ -114,16 +114,16 @@ def test_add_target_manual_when_nothing_knows_it(qapp, db):
     assert p["context"]["mag"] == 15.0
 
 
-def test_add_target_without_coordinates_warns(qapp, db, monkeypatch):
+def test_new_project_without_coordinates_warns(qapp, db, monkeypatch):
     # UX-e: replaces test_add_target_without_coordinates_is_refused
     from PySide6.QtWidgets import QMessageBox
     from nightscribe.core import project as proj_mod
-    from nightscribe.gui.campaigns_dialog import AddTargetDialog
+    from nightscribe.gui.campaigns_dialog import NewProjectDialog
     seen = {}
     monkeypatch.setattr(QMessageBox, "warning",
                         lambda *a, **k: seen.setdefault("warned", True))
     cid = campaign.create(db, "C")
-    dlg = AddTargetDialog(campaign_id=cid, db_obj=db)
+    dlg = NewProjectDialog(campaign_id=cid, db_obj=db)
     dlg.edt_name.setText("X")
     dlg._save()
     assert seen.get("warned")

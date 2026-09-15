@@ -76,7 +76,7 @@ def test_campaign_list_shows_health(window):
     lst = window.campaigns.lst_campaigns
     texts = [lst.item(i).text() for i in range(lst.count())]
     assert any("Campaña T CrB" in t and "obsSN" in t for t in texts)
-    assert any("1 target" in t or "1 objetivo" in t for t in texts)
+    assert any("1 projects" in t or "1 proyectos" in t for t in texts)
 
 
 def test_finished_campaign_is_dimmed(window):

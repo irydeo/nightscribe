@@ -99,7 +99,8 @@ está en una tarjeta, manda la tarjeta):
 **Hecho cuando**: verde; 0 entradas `unfinished` en los `.ts`
 (`grep -c 'type="unfinished"' nightscribe/gui/i18n/nightscribe_es.ts` → 0).
 **Commit**: `Gui/i18n: full ES/EN pass for the campaigns-UX track (UX, subplan UC.1)`
-**Estado**: Pendiente
+**Estado**: Hecho (0 cadenas nuevas, 0 unfinished — las tarjetas anteriores
+ya iban traduciendo al vuelo; el pase completa a 780/780; suite 1146 verde)
 
 ---
 

@@ -1989,3 +1989,146 @@ def test_panel_survives_page_wipe_rebuild(window):
         window._proj_panel = None
         window._proj_panel_loader = orig_loader
         _flush_deferred_deletions()
+
+
+# -------------------- wheel-passive detail form controls -----------------
+#
+# The detail page scrolls inside a single QScrollArea (scroll_page). A bare
+# spin box or item view swallows the mouse wheel, killing the page scroll
+# (the "wheel hijack"), so the page's wheelable controls are passive: plain
+# wheel is deferred to the page, Ctrl+wheel stays as the deliberate
+# fine-tune. Lists keep the native wheel while their scrollbar is active.
+# These tests lock that in offscreen with synthetic QWheelEvents.
+
+def _wheel_event(dy=-120, modifiers=None):
+    # one notch down, the full 8-arg constructor (this PySide6 build has no
+    # QTest.qWheelEvent); the event object is returned so the test can
+    # inspect its accepted state afterwards.
+    from PySide6.QtCore import QPointF, QPoint, Qt
+    from PySide6.QtGui import QWheelEvent
+    if modifiers is None:
+        modifiers = Qt.NoModifier
+    return QWheelEvent(QPointF(10, 10), QPointF(10, 10),
+                       QPoint(0, dy), QPoint(0, dy),
+                       Qt.NoButton, modifiers, Qt.ScrollUpdate, False)
+
+
+def test_detail_spins_are_wheel_passive(window, panel):
+    # A plain wheel over a detail spin must not change its value: the
+    # gesture belongs to the page's scroll.
+    from PySide6.QtCore import QCoreApplication
+    from nightscribe.gui.widgets.passive_wheel import (
+        PassiveDoubleSpinBox, PassiveSpinBox)
+    _create_and_select(window, "neo", "wheel-passive-spin", dict(NEO_CTX))
+    for key, cls in (("spn_darks", PassiveSpinBox),
+                     ("spn_darkexp", PassiveDoubleSpinBox)):
+        w = window._project_widgets[key]
+        assert isinstance(w, cls), f"{key} should be a {cls.__name__}"
+        before = w.value()
+        e = _wheel_event()
+        QCoreApplication.instance().sendEvent(w, e)
+        assert w.value() == before, f"plain wheel on {key} should be passive"
+        assert not e.isAccepted(), f"passive wheel on {key} must stay unaccepted"
+
+
+def test_detail_spins_fine_tune_on_ctrl_wheel(window, panel):
+    # Ctrl+wheel is the deliberate fine-tune gesture and must still work.
+    from PySide6.QtCore import QCoreApplication, Qt
+    _create_and_select(window, "neo", "wheel-ctrl-spin", dict(NEO_CTX))
+    spn = window._project_widgets["spn_darks"]
+    spn.setValue(50)
+    e = _wheel_event(modifiers=Qt.ControlModifier)
+    QCoreApplication.instance().sendEvent(spn, e)
+    assert spn.value() < 50, "Ctrl+wheel should fine-tune a plain wheel down"
+    assert e.isAccepted(), "fine-tune wheel should be consumed by the native handler"
+
+    dbl = window._project_widgets["spn_darkexp"]
+    dbl.setValue(5.0)
+    e2 = _wheel_event(modifiers=Qt.ControlModifier)
+    QCoreApplication.instance().sendEvent(dbl, e2)
+    assert dbl.value() < 5.0, "Ctrl+wheel should fine-tune a double spin down"
+
+
+def test_short_list_is_wheel_passive(window, panel):
+    # A list with nothing to scroll has no claim on the wheel: it belongs
+    # to the page. A standalone PassiveList that does not overflow keeps
+    # this deterministic (no dependence on the page's shared layout state).
+    from PySide6.QtCore import QCoreApplication, Qt
+    from nightscribe.gui.widgets.passive_wheel import PassiveList
+    lst = PassiveList(window)
+    for i in range(5):                      # a handful of rows: fits easily
+        lst.addItem(f"file_{i}")
+    lst.setFixedHeight(600)
+    lst.show()
+    QCoreApplication.instance().processEvents()
+    try:
+        sb = lst.verticalScrollBar()
+        assert sb.maximum() == 0, "a short list cannot overflow"
+        # Wheels on item views arrive at the viewport, so that's the target.
+        e = _wheel_event()
+        QCoreApplication.instance().sendEvent(lst.viewport(), e)
+        QCoreApplication.instance().processEvents()
+        assert not e.isAccepted(), "wheel on a short list must stay unaccepted"
+        assert sb.value() == 0
+        # Ctrl+wheel takes the native path but cannot scroll a short list.
+        e2 = _wheel_event(modifiers=Qt.ControlModifier)
+        QCoreApplication.instance().sendEvent(lst.viewport(), e2)
+        QCoreApplication.instance().processEvents()
+        assert sb.value() == 0
+    finally:
+        lst.deleteLater()
+        _flush_deferred_deletions()
+
+
+def test_overflowing_list_keeps_native_wheel(window, panel):
+    # A long list must stay scrollable with the wheel (its scrollbar is
+    # active). A standalone PassiveList with a forced height keeps this
+    # independent of the page layout.
+    from PySide6.QtCore import QCoreApplication, Qt
+    from nightscribe.gui.widgets.passive_wheel import PassiveList
+    # Standalone (no parent) with a forced height: deterministic geometry
+    # offscreen, the way the list overflow is meant to be measured.
+    lst = PassiveList()
+    lst.setFixedHeight(120)
+    lst.show()
+    QCoreApplication.instance().processEvents()
+    for i in range(200):
+        lst.addItem(f"frame {i:03d}")
+    QCoreApplication.instance().processEvents()
+    try:
+        sb = lst.verticalScrollBar()
+        assert sb.maximum() > 0, "sanity: the list must overflow"
+        e = _wheel_event()
+        QCoreApplication.instance().sendEvent(lst.viewport(), e)
+        QCoreApplication.instance().processEvents()
+        assert sb.value() > 0, "wheel on an overflowing list must scroll it"
+        assert e.isAccepted(), "native wheel should be consumed"
+
+        sb.setValue(0)
+        QCoreApplication.instance().processEvents()
+        e2 = _wheel_event(dy=-120 * 10, modifiers=Qt.ControlModifier)
+        QCoreApplication.instance().sendEvent(lst.viewport(), e2)
+        QCoreApplication.instance().processEvents()
+        assert sb.value() > 0, "Ctrl+wheel must scroll an overflowing list too"
+    finally:
+        lst.deleteLater()
+        _flush_deferred_deletions()
+
+
+def test_detail_page_has_no_bare_wheel_hijackers(window, panel):
+    # The regression lock for the wheel-hijack fix: everything wheelable
+    # the page builds must be one of the passive variants, or it will eat
+    # the scroll again (new controls added without the passive class fail
+    # here).
+    _create_and_select(window, "neo", "wheel-audit", dict(NEO_CTX))
+    from PySide6.QtWidgets import QDoubleSpinBox, QSpinBox, QListWidget
+    from nightscribe.gui.widgets.passive_wheel import (
+        PassiveDoubleSpinBox, PassiveList, PassiveSpinBox)
+    container = window.projects.page_container
+    bad = [type(w).__name__ for w in container.findChildren(QSpinBox)
+           if not isinstance(w, PassiveSpinBox)]
+    bad += [type(w).__name__ for w in container.findChildren(QDoubleSpinBox)
+            if not isinstance(w, PassiveDoubleSpinBox)]
+    bad += [type(w).__name__ for w in container.findChildren(QListWidget)
+            if not isinstance(w, PassiveList)]
+    assert not bad, f"bare wheel-hijacking controls on the detail page: {bad}"

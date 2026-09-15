@@ -39,6 +39,8 @@ from ..core.db import db
 from . import theme
 from .overview import ObjectPanel
 from .skeleton import ShimmerRow
+from .widgets.passive_wheel import (PassiveDoubleSpinBox, PassiveList,
+                                    PassiveSpinBox)
 from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PostWorker, SunWorker,
                       TonightWorker)
@@ -2077,7 +2079,7 @@ class MainWindow(QMainWindow):
         if getattr(self, "_proj_files_list", None) is None:
             from .widgets.collapsible_section import CollapsibleSection
             sec = CollapsibleSection(self.tr("Project files"))
-            self._proj_files_list = QListWidget()
+            self._proj_files_list = PassiveList()
             self._proj_files_list.itemDoubleClicked.connect(
                 self._open_project_file)
             sec.setContentWidget(self._proj_files_list)
@@ -2507,10 +2509,10 @@ class MainWindow(QMainWindow):
         form_layout = QVBoxLayout(form)
         row = QHBoxLayout()
         row.addWidget(QLabel(self.tr("Frames:")))
-        spn = QSpinBox(); spn.setMinimum(1); spn.setMaximum(999); spn.setValue(30)
+        spn = PassiveSpinBox(); spn.setMinimum(1); spn.setMaximum(999); spn.setValue(30)
         row.addWidget(spn)
         row.addWidget(QLabel(self.tr("Exposure (s):")))
-        spn_exp = QDoubleSpinBox(); spn_exp.setMinimum(0.1)
+        spn_exp = PassiveDoubleSpinBox(); spn_exp.setMinimum(0.1)
         spn_exp.setMaximum(3600.0); spn_exp.setValue(60.0)
         row.addWidget(spn_exp)
         row.addWidget(QLabel(self.tr("Filter:")))
@@ -2562,14 +2564,14 @@ class MainWindow(QMainWindow):
         # appends a Dark and a Bias step from these counts (0 = omit).
         grp = QGroupBox(self.tr("Calibration"))
         cal_form = QFormLayout(grp)
-        spn_darks = QSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
+        spn_darks = PassiveSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
         spn_darks.setValue(25)
         cal_form.addRow(self.tr("Darks:"), spn_darks)
-        spn_darkexp = QDoubleSpinBox(); spn_darkexp.setMinimum(0.1)
+        spn_darkexp = PassiveDoubleSpinBox(); spn_darkexp.setMinimum(0.1)
         spn_darkexp.setMaximum(3600.0)
         spn_darkexp.setValue(spn_exp.value())
         cal_form.addRow(self.tr("Dark exposure (s):"), spn_darkexp)
-        spn_bias = QSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
+        spn_bias = PassiveSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
         spn_bias.setValue(100)
         cal_form.addRow(self.tr("Bias:"), spn_bias)
         layout.addWidget(grp)
@@ -3324,14 +3326,14 @@ class MainWindow(QMainWindow):
         row2.addWidget(btn_anim)
         lbl_zoom = QLabel(self.tr("Zoom:"))
         row2.addWidget(lbl_zoom)
-        spn_zoom = QSpinBox()
+        spn_zoom = PassiveSpinBox()
         spn_zoom.setRange(1, 8)
         spn_zoom.setValue(2)
         spn_zoom.setToolTip(self.tr("Crop zoom (1 = full frame)"))
         row2.addWidget(spn_zoom)
         row2.addStretch()
         gl.addLayout(row2)
-        lst = QListWidget()
+        lst = PassiveList()
         lst.setMaximumHeight(120)
         gl.addWidget(lst)
         layout.addWidget(grp)
@@ -4039,7 +4041,7 @@ class MainWindow(QMainWindow):
         # sessions list
         grp = QGroupBox(self.tr("Visits"))
         grp.setLayout(QVBoxLayout())
-        lst = QListWidget()
+        lst = PassiveList()
         self._fu_populate_sessions(lst, pid)
         lst.itemSelectionChanged.connect(
             lambda: self._fu_session_selected(lst, pid))
@@ -4291,7 +4293,7 @@ class MainWindow(QMainWindow):
         fu_row.addWidget(btn_del)
         dlay.addLayout(fu_row)
         # images list for this session
-        img_lst = QListWidget()
+        img_lst = PassiveList()
         self._fu_populate_images(img_lst, sid)
         dlay.addWidget(img_lst)
         self._project_widgets["fu_images"] = img_lst
@@ -4300,13 +4302,13 @@ class MainWindow(QMainWindow):
         grp_meas.setLayout(QVBoxLayout())
         meas_row = QHBoxLayout()
         meas_row.addWidget(QLabel(self.tr("Mag:")))
-        spn_mag = QDoubleSpinBox()
+        spn_mag = PassiveDoubleSpinBox()
         spn_mag.setRange(-5.0, 30.0)
         spn_mag.setDecimals(3)
         spn_mag.setValue(16.0)
         meas_row.addWidget(spn_mag)
         meas_row.addWidget(QLabel(self.tr("Err:")))
-        spn_err = QDoubleSpinBox()
+        spn_err = PassiveDoubleSpinBox()
         spn_err.setRange(0.0, 9.0)
         spn_err.setDecimals(3)
         spn_err.setValue(0.0)
@@ -4323,7 +4325,7 @@ class MainWindow(QMainWindow):
                                               spn_err, cmb_filt))
         grp_meas.layout().addLayout(meas_row)
         # measurements list for this session
-        meas_lst = QListWidget()
+        meas_lst = PassiveList()
         self._fu_populate_measurements(meas_lst, pid, sid)
         grp_meas.layout().addWidget(meas_lst)
         dlay.addWidget(grp_meas)
@@ -4716,11 +4718,11 @@ class MainWindow(QMainWindow):
         cmb.addItems(["Clear", "V", "R", "G", "B", "I", "NIR", "L"])
         cmb.setCurrentText(filt)
         row.addWidget(cmb)
-        spn_n = QSpinBox()
+        spn_n = PassiveSpinBox()
         spn_n.setMinimum(1); spn_n.setMaximum(999)
         spn_n.setValue(n)
         row.addWidget(spn_n)
-        spn_e = QDoubleSpinBox()
+        spn_e = PassiveDoubleSpinBox()
         spn_e.setMinimum(0.1); spn_e.setMaximum(3600.0)
         spn_e.setValue(exp)
         row.addWidget(spn_e)

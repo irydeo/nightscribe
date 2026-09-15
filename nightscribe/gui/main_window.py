@@ -15,6 +15,7 @@ import datetime
 import logging
 from pathlib import Path
 
+from PySide6 import Shiboken
 from PySide6.QtCore import (QFile, Qt, Signal, QPropertyAnimation,
                             QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
@@ -2163,6 +2164,12 @@ class MainWindow(QMainWindow):
     def _get_proj_panel(self):
         # Reusable object card (lazy): built once, then re-parented into
         # whatever section asks for it on each project-page build (UX-i).
+        # UD.5: a page wipe can leave a dangling wrapper behind once its
+        # deleteLater() has run — if the C++ card is gone, build a fresh
+        # one instead of touching the dead object ("already deleted").
+        if self._proj_panel is not None \
+                and not Shiboken.isValid(self._proj_panel):
+            self._proj_panel = None
         if self._proj_panel is None:
             from .overview import ObjectPanel
             panel = ObjectPanel(loader=self._proj_panel_loader)
@@ -2172,6 +2179,13 @@ class MainWindow(QMainWindow):
     def _reset_proj_panel(self):
         # Drops any in-flight worker and empties the panel (used when the
         # selection or the project list goes away).
+        if self._proj_panel is not None \
+                and not Shiboken.isValid(self._proj_panel):
+            # UD.5: the C++ card is already gone — nothing in flight to
+            # cancel, just drop the dead wrapper (a live cancel() below
+            # would not reach it either, and touching it would raise).
+            self._proj_panel = None
+            return
         if self._proj_panel is not None:
             self._proj_panel.cancel()
 
@@ -2296,6 +2310,17 @@ class MainWindow(QMainWindow):
         # the registry belongs to the wiped page: stale keys must not
         # survive the rebuild (UD.5)
         self._project_widgets = {}
+        # the wipe below also destroys whatever the page hosted, including
+        # the lazily-cached project-files list (UD.5: nothing from a wiped
+        # page survives): drop those caches so the next build creates fresh
+        # ones — reusing a dangling C++ object crashed with "already
+        # deleted" (RuntimeError) on the second selection of any project.
+        # The reusable ObjectPanel stays put on purpose: it is not killed
+        # here (tests may have slotted a fake one in, and a live panel can
+        # be re-parented into the new page); _get_proj_panel() checks
+        # liveness and rebuilds it only if its C++ object really is gone.
+        self._proj_files_list = None
+        self._proj_files_section = None
         self._wipe_layout(self.projects.page_container.layout())
 
     def _next_target_key(self, p):

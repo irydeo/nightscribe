@@ -1881,3 +1881,111 @@ def test_year_headers_never_open(window):
     if header is not None:
         window._project_open_activated(header)      # must not raise
         assert window._current_project is None or True
+
+
+# ---------------- UD.5: a wiped page must not leave a dead cache behind ----
+#
+# Wiping the project page schedules its subtree for destruction
+# (deleteLater). The offscreen harness never spins the event loop, so
+# those deletions pile up -- and the next selection runs into them.
+# These two tests flush the queued deferred deletions (exactly what the
+# real loop does between two clicks by a user) and re-select: the path
+# that used to raise "QListWidget ... already deleted" (RuntimeError).
+
+def _flush_deferred_deletions():
+    # @args: none
+    # @return: None, runs the queued deleteLater() events; a couple of
+    #          rounds, because deleting one widget can queue the next.
+    from PySide6.QtCore import QEvent
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance()
+    for _ in range(2):
+        app.sendPostedEvents(None, QEvent.DeferredDelete)
+
+
+def test_reselect_rebuilds_files_list_after_wipe(window):
+    # Select, wipe (reselecting clears the page first), let the queued
+    # deletions run, then select again: the files list must be rebuilt
+    # fresh and repopulated -- the old QListWidget is dead by then.
+    from PySide6 import Shiboken
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    from nightscribe.gui.overview import ObjectPanel
+    orig_loader = window._proj_panel_loader
+    # a fake-loader card goes in first: the wipe below kills it, and the
+    # rebuild has to stay off the real (networked) ExploreWorker
+    window._proj_panel_loader = (lambda name, fallback_target=None:
+                                 FakeWorker(FAKE_ELEMENT))
+    window._proj_panel = ObjectPanel(loader=window._proj_panel_loader,
+                                     chart_dir=None)
+    try:
+        p = _create_and_select(window, "sn", "SN2026wipe", {"kind": "sn"})
+        project.add_file(dbmod.db, p["id"], "/tmp/wipe_seq.targets",
+                         "sequence")
+        _reselect(window, p["id"])
+        first = window._proj_files_list
+        assert first is not None and first.count() == 1
+
+        # the wipe schedules the deletion of the list it hosted...
+        _reselect(window, p["id"])
+        assert window._proj_files_list is not first
+        _flush_deferred_deletions()
+        assert not Shiboken.isValid(first)   # ...and by now it is truly gone
+
+        # ...the next select must build a fresh one and fill it -- pre-fix
+        # this is exactly where "already deleted" surfaced (lst.clear()).
+        _reselect(window, p["id"])           # must not raise
+        lst = window._proj_files_list
+        assert lst is not first
+        assert lst.count() == 1
+        texts = [lst.item(i).text() for i in range(lst.count())]
+        assert any("sequence" in t for t in texts)
+    finally:
+        if window._proj_panel is not None \
+                and Shiboken.isValid(window._proj_panel):
+            window._proj_panel.deleteLater()
+        window._proj_panel = None
+        window._proj_panel_loader = orig_loader
+        _flush_deferred_deletions()
+
+
+def test_panel_survives_page_wipe_rebuild(window):
+    # The shared ObjectPanel goes under the wipe as well (it is parented
+    # into the page). Once the queued deletion has fired, the hub must
+    # notice the dead card, drop it and hand out a fresh one -- not blow
+    # up on a dead C++ object.
+    from PySide6 import Shiboken
+    from nightscribe.gui.overview import ObjectPanel
+    orig_loader = window._proj_panel_loader
+    window._proj_panel_loader = (lambda name, fallback_target=None:
+                                 FakeWorker(FAKE_ELEMENT))
+    # a test-owned card in the shared slot: selection will parent it into
+    # the page, so the wipe below really catches it
+    fake = ObjectPanel(loader=lambda name, fallback_target=None:
+                       FakeWorker(FAKE_ELEMENT), chart_dir=None)
+    window._proj_panel = fake
+    try:
+        p = _create_and_select(window, "neo", "panel-wipe", NEO_CTX)
+        assert window._proj_panel is fake
+
+        # wipe + delete: the normal "deselect" path kills the card...
+        window._clear_project_detail()
+        _flush_deferred_deletions()
+        assert not Shiboken.isValid(fake)    # ...the C++ card is really dead
+
+        # ...and re-selecting must serve a fresh, valid one (pre-fix:
+        # "already deleted" on the dead wrapper).
+        _reselect(window, p["id"])           # must not raise
+        assert window._proj_panel is not fake
+        assert Shiboken.isValid(window._proj_panel)
+        assert window._proj_panel.state() == "ready"
+    finally:
+        built = window._proj_panel
+        if built is not None and built is not fake:
+            if Shiboken.isValid(built):
+                built.deleteLater()
+        if Shiboken.isValid(fake):
+            fake.deleteLater()
+        window._proj_panel = None
+        window._proj_panel_loader = orig_loader
+        _flush_deferred_deletions()

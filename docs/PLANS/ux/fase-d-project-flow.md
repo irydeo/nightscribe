@@ -1048,7 +1048,9 @@ def test_go_button_expands_target(window, panel):
 **Hecho cuando**: verde; suite verde (N→M) salvo los ficheros de
 hads/transit/neo que retargeta UD.5 (anótalo).
 **Commit**: `Gui: the Next card drives the project page — deep links scroll to sections (UX, subplan UD.4)`
-**Estado**: Pendiente
+**Estado**: Hecho (1143→1146 tests, suite verde salvo
+`test_hads_plan.py`/`test_transit_plan.py`/`test_neo_process.py`, que
+retargeta UD.5; 6 cadenas nuevas con ES en la tabla de arriba)
 
 ---
 

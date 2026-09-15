@@ -78,3 +78,7 @@ class CollapsibleSection(QWidget):
     # @return: True while the section's content is shown
     def isExpanded(self):
         return self._expanded
+
+    # @return: True while the section's content is hidden
+    def isCollapsed(self):
+        return not self._expanded

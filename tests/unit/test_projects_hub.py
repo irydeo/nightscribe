@@ -183,6 +183,23 @@ def _create_and_select(window, kind, name, ctx):
     return p
 
 
+def _build_page(window, p):
+    # Build the project page with a fake panel loader slotted into the
+    # hub's lazy slot, so the real ExploreWorker is never built; the
+    # previous state is restored afterwards.
+    # @args: window - MainWindow, p - the project dict to page
+    orig_panel = window._proj_panel
+    orig_loader = window._proj_panel_loader
+    window._proj_panel = None
+    window._proj_panel_loader = (lambda name, fallback_target=None:
+                                 FakeWorker(FAKE_ELEMENT))
+    try:
+        window._build_project_page(p)
+    finally:
+        window._proj_panel = orig_panel
+        window._proj_panel_loader = orig_loader
+
+
 # ---------------- D4 contracts ----------------
 
 def test_select_project_drives_panel(window, panel):
@@ -190,17 +207,16 @@ def test_select_project_drives_panel(window, panel):
     assert window._proj_panel is panel
     assert panel.state() == "ready"
     assert panel.lbl_hook.text()
-    # step machine and buttons stayed intact ("Details" tab first, then the
-    # three steps — capture merged into plan, ADR-030) plus the SN follow-up
-    # tab (B2, hidden for non-SN kinds but still counted by QTabWidget)
-    assert window.projects.tabs_steps.count() == 5
-    # a project opens on "Details": prev has no target there, next enters
-    # step 1
-    assert window.projects.tabs_steps.currentIndex() == 0
-    assert not window.projects.btn_prev.isEnabled()
-    assert window.projects.btn_next.isEnabled()
-    assert not window.projects.btn_skip.isEnabled()
-    assert not window.projects.btn_mark_done.isEnabled()
+    # the project page built its sections ("details" + the three
+    # steps - capture merged into plan, ADR-030, no follow-up for a
+    # NEO) and the Next card took over the old wizard buttons
+    assert len(window._page_sections) == 4
+    # a project opens on its details, plus the section the Next card
+    # points at (a fresh project is at "plan"); the rest stays folded
+    assert not window._page_sections["details"].isCollapsed()
+    assert window._next_target == "plan"
+    assert not window.projects.btn_next_go.isHidden()
+    assert window.projects.lbl_next.text()
     assert window._current_project is not None
     assert "443089" in window.projects.lbl_header.text()
 
@@ -280,35 +296,31 @@ def test_switch_project_cancels_inflight(window):
 
 
 def test_lazy_build_panel_on_first_selection(window):
-    # No pre-built panel: the hub builds the shared ObjectPanel itself,
-    # wraps it in a scroll area, and docks it into the "Details" tab (the
-    # first one) — the business card owns the whole tab, the steps keep
-    # their own content (the real QScrollArea path).
-    from PySide6.QtWidgets import QScrollArea, QWidget
-    # point the built panel's loader at a fake so no ExploreWorker is made
-    orig_loaders = window._proj_panel_loader
+    # No pre-built panel: the hub builds the shared ObjectPanel itself
+    # (fake loader, so no ExploreWorker is made) and docks it into the
+    # "details" section when the project page is built - the card is
+    # parented into that section's content widget, not a wrapper area.
+    window._proj_panel = None
+    orig_loader = window._proj_panel_loader
     window._proj_panel_loader = (lambda name, fallback_target=None:
                                  FakeWorker(FAKE_ELEMENT))
-    window._proj_panel = None
     try:
+        import nightscribe.core.db as dbmod
+        from nightscribe.core import project as proj_mod
+        p = proj_mod.create(dbmod.db, "neo", "lazy-card", {"mag": 19.5})
         panel = window._get_proj_panel()
         assert window._proj_panel is panel
-        assert window._proj_panel_area is not None
-        assert isinstance(window._proj_panel_area, QScrollArea)
-        assert window._proj_panel_area.widget() is panel
-        # setWidget() re-parents the panel into the scroll area's viewport
-        assert (panel.parentWidget()
-                is window._proj_panel_area.viewport())
-        # docked into the "Details" tab (index 0), not the step tabs
-        tab = window.projects.tabs_steps.findChild(QWidget, "tab_details")
-        assert window.projects.tabs_steps.currentIndex() == 0 or \
-            window.projects.tabs_steps.tabIndex(tab) == 0
-        lay = tab.layout()
-        assert lay.indexOf(window._proj_panel_area) >= 0
+        # _get_proj_panel only builds; the project page does the docking
+        window._build_project_page(proj_mod.get(dbmod.db, p["id"]))
+        # docked into the "details" section (walk the parents up to it)
+        sec = window._page_sections["details"]
+        node = panel.parentWidget()
+        while node is not None and node is not sec:
+            node = node.parentWidget()
+        assert node is sec
     finally:
-        window._proj_panel_loader = orig_loaders
+        window._proj_panel_loader = orig_loader
         window._proj_panel = None
-        window._proj_panel_area = None
 
 
 def test_no_projects_clears_state(window):
@@ -976,19 +988,14 @@ def test_change_project_folder_rehomes_future_exports(window, panel,
 # ---------------- B2: SN follow-up tab ----------------
 
 def test_followup_tab_visible_for_sn(window, panel):
-    from PySide6.QtWidgets import QWidget
     _create_and_select(window, "sn", "SN2026fu", {"kind": "sn"})
-    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
-    fu_idx = window.projects.tabs_steps.indexOf(fu_tab)
-    assert window.projects.tabs_steps.isTabVisible(fu_idx)
+    # the SN page gets a follow-up section, a NEO page does not
+    assert "followup" in window._page_sections
 
 
 def test_followup_tab_hidden_for_non_sn(window, panel):
-    from PySide6.QtWidgets import QWidget
     _create_and_select(window, "neo", "NEO2026nofu", {"kind": "neo"})
-    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
-    fu_idx = window.projects.tabs_steps.indexOf(fu_tab)
-    assert not window.projects.tabs_steps.isTabVisible(fu_idx)
+    assert "followup" not in window._page_sections
 
 
 def test_followup_add_session(window, panel):
@@ -1169,15 +1176,14 @@ def test_followup_cadence_uses_config(window, panel, monkeypatch):
     # label should use the muted colour. Then set cadence to 1 and rebuild:
     # it MUST switch to the warning colour — proving the value comes from
     # config, not a hardcoded 3.
-    from PySide6.QtWidgets import QLabel, QWidget
-    tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    from PySide6.QtWidgets import QLabel
 
     def last_visit_label():
-        # wipe any previous build so only the fresh label is visible
-        if tab.layout():
-            window._wipe_layout(tab.layout())
+        # each build makes a fresh "followup" section; scope the search
+        # to the newest one so stale rebuilds can never leak in
         window._build_followup_tab(p, {})
-        chips = [w for w in tab.findChildren(QLabel)
+        sec = window._page_sections["followup"]
+        chips = [w for w in sec.findChildren(QLabel)
                  if "Last visit" in w.text()]
         return chips[0] if chips else None
 
@@ -1498,10 +1504,9 @@ def test_variable_project_gets_followup_with_protocol(window):
                   "comp_stars": ["000-BB0-123"], "notes": "Do not saturate"})
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
-    fu = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
-    assert window.projects.tabs_steps.isTabVisible(
-        window.projects.tabs_steps.indexOf(fu))
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    # a variable project gets a "followup" section on its page
+    fu = window._page_sections["followup"]
     texts = [l.text() for l in fu.findChildren(QLabel)]
     assert any("Campaña T CrB" in t for t in texts)
     assert any("B, V" in t for t in texts)
@@ -1511,14 +1516,16 @@ def test_variable_project_gets_followup_with_protocol(window):
 def test_variable_followup_keeps_quicklook_hides_animation(window):
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from PySide6.QtWidgets import QPushButton, QWidget
+    from PySide6.QtWidgets import QPushButton
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
-    fu = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    fu = window._page_sections["followup"]
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
-    assert btns["Run quick-look"].isVisibleTo(fu)
-    assert not btns["Generate animation"].isVisibleTo(fu)
-    assert not btns["Export annotated FITS"].isVisibleTo(fu)
+    # buttons self-hide via hide(); assert their own flag (a collapsed
+    # section would hide content anyway and hide the signal)
+    assert not btns["Run quick-look"].isHidden()
+    assert btns["Generate animation"].isHidden()
+    assert btns["Export annotated FITS"].isHidden()
 
 
 def test_cadence_chip_ignores_campaign_projects(window):
@@ -1552,13 +1559,13 @@ def test_followup_event_advisor_label(window):
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from PySide6.QtWidgets import QLabel, QWidget
+    from PySide6.QtWidgets import QLabel
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
     for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
         fu.add_point(mw.db, p["id"], 61000.0 + i, "V", m)
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
-    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
-    texts = [l.text() for l in fu_tab.findChildren(QLabel)]
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    texts = [l.text() for
+             l in window._page_sections["followup"].findChildren(QLabel)]
     assert any("brightness drop" in t or "descenso" in t for t in texts)
 
 
@@ -1576,9 +1583,9 @@ def test_variable_plan_block_shows_protocol_and_extremum(window):
                                           "days": 3.0}},
            "safe_window": "2026-09-11T22:00|2026-09-12T04:00"}
     p = proj_mod.create(mw.db, "variable", "T CrB", ctx, campaign_id=cid)
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
-    plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
-    texts = [l.text() for l in plan.findChildren(QLabel)]
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    texts = [l.text()
+             for l in window._page_sections["plan"].findChildren(QLabel)]
     assert any("Campaña T CrB" in t for t in texts)
     assert any("3" in t and ("ays" in t or "ías" in t) for t in texts)
     # the saturation warning does NOT fire at mag 10.1
@@ -1590,9 +1597,9 @@ def test_variable_plan_block_saturation_warning(window):
     from nightscribe.gui import main_window as mw
     from PySide6.QtWidgets import QLabel, QWidget
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 9.0})
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
-    plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
-    texts = [l.text() for l in plan.findChildren(QLabel)]
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    texts = [l.text()
+             for l in window._page_sections["plan"].findChildren(QLabel)]
     assert any("aturat" in t for t in texts)
 
 
@@ -1605,7 +1612,7 @@ def test_variable_plan_prefills_protocol_filters(window):
                                     "filters": ["B", "V"]})
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["B", "V"]
 
@@ -1614,7 +1621,7 @@ def test_variable_without_campaign_keeps_clear_default(window):
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["Clear"]
 
@@ -1622,11 +1629,11 @@ def test_variable_without_campaign_keeps_clear_default(window):
 def test_followup_has_export_report_button(window):
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from PySide6.QtWidgets import QPushButton, QWidget
+    from PySide6.QtWidgets import QPushButton
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1})
-    window._build_step_tabs(proj_mod.get(mw.db, p["id"]))
-    fu_tab = window.projects.tabs_steps.findChild(QWidget, "tab_followup")
-    texts = [b.text() for b in fu_tab.findChildren(QPushButton)]
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    texts = [b.text()
+             for b in window._page_sections["followup"].findChildren(QPushButton)]
     assert any("Export photometry report" in t or "Exportar" in t
                for t in texts)
 
@@ -1763,8 +1770,10 @@ def test_project_activated_jumps_to_current_step(window, panel):
     item = next(lst.item(i) for i in range(lst.count())
                 if lst.item(i).data(Qt.UserRole) == p["id"])
     window._project_open_activated(item)
-    # a fresh project sits at step "plan" -> tab index 1 (Details is 0)
-    assert window.projects.tabs_steps.currentIndex() == 1
+    # a fresh project sits at step "plan" -> that section is the only
+    # expanded one (everything besides "details" starts collapsed)
+    assert "plan" in window._page_sections
+    assert not window._page_sections["plan"].isCollapsed()
 
 
 def test_projects_context_menu_offers_actions(window, panel, monkeypatch):

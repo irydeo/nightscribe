@@ -547,6 +547,8 @@ class MainWindow(QMainWindow):
         p.chk_favorites.stateChanged.connect(self.on_refresh_projects)
         # A3: favorite star toggle + tags editor in the project header
         p.btn_favorite.clicked.connect(self._project_toggle_favorite)
+        p.btn_next_go.clicked.connect(
+            lambda: self._scroll_to_section(self._next_target))
         p.edt_tags.editingFinished.connect(self._project_tags_edited)
         # A2: click on the advisor banner dismisses it for this session
         self._advisor_dismissed = None
@@ -1194,9 +1196,7 @@ class MainWindow(QMainWindow):
         # here, UX-d). The section is expanded, not navigated by index.
         if not self._goto_project_by_id(pid):
             return
-        sec = self._page_sections.get("followup")
-        if sec is not None:
-            sec.setCollapsed(False)
+        self._scroll_to_section("followup")
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and
@@ -2012,11 +2012,8 @@ class MainWindow(QMainWindow):
         p = self._current_project
         if not p or p["status"] != project.STATUS_ACTIVE:
             return
-        cur = project.current_step(db, p["id"])
-        if cur in _STEP_KEYS:
-            sec = self._page_sections.get(cur)
-            if sec is not None:
-                sec.setCollapsed(False)
+        self._scroll_to_section(
+            self._next_target_key(self._current_project))
 
     def _project_context_menu(self, pos):
         # Right-click on the projects list (UX-c): all the row actions,
@@ -2050,9 +2047,7 @@ class MainWindow(QMainWindow):
         if chosen is act_open:
             self._project_open_activated(item)
         elif chosen is act_fu:
-            sec = self._page_sections.get("followup")
-            if sec is not None:
-                sec.setCollapsed(False)
+            self._scroll_to_section("followup")
         elif chosen is act_fav:
             self._project_toggle_favorite()
         elif chosen is act_close:
@@ -2300,6 +2295,58 @@ class MainWindow(QMainWindow):
         self._page_sections = {}
         self._wipe_layout(self.projects.page_container.layout())
 
+    def _next_target_key(self, p):
+        # @return: the section key the Next card points at
+        act = project.next_action(db, p)
+        return {"followup": "followup", "plan": "plan",
+                "process": "process", "publish": "publish",
+                "close": None}.get(act["key"])
+
+    def _refresh_next_card(self, p):
+        # Fills the Next card from next_action() (UX-i): one bold line
+        # saying what to do, one small line with the steps in words,
+        # and the Go button scrolling to the right section.
+        # @args: p - the project dict
+        # @return: None
+        act = project.next_action(db, p)
+        texts = {
+            "followup": self.tr("Measure tonight — %1 d since the last "
+                                "visit").replace(
+                "%1", str(act["overdue_days"]))
+            if not act["never_visited"] else
+            self.tr("First measurement — it opens the series"),
+            "plan": self.tr("Plan the capture"),
+            "process": self.tr("Process your data"),
+            "publish": self.tr("Draft the post"),
+            "close": self.tr("All steps done — consider closing the "
+                             "project"),
+        }
+        self.projects.lbl_next.setText("▶ " + texts[act["key"]])
+        steps = {s["step"]: s["status"] for s in p.get("steps", [])}
+        words = []
+        for key in _STEP_KEYS:
+            st = steps.get(key, "pending")
+            mark = "✔" if st == "done" else "–" if st == "skipped" \
+                else "○"
+            words.append(f"{mark} {self._step_label(key)}")
+        self.projects.lbl_steps_line.setText("  ·  ".join(words))
+        target = self._next_target_key(p)
+        self._next_target = target
+        self.projects.btn_next_go.setVisible(target is not None)
+
+    def _scroll_to_section(self, key):
+        # Expands the section and scrolls the page to it (the landing
+        # spot of every deep link after UD.4, UX-i).
+        # @args: key - section key, e.g. "followup"|"plan"|None
+        # @return: None
+        if not key or key not in getattr(self, "_page_sections", {}):
+            return
+        sec = self._page_sections[key]
+        sec.setCollapsed(False)
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: self.projects.scroll_page
+                          .ensureWidgetVisible(sec))
+
     def _build_project_page(self, p):
         # The project page (UX-i): one scroll with collapsible
         # sections instead of step tabs + wizard. Same per-kind
@@ -2320,6 +2367,12 @@ class MainWindow(QMainWindow):
         self._build_publish_tab(p, kind, ctx)
         if kind in FOLLOWUP_KINDS:
             self._build_followup_tab(p, ctx)
+        # the Next card drives which sections start expanded:
+        # the next-action section open, the rest collapsed (except details)
+        self._refresh_next_card(p)
+        target = self._next_target_key(p)
+        for key, sec in self._page_sections.items():
+            sec.setCollapsed(key not in ("details", target))
 
     def _step_section(self, key):
         # Builds one step section with its state line + toggle inside

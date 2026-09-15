@@ -215,3 +215,33 @@ def test_step_reopen(window, panel):
              for s in proj_mod.get(mw.db, p["id"])["steps"]}
     assert steps["plan"] == "current"
     assert steps["process"] == "pending"
+
+
+def test_next_card_points_at_pending_section(window, panel):
+    _mk_project(window)
+    assert "Plan" in window.projects.lbl_next.text() or \
+        "Planifica" in window.projects.lbl_next.text()
+    assert window._page_sections["plan"].isCollapsed() is False
+    assert window._page_sections["process"].isCollapsed() is True
+
+
+def test_next_card_followup_when_cadence_due(window, panel):
+    p = _mk_project(window)
+    window._step_done("plan")
+    from nightscribe.core import followup as fu
+    from nightscribe.gui import main_window as mw
+    fu.create_session(mw.db, p["id"])
+    mw.db.execute("UPDATE project_sessions SET created=? WHERE"
+                  " project_id=?", (1_700_000_000, p["id"]))
+    mw.db.commit()
+    window._build_project_page(window._current_project)
+    assert "Measure" in window.projects.lbl_next.text() or \
+        "Mide" in window.projects.lbl_next.text()
+    assert window._page_sections["followup"].isCollapsed() is False
+
+
+def test_go_button_expands_target(window, panel):
+    _mk_project(window)
+    window._page_sections["plan"].setCollapsed(True)
+    window.projects.btn_next_go.click()
+    assert window._page_sections["plan"].isCollapsed() is False

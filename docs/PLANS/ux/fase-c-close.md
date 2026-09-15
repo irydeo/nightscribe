@@ -236,4 +236,8 @@ actualizados; `grep -n "superseded" docs/adr/ADR-035-variables-campaigns.md`
 muestra las dos enmiendas (ES/EN) y `grep -n "Track UX"
 docs/adr/ADR-019-projects-ux-v3.md` la tercera.
 **Commit**: `Docs: Track UX close — ADR-035 decision 9 superseded (Campaigns tab), ADR-019 rev (project single page), WORKFLOWS 7sexdecies, AGENTS.md (UX, subplan UC.2)`
-**Estado**: Pendiente
+**Estado**: Hecho (2026-09-15). Unitaria verde: 1146 passed. Funcional:
+46 passed, 1 skipped, 1 failed **externo** — `test_astrometry_solve_live`:
+astrometry.net devolvió `None` sobre el campo sintético (servicio vivo;
+reintentado 3×, mismo fallo; `core/sources/astrometry.py` no se ha tocado
+en esta rama). Los cinco documentos actualizados; gates verificados.

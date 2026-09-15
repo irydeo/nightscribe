@@ -825,3 +825,47 @@ bidireccionales, un solo lenguaje de gestos, el proyecto como página única
 con tarjeta «Siguiente acción», y CCDciel en su propia pestaña
 Observatory). También pendiente, aprobado el 2026-09-12: el add-on de
 descubrimiento de variables (extremos predecibles + vigilias T CrB/R CrB).
+
+### 7sexdecies. Track UX — usabilidad de variables y campañas (2026-09-13, enmienda ADR-035 + ADR-019)
+
+Plan: `docs/PLANS/ux-variables-campaigns.md` (maestro) +
+`docs/PLANS/ux/fase-*.md` (23 subplanes). Rama `feature/campaigns-ux`
+(independiente: sin merge de vuelta en la cadena de features).
+
+La auditoría de usabilidad (2026-09-13) encontró las funciones del
+Track V correctas pero escondidas: el gestor de campañas era un selector
+sin vista de detalle, ninguna mención a una campaña era un enlace, el
+lenguaje de gestos difería por lista y el flujo de proyecto apilaba dos
+modelos de navegación (pestañas + wizard). El track entrega: la
+**pestaña Campaigns quinta** (maestro-detalle: la salud de cada campaña
+de un golpe de vista —miembros × cadencia × eventos vía la nueva query
+`campaign.status_report`—, protocolo, URLs clicables, tabla de
+miembros; el gestor modal se jubila y la decisión 9 de ADR-035 queda
+superseded); **navegación bidireccional** (badge en la cabecera del
+proyecto, chip ⚑ en la tarjeta de Tonight, chips de cadencia por
+proyecto que caen en el Follow-up al hacer clic, doble clic en un
+miembro → hub, doble clic en History → proyecto/Explore); **un solo
+lenguaje de gestos** en todas partes (clic selecciona · doble clic/Enter
+abre · menú con botón derecho · cursor de mano); el **proyecto como
+página única** (tarjeta «Siguiente acción» alimentada por
+`project.next_action()` + secciones plegables con estado en palabras
+llanas —las pestañas de paso y el wizard se jubilan; ADR-019 enmendado,
+modelo de ciclo de vida sin cambios); la **pestaña Observatory sexta**
+(el control de CCDciel sale del paso Plan); y la tanda de
+correcciones (sin validaciones silenciosas, red fuera del hilo de GUI
+vía `ResolveWorker`/`SurveyWorker`, `event_mag_threshold` en Ajustes,
+filtro de campaña persistido, detalle obsoleto limpiado, el CTA ya no
+cierra al fallar).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| U0.1–U0.6 | tanda de correcciones y feedback | **Hecho** |
+| UA.1–UA.7 | pestaña Campaigns + enlaces | **Hecho** |
+| UB.1–UB.3 | lenguaje de gestos | **Hecho** |
+| UD.1–UD.5 | proyecto como página única + pestaña Observatory | **Hecho** |
+| UC.1–UC.2 | i18n + cierre documental (este track) | **Hecho** |
+
+**Estado**: suite unitaria verde (**1146**). **Fuera de esta iteración**:
+exportación fotométrica a nivel de campaña, compartir campañas, el
+add-on de descubrimiento de variables destacadas (aprobado el
+2026-09-12, su propio track).

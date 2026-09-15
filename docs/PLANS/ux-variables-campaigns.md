@@ -1,7 +1,8 @@
 # Plan — UX de variables y campañas: pestaña Campaigns, enlaces, gestos y el proyecto como página única (Track UX)
 
-> **Pendiente de ejecutar (2026-09-13): plan escrito, 23 subplanes
-> autocontenidos.** Un subplan = un commit. Las tarjetas de subplan viven en
+> **Executado (plan escrito 2026-09-13; cerrado 2026-09-15): 23
+> subplanes autocontenidos, todos hechos, suite unitaria 1146.** Un
+> subplan = un commit. Las tarjetas de subplan viven en
 > `docs/PLANS/ux/` (un fichero por fase). Anclas verificadas a HEAD
 > `4df771b` (cierre del Track V). **El ejecutor es un modelo local pequeño
 > (qwen3.8)**: las tarjetas llevan todo el código y los tests ya escritos

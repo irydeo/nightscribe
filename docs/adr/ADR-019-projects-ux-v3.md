@@ -1,6 +1,6 @@
 # ADR-019: UX v3 — project-centric workflow
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06, 2026-09 (Track UX)
 
 ## Español
 
@@ -102,6 +102,18 @@ cita **EXOTIC** como herramienta externa de reducción y exporta su `inits.json`
 no pasos nuevos. El paso Process de NEO/PCCP/cometa (Track C, misma semana)
 registra los productos de la sesión (FITS, imágenes anotadas, reporte MPC) en
 `project_files` + `project_steps.data`.
+
+**Revisión 2026-09 (Track UX, decisión UX-i/UX-j del plan)**: la presentación
+de los pasos guiados cambia de «pestañas internas + stepper (Previous/Skip/Mark
+done/Next)» a **página única con secciones plegables** y una tarjeta «Siguiente
+acción» alimentada por `project.next_action()`. La auditoría de usabilidad
+mostró el doble modelo de navegación (pestañas libres + wizard) y los iconos
+de estado ✔/●/○/– como la fuente de complejidad del flujo de proyecto.
+**El modelo no cambia**: `project_steps` y sus estados
+(`pending/current/done/skipped`) siguen siendo la fuente de verdad; el cierre
+automático al completar el último paso se conserva. El control de CCDciel sale
+del paso Plan a la pestaña **Observatory** (6ª): la conexión ya era de
+ventana, ahora también su UI.
 
 ## English
 
@@ -205,3 +217,14 @@ checklist in `project_steps.data`); the transit **Process** step names
 content, not new steps. The NEO/PCCP/comet Process step (Track C, same week)
 registers the session products (FITS, annotated images, MPC report) in
 `project_files` + `project_steps.data`.
+
+**Review 2026-09 (Track UX, plan decision UX-i/UX-j)**: the guided-steps
+presentation changes from "inner tabs + stepper (Previous/Skip/Mark done/Next)"
+to a **single page with collapsible sections** and a "Next action" card fed by
+`project.next_action()`. The usability audit showed the doubled navigation
+model (free tabs + wizard) and the state icons ✔/●/○/– as the source of the
+project flow's complexity. **The model does not change**: `project_steps` and
+its states (`pending/current/done/skipped`) remain the source of truth; the
+auto-close on the last completed step is kept. The CCDciel control leaves the
+Plan step for the **Observatory** tab (6th): the connection was already
+window-level, now so is its UI.

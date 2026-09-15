@@ -658,3 +658,42 @@ checklist page with a Next-action card, and CCDciel moved to its own
 Observatory tab). Also pending, approved 2026-09-12: the
 featured-variables discovery add-on (predictable extrema + T CrB/R CrB
 watch lists).
+
+### 7sexdecies. Track UX — variables & campaigns usability (2026-09-13, amends ADR-035 + ADR-019)
+
+Plan: `docs/PLANS/ux-variables-campaigns.md` (master) +
+`docs/PLANS/ux/fase-*.md` (23 subplans). Branch `feature/campaigns-ux`
+(independent: no merge-back into the feature chain).
+
+The usability audit (2026-09-13) found Track V's features correct but
+hidden: the campaign manager was a selector with no detail view, no
+mention of a campaign was a link, the gesture language differed per
+list, and the project flow stacked two navigation models (tabs +
+wizard). The track delivers: the **Campaigns fifth tab** (master-detail:
+per-campaign health at a glance — members × cadence × events via the
+new `campaign.status_report` query — protocol, clickable URLs, members
+table; the modal manager retires and ADR-035 decision 9 is superseded);
+**bidirectional navigation** (project header badge, ⚑ Tonight card chip,
+per-project clickable cadence chips landing on Follow-up, member
+double-click → hub, History double-click → project/Explore); **one
+gesture language** everywhere (click selects · double-click/Enter opens ·
+right-click menu · hand cursor); the **project as a single page**
+(Next-action card fed by `project.next_action()` + collapsible sections
+with plain-word state — the step tabs and wizard retire; ADR-019
+amended, lifecycle model unchanged); the **Observatory sixth tab**
+(CCDciel control leaves the Plan step); and the fixes batch (no silent
+validation, network off the GUI thread via `ResolveWorker`/
+`SurveyWorker`, `event_mag_threshold` in Settings, persisted campaign
+filter, stale detail cleared, CTA no longer closes on failure).
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| U0.1–U0.6 | fixes & feedback batch | **Done** |
+| UA.1–UA.7 | Campaigns tab + links | **Done** |
+| UB.1–UB.3 | gesture language | **Done** |
+| UD.1–UD.5 | project single page + Observatory tab | **Done** |
+| UC.1–UC.2 | i18n + docs close (this track) | **Done** |
+
+**Status**: unit suite green (**1146**). **Out of this iteration**:
+campaign-level photometric export, campaign sharing, the featured-
+variables discovery add-on (approved 2026-09-12, its own track).

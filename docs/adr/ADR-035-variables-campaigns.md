@@ -1,6 +1,6 @@
 # ADR-035: Variables de largo periodo y campañas de observación — kind `variable`, campaña 1:N ortogonal, VSX/SIMBAD/manual, reporte con HJD
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-11 · **rev. 2026-09-13**: ejecutado completo — suite unitaria 1096
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-11 · **rev. 2026-09-13**: ejecutado completo — suite unitaria 1096 · **rev. 2026-09-15 (Track UX)**: la decisión 9 queda **superseded** — el gestor modal se sustituye por la pestaña Campaigns; ver [docs/PLANS/ux-variables-campaigns.md](../PLANS/ux-variables-campaigns.md)
 
 **Ver / See**: [docs/PLANS/variables-campaigns.md](../PLANS/variables-campaigns.md)
 (maestro) · [docs/PLANS/variables/](../PLANS/variables/) (40 subplanes) ·
@@ -66,9 +66,18 @@ heliocéntrica (HJD) vía formulario del grupo.
    τ = 499.004784 s/UA; referencias congeladas en los tests: WeSb 1 +250.09 s,
    T CrB −196.45 s). Los puntos quick-look solo exportan con checkbox
    explícito (T6).
-9. **Gestor de campañas = diálogo modal** (menú Herramientas + botón en el
-   hub): activas/finalizadas, crear/editar/finalizar/reabrir, alta de
-   objetivos y adjuntar proyectos existentes. Sin pestaña nueva. Campañas
+9. **[Superseded 2026-09, Track UX]** ~~Gestor de campañas = diálogo
+   modal~~ → **pestaña «Campaigns»** (5ª pestaña, maestro-detalle como el
+   hub): la auditoría de usabilidad mostró que el diálogo era un selector
+   sin detalle (no se podía ni abrir una campaña). La pestaña muestra la
+   salud de cada campaña (miembros × cadencia × eventos, nueva query
+   `campaign.status_report`), enlaces bidireccionales (badge en la
+   cabecera del proyecto, chip ⚑ en Tonight, chips de cadencia → Follow-up)
+   y las acciones CRUD con feedback nunca silencioso. Los sub-diálogos
+   (crear/editar, añadir objetivo) se conservan. Lo demás de la decisión
+   sigue vigente: (menú Herramientas + botón en el hub):
+   activas/finalizadas, crear/editar/finalizar/reabrir, alta de objetivos
+   y adjuntar proyectos existentes. ~~Sin pestaña nueva~~ Campañas
    **personales** (sin export/import en v1).
 
 **Alternativas consideradas**:
@@ -125,8 +134,15 @@ heliocentric Julian dates via the group's form.
 8. **Photometric report**: per-project CSV + AAVSO EFF with **in-app HJD**
    (Schlyter Sun; frozen reference values in tests). Quick-look points only
    with an explicit checkbox.
-9. **Campaign manager = modal dialog** (Tools menu + hub button); personal
-   campaigns, no sharing in v1.
+9. **[Superseded 2026-09, Track UX]** ~~Campaign manager = modal
+   dialog~~ → **the "Campaigns" tab** (5th tab, master-detail like the
+   hub): the usability audit showed the dialog was a selector with no
+   detail view. The tab shows each campaign's health (members × cadence
+   × events, new `campaign.status_report` query), bidirectional links
+   (project header badge, ⚑ Tonight chip, cadence chips → Follow-up)
+   and CRUD actions with non-silent feedback. The sub-dialogs survive.
+   Still in force (Tools menu + hub button): personal campaigns, no
+   sharing in v1.
 
 **Alternatives considered**: www-hosted VSX API (Cloudflare-blocked),
 campaign as context JSON (not queryable), generic variable catalogue with

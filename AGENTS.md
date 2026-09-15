@@ -87,7 +87,9 @@ nightscribe/
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —
                      #   la "prueba de fuego", Track C)
-   gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer)
+   gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
+                      # seis pestañas: Tonight, Projects, **Campaigns**, Solar, **Observatory**,
+                      # History (ADR-019/035 rev.)
                       # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
                       #   incl. timeline_widget: línea de tiempo del tránsito, Track D)
 tests/

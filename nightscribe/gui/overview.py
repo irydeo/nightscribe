@@ -26,7 +26,9 @@
 # chart the tab bar auto-hides and the chart stands alone; with several
 # they group side by side behind tabs. The orbit, sky and approach slots
 # are live vector widgets (OrbitChart / SkyChart / ApproachChart,
-# ADR-029 Fase 2-3) that the user can zoom, pan and hover. The transit
+# ADR-029 Fase 2-3) that the user can hover; in the panel they are
+# passive previews (wheel and drag scroll the page, click opens the
+# ChartViewer where zoom / pan / export live — see _mark_embedded). The transit
 # (light curve) and field (cutout) slots have no vector widget yet and
 # keep the QLabel+QPixmap route. Clicking any slot opens the same
 # ChartViewer dialog (widget mode or pixmap mode).
@@ -102,6 +104,22 @@ def resize_to_panel_content(parent, panel):
     w = max(int(hint.width()), _MIN_READ_W)
     h = max(int(hint.height()) + _DLG_CHROME, _MIN_READ_H)
     parent.resize(w, h)
+
+
+def _mark_embedded(w):
+    # The panel's live charts are passive previews: the wheel and the
+    # drag belong to the page (the enclosing QScrollArea scrolls), hover
+    # keeps working, and clicking opens the dedicated ChartViewer for
+    # zoom / pan / export. The viewer builds its own widgets separately,
+    # so they stay in the default, fully interactive mode.
+    # @args: w - the panel widget (a composite exposing `.view`, or a
+    #        ChartView itself, e.g. LightCurveChart)
+    from .widgets.base_chart import ChartView
+    view = getattr(w, "view", None)
+    if view is None and isinstance(w, ChartView):
+        view = w
+    if isinstance(view, ChartView):
+        view.set_embedded(True)
 
 
 class _SlotClick(QObject):
@@ -710,6 +728,7 @@ class ObjectPanel(QWidget):
                     w.setProperty("chart_key", key)
                     w.setCursor(Qt.PointingHandCursor)
                     w.installEventFilter(self._slot_click)
+                    _mark_embedded(w)
                     self._slot_data[key] = self._extract(key, e)
                     self._tabs.addTab(w, self._slot_titles[key])
                 continue
@@ -723,6 +742,7 @@ class ObjectPanel(QWidget):
                     w.setProperty("chart_key", key)
                     w.setCursor(Qt.PointingHandCursor)
                     w.installEventFilter(self._slot_click)
+                    _mark_embedded(w)
                     self._slot_data[key] = self._extract(key, e)
                     self._tabs.addTab(w, self._slot_titles[key])
             else:

@@ -56,7 +56,9 @@ class ChartView(QGraphicsView):
     # A QGraphicsView with a dark background, mouse zoom under the cursor,
     # drag pan, fit-to-parent, a single hover tooltip and a PNG export of
     # the visible scene (not of a frozen pixmap — the export is whatever the
-    # user left on screen).
+    # user left on screen). set_embedded(True) turns it into a passive
+    # preview for embedding inside a scrolling page (wheel/drag scroll the
+    # page; hover and click keep working — see set_embedded).
     #
     # Contract for subclasses (see ADR-029):
     #   * add items to `self.scene()` — the base already owns it;
@@ -90,6 +92,7 @@ class ChartView(QGraphicsView):
         self._watermark = _WM_TEXT      # bottom-right signature
         self._wm_font = QFont()
         self._wm_font.setPointSize(_WM_FONT_PT)
+        self._embedded = False          # passive preview in a scrolling page
 
         # --- chrome (view-level, not scene-level) -----------------------
         self.setBackgroundBrush(QBrush(QColor(palette.BG)))
@@ -175,6 +178,19 @@ class ChartView(QGraphicsView):
         # may wire that; the base does not).
         self.fit_to_scene()
 
+    def set_embedded(self, flag=True):
+        # Toggle "embedded preview" mode: the chart sits inside a scrolling
+        # page (QScrollArea). There, the wheel and the drag belong to the
+        # page (the wheel scrolls, no inline pan) while hover inspection
+        # and clicking (which opens the dedicated ChartViewer for zoom,
+        # pan and export) keep working.
+        # @args: flag - True to embed (default is the full, interactive view)
+        self._embedded = bool(flag)
+        if self._embedded:
+            self.setDragMode(QGraphicsView.NoDrag)
+        else:
+            self.setDragMode(QGraphicsView.ScrollHandDrag)
+
     # ------------------------------------------------- watermark ----------
 
     def set_watermark(self, text):
@@ -221,8 +237,10 @@ class ChartView(QGraphicsView):
         super().scale(factor, factor)
 
     def wheelEvent(self, event):
-        # Wheel zooms centred on the cursor (setTransformationAnchor above).
-        if event.angleDelta().y() == 0:
+        # Wheel zooms centred on the cursor (setTransformationAnchor above);
+        # in embedded preview mode the wheel belongs to the page, so pass
+        # it through (the enclosing scroll area scrolls instead).
+        if self._embedded or event.angleDelta().y() == 0:
             event.ignore()
             return
         self._zoom_by(_WHEEL if event.angleDelta().y() > 0 else 1.0 / _WHEEL)

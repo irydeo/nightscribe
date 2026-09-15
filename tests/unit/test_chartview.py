@@ -233,6 +233,79 @@ def test_scene_clicked_fires_on_no_drag_release(qapp):
     v.close()
 
 
+def _wheel(angle_dy=120):
+    # @args: angle_dy - vertical angle delta (positive = zoom-in direction)
+    # @return: a wheel event over the view at (100, 100).
+    from PySide6.QtCore import QPointF, QPoint, Qt
+    from PySide6.QtGui import QWheelEvent
+    return QWheelEvent(QPointF(100, 100), QPointF(100, 100),
+                       QPoint(0, 0), QPoint(0, angle_dy),
+                       Qt.NoButton, Qt.NoModifier,
+                       Qt.ScrollPhase.NoScrollPhase, False)
+
+
+def test_default_mode_zooms_on_wheel(qapp):
+    # Regression guard: a standalone view (the one ChartViewer builds)
+    # still zooms centred on the cursor and keeps the wheel event.
+    v = _mk_view(qapp)
+    before = v.transform().m11()
+    evt = _wheel()
+    v.wheelEvent(evt)
+    assert v.transform().m11() > before, (
+        "the wheel should zoom a standalone view in")
+    assert evt.isAccepted(), (
+        "a standalone view must keep the wheel event")
+    v.close()
+
+
+def test_embedded_mode_ignores_wheel_and_pans(qapp):
+    # Panel preview (the "Detalles del proyecto" fix): when embedded,
+    # the wheel must pass through to the enclosing QScrollArea (event
+    # not accepted, transform untouched) and the drag must not pan the
+    # scene; hovering and clicks are a separate path, not touched here.
+    from PySide6.QtWidgets import QGraphicsView
+    v = _mk_view(qapp)
+    before = v.transform().m11()
+    v.set_embedded(True)
+    assert v.dragMode() == QGraphicsView.NoDrag
+    evt = _wheel()
+    v.wheelEvent(evt)
+    assert v.transform().m11() == pytest.approx(before), (
+        "the wheel in embedded (passive preview) mode must not zoom")
+    assert not evt.isAccepted(), (
+        "an embedded view must not keep the wheel event: it belongs to "
+        "the page scrolling")
+    # Toggling back off restores the fully interactive mode.
+    v.set_embedded(False)
+    assert v.dragMode() == QGraphicsView.ScrollHandDrag
+    v.close()
+
+
+def test_overview_marks_panel_charts_embedded(qapp):
+    # The panel helper marks live charts as passive previews, whichever
+    # shape they come in (composite widget exposing `.view`, or a
+    # ChartView subclass), and leaves non-chart widgets alone.
+    from PySide6.QtWidgets import QGraphicsView, QWidget
+    from nightscribe.gui.overview import _mark_embedded
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    from nightscribe.gui.widgets.lightcurve_widget import LightCurveChart
+
+    oc = OrbitChart()
+    _mark_embedded(oc)
+    assert oc.view.dragMode() == QGraphicsView.NoDrag
+    assert oc.view._embedded is True
+    oc.close()
+
+    lc = LightCurveChart()
+    _mark_embedded(lc)
+    assert lc.dragMode() == QGraphicsView.NoDrag
+    lc.close()
+
+    plain = QWidget()
+    _mark_embedded(plain)          # must not raise
+    plain.close()
+
+
 def test_widgets_package_does_not_import_matplotlib(qapp, tmp_path):
     # ADR-029: gui/widgets/* must not import matplotlib. The palette lives
     # in viz/palette.py (matplotlib-free); if a future change pulled

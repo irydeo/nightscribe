@@ -399,7 +399,7 @@ def test_finished_campaign_is_dimmed(window):
 `grep -n "_goto_tab(1)\|index == 1" nightscribe/gui/main_window.py` que no
 quedan literales de pestaña principal.
 **Commit**: `Gui: Campaigns tab — skeleton, fifth tab, campaign list with health summary (UX, subplan UA.2)`
-**Estado**: Pendiente
+**Estado**: Hecho (1110→1113 tests; i18n 726→749, 0 sin traducir ES+EN)
 
 ---
 

@@ -4500,25 +4500,6 @@ class MainWindow(QMainWindow):
                 self.tr("Select a visit to see its images.")))
         self._populate_project_files(pid)
 
-    def _populate_project_files(self, pid):
-        # Refresh the project files list in the Details tab. The files list
-        # widget is built by Track A (A4); if it doesn't exist yet this is a
-        # safe no-op so B2/B3 don't crash on branches without A merged.
-        lst = getattr(self, "_proj_files_list", None)
-        if lst is None:
-            return
-        lst.clear()
-        for f in project.list_files(db, pid):
-            name = Path(f["path"]).name
-            dt = datetime.datetime.fromtimestamp(f["created"])
-            item = QListWidgetItem(
-                f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
-            item.setData(Qt.UserRole, str(f["path"]))
-            lst.addItem(item)
-        sec = getattr(self, "_proj_files_section", None)
-        if sec is not None and lst.count() > 0:
-            sec.setCollapsed(True)
-
     def _fu_paste_dialog(self, pid):
         # B3: paste bulk photometry — tolerant parser + preview + save.
         from ..core.photometry_import import parse_photometry

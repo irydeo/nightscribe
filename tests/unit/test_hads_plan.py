@@ -43,6 +43,29 @@ def _hads_ctx(session_fits=True):
                      "covered_this_month": True}}
 
 
+# Borrowed from test_projects_hub.py (UD.5): stand-in for the real
+# ExploreWorker, so the object card never touches the network (the panel
+# never starts its worker in these tests; the payload is just a name).
+class FakeWorker:
+    def __init__(self, element, deliver=True):
+        self._element, self._deliver = element, deliver
+
+    # @return: a QThread that would deliver the element
+    def start(self):
+        from PySide6.QtCore import QThread
+        return QThread()
+
+    def cancel(self):
+        pass
+
+
+FAKE_ELEMENT = {
+    "type": "small_body",
+    "name": "443089 (2026 QK)",
+    "data": {},
+}
+
+
 @pytest.fixture(scope="module", autouse=True)
 def _point_db_at_tmpdir(tmp_path_factory):
     # Redirect the shared db singleton to a throwaway file
@@ -76,13 +99,26 @@ def window(_point_db_at_tmpdir):
     w.close()
 
 
+def _build(window, p):
+    # @return: None — rebuilds the project page of p over the fake panel
+    #          (no ExploreWorker; the pattern of test_projects_hub.py)
+    orig_panel, orig_loader = window._proj_panel, window._proj_panel_loader
+    try:
+        window._proj_panel = None
+        window._proj_panel_loader = (lambda name, fallback_target=None:
+                                     FakeWorker(FAKE_ELEMENT))
+        window._build_project_page(p)
+    finally:
+        window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
+
+
 def _select(window, name, ctx):
-    # @return: the created hads project, current and with tabs built
+    # @return: the created hads project, current and with its page built
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project
     p = project.create(mw.db, "hads", name, ctx)
     window._current_project = p
-    window._build_step_tabs(p)
+    _build(window, p)
     return p
 
 
@@ -134,7 +170,7 @@ def test_checklist_persists_across_rebuild(window):
     cbs[3].setChecked(True)
     p2 = project.get(mw.db, p["id"])
     window._current_project = p2
-    window._build_step_tabs(p2)
+    _build(window, p2)
     cbs2 = window._project_widgets["hads_checklist"]
     assert cbs2[0].isChecked() and cbs2[3].isChecked()
     assert not cbs2[1].isChecked()
@@ -142,22 +178,22 @@ def test_checklist_persists_across_rebuild(window):
 
 # ---------------- follow-up + process (subplan D.3) ----------------
 
-def _tab(window, name):
-    from PySide6.QtWidgets import QWidget
-    return window.projects.tabs_steps.findChild(QWidget, name)
+def _section(window, key):
+    # @return: the project page section by key, expanded for poking
+    sec = window._page_sections[key]
+    sec.setCollapsed(False)
+    return sec
 
 
-def test_followup_tab_visible_for_hads(window):
+def test_followup_section_built_for_hads(window):
     _select(window, "T UMa", _hads_ctx())
-    tab = _tab(window, "tab_followup")
-    idx = window.projects.tabs_steps.indexOf(tab)
-    assert window.projects.tabs_steps.isTabVisible(idx)
+    assert "followup" in window._page_sections
 
 
 def test_followup_hides_sn_analysis_buttons_for_hads(window):
     from PySide6.QtWidgets import QPushButton
     _select(window, "V0392 UMa", _hads_ctx())
-    buttons = {b.text(): b for b in _tab(window, "tab_followup")
+    buttons = {b.text(): b for b in _section(window, "followup")
                .findChildren(QPushButton)}
     assert buttons["Run quick-look"].isHidden()
     assert buttons["Generate animation"].isHidden()
@@ -166,10 +202,10 @@ def test_followup_hides_sn_analysis_buttons_for_hads(window):
     assert not buttons["Import file…"].isHidden()
 
 
-def test_process_tab_fotodif_webobs_block(window):
+def test_process_block_fotodif_webobs(window):
     from PySide6.QtWidgets import QPushButton
     _select(window, "DY Her", _hads_ctx())
-    buttons = [b.text() for b in _tab(window, "tab_process")
+    buttons = [b.text() for b in _section(window, "process")
                .findChildren(QPushButton)]
     assert any("WebObs" in t for t in buttons)
 

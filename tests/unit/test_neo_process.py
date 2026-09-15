@@ -18,7 +18,7 @@ The NEO/PCCP/comet Process step registers what the observer actually keeps
 from the session: the FITS frames (metadata auto-read via fits_meta), the
 Tycho annotated images (kind "image") and the MPC report (registered on
 save, already covered). Registration goes to project_files (visible in the
-Details tab, A4) and a summary is persisted in the process step data, so
+Details section, A4) and a summary is persisted in the process step data, so
 the block survives a project switch.
 """
 
@@ -64,15 +64,51 @@ def window(_point_db_at_tmpdir):
     w.close()
 
 
+# Borrowed from test_projects_hub.py (UD.5): stand-in for the real
+# ExploreWorker, so the object card never touches the network (the panel
+# never starts its worker in these tests; the payload is just a name).
+class FakeWorker:
+    def __init__(self, element, deliver=True):
+        self._element, self._deliver = element, deliver
+
+    # @return: a QThread that would deliver the element
+    def start(self):
+        from PySide6.QtCore import QThread
+        return QThread()
+
+    def cancel(self):
+        pass
+
+
+FAKE_ELEMENT = {
+    "type": "small_body",
+    "name": "443089 (2026 QK)",
+    "data": {},
+}
+
+
+def _build(window, p):
+    # @return: None — rebuilds the project page of p over the fake panel
+    #          (no ExploreWorker; the pattern of test_projects_hub.py)
+    orig_panel, orig_loader = window._proj_panel, window._proj_panel_loader
+    try:
+        window._proj_panel = None
+        window._proj_panel_loader = (lambda name, fallback_target=None:
+                                     FakeWorker(FAKE_ELEMENT))
+        window._build_project_page(p)
+    finally:
+        window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
+
+
 def _select_project(window, kind, name):
     # @args: window - MainWindow, kind - project kind, name - target name
-    # @return: the created project dict, set as current and with step tabs
+    # @return: the created project dict, set as current and with its page
     #          built (as if the user had selected it in the hub)
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project
     p = project.create(mw.db, kind, name, {"ra_deg": 10.0, "dec_deg": 20.0})
     window._current_project = p
-    window._build_step_tabs(p)
+    _build(window, p)
     return p
 
 
@@ -153,7 +189,7 @@ def test_products_accumulate_and_survive_rebuild(window, monkeypatch):
     # rebuild from the db (project switch) — the block must restore
     fresh = project.get(mw.db, p["id"])
     window._current_project = fresh
-    window._build_step_tabs(fresh)
+    _build(window, fresh)
     lst = window._project_widgets["neo_products"]
     assert lst.count() == 3
 
@@ -174,6 +210,6 @@ def test_comet_gets_products_block_without_mpc(window):
 
 
 def test_sn_has_no_products_block(window):
-    # SN keeps its own FITS import + follow-up tab; no products block.
+    # SN keeps its own FITS import + follow-up section; no products block.
     _select_project(window, "sn", "SN 2026zz")
     assert "neo_products" not in window._project_widgets

@@ -50,6 +50,29 @@ def _transit_ctx(baseline_fits=True):
                 "exp_recommended_s": 60}}
 
 
+# Borrowed from test_projects_hub.py (UD.5): stand-in for the real
+# ExploreWorker, so the object card never touches the network (the panel
+# never starts its worker in these tests; the payload is just a name).
+class FakeWorker:
+    def __init__(self, element, deliver=True):
+        self._element, self._deliver = element, deliver
+
+    # @return: a QThread that would deliver the element
+    def start(self):
+        from PySide6.QtCore import QThread
+        return QThread()
+
+    def cancel(self):
+        pass
+
+
+FAKE_ELEMENT = {
+    "type": "exoplanet",
+    "name": "WASP-999 b",
+    "data": {},
+}
+
+
 @pytest.fixture(scope="module", autouse=True)
 def _point_db_at_tmpdir(tmp_path_factory):
     # Redirect the shared db singleton to a throwaway file (mirrors
@@ -85,12 +108,20 @@ def window(_point_db_at_tmpdir):
 
 
 def _select(window, name, ctx):
-    # @return: the created transit project, current and with tabs built
+    # @return: the created transit project, current and with its page built
+    #          (no ExploreWorker; the hub's fake-panel pattern)
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project
     p = project.create(mw.db, "transit", name, ctx)
     window._current_project = p
-    window._build_step_tabs(p)
+    orig_panel, orig_loader = window._proj_panel, window._proj_panel_loader
+    try:
+        window._proj_panel = None
+        window._proj_panel_loader = (lambda name_, fallback_target=None:
+                                     FakeWorker(FAKE_ELEMENT))
+        window._build_project_page(p)
+    finally:
+        window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
     return p
 
 
@@ -142,9 +173,16 @@ def test_checklist_persists_across_rebuild(window):
     fresh = project.get(mw.db, p["id"])
     step = next(s for s in fresh["steps"] if s["step"] == "plan")
     assert step["data"]["checklist"] == [True, False, True, False, False]
-    # and restored on rebuild (project switch)
+    # and restored on rebuild (project switch, fake panel as in _select)
     window._current_project = fresh
-    window._build_step_tabs(fresh)
+    orig_panel, orig_loader = window._proj_panel, window._proj_panel_loader
+    window._proj_panel = None
+    window._proj_panel_loader = (lambda name_, fallback_target=None:
+                                 FakeWorker(FAKE_ELEMENT))
+    try:
+        window._build_project_page(fresh)
+    finally:
+        window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
     cbs = window._project_widgets["transit_checklist"]
     assert [cb.isChecked() for cb in cbs] == [True, False, True, False, False]
 
@@ -199,30 +237,29 @@ def _fake_enrich():
 
 def test_exotic_button_in_process_tab(window):
     from PySide6.QtWidgets import QPushButton
-    from PySide6.QtWidgets import QWidget
     _select(window, "WASP-994 b", _transit_ctx())
-    tab = window.projects.tabs_steps.findChild(QWidget, "tab_process")
-    texts = [b.text() for b in tab.findChildren(QPushButton)]
+    sec = window._page_sections["process"]
+    sec.setCollapsed(False)
+    texts = [b.text() for b in sec.findChildren(QPushButton)]
     assert any("EXOTIC" in t for t in texts)
 
 
 def test_step_tabs_do_not_grow_window(window):
-    # Regression: before the scroll-wrap, the transit plan page set the
-    # QTabWidget's minimum to the full content height, so the window grew
-    # off-screen and could not be resized back down.
+    # Regression: the transit page must keep its content scrollable inside
+    # the hub, so the window itself is not forced off-screen (UD.5).
     _select(window, "WASP-991 b", _transit_ctx())
-    assert window.projects.tabs_steps.minimumSizeHint().height() < 700
+    assert window.projects.scroll_page is not None
+    # and the page container is the scollable widget, not the tabs anymore
+    assert window.projects.scroll_page.widget() is window.projects.page_container
 
 
 def test_transit_timeline_capped(window):
     from nightscribe.gui.widgets.timeline_widget import TransitTimeline
-    from PySide6.QtWidgets import QScrollArea, QWidget
     _select(window, "WASP-990 b", _transit_ctx())
-    plan = window.projects.tabs_steps.findChild(QWidget, "tab_plan")
-    tl = plan.findChild(TransitTimeline)
+    tl = window.findChild(TransitTimeline)
     assert tl is not None and tl.maximumHeight() == 220
-    areas = [c for c in plan.children() if isinstance(c, QScrollArea)]
-    assert len(areas) == 1
+    # the timeline lives inside the plan section of the project page (UD.5)
+    assert window._page_sections["plan"].findChild(TransitTimeline) is tl
 
 
 def test_exotic_write_registers_the_file(window, monkeypatch, tmp_path):

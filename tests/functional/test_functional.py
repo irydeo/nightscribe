@@ -880,19 +880,21 @@ def test_gui_boots_offscreen():
     from nightscribe.gui.main_window import MainWindow
     w = MainWindow()
     tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    # UX v3 + campaigns tab: Tonight · Projects · Campaigns · Solar · History
-    assert tabs.count() == 5
+    # UX v3 + campaigns + observatory tabs:
+    # Tonight · Projects · Campaigns · Solar system · Observatory · History
+    assert tabs.count() == 6
     assert tabs.tabText(0) == "Tonight"
     assert tabs.tabText(1) == "Projects"
     assert tabs.tabText(2) == "Campaigns"
+    assert tabs.tabText(4) == "Observatory"
     # suggestion grid container exists
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)
     assert not w.tonight.grp_list.isVisible()
-    # projects step tabs: Details (the object card) + 3 steps (capture ->
-    # plan, ADR-030) + Follow-up (Track B, visible for SN projects only)
-    assert w.projects.tabs_steps.count() == 5
-    assert w.projects.tabs_steps.tabText(0) == "Details"
+    # projects page: the plan/process/publish sections are built per project
+    # (UD.5, retired the step tabs); the hub ships with the empty page
+    assert w.projects.page_container is not None
+    assert w._page_sections == {}
     # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]
     assert "File" in menu_texts and "Tools" in menu_texts

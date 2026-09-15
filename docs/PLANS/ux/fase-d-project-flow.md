@@ -1109,4 +1109,4 @@ marca vanished y se limpian en UC.1).
 **Ejecuta**: `.venv/bin/python -m pytest tests/unit -q`
 **Hecho cuando**: suite verde completa (N→M); los greps de la tarjeta en 0.
 **Commit**: `Gui: the step wizard retires — page sections carry their own state (UX, subplan UD.5)`
-**Estado**: Pendiente
+**Estado**: Hecho (1146 unit tests, suite verde; bandeja retargetada 28/28 + `test_gui_boots_offscreen` verde)

@@ -2293,6 +2293,9 @@ class MainWindow(QMainWindow):
         # Wipes the project page sections (one rebuild per project
         # selection, same discipline as the old step tabs).
         self._page_sections = {}
+        # the registry belongs to the wiped page: stale keys must not
+        # survive the rebuild (UD.5)
+        self._project_widgets = {}
         self._wipe_layout(self.projects.page_container.layout())
 
     def _next_target_key(self, p):

@@ -332,6 +332,41 @@ def set_campaign(db, project_id, campaign_id):
     return cur.rowcount > 0
 
 
+def activity_for(db, name):
+    # The project-activity answer the Tonight feedback reads (ADR-036
+    # J3): the project world replaces the never-written observations
+    # table. Name matching is case/space-insensitive (the same rule the
+    # fusion and goto helpers use).
+    # @args: db - Database, name - target id / object name
+    # @return: {"has_project", "active", "covered", "posted", "last_ts"}
+    key = "".join(str(name or "").lower().split())
+    rows = db.execute(
+        "SELECT id, status, created, updated, closed_at FROM projects"
+        " WHERE LOWER(REPLACE(object_name, ' ', '')) = ?",
+        (key,)).fetchall()
+    if not rows:
+        return {"has_project": False, "active": False, "covered": False,
+                "posted": False, "last_ts": None}
+    ids = [r[0] for r in rows]
+    marks = ",".join("?" * len(ids))
+    last_ts = max(max(r[2], r[3], r[4] or 0) for r in rows)
+    active = any(r[1] == STATUS_ACTIVE for r in rows)
+    done = any(r[1] in (STATUS_DONE, STATUS_ARCHIVED) for r in rows)
+    last_ses = db.execute(
+        f"SELECT MAX(created) FROM project_sessions"
+        f" WHERE project_id IN ({marks})", ids).fetchone()[0]
+    last_file = db.execute(
+        f"SELECT MAX(created) FROM project_files"
+        f" WHERE project_id IN ({marks})", ids).fetchone()[0]
+    posted = bool(db.execute(
+        f"SELECT 1 FROM project_files WHERE kind='post'"
+        f" AND project_id IN ({marks}) LIMIT 1", ids).fetchone())
+    last_ts = max(last_ts, last_ses or 0, last_file or 0)
+    return {"has_project": True, "active": active,
+            "covered": done or posted, "posted": posted,
+            "last_ts": last_ts or None}
+
+
 def close(db, project_id, outcome=None):
     # Closes an active project: status -> done, stamps closed_at and stores
     # the final outcome (free text, or None to close without one). Idempotent:

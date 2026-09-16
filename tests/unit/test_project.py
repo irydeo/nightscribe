@@ -561,3 +561,39 @@ def test_create_hads_project(tmp_db):
     assert closed["outcome"] == "reported_aavso"
     reopened = project.reopen(tmp_db, p["id"])
     assert reopened["status"] == "active"
+
+
+# ---------------- ADR-036 J3: project activity query ----------------
+
+def test_activity_for_empty(tmp_db):
+    from nightscribe.core import project
+    act = project.activity_for(tmp_db, "Nobody")
+    assert act == {"has_project": False, "active": False,
+                   "covered": False, "posted": False, "last_ts": None}
+
+
+def test_activity_for_matching_and_states(tmp_db):
+    from nightscribe.core import project
+    p = project.create(tmp_db, "variable", "T CrB", {})
+    act = project.activity_for(tmp_db, "tcrb")        # case/space-free
+    assert act["has_project"] and act["active"] and not act["covered"]
+    assert act["last_ts"] is not None
+    project.add_file(tmp_db, p["id"], "/tmp/post_es.md", "post")
+    act = project.activity_for(tmp_db, "T CrB")
+    assert act["posted"] and act["covered"]           # a post covers it
+    project.close(tmp_db, p["id"], "done")
+    act = project.activity_for(tmp_db, "T CrB")
+    assert act["covered"] and not act["active"]
+
+
+def test_activity_for_sessions_bump_last_ts(tmp_db):
+    import time
+    from nightscribe.core import followup, project
+    p = project.create(tmp_db, "variable", "R CrB", {})
+    old = time.time() - 100 * 86400
+    tmp_db.execute("UPDATE projects SET created=?, updated=?",
+                   (old, old))
+    tmp_db.commit()
+    assert project.activity_for(tmp_db, "R CrB")["last_ts"] == old
+    followup.create_session(tmp_db, p["id"])
+    assert project.activity_for(tmp_db, "R CrB")["last_ts"] > old

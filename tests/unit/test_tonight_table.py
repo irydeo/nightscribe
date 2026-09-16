@@ -170,18 +170,28 @@ def test_kind_filter_keeps_only_that_kind(window):
     assert window.tonight.tbl_targets.rowCount() == len(TARGETS)
 
 
-def test_observed_hidden_when_unchecked(window, monkeypatch):
-    from nightscribe.core.db import db
-    monkeypatch.setattr(db, "is_observed", lambda obj: obj == "com1")
+def test_covered_hidden_when_unchecked(window, monkeypatch):
+    # ADR-036 J3: the checkbox filters objects already "covered" (a
+    # project closed or a post written); the activity query is patched so
+    # the real database is never read by this smoke test
+    from nightscribe.core import project
+    monkeypatch.setattr(project, "activity_for",
+                        lambda db, name: {
+                            "has_project": name == "com1",
+                            "active": False, "covered": name == "com1",
+                            "posted": False, "last_ts": None})
     window._tonight_all = TARGETS
     window.tonight.cmb_filter.setCurrentIndex(0)
     window.tonight.chk_show_observed.setChecked(False)
     window._fill_table()
     assert "C/2024 A1 (ATLAS)" not in _names(window)
-    # showing observed brings it back
+    # showing covered brings it back, with its ✔ mark
     window.tonight.chk_show_observed.setChecked(True)
     window._fill_table()
-    assert "C/2024 A1 (ATLAS)" in _names(window)
+    tbl = window.tonight.tbl_targets
+    row = _names(window).index("C/2024 A1 (ATLAS)")
+    assert any(tbl.item(row, c) and tbl.item(row, c).text() == "✔"
+               for c in range(tbl.columnCount()))
 
 
 def test_double_click_opens_explore_from_any_column(window, monkeypatch):

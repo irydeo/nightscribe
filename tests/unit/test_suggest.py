@@ -47,16 +47,41 @@ def test_hook_rules():
 
 
 def test_history_feedback(tmp_db, fake_cfg):
-    # observed-but-unposted gains urgency; posted loses the hook
+    # ADR-036 J3: the feedback reads PROJECT activity now (the old
+    # manual marks were never written). Active/recent project -> the
+    # novelty hook dies; long-finished project -> revisit urgency grows.
+    import time
+    from nightscribe.core import project as proj_mod
     t = _neo(neocp=False)
     t["impact"] = 0.01  # gives hook
     s0, p0 = suggest.score_target(t, fake_cfg, tmp_db)
-    tmp_db.mark_observed("T1", "neo")
-    s1, p1 = suggest.score_target(t, fake_cfg, tmp_db)
-    assert p1["urgency"] >= p0["urgency"]
-    tmp_db.mark_posted("T1")
-    s2, p2 = suggest.score_target(t, fake_cfg, tmp_db)
-    assert p2["hook"] == 0.0
+    p = proj_mod.create(tmp_db, "neo", "T1", {})
+    _s1, p1 = suggest.score_target(t, fake_cfg, tmp_db)
+    assert p1["hook"] == 0.0                     # active project
+    proj_mod.close(tmp_db, p["id"], "found")
+    old = time.time() - 365 * 86400
+    tmp_db.execute(
+        "UPDATE projects SET created=?, updated=?, closed_at=?",
+        (old, old, old))
+    tmp_db.commit()
+    _s2, p2 = suggest.score_target(t, fake_cfg, tmp_db)
+    assert p2["hook"] > 0 or p2["urgency"] > p0["urgency"]
+    assert p2["urgency"] >= p0["urgency"]        # the revisit boost
+
+
+def test_commitment_rows_skip_the_novelty_decay(tmp_db, fake_cfg):
+    # ADR-036 J3: campaign/vigil/AAVSO rows always carry a project — the
+    # active project is their normal state, not a reason to shut up
+    from nightscribe.core import project as proj_mod
+    proj_mod.create(tmp_db, "variable", "T1", {})
+    t = {"id": "T1", "kind": "variable", "name": "T1", "mag": 10.0,
+         "variable": {"next_extremum": {"days": 2, "kind": "max"},
+                      "amp": 2.5},
+         "campaign": {"id": 1, "name": "C", "overdue_days": 2,
+                      "cadence_nights": 1, "never_visited": False,
+                      "event": None}}
+    _s, parts = suggest.score_target(t, fake_cfg, tmp_db)
+    assert parts["hook"] > 0
 
 
 def test_why_phrase_bilingual_and_specific():

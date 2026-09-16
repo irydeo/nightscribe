@@ -295,10 +295,21 @@ def score_target(t, cfg=None, db=None):
         "urgency": _urgency(t),
         "hook": _hook(t),
     }
-    if db is not None:
-        if db.observed_recently(t.get("id", "")):
-            parts["hook"] = 0.0  # novelty decay: already told
-        elif db.is_observed(t.get("id", "")):
+    if db is not None and not (t.get("campaign") or t.get("vigil")
+                               or t.get("aavso")):
+        # novelty feedback over PROJECT activity (ADR-036 J3): an active
+        # project, or one touched in the last 30 days, kills the novelty
+        # hook; a long-finished one makes the revisit more urgent.
+        # Commitment rows (campaign / vigil / AAVSO) are exempt: their
+        # active project is the normal state, not a reason to shut up.
+        import time as _time
+        from . import project as _proj
+        act = _proj.activity_for(db, t.get("id", ""))
+        if act["active"] or (act["last_ts"] is not None and
+                             act["last_ts"] >= _time.time()
+                             - 30 * 86400):
+            parts["hook"] = 0.0
+        elif act["has_project"]:
             parts["urgency"] = _clamp(parts["urgency"] + 5, 0, 20)
     total = _clamp(sum(parts.values()))
     return round(total, 1), parts

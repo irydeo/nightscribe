@@ -170,39 +170,39 @@ TABLE_COLS = {
     "neo": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
             ("Max alt", "max_alt"), ("Best time (UTC)", "best_time"),
             ("NEOfixer", "nf"), ("NObs", "nobs"), ("MOID (AU)", "moid"),
-            ("Discovered", "disc"), ("Observed", "obs")],
+            ("Discovered", "disc"), ("Covered", "obs")],
     "sn": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
            ("SN type", "sn_type"), ("Host galaxy", "host"),
-           ("Discovered", "disc"), ("Max alt", "max_alt"), ("Observed", "obs")],
+           ("Discovered", "disc"), ("Max alt", "max_alt"), ("Covered", "obs")],
     "comet": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
                ("Perihelion", "perihelion"), ("Max alt", "max_alt"),
-               ("Best time (UTC)", "best_time"), ("Observed", "obs")],
+               ("Best time (UTC)", "best_time"), ("Covered", "obs")],
     "pccp": [("Object", "name"), ("Score", "score"), ("PCCP score", "pccp"),
              ("Mag", "mag"), ("Arc (days)", "arc"), ("NObs", "nobs"),
-             ("Max alt", "max_alt"), ("Observed", "obs")],
+             ("Max alt", "max_alt"), ("Covered", "obs")],
     "transit": [("Object", "name"), ("Score", "score"),
                 ("Star mag", "mag"), ("Window (UTC)", "window"),
                 ("Depth", "depth"), ("Max alt", "max_alt"),
-                ("Observed", "obs")],
+                ("Covered", "obs")],
     "hads": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
              ("Period", "period"), ("Amp", "amp"), ("Cycles", "cycles"),
              ("Max alt", "max_alt"), ("Best time (UTC)", "best_time"),
-             ("Observed", "obs")],
+             ("Covered", "obs")],
     "variable": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
                  ("Period (d)", "vperiod"), ("Next extremum", "vext"),
                  ("Campaign", "camp"), ("Max alt", "max_alt"),
-                 ("Best time (UTC)", "best_time"), ("Observed", "obs")],
+                 ("Best time (UTC)", "best_time"), ("Covered", "obs")],
     "alert": [("Object", "name"), ("Approach date", "adate"),
               ("Distance (LD)", "ald"), ("Diameter (m)", "adiam"),
               ("Max mag", "amag"), ("Velocity (km/s)", "avel"),
-              ("Observed", "obs")],
+              ("Covered", "obs")],
 }
 TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
                       ("Campaign", "camp"), ("Score", "score"),
                       ("Mag", "mag"), ("Max alt", "max_alt"),
                       ("Best time (UTC)", "best_time"), ("NEOfixer", "nf"),
                       ("NObs", "nobs"), ("Discovered", "disc"),
-                      ("Observed", "obs")]
+                      ("Covered", "obs")]
 
 # Canonical kind order (theme.KIND_LABELS order, ADR-026): the tonight filter
 # combo and the settings whitelist stay in the same order wherever shown.
@@ -1736,7 +1736,10 @@ class MainWindow(QMainWindow):
             a = t.get("approach") or {}
             return float(a["vel_kms"]) if a.get("vel_kms") else None
         if key == "obs":
-            return "✔" if db.is_observed(t["id"]) else ""
+            # ADR-036 J3: the ✔ means "covered" — a project closed or a
+            # post already written (the project world replaced the
+            # never-written observations table)
+            return "✔" if project.activity_for(db, t["id"])["covered"]                 else ""
         return "—"
 
     def _fill_table(self, want=None):
@@ -1761,7 +1764,8 @@ class MainWindow(QMainWindow):
         # same helper, so both views always agree on what "All" means), then
         # apply the observed-only switch
         kept = [x for x in self._visible_targets(want)
-                if show_obs or not db.is_observed(x[0]["id"])]
+                if show_obs
+                or not project.activity_for(db, x[0]["id"])["covered"]]
         # best first (score desc, name asc) so the podium tints land on the
         # top 3 of what is actually shown
         kept.sort(key=lambda x: (-x[1], x[0]["name"]))

@@ -72,7 +72,7 @@
        <layout class="QVBoxLayout" name="listLayout">
         <item>
          <layout class="QHBoxLayout" name="observedLayout">
-          <item><widget class="QCheckBox" name="chk_show_observed"><property name="text"><string>Show observed</string></property><property name="checked"><bool>true</bool></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_show_observed"><property name="text"><string>Show covered</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Include objects already covered (a project closed or a post written)</string></property></widget></item>
           <item><spacer name="observedSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
          </layout>
         </item>

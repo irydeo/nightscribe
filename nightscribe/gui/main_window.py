@@ -209,10 +209,11 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
 KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
               "variable"]
 
-# Top-level tab indices (ui/main_window.ui order, UX track): never
-# use literals for the main tabs.
-TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_SOLAR, TAB_OBSERVATORY, \
-    TAB_HISTORY = range(6)
+# Top-level tab indices (ui/main_window.ui order; ADR-036: History left
+# the bar for the Tools-menu journal dialog, J0): never use literals for
+# the main tabs.
+TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_SOLAR, TAB_OBSERVATORY = \
+    range(5)
 
 
 class _ClickableFrame(QFrame):
@@ -440,10 +441,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QTabWidget
         tabs = self.centralWidget().findChild(QTabWidget, "tabs")
         widgets = (self.tonight, self.projects, self.campaigns,
-                   self.solar, self.observatory, self.history) = (
+                   self.solar, self.observatory) = (
             _load_ui("tonight_tab"), _load_ui("projects_tab"),
             _load_ui("campaigns_tab"), _load_ui("solar_tab"),
-            _load_ui("observatory_tab"), _load_ui("history_tab"))
+            _load_ui("observatory_tab"))
         for i, w in enumerate(widgets):
             title = tabs.tabText(i)
             tabs.removeTab(i)
@@ -586,20 +587,14 @@ class MainWindow(QMainWindow):
             lambda: self._open_url("https://www.solarmonitor.org"))
         self.solar.btn_sidc.clicked.connect(
             lambda: self._open_url("https://sidc.be/uset"))
-        self.history.btn_refresh_hist.clicked.connect(self.on_refresh_history)
-        # UX-c/UX-d: the history rows are links to their project (or to
-        # Explore when there is none), and Ctrl+1..6 switches main tabs.
-        self.history.tbl_history.cellDoubleClicked.connect(
-            self._history_open)
-        self.history.tbl_history.viewport().setCursor(
-            Qt.PointingHandCursor)
-        self.history.tbl_history.setToolTip(
-            self.tr("Double-click a row to open its project or explore "
-                    "the object"))
+        # ADR-036 (J0): the journal lives in the Tools menu, not in the
+        # tab bar; Ctrl+1..5 switches the five main tabs.
+        self._menus.action_journal.triggered.connect(
+            self._open_journal_dialog)
         from PySide6.QtGui import QKeySequence, QShortcut
         for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
                                      TAB_CAMPAIGNS, TAB_SOLAR,
-                                     TAB_OBSERVATORY, TAB_HISTORY)):
+                                     TAB_OBSERVATORY)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
             sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
@@ -6279,10 +6274,44 @@ class MainWindow(QMainWindow):
             self.tr("Planets at dusk: ")
             + (", ".join(visible) if visible else self.tr("none above 15°")))
 
-    # ---------------- History ----------------
+    # ---------------- Observing journal (ADR-036) ----------------
 
-    def on_refresh_history(self):
-        tbl = self.history.tbl_history
+    def _build_journal_dialog(self):
+        # The journal dialog (ADR-036, J0): the history table leaves the
+        # tab bar for the Tools menu — an occasional-recall tool. Split
+        # from _open_journal_dialog so tests can drive it without exec().
+        # @return: (dialog, journal_widget)
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, \
+            QDialogButtonBox
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Observing journal"))
+        lay = QVBoxLayout(dlg)
+        w = _load_ui("history_tab")
+        lay.addWidget(w)
+        btns = QDialogButtonBox(QDialogButtonBox.Close)
+        btns.rejected.connect(dlg.reject)
+        lay.addWidget(btns)
+        # UX-c/UX-d: the rows are links to their project (or to Explore
+        # when there is none)
+        w.btn_refresh_hist.clicked.connect(lambda: self._journal_fill(w))
+        w.tbl_history.cellDoubleClicked.connect(
+            lambda row, _col: self._journal_open(w, row))
+        w.tbl_history.viewport().setCursor(Qt.PointingHandCursor)
+        w.tbl_history.setToolTip(
+            self.tr("Double-click a row to open its project or explore "
+                    "the object"))
+        dlg.resize(760, 480)
+        self._journal_fill(w)
+        return dlg, w
+
+    def _open_journal_dialog(self):
+        # Menu Tools → Observing journal…: build and show modally.
+        dlg, _w = self._build_journal_dialog()
+        dlg.exec()
+
+    def _journal_fill(self, w):
+        # @args: w - the journal widget (history_tab.ui inside the dialog)
+        tbl = w.tbl_history
         tbl.setSortingEnabled(False)
         tbl.setRowCount(0)
         for r in db.history(100):
@@ -6296,10 +6325,11 @@ class MainWindow(QMainWindow):
         tbl.setSortingEnabled(True)
         tbl.sortItems(0, Qt.DescendingOrder)
 
-    def _history_open(self, row, _col):
-        # Double-click on a history row: open the object's active project,
+    def _journal_open(self, w, row):
+        # Double-click on a journal row: open the object's active project,
         # or explore the object when there is none (UX-c/UX-d).
-        name_item = self.history.tbl_history.item(row, 1)
+        # @args: w - the journal widget, row - the table row
+        name_item = w.tbl_history.item(row, 1)
         name = name_item.text().strip() if name_item is not None else ""
         if not name:
             return

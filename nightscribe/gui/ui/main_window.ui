@@ -28,9 +28,6 @@
       <widget class="QWidget" name="tab_observatory">
        <attribute name="title"><string>Observatory</string></attribute>
       </widget>
-      <widget class="QWidget" name="tab_history">
-       <attribute name="title"><string>History</string></attribute>
-      </widget>
      </widget>
     </item>
    </layout>
@@ -48,10 +45,11 @@
     <property name="title"><string>Tools</string></property>
     <addaction name="action_settings"/>
     <addaction name="separator"/>
-     <addaction name="action_explore"/>
-     <addaction name="action_blink"/>
-     <addaction name="action_campaigns"/>
-    </widget>
+      <addaction name="action_explore"/>
+      <addaction name="action_blink"/>
+      <addaction name="action_journal"/>
+      <addaction name="action_campaigns"/>
+     </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
      <addaction name="action_docs"/>
@@ -74,6 +72,9 @@
   </action>
   <action name="action_blink">
    <property name="text"><string>Blink (ad-hoc)…</string></property>
+  </action>
+  <action name="action_journal">
+   <property name="text"><string>Observing journal…</string></property>
   </action>
   <action name="action_campaigns">
    <property name="text"><string>Campaigns…</string></property>

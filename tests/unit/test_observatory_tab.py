@@ -72,7 +72,7 @@ def test_observatory_tab_exists(window):
     from PySide6.QtWidgets import QTabWidget
     from nightscribe.gui.main_window import TAB_OBSERVATORY
     tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 6
+    assert tabs.count() == 5      # ADR-036 J0: History left for the menu
     assert tabs.widget(TAB_OBSERVATORY) is window.observatory
 
 

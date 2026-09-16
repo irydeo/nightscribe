@@ -280,3 +280,65 @@ def test_variable_extremum_chip_min_kind(window):
     labels = [w.text() for w in rows[0].findChildren(QLabel)]
     assert any(l in ("minimum in 4.7 d", "mínimo en 4.7 d") for l in labels), \
         f"extremum chip not found: {labels!r}"
+
+
+def _vigil_alert():
+    # ADR-037 SC4a: a vigil-alert dict as core/vigils.check_vigils emits it
+    return {"name": "T CrB", "direction": "rise", "baseline_mag": 10.2,
+            "threshold": 0.75, "mag": 9.0, "filter": "g", "mjd": 61050.0,
+            "delta": -1.2, "ra_deg": 239.87567, "dec_deg": 25.92017}
+
+
+def test_vigil_chip_on_standalone_row(window):
+    # ADR-037 SC4a: a standalone vigil row carries the 👁 chip with the
+    # latest ZTF magnitude
+    t = dict(TARGETS[0][0])
+    t.update({"id": "vig1", "kind": "variable", "name": "T CrB",
+              "mag": 9.0, "max_alt": 70, "vigil": _vigil_alert()})
+    window._tonight_all = [(t, 85.0, TARGETS[0][2], TARGETS[0][3])]
+    window._build_suggestion_grid()
+    from PySide6.QtWidgets import QLabel, QApplication
+    QApplication.processEvents()
+    rows = _all_rows(window)
+    labels = [w.text() for w in rows[0].findChildren(QLabel)]
+    assert any(l.startswith("👁") and "9.0" in l for l in labels), \
+        f"vigil chip not found: {labels!r}"
+
+
+def test_vigil_chip_when_fused_into_campaign_row(window):
+    # ADR-037 SC-g: the fused alert rides the campaign sub-dict and the
+    # row shows the same 👁 chip (never a duplicate standalone row)
+    t = dict(TARGETS[0][0])
+    t.update({"id": "vig2", "kind": "variable", "name": "T CrB",
+              "mag": 9.0, "max_alt": 70,
+              "campaign": {"id": 7, "name": "T CrB 2026",
+                           "overdue_days": 0, "cadence_nights": 3,
+                           "never_visited": False, "event": None,
+                           "vigil": _vigil_alert()}})
+    window._tonight_all = [(t, 85.0, TARGETS[0][2], TARGETS[0][3])]
+    window._build_suggestion_grid()
+    from PySide6.QtWidgets import QLabel, QApplication
+    QApplication.processEvents()
+    rows = _all_rows(window)
+    labels = [w.text() for w in rows[0].findChildren(QLabel)]
+    assert any(l.startswith("👁") and "9.0" in l for l in labels), \
+        f"fused vigil chip not found: {labels!r}"
+
+
+def test_aavso_chip_on_rows(window):
+    # ADR-037 SC4b: an AAVSO-channel row carries the 📣 chip (alert =
+    # warn colour, campaign = ok), standalone or fused into a campaign
+    from PySide6.QtWidgets import QLabel, QApplication
+    t = dict(TARGETS[0][0])
+    t.update({"id": "av1", "kind": "variable", "name": "SU Tau",
+              "mag": 11.0, "max_alt": 70,
+              "aavso": {"name": "SU Tau", "kind": "alert",
+                        "title": "SU Tau is dimming", "date": "2026-08-12",
+                        "url": "https://forums.aavso.org/t/4914"}})
+    window._tonight_all = [(t, 80.0, TARGETS[0][2], TARGETS[0][3])]
+    window._build_suggestion_grid()
+    QApplication.processEvents()
+    rows = _all_rows(window)
+    labels = [w.text() for w in rows[0].findChildren(QLabel)]
+    assert any("📣 AAVSO" in l for l in labels), \
+        f"AAVSO chip not found: {labels!r}"

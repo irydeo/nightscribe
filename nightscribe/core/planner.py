@@ -16,9 +16,9 @@ import logging
 from concurrent.futures import ThreadPoolExecutor
 
 from . import campaign, coords, dates, exposure, hads, horizon
-from . import transits
-from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
-                      rochester, sbdb)
+from . import transits, vigils
+from .sources import (aavso, cobs, esa_neo, exoclock, horizons, neofixer,
+                      pccp, rochester, sbdb)
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # worker after build_tonight returns. The GUI keeps the human labels (they
 # must be literal tr() strings so lupdate sees them).
 PHASES = ("neo", "sn", "comet", "pccp", "transit", "hads", "campaigns",
-          "approach", "scoring")
+          "vigils", "aavso", "approach", "scoring")
 
 # Builds the raw list of tonight's targets from every source. Each target is
 # a flat dict; scoring lives in suggest.py. A source that fails simply
@@ -49,6 +49,25 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
     hor = horizon.from_config(cfg)
     margin = float(cfg.get("horizon_margin_deg", 0.0))
     targets = []
+    # vigil alerts (ADR-037 SC4a) are computed once per build and shared:
+    # the campaigns phase fuses them into existing projects (SC-g, never a
+    # duplicate row) and the vigils phase lists what is left standalone
+    vigil_state = {"alerts": None, "consumed": set()}
+
+    def _vigil_alerts():
+        if vigil_state["alerts"] is None:
+            vigil_state["alerts"] = vigils.check_vigils(cfg)
+        return vigil_state["alerts"]
+
+    # the AAVSO editorial channel (SC4b) shares the same compute-once +
+    # fusion machinery (SC-g)
+    aavso_state = {"items": None}
+
+    def _aavso_items():
+        if aavso_state["items"] is None:
+            aavso_state["items"] = _aavso_fetch(cfg)
+        return aavso_state["items"]
+
     stages = (
         (1, "neo",
          lambda: _neo_targets(site, n_neofixer, lat, lon, date, hor, margin,
@@ -70,8 +89,19 @@ def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
          lambda: _hads_targets(lat, lon, date, hor, limit_mag, margin,
                                _transit_plate_scale(cfg))),
         (7, "campaigns",
-         lambda: _campaign_targets(cfg, lat, lon, date, hor, margin)),
-        (8, "approach",
+         lambda: _campaign_targets(cfg, lat, lon, date, hor, margin,
+                                   vigil_alerts=_vigil_alerts(),
+                                   vigil_consumed=vigil_state["consumed"],
+                                   aavso_items=_aavso_items())),
+        (8, "vigils",
+         lambda: _vigil_targets(_vigil_alerts(), lat, lon, date, hor,
+                                margin,
+                                consumed=vigil_state["consumed"])),
+        (9, "aavso",
+         lambda: _aavso_targets(_aavso_items(), cfg, lat, lon, date, hor,
+                                margin,
+                                consumed=vigil_state["consumed"])),
+        (10, "approach",
          lambda: _approach_alerts()),
     )
     for idx, key, fetch in stages:
@@ -444,23 +474,76 @@ def _hads_targets(lat, lon, date, hor, limit_mag=20.0, margin=0.0,
     return out
 
 
-def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
+def _fuse_external(rows, items, attach_key, db_obj, extremum_days,
+                   event_threshold, consumed):
+    # The fusion rule (ADR-037 SC-g): an external signal (vigil alert,
+    # AAVSO item) about a star that is already a campaign project joins
+    # that project's listing reasons — and lists it even when nothing
+    # else fired — instead of creating a duplicate Tonight row.
+    # @args: rows - tonight_listable rows (extended in place), items -
+    #        external signal dicts with a "name", attach_key - "vigil" |
+    #        "aavso" (the row sub-key), consumed - normalized names the
+    #        standalone phases must skip
+    if not items:
+        return
+    by_name = {vigils.norm_name(r["project"]["object_name"]): r
+               for r in rows}
+    for camp in campaign.list_campaigns(db_obj,
+                                        status=campaign.CAMPAIGN_ACTIVE):
+        for proj in campaign.projects_of(db_obj, camp["id"],
+                                         status="active"):
+            key = vigils.norm_name(proj["object_name"])
+            hit = next((a for a in items
+                        if vigils.norm_name(a["name"]) == key), None)
+            if hit is None:
+                continue
+            if consumed is not None:
+                consumed.add(key)
+            row = by_name.get(key)
+            if row is not None:
+                row[attach_key] = hit
+                continue
+            sig = campaign.project_signal(db_obj, camp, proj,
+                                          extremum_days, event_threshold)
+            new = {"campaign": camp, "project": proj}
+            new.update(sig)
+            new[attach_key] = hit
+            new["reasons"] = sig["reasons"] + [attach_key]
+            rows.append(new)
+            by_name[key] = new
+
+
+def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None,
+                      vigil_alerts=None, vigil_consumed=None,
+                      aavso_items=None):
     # Tonight from the observer's own commitments (ADR-037 SC1): a
     # campaign project is listed when it is DUE, or a detector event
     # fired, or an extremum is imminent (setting campaign_extremum_days).
-    # Fully local (SQLite + sky maths) — no network, and nothing breaks
-    # without one. Each target re-surfaces an EXISTING project, so the
-    # Explore CTA will offer "Continue project" (phase E machinery,
-    # gui/main_window.py).
-    # @args: db_obj - Database (tests inject a temp one; default: shared)
+    # SC4a/SC-g: a vigil alert on a campaign project fuses into its
+    # listing reasons (provenance "vigil") and pulls it in even when
+    # nothing else fired — never a duplicate row. Fully local (SQLite +
+    # sky maths) — no network, and nothing breaks without one. Each
+    # target re-surfaces an EXISTING project, so the Explore CTA will
+    # offer "Continue project" (phase E machinery, gui/main_window.py).
+    # @args: db_obj - Database (tests inject a temp one; default: shared),
+    #        vigil_alerts - alerts from vigils.check_vigils (or None),
+    #        vigil_consumed - set of normalized names this call marks, so
+    #        the vigils phase skips the fused ones
     if db_obj is None:
         from .db import db as db_obj
     limit_mag = float(cfg.get("limit_mag", 20.0))
+    extremum_days = float(cfg.get("campaign_extremum_days", 3))
+    event_threshold = float(cfg.get("event_mag_threshold", 0.5))
     out = []
     rows = campaign.tonight_listable(
-        db_obj,
-        extremum_days=float(cfg.get("campaign_extremum_days", 3)),
-        event_threshold=float(cfg.get("event_mag_threshold", 0.5)))
+        db_obj, extremum_days=extremum_days, event_threshold=event_threshold)
+    # fusion (ADR-037 SC-g): external signals match by normalized name
+    # against every active campaign project; fused items never reach the
+    # standalone phases
+    _fuse_external(rows, list(vigil_alerts or []), "vigil", db_obj,
+                   extremum_days, event_threshold, vigil_consumed)
+    _fuse_external(rows, list(aavso_items or []), "aavso", db_obj,
+                   extremum_days, event_threshold, vigil_consumed)
     for sig in rows:
         camp, proj = sig["campaign"], sig["project"]
         ctx = proj.get("context") or {}
@@ -489,7 +572,9 @@ def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
                          "cadence_nights": sig["cadence_nights"],
                          "never_visited": sig["never_visited"],
                          "event": sig["event"],
-                         "imminent_extremum": sig["imminent_extremum"]},
+                         "imminent_extremum": sig["imminent_extremum"],
+                         "vigil": sig.get("vigil"),
+                         "aavso": sig.get("aavso")},
         }
         # variable sub-dict: the context snapshot + tonight's fresh values
         # (the next extremum is pure local maths — same as the signal)
@@ -501,6 +586,101 @@ def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
             v["next_extremum"] = sig["extremum"]
             t["variable"] = v
         out.append(t)
+    return out
+
+
+def _vigil_targets(alerts, lat, lon, date, hor, margin, consumed=()):
+    # Standalone Tonight rows for vigil alerts with no project of their
+    # own (ADR-037 SC4a). An alert you cannot see tonight is noise, so
+    # the same visibility gate as every other kind applies; the Explore
+    # CTA offers "Create project" for them (phase E machinery).
+    # @args: alerts - from vigils.check_vigils, consumed - normalized
+    #        names already fused into campaign projects (SC-g)
+    # @return: list of target dicts (kind "variable", sub-dict "vigil")
+    out = []
+    for a in alerts:
+        if vigils.norm_name(a["name"]) in consumed:
+            continue
+        if a.get("ra_deg") is None or a.get("dec_deg") is None:
+            continue
+        vis = _visibility(a["ra_deg"], a["dec_deg"], lat, lon, date, hor,
+                          margin)
+        if vis.get("window_start") is None:
+            continue           # not up tonight
+        out.append({
+            "id": a["name"], "kind": "variable", "name": a["name"],
+            "mag": a["mag"], "ra_deg": a["ra_deg"], "dec_deg": a["dec_deg"],
+            **vis, "vigil": a,
+        })
+    return out
+
+
+def _aavso_fetch(cfg):
+    # The AAVSO editorial items with a star name attached (ADR-037 SC4b):
+    # forum alerts first (the freshest news), then the active observing
+    # campaigns. A title whose star does not parse is simply dropped —
+    # VSX validates the candidate downstream.
+    # @return: [{"name", "kind": "alert"|"campaign", "title", "url", ...}]
+    if not cfg.get("aavso_feed", True):
+        return []
+    out = []
+    for a in aavso.alerts():
+        name = aavso.extract_star_name(a["title"])
+        if name:
+            out.append({**a, "name": name, "kind": "alert"})
+    for c in aavso.campaigns():
+        name = aavso.extract_star_name(c["title"])
+        if name:
+            out.append({**c, "name": name, "kind": "campaign"})
+    return out
+
+
+def _vsx_retry_name(name):
+    # VSX wants the canonical mixed case ("T CrB", not the "T CRB" of an
+    # all-caps headline): retry with the constellation token title-cased
+    # and the known mixed-case genitives fixed.
+    # @return: the normalized name for a second VSX attempt
+    parts = name.split()
+    if len(parts) != 2:
+        return name
+    const = parts[1].capitalize()
+    const = {"Crb": "CrB", "Uma": "UMa", "Umi": "UMi", "Cvn": "CVn",
+             "Cma": "CMa", "Cmi": "CMi"}.get(const, const)
+    return f"{parts[0].upper()} {const}"
+
+
+def _aavso_targets(items, cfg, lat, lon, date, hor, margin, consumed=()):
+    # Tonight rows from the AAVSO editorial channel (ADR-037 SC4b): the
+    # star is resolved via VSX (7-day cached) and gated by tonight's
+    # visibility like everything else. Rows fused into campaign projects
+    # (SC-g) never reappear here.
+    # @args: items - from _aavso_fetch, consumed - normalized names fused
+    #        into campaign projects
+    # @return: list of target dicts (kind "variable", sub-dict "aavso")
+    from .sources import vsx
+    out = []
+    seen = set()
+    for it in items:
+        name = it.get("name")
+        key = vigils.norm_name(name)
+        if not name or key in consumed or key in seen:
+            continue
+        seen.add(key)
+        obj = vsx.lookup(name)
+        if obj is None and " " in name:
+            obj = vsx.lookup(_vsx_retry_name(name))
+        if not obj or obj.get("ra_deg") is None:
+            continue
+        vis = _visibility(obj["ra_deg"], obj["dec_deg"], lat, lon, date,
+                          hor, margin)
+        if vis.get("window_start") is None:
+            continue           # not up tonight
+        out.append({
+            "id": obj["name"] or name, "kind": "variable",
+            "name": obj["name"] or name, "mag": obj.get("max"),
+            "ra_deg": obj["ra_deg"], "dec_deg": obj["dec_deg"],
+            **vis, "aavso": it,
+        })
     return out
 
 

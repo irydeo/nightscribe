@@ -221,8 +221,14 @@ def _urgency(t):
         score += _clamp((c.get("overdue_days") or 0) * 3, 0, 15)
         if c.get("event"):
             score += 10
-        if c.get("imminent_extremum"):
-            score += 5       # ADR-037: maximum/minimum is days away — watch it
+        if c.get("vigil"):
+            score += 8      # survey vigil anomaly fused in (ADR-037 SC4a)
+        if c.get("aavso"):
+            score += 6      # the AAVSO editorial channel asks for it
+    if t.get("vigil"):
+        score += 8          # standalone vigil alert (no project of its own)
+    if t.get("aavso"):
+        score += 6          # standalone AAVSO item (ADR-037 SC4b)
     return _clamp(score, 0, 20)
 
 
@@ -490,6 +496,13 @@ def _fragments(t, cfg=None):
         if h.get("session_fits") is False:
             frags.append(("⚠ No caben 2 ciclos completos de seguida esta noche: captura lo máximo posible",
                            "⚠ Two full consecutive cycles don't fit tonight: capture as much as possible"))
+    elif kind == "variable":
+        # standalone vigil / AAVSO rows (no campaign of their own — fused
+        # rows speak in _campaign_fragments instead)
+        if t.get("vigil"):
+            frags.append(_vigil_fragment(t["vigil"]))
+        if t.get("aavso"):
+            frags.append(_aavso_fragment(t["aavso"]))
     elif kind == "alert":
         a = t.get("approach") or {}
         ld, adate = a.get("dist_ld"), a.get("date")
@@ -504,6 +517,39 @@ def _fragments(t, cfg=None):
             frags.append((f"Visible a magnitud {mag:.1f}",
                           f"Visible at magnitude {mag:.1f}"))
     return _campaign_fragments(t) + frags
+
+
+def _vigil_fragment(vg):
+    # The vigil-alert line, shared by the fused (campaign) and standalone
+    # rows (ADR-037 SC4a). Mind the inverted magnitude axis: a "rise" is
+    # the star BRIGHTENING past its baseline.
+    # @args: vg - vigil alert dict (name, direction, baseline_mag, mag,
+    #        filter, delta)
+    # @return: one (es, en) fragment pair
+    mag, band = vg.get("mag") or 0.0, vg.get("filter") or ""
+    base = vg.get("baseline_mag") or 0.0
+    delta = abs(vg.get("delta") or 0.0)
+    if vg.get("direction") == "rise":
+        return (f"👁 Vigilia ZTF: brilla a {mag:.1f} {band}, {delta:.1f} mag más de lo habitual (basal {base:.1f}) — posible erupción en curso",
+                f"👁 ZTF vigil: shining at {mag:.1f} {band}, {delta:.1f} mag above its usual baseline ({base:.1f}) — possible outburst under way")
+    return (f"👁 Vigilia ZTF: ha caído a {mag:.1f} {band}, {delta:.1f} mag bajo su basal ({base:.1f}) — posible descenso en curso",
+            f"👁 ZTF vigil: faded to {mag:.1f} {band}, {delta:.1f} mag below its baseline ({base:.1f}) — possible decline under way")
+
+
+def _aavso_fragment(av):
+    # The AAVSO-channel line, shared by the fused (campaign) and
+    # standalone rows (ADR-037 SC4b).
+    # @args: av - aavso item dict (kind "alert"|"campaign", title, date,
+    #        end, url)
+    # @return: one (es, en) fragment pair
+    title = (av.get("title") or "").strip()
+    if av.get("kind") == "campaign":
+        end = av.get("end") or ""
+        return (f"📣 Campaña AAVSO activa hasta el {end}: «{title}»",
+                f"📣 Active AAVSO campaign until {end}: “{title}”")
+    date = av.get("date") or ""
+    return (f"📣 La AAVSO la señala como de interés: «{title}» ({date})",
+            f"📣 AAVSO flags it as a target of interest: “{title}” ({date})")
 
 
 def _campaign_fragments(t):
@@ -524,6 +570,11 @@ def _campaign_fragments(t):
         else:
             frags.append((f"¡Posible erupción o subida de brillo (Δ≈−{d:.1f} mag)! Máxima prioridad esta noche",
                           f"Possible outburst (Δ≈−{d:.1f} mag)! Top priority tonight"))
+    vg = c.get("vigil") or {}
+    if vg:
+        frags.append(_vigil_fragment(vg))
+    if c.get("aavso"):
+        frags.append(_aavso_fragment(c["aavso"]))
     if c.get("never_visited"):
         frags.append((f"Campaña {c['name']}: sin ninguna visita todavía — la primera medida abre la serie",
                       f"Campaign {c['name']}: no visits yet — the first measurement opens the series"))

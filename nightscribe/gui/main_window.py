@@ -654,6 +654,7 @@ class MainWindow(QMainWindow):
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         # Track D (EXOTIC handoff): AAVSO code, camera type and binning
         dlg.edt_aavso_code.setText(config.get("aavso_code", ""))
+        dlg.edt_aavso_token.setText(config.get("aavso_api_token", ""))
         dlg.cmb_camera_type.addItems(["CCD", "CMOS", "DSLR"])
         dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
         dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
@@ -671,6 +672,12 @@ class MainWindow(QMainWindow):
             float(config.get("event_mag_threshold", 0.5)))
         dlg.spn_extremum_days.setValue(
             int(config.get("campaign_extremum_days", 3)))
+        # ADR-037 SC4a: the vigil watch list, as editable text (one star
+        # per line); the curated defaults show when nothing is stored
+        from ..core import vigils
+        dlg.edt_vigils.setPlainText(
+            vigils.vigils_to_text(vigils.vigils_from_config(config)))
+        dlg.chk_aavso.setChecked(bool(config.get("aavso_feed", True)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
                                                      "127.0.0.1")))
         dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
@@ -726,6 +733,7 @@ class MainWindow(QMainWindow):
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
         config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())
+        config.set("aavso_api_token", dlg.edt_aavso_token.text().strip())
         config.set("camera_type", dlg.cmb_camera_type.currentText())
         config.set("pixel_binning", dlg.cmb_binning.currentText().strip()
                    or "1x1")
@@ -738,6 +746,10 @@ class MainWindow(QMainWindow):
         config.set("sn_cadence_days", dlg.spn_sn_cadence.value())
         config.set("event_mag_threshold", dlg.spn_event_mag.value())
         config.set("campaign_extremum_days", dlg.spn_extremum_days.value())
+        from ..core import vigils
+        config.set("vigil_list",
+                   vigils.vigils_from_text(dlg.edt_vigils.toPlainText()))
+        config.set("aavso_feed", dlg.chk_aavso.isChecked())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
@@ -1030,6 +1042,8 @@ class MainWindow(QMainWindow):
             "transit": self.tr("Scanning exoplanet transits…"),
             "hads": self.tr("Checking HADS variables…"),
             "campaigns": self.tr("Checking campaigns…"),
+            "vigils": self.tr("Checking vigils…"),
+            "aavso": self.tr("Checking the AAVSO channel…"),
             "approach": self.tr("Fetching close approaches…"),
             "scoring": self.tr("Scoring targets…"),
         }
@@ -1469,6 +1483,30 @@ class MainWindow(QMainWindow):
             head.addWidget(self._chip(
                 txt, theme.C_OK,
                 self.tr("Next expected extremum (VSX epoch)")))
+        # 👁 vigil alert (ADR-037 SC4a): a watch-list star off its
+        #   baseline in the public survey data — standalone row, or fused
+        #   into the campaign it belongs to (never a duplicate row, SC-g)
+        vg = t.get("vigil") or (t.get("campaign") or {}).get("vigil")
+        if vg:
+            head.addWidget(self._chip(
+                self.tr("👁 ZTF %1 %2").replace("%1", vg.get("filter", "?"))
+                    .replace("%2", f"{vg.get('mag', 0.0):.1f}"),
+                theme.C_WARN,
+                self.tr("Vigil alert: the latest ZTF point shows it at "
+                        "%1 mag versus its %2 baseline (Δ %3)")
+                .replace("%1", f"{vg.get('mag', 0.0):.1f}")
+                .replace("%2", f"{vg.get('baseline_mag', 0.0):.1f}")
+                .replace("%3", f"{vg.get('delta', 0.0):+.1f}")))
+        # 📣 AAVSO editorial channel (ADR-037 SC4b): an alert (warn) or an
+        #   active observing campaign (ok) asks for this star — standalone
+        #   row, or fused into its campaign project (SC-g)
+        av = t.get("aavso") or (t.get("campaign") or {}).get("aavso")
+        if av:
+            col = theme.C_WARN if av.get("kind") == "alert" else theme.C_OK
+            tip = av.get("title", "")
+            if av.get("url"):
+                tip += "\n" + av["url"]
+            head.addWidget(self._chip(self.tr("📣 AAVSO"), col, tip))
         # soft-limit warning (ADR-025): predicted-mag kinds beyond the limit
         beyond, delta = suggest.beyond_limit(t, config)
         if beyond:
@@ -1880,6 +1918,16 @@ class MainWindow(QMainWindow):
                 f"{row['campaign']} — {self._format_campaign_signal(row)}")
             item.setData(Qt.UserRole, row["project"]["id"])
             lst.addItem(item)
+        # 👁 vigil alerts (ADR-037 SC4a), cache-only re-read: the console
+        # never touches the network — it shows what the last Tonight run
+        # left in the short-TTL vigil cache, or nothing
+        from ..core import vigils as _vig
+        for a in _vig.cached_alerts(config, db):
+            item = QListWidgetItem(
+                f"👁 {a['name']} — {self._format_vigil_signal(a)}")
+            item.setData(Qt.UserRole, "vigil")
+            item.setData(Qt.UserRole + 1, a["name"])
+            lst.addItem(item)
         if lst.count() == 0:
             item = QListWidgetItem(tr("No signals right now"))
             item.setFlags(Qt.NoItemFlags)   # empty state: not clickable
@@ -1900,10 +1948,28 @@ class MainWindow(QMainWindow):
             return tr("%1 in %2 d", tr(word), f"{ex['days']:.1f}")
         return ""
 
+    @staticmethod
+    def _format_vigil_signal(a):
+        # @args: a - a vigil alert dict (vigils.check_vigils)
+        # @return: the human part of the row — direction, delta, band
+        word = "up" if a.get("direction") == "rise" else "down"
+        return tr("%1 mag %2 in ZTF %3 (baseline %4)",
+                  abs(a.get("delta") or 0.0), tr(word),
+                  a.get("filter") or "?", a.get("baseline_mag") or 0.0)
+
     def _camp_signal_opened(self, item):
         # Double-click on a signal row: open the project it points at.
-        # Empty-state rows carry no data, so they are no-ops.
-        if item is not None and item.data(Qt.UserRole) is not None:
+        # Vigil rows carry the star name: they jump to its project when
+        # one exists (SC-g fusion), else to Explore. Empty-state rows
+        # carry no data, so they are no-ops.
+        if item is None:
+            return
+        if item.data(Qt.UserRole) == "vigil":
+            name = item.data(Qt.UserRole + 1) or ""
+            if name and not self._goto_active_project(name):
+                self._open_explore_dialog(name)
+            return
+        if item.data(Qt.UserRole) is not None:
             self._goto_project_by_id(item.data(Qt.UserRole))
 
     def _selected_campaign_id(self):

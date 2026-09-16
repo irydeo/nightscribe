@@ -91,6 +91,13 @@
            </layout>
           </item>
           <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Optional; written into the EXOTIC inits.json handoff (transit projects)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item>
+           <layout class="QHBoxLayout" name="row_aavso_token">
+            <item><widget class="QLabel" name="lbl_aavso_token"><property name="text"><string>AAVSO API token:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QLineEdit" name="edt_aavso_token"><property name="echoMode"><enum>QLineEdit::Password</enum></property></widget></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_aavso_token"><property name="text"><string>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
          </layout>
         </widget>
        </item>
@@ -345,6 +352,20 @@
             </layout>
            </item>
            <item><widget class="QLabel" name="lblH_extremumd"><property name="text"><string>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_vigils">
+             <item><widget class="QLabel" name="lbl_vigils"><property name="text"><string>Variable vigils:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+             <item><widget class="QPlainTextEdit" name="edt_vigils"><property name="minimumSize"><size><width>0</width><height>70</height></size></property><property name="maximumSize"><size><width>16777215</width><height>70</height></size></property></widget></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_vigils"><property name="text"><string>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_aavso_feed">
+             <item><widget class="QCheckBox" name="chk_aavso"><property name="text"><string>AAVSO channel in Tonight</string></property></widget></item>
+             <item><spacer name="hsp_aavso_feed"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_aavso"><property name="text"><string>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
           </layout>
         </widget>
        </item>

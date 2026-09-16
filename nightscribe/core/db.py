@@ -41,6 +41,9 @@ SOURCE_TTL = {
                             # nightly run, so 12 h keeps it fresh both ways
     "vsx": 7 * DAY,      # AAVSO VSX object data: stable for weeks
     "surveys": 30 * DAY,  # survey light-curve context (ALeRCE/ZTF)
+    "vigils": 12 * HOUR,  # vigil checks need the LATEST survey point
+                          # (ADR-037 SC4a): never the 30-day context cache
+    "aavso": 12 * HOUR,   # AAVSO editorial channel (ADR-037 SC4b)
     "silso": 24 * HOUR,
     "sbdb": 7 * DAY,
     "simbad": 7 * DAY,

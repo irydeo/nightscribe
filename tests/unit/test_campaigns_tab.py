@@ -360,3 +360,90 @@ def test_signal_double_click_opens_project(window):
     assert tabs.currentIndex() == TAB_PROJECTS
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
+
+
+def _seed_vigil_cache(db, mag=9.0):
+    # Writes the short-TTL AAVSO community-photometry cache entry that the
+    # bright vigil (T CrB, baseline 10.2 < BRIGHT_LIMIT) re-reads — the
+    # console never touches the network (ADR-037 SC4a rev.)
+    import json
+    payload = {"count": 1, "results": [
+        {"jd_dbl": 2461050.5, "magnitude": mag, "band": "V"}]}
+    db.cache_put("aavso:phot:T CrB:30", "aavso",
+                 json.dumps(payload).encode(), "application/json")
+
+
+def _wipe_vigil_cache(db):
+    db.execute("DELETE FROM http_cache WHERE key LIKE 'aavso:phot:%'", ())
+    db.commit()
+
+
+def test_signals_console_lists_cached_vigil(window):
+    # ADR-037 SC4a: the console shows the vigil alerts the last Tonight
+    # run left in the cache, after the campaign signals
+    from PySide6.QtCore import Qt
+    from nightscribe.gui import main_window as mw
+    _wipe_campaigns()
+    _seed_vigil_cache(mw.db)
+    try:
+        window._refresh_campaigns_tab()
+        lst = window.campaigns.lst_signals
+        texts = [lst.item(i).text() for i in range(lst.count())]
+        assert any("👁 T CrB" in t for t in texts), texts
+        row = next(lst.item(i) for i in range(lst.count())
+                   if "👁 T CrB" in lst.item(i).text())
+        assert row.data(Qt.UserRole) == "vigil"
+        assert row.data(Qt.UserRole + 1) == "T CrB"
+    finally:
+        _wipe_vigil_cache(mw.db)
+
+
+def test_vigil_signal_double_click_explores_without_project(window):
+    # SC-g: no project for the star -> the vigil row opens Explore (the
+    # module DB is shared and projects are never wiped, so the routing
+    # methods are patched to keep the test order-independent)
+    from nightscribe.gui import main_window as mw
+    _wipe_campaigns()
+    _seed_vigil_cache(mw.db)
+    seen = []
+    orig_exp, orig_goto = window._open_explore_dialog, \
+        window._goto_active_project
+    window._goto_active_project = lambda name, *a, **k: False
+    window._open_explore_dialog = lambda name, *a, **k: seen.append(name)
+    try:
+        window._refresh_campaigns_tab()
+        lst = window.campaigns.lst_signals
+        row = next(lst.item(i) for i in range(lst.count())
+                   if "👁 T CrB" in lst.item(i).text())
+        window._camp_signal_opened(row)
+        assert seen == ["T CrB"]
+    finally:
+        window._open_explore_dialog = orig_exp
+        window._goto_active_project = orig_goto
+        _wipe_vigil_cache(mw.db)
+
+
+def test_vigil_signal_double_click_jumps_to_existing_project(window):
+    # SC-g fusion: the vigil row of a star that IS a project jumps to it
+    # and never falls through to Explore
+    from nightscribe.gui import main_window as mw
+    _wipe_campaigns()
+    _seed_vigil_cache(mw.db)
+    seen, explored = [], []
+    orig_goto, orig_exp = window._goto_active_project, \
+        window._open_explore_dialog
+    window._goto_active_project = lambda name, *a, **k: seen.append(name) \
+        or True
+    window._open_explore_dialog = lambda name, *a, **k: \
+        explored.append(name)
+    try:
+        window._refresh_campaigns_tab()
+        lst = window.campaigns.lst_signals
+        row = next(lst.item(i) for i in range(lst.count())
+                   if "👁 T CrB" in lst.item(i).text())
+        window._camp_signal_opened(row)
+        assert seen == ["T CrB"] and explored == []
+    finally:
+        window._goto_active_project = orig_goto
+        window._open_explore_dialog = orig_exp
+        _wipe_vigil_cache(mw.db)

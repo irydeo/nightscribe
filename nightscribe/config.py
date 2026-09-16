@@ -67,6 +67,17 @@ DEFAULTS = {
     "event_mag_threshold": 0.5,
     # ADR-037 (SC1): "extremum imminent" window for campaign signals (days)
     "campaign_extremum_days": 3,
+    # ADR-037 (SC4a): the vigil watch list — None means the curated
+    # defaults in core/vigils.py (T CrB rise, R CrB drop); the settings
+    # editor stores a list of dicts here
+    "vigil_list": None,
+    # ADR-037 (SC4b): show the AAVSO editorial channel (forum alerts +
+    # active observing campaigns) in Tonight
+    "aavso_feed": True,
+    # ADR-037 (SC4a rev.): the AAVSO API token — the bright-star vigils
+    # read the community photometry, and that endpoint answers 401
+    # without it (empty = bright vigils stay silent, by design)
+    "aavso_api_token": "",
     # EXOTIC handoff (Track D, subplan 4): camera identity and observer code
     # for the inits.json; height above is reused as "Obs. Elevation (meters)"
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)

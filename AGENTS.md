@@ -89,13 +89,16 @@ nightscribe/
                       #   y última magnitud para vigilias (claves "vigils:", TTL 12 h)
                       # + aavso.py: canal editorial AAVSO — alertas del foro (JSON
                       #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
+                     #   + fotometría de la comunidad con token (vigilias brillantes)
+    journal.py       # Diario de observación: vista derivada por noche (ADR-036)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —
                      #   la "prueba de fuego", Track C)
    gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
-                      # seis pestañas: Tonight, Projects, **Campaigns**, Solar, **Observatory**,
-                      # History (ADR-019/035 rev.)
+                      # cinco pestañas: Tonight, Projects, **Campaigns**, **Sun & sky**,
+                      # Observatory (ADR-019/035/036 rev.) — el **Diario de observación**
+                      # vive en el menú Herramientas (journal_dialog.py, ADR-036)
                       # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
                       #   incl. timeline_widget: línea de tiempo del tránsito, Track D)
 tests/

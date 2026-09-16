@@ -751,3 +751,37 @@ listing reasons, never a duplicate row.
 ASAS-SN Sky Patrol; forum topic bodies (the title is enough for the
 Tonight row); ZTF cadence reminded in the object card (a vigil is a
 safety net, not an alert network).
+
+### 7octdecies. Track JO — Observing journal & "Sun & sky" (2026-09-16, ADR-036)
+
+Plan: `docs/PLANS/journal-outreach.md`. Branch `feature/campaigns-ux`
+(all the work of this era lives on this branch, per the user's call).
+
+The History tab was dead by construction (`observations` had no writer
+since UX v3.1) and "Solar system" was a showcase with no flow. The track
+delivers: the **observing journal** — History leaves the tab bar (five
+tabs: Tonight · Projects · Campaigns · Sun & sky · Observatory,
+Ctrl+1..5) for the Tools menu, rebuilt as an **auto-generated derived
+view** (`core/journal.py`: UNION of projects/visits/files/photometry/
+campaigns + legacy marks, grouped by **observing night** noon-to-noon
+local, with a kind filter, search and project/Explore jumps); the
+**observed-feedback rewiring** to project activity
+(`project.activity_for`: scoring novelty and the ✔ column — now
+"Covered" — read the project world, not the orphan table; commitment
+rows — campaign/vigil/AAVSO — are exempt from the decay); and the
+**"Sun & sky"** tab as the outreach home: the "impact on your night"
+line (Moon → faint targets, Kp → auroras) jumping to Tonight, the
+**"Render PNG for socials"** CTA (`sun_panel.draw_sun` with the
+observatory watermark, shown in the ChartViewer) and the bilingual
+**"sky post" draft** (`narrative.sky_draft` + copyable dialog).
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| J0–J2 | journal in the menu + derived view + dialog/CLI | **Done** |
+| J3 | score/✔ rewired to project activity | **Done** |
+| S1–S3 | "Sun & sky" + impact + social PNG + sky post | **Done** |
+
+**Status**: unit suite green (**1272**), i18n 825 strings 0 unfinished.
+**Noted future idea**: a "night chronicle" generated from the journal
+(a post draft of what the session did). Pending live validation with
+the user's token: the AAVSO bright-vigil path (see 7septdecies).

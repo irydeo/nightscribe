@@ -1,6 +1,6 @@
 # ADR-036: Historial → Diario de observación (menú, vista derivada) y Solar → «Sol y cielo» (pestaña de divulgación)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-16
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-16 · **ejecutado completo el mismo día**: J0–J3 + S1–S3 (la crónica de la noche desde el Diario queda como idea futura) — suite unitaria 1272
 
 **Ver / See**: [docs/PLANS/journal-outreach.md](../PLANS/journal-outreach.md)
 (plan del track) · ADR-019 (UX v3, cuya disposición de pestañas se revisa

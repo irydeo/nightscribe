@@ -881,12 +881,8 @@ siguen, **en este orden** (decisiones documentadas; todo en la rama
    plan `docs/PLANS/signals-campaigns.md`. **Ejecutado completo el
    2026-09-16** (SC1–SC5): ver la sección 7septdecies más abajo.
 2. **Diario & Divulgación** — `docs/adr/ADR-036-journal-and-sunsky.md`
-   + plan `docs/PLANS/journal-outreach.md`. History sale de la barra →
-   diálogo «Diario de observación…» en el menú Herramientas (vista
-   derivada auto-generada, agrupada por noche astronómica; la barra
-   queda en 5 pestañas: Esta noche · Proyectos · Campañas · Sol y cielo
-   · Observatorio) y Solar → «Sol y cielo», la pestaña de divulgación
-   con CTA «Generar PNG para redes».
+   + plan `docs/PLANS/journal-outreach.md`. **Ejecutado completo el
+   2026-09-16** (J0–J3, S1–S3): ver la sección 7octdecies más abajo.
 
 ### 7septdecies. Track SC — Señales y campañas (2026-09-16, ADR-037)
 
@@ -925,3 +921,39 @@ fila duplicada.
 iteración**: ASAS-SN Sky Patrol; el cuerpo de los temas del foro (el
 título basta para la fila de Tonight); cadencia ZTF recordada en la ficha
 (la vigilia es red de seguridad, no red de alertas).
+
+### 7octdecies. Track JO — Diario de observación y «Sol y cielo» (2026-09-16, ADR-036)
+
+Plan: `docs/PLANS/journal-outreach.md`. Rama `feature/campaigns-ux`
+(todo el trabajo de esta era vive en esta rama, decisión del usuario).
+
+La pestaña History estaba muerta por construcción (`observations` no
+tenía escritor desde UX v3.1) y «Sistema solar» era un escaparate sin
+flujo. El track entrega: el **Diario de observación** — el Historial sale
+de la barra de pestañas (cinco pestañas: Esta noche · Proyectos ·
+Campañas · Sol y cielo · Observatorio, Ctrl+1..5) al menú Herramientas,
+reconstruido como **vista derivada auto-generada** (`core/journal.py`:
+UNION de proyectos/visitas/ficheros/fotometría/campañas + marcas legacy,
+agrupada por **noche astronómica** mediodía→mediodía local, con filtro
+por tipo, búsqueda y salto a proyecto/Explorar); el **re-cableado del
+feedback de observación** a la actividad de proyectos
+(`project.activity_for`: la novedad del score y la columna ✔ —ahora
+«Covered»— leen el mundo-proyecto, no la tabla huérfana; las filas de
+compromiso —campaña/vigilia/AAVSO— están exentas del decay); y la
+pestaña **«Sol y cielo»** como hogar de la divulgación: línea de
+«impacto en tu noche» (Luna → débiles, Kp → auroras) con salto a Esta
+noche, CTA **«Generar PNG para redes»** (`sun_panel.draw_sun` con la
+marca de agua del observatorio, vista en el ChartViewer) y el **borrador
+bilingüe «post del cielo»** (`narrative.sky_draft` + diálogo copiable).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| J0–J2 | Diario en el menú + vista derivada + diálogo/CLI | **Hecho** |
+| J3 | re-cableado score/✔ a actividad de proyectos | **Hecho** |
+| S1–S3 | «Sol y cielo» + impacto + PNG redes + post del cielo | **Hecho** |
+
+**Estado**: suite unitaria verde (**1272**), i18n 825 cadenas 0
+unfinished. **Idea futura anotada**: la «crónica de la noche» generada
+desde el Diario (borrador de post con lo hecho en la sesión). Pendiente
+de validación con el token del usuario: el camino AAVSO de las vigilias
+brillantes (ver 7septdecies).

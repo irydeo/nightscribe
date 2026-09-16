@@ -1,6 +1,6 @@
 # Plan — Diario de observación y «Sol y cielo»: la pestaña de divulgación (Track JO)
 
-> **Abierto (2026-09-16)** — documento maestro, sin implementar. Las
+> **Ejecutado completo (2026-09-16)** — mismo día. Las
 > decisiones están registradas en
 > [ADR-036](../adr/ADR-036-journal-and-sunsky.md) — **léelo primero**. Las
 > tarjetas de subplan se escriben al arrancar el track, con anclas frescas.
@@ -50,14 +50,14 @@ Herramientas, de consulta ocasional.
 
 | Fase | Entregable | Criterio de aceptación |
 |---|---|---|
-| **J0** | History sale de la barra: la tabla clicable actual se mueve tal cual al diálogo «Diario de observación…» del menú Herramientas; `TAB_*` a 5; Ctrl+1..5 | Tests del Track UX retargetados (los gestos de UB.2 viven ahora en el diálogo); barra con 5 pestañas |
-| **J1** | `core/journal.py`: vista derivada (UNION de las fuentes de JO-b, agrupada por noche astronómica, textos ES/EN). Puro, sin GUI | Tests: eventos sintéticos de cada fuente agrupan bien por noche (caso 23:59 y 00:30 = misma noche); legacy `observations` aparece |
-| **J2** | El diálogo Diario se alimenta de `journal.py` (secciones por noche, filtro por tipo, búsqueda, doble-clic → proyecto/Explorar); CLI `history` re-cableado | Tests offscreen del diálogo + test del CLI |
-| **J3** | Re-cableado (JO-e): `activity_for` en core; `suggest.score_target` lo usa; columna ✔/checkbox de Tonight redefinidos | Tests: novedad/urgencia reaccionan a la actividad de proyecto, no a `observations` |
-| **S1** | Renombre a «Sol y cielo» / "Sun & sky" (título `.ui` + cadenas ES/EN) + línea «impacto en tu noche» (Luna → penaliza débiles → ver Esta noche; Kp → auroras) | Test de la línea con datos fake; tab renombrado en ambos idiomas |
-| **S2** | CTA «Generar PNG para redes» en la pestaña: `sun_panel.draw_sun` con idioma y watermark, guardado en `data_dir/posts`, vista en `ChartViewer` | Test offscreen con `draw_sun` monkeypatcheado: botón → fichero registrado y mostrado |
-| **S3** *(opcional, se decide al llegar)* | Borrador «post del cielo» bilingüe (extender `narrative` con Luna/planetas) y/o crónica de la noche desde el Diario | — |
-| **J9** | Cierre: i18n ES/EN completo, estados de ADR-036, sección en WORKFLOWS.es/.md, suite verde | `pytest tests/unit` verde; 0 cadenas unfinished |
+| **J0** | History sale de la barra: la tabla clicable actual se mueve tal cual al diálogo «Diario de observación…» del menú Herramientas; `TAB_*` a 5; Ctrl+1..5 | **Hecho (2026-09-16)** — diálogo en menú Herramientas; 5 pestañas; Ctrl+1..5 |
+| **J1** | `core/journal.py`: vista derivada (UNION de las fuentes de JO-b, agrupada por noche astronómica, textos ES/EN). Puro, sin GUI | **Hecho (2026-09-16)** — `core/journal.py` + 9 tests |
+| **J2** | El diálogo Diario se alimenta de `journal.py` (secciones por noche, filtro por tipo, búsqueda, doble-clic → proyecto/Explorar); CLI `history` re-cableado | **Hecho (2026-09-16)** — `gui/journal_dialog.py` + CLI re-cableado; `history_tab.ui` retirado |
+| **J3** | Re-cableado (JO-e): `activity_for` en core; `suggest.score_target` lo usa; columna ✔/checkbox de Tonight redefinidos | **Hecho (2026-09-16)** — `project.activity_for`; «Covered»/«Mostrar cubiertos»; filas de compromiso exentas del decay |
+| **S1** | Renombre a «Sol y cielo» / "Sun & sky" (título `.ui` + cadenas ES/EN) + línea «impacto en tu noche» (Luna → penaliza débiles → ver Esta noche; Kp → auroras) | **Hecho (2026-09-16)** — pestaña «Sol y cielo» + línea de impacto con salto a Tonight |
+| **S2** | CTA «Generar PNG para redes» en la pestaña: `sun_panel.draw_sun` con idioma y watermark, guardado en `data_dir/posts`, vista en `ChartViewer` | **Hecho (2026-09-16)** — «Generar PNG para redes» con watermark del observatorio + ChartViewer |
+| **S3** *(opcional, se decide al llegar)* | Borrador «post del cielo» bilingüe (extender `narrative` con Luna/planetas) y/o crónica de la noche desde el Diario | **Hecho (2026-09-16)** — `narrative.sky_draft` + diálogo copiable; la crónica de la noche queda como idea futura |
+| **J9** | Cierre: i18n ES/EN completo, estados de ADR-036, sección en WORKFLOWS.es/.md, suite verde | **Hecho (2026-09-16)** — 825 cadenas 0 unfinished; suite 1272 |
 
 ## Reglas de ejecución (vigentes, de WORKFLOWS)
 

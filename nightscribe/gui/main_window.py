@@ -16,8 +16,8 @@ import logging
 from pathlib import Path
 
 from PySide6 import Shiboken
-from PySide6.QtCore import (QFile, Qt, Signal, QPropertyAnimation,
-                            QEasingCurve, QTimer)
+from PySide6.QtCore import (QCoreApplication, QFile, Qt, Signal,
+                            QPropertyAnimation, QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
@@ -93,6 +93,18 @@ def _load_ui(name, parent=None):
     widget = QUiLoader().load(file, parent)
     file.close()
     return widget
+
+
+def tr(fmt, *sub):
+    # Translate + fill, for helper code that lives outside the window class
+    # (the SC2 signal rows, ...). Values go in AFTER the lookup, so the
+    # translator may reorder them.
+    # @args: fmt - source string with %1, %2, ... slots, sub - slot values
+    # @return: localized string, slots filled
+    t = QCoreApplication.translate("MainWindow", fmt)
+    for i, val in enumerate(sub, 1):
+        t = t.replace(f"%{i}", str(val))
+    return t
 
 
 def _settings_two_columns(dlg):
@@ -533,6 +545,8 @@ class MainWindow(QMainWindow):
             self._campaign_member_menu)
         c.lst_campaigns.viewport().setCursor(Qt.PointingHandCursor)
         c.tbl_members.viewport().setCursor(Qt.PointingHandCursor)
+        c.lst_signals.itemActivated.connect(self._camp_signal_opened)
+        c.lst_signals.viewport().setCursor(Qt.PointingHandCursor)
         c.btn_new.clicked.connect(self._camp_new)
         c.btn_edit.clicked.connect(self._camp_edit)
         c.btn_delete.clicked.connect(self._camp_delete)
@@ -1828,6 +1842,57 @@ class MainWindow(QMainWindow):
                 lst.setCurrentItem(item)
         if lst.count() == 0:
             self._campaign_selected()     # clears the detail side
+        self._refresh_campaign_signals()
+
+    def _refresh_campaign_signals(self):
+        # Fills the signals console (ADR-037 SC2): the coverage line and
+        # the live signal list — detector events first (the strongest
+        # news), then upcoming extrema ordered by arrival. A double-click
+        # on a row opens its project in the hub.
+        from ..core import campaign as _camp
+        w = self.campaigns
+        rep = _camp.signals_report(
+            db,
+            config.get("campaign_extremum_days", 3),
+            config.get("event_mag_threshold", 0.5))
+        if rep["members"] == 0:
+            w.lbl_cov.setText(tr("No campaign projects to monitor yet"))
+        else:
+            w.lbl_cov.setText(
+                tr("%1 of %2 up to date", rep["up_to_date"], rep["members"]))
+        lst = w.lst_signals
+        lst.clear()
+        for row in rep["signals"]:
+            item = QListWidgetItem(
+                f"{row['project']['object_name']} · "
+                f"{row['campaign']} — {self._format_campaign_signal(row)}")
+            item.setData(Qt.UserRole, row["project"]["id"])
+            lst.addItem(item)
+        if lst.count() == 0:
+            item = QListWidgetItem(tr("No signals right now"))
+            item.setFlags(Qt.NoItemFlags)   # empty state: not clickable
+            lst.addItem(item)
+
+    @staticmethod
+    def _format_campaign_signal(row):
+        # @args: row - a signals_report row
+        # @return: the human part of the row — the event, or the countdown
+        ev, ex = row["event"], row["extremum"]
+        if ev:
+            # inverted magnitude axis: a "drop" is the star dimming
+            word = "down" if ev["direction"] == "drop" else "up"
+            return tr("%1 mag %2 in %3", ev["delta_mag"], tr(word),
+                      ev["filter"])
+        if ex:
+            word = "maximum" if ex["kind"] == "max" else "minimum"
+            return tr("%1 in %2 d", tr(word), f"{ex['days']:.1f}")
+        return ""
+
+    def _camp_signal_opened(self, item):
+        # Double-click on a signal row: open the project it points at.
+        # Empty-state rows carry no data, so they are no-ops.
+        if item is not None and item.data(Qt.UserRole) is not None:
+            self._goto_project_by_id(item.data(Qt.UserRole))
 
     def _selected_campaign_id(self):
         # @return: campaign id selected in the tab's list, or None

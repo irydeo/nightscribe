@@ -496,6 +496,16 @@
         <source>Double-click a row to open its project</source>
         <translation>Doble clic en una fila para abrir su proyecto</translation>
     </message>
+    <message>
+        <location filename="../ui/campaigns_tab.ui" line="50"/>
+        <source>Signals</source>
+        <translation>Señales</translation>
+    </message>
+    <message>
+        <location filename="../ui/campaigns_tab.ui" line="61"/>
+        <source>Double-click a signal to open its project</source>
+        <translation>Doble clic en una señal para abrir su proyecto</translation>
+    </message>
 </context>
 <context>
     <name>ChartViewer</name>
@@ -2721,6 +2731,51 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
         <location filename="../main_window.py" line="574"/>
         <source>Double-click a row to open its project or explore the object</source>
         <translation>Doble-clic en una fila para abrir su proyecto o explorar el objeto</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1859"/>
+        <source>No campaign projects to monitor yet</source>
+        <translation>Aún no hay proyectos de campaña que vigilar</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1872"/>
+        <source>No signals right now</source>
+        <translation>Ahora mismo no hay señales</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1862"/>
+        <source>%1 of %2 up to date</source>
+        <translation>%1 de %2 al día</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1884"/>
+        <source>%1 mag %2 in %3</source>
+        <translation>%1 mag %2 en %3</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1883"/>
+        <source>down</source>
+        <translation>baja</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1883"/>
+        <source>up</source>
+        <translation>sube</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1887"/>
+        <source>maximum</source>
+        <translation>máximo</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1887"/>
+        <source>minimum</source>
+        <translation>mínimo</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="1888"/>
+        <source>%1 in %2 d</source>
+        <translation>%1 en %2 d</translation>
     </message>
 </context>
 <context>

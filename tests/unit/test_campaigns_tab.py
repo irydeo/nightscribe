@@ -281,3 +281,82 @@ def test_cadence_chip_navigates_to_followup(window):
     sec = window._page_sections.get("followup")
     assert sec is not None, "the Follow-up section was not built"
     assert sec.isExpanded(), "the Follow-up section should be expanded"
+
+
+# --- ADR-037 SC2: the signals console -------------------------------------
+
+
+def _wipe_campaigns():
+    # @return: nothing — the shared module DB accumulates campaigns across
+    #          tests; the console reads the WHOLE database, so each test
+    #          starts from a clean slate
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    for c in camp_mod.list_campaigns(mw.db):
+        camp_mod.delete(mw.db, c["id"])
+
+
+def test_signals_console_empty_box(window):
+    _wipe_campaigns()
+    window._refresh_campaigns_tab()
+    w = window.campaigns
+    assert w.lst_signals.count() == 1
+    item = w.lst_signals.item(0)
+    assert not item.flags()
+    text = w.lbl_cov.text()
+    assert ("No campaign projects to monitor yet" in text
+            or "Aún no hay proyectos de campaña que vigilar" in text)
+    # empty-state rows carry no data: opening them is a no-op
+    window._camp_signal_opened(item)
+
+
+def test_signals_console_lists_event_with_coverage(window):
+    import re
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtCore import Qt
+    _wipe_campaigns()
+    cid = camp_mod.create(mw.db, "Campaña señales")
+    p = proj_mod.create(mw.db, "variable", "R Crl",
+                        {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
+    fu.create_session(mw.db, p["id"])            # today: up to date
+    for i, mag in enumerate((11.0, 11.0, 11.0, 11.0, 11.9)):
+        fu.add_point(mw.db, p["id"], 61500.0 + i, "V", mag,
+                     source="manual")
+    window._refresh_campaigns_tab()
+    w = window.campaigns
+    assert w.lst_signals.count() == 1
+    text = w.lst_signals.item(0).text()
+    assert "0.9" in text and "V" in text
+    assert re.findall(r"\d+", w.lbl_cov.text()) == ["1", "1"]
+    # and the row points at the project, so a double-click can open it
+    assert w.lst_signals.item(0).data(Qt.UserRole) == p["id"]
+
+
+def test_signal_double_click_opens_project(window):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QTabWidget
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    from nightscribe.gui.main_window import TAB_PROJECTS
+    _wipe_campaigns()
+    cid = camp_mod.create(mw.db, "Campaña doble clic")
+    p = proj_mod.create(mw.db, "variable", "R Crl",
+                        {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
+    fu.create_session(mw.db, p["id"])
+    for i, mag in enumerate((11.0, 11.0, 11.0, 11.0, 11.9)):
+        fu.add_point(mw.db, p["id"], 61600.0 + i, "V", mag,
+                     source="manual")
+    window._refresh_campaigns_tab()
+    lst = window.campaigns.lst_signals
+    item = next(lst.item(i) for i in range(lst.count())
+                if lst.item(i).data(Qt.UserRole) == p["id"])
+    window._camp_signal_opened(item)
+    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
+    assert tabs.currentIndex() == TAB_PROJECTS
+    cur = window.projects.lst_projects.currentItem()
+    assert cur is not None and cur.data(Qt.UserRole) == p["id"]

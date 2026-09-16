@@ -256,6 +256,42 @@ def tonight_listable(db, extremum_days=3, event_threshold=0.5):
     return out
 
 
+def signals_report(db, extremum_days=3, event_threshold=0.5):
+    # The signals console (ADR-037, SC2): one row per SIGNAL across all
+    # active campaigns — detector events first (the strongest news),
+    # then upcoming extrema ordered by arrival — plus the coverage: how
+    # many members are up to date. Same local maths as tonight_listable,
+    # except the extremum row survives any distance (it is a countdown,
+    # not an imminence flag).
+    # @args: db - Database, extremum_days - imminence window in days,
+    #        event_threshold - min |Δmag| for detect_event
+    # @return: {"members": int, "up_to_date": int, "signals":
+    #          [{"campaign": str, "project": dict,
+    #            "event": dict|None, "extremum": dict|None}]}
+    members = up_to_date = 0
+    events, extrema = [], []
+    for camp in list_campaigns(db, status=CAMPAIGN_ACTIVE):
+        for proj in projects_of(db, camp["id"], status="active"):
+            sig = project_signal(db, camp, proj, extremum_days,
+                                 event_threshold)
+            members += 1
+            if not sig["due"]:
+                up_to_date += 1
+            if sig["event"] is None and sig["extremum"] is None:
+                continue
+            row = {"campaign": camp["name"], "project": proj,
+                   "event": sig["event"], "extremum": sig["extremum"]}
+            if sig["event"] is not None:
+                events.append(row)
+            else:
+                extrema.append(row)
+    events.sort(key=lambda r: r["project"]["object_name"].lower())
+    extrema.sort(key=lambda r: (r["extremum"]["days"],
+                                r["project"]["object_name"].lower()))
+    return {"members": members, "up_to_date": up_to_date,
+            "signals": events + extrema}
+
+
 def status_report(db, campaign_id):
     # The Campaigns tab data (UX-b): EVERY member project with its cadence
     # health and event flag, so the tab shows the whole campaign at a

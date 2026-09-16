@@ -251,3 +251,73 @@ def test_tonight_listable_respects_lifecycle(db):
     assert campaign.tonight_listable(db) == []          # project finished
     campaign.finish(db, cid)
     assert campaign.tonight_listable(db) == []          # campaign finished too
+
+
+# ---------------- ADR-037 SC2: the signals console ----------------
+
+def test_signals_report_empty(db):
+    rep = campaign.signals_report(db)
+    assert rep == {"members": 0, "up_to_date": 0, "signals": []}
+
+
+def test_signals_report_counts_coverage(db):
+    # 2 up-to-date members + 1 overdue, none with event/extremum ->
+    # coverage 2/3 and an EMPTY signals list
+    _mk(db, "Fresh 1", cadence=7, visited_days_ago=0)
+    _mk(db, "Fresh 2", cadence=7, visited_days_ago=2)
+    _mk(db, "Overdue 1", cadence=3, visited_days_ago=5)
+    rep = campaign.signals_report(db)
+    assert rep["members"] == 3
+    assert rep["up_to_date"] == 2
+    assert rep["signals"] == []
+
+
+def test_signals_report_events_rank_before_extrema(db):
+    # "Z" sorts AFTER "M" alphabetically — event order must win
+    _mk(db, "Z Event", visited_days_ago=0, mags=EVENT_MAGS)
+    now = variables._now_mjd()
+    _mk(db, "M Max", visited_days_ago=0, ctx={"variable": {
+        "var_type": "M", "period_d": 300.0, "epoch_mjd": now + 1}})
+    rep = campaign.signals_report(db)
+    assert [r["project"]["object_name"] for r in rep["signals"]] == \
+        ["Z Event", "M Max"]
+    assert rep["signals"][0]["event"]["direction"] == "drop"
+    assert rep["signals"][1]["event"] is None
+    assert rep["signals"][1]["extremum"]["kind"] == "max"
+
+
+def test_signals_report_keeps_far_extrema(db):
+    # A countdown, not an imminence flag: 145 days out still surfaces
+    now = variables._now_mjd()
+    _mk(db, "Far", visited_days_ago=0, ctx={"variable": {
+        "var_type": "M", "period_d": 300.0, "epoch_mjd": now + 145}})
+    rep = campaign.signals_report(db)
+    assert len(rep["signals"]) == 1
+    assert rep["signals"][0]["extremum"]["days"] > 3
+
+
+def test_signals_report_extrema_ordered_by_days(db):
+    now = variables._now_mjd()
+    _mk(db, "Far", visited_days_ago=0, ctx={"variable": {
+        "var_type": "M", "period_d": 300.0, "epoch_mjd": now + 40}})
+    _mk(db, "Near", visited_days_ago=0, ctx={"variable": {
+        "var_type": "M", "period_d": 300.0, "epoch_mjd": now + 10}})
+    rep = campaign.signals_report(db)
+    names = [r["project"]["object_name"] for r in rep["signals"]]
+    assert names == ["Near", "Far"]
+
+
+def test_signals_report_excludes_finished_campaign(db):
+    cid, _ = _mk(db, "Done")                             # due member
+    assert campaign.signals_report(db)["members"] == 1
+    campaign.finish(db, cid)
+    assert campaign.signals_report(db) == \
+        {"members": 0, "up_to_date": 0, "signals": []}
+
+
+def test_signals_report_excludes_archived_project(db):
+    cid, pid = _mk(db, "Archived")                       # due member
+    assert campaign.signals_report(db)["members"] == 1
+    project.set_status(db, pid, "archived")
+    rep = campaign.signals_report(db)
+    assert rep["members"] == 0 and rep["signals"] == []

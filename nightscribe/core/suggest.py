@@ -221,6 +221,8 @@ def _urgency(t):
         score += _clamp((c.get("overdue_days") or 0) * 3, 0, 15)
         if c.get("event"):
             score += 10
+        if c.get("imminent_extremum"):
+            score += 5       # ADR-037: maximum/minimum is days away — watch it
     return _clamp(score, 0, 20)
 
 

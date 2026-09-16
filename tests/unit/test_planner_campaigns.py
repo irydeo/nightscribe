@@ -24,8 +24,9 @@ DATE = datetime.date(2026, 9, 11)
 
 
 class _Cfg:
-    def __init__(self, limit_mag=14.0):
+    def __init__(self, limit_mag=14.0, **extra):
         self._d = {"limit_mag": limit_mag}
+        self._d.update(extra)
 
     def get(self, k, default=None):
         return self._d.get(k, default)
@@ -53,8 +54,8 @@ def _make_due(db, name="T CrB", ra=10.0, dec=80.0, mag=10.0,
     return cid, p["id"]
 
 
-def _targets(db, limit_mag=14.0):
-    return planner._campaign_targets(_Cfg(limit_mag), LAT, LON, DATE,
+def _targets(db, limit_mag=14.0, **extra):
+    return planner._campaign_targets(_Cfg(limit_mag, **extra), LAT, LON, DATE,
                                      horizon.FlatHorizon(10.0), 0.0,
                                      db_obj=db)
 
@@ -126,3 +127,50 @@ def test_event_flag_from_own_points(db):
 def test_no_variable_no_subdict(db):
     _make_due(db)
     assert "variable" not in _targets(db)[0]
+
+
+# ---------------- ADR-037 SC1: event / extremum listing ----------------
+
+def test_up_to_date_event_project_is_listed(db):
+    # the bug due_campaigns had (ADR-037): a WeSb drop seen today must not
+    # wait for the cadence — an event alone gets the project listed
+    _cid, pid = _make_due(db, "R CrB", cadence=3, visited_days_ago=0)
+    for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
+        followup.add_point(db, pid, 61000.0 + i, "V", m)
+    out = _targets(db)
+    assert len(out) == 1
+    assert out[0]["campaign"]["event"]["direction"] == "drop"
+    assert out[0]["campaign"]["imminent_extremum"] is False
+
+
+def test_imminent_extremum_project_is_listed(db):
+    from nightscribe.core import variables
+    epoch = variables._now_mjd() + 2 - 300.0 * 100    # max ~2 days out
+    _make_due(db, "WeSb 1", cadence=3, visited_days_ago=0,
+              ctx={"variable": {"var_type": "M", "period_d": 300.0,
+                                "epoch_mjd": epoch}})
+    out = _targets(db)
+    assert len(out) == 1                              # up-to-date otherwise
+    assert out[0]["campaign"]["imminent_extremum"] is True
+    assert out[0]["variable"]["next_extremum"]["kind"] == "max"
+    assert out[0]["variable"]["next_extremum"]["days"] >= 1.0
+
+
+def test_extremum_window_is_configurable(db):
+    from nightscribe.core import variables
+    epoch = variables._now_mjd() + 2 - 300.0 * 100    # max ~2 days out
+    _make_due(db, "WeSb 1", cadence=3, visited_days_ago=0,
+              ctx={"variable": {"var_type": "M", "period_d": 300.0,
+                                "epoch_mjd": epoch}})
+    assert len(_targets(db)) == 1                     # default window: 3 d
+    assert _targets(db, campaign_extremum_days=1) == []   # 2 d > 1 d window
+    assert _targets(db, campaign_extremum_days=0) == []   # 0 = today only
+
+
+def test_event_threshold_is_configurable(db):
+    # a 0.6 mag jump is an event at the default 0.5 threshold but not at 1
+    _cid, pid = _make_due(db, "R CrB", cadence=3, visited_days_ago=0)
+    for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.6)):
+        followup.add_point(db, pid, 61000.0 + i, "V", m)
+    assert len(_targets(db)) == 1                     # 0.6 >= 0.5
+    assert _targets(db, event_mag_threshold=1.0) == []

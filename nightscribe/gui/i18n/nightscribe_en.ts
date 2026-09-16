@@ -3794,6 +3794,16 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation>Brightness jump (in magnitudes) from which a variable/SN project raises the event advisor</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="342"/>
+        <source>Extremum window (days):</source>
+        <translation>Extremum window (days):</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="347"/>
+        <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</source>
+        <translation>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="354"/>
         <source>Integrations</source>
         <translation>Integrations</translation>

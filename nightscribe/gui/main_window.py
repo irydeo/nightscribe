@@ -655,6 +655,8 @@ class MainWindow(QMainWindow):
         dlg.spn_sn_cadence.setValue(int(config.get("sn_cadence_days", 3)))
         dlg.spn_event_mag.setValue(
             float(config.get("event_mag_threshold", 0.5)))
+        dlg.spn_extremum_days.setValue(
+            int(config.get("campaign_extremum_days", 3)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
                                                      "127.0.0.1")))
         dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
@@ -721,6 +723,7 @@ class MainWindow(QMainWindow):
         config.set("overhead_s", dlg.spn_overhead.value())
         config.set("sn_cadence_days", dlg.spn_sn_cadence.value())
         config.set("event_mag_threshold", dlg.spn_event_mag.value())
+        config.set("campaign_extremum_days", dlg.spn_extremum_days.value())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())

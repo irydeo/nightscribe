@@ -195,6 +195,67 @@ def due_campaigns(db):
     return out
 
 
+def project_signal(db, camp, project, extremum_days=3, event_threshold=0.5):
+    # One member's signal (ADR-037 SC1): the three conditions that can put
+    # a campaign project in Tonight — cadence due, a detector event, an
+    # imminent extremum — with reasons, so the planner (SC1) and the
+    # signals console (SC2) read the same truth. Pure local maths: the
+    # same building blocks status_report already runs.
+    # @args: db - Database, camp - campaign dict, project - projects_of row,
+    #        extremum_days - "imminent" window in days (setting
+    #        campaign_extremum_days), event_threshold - min |Δmag| for
+    #        detect_event (setting event_mag_threshold)
+    # @return: {"due", "never_visited", "overdue_days", "cadence_nights",
+    #          "event", "extremum", "imminent_extremum", "reasons"}
+    from . import followup, variables
+    cad = int(protocol_get(camp, "cadence_nights", 1) or 1)
+    days = followup.days_since_last_session(db, project["id"])
+    never = days is None
+    due = never or days >= cad
+    ev = None
+    if project.get("kind") in ("variable", "sn"):
+        ev = variables.detect_event(followup.list_points(db, project["id"]),
+                                    threshold=event_threshold)
+    v = project.get("context", {}).get("variable") or {}
+    nxt = variables.next_extremum(v.get("period_d"), v.get("epoch_mjd"),
+                                  var_type=v.get("var_type", ""))
+    imminent = bool(nxt) and (nxt.get("days") or 0) <= extremum_days
+    reasons = []
+    if due:
+        reasons.append("due")
+    if ev:
+        reasons.append("event")
+    if imminent:
+        reasons.append("extremum")
+    return {"due": due, "never_visited": never,
+            "overdue_days": days if days is not None else cad,
+            "cadence_nights": cad, "event": ev, "extremum": nxt,
+            "imminent_extremum": imminent, "reasons": reasons}
+
+
+def tonight_listable(db, extremum_days=3, event_threshold=0.5):
+    # The Tonight loop, ADR-037 (SC1): a campaign project is listed when
+    # it is DUE, OR a detector event fired, OR an extremum is IMMINENT —
+    # honoring the WeSb protocol (a drop seen today must not wait for the
+    # cadence, ADR-035). due_campaigns stays the narrower due-only view,
+    # and the GUI status_report shows all members regardless.
+    # @args: db - Database, extremum_days - imminence window in days,
+    #        event_threshold - min |Δmag| for detect_event
+    # @return: [{"campaign", "project", <project_signal fields>}] — one
+    #          row per listable project
+    out = []
+    for camp in list_campaigns(db, status=CAMPAIGN_ACTIVE):
+        for proj in projects_of(db, camp["id"], status="active"):
+            sig = project_signal(db, camp, proj, extremum_days,
+                                 event_threshold)
+            if not sig["reasons"]:
+                continue
+            row = {"campaign": camp, "project": proj}
+            row.update(sig)
+            out.append(row)
+    return out
+
+
 def status_report(db, campaign_id):
     # The Campaigns tab data (UX-b): EVERY member project with its cadence
     # health and event flag, so the tab shows the whole campaign at a

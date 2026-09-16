@@ -15,8 +15,8 @@ import datetime
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
-from . import campaign, coords, dates, exposure, followup, hads, horizon
-from . import transits, variables
+from . import campaign, coords, dates, exposure, hads, horizon
+from . import transits
 from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
                       rochester, sbdb)
 
@@ -445,18 +445,24 @@ def _hads_targets(lat, lon, date, hor, limit_mag=20.0, margin=0.0,
 
 
 def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
-    # Tonight from the observer's own commitments (ADR-035, V-d): the due
-    # projects of the active campaigns. Fully local (SQLite + sky maths) —
-    # no network, and nothing breaks without one. Each target re-surfaces
-    # an EXISTING project, so the Explore CTA will offer "Continue
-    # project" (phase E machinery, gui/main_window.py).
+    # Tonight from the observer's own commitments (ADR-037 SC1): a
+    # campaign project is listed when it is DUE, or a detector event
+    # fired, or an extremum is imminent (setting campaign_extremum_days).
+    # Fully local (SQLite + sky maths) — no network, and nothing breaks
+    # without one. Each target re-surfaces an EXISTING project, so the
+    # Explore CTA will offer "Continue project" (phase E machinery,
+    # gui/main_window.py).
     # @args: db_obj - Database (tests inject a temp one; default: shared)
     if db_obj is None:
         from .db import db as db_obj
     limit_mag = float(cfg.get("limit_mag", 20.0))
     out = []
-    for due in campaign.due_campaigns(db_obj):
-        camp, proj = due["campaign"], due["project"]
+    rows = campaign.tonight_listable(
+        db_obj,
+        extremum_days=float(cfg.get("campaign_extremum_days", 3)),
+        event_threshold=float(cfg.get("event_mag_threshold", 0.5)))
+    for sig in rows:
+        camp, proj = sig["campaign"], sig["project"]
         ctx = proj.get("context") or {}
         ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
         if ra is None or dec is None:
@@ -479,29 +485,21 @@ def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None):
             "ra_deg": ra, "dec_deg": dec, "project_id": proj["id"],
             **vis,
             "campaign": {"id": camp["id"], "name": camp["name"],
-                         "overdue_days": due["overdue_days"],
-                         "cadence_nights": due["cadence_nights"],
-                         "never_visited": due["never_visited"],
-                         "event": None},
+                         "overdue_days": sig["overdue_days"],
+                         "cadence_nights": sig["cadence_nights"],
+                         "never_visited": sig["never_visited"],
+                         "event": sig["event"],
+                         "imminent_extremum": sig["imminent_extremum"]},
         }
         # variable sub-dict: the context snapshot + tonight's fresh values
-        # (the next extremum is computed nightly — pure local maths)
+        # (the next extremum is pure local maths — same as the signal)
         v = dict(ctx.get("variable") or {})
         if v:
             if v.get("amp") is None and v.get("max") is not None \
                     and v.get("min") is not None:
                 v["amp"] = round(v["min"] - v["max"], 2)  # inverted axis
-            v["next_extremum"] = variables.next_extremum(
-                v.get("period_d"), v.get("epoch_mjd"),
-                var_type=v.get("var_type", ""))
+            v["next_extremum"] = sig["extremum"]
             t["variable"] = v
-        # event advisor (V-h): a dip/outburst in the observer's own points
-        # rides on the target so suggest can boost and phrase it
-        ev = variables.detect_event(
-            followup.list_points(db_obj, proj["id"]),
-            threshold=float(cfg.get("event_mag_threshold", 0.5)))
-        if ev:
-            t["campaign"]["event"] = ev
         out.append(t)
     return out
 

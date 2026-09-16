@@ -11,9 +11,11 @@
 #
 ############################################################
 
+import time
+
 import pytest
 
-from nightscribe.core import campaign, followup, project
+from nightscribe.core import campaign, followup, project, variables
 from nightscribe.core.db import Database
 
 
@@ -153,3 +155,99 @@ def test_status_report_flags_events(db):
 
 def test_status_report_unknown_campaign(db):
     assert campaign.status_report(db, 9999) is None
+
+
+# ---------------- ADR-037 SC1: the three signals ----------------
+
+EVENT_MAGS = (12.0, 12.1, 11.9, 12.0, 12.9)   # last point: 0.9 mag drop
+
+
+def _mk(db, name, cadence=3, visited_days_ago=None, ctx=None, mags=None):
+    # @return: (campaign_id, project_id) of a variable project; default is
+    #          never visited (cadence-due), pass visited_days_ago=0 for an
+    #          up-to-date member, mags=EVENT_MAGS for a drop event
+    cid = campaign.create(db, name, protocol={"cadence_nights": cadence})
+    full = {"ra_deg": 10.0, "dec_deg": 80.0, "mag": 10.0}
+    full.update(ctx or {})
+    p = project.create(db, "variable", name, full, campaign_id=cid)
+    if visited_days_ago is not None:
+        followup.create_session(db, p["id"])
+        sid = followup.list_sessions(db, p["id"])[0]["id"]
+        db.execute("UPDATE project_sessions SET created=? WHERE id=?",
+                   (time.time() - visited_days_ago * 86400, sid))
+        db.commit()
+    if mags:
+        for i, m in enumerate(mags):
+            followup.add_point(db, p["id"], 61000.0 + i, "V", m)
+    return cid, p["id"]
+
+
+def test_project_signal_due_only(db):
+    cid, _ = _mk(db, "T CrB", cadence=3)          # never visited -> due
+    camp = campaign.get(db, cid)
+    sig = campaign.project_signal(db, camp, campaign.projects_of(db, cid)[0])
+    assert sig["due"] is True and sig["never_visited"] is True
+    assert sig["event"] is None
+    assert sig["imminent_extremum"] is False
+    assert sig["reasons"] == ["due"]
+
+
+def test_project_signal_event_survives_fresh_visit(db):
+    # ADR-037: the bug due_campaigns had — an up-to-date member that RAISES
+    # an event must still be listable, with reasons == ["event"]
+    _cid, _ = _mk(db, "R CrB", cadence=3, visited_days_ago=0, mags=EVENT_MAGS)
+    camp = campaign.get(db, campaign.list_campaigns(db)[0]["id"])
+    sig = campaign.project_signal(db, camp,
+                                  campaign.projects_of(
+                                      db, camp["id"])[0])
+    assert sig["due"] is False
+    assert sig["event"]["direction"] == "drop"
+    assert sig["reasons"] == ["event"]
+
+
+def test_project_signal_extremum_window(db):
+    # maximum ~2 days out: imminent inside a 3-day window, not inside 1
+    epoch = variables._now_mjd() + 2 - 300.0 * 100
+    cid, _ = _mk(db, "WeSb 1", cadence=3, visited_days_ago=0,
+                 ctx={"variable": {"var_type": "M", "period_d": 300.0,
+                                   "epoch_mjd": epoch}})
+    camp = campaign.get(db, cid)
+    p = campaign.projects_of(db, cid)[0]
+    sig3 = campaign.project_signal(db, camp, p, extremum_days=3)
+    assert sig3["imminent_extremum"] is True
+    assert sig3["extremum"]["kind"] == "max"
+    assert sig3["reasons"] == ["extremum"]
+    sig1 = campaign.project_signal(db, camp, p, extremum_days=1)
+    assert sig1["imminent_extremum"] is False
+    assert sig1["reasons"] == []
+
+
+def test_project_signal_no_signals(db):
+    cid, _ = _mk(db, "Calm 1", cadence=3, visited_days_ago=0)
+    camp = campaign.get(db, cid)
+    sig = campaign.project_signal(db, camp, campaign.projects_of(db, cid)[0])
+    assert sig["due"] is False and sig["event"] is None
+    assert sig["imminent_extremum"] is False
+    assert sig["reasons"] == []
+
+
+def test_tonight_listable_mixes_the_three_signals(db):
+    epoch = variables._now_mjd() + 1 - 300.0 * 100     # max ~1 day out
+    _mk(db, "Due 1")                                    # cadence signal
+    _mk(db, "Event 1", visited_days_ago=0, mags=EVENT_MAGS)
+    _mk(db, "Max 1", visited_days_ago=0,
+        ctx={"variable": {"var_type": "M", "period_d": 300.0,
+                          "epoch_mjd": epoch}})
+    _mk(db, "Calm 1", visited_days_ago=0)               # no signal at all
+    rows = campaign.tonight_listable(db)
+    names = sorted(r["project"]["object_name"] for r in rows)
+    assert names == ["Due 1", "Event 1", "Max 1"]
+
+
+def test_tonight_listable_respects_lifecycle(db):
+    cid, pid = _mk(db, "Gone")                          # due (never visited)
+    assert len(campaign.tonight_listable(db)) == 1
+    project.close(db, pid, outcome="completed")
+    assert campaign.tonight_listable(db) == []          # project finished
+    campaign.finish(db, cid)
+    assert campaign.tonight_listable(db) == []          # campaign finished too

@@ -65,6 +65,8 @@ DEFAULTS = {
     # Track V (ADR-035, V-h): brightness-jump threshold for the variable
     # event advisor (dip/outburst vs. the median of the previous points)
     "event_mag_threshold": 0.5,
+    # ADR-037 (SC1): "extremum imminent" window for campaign signals (days)
+    "campaign_extremum_days": 3,
     # EXOTIC handoff (Track D, subplan 4): camera identity and observer code
     # for the inits.json; height above is reused as "Obs. Elevation (meters)"
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)

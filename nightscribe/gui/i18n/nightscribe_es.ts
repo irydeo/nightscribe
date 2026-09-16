@@ -3687,6 +3687,16 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
         <translation>Salto de brillo (en magnitudes) a partir del cual un proyecto de variable/SN activa el asesor de eventos</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="342"/>
+        <source>Extremum window (days):</source>
+        <translation>Ventana del extremo (días):</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="347"/>
+        <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</source>
+        <translation>Una variable de campaña cuyo máximo o mínimo está a este número de días o menos cuenta como inminente — entra en "Esta noche" (ventana de 0 = hoy)</translation>
+    </message>
+    <message>
         <location filename="../ui/settings_dialog.ui" line="358"/>
         <source>CCDciel (JSON-RPC connection)</source>
         <translation>CCDciel (conexión JSON-RPC)</translation>

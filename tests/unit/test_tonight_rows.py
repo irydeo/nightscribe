@@ -244,3 +244,39 @@ def test_card_button_continue_falls_back_to_create(window, monkeypatch):
                         lambda tt: called.update(t=tt) or {"id": 99})
     btn.clicked.emit()
     assert called.get("t") is t
+
+
+def test_variable_extremum_chip_max(window):
+    # ADR-037 SC3: variable rows get the predicted-extremum countdown chip
+    t = dict(TARGETS[0][0])
+    t.update({"id": "var1", "kind": "variable", "name": "V Cyg",
+              "mag": 9.4, "max_alt": 80,
+              "variable": {"period_d": 150.0, "amp": 1.5,
+                           "next_extremum": {"kind": "max", "mjd": 61044.0,
+                                              "days": 2.4}}})
+    window._tonight_all = [(t, 80.0, TARGETS[0][2], TARGETS[0][3])]
+    window._build_suggestion_grid()
+    from PySide6.QtWidgets import QLabel, QApplication
+    QApplication.processEvents()
+    rows = _all_rows(window)
+    labels = [w.text() for w in rows[0].findChildren(QLabel)]
+    assert any(l in ("maximum in 2.4 d", "máximo en 2.4 d") for l in labels), \
+        f"extremum chip not found: {labels!r}"
+
+
+def test_variable_extremum_chip_min_kind(window):
+    # Eclipsing: the VSX epoch marks the minimum, so the chip reads "minimum"
+    t = dict(TARGETS[0][0])
+    t.update({"id": "var2", "kind": "variable", "name": "β Lyg",
+              "mag": 4.4, "max_alt": 60,
+              "variable": {"period_d": 12.9,
+                           "next_extremum": {"kind": "min", "mjd": 61046.3,
+                                              "days": 4.7}}})
+    window._tonight_all = [(t, 72.0, TARGETS[0][2], TARGETS[0][3])]
+    window._build_suggestion_grid()
+    from PySide6.QtWidgets import QLabel, QApplication
+    QApplication.processEvents()
+    rows = _all_rows(window)
+    labels = [w.text() for w in rows[0].findChildren(QLabel)]
+    assert any(l in ("minimum in 4.7 d", "mínimo en 4.7 d") for l in labels), \
+        f"extremum chip not found: {labels!r}"

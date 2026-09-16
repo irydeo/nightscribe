@@ -1457,6 +1457,18 @@ class MainWindow(QMainWindow):
                 chip.clicked.connect(
                     lambda _c=cid: self._goto_campaigns(_c))
             head.addWidget(chip)
+        # ⏳ predicted extremum of the variability cycle (ADR-037 SC3):
+        #   the max/min kind is decided by the VSX epoch convention inside
+        #   variables.next_extremum — here we only render the countdown
+        nxt = (t.get("variable") or {}).get("next_extremum") or {}
+        if nxt.get("days") is not None:
+            lab = self.tr("maximum") if nxt.get("kind") == "max" \
+                else self.tr("minimum")
+            txt = self.tr("%1 in %2 d").replace("%1", lab) \
+                                  .replace("%2", f"{float(nxt['days']):.1f}")
+            head.addWidget(self._chip(
+                txt, theme.C_OK,
+                self.tr("Next expected extremum (VSX epoch)")))
         # soft-limit warning (ADR-025): predicted-mag kinds beyond the limit
         beyond, delta = suggest.beyond_limit(t, config)
         if beyond:

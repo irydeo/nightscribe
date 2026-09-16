@@ -587,6 +587,13 @@ class MainWindow(QMainWindow):
             lambda: self._open_url("https://www.solarmonitor.org"))
         self.solar.btn_sidc.clicked.connect(
             lambda: self._open_url("https://sidc.be/uset"))
+        # ADR-036 S1: the impact line's link jumps to Tonight
+        self.solar.lbl_impact.linkActivated.connect(
+            lambda _u: self._goto_tab(TAB_TONIGHT))
+        # ADR-036 S2: today's Sun as a social-media PNG
+        self.solar.btn_sun_post.clicked.connect(self.on_render_sun_post)
+        # ADR-036 S3: the bilingual "sky today" draft
+        self.solar.btn_sky_post.clicked.connect(self.on_sky_post)
         # ADR-036 (J0): the journal lives in the Tools menu, not in the
         # tab bar; Ctrl+1..5 switches the five main tabs.
         self._menus.action_journal.triggered.connect(
@@ -6191,6 +6198,8 @@ class MainWindow(QMainWindow):
 
     def _sun_done(self, data, img_path, hmi_path):
         self.solar.btn_refresh_sun.setEnabled(True)
+        self._last_sun = data             # S2: kept for the social PNG
+        self._last_sun_img = img_path
         if img_path:
             self._set_sun_image(img_path)
         lines = []
@@ -6218,6 +6227,41 @@ class MainWindow(QMainWindow):
         self.solar.txt_sun_data.setPlainText("\n".join(lines))
         self._fill_almanac()
         self._draw_sun_map(data.get("regions") or [], hmi_path)
+
+    def on_sky_post(self):
+        # ADR-036 S3: the bilingual "sky today" draft — Sun (if loaded)
+        # + Moon + dusk planets, ready to copy (narrative.sky_draft).
+        from ..core import coords, ephem_minor, narrative
+        from .skypost_dialog import SkyPostDialog
+        jd = coords.jd_from_datetime(
+            datetime.datetime.now(datetime.timezone.utc))
+        moon = ephem_minor.moon(jd)
+        draft = narrative.sky_draft(getattr(self, "_last_sun", None) or {},
+                                    moon, self._planets_at_dusk())
+        SkyPostDialog(draft, parent=self).exec()
+
+    def on_render_sun_post(self):
+        # ADR-036 S2: today's Sun as a shareable PNG — the panel the CLI
+        # (`solar --png`) already produced, now one click from the tab.
+        # Written to the posts folder and shown in the chart viewer.
+        data = getattr(self, "_last_sun", None)
+        if not data:
+            self.statusBar().showMessage(
+                self.tr("Refresh the Sun first"), 5000)
+            return
+        from ..viz import sun_panel
+        out = paths.data_dir() / "posts" / (
+            "sun_" + datetime.date.today().isoformat() + ".png")
+        out.parent.mkdir(parents=True, exist_ok=True)
+        sun_panel.draw_sun(getattr(self, "_last_sun_img", None), data,
+                           out=str(out),
+                           watermark=config.get("observatory_name",
+                                                "NightScribe"),
+                           lang=self._lang())
+        self.statusBar().showMessage(
+            self.tr("Saved to: %1").replace("%1", str(out)), 8000)
+        from .chart_viewer import open_chart
+        open_chart(self, str(out), title=self.tr("Sun today"))
 
     def _set_sun_image(self, img_path):
         from PySide6.QtGui import QPixmap
@@ -6260,8 +6304,40 @@ class MainWindow(QMainWindow):
             .replace("%1", f"{m['illum'] * 100:.0f}")
             .replace("%2", f"{m['dist_km']:,.0f}")
             .replace("%3", f"{m['phase_age_days']:.0f}"))
+        # ADR-036 S1: the "impact on your night" line — the tab connects
+        # its context to the observing plan (Moon -> faint targets, Kp ->
+        # auroras) instead of standing alone
+        parts = []
+        illum = m["illum"]
+        limit = float(config.get("moon_max_illum", 0.5))
+        if illum > limit:
+            parts.append(self.tr(
+                "Moon %1% lit — faint targets are penalised tonight")
+                .replace("%1", f"{illum * 100:.0f}"))
+        else:
+            parts.append(self.tr(
+                "Moon %1% lit — a good night for faint targets")
+                .replace("%1", f"{illum * 100:.0f}"))
+        kp = (getattr(self, "_last_sun", None) or {}).get("kp")
+        if kp is not None and kp >= 5:
+            parts.append(self.tr(
+                "Kp %1 — mid-latitude auroras possible")
+                .replace("%1", f"{kp:.1f}"))
+        link = ("<a href='tonight://'>"
+                + self.tr("See Tonight →") + "</a>")
+        self.solar.lbl_impact.setText(" · ".join(parts) + " — " + link)
         self.solar.lbl_moon_icon.setPixmap(
             moon_icon.moon_pixmap(m["elong_deg"], 20))
+        self.solar.lbl_planets.setText(
+            self.tr("Planets at dusk: ")
+            + (", ".join(self._planets_at_dusk())
+               if self._planets_at_dusk() else self.tr("none above 15°")))
+
+    def _planets_at_dusk(self):
+        # The naked-eye planets above 15° at dusk (Schlyter, pure local
+        # maths) — shared by the almanac line and the sky-post draft (S3).
+        # @return: ["Venus (mag -4.2, 18°)", ...]
+        from ..core import coords, ephem_minor
         window = coords.tonight_window(config.get("lat"), config.get("lon"))
         visible = []
         if window:
@@ -6274,9 +6350,7 @@ class MainWindow(QMainWindow):
                 if alt >= 15:
                     visible.append(f"{name.capitalize()} (mag {p['mag']}, "
                                    f"{alt:.0f}°)")
-        self.solar.lbl_planets.setText(
-            self.tr("Planets at dusk: ")
-            + (", ".join(visible) if visible else self.tr("none above 15°")))
+        return visible
 
     # ---------------- Observing journal (ADR-036) ----------------
 

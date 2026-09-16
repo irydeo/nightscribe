@@ -18,11 +18,12 @@
        <item><property name="text"><string>Magnetogram</string></property></item>
       </widget>
      </item>
-     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="sunMain">
+      <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+      <item><widget class="QPushButton" name="btn_sun_post"><property name="text"><string>Render PNG for socials</string></property><property name="toolTip"><string>Write today's Sun panel (with the observatory watermark) for your networks</string></property></widget></item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="sunMain">
      <item>
       <widget class="QLabel" name="lbl_sun_image">
        <property name="alignment"><enum>Qt::AlignCenter</enum></property>
@@ -50,6 +51,12 @@
     </layout>
    </item>
    <item>
+    <widget class="QLabel" name="lbl_impact">
+     <property name="wordWrap"><bool>true</bool></property>
+     <property name="text"><string/></property>
+    </widget>
+   </item>
+   <item>
     <widget class="QGroupBox" name="grp_almanac">
      <property name="title"><string>Moon and planets tonight</string></property>
      <layout class="QVBoxLayout">
@@ -70,9 +77,10 @@
      </layout>
     </widget>
    </item>
-   <item>
-    <layout class="QHBoxLayout">
-     <item><widget class="QLabel" name="lbl_links"><property name="text"><string>More:</string></property></widget></item>
+    <item>
+     <layout class="QHBoxLayout">
+      <item><widget class="QPushButton" name="btn_sky_post"><property name="text"><string>Sky post draft…</string></property><property name="toolTip"><string>Draft the bilingual "sky today" post (Sun + Moon + planets)</string></property></widget></item>
+      <item><widget class="QLabel" name="lbl_links"><property name="text"><string>More:</string></property></widget></item>
      <item><widget class="QPushButton" name="btn_raben"><property name="text"><string>Raben maps</string></property></widget></item>
      <item><widget class="QPushButton" name="btn_solarmonitor"><property name="text"><string>SolarMonitor</string></property></widget></item>
      <item><widget class="QPushButton" name="btn_sidc"><property name="text"><string>SIDC</string></property></widget></item>

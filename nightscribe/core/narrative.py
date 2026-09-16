@@ -545,6 +545,32 @@ def _sun_facts(d):
     return out
 
 
+def sky_draft(sun, moon, planets):
+    # The "sky today" outreach draft (ADR-036, S3): hook + Sun + Moon +
+    # naked-eye planets at dusk, bilingual markdown ready to paste. Built
+    # from the same data the "Sun & sky" tab shows.
+    # @args: sun - solar.solar_now() dict (may be {}), moon -
+    #        ephem_minor.moon() dict, planets - ["Venus (mag -4.2, 18°)",
+    #        ...] visible at dusk (may be empty)
+    # @return: {"es": str, "en": str}
+    es, en = [], []
+    es.append("**El cielo de hoy**")
+    en.append("**Today's sky**")
+    for b in _sun_facts(sun or {}):
+        es.append("• " + b["es"])
+        en.append("• " + b["en"])
+    if moon:
+        es.append("• La Luna está al "
+                  f"{moon['illum'] * 100:.0f}% (edad {moon['phase_age_days']:.0f} días)."
+                  )
+        en.append(f"• The Moon is {moon['illum'] * 100:.0f}% lit "
+                  f"(age {moon['phase_age_days']:.0f} days).")
+    if planets:
+        es.append("• Al anochecer: " + ", ".join(planets) + ".")
+        en.append("• At dusk: " + ", ".join(planets) + ".")
+    return {"es": "\n".join(es), "en": "\n".join(en)}
+
+
 def safe_window_text(t, duration_s=None):
     # The session-safe observing window (ADR-020): when the planned sequence
     # still clears the local horizon and the latest safe start. Bilingual so

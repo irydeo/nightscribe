@@ -23,7 +23,7 @@
        <attribute name="title"><string>Campaigns</string></attribute>
       </widget>
       <widget class="QWidget" name="tab_solar">
-       <attribute name="title"><string>Solar system</string></attribute>
+       <attribute name="title"><string>Sun &amp; sky</string></attribute>
       </widget>
       <widget class="QWidget" name="tab_observatory">
        <attribute name="title"><string>Observatory</string></attribute>

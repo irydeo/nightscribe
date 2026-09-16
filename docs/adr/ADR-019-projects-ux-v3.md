@@ -1,6 +1,6 @@
 # ADR-019: UX v3 — project-centric workflow
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06, 2026-09 (Track UX)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06, 2026-09 (Track UX), 2026-09-16
 
 ## Español
 
@@ -114,6 +114,38 @@ de estado ✔/●/○/– como la fuente de complejidad del flujo de proyecto.
 automático al completar el último paso se conserva. El control de CCDciel sale
 del paso Plan a la pestaña **Observatory** (6ª): la conexión ya era de
 ventana, ahora también su UI.
+
+**Revisión 2026-09 (acordeón + chip de estado)**: la página del proyecto
+gana la regla del «único lugar de aterrizaje» — toda la página es un único
+acordeón exclusivo donde como mucho una de las secciones **Ficha de objeto /
+plan / procesado / publicar / seguimiento** está abierta a la vez (0 abiertas
+es un estado de reposo legal; nada se fuerza abierto). Un clic real en la
+cabecera lo gobierna (`sectionToggled`, disparado solo por el clic del
+usuario; el `setCollapsed()` programático permanece silencioso, así que el
+cierre de hermanas nunca rebota), y cada enlace profundo (el botón «Go»,
+los chips de cadencia, las acciones de contexto) se enruta por el mismo
+camino de scroll-a-sección que impone el invariante. Un proyecto recién
+creado se abre con solo su sección de siguiente acción expandida — la ficha
+de objeto arranca plegada como las demás (un borrador anterior mantenía la
+ficha y la lista de ficheros inmunes al grupo; quedó revocado: la ficha
+participa para que la página nunca muestre dos secciones abiertas a la vez).
+Los *estados* ya vivían en palabras en la fila del toggle de cada paso
+(«hecho el <fecha>» / «saltado» / «pendiente»); esas mismas palabras viajan
+ahora en la cabecera de la sección como chip, de modo que el estado del paso
+sobrevive aunque el paso esté plegado.
+
+**Revisión (2026-09-16)** — reasentamiento de pestañas y rol de Campañas
+(ADR-036 / ADR-037): la línea «Cuatro pestañas: Esta noche · Proyectos ·
+Solar · Historial» queda **superseded**. La barra final son **cinco**
+pestañas — *Esta noche · Proyectos · Campañas · Sol y cielo · Observatorio*:
+History sale de la barra y se convierte en el diálogo «Diario de
+observación…» del menú Herramientas (vista derivada auto-generada — la
+tabla `observations` llevaba sin escritor desde `8822ca7`), y Solar se
+renombra «Sol y cielo» como pestaña de divulgación con salida a redes
+(ADR-036). El rol de la pestaña Campaigns se redefine como **consola de
+señales** del compromiso (eventos ⚡ y extremos ⏳ agregados), frente a
+Proyectos = ejecutar (ADR-037). El modelo de proyecto (3 pasos, página
+única, ciclo de vida) no cambia.
 
 ## English
 
@@ -245,3 +277,15 @@ shows two open sections at once). The *states* already lived in words on
 each step's toggle row ("done on <date>" / "skipped" / "pending"); the
 same words now ride the section header as a chip so the step status
 survives even when a step is collapsed.
+
+**Review (2026-09-16)** — tab settlement and the Campaigns role (ADR-036 /
+ADR-037): the line "Four tabs: Tonight · Projects · Solar · History" is
+**superseded**. The final bar holds **five** tabs — *Tonight · Projects ·
+Campaigns · Sun & sky · Observatory*: History leaves the bar and becomes
+the "Observing journal…" dialog under the Tools menu (an auto-generated
+derived view — the `observations` table had no writer since `8822ca7`),
+and Solar is renamed "Sun & sky" as the outreach tab with a social-media
+output (ADR-036). The Campaigns tab's role is redefined as the
+commitment's **signals console** (aggregated ⚡ events and ⏳ extrema),
+versus Projects = execute (ADR-037). The project model (3 steps, single
+page, lifecycle) is unchanged.

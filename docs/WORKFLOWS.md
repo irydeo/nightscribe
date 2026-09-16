@@ -697,3 +697,24 @@ filter, stale detail cleared, CTA no longer closes on failure).
 **Status**: unit suite green (**1146**). **Out of this iteration**:
 campaign-level photometric export, campaign sharing, the featured-
 variables discovery add-on (approved 2026-09-12, its own track).
+
+### Next tracks decided (2026-09-16 — ADR-036 + ADR-037)
+
+With the UX track closed, the review with the observer settled the final
+tab-bar layout and the two tracks that follow, **in this order**
+(decisions already documented; execution pending — all on branch
+`feature/campaigns-ux`, per the user's decision):
+
+1. **Signals & campaigns** — `docs/adr/ADR-037-campaign-signals.md` +
+   plan `docs/PLANS/signals-campaigns.md`. Campaigns = signals console
+   (aggregated ⚡ events and ⏳ extrema, "N of M up to date" coverage);
+   Tonight lists campaign projects for science reasons, not just
+   cadence (detected event **or** imminent extremum,
+   `campaign_extremum_days`); T CrB/R CrB vigils via ZTF/ALeRCE. The
+   taxonomy of the events shown is fixed in ADR-037's table.
+2. **Journal & Outreach** — `docs/adr/ADR-036-journal-and-sunsky.md` +
+   plan `docs/PLANS/journal-outreach.md`. History leaves the tab bar →
+   "Observing journal…" dialog under the Tools menu (auto-generated
+   derived view, grouped by observing night; the bar keeps 5 tabs:
+   Tonight · Projects · Campaigns · Sun & sky · Observatory) and Solar
+   → "Sun & sky", the outreach tab with a "Render PNG for socials" CTA.

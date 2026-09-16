@@ -869,3 +869,26 @@ cierra al fallar).
 exportación fotométrica a nivel de campaña, compartir campañas, el
 add-on de descubrimiento de variables destacadas (aprobado el
 2026-09-12, su propio track).
+
+### Próximos tracks decididos (2026-09-16 — ADR-036 + ADR-037)
+
+Con el Track UX cerrado, la revisión con el observador fijó el
+reasentamiento final de la barra de pestañas y los dos tracks que
+siguen, **en este orden** (decisiones ya documentadas; ejecución
+pendiente — todo en la rama `feature/campaigns-ux`, decisión del
+usuario):
+
+1. **Señales y campañas** — `docs/adr/ADR-037-campaign-signals.md` +
+   plan `docs/PLANS/signals-campaigns.md`. Campañas = consola de
+   señales (eventos ⚡ y extremos ⏳ agregados, cobertura «N de M al
+   día»); Tonight lista proyectos de campaña por ciencia y no solo por
+   cadencia (evento detectado **o** extremo inminente,
+   `campaign_extremum_days`); vigilias T CrB/R CrB vía ZTF/ALeRCE. La
+   taxonomía de eventos mostrados está fijada en la tabla de ADR-037.
+2. **Diario & Divulgación** — `docs/adr/ADR-036-journal-and-sunsky.md`
+   + plan `docs/PLANS/journal-outreach.md`. History sale de la barra →
+   diálogo «Diario de observación…» en el menú Herramientas (vista
+   derivada auto-generada, agrupada por noche astronómica; la barra
+   queda en 5 pestañas: Esta noche · Proyectos · Campañas · Sol y cielo
+   · Observatorio) y Solar → «Sol y cielo», la pestaña de divulgación
+   con CTA «Generar PNG para redes».

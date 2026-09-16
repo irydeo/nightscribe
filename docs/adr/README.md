@@ -41,3 +41,5 @@
 | [033](ADR-033-versioning-setuptools-scm.md) | Versionado automático con setuptools-scm / automatic versioning with setuptools-scm |
 | [034](ADR-034-hads-stars.md) | Estrellas HADS: catálogo empaquetado, observación continua sin fase / HADS stars: bundled catalogue, phase-free continuous observation |
 | [035](ADR-035-variables-campaigns.md) | Variables de largo periodo y campañas de observación (kind `variable`, campaña 1:N, VSX/SIMBAD, HJD) / long-period variables and observing campaigns (`variable` kind, 1:N campaign, VSX/SIMBAD, HJD) |
+| [036](ADR-036-journal-and-sunsky.md) | Historial → Diario de observación (menú, vista derivada) y Solar → «Sol y cielo» (divulgación) / History → observing journal (menu, derived view) & Solar → "Sun & sky" (outreach) |
+| [037](ADR-037-campaign-signals.md) | Campañas = consola de señales; eventos de variables en tres pisos / Campaigns = signals console; variable-star events in three tiers |

@@ -1832,50 +1832,55 @@ def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
 
 
 def test_journal_double_click_opens_project(window, panel):
-    # ADR-036 (J0): the journal is a Tools-menu dialog now; a double-click
-    # on a row opens the active project of the same object (hub row).
+    # ADR-036 (J0+J2): the journal is a Tools-menu dialog fed by
+    # core/journal.py; activating an entry opens the object's project.
     # harness: `panel` slots the fake loader (the hub contract, the real
     # ExploreWorker is never built); the hub list is refreshed first so
     # _goto_active_project can select the new row.
     from PySide6.QtCore import Qt
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
+    from nightscribe.gui.journal_dialog import JournalDialog
     p = proj_mod.create(mw.db, "sn", "SN 2099ff", {"mag": 15.0})
     mw.db.mark_observed("SN 2099ff", "sn", "2026-09-13")
     window.on_refresh_projects()
-    dlg, w = window._build_journal_dialog()
-    tbl = w.tbl_history
-    row = next(r for r in range(tbl.rowCount())
-               if tbl.item(r, 1) and tbl.item(r, 1).text() == "SN 2099ff")
-    window._journal_open(w, row)
+    dlg = JournalDialog(mw.db, on_open_object=window._journal_entry_open)
+    lst = dlg.lst
+    item = next(lst.item(i) for i in range(lst.count())
+                if (lst.item(i).data(Qt.UserRole + 1) or "") == "SN 2099ff")
+    lst.itemActivated.emit(item)
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
     dlg.deleteLater()
 
 
 def test_journal_double_click_without_project_explores(window, monkeypatch):
+    from PySide6.QtCore import Qt
     from nightscribe.gui import main_window as mw
+    from nightscribe.gui.journal_dialog import JournalDialog
     mw.db.mark_observed("2099 ZZ9", "neo", "2026-09-13")
     seen = []
     monkeypatch.setattr(window, "_open_explore_dialog",
                         lambda name: seen.append(name))
-    dlg, w = window._build_journal_dialog()
-    tbl = w.tbl_history
-    row = next(r for r in range(tbl.rowCount())
-               if tbl.item(r, 1) and tbl.item(r, 1).text() == "2099 ZZ9")
-    window._journal_open(w, row)
+    dlg = JournalDialog(mw.db, on_open_object=window._journal_entry_open)
+    lst = dlg.lst
+    item = next(lst.item(i) for i in range(lst.count())
+                if (lst.item(i).data(Qt.UserRole + 1) or "") == "2099 ZZ9")
+    lst.itemActivated.emit(item)
     assert seen == ["2099 ZZ9"]
     dlg.deleteLater()
 
 
 def test_gesture_language_is_consistent(window):
     # UX-c sweep: every list/table that navigates advertises it with the
-    # hand cursor (the journal's table lives in the Tools-menu dialog
-    # since ADR-036 J0)
+    # hand cursor (the journal lives in the Tools-menu dialog since
+    # ADR-036 J0, rebuilt on core/journal.py in J2)
     from PySide6.QtCore import Qt
-    dlg, jw = window._build_journal_dialog()
+    from nightscribe.gui import main_window as mw
+    from nightscribe.gui.journal_dialog import JournalDialog
+    dlg = JournalDialog(mw.db)
     for w in (window.projects.lst_projects, window.campaigns.lst_campaigns,
-              window.campaigns.tbl_members, jw.tbl_history):
+              window.campaigns.tbl_members, dlg.lst):
         assert w.viewport().cursor().shape() == Qt.PointingHandCursor, \
             f"{w.objectName()} lost its hand cursor"
     dlg.deleteLater()

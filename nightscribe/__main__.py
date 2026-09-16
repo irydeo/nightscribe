@@ -126,15 +126,19 @@ def cmd_solar(args):
 
 
 def cmd_history(args):
-    # Observation history.
-    rows = db.history(50)
-    if not rows:
-        print("Sin observaciones registradas / No observations recorded yet")
+    # Observing journal (ADR-036): the derived activity view, grouped by
+    # observing night (noon-to-noon local).
+    from .core import journal
+    nights = journal.build_journal(db, days=90)
+    if not nights:
+        print("Sin actividad registrada / No activity recorded yet")
         return
-    print("== Historial / History ==")
-    for r in rows:
-        posted = "✓ post" if r["posted"] else "  —   "
-        print(f"{r['obs_date']}  {r['object']:<22s} [{r['type'] or '?':8s}] {posted}")
+    for n in nights[:14]:
+        print(f"== Noche / Night {n['night']} ==")
+        for e in n["events"]:
+            es, en = e["text"]
+            print(f"  {journal.hm_local(e['ts'])}  {e['object']:<22s} "
+                  f"{es} / {en}")
 
 
 def cmd_blink(args):

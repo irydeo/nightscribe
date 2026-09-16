@@ -6276,62 +6276,21 @@ class MainWindow(QMainWindow):
 
     # ---------------- Observing journal (ADR-036) ----------------
 
-    def _build_journal_dialog(self):
-        # The journal dialog (ADR-036, J0): the history table leaves the
-        # tab bar for the Tools menu — an occasional-recall tool. Split
-        # from _open_journal_dialog so tests can drive it without exec().
-        # @return: (dialog, journal_widget)
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, \
-            QDialogButtonBox
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Observing journal"))
-        lay = QVBoxLayout(dlg)
-        w = _load_ui("history_tab")
-        lay.addWidget(w)
-        btns = QDialogButtonBox(QDialogButtonBox.Close)
-        btns.rejected.connect(dlg.reject)
-        lay.addWidget(btns)
-        # UX-c/UX-d: the rows are links to their project (or to Explore
-        # when there is none)
-        w.btn_refresh_hist.clicked.connect(lambda: self._journal_fill(w))
-        w.tbl_history.cellDoubleClicked.connect(
-            lambda row, _col: self._journal_open(w, row))
-        w.tbl_history.viewport().setCursor(Qt.PointingHandCursor)
-        w.tbl_history.setToolTip(
-            self.tr("Double-click a row to open its project or explore "
-                    "the object"))
-        dlg.resize(760, 480)
-        self._journal_fill(w)
-        return dlg, w
-
     def _open_journal_dialog(self):
-        # Menu Tools → Observing journal…: build and show modally.
-        dlg, _w = self._build_journal_dialog()
+        # Menu Tools → Observing journal… (ADR-036, J2): the derived
+        # journal dialog (core/journal.py); entries jump to their project
+        # or to Explore.
+        from .journal_dialog import JournalDialog
+        dlg = JournalDialog(db, lang=self._lang(),
+                            on_open_object=self._journal_entry_open,
+                            parent=self)
         dlg.exec()
 
-    def _journal_fill(self, w):
-        # @args: w - the journal widget (history_tab.ui inside the dialog)
-        tbl = w.tbl_history
-        tbl.setSortingEnabled(False)
-        tbl.setRowCount(0)
-        for r in db.history(100):
-            row = tbl.rowCount()
-            tbl.insertRow(row)
-            for col, val in enumerate((r["obs_date"], r["object"],
-                                       r["type"] or "",
-                                       "✔" if r["posted"] else "",
-                                       r["notes"])):
-                tbl.setItem(row, col, QTableWidgetItem(val))
-        tbl.setSortingEnabled(True)
-        tbl.sortItems(0, Qt.DescendingOrder)
-
-    def _journal_open(self, w, row):
-        # Double-click on a journal row: open the object's active project,
-        # or explore the object when there is none (UX-c/UX-d).
-        # @args: w - the journal widget, row - the table row
-        name_item = w.tbl_history.item(row, 1)
-        name = name_item.text().strip() if name_item is not None else ""
-        if not name:
+    def _journal_entry_open(self, name, pid):
+        # A journal entry jumps to its project (by id when known, else by
+        # name), or to Explore when there is none (UX-c/UX-d).
+        # @args: name - object name, pid - project id or None
+        if pid is not None and self._goto_project_by_id(pid):
             return
         if not self._goto_active_project(name):
             self._open_explore_dialog(name)

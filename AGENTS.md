@@ -65,7 +65,10 @@ nightscribe/
     orbits.py        # familias orbitales + parámetros explicados
     hads.py          # HADS: catálogo híbrido (snapshot+sheet), merge, mat. de sesión
     variables.py     # variables: extremos VSX, HJD (Sol Schlyter), asesor de eventos
-    campaign.py      # campañas 1:N ortogonales (CRUD, protocolo, due_campaigns)
+    campaign.py      # campañas 1:N ortogonales (CRUD, protocolo, due_campaigns,
+                     #   project_signal, tonight_listable, signals_report — ADR-037)
+    vigils.py        # vigilias de variables (ADR-037 SC4a): lista curada editable
+                     #   (T CrB/R CrB), chequeo ZTF vs basal (caché propia 12 h)
     photometry_export.py  # reporte fotométrico: CSV + AAVSO EFF (TTL n/a, local)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
@@ -83,6 +86,9 @@ nightscribe/
                       #   solo comanda con CCDciel abierto; lecturas cacheadas TTL 60s)
                       # + vsx.py: AAVSO VSX (subdominio vsx.aavso.org, TTL 7 d; ADR-035)
                       # + surveys.py: contexto ALeRCE/ZTF en curvas (TTL 30 d; ADR-035)
+                      #   y última magnitud para vigilias (claves "vigils:", TTL 12 h)
+                      # + aavso.py: canal editorial AAVSO — alertas del foro (JSON
+                      #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —

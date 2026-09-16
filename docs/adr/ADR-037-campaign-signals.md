@@ -1,6 +1,6 @@
 # ADR-037: Campañas = consola de señales; eventos de estrellas variables en tres pisos (detectados, predichos, vigilias)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-16
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-16 · **Revisión / Review**: 2026-09-16 (re-scope de SC4, mismo día) · **rev. 2 (mismo día, hallazgo del spike)**: el backend de las vigilias se elige **por brillo** — ver abajo · **ejecutado completo el mismo día**: SC1–SC3 (`fcdf443`/`f96b2e6`/`50bdf58`) + SC4a/SC4b — suite unitaria 1244
 
 **Ver / See**: [docs/PLANS/signals-campaigns.md](../PLANS/signals-campaigns.md)
 (plan del track) · ADR-035 (variables y campañas, cuyo rol de pestaña se
@@ -77,6 +77,48 @@ Track UX). El Diario de ADR-036 registrará los eventos ⚡ como entradas de
 la noche. Ejecución por fases SC1→SC5 en
 [docs/PLANS/signals-campaigns.md](../PLANS/signals-campaigns.md).
 
+**Revisión (2026-09-16, re-scope de SC4 — el mismo día, decidido con el
+observador)**: la expectativa del observador es *«que los eventos
+relevantes de variables aparezcan en las recomendaciones nocturnas»* — más
+amplio que una lista de estrellas configurada a mano. SC4 pasa a ser
+**híbrido**, en dos mitades:
+
+- **SC4a — vigilias automáticas** (sin fuente nueva): lista de guardia
+  **curada, precargada y editable** (defectos: T CrB → vigilia de erupción,
+  basal ~10,2 V; R CrB → vigilia de caída, basal ~5,8 V) chequeada contra
+  la última magnitud ZTF vía ALeRCE (`surveys.py`). La vigilia necesita el
+  *último* punto, así que usa **clave de caché propia con TTL corto
+  (~12 h)** — nunca la caché de contexto de 30 días. Una anomalía levanta
+  una fila en Tonight (filtrada por el horizonte, como todo) y una señal en
+  la consola. **Regla de fusión**: si la estrella ya es proyecto (p. ej. el
+  T CrB del observador en el grupo obsSN), la vigilia se suma a las razones
+  de listado de ese proyecto con procedencia 👁 — nunca una fila duplicada.
+- **SC4b — el canal editorial AAVSO** (arriba figuraba *fuera de alcance* —
+  **entra en alcance** aquí): las alertas AAVSO (la categoría *Alerts* del
+  foro es Discourse, con JSON nativo por categoría, parseable con la
+  stdlib) y la app de Observing Campaigns. La **primera tarea de SC4b es un
+  spike de validación**: si el JSON/apps no son consumibles, SC4b se acota
+  a lo viable y se documenta el resultado. Las estrellas se resuelven a
+  coordenadas vía VSX (ya en la app) y se filtran por horizonte; las filas
+  de Tonight llevan la procedencia «AAVSO» y la misma regla de fusión.
+  Sigue fuera de alcance: ASAS-SN Sky Patrol (demasiado ruido para la
+  filosofía de la app).
+
+**Revisión 2 (2026-09-16, hallazgo del spike en vivo)**: la fuente de las
+vigilias pasa a elegirse **por brillo**. Verificado contra el catálogo
+vivo: ni T CrB (10,2 V) ni R CrB (5,8 V) — ni SS Cyg/SU Tau en sus
+brillos habituales — tienen objeto en ALeRCE/ZTF, porque **ZTF satura por
+debajo de ~11-12 mag** (el conesearch funciona en otros campos; en esas
+posiciones simplemente no hay objeto). Diseño resultante: vigilias con
+basal < `BRIGHT_LIMIT` (11,5) leen la **fotometría de la comunidad AAVSO**
+(`GET /v2/api/observations/photometry/`, endpoint oficial con token de API
+del usuario — 401 sin él; latencia de horas, mejor que la de surveys); las
+débiles siguen con ZTF/ALeRCE. Sin token configurado, las vigilias
+brillantes permanecen en silencio (degradación amable, documentada en la
+ayuda del editor). ASAS-SN Sky Patrol se evaluó como backend alternativo
+de brillantes y estaba **inalcanzable** durante el spike (timeout); queda
+como opción futura si se valida en vivo.
+
 ## English
 
 **Context**: with the UX track closed, a review of the app with the observer
@@ -145,3 +187,44 @@ only *who gets listed* changes). New core pieces: the signals aggregation
 `SurveyWorker` pattern). The journal of ADR-036 will record ⚡ events as
 night entries. Execution in phases SC1→SC5 per
 [docs/PLANS/signals-campaigns.md](../PLANS/signals-campaigns.md).
+
+**Review (2026-09-16, SC4 re-scope — same day, decided with the
+observer)**: the observer's expectation is *"relevant variable-star events
+surfaced in the nightly recommendations"*, which is broader than a
+hand-configured watchlist. SC4 therefore becomes **hybrid**, in two halves:
+
+- **SC4a — automatic vigils** (no new source): a **curated, preloaded,
+  editable** watch list (defaults: T CrB → eruption watch, baseline ~10.2 V;
+  R CrB → fade watch, baseline ~5.8 V) checked against the latest ZTF
+  magnitude via ALeRCE (`surveys.py`). The vigil needs the *latest* point,
+  so it uses its **own cache key with a short TTL (~12 h)** — never the
+  30-day context cache. An anomaly raises a Tonight row (horizon-filtered
+  like everything else) and a console signal. **Fusion rule**: if the star
+  already is a project (e.g. the observer's T CrB from the obsSN group),
+  the vigil joins that project's listing reasons with 👁 provenance — never
+  a duplicate row.
+- **SC4b — the AAVSO editorial channel** (was *out of scope* above — it
+  **enters scope** here): AAVSO alerts (the forums' Alerts category is
+  Discourse, with native per-category JSON, parseable with the stdlib) and
+  the Observing Campaigns app. The **first task of SC4b is a validation
+  spike**: if the JSON/apps are not consumable, SC4b is cut down to what is
+  viable and the result is documented. Stars are resolved to coordinates
+  via VSX (already in the app) and horizon-filtered; Tonight rows carry the
+  "AAVSO" provenance and the same fusion rule. Still out of scope:
+  ASAS-SN Sky Patrol (too noisy for this app's philosophy).
+
+**Review 2 (2026-09-16, live-spike finding)**: the vigil photometry source
+is now chosen **by brightness**. Verified against the live catalogue:
+neither T CrB (10.2 V) nor R CrB (5.8 V) — nor SS Cyg/SU Tau at their
+usual brightness — have an ALeRCE/ZTF object at all, because **ZTF
+saturates brighter than ~11-12 mag** (the conesearch works on other
+fields; there is simply no object at those positions). The resulting
+design: vigils with a baseline below `BRIGHT_LIMIT` (11.5) read the
+**AAVSO community photometry** (`GET /v2/api/observations/photometry/`,
+the official endpoint, behind the user's API token — 401 without it;
+hours-scale latency, better than surveys); fainter ones keep
+ZTF/ALeRCE. With no token configured, bright vigils stay silent
+(graceful degradation, documented in the editor's help). ASAS-SN Sky
+Patrol was evaluated as the alternative bright backend and was
+**unreachable** during the spike (connect timeout); it remains a future
+option if validated live.

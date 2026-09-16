@@ -874,17 +874,12 @@ add-on de descubrimiento de variables destacadas (aprobado el
 
 Con el Track UX cerrado, la revisión con el observador fijó el
 reasentamiento final de la barra de pestañas y los dos tracks que
-siguen, **en este orden** (decisiones ya documentadas; ejecución
-pendiente — todo en la rama `feature/campaigns-ux`, decisión del
-usuario):
+siguen, **en este orden** (decisiones documentadas; todo en la rama
+`feature/campaigns-ux`, decisión del usuario):
 
 1. **Señales y campañas** — `docs/adr/ADR-037-campaign-signals.md` +
-   plan `docs/PLANS/signals-campaigns.md`. Campañas = consola de
-   señales (eventos ⚡ y extremos ⏳ agregados, cobertura «N de M al
-   día»); Tonight lista proyectos de campaña por ciencia y no solo por
-   cadencia (evento detectado **o** extremo inminente,
-   `campaign_extremum_days`); vigilias T CrB/R CrB vía ZTF/ALeRCE. La
-   taxonomía de eventos mostrados está fijada en la tabla de ADR-037.
+   plan `docs/PLANS/signals-campaigns.md`. **Ejecutado completo el
+   2026-09-16** (SC1–SC5): ver la sección 7septdecies más abajo.
 2. **Diario & Divulgación** — `docs/adr/ADR-036-journal-and-sunsky.md`
    + plan `docs/PLANS/journal-outreach.md`. History sale de la barra →
    diálogo «Diario de observación…» en el menú Herramientas (vista
@@ -892,3 +887,41 @@ usuario):
    queda en 5 pestañas: Esta noche · Proyectos · Campañas · Sol y cielo
    · Observatorio) y Solar → «Sol y cielo», la pestaña de divulgación
    con CTA «Generar PNG para redes».
+
+### 7septdecies. Track SC — Señales y campañas (2026-09-16, ADR-037)
+
+Plan: `docs/PLANS/signals-campaigns.md`. Rama `feature/campaigns-ux`
+(todo el trabajo de esta era vive en esta rama, decisión del usuario).
+
+La revisión con el observador detectó dos carencias: la pestaña Campañas
+era funcionalmente «el hub filtrado por campaña» y los eventos de
+variables apenas se veían (un evento en un proyecto *al día* nunca salía
+en Tonight — `due_campaigns` filtraba antes de evaluar). El track
+entrega: la **triple condición de listado** (vencido **o** evento
+detectado **o** extremo inminente `campaign_extremum_days`, con
+`campaign.project_signal()` como fuente única de verdad — SC1); la
+**consola de señales** en la pestaña Campañas (`signals_report`: eventos
+⚡ primero, extremos ⏳ por llegada, cobertura «N de M al día» — SC2); el
+**chip de extremo** en las filas de Tonight (convención VSX de época —
+SC3); y los **eventos relevantes de variables** en dos canales
+(SC4, re-scope pactado el mismo día): las **vigilias automáticas**
+(`core/vigils.py`, lista curada T CrB/R CrB editable en Ajustes, última
+magnitud ZTF/ALeRCE contra basal con **caché propia de 12 h** — nunca la
+de contexto de 30 d) y el **canal editorial AAVSO**
+(`core/sources/aavso.py`: alertas del foro —Discourse sirve JSON nativo—
+y campañas activas parseadas de la app; spike validado antes de
+escribir). Todo con la **regla de fusión** (SC-g): una señal sobre una
+estrella que ya es proyecto se suma a sus razones de listado, jamás una
+fila duplicada.
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| SC1–SC3 | triple condición + consola de señales + chip de extremo | **Hecho** (`fcdf443`, `f96b2e6`, `50bdf58`) |
+| SC4a | vigilias: `core/vigils.py`, fase planner, fusión, chip 👁, consola solo-caché, editor en Ajustes | **Hecho** (24 tests `test_vigils.py`) |
+| SC4b | canal AAVSO: spike (Discourse JSON + tabla de campañas viables), `core/sources/aavso.py`, fase planner, fusión, chip 📣, checkbox en Ajustes | **Hecho** (17 tests `test_aavso.py` con títulos reales del spike) |
+| SC5 | cierre: i18n ES/EN (809 cadenas, 0 unfinished), revisión ADR-035 (rol de la pestaña), esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (**1244**). **Fuera de esta
+iteración**: ASAS-SN Sky Patrol; el cuerpo de los temas del foro (el
+título basta para la fila de Tonight); cadencia ZTF recordada en la ficha
+(la vigilia es red de seguridad, no red de alertas).

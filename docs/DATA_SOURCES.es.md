@@ -90,14 +90,41 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
 - TTL: 7 d. **Degradación**: `lookup()` devuelve `None` si no existe o falla →
   ficha por SIMBAD (coordenadas) → alta manual; Tonight es local y nunca rompe.
 
-### ALeRCE ZTF API v1 — `surveys.py` — contexto de curvas (V-f)
+### ALeRCE ZTF API v1 — `surveys.py` — contexto de curvas (V-f) + vigilias (SC4a)
 
 - `GET https://api.alerce.online/ztf/v1/conesearch?_ra=..&_dec=..&_radius=..` y
   `GET .../lightcurve?oid=<oid>` — dos llamadas cacheadas por objeto (oid →
   curva). Puntos grises de referencia `source="survey:ztf"` bajo los propios,
   nunca mezclados (bandas ZTF g/r/i mapeadas a filtros). Verificado 2026-09-11.
-- TTL: 30 d (la fotometría de survey no cambia). Fallo → `[]`; el botón de
-  surveys avisa y nada más se rompe.
+- TTL: 30 d para el contexto de curvas (la fotometría de survey no cambia).
+  Las **vigilias** (ADR-037) usan las mismas llamadas con claves `vigils:*` y
+  TTL 12 h: la guardia necesita el *último* punto, no el contexto. Fallo →
+  `[]`/`None`; el botón de surveys avisa y nada más se rompe.
+
+### AAVSO canal editorial — `aavso.py` — alertas del foro + campañas (SC4b)
+
+- `GET https://forums.aavso.org/c/observing/alerts/50.json` — el foro es
+  Discourse y sirve JSON nativo por categoría (spike validado 2026-09-16:
+  títulos tipo «SU Tau is dimming», «T CRB Johnson V scores below 8.5»).
+  Se listan los temas con actividad en los últimos 60 d (el *pinned* «About»
+  se descarta).
+- `GET https://apps.aavso.org/v2/campaigns/` — lista HTML de campañas de
+  observación; se parsean las filas `<tr>` (id+enlace | título | solicitante |
+  inicio | fin | tipos) con la stdlib y se filtran las activas
+  (inicio ≤ hoy ≤ fin).
+- El nombre de la estrella se extrae del título con patrones tolerantes
+  (`Nova Sgr 2026 No. 3`, `NSV 11664`, designación + genitivo tipo `SU Tau` /
+  `T CRB`) y se **valida vía VSX** antes de mostrar nada: lo que no resuelve
+  no se muestra. TTL: 12 h. Fallo → `[]`.
+- **Fotometría de la comunidad (vigilias brillantes, SC4a rev. 2)**:
+  `GET https://apps.aavso.org/v2/api/observations/photometry/?target=<estrella>&start_date=..&end_date=..`
+  — endpoint oficial (docs.aavso.org), **exige el token de API del usuario**
+  (`Authorization: Token …`, 401 sin él; se configura en Ajustes junto al
+  código de observador). Es el backend de las vigilias con basal < 11,5 mag:
+  ZTF satura ahí (verificado 2026-09-16: T CrB/R CrB no tienen objeto
+  ALeRCE). Campos usados: `jd_dbl`, `magnitude`, `band` (respuesta
+  DRF-paginada o lista; parseo tolerante). TTL: 12 h. Sin token → `None`,
+  silencio amable.
 
 ## Fuentes de datos de objeto (alimentan «Explora» y «Post»)
 

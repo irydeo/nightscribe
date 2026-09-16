@@ -706,15 +706,48 @@ tab-bar layout and the two tracks that follow, **in this order**
 `feature/campaigns-ux`, per the user's decision):
 
 1. **Signals & campaigns** — `docs/adr/ADR-037-campaign-signals.md` +
-   plan `docs/PLANS/signals-campaigns.md`. Campaigns = signals console
-   (aggregated ⚡ events and ⏳ extrema, "N of M up to date" coverage);
-   Tonight lists campaign projects for science reasons, not just
-   cadence (detected event **or** imminent extremum,
-   `campaign_extremum_days`); T CrB/R CrB vigils via ZTF/ALeRCE. The
-   taxonomy of the events shown is fixed in ADR-037's table.
+   plan `docs/PLANS/signals-campaigns.md`. **Executed in full on
+   2026-09-16** (SC1–SC5): see section 7septdecies below.
 2. **Journal & Outreach** — `docs/adr/ADR-036-journal-and-sunsky.md` +
    plan `docs/PLANS/journal-outreach.md`. History leaves the tab bar →
    "Observing journal…" dialog under the Tools menu (auto-generated
    derived view, grouped by observing night; the bar keeps 5 tabs:
    Tonight · Projects · Campaigns · Sun & sky · Observatory) and Solar
    → "Sun & sky", the outreach tab with a "Render PNG for socials" CTA.
+
+### 7septdecies. Track SC — Signals & campaigns (2026-09-16, ADR-037)
+
+Plan: `docs/PLANS/signals-campaigns.md`. Branch `feature/campaigns-ux`
+(all the work of this era lives on this branch, per the user's call).
+
+The review with the observer found two gaps: the Campaigns tab was
+functionally "the hub filtered by campaign", and variable-star events
+were barely visible (an event in an *up-to-date* project never showed
+in Tonight — `due_campaigns` filtered before evaluating). The track
+delivers: the **triple listing condition** (due **or** detected event
+**or** imminent extremum `campaign_extremum_days`, with
+`campaign.project_signal()` as the single source of truth — SC1); the
+**signals console** on the Campaigns tab (`signals_report`: ⚡ events
+first, ⏳ extrema by arrival, "N of M up to date" coverage — SC2); the
+**extremum chip** on Tonight rows (VSX epoch convention — SC3); and the
+**relevant variable-star events** over two channels (SC4, re-scoped with
+the observer the same day): the **automatic vigils** (`core/vigils.py`,
+editable curated T CrB/R CrB list, latest ZTF/ALeRCE magnitude against
+baseline under its **own 12 h cache** — never the 30-day context one)
+and the **AAVSO editorial channel** (`core/sources/aavso.py`: forum
+alerts — Discourse serves native JSON — and the active campaigns parsed
+off the app; spike validated before writing). All under the **fusion
+rule** (SC-g): a signal about a star that already is a project joins its
+listing reasons, never a duplicate row.
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| SC1–SC3 | triple condition + signals console + extremum chip | **Done** (`fcdf443`, `f96b2e6`, `50bdf58`) |
+| SC4a | vigils: `core/vigils.py`, planner phase, fusion, 👁 chip, cache-only console, Settings editor | **Done** (24 tests in `test_vigils.py`) |
+| SC4b | AAVSO channel: spike (Discourse JSON + campaigns table viable), `core/sources/aavso.py`, planner phase, fusion, 📣 chip, Settings checkbox | **Done** (17 tests in `test_aavso.py` with real spike titles) |
+| SC5 | close: ES/EN i18n (809 strings, 0 unfinished), ADR-035 review (the tab's role), this section | **Done** |
+
+**Status**: unit suite green (**1244**). **Out of this iteration**:
+ASAS-SN Sky Patrol; forum topic bodies (the title is enough for the
+Tonight row); ZTF cadence reminded in the object card (a vigil is a
+safety net, not an alert network).

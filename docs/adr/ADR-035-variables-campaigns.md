@@ -1,6 +1,6 @@
 # ADR-035: Variables de largo periodo y campañas de observación — kind `variable`, campaña 1:N ortogonal, VSX/SIMBAD/manual, reporte con HJD
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-11 · **rev. 2026-09-13**: ejecutado completo — suite unitaria 1096 · **rev. 2026-09-15 (Track UX)**: la decisión 9 queda **superseded** — el gestor modal se sustituye por la pestaña Campaigns; ver [docs/PLANS/ux-variables-campaigns.md](../PLANS/ux-variables-campaigns.md)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-11 · **rev. 2026-09-13**: ejecutado completo — suite unitaria 1096 · **rev. 2026-09-15 (Track UX)**: la decisión 9 queda **superseded** — el gestor modal se sustituye por la pestaña Campaigns; ver [docs/PLANS/ux-variables-campaigns.md](../PLANS/ux-variables-campaigns.md) · **rev. 2026-09-16 (ADR-037)**: la *función* de la pestaña se redefine como **consola de señales** (eventos ⚡ y extremos ⏳ agregados, cobertura «N de M al día») — la tabla de miembros queda subordinada como vista de salud; y Tonight lista proyectos de campaña por ciencia y no solo por cadencia (evento detectado, extremo inminente, vigilia 👁 o canal AAVSO 📣). Ver [ADR-037](ADR-037-campaign-signals.md)
 
 **Ver / See**: [docs/PLANS/variables-campaigns.md](../PLANS/variables-campaigns.md)
 (maestro) · [docs/PLANS/variables/](../PLANS/variables/) (40 subplanes) ·

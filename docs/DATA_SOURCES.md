@@ -94,8 +94,35 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   light curve). Grey reference points `source="survey:ztf"` under the
   observer's own, never mixed (ZTF g/r/i bands mapped to filters). Verified
   2026-09-11.
-- TTL: 30 d (survey photometry does not change). Failure → `[]`; the survey
-  button warns and nothing else breaks.
+- TTL: 30 d for the light-curve context (survey photometry does not
+  change). The **vigils** (ADR-037) reuse the same calls under `vigils:*`
+  keys with a 12 h TTL: a watch needs the *latest* point, not the context.
+  Failure → `[]`/`None`; the survey button warns and nothing else breaks.
+
+### AAVSO editorial channel — `aavso.py` — forum alerts + campaigns (SC4b)
+
+- `GET https://forums.aavso.org/c/observing/alerts/50.json` — the forum is
+  Discourse and serves native per-category JSON (spike validated
+  2026-09-16: titles like "SU Tau is dimming", "T CRB Johnson V scores
+  below 8.5"). Topics with activity in the last 60 days are listed (the
+  pinned "About" post is discarded).
+- `GET https://apps.aavso.org/v2/campaigns/` — the observing-campaigns
+  list page (HTML); rows `<tr>` are parsed with the stdlib (id+link |
+  title | requester | start | end | kinds) and filtered to active ones
+  (start ≤ today ≤ end).
+- The star name is extracted from the free-text title with tolerant
+  patterns (`Nova Sgr 2026 No. 3`, `NSV 11664`, designation + genitive
+  like `SU Tau` / `T CRB`) and **validated via VSX** before anything is
+  shown: what does not resolve is not shown. TTL: 12 h. Failure → `[]`.
+- **Community photometry (bright vigils, SC4a rev. 2)**:
+  `GET https://apps.aavso.org/v2/api/observations/photometry/?target=<star>&start_date=..&end_date=..`
+  — official endpoint (docs.aavso.org), **requires the user's API token**
+  (`Authorization: Token …`, 401 without it; configured in Settings next
+  to the observer code). It is the backend of vigils with a baseline
+  under 11.5 mag: ZTF saturates there (verified 2026-09-16: T CrB/R CrB
+  have no ALeRCE object). Fields used: `jd_dbl`, `magnitude`, `band`
+  (DRF-paginated or bare list; tolerant parsing). TTL: 12 h. No token →
+  `None`, silent by design.
 
 ## Object data sources (feed "Explore" and "Post")
 

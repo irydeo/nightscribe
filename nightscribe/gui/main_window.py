@@ -16,7 +16,7 @@ import logging
 from pathlib import Path
 
 from PySide6 import Shiboken
-from PySide6.QtCore import (QCoreApplication, QFile, Qt, Signal,
+from PySide6.QtCore import (QCoreApplication, QFile, QSize, Qt, Signal,
                             QPropertyAnimation, QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtUiTools import QUiLoader
@@ -33,14 +33,16 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 from .. import paths
 from ..config import config
 from ..version import full_version
-from ..core import (dates, ephemeris, mpc_report, orbits, project,
-                    sequence, suggest)
+from ..core import (attention, dates, ephemeris, mpc_report, orbits,
+                    project, sequence, suggest)
 from ..core.db import db
 from . import theme
 from .overview import ObjectPanel
 from .skeleton import ShimmerRow
 from .widgets.passive_wheel import (PassiveDoubleSpinBox, PassiveList,
                                     PassiveSpinBox)
+from .widgets.project_row import ProjectRow
+from .widgets.sparkline import sparkline_pixmap
 from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
                       ExploreWorker, MpcResolveWorker, PostWorker, SunWorker,
                       TonightWorker)
@@ -465,10 +467,16 @@ class MainWindow(QMainWindow):
         # A3: restore the projects hub classification prefs
         self.projects.cmb_kind.setCurrentIndex(
             int(config.get("projects_filter_kind", 0)))
-        self.projects.cmb_sort.setCurrentIndex(
-            int(config.get("projects_filter_sort", 0)))
+        # UX-PC (U2): the sort combo gained "Needs you" at index 0 — a new
+        # config key keeps old prefs from pointing at the wrong order
+        sort_idx = int(config.get("projects_filter_sort_v2", 0))
+        sort_idx = max(0, min(sort_idx, self.projects.cmb_sort.count() - 1))
+        self.projects.cmb_sort.setCurrentIndex(sort_idx)
         self.projects.chk_favorites.setChecked(
             bool(config.get("projects_filter_fav", False)))
+        # UX-PC (U2): the right pane starts on the dashboard (no selection)
+        self.projects.stack_detail.setCurrentWidget(
+            self.projects.page_dashboard)
         # UX-PC (U1): the advanced filters row starts collapsed; the toggle
         # restores the user's last choice
         filters_open = bool(config.get("projects_filters_open", False))
@@ -587,6 +595,12 @@ class MainWindow(QMainWindow):
         p.btn_favorite.clicked.connect(self._project_toggle_favorite)
         p.btn_next_go.clicked.connect(
             lambda: self._scroll_to_section(self._next_target))
+        # UX-PC (U2): ⌂ goes back to the dashboard (clearing the selection
+        # fires itemSelectionChanged -> the detail pane swaps itself)
+        p.btn_home.clicked.connect(
+            lambda: p.lst_projects.clearSelection())
+        p.lst_projects.currentItemChanged.connect(
+            self._project_row_selection_sync)
         # A2: click on the advisor banner dismisses it for this session
         self._advisor_dismissed = None
         self.projects.lbl_advisor.mouseReleaseEvent = \
@@ -2095,18 +2109,32 @@ class MainWindow(QMainWindow):
         tag = self.projects.edt_tag.text().strip() or None
         camp_id = self.projects.cmb_campaign.currentData()
         sort_idx = self.projects.cmb_sort.currentIndex()
-        orders = ("updated", "created", "name")
-        order = orders[sort_idx] if sort_idx < len(orders) else "updated"
+        # UX-PC (U2): index 0 is "Needs you" — the attention order; the
+        # other entries are the classic core orders
+        orders = (None, "updated", "created", "name")
+        order = orders[sort_idx] if sort_idx < len(orders) else None
         favorites = self.projects.chk_favorites.isChecked()
         # persist the prefs (pattern of WORKFLOWS 7quater)
         config.set("projects_filter_kind", kind_idx)
-        config.set("projects_filter_sort", sort_idx)
+        config.set("projects_filter_sort_v2", sort_idx)
         config.set("projects_filter_fav", favorites)
         config.set("projects_filter_campaign", camp_id or "")
         projects_list = project.list_projects(
             db, status, kind=kind, search=search, tags=tag,
             campaign_id=camp_id,
-            favorites_first=favorites, order=order)
+            favorites_first=favorites, order=order or "updated")
+        # UX-PC (U2): one attention report feeds both the dashboard and the
+        # "Needs you" row order (a project that calls for action floats up)
+        self._attention = attention.attention_report(db, config)
+        attn_map = {e["project_id"]: e for e in self._attention}
+        if order is None:
+            # stable: the core order (favorites + updated) breaks ties
+            # inside the same urgency rung
+            projects_list = sorted(
+                projects_list,
+                key=lambda p: attention.URGENCY_RANK.get(
+                    attn_map.get(p["id"], {}).get("urgency"), 2)
+                if p["id"] in attn_map else 3)
         from ..core import campaign as _camp
         camp_names = {c["id"]: c["name"] for c in _camp.list_campaigns(db)}
         lst = self.projects.lst_projects
@@ -2115,20 +2143,29 @@ class MainWindow(QMainWindow):
         # project the user is currently viewing)
         sel = lst.currentItem()
         keep_id = sel.data(Qt.UserRole) if sel is not None else None
+        # block selection signals while the rows are rebuilt — and restore
+        # the PREVIOUS blocked state afterwards (blockSignals is a plain
+        # boolean: an unconditional False would tear down a caller's own
+        # block, and the selection would fire mid-rebuild)
+        was_blocked = lst.signalsBlocked()
+        lst.blockSignals(True)
         lst.clear()
-        # A3: group by year of created (section headers, non-selectable)
+        # A3: group by year of created (section headers, non-selectable) —
+        # only when the order keeps years monotonic (attention order mixes
+        # them on purpose: what needs you floats up regardless of age)
         last_year = None
         for p in projects_list:
-            year = datetime.datetime.fromtimestamp(p["created"]).year
-            if year != last_year:
-                last_year = year
-                header = QListWidgetItem(f"— {year} —")
-                header.setFlags(Qt.NoItemFlags)
-                font = header.font()
-                font.setBold(True)
-                header.setFont(font)
-                header.setTextAlignment(Qt.AlignCenter)
-                lst.addItem(header)
+            if order is not None:
+                year = datetime.datetime.fromtimestamp(p["created"]).year
+                if year != last_year:
+                    last_year = year
+                    header = QListWidgetItem(f"— {year} —")
+                    header.setFlags(Qt.NoItemFlags)
+                    font = header.font()
+                    font.setBold(True)
+                    header.setFont(font)
+                    header.setTextAlignment(Qt.AlignCenter)
+                    lst.addItem(header)
             kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
                           "pccp": "PCCP", "transit": self.tr("Transit"),
                           "hads": "HADS",
@@ -2144,18 +2181,301 @@ class MainWindow(QMainWindow):
                 item.setText(item.text() + " ⚑")
                 item.setToolTip(self.tr("Campaign: %1").replace(
                     "%1", camp_names.get(p["campaign_id"], "?")))
+            item.setSizeHint(QSize(-1, 78))
             lst.addItem(item)
+            # UX-PC (U2): the rich row — the plain text above stays as the
+            # accessible/searchable fallback under the widget
+            row = ProjectRow()
+            payload = self._project_row_payload(
+                p, attn_map.get(p["id"]), camp_names)
+            urgency = payload.pop("_urgency", None)
+            row.set_project(**payload)
+            if urgency == "event":
+                row.lbl_next.setStyleSheet(
+                    f"color: #e05555; font-weight: bold;")
+            elif urgency == "due":
+                row.lbl_next.setStyleSheet(
+                    f"color: #e0c060; font-weight: bold;")
+            row.clicked.connect(
+                lambda it=item: self.projects.lst_projects
+                .setCurrentItem(it))
+            row.double_clicked.connect(
+                lambda it=item: self._row_double_clicked(it))
+            row.context_menu.connect(
+                lambda pos, it=item: self._project_row_menu(it, pos))
+            lst.setItemWidget(item, row)
             if p["id"] == keep_id:
                 lst.setCurrentItem(item)
-        if not projects_list:
-            self.projects.lbl_header.setText(
-                self.tr("No projects yet. Create one from Tonight."))
-            self.projects.lbl_context.setText("—")
-            self._reset_proj_panel()
-            self._clear_project_page()
-            self._current_project = None
+        lst.blockSignals(was_blocked)
+        self._project_row_selection_sync(lst.currentItem(), None)
+        # signals were blocked for the rebuild: settle the selection
+        # aftermath explicitly (U0.2: no stale detail when the selected
+        # project leaves the list — the pane then lands on the dashboard).
+        # A kept selection does NOT reload the detail here: the callers
+        # that mutate projects rebuild the page themselves.
+        if lst.currentItem() is None:
+            self._clear_project_detail()
         # the Observatory tab's target combo follows the active projects
         self._refresh_obs_targets()
+
+    # ---------------- UX-PC (U2): rich rows + dashboard ----------------
+
+    @staticmethod
+    def _activity_words(p):
+        # @args: p - project dict (list row)
+        # @return: "today" / "yesterday" / "N d ago" from the updated stamp
+        days = int((datetime.datetime.now().timestamp()
+                    - (p.get("updated") or 0)) / 86400)
+        if days <= 0:
+            return tr("today")
+        if days == 1:
+            return tr("yesterday")
+        return tr("%1 d ago").replace("%1", str(days))
+
+    def _project_window_chip(self, p, full):
+        # The "up tonight HH:MM–HH:MM" chip (UX-PC U2): fresh local maths
+        # from the object's coords — never the stale creation-night
+        # snapshot. Empty when the object is down tonight or has no coords.
+        # @args: p - list row, full - the same project with steps
+        # @return: chip text or ""
+        if p["status"] != project.STATUS_ACTIVE:
+            return ""
+        ctx = p.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None or dec is None:
+            return ""
+        plan = next((s["data"] for s in full.get("steps", [])
+                     if s["step"] == "plan"), {})
+        duration = 3600.0
+        if plan.get("n_frames") and plan.get("exp_s"):
+            duration = float(plan["n_frames"]) * (
+                float(plan["exp_s"]) + float(config.get("overhead_s", 15.0)))
+        try:
+            from ..core import planner
+            w = planner.safe_window_for(ra, dec, config, duration)
+        except Exception:
+            return ""
+        if not w.get("window_start") or not w.get("window_end"):
+            return tr("✕ not up tonight")
+        try:
+            t0 = datetime.datetime.fromisoformat(
+                w["window_start"]).strftime("%H:%M")
+            t1 = datetime.datetime.fromisoformat(
+                w["window_end"]).strftime("%H:%M")
+        except (TypeError, ValueError):
+            return ""
+        return f"⊕ {t0}–{t1}"
+
+    def _project_row_payload(self, p, attn, camp_names):
+        # @args: p - the list row, attn - its attention entry or None,
+        #        camp_names - {campaign id: name}
+        # @return: the kwargs dict for ProjectRow.set_project
+        from ..core import followup as _fu
+        kind = p["kind"]
+        kind_color = self._KIND_COLORS.get(kind, "#888888")
+        kind_label = {"sn": "SN", "neo": "NEO", "comet": self.tr("Comet"),
+                      "pccp": "PCCP", "transit": self.tr("Transit"),
+                      "hads": "HADS",
+                      "variable": self.tr("Variable")}.get(kind, kind)
+        full = project.get(db, p["id"]) or p
+        steps = {s["step"]: s["status"] for s in full.get("steps", [])}
+        dots = "".join(
+            "●" if steps.get(k) == "done"
+            else "–" if steps.get(k) == "skipped" else "○"
+            for k in _STEP_KEYS)
+        if p["status"] == project.STATUS_ACTIVE:
+            next_text = self._next_action_text(
+                project.next_action(db, full))
+        elif p.get("closed_at"):
+            dt = datetime.datetime.fromtimestamp(p["closed_at"])
+            next_text = self.tr("closed %1").replace(
+                "%1", dt.strftime("%Y-%m-%d"))
+        else:
+            next_text = self.tr("archived")
+        # urgency paints the next action (the row says WHY it floats up)
+        urgency = (attn or {}).get("urgency")
+        spark = None
+        if kind in FOLLOWUP_KINDS:
+            spark = sparkline_pixmap(_fu.list_points(db, p["id"]))
+        return {
+            "kind_label": kind_label, "kind_color": kind_color,
+            "name": p["object_name"], "favorite": bool(p.get("favorite")),
+            "campaign_name": camp_names.get(p.get("campaign_id")),
+            "progress_text": dots, "next_text": next_text,
+            "activity_text": self._activity_words(p),
+            "window_text": self._project_window_chip(p, full),
+            "sparkline": spark,
+            # not a widget field: the urgency tint is applied after
+            "_urgency": urgency,
+        }
+
+    def _project_row_selection_sync(self, current, _previous):
+        # Paints the selection on the rich rows (the item widget covers the
+        # list's own highlight, so the rows do it themselves).
+        # @args: current - the newly current item (or None)
+        lst = self.projects.lst_projects
+        for i in range(lst.count()):
+            item = lst.item(i)
+            row = lst.itemWidget(item)
+            if row is not None:
+                row.set_selected(item is current)
+
+    def _row_double_clicked(self, item):
+        # Rich-row double-click = open at the current step (the same
+        # gesture as the plain list underneath).
+        self.projects.lst_projects.setCurrentItem(item)
+        self._project_open_activated(item)
+
+    def _project_row_menu(self, item, global_pos):
+        # Right-click on a rich row: the same menu as the plain list.
+        self.projects.lst_projects.setCurrentItem(item)
+        self._open_project_menu(item, global_pos)
+
+    # ---------------- UX-PC (U2): the attention dashboard ----------------
+
+    def _next_action_text(self, act):
+        # The project's voice in ONE plain line (UX-i + U2): shared by the
+        # Next card, the rich rows and the dashboard cards.
+        # @args: act - a project.next_action() dict
+        # @return: the text
+        texts = {
+            "followup": self.tr("Measure tonight — %1 d since the last "
+                                "visit").replace(
+                "%1", str(act["overdue_days"]))
+            if not act["never_visited"] else
+            self.tr("First measurement — it opens the series"),
+            "plan": self.tr("Plan the capture"),
+            "process": self.tr("Process your data"),
+            "publish": self.tr("Draft the post"),
+            "close": self.tr("All steps done — consider closing the "
+                             "project"),
+        }
+        return texts[act["key"]]
+
+    def _attention_text(self, e):
+        # @args: e - an attention_report entry
+        # @return: the full-sentence reason (the dashboard rows are plain
+        #          words, never codes)
+        name = e["object_name"]
+        if e["reason"] == "event":
+            ev = e["event"] or {}
+            word = self.tr("down") if ev.get("direction") == "drop" \
+                else self.tr("up")
+            return self.tr("⚡ %1 — %2 mag %3 in %4 — measure tonight") \
+                .replace("%1", name).replace("%2", str(ev.get("delta_mag"))) \
+                .replace("%3", word).replace("%4", str(ev.get("filter")))
+        if e["reason"] == "due":
+            return self.tr("⏳ %1 — %2 nights since the last visit") \
+                .replace("%1", name).replace("%2", str(e["overdue_days"]))
+        if e["reason"] == "never_visited":
+            return self.tr("⏳ %1 — the first measurement opens the "
+                           "series").replace("%1", name)
+        if e["reason"] == "extremum":
+            ex = e["extremum"] or {}
+            word = self.tr("maximum") if ex.get("kind") == "max" \
+                else self.tr("minimum")
+            return self.tr("⏳ %1 — %2 expected in ~%3 d") \
+                .replace("%1", name).replace("%2", word) \
+                .replace("%3", str(ex.get("days")))
+        text = self._next_action_text(
+            {"key": e["reason"], "overdue_days": None,
+             "never_visited": False})
+        return f"○ {name} — {text[0].lower() + text[1:] if text else ''}"
+
+    def _attention_card(self, e):
+        # @args: e - an attention_report entry
+        # @return: a QFrame card: urgency band + the reason in words + one
+        #          action button landing on the right section
+        colors = {"event": "#e05555", "due": "#e0c060",
+                  "info": theme.C_OK}
+        color = colors.get(e["urgency"], theme.C_OK)
+        card = QFrame()
+        card.setObjectName("attcard")
+        card.setStyleSheet(
+            f"QFrame#attcard {{ background: {theme.C_BASE};"
+            f" border-radius: 8px; border: 1px solid {theme.C_LINE}; }}")
+        lay = QHBoxLayout(card)
+        lay.setContentsMargins(0, 8, 10, 8)
+        lay.setSpacing(10)
+        band = QFrame()
+        band.setFixedWidth(4)
+        band.setStyleSheet(f"background: {color}; border-radius: 2px;")
+        lay.addWidget(band)
+        text = self._attention_text(e)
+        if e.get("campaign"):
+            text += "  ·  ⚑ " + e["campaign"]
+        lbl = QLabel(text)
+        lbl.setWordWrap(True)
+        lay.addWidget(lbl, 1)
+        btn = QPushButton(
+            self.tr("Measure →") if e.get("section") == "followup"
+            else self.tr("Go →"))
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(lambda _=False, entry=e:
+                            self._dashboard_goto(entry))
+        lay.addWidget(btn, 0, Qt.AlignVCenter)
+        return card
+
+    def _dashboard_goto(self, e):
+        # A dashboard card button: open the project AND land on the
+        # section the reason calls for (the app speaks, then walks you).
+        # @args: e - the attention entry behind the card
+        if self._goto_project_by_id(e["project_id"]) and e.get("section"):
+            self._scroll_to_section(e["section"])
+
+    def _refresh_dashboard(self):
+        # Fills the dashboard page from the last attention report (UX-PC
+        # U2). Three states: no projects at all (a pointer to Tonight),
+        # nothing calling (calm), and the calling cards.
+        lay = self.projects.dash_container.layout()
+        self._wipe_layout(lay)
+        entries = getattr(self, "_attention", None)
+        if entries is None:
+            entries = attention.attention_report(db, config)
+        any_projects = bool(project.list_projects(db))
+        if not any_projects:
+            self.projects.lbl_dash_title.setText(
+                self.tr("Your projects live here"))
+            self.projects.lbl_dash_sub.setText(
+                self.tr("A project is one object with its three steps: "
+                        "plan, process, publish. Pick an object in Tonight "
+                        "and it becomes a project that guides you."))
+            box = QLabel(
+                self.tr("No projects yet — tonight's best objects are on "
+                        "the Tonight tab."))
+            box.setWordWrap(True)
+            box.setStyleSheet(f"color: {theme.C_TEXT_DIM}; padding: 12px;")
+            lay.addWidget(box)
+            btn = QPushButton(self.tr("Go to Tonight →"))
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(lambda: self._goto_tab(TAB_TONIGHT))
+            lay.addWidget(btn, 0, Qt.AlignLeft)
+        elif not entries:
+            self.projects.lbl_dash_title.setText(
+                self.tr("Needs your attention"))
+            self.projects.lbl_dash_sub.setText(
+                self.tr("Your projects calling for action, most urgent "
+                        "first."))
+            box = QLabel(self.tr("✨ All quiet — nothing needs you "
+                                 "tonight. Clear skies!"))
+            box.setWordWrap(True)
+            box.setStyleSheet(f"color: {theme.C_TEXT_DIM}; padding: 12px;")
+            lay.addWidget(box)
+        else:
+            self.projects.lbl_dash_title.setText(
+                self.tr("Needs your attention"))
+            self.projects.lbl_dash_sub.setText(
+                self.tr("Your projects calling for action, most urgent "
+                        "first."))
+            for e in entries[:5]:
+                lay.addWidget(self._attention_card(e))
+        lay.addStretch()
+
+    def _show_dashboard(self):
+        # Swaps the right pane to the dashboard (no selection) and fills it.
+        self._refresh_dashboard()
+        self.projects.stack_detail.setCurrentWidget(
+            self.projects.page_dashboard)
 
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()
@@ -2168,6 +2488,10 @@ class MainWindow(QMainWindow):
             self._clear_project_detail()
             return
         self._current_project = p
+        # UX-PC (U2): the right pane shows the project page when there is
+        # a selection, the dashboard when there is none
+        self.projects.stack_detail.setCurrentWidget(
+            self.projects.page_detail)
         self._render_project_header(p)
         self._build_project_page(p)
         panel = self._get_proj_panel()
@@ -2196,8 +2520,17 @@ class MainWindow(QMainWindow):
         if item is None or item.data(Qt.UserRole) is None:
             return
         self.projects.lst_projects.setCurrentItem(item)
+        self._open_project_menu(
+            item, self.projects.lst_projects.viewport().mapToGlobal(pos))
+
+    def _open_project_menu(self, item, global_pos):
+        # The project context menu body — shared by the plain list and the
+        # rich rows (one gesture language, UX-c + UX-PC U2).
+        # @args: item - the row's QListWidgetItem, global_pos - where to
+        #        pop the menu
+        # @return: None
         p = self._current_project
-        if not p:
+        if not p or item is None:
             return
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
@@ -2216,8 +2549,7 @@ class MainWindow(QMainWindow):
         act_delete = menu.addAction(self.tr("Delete…"))
         menu.addSeparator()
         act_folder = menu.addAction(self.tr("Show in folder"))
-        chosen = menu.exec(
-            self.projects.lst_projects.viewport().mapToGlobal(pos))
+        chosen = menu.exec(global_pos)
         if chosen is act_open:
             self._project_open_activated(item)
         elif chosen is act_fu:
@@ -2373,6 +2705,7 @@ class MainWindow(QMainWindow):
         # (closed under the Active filter, filtered out, deleted): header,
         # context, step tabs and the panel worker. Before U0.2 the header
         # and tabs kept showing the vanished project (stale detail).
+        # UX-PC (U2): no selection -> the right pane is the dashboard.
         self._current_project = None
         self._reset_proj_panel()
         self._clear_project_page()
@@ -2380,6 +2713,7 @@ class MainWindow(QMainWindow):
             self.tr("Select a project or create one from Tonight."))
         self.projects.lbl_context.setText("—")
         self.projects.lbl_advisor.setVisible(False)
+        self._show_dashboard()
 
     def _render_project_header(self, p):
         kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",
@@ -2520,19 +2854,7 @@ class MainWindow(QMainWindow):
         # @args: p - the project dict
         # @return: None
         act = project.next_action(db, p)
-        texts = {
-            "followup": self.tr("Measure tonight — %1 d since the last "
-                                "visit").replace(
-                "%1", str(act["overdue_days"]))
-            if not act["never_visited"] else
-            self.tr("First measurement — it opens the series"),
-            "plan": self.tr("Plan the capture"),
-            "process": self.tr("Process your data"),
-            "publish": self.tr("Draft the post"),
-            "close": self.tr("All steps done — consider closing the "
-                             "project"),
-        }
-        self.projects.lbl_next.setText("▶ " + texts[act["key"]])
+        self.projects.lbl_next.setText("▶ " + self._next_action_text(act))
         steps = {s["step"]: s["status"] for s in p.get("steps", [])}
         words = []
         for key in _STEP_KEYS:

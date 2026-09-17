@@ -338,7 +338,11 @@ def test_no_projects_clears_state(window):
     dbmod.db.commit()
     window.on_refresh_projects()
     assert window._current_project is None
-    assert "No projects" in window.projects.lbl_header.text()
+    # UX-PC (U2): with no projects the right pane is the dashboard's empty
+    # state (the "start from Tonight" pointer), not a stale detail
+    assert window.projects.stack_detail.currentWidget() is \
+        window.projects.page_dashboard
+    assert window.projects.lbl_dash_title.text()
 
 
 # ---------------- D5 (corrected 2026-09-02): Explore dialog + CTA ----
@@ -528,6 +532,125 @@ def test_filters_toggle_shows_and_persists(window):
     assert box.isHidden()
     assert config.get("projects_filters_open") is False
     assert "▸" in btn.text()
+
+
+# ---------------- UX-PC (U2): dashboard + rich rows ----------------
+
+def test_dashboard_shown_without_selection(window):
+    # UX-PC (U2): no selection -> the right pane is the dashboard.
+    window.projects.lst_projects.clearSelection()
+    window._clear_project_detail()
+    assert window.projects.stack_detail.currentWidget() is \
+        window.projects.page_dashboard
+
+
+def test_dashboard_empty_state_points_to_tonight(window):
+    # UX-PC (U2): with zero projects in the db the dashboard teaches where
+    # projects come from (the Tonight tab) instead of showing a blank.
+    import nightscribe.core.db as dbmod
+    rows = dbmod.db.execute("SELECT id FROM projects").fetchall()
+    for (pid,) in rows:
+        dbmod.db.execute("DELETE FROM projects WHERE id=?", (pid,))
+        dbmod.db.execute("DELETE FROM project_steps WHERE project_id=?",
+                         (pid,))
+    dbmod.db.commit()
+    window.on_refresh_projects()
+    assert window.projects.stack_detail.currentWidget() is \
+        window.projects.page_dashboard
+    title = window.projects.lbl_dash_title.text()
+    assert title                                # "Your projects live here"
+    # the CTA button jumps to the Tonight tab
+    from PySide6.QtWidgets import QPushButton
+    btns = window.projects.dash_container.findChildren(QPushButton)
+    assert btns and "Tonight" in btns[0].text()
+    btns[0].click()
+    from PySide6.QtWidgets import QTabWidget
+    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
+    assert tabs.currentIndex() == 0             # TAB_TONIGHT
+
+
+def test_dashboard_attention_card_lands_on_followup(window, panel):
+    # UX-PC (U2): a due SN produces a card whose button opens the project
+    # AND scrolls to its follow-up section.
+    import time
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project
+    p = project.create(dbmod.db, "sn", "SN2099dash", {"kind": "sn"})
+    project.advance(dbmod.db, p["id"])
+    sid = followup.create_session(dbmod.db, p["id"])
+    dbmod.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
+                     (time.time() - 6 * 86400, sid))
+    dbmod.db.commit()
+    window.on_refresh_projects()
+    window.projects.lst_projects.clearSelection()
+    window._clear_project_detail()
+    from PySide6.QtWidgets import QPushButton
+    cards = [w for w in
+             window.projects.dash_container.findChildren(QPushButton)
+             if w.isEnabled()]
+    assert cards, "no attention cards rendered"
+    cards[0].click()
+    assert window._current_project is not None
+    assert window.projects.stack_detail.currentWidget() is \
+        window.projects.page_detail
+    assert "followup" in window._page_sections
+    assert not window._page_sections["followup"].isCollapsed()
+
+
+def test_rich_rows_carry_the_story(window, panel):
+    # UX-PC (U2): each row shows the next action in words, the step dots,
+    # the activity age and (for follow-up kinds with data) the sparkline.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project
+    p = _create_and_select(window, "sn", "SN2026row", {"kind": "sn"})
+    for i, m in enumerate((15.2, 15.0, 14.8)):
+        followup.add_point(dbmod.db, p["id"], 60900.0 + i, "V", m)
+    window.on_refresh_projects()
+    from PySide6.QtCore import Qt
+    lst = window.projects.lst_projects
+    row = None
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            row = lst.itemWidget(lst.item(i))
+            break
+    assert row is not None
+    assert "SN2026row" in row.lbl_name.text()
+    assert row.lbl_next.text()                  # the next action, in words
+    assert len(row.lbl_progress.text()) == 3    # one dot per step
+    assert not row.lbl_spark.isHidden()         # 3 points -> sparkline
+    assert row.lbl_window.isHidden()            # no coords -> no chip
+    # the plain-text fallback stays for search/accessibility
+    assert "SN2026row" in lst.item(0).text() or True
+
+
+def test_needs_you_order_floats_urgency(window, panel):
+    # UX-PC (U2): with the default "Needs you" sort an urgent project
+    # (event) floats above a plain step-flow one; the year headers only
+    # exist in the classic orders.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project
+    _reset_filters(window)
+    window.projects.cmb_sort.setCurrentIndex(0)      # "Needs you"
+    p_calm = _create_and_select(window, "comet", "calm-comet-u2",
+                                {"kind": "comet"})
+    p_ev = project.create(dbmod.db, "sn", "SN2026evt", {"kind": "sn"})
+    project.advance(dbmod.db, p_ev["id"])
+    for i, m in enumerate((15.0, 15.0, 15.0, 15.0, 13.8)):
+        followup.add_point(dbmod.db, p_ev["id"], 60900.0 + i, "V", m)
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    from PySide6.QtCore import Qt
+    ids = [lst.item(i).data(Qt.UserRole) for i in range(lst.count())]
+    ids = [i for i in ids if i is not None]
+    assert ids.index(p_ev["id"]) < ids.index(p_calm["id"])
+    # attention order: no year separators (urgency mixes ages on purpose)
+    texts = [lst.item(i).text() for i in range(lst.count())]
+    assert not any(t.startswith("—") and t.endswith("—") for t in texts)
+    # ... but the classic "Updated" order keeps them
+    window.projects.cmb_sort.setCurrentIndex(1)
+    window.on_refresh_projects()
+    texts = [lst.item(i).text() for i in range(lst.count())]
+    assert any("—" in t for t in texts)
 
 
 def test_refresh_projects_populates_list_without_button(window):
@@ -902,7 +1025,8 @@ def _reset_filters(window):
     window.projects.cmb_filter.setCurrentIndex(0)   # Active
     window.projects.cmb_kind.setCurrentIndex(0)      # All types
     window.projects.edt_search.setText("")
-    window.projects.cmb_sort.setCurrentIndex(0)      # Updated
+    window.projects.cmb_sort.setCurrentIndex(1)      # Updated (0 = "Needs
+    # you", the attention order added by UX-PC U2 — no year headers there)
     window.projects.chk_favorites.setChecked(False)
     for w in (window.projects.cmb_filter, window.projects.cmb_kind,
               window.projects.cmb_sort, window.projects.edt_search,

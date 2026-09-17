@@ -78,6 +78,19 @@ _OUTCOME_LABELS = {
     "reported_aavso": {"es": "Reportada a la AAVSO", "en": "Reported to AAVSO"},
     "abandoned": {"es": "Abandonado", "en": "Abandoned"},
 }
+# SC2 (ADR-040): the sky-event chips in the Tonight header — the big
+# things first. One chip per family, at most three.
+_SKY_CHIP_PRIORITY = {
+    "lunar_eclipse": 100, "solar_eclipse": 100,
+    "shadow_transit": 95, "sat_transit": 90,
+    "opposition": 80, "max_elongation": 70, "planet_conjunction": 65,
+    "moon_conjunction": 60, "meteor_shower": 50,
+    "full_moon": 45, "new_moon": 45, "first_quarter": 40,
+    "last_quarter": 40, "perigee": 30, "apogee": 25,
+    "sun_conjunction": 20,
+}
+
+
 # Kinds with multi-night photometry follow-up (the tab is kind-agnostic;
 # SN-only analysis buttons hide for the others)
 # Track V: variables join (V-g: the quick-look engine serves them unchanged)
@@ -317,6 +330,7 @@ class MainWindow(QMainWindow):
         self._blink_phase = False
         self._current_project = None
         self._project_widgets = {}
+        self._skycal = None       # lazy Sky calendar dialog (SC2/ADR-040)
         self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
         self._page_sections = {}  # key -> CollapsibleSection of the project page
         self._advisor_dismissed = None  # A2: id of the project whose advisor
@@ -352,6 +366,9 @@ class MainWindow(QMainWindow):
         # fallback, and _on_main_tab_changed keeps the list fresh on every
         # visit to the Projects tab.
         QTimer.singleShot(0, self.on_refresh_projects)
+        # SC2: the sky-event chips are local maths — no need to wait for
+        # the network tonight computation
+        QTimer.singleShot(0, self._skyevent_chips)
         if config.get("ccdciel_auto_connect", False):
             # ADR-030: opt-in, off by default — connecting an observatory is
             # a human decision, not something the app does silently.
@@ -1154,6 +1171,7 @@ class MainWindow(QMainWindow):
         self._build_suggestion_grid()
         self._fill_table()
         self._show_cadence_hints()
+        self._skyevent_chips()
         self.statusBar().showMessage(
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
             8000)
@@ -1283,6 +1301,116 @@ class MainWindow(QMainWindow):
         if not self._goto_project_by_id(pid):
             return
         self._scroll_to_section("followup")
+
+    # ---------------- sky-event chips in the Tonight header (SC2) -------
+
+    def _skyevent_chips(self, evs=None):
+        # The solar system as an event source (SC2, ADR-040): up to three
+        # chips in the Tonight header, the big things first, one per
+        # family. Local maths, no network. A click opens the Sky calendar.
+        # @args: evs - optional precomputed list (tests inject fakes)
+        # @return: the picked events (also handy for tests)
+        for old in self.tonight.findChildren(QLabel, "ns_skyevent_chip"):
+            parent = old.parentWidget()
+            if parent and parent.layout():
+                parent.layout().removeWidget(old)
+            old.setParent(None)     # detach NOW — deleteLater alone lets
+            old.deleteLater()       # findChildren still see the corpse
+        from ..core import coords, skyevents
+        if evs is None:
+            evs = skyevents.events(float(config.get("lat")),
+                                   float(config.get("lon")), days=14)
+        now_jd = coords.jd_from_datetime(
+            datetime.datetime.now(datetime.timezone.utc))
+        cands = [e for e in evs if e["jd"] >= now_jd - 1.0]
+        cands.sort(key=lambda e: (-_SKY_CHIP_PRIORITY.get(e["kind"], 10),
+                                  e["jd"]))
+        picks = []
+        seen = set()
+        for e in cands:
+            kind = e["kind"]
+            if kind in ("sat_transit", "shadow_transit") \
+                    and not e.get("observable"):
+                continue            # invisible from the site: no chip
+            if kind == "moon_conjunction" and not e.get("up_at_dusk"):
+                continue            # a daytime pass is noise
+            if kind in seen:
+                continue
+            seen.add(kind)
+            picks.append(e)
+            if len(picks) == 3:
+                break
+        if not picks:
+            return picks
+        # same header home as the cadence chips (the layout that hosts
+        # lbl_context; see _show_cadence_hints for the fallback walk)
+        parent = self.tonight.lbl_context.parentWidget()
+        header_layout = parent.layout() if parent else None
+        if header_layout is None:
+            p = parent
+            while p is not None:
+                if p.layout() is not None:
+                    header_layout = p.layout()
+                    break
+                p = p.parentWidget()
+        if not (header_layout and hasattr(header_layout, "addWidget")):
+            return picks
+        for e in picks:
+            chip = _LinkChip(self._sky_chip_text(e), "#6ab0ff",
+                             self.tr("From the solar-system calendar — "
+                                     "click to open the Sky calendar"))
+            chip.setObjectName("ns_skyevent_chip")
+            chip.clicked.connect(self._tools_skycal)
+            header_layout.addWidget(chip)
+        return picks
+
+    def _sky_chip_text(self, e):
+        # The chip's short text: icon + the thing + when ("tonight" or
+        # the day). @args: e - the event dict. @return: text
+        kind = e["kind"]
+        objs = e["objects"]
+        when = self.tr("tonight") if e.get("tonight") \
+            else e["date"].strftime("%d %b")
+        if kind == "lunar_eclipse":
+            return self.tr("🌘 Lunar eclipse %1").replace("%1", when)
+        if kind == "solar_eclipse":
+            return self.tr("🌘 Solar eclipse %1").replace("%1", when)
+        if kind == "shadow_transit":
+            return self.tr("🔭 %1's shadow %2 UT").replace(
+                "%1", objs[0].capitalize()).replace(
+                "%2", e["t0"].strftime("%H:%M"))
+        if kind == "sat_transit":
+            return self.tr("🔭 %1 transit %2 UT").replace(
+                "%1", objs[0].capitalize()).replace(
+                "%2", e["t0"].strftime("%H:%M"))
+        if kind == "opposition":
+            return self.tr("🔴 %1 at opposition %2").replace(
+                "%1", objs[0].capitalize()).replace("%2", when)
+        if kind == "max_elongation":
+            return self.tr("%1 %2 greatest elongation").replace(
+                "%1", e["icon"]).replace("%2", objs[0].capitalize())
+        if kind == "planet_conjunction":
+            return self.tr("✨ %1–%2 %3°").replace(
+                "%1", objs[0].capitalize()).replace(
+                "%2", objs[1].capitalize()).replace(
+                "%3", str(e.get("sep_deg")))
+        if kind == "moon_conjunction":
+            return self.tr("🌙 Moon–%1 %2°").replace(
+                "%1", objs[1].capitalize()).replace(
+                "%2", str(e.get("sep_deg")))
+        if kind == "meteor_shower":
+            return self.tr("☄️ %1 %2").replace(
+                "%1", objs[0].capitalize()).replace("%2", when)
+        if kind in ("full_moon", "new_moon", "first_quarter",
+                    "last_quarter"):
+            words = {"full_moon": self.tr("🌕 Full moon"),
+                     "new_moon": self.tr("🌑 New moon"),
+                     "first_quarter": self.tr("🌓 First quarter"),
+                     "last_quarter": self.tr("🌗 Last quarter")}
+            return f"{words[kind]} {when}"
+        if kind == "perigee":
+            return self.tr("🌕 Perigee Moon %1").replace("%1", when)
+        return f"{e['icon']} {kind} {when}"
 
     def _clear_suggestions(self):
         # Drops every widget inside the suggestion scroll container and

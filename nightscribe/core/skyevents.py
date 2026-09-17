@@ -48,9 +48,12 @@ _INNER = ("mercury", "venus")  # the Sun's shadows: elongations & inferior conju
 # listing thresholds, degrees
 MOON_CONJ_DEG = 4.0       # Moon-planet closeness
 PAIR_CONJ_DEG = 1.5       # planet-planet closeness
-OPPOSITION_DEG = 1.5      # within this of 180 deg at opposition
-SUN_CONJ_DEG = 2.0        # Sun-planet conjunction
 MAXEL_MIN_DEG = 10.0      # a maximum elongation below this is noise
+# Oppositions and Sun conjunctions are detected as ECLIPTIC LONGITUDE
+# crossings (lambda_planet - lambda_sun = 180 / 0), never by elongation:
+# a planet off the ecliptic tops out below 180 deg of elongation (Saturn
+# 2026-10-04 peaked at 177.28 deg with beta=-2.7 deg and a 178.5 deg
+# elongation gate lost a real opposition — the one true bug of SC0).
 
 # eclipse geometry: shadow cones in kilometres, not fixed latitude cuts
 # (a "grazing" latitude is not what separates total from partial)
@@ -178,6 +181,37 @@ def _syzygy_crossings(jds, target):
         if w0 > 355.0 and w1 < 5.0:  # the sweep crosses inside the cell
             out.append(_bisect_crossing(
                 jds[i], jds[i + 1], lambda jd: _syzygy_lambda(jd, target)))
+    return out
+
+
+def _lambda_minus_sun(jd, name, target):
+    # Signed circular distance (deg) of the planet's geocentric ecliptic
+    # longitude from the Sun's + `target` (180 = opposition, 0 =
+    # conjunction). The one true clock for both families.
+    # @return: degrees in (-180, 180]
+    p = ephem_minor.planet(name, jd)
+    s = ephem_minor.sun_ra_dec(jd)
+    w = (_ecl_lon(p["ra"], p["dec"]) - _ecl_lon(s[0], s[1]) - target) % 360.0
+    return w - 360.0 if w > 180.0 else w
+
+
+def _lambda_crossings(jds, name, target):
+    # Every jd where (lambda_planet - lambda_sun) sweeps past `target`,
+    # bisection-refined. Direction-agnostic: near an opposition the outer
+    # planets RETROGRADE (their longitude walks backwards), so the sweep
+    # may cross from either side — a plain "wrap past 355/5" pattern only
+    # catches the Moon's forward march.
+    # @return: [crossing jd]
+    out = []
+    for i in range(len(jds) - 1):
+        w0 = _lambda_minus_sun(jds[i], name, target)
+        w1 = _lambda_minus_sun(jds[i + 1], name, target)
+        if abs(w1 - w0) > 180.0:
+            continue  # the far boundary (target ± 180) alias, not a cross
+        if w0 == 0.0 or (w0 < 0.0) != (w1 < 0.0):
+            out.append(_bisect_crossing(
+                jds[i], jds[i + 1],
+                lambda jd: _lambda_minus_sun(jd, name, target)))
     return out
 
 
@@ -394,20 +428,26 @@ def _locals_min(series):
             if series[i] < series[i - 1] and series[i] <= series[i + 1]]
 
 
-def _oppositions(el, jds, planets):
-    # Outer planets: local maximum elongation within 1.5 deg of 180.
-    # @return: [event] with elong_deg, mag
+def _oppositions(jds, planets):
+    # Outer planets: the geocentric ECLIPTIC LONGITUDE crossing
+    # lambda_planet - lambda_sun = 180 (bisection-refined). Elongation
+    # peaks below 180 deg when the planet is off the ecliptic, so an
+    # elongation gate loses real oppositions (Saturn 2026-10-04, peaked
+    # at 177.28 deg with beta=-2.7 deg — lost by the old 178.5 deg gate).
+    # The reported elong_deg is the TRUE elongation at the crossing —
+    # real data, not a failure.
+    # @return: [event] with elong_deg, dist_au, mag
     out = []
-    h = jds[1] - jds[0]
     for name in _OUTER:
-        eln = el[name]
-        for i in _locals_max(eln):
-            if eln[i] < 180.0 - OPPOSITION_DEG:
-                continue
-            jd = _parabolic(jds[i], h, eln[i - 1], eln[i], eln[i + 1])
+        for jd in _lambda_crossings(jds, name, 180.0):
+            p = ephem_minor.planet(name, jd)
+            s = ephem_minor.sun_ra_dec(jd)
+            elong = coords.angular_separation(p["ra"], p["dec"],
+                                              s[0], s[1])
             out.append(_ev(jd, "opposition", "🔴", [name],
-                           elong_deg=round(eln[i], 1),
-                           mag=ephem_minor.planet(name, jd)["mag"]))
+                           elong_deg=round(elong, 1),
+                           dist_au=round(p["dist_au"], 2),
+                           mag=p["mag"]))
     return out
 
 
@@ -440,20 +480,24 @@ def _max_elongations(el, jds, planets):
     return out
 
 
-def _sun_conjunctions(el, jds):
-    # Sun-planet: local minimum elongation < 2 deg. Inner planets pass
-    # between us and the Sun (inferior); the rest go behind (superior).
-    # @return: [event] with detail
+def _sun_conjunctions(jds):
+    # Sun-planet: the longitude crossing lambda_planet - lambda_sun = 0.
+    # Same latitude trap as the oppositions (a high-beta planet's minimum
+    # elongation stays above the old 2 deg gate — Saturn reaches ~3.4 deg).
+    # Inner planets cross twice per synodic cycle: BETWEEN us and the Sun
+    # (inferior, planet closer than the Sun) or BEHIND it (superior).
+    # @return: [event] with detail ("inferior"|"superior"), elong_deg
     out = []
-    h = jds[1] - jds[0]
     for name in _ALL:
-        eln = el[name]
-        for i in _locals_min(eln):
-            if eln[i] >= SUN_CONJ_DEG:
-                continue
-            jd = _parabolic(jds[i], h, eln[i - 1], eln[i], eln[i + 1])
-            detail = "inferior" if name in _INNER else "superior"
-            out.append(_ev(jd, "sun_conjunction", "☀️", [name], detail=detail))
+        for jd in _lambda_crossings(jds, name, 0.0):
+            p = ephem_minor.planet(name, jd)
+            s = ephem_minor.sun_ra_dec(jd)
+            elong = coords.angular_separation(p["ra"], p["dec"],
+                                              s[0], s[1])
+            detail = ("inferior" if name in _INNER
+                      and p["dist_au"] < s[2] else "superior")
+            out.append(_ev(jd, "sun_conjunction", "☀️", [name],
+                           detail=detail, elong_deg=round(elong, 1)))
     return out
 
 
@@ -540,9 +584,9 @@ def events(lat_deg, lon_deg, from_date=None, days=60):
     out += _apsides(jds, moons)
     out += _moon_conjunctions(jds, moons, planets, lat_deg, lon_deg)
     out += _pair_conjunctions(jds, planets)
-    out += _oppositions(el, jds, planets)
+    out += _oppositions(jds, planets)
     out += _max_elongations(el, jds, planets)
-    out += _sun_conjunctions(el, jds)
+    out += _sun_conjunctions(jds)
     out += _meteor_showers(jd_from, jd_to, date0, lat_deg, lon_deg)
     out += _satellite_events(jd_from, jd_to, lat_deg, lon_deg)
 

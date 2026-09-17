@@ -112,13 +112,20 @@ existe; los invariantes de SC0 tampoco están escritos):
 
 **Siguiente movimiento (orden exacto)**
 
-1. Fix de `_oppositions` + `_sun_conjunctions` con el patrón de longitud
-   (dejar `elong_deg` como dato).
-2. `tests/unit/test_skyevents.py` con la tabla de regresión de arriba.
-3. Regenerar la lista de 60 d y diff contra la tabla validada;
-   confirmar que Saturno aparece.
-4. Cerrar SC0 (invariantes del plan) → SD → SC1 → SC2 → SC3 con
-   **ADR-040**.
+1. ~~Fix de `_oppositions` + `_sun_conjunctions` con el patrón de
+   longitud~~ **HECHO (2026-09-17)**: `_lambda_crossings()` direccional-
+   agnóstica (los exteriores RETROGRADAN cerca de la oposición — el
+   patrón de wrap 355/5 solo sirve para la Luna; sign-change + guarda
+   |Δw|>180). Saturno 2026-10-04 ✓, Neptuno 09-26 ✓, Urano 11-25 ✓,
+   Júpiter 01-10 ✓, Marte: conjunción 01-09 sin oposición ✓. Ojo: un
+   primer intento con el patrón de la Luna no detectó NADA (dirección) —
+   la regresión lo tiene cubierto.
+2. ~~`tests/unit/test_skyevents.py`~~ **HECHO**: 16 tests (tabla de
+   regresión + invariantes + anclas de eclipse). El invariante de ápsides
+   se midió primero: el rango físico 2026 es 11.9–15.9 d (no ~13.9 fijo).
+3. ~~Regenerar la lista y confirmar que Saturno aparece~~ ✓ (salida
+   completa contrastada contra la tabla validada).
+4. Cerrar SC0 → **SD** → SC1 → SC2 → SC3 con **ADR-040**.
 5. Mensaje al observador: Marte (conjunción ≠ oposición), 09-26 =
    Neptuno, 11-25/26 = Urano (su "Júpiter 11-27"), Saturno arreglada.
 

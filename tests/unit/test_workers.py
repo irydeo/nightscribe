@@ -74,21 +74,31 @@ def test_survey_worker_payload(qapp, monkeypatch):
     from nightscribe.gui.workers import SurveyWorker
     pts = [{"mjd": 60100.0, "filter": "g", "mag": 15.1, "err": 0.02,
             "source": "survey:ztf"}]
-    monkeypatch.setattr(surveys, "fetch_points", lambda ra, dec: pts)
+    def detailed(ra, dec, radius_arcsec=3.0, force=False):
+        return {"status": "ok", "points": pts, "error": None}
+    monkeypatch.setattr(surveys, "fetch_points_detailed", detailed)
     w = SurveyWorker(15.2, 55.0)
     spy = QSignalSpy(w.finished)
     w.run()
-    assert spy.at(0)[0][0]["source"] == "survey:ztf"
+    out = spy.at(0)[0]
+    assert out["status"] == "ok"
+    assert out["points"][0]["source"] == "survey:ztf"
+    assert out["error"] is None
 
 
-def test_survey_worker_failure_is_empty(qapp, monkeypatch):
+def test_survey_worker_failure_reports_error(qapp, monkeypatch):
+    # A dead network must not crash the GUI thread: the worker catches it
+    # and reports status="error" with the reason
     from nightscribe.core.sources import surveys
     from nightscribe.gui.workers import SurveyWorker
 
-    def boom(_ra, _dec):
+    def boom(_ra, _dec, radius_arcsec=3.0, force=False):
         raise OSError("network down")
-    monkeypatch.setattr(surveys, "fetch_points", boom)
+    monkeypatch.setattr(surveys, "fetch_points_detailed", boom)
     w = SurveyWorker(0.0, 0.0)
     spy = QSignalSpy(w.finished)
     w.run()
-    assert spy.at(0)[0] == []
+    out = spy.at(0)[0]
+    assert out["status"] == "error"
+    assert out["points"] == []
+    assert "network down" in out["error"]

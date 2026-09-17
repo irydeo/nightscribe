@@ -36,6 +36,7 @@ from .base_chart import ChartView
 # Scene z-order (higher = drawn on top)
 _Z_GRID = 0.0
 _Z_TEMPLATE = 1.0
+_Z_LINK = 1.5
 _Z_DATA = 2.0
 _Z_ERROR = 3.0
 _Z_LABEL = 4.0
@@ -47,12 +48,6 @@ _FONT_LABEL = 22
 # Scene half-extent: the data area is always this wide/tall, independent of
 # the data's actual span. The mapping scales the data into this box.
 _HALF = 500.0
-
-
-def _filter_label(filt):
-    # @args: filt - filter name (None/"Clear"/"None" = the generic band)
-    # @return: the display label for a legend entry
-    return "Sin filtro" if not filt or filt in ("Clear", "None") else filt
 
 
 def _series_style(src_class):
@@ -105,7 +100,46 @@ class LightCurveChart(ChartView):
         self._epoch = None
         self._schematic = None
         self._bounds = None   # (x_min, x_max, mag_min, mag_max)
+        self._tpl_visible = True   # template overlay: ON by default
+        self._link = True          # series linking lines: ON by default
         self.set_hover_probe(self._probe)
+
+    def filter_label(self, filt):
+        # @args: filt - filter name (None/"Clear"/"None" = the generic band)
+        # @return: the human band label for the legend and the probe
+        if not filt or filt in ("Clear", "None"):
+            return self.tr("No filter")
+        return filt
+
+    def source_label(self, source):
+        # @args: source - the point's source (manual|paste|file|quicklook|
+        #        survey:ztf)
+        # @return: the human source label for the legend and the probe
+        source = source or "manual"
+        if source.startswith("survey"):
+            return self.tr("Survey · ALeRCE/ZTF")
+        if source == "quicklook":
+            return self.tr("Quick-look · indicative")
+        if source == "paste":
+            return self.tr("Pasted data")
+        if source == "file":
+            return self.tr("From file")
+        return self.tr("Manual entry")
+
+    def set_template_visible(self, on):
+        # @args: on - draw the template/schematic overlay or not
+        # @return: None. The axis bounds do not move on toggle: the
+        #          template is a reference, and its mags are already in
+        #          the data range at draw time.
+        self._tpl_visible = bool(on)
+        self._build_scene()
+        self.fit_to_scene()
+
+    def set_link_lines(self, on):
+        # @args: on - connect each series' points with a line or not
+        self._link = bool(on)
+        self._build_scene()
+        self.fit_to_scene()
 
     def set_data(self, points, sn_type=None, peak_mjd=None, peak_mag=None,
                  fold_period_d=None, epoch_mjd=None, schematic=None):
@@ -187,10 +221,15 @@ class LightCurveChart(ChartView):
                              2 * _HALF + 120, 2 * _HALF + 100)
         # grid + axes
         self._draw_grid()
+        # series linking (like the PNG export): solid line for the
+        # observer's own points, dashed for quick-look and survey
+        if self._link:
+            self._draw_link_lines()
         # template overlay: the schematic reference curve in fold mode
-        # (never real data), the SN type template otherwise
+        # (never real data), the SN type template otherwise. Togglable
+        # from the Follow-up tab without touching the axis bounds.
         has_overlay = False
-        if self._fold_p and self._schematic:
+        if self._tpl_visible and self._fold_p and self._schematic:
             pen = QPen(QColor(palette.MUTED), 1.0, Qt.DashLine)
             for shift in (0.0, 1.0):
                 path_pts = [(self._map_x(ph + shift), self._map_y(m))
@@ -203,8 +242,12 @@ class LightCurveChart(ChartView):
                     line.setZValue(_Z_TEMPLATE)
                     self.add_item(line)
             has_overlay = True
-        tpl = None if self._fold_p else (
-            sn_templates.template(self._sn_type) if self._sn_type else None)
+        if self._tpl_visible:
+            tpl = None if self._fold_p else (
+                sn_templates.template(
+                    self._sn_type) if self._sn_type else None)
+        else:
+            tpl = None
         if tpl and self._peak_mjd is not None and self._peak_mag is not None:
             pen = QPen(QColor(palette.MUTED), 1.0,Qt.DashLine)
             path_pts = []
@@ -242,6 +285,44 @@ class LightCurveChart(ChartView):
         # legend: one entry per (filter, source) series the data has
         self._add_legend(has_overlay)
 
+    def _link_pen(self, source, band):
+        # @args: source - the series' source, band - the series' filter
+        # @return: the QPen of the series' linking line: the series colour,
+        #          dashed for quick-look and survey (mirrors the PNG)
+        colour, _filled = _point_style(
+            {"filter": band, "source": source, "mjd": 0, "mag": 0})
+        pen = QPen(colour, 1.4)
+        if (source or "manual").startswith("survey") or source == "quicklook":
+            pen.setStyle(Qt.DashLine)
+        return pen
+
+    def _draw_link_lines(self):
+        # Connects the points of each (filter, source) series, like the PNG
+        # export. In fold mode each cycle is linked within itself, so no
+        # seam-crossing artefacts.
+        by_series = {}
+        for p in self._points:
+            by_series.setdefault(
+                (p.get("filter") or "Clear", p.get("source") or "manual"),
+                []).append(p)
+        for (band, src), pts in by_series.items():
+            if len(pts) < 2:
+                continue
+            pen = self._link_pen(src, band)
+            copies = {}
+            for p in pts:
+                for k, xv in enumerate(self._xs(p)):
+                    copies.setdefault(k, []).append(
+                        (self._map_x(xv), self._map_y(p["mag"])))
+            for seq in copies.values():
+                seq.sort(key=lambda xy: xy[0])
+                for i in range(len(seq) - 1):
+                    line = QGraphicsLineItem(seq[i][0], seq[i][1],
+                                              seq[i + 1][0], seq[i + 1][1])
+                    line.setPen(pen)
+                    line.setZValue(_Z_LINK)
+                    self.add_item(line)
+
     def _add_legend(self, has_template):
         # @args: has_template - whether the schematic overlay is drawn
         # Draws a compact legend in the bottom-right of the data area
@@ -253,24 +334,17 @@ class LightCurveChart(ChartView):
             entries.append(
                 (self.tr("schematic (sawtooth)") if self._fold_p
                  else self.tr("Typical template"), QColor(palette.MUTED)))
+        # one entry per (band, source) series: human labels, so the
+        # observer sees "Pasted data", "From file", "Survey · ALeRCE/ZTF"
         seen = set()
         for p in self._points:
             src = p.get("source") or "manual"
-            if src.startswith("survey"):
-                cls = "survey"
-            elif src == "quicklook":
-                cls = "quicklook"
-            else:
-                cls = "manual"
-            key = (p.get("filter"), cls)
+            key = (p.get("filter"), src)
             if key in seen:
                 continue
             seen.add(key)
-            text = _filter_label(p.get("filter"))
-            if cls == "quicklook":
-                text += " · " + self.tr("indicative")
-            elif cls == "survey":
-                text += " · " + self.tr("catalog")
+            text = (self.filter_label(p.get("filter"))
+                    + " · " + self.source_label(src))
             colour, _filled = _point_style(p)
             entries.append((text, colour))
         if not entries:
@@ -373,10 +447,10 @@ class LightCurveChart(ChartView):
         lines += [
             f"MJD {best['mjd']:.2f}",
             f"mag {best['mag']:.2f}",
-            f"[{best.get('filter') or 'Clear'}]",
+            f"[{self.filter_label(best.get('filter'))}]",
         ]
         if best.get("source"):
-            lines.append(f"({best['source']})")
+            lines.append(f"({self.source_label(best['source'])})")
         if best.get("err") is not None:
             lines.append(f"±{best['err']:.3f}")
         return True, lines

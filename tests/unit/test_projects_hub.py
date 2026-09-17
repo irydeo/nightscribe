@@ -1648,8 +1648,9 @@ def test_download_survey_points_are_stored_and_deduped(window):
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    fake = [{"mjd": 59000.0 + i, "filter": "g", "mag": 15.5 + i * 0.01,
-             "err": 0.02, "source": "survey:ztf"} for i in range(5)]
+    points = [{"mjd": 59000.0 + i, "filter": "g", "mag": 15.5 + i * 0.01,
+               "err": 0.02, "source": "survey:ztf"} for i in range(5)]
+    fake = {"status": "ok", "points": points, "error": None}
     p = proj_mod.create(mw.db, "variable", "WeSb 1",
                         {"ra_deg": 15.2254, "dec_deg": 55.0667})
     window._fu_survey_done(p["id"], fake)

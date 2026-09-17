@@ -4258,6 +4258,39 @@ class MainWindow(QMainWindow):
             self._project_widgets["fu_survey"] = btn_survey
         layout.addLayout(fu_btns)
 
+        # Inline light curve (2026-09-17): all the project's photometry —
+        # manual, pasted, file, quick-look, survey — with the SN template
+        # or the folded sawtooth. Live in the tab, no dialog, no rebuild;
+        # the template is toggleable without the axis moving.
+        if kind in ("sn", "variable"):
+            from .widgets.lightcurve_widget import LightCurveChart
+            from ..core import lightcurve_data
+            grp_lc = QGroupBox(self.tr("Light curve"))
+            glc = QVBoxLayout(grp_lc)
+            chk_tpl = QCheckBox(self.tr("Show template"))
+            chk_tpl.setChecked(True)
+            glc.addWidget(chk_tpl)
+            lchart = LightCurveChart()
+            lchart.setMinimumHeight(220)
+            glc.addWidget(lchart, stretch=1)
+            lcurve_pts = fu.list_points(db, pid)
+            if lcurve_pts:
+                payload = lightcurve_data.build_payload(
+                    {"points": lcurve_pts,
+                     "sn_type": ctx.get("sn_type")},
+                    sn_type_fallback=ctx.get("sn_type") or ctx.get("otype"),
+                    variable=ctx.get("variable"))
+                lchart.set_data(
+                    payload["points"],
+                    sn_type=payload.get("sn_type"),
+                    peak_mjd=payload.get("peak_mjd"),
+                    peak_mag=payload.get("peak_mag"),
+                    fold_period_d=payload.get("fold_period_d"),
+                    epoch_mjd=payload.get("epoch_mjd"),
+                    schematic=payload.get("schematic"))
+            chk_tpl.toggled.connect(lchart.set_template_visible)
+            layout.addWidget(grp_lc)
+
         # sessions list
         grp = QGroupBox(self.tr("Visits"))
         grp.setLayout(QVBoxLayout())
@@ -4775,6 +4808,19 @@ class MainWindow(QMainWindow):
         btns.rejected.connect(dlg.reject)
         dlg.layout().addWidget(btns)
         # live parse as the user types
+        def _human(mjd):
+            # preview-only: show the parsed date so a typo is visible
+            # before saving. ±60-year sanity band around today (2026).
+            from ..core import coords
+            try:
+                dt = coords.datetime_from_jd(mjd + 2400000.5)
+                s = dt.strftime("%Y-%m-%d %H:%M")
+            except (ValueError, OverflowError):
+                return f"MJD {mjd:.5f}"
+            if not (39380.0 <= mjd <= 83220.0):
+                s += "  " + self.tr("⚠ date outside 1966–2086 — check")
+            return s
+
         def on_text_changed():
             pts, skipped = parse_photometry(
                 edit.toPlainText(),
@@ -4783,7 +4829,8 @@ class MainWindow(QMainWindow):
             for p in pts:
                 err_str = f" ±{p['err']}" if p["err"] else ""
                 preview.addItem(
-                    f"mag {p['mag']}{err_str}  [{p['filter']}]")
+                    f"{_human(p['mjd'])}  ·  mag {p['mag']}{err_str}"
+                    f"  [{p['filter']}]")
             if skipped:
                 preview.addItem(
                     self.tr("({} lines skipped)").format(len(skipped)))
@@ -4903,30 +4950,51 @@ class MainWindow(QMainWindow):
         if btn is not None:
             btn.setEnabled(False)
         w = SurveyWorker(ra, dec)
-        w.finished.connect(lambda pts: self._fu_survey_done(pid, pts))
+        w.finished.connect(lambda out: self._fu_survey_done(pid, out))
         self._keep(w)
 
-    def _fu_survey_done(self, pid, pts):
-        # Merges the worker's survey points and rebuilds the tab in place.
+    def _fu_survey_done(self, pid, out):
+        # Stores the worker's result and reports the outcome — the old
+        # silent success was the bug. ok: upserts (added/updated/unchanged/
+        # removed), MJD range, bands, origin. empty: nothing at the
+        # position. error: what the network said.
         from ..core import followup as fu
         btn = self._project_widgets.get("fu_survey")
         if btn is not None:
             btn.setEnabled(True)
+        status = (out or {}).get("status") or "error"
+        pts = (out or {}).get("points") or []
+        if status == "error":
+            extra = (out or {}).get("error")
+            msg = self.tr("Survey download failed")
+            if extra:
+                msg += " — " + str(extra)
+            self.statusBar().showMessage(msg, 10000)
+            self._build_project_page(project.get(db, pid))
+            return
         if not pts:
             self.statusBar().showMessage(
-                self.tr("No survey data for this position"), 6000)
+                self.tr("No survey data for this position"), 8000)
             return
-        existing = {(q["mjd"], q["filter"]) for q in fu.list_points(db, pid)
-                    if (q.get("source") or "").startswith("survey:")}
-        n = 0
-        for pt in pts:
-            if (pt["mjd"], pt["filter"]) in existing:
-                continue
-            fu.add_point(db, pid, pt["mjd"], pt["filter"], pt["mag"],
-                         err=pt.get("err"), source=pt["source"])
-            n += 1
-        self.statusBar().showMessage(
-            self.tr("Added %1 survey points").replace("%1", str(n)), 8000)
+        try:
+            res = fu.upsert_survey_points(db, pid, pts)
+        except ValueError as err:      # wrong project kind
+            self.statusBar().showMessage(
+                self.tr("Cannot store survey points: %1")
+                .replace("%1", str(err)), 10000)
+            return
+        mjds = [p["mjd"] for p in pts if p.get("mjd") is not None]
+        bands = sorted({p.get("filter") or "Clear" for p in pts})
+        msg = (self.tr("Survey data (ZTF via ALeRCE): %1 new, %2 updated, "
+                       "%3 unchanged, %4 removed; MJD %5 → %6; bands %7")
+               .replace("%1", str(res["added"]))
+               .replace("%2", str(res["updated"]))
+               .replace("%3", str(res["unchanged"]))
+               .replace("%4", str(res["removed"]))
+               .replace("%5", f"{min(mjds):.1f}")
+               .replace("%6", f"{max(mjds):.1f}")
+               .replace("%7", ", ".join(bands)))
+        self.statusBar().showMessage(msg, 15000)
         # rebuild the page so the curve/points update in place
         self._build_project_page(project.get(db, pid))
 

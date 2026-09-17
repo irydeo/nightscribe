@@ -88,6 +88,37 @@ def test_parse_jd_converts_to_mjd():
     assert abs(pts[0]["mjd"] - 58107.214) < 0.01
 
 
+# ---------------- bare YYYYMMDD (forensic 2026-09-17) ----------------
+
+def test_parse_yyyymmdd_bare_date():
+    # AIJ/Tycho hand the date as one number; 2026-09-09 → MJD 61292.0
+    text = "20260909 16.6 V"
+    pts, _ = parse_photometry(text)
+    assert abs(pts[0]["mjd"] - 61292.0) < 1e-6
+
+
+def test_parse_yyyymmdd_with_day_fraction():
+    text = "20260909.85 16.6 V"
+    pts, _ = parse_photometry(text)
+    assert abs(pts[0]["mjd"] - 61292.85) < 1e-6
+
+
+def test_parse_yyyymmdd_rejects_bad_calendar():
+    # "20261332" (month 13) and "20260230" (30 Feb) are not dates
+    text = "20261332 16.6 V\n20260230 16.7 V"
+    pts, skipped = parse_photometry(text)
+    assert pts == []
+    assert skipped == [1, 2]
+
+
+def test_parse_yyyymmdd_out_of_range_skipped():
+    # 17860908.5 is the old bug output (and not a real YYYYMMDD): skipped
+    text = "17860908.5 16.6 V"
+    pts, skipped = parse_photometry(text)
+    assert pts == []
+    assert skipped == [1]
+
+
 def test_parse_iso_date():
     text = "2020-09-08 16.557 Clear"
     pts, _ = parse_photometry(text)
@@ -159,3 +190,5 @@ def test_parse_preserves_original_date_string():
     pts, _ = parse_photometry(text)
     # the mjd is computed, but the original string is available in skipped
     # only if the line failed — for success, the caller has the mjd float.
+    assert len(pts) == 1
+    assert pts[0]["mjd"] is not None

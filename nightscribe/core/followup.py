@@ -174,3 +174,67 @@ def delete_point(db, point_id):
     cur = db.execute("DELETE FROM photometry_points WHERE id=?", (point_id,))
     db.commit()
     return cur.rowcount > 0
+
+
+def upsert_survey_points(db, project_id, points, source="survey:ztf"):
+    # Idempotent survey sync (2026-09-17): the re-click button re-queries the
+    # API and this mirrors the result into the DB. Key per point:
+    # (round(mjd,6), coalesce(filter,'')). Only rows with source LIKE
+    # 'survey:%' are ever read/updated/deleted — paste, manual, file and
+    # quicklook points are off limits.
+    # @args: points - [{"mjd","filter","mag","err"}] from
+    #        surveys.fetch_points_detailed (may be empty), source -
+    #        "survey:ztf" (must start with "survey:")
+    # @return: {"added","updated","unchanged","removed"} (ints)
+    # Raises ValueError on a non-gated project kind or a foreign source;
+    # bad individual rows (no mjd/mag) are skipped, never fatal.
+    row = db.execute("SELECT kind FROM projects WHERE id=?",
+                     (project_id,)).fetchone()
+    if not row or row[0] not in ("sn", "variable"):
+        raise ValueError("survey points are only for sn/variable projects")
+    if not str(source).startswith("survey:"):
+        raise ValueError("source must start with 'survey:'")
+
+    incoming = {}
+    for p in points or []:
+        mjd, mag = p.get("mjd"), p.get("mag")
+        if mjd is None or mag is None:
+            continue                        # not a point — drop it, no error
+        incoming[(round(float(mjd), 6), p.get("filter") or "")] = (
+            float(mjd), p.get("filter") or "", mag, p.get("err"))
+
+    added = updated = unchanged = removed = 0
+    if incoming:                            # empty = "no data", never wipe
+        existing = db.execute(
+            "SELECT id, ROUND(mjd, 6), COALESCE(filter,''), mag, err"
+            " FROM photometry_points WHERE project_id=?"
+            " AND source LIKE 'survey:%'", (project_id,)).fetchall()
+        seen = set()
+        for row_id, m, filt, mag, err in existing:
+            key = (m, filt)
+            if key not in incoming:
+                # stale point the API no longer reports — drop it
+                db.execute("DELETE FROM photometry_points WHERE id=?",
+                           (row_id,)); removed += 1; continue
+            seen.add(key)
+            _, _, mag, err = incoming[key]
+            cur = db.execute(
+                "SELECT mag, err FROM photometry_points WHERE id=?",
+                (row_id,)).fetchone()
+            if cur and (cur[0] == mag and cur[1] == err):
+                unchanged += 1
+            else:
+                db.execute(
+                    "UPDATE photometry_points SET mag=?, err=? WHERE id=?",
+                    (mag, err, row_id)); updated += 1
+        for key, (mjd, filt, mag, err) in incoming.items():
+            if key not in seen:
+                db.execute(
+                    "INSERT INTO photometry_points (project_id, session_id,"
+                    " mjd, filter, mag, err, source)"
+                    " VALUES (?, NULL, ?, ?, ?, ?, ?)",
+                    (project_id, mjd, filt or None, mag, err, source))
+                added += 1
+    db.commit()
+    return {"added": added, "updated": updated,
+            "unchanged": unchanged, "removed": removed}

@@ -299,51 +299,30 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
         transit_view.draw_transit(tr, out=str(p), fmt=fmt, size=size,
                                   lang=lang)
         charts["transit"] = p
-    # B9: SN follow-up light curve; ADR-034 (D.5): a HADS with photometry
-    # gets its curve folded by the catalog period + the schematic sawtooth
-    fu = d.get("followup") or {}
-    fu_points = fu.get("points") or []
-    if fu_points and e.get("type") in ("transient", "sn", "hads",
-                                       "variable"):
-        from ..viz import lightcurve_view
-        p = outdir / f"{safe}lightcurve.png"
-        try:
-            kw = {}
-            if e.get("type") == "hads":
-                from . import hads as hads_mod
-                h = d.get("hads") or {}
-                if h.get("period_h"):
-                    kw["fold_period_d"] = h["period_h"] / 24.0
-                    amp = h.get("amp")
-                    if amp is None and h.get("max") is not None \
-                            and h.get("min") is not None:
-                        amp = h["min"] - h["max"]
-                    if amp and h.get("max") is not None:
-                        kw["schematic"] = hads_mod.sawtooth_template(
-                            h["period_h"], amp, (h["max"] + h["min"]) / 2)
-            if e.get("type") == "variable":
-                v = d.get("variable") or {}
-                if v.get("period_d"):
-                    kw["fold_period_d"] = v["period_d"]
-                    if v.get("epoch_mjd") is not None:
-                        kw["epoch_mjd"] = v["epoch_mjd"]
-                    amp = v.get("amp")
-                    if amp is None and v.get("max") is not None \
-                            and v.get("min") is not None:
-                        amp = v["min"] - v["max"]     # inverted axis
-                    if amp and v.get("max") is not None:
-                        from . import hads as hads_mod
-                        kw["schematic"] = hads_mod.sawtooth_template(
-                            v["period_d"] * 24.0, amp,
-                            (v["max"] + v["min"]) / 2)
-            lightcurve_view.draw_lightcurve(
-                fu_points, out=str(p), fmt=fmt, size=size, lang=lang,
-                sn_type=(d.get("simbad") or {}).get("otype"),
-                peak_mjd=fu.get("peak_mjd"), peak_mag=fu.get("peak_mag"),
-                **kw)
-            charts["lightcurve"] = p
-        except Exception:
-            logger.exception("light curve skipped for %s", e["name"])
+    # B9: SN follow-up light curve; the fold/schematic/sn_type logic now
+    # lives in core/lightcurve_data.py (one place, 2026-09-17) — including
+    # the project's own sn_type taking priority over the catalog otype.
+    if e.get("type") in ("transient", "sn", "hads", "variable"):
+        from . import lightcurve_data
+        payload = lightcurve_data.build_payload(
+            d.get("followup"),
+            sn_type_fallback=(d.get("simbad") or {}).get("otype"),
+            hads=d.get("hads"), variable=d.get("variable"))
+        if payload["points"]:
+            from ..viz import lightcurve_view
+            p = outdir / f"{safe}lightcurve.png"
+            try:
+                lightcurve_view.draw_lightcurve(
+                    payload["points"], out=str(p), fmt=fmt, size=size,
+                    lang=lang, sn_type=payload["sn_type"],
+                    peak_mjd=payload["peak_mjd"],
+                    peak_mag=payload["peak_mag"],
+                    fold_period_d=payload.get("fold_period_d"),
+                    epoch_mjd=payload.get("epoch_mjd"),
+                    schematic=payload.get("schematic"))
+                charts["lightcurve"] = p
+            except Exception:
+                logger.exception("light curve skipped for %s", e["name"])
     plt.close("all")
     return charts
 

@@ -132,9 +132,11 @@ def test_widget_survey_point_style():
     assert m_filled is True
 
 
-def test_widget_legend_suffixes():
-    # legend rows carry the "indicative" / "catalog" suffixes (English
-    # source strings — no .qm loaded in the test env, tr() passes through)
+def test_widget_legend_labels():
+    # Legend rows group by (filter, source) with the human labels:
+    # "No filter · Survey · ALeRCE/ZTF", "… Quick-look · indicative"…
+    # (English source strings — no .qm loaded in the test env, so
+    # tr() passes through unchanged)
     pts = [
         {"mjd": 60600.0, "mag": 16.0, "err": 0.02, "filter": "Clear",
          "source": "survey:atlas"},
@@ -144,12 +146,108 @@ def test_widget_legend_suffixes():
     chart = LightCurveChart()
     chart.set_data(pts)
     texts = _legend_texts(chart)
-    assert any("catalog" in t for t in texts)
-    assert any("indicative" in t for t in texts)
-    # a manual-only set has no suffix at all
+    assert "No filter · Survey · ALeRCE/ZTF" in texts
+    assert "No filter · Quick-look · indicative" in texts
+    # named filters keep their name
+    chart3 = LightCurveChart()
+    chart3.set_data([dict(pts[0], filter="V")])
+    assert "V · Survey · ALeRCE/ZTF" in _legend_texts(chart3)
+
+
+def test_widget_source_labels():
+    # filter / source label helpers (legend + probe share them, so the
+    # two renderers cannot drift into different wording)
+    chart = LightCurveChart()
+    assert chart.filter_label(None) == "No filter"
+    assert chart.filter_label("Clear") == "No filter"
+    assert chart.filter_label("None") == "No filter"
+    assert chart.filter_label("V") == "V"
+    assert chart.source_label(None) == "Manual entry"
+    assert chart.source_label("manual") == "Manual entry"
+    assert chart.source_label("paste") == "Pasted data"
+    assert chart.source_label("file") == "From file"
+    assert chart.source_label("quicklook") == "Quick-look · indicative"
+    assert chart.source_label("survey:ztf") == "Survey · ALeRCE/ZTF"
+    assert chart.source_label("survey:atlas") == "Survey · ALeRCE/ZTF"
+
+
+def test_widget_template_toggle_keeps_bounds():
+    # Toggling the template rebuilds the scene but never moves the axis:
+    # the template is a reference, not data.
+    _app()
+    from nightscribe.core import hads
+    saw = hads.sawtooth_template(12.0, 0.5, 11.55)
+    chart = LightCurveChart()
+    chart.set_data(_FOLD_POINTS, fold_period_d=0.5, schematic=saw)
+    before = chart._bounds
+    assert before is not None
+    n_with = len(chart._items_registered)
+    chart.set_template_visible(False)
+    assert chart._bounds == before          # axis fixed
+    n_without = len(chart._items_registered)
+    assert n_without < n_with               # schematic lines gone
+    assert chart._tpl_visible is False
+    chart.set_template_visible(True)
+    assert chart._bounds == before
+    assert len(chart._items_registered) == n_with
+    # without a template/schematic the toggle is a no-op on the scene
     chart2 = LightCurveChart()
-    chart2.set_data([dict(pts[0], source="manual")])
-    assert not any("·" in t for t in _legend_texts(chart2))
+    chart2.set_data(_POINTS, sn_type="SN Ia")
+    b2 = chart2._bounds
+    n2 = len(chart2._items_registered)
+    chart2.set_template_visible(False)
+    assert chart2._bounds == b2
+    chart2.set_template_visible(True)
+    assert chart2._bounds == b2
+    assert len(chart2._items_registered) == n2
+
+
+def test_widget_link_lines_toggle():
+    # Linking lines on/off: solid for the observer's own points, dashed
+    # for quick-look / survey, and it must not crash when a series has
+    # 0, 1 or 2 points (a series with a single point has no neighbours
+    # to connect and gets no line).
+    _app()
+    from PySide6.QtCore import Qt as _Qt
+    from PySide6.QtGui import QPen as _QPen
+    pts = [
+        {"mjd": 60600.0, "mag": 16.0, "err": 0.02, "filter": "Clear",
+         "source": "manual"},
+        {"mjd": 60602.0, "mag": 16.3, "err": 0.02, "filter": "Clear",
+         "source": "manual"},
+        {"mjd": 60601.0, "mag": 15.8, "err": 0.03, "filter": "Clear",
+         "source": "survey:ztf"},
+    ]
+    for n in (0, 1, len(pts)):
+        chart = LightCurveChart()
+        chart.set_data(pts[:n])
+        chart.set_link_lines(False)
+        linkless = len(chart._items_registered)
+        chart.set_link_lines(True)
+        linked = len(chart._items_registered)
+        assert linked >= linkless
+        if n < len(pts):
+            assert linked == linkless  # every series has 1 point: no line
+        else:
+            # only the 2-point manual series gets a line (single survey
+            # point stays unlinked)
+            assert linked == linkless + 1
+    # both series with 2 points: two lines
+    pts2 = pts + [dict(pts[2], mjd=60603.0, source="survey:ztf")]
+    chart = LightCurveChart()
+    chart.set_data(pts2)
+    chart.set_link_lines(False)
+    linkless = len(chart._items_registered)
+    chart.set_link_lines(True)
+    assert len(chart._items_registered) == linkless + 2
+    # pen styles: manual solid, survey dashed (mirrors the PNG export)
+    solid = chart._link_pen("manual", "Clear")
+    dash = chart._link_pen("survey:ztf", "Clear")
+    dashed = chart._link_pen("quicklook", "Clear")
+    assert isinstance(solid, _QPen)
+    assert solid.style() == _Qt.SolidLine
+    assert dash.style() == _Qt.DashLine
+    assert dashed.style() == _Qt.DashLine
 
 
 def test_widget_survey_point_not_crash():

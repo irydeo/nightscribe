@@ -43,6 +43,27 @@ def fetch_points(ra_deg, dec_deg, radius_arcsec=3.0, force=False):
     return _to_points(_lightcurve(oid, force=force))
 
 
+def fetch_points_detailed(ra_deg, dec_deg, radius_arcsec=3.0, force=False):
+    # Talking twin of fetch_points (2026-09-17): instead of silently
+    # returning [] it reports what actually happened, so the Follow-up
+    # button can show ok / empty / error to the observer.
+    # @args: same as fetch_points
+    # @return: {"status": "ok"|"empty"|"error", "points": [...],
+    #          "error": str|None}
+    try:
+        oid = _conesearch_oid(ra_deg, dec_deg, radius_arcsec, force=force,
+                              strict=True)
+        if not oid:
+            return {"status": "empty", "points": [], "error": None}
+        pts = _to_points(_lightcurve(oid, force=force, strict=True))
+        if not pts:
+            return {"status": "empty", "points": [], "error": None}
+        return {"status": "ok", "points": pts, "error": None}
+    except (requests.RequestException, ValueError) as err:
+        logger.warning("survey fetch failed: %s", err)
+        return {"status": "error", "points": [], "error": str(err)}
+
+
 def latest_mag(ra_deg, dec_deg, radius_arcsec=3.0, force=False):
     # The freshest ZTF detection near a position, for the vigil checks
     # (ADR-037 SC4a). Cached under the short-TTL "vigils" keys — a vigil
@@ -102,10 +123,12 @@ def latest_mag_cached(ra_deg, dec_deg, radius_arcsec=3.0, db_obj=None):
             "mag": newest["mag"]}
 
 
-def _get(url, params, cache_key, force, source="surveys"):
+def _get(url, params, cache_key, force, source="surveys", strict=False):
     # One cached GET; returns the decoded JSON or None on failure.
     # @args: source - SOURCE_TTL key in db.py ("surveys" 30 d context,
-    #        "vigils" 12 h for the latest-point checks)
+    #        "vigils" 12 h for the latest-point checks),
+    #        strict - re-raise fetch/parse errors instead of returning None
+    #                 (fetch_points_detailed needs to report them)
     def fetch():
         r = requests.get(url, params=params, timeout=30)
         r.raise_for_status()
@@ -114,18 +137,20 @@ def _get(url, params, cache_key, force, source="surveys"):
         body, _ = db.http_get(cache_key, source, fetch, force=force)
         return json.loads(body.decode("utf-8", "replace"))
     except (requests.RequestException, ValueError) as err:
+        if strict:
+            raise
         logger.warning("survey fetch failed (%s): %s", cache_key, err)
         return None
 
 
 def _conesearch_oid(ra_deg, dec_deg, radius_arcsec, force=False,
-                    source="surveys", prefix="surveys"):
+                    source="surveys", prefix="surveys", strict=False):
     # @return: the oid of the nearest ALeRCE object inside the radius, None
     data = _get(f"{_BASE}/objects/",
                 {"ra": ra_deg, "dec": dec_deg, "radius": radius_arcsec,
                  "page_size": 5},
                 f"{prefix}:cone:{ra_deg:.4f}:{dec_deg:.4f}", force,
-                source=source)
+                source=source, strict=strict)
     items = (data or {}).get("items") or []
     best, best_d = None, None
     for it in items:
@@ -136,10 +161,11 @@ def _conesearch_oid(ra_deg, dec_deg, radius_arcsec, force=False,
     return (best or {}).get("oid")
 
 
-def _lightcurve(oid, force=False, source="surveys", prefix="surveys"):
+def _lightcurve(oid, force=False, source="surveys", prefix="surveys",
+                strict=False):
     # @return: {"detections": [...], "non_detections": [...]} or None
     return _get(f"{_BASE}/objects/{oid}/lightcurve", {},
-                f"{prefix}:lc:{oid}", force, source=source)
+                f"{prefix}:lc:{oid}", force, source=source, strict=strict)
 
 
 def _to_points(data):

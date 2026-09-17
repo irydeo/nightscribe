@@ -958,7 +958,70 @@ desde el Diario (borrador de post con lo hecho en la sesión). Pendiente
 de validación con el token del usuario: el camino AAVSO de las vigilias
 brillantes (ver 7septdecies).
 
-### 7novdecies. Track UX-PC — Projects y Campaigns que dicen «Ohh» (2026-09-17, ADR-038)
+### 7noovies. Track VU — Informe de surveys y curva inline (2026-09-17, ampliación ADR-035)
+
+Rama `feature/campaigns-ux` (continuidad natural de la opción B12 que cierra
+el ADR-035 §7).
+
+El botón de surveys de Follow-up era *silencioso* por diseño: clic → nada
+visible (ni puntos, ni confirmación), y la descarga además **almacenaba
+fechas erróneas** (un pegado con enteros YMD había pasado 4 filas de un
+proyecto real con MJDs 4 años atrás — corregido y reparado en la BD). El
+track entrega:
+
+- **Informe, nunca silencio** (`surveys.fetch_points_detailed`): el
+  worker devuelve `{status: ok|empty|error, points, error}` y la GUI
+  reporta siempre con voz humana: ok → «%1 new, %2 updated, %3
+  unchanged, %4 removed; MJD min → max; bands (ZTF via ALeRCE)»; empty →
+  «No survey data for this position»; error → «Survey download failed —
+  <razón>».
+- **Recliclar = re-consulta real**: `force=True` siempre; la caché de 30 d
+  no oculta el clic. `fetch_points` (el camino de las vigilias, ADR-037
+  SC4a) mantiene el silencio `[]`: la vigilia nunca debe tumbar la app.
+- **Upsert idempotente y protegido**
+  (`followup.upsert_survey_points`): clave `(mjd, filter)`; solo toca
+  filas `source LIKE 'survey:%'` (jamás paste/manual/file/quicklook) y
+  solo elimina las `survey:%` huérfanas **si** el resultado es no vacío:
+  una respuesta vacía nunca borra fotometría almacenada. Solo proyectos
+  `sn`/`variable`; los demás reciben un «Cannot store survey points:
+  <razón>» explícito.
+- **Curva inline en Follow-up** (`gui/widgets/lightcurve_widget.py`):
+  etiquetas humanas por origen («Manual entry», «Pasted data», «From
+  file», «Quick-look · indicative», «Survey · ALeRCE/ZTF»); proyecto
+  `sn` con `sn_type`: plantilla de SN plegada al pico (toggle ON por
+  defecto); `variable`: plegado periódica + diente de sierra; líneas de
+  conexión ON por defecto (manual = continuada, quick-look/survey =
+  discontinua — la misma convención semántica que el PNG, solo cambia el
+  texto de la etiqueta).
+- **Payload en un sitio solo** (`core/lightcurve_data.py::build_payload`):
+  el widget inline, `post.py` (PNG, vía `viz/lightcurve_view.py`) y
+  `overview.py` comparten la construcción (puntos, prioridad de
+  `sn_type`, pico, plegados, diente de sierra); el crash `TypeError`
+  cuando `min` era `None` (rama del overview) queda corregido en el sitio
+  común (guarda de mínimos).
+- **Pegado con feedback**: vista previa con fecha humana y aviso «⚠ date
+  outside 1966–2086 — check» para MJDs fuera de banda (solo vista previa;
+  la ruta de guardado no cambia) y el parser `core/photometry_import.py`
+  ya no confunde enteros YMD con MJD (`20260909 → 61292` en vez de
+  `58107`), acepta JD (restando 2 400 000,5) y MJD directo, y devuelve
+  `None` si no sabe (sin excepción).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| VU.1 | parser pegado YMD/MJD/JD + reparación de filas pid 18 + tests | **Hecho** |
+| VU.2 | `fetch_points_detailed` + worker + informe ok/empty/error | **Hecho** |
+| VU.3 | `upsert_survey_points` (idempotente, protegido, con puerta de kind) + tests | **Hecho** |
+| VU.4 | curva inline (etiquetas, toggle de plantilla, líneas de conexión) + `build_payload` compartido | **Hecho** |
+| VU.5 | aviso de pegado + ampliación ADR-035 + esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (**1293**): 17 tests nuevos
+(`test_lightcurve_data.py` 10, `test_surveys.py` +4, `test_lightcurve_widget.py`
++3) y 3 tests actualizados al payload dict (`test_workers.py` ×2,
+`test_projects_hub.py`). **Fuera de esta iteración**: descarga
+automática al crear el proyecto (el botón manual sigue siendo la vía),
+mezcla de survey en la vista de AAVSO (los puntos `survey:%` siguen siendo
+referencia, nunca suben a AAVSO).
+### 7vigies. Track UX-PC — Projects y Campaigns que dicen «Ohh» (2026-09-17, ADR-038)
 
 Plan: `docs/PLANS/ux-proyectos-campanas.md`. Rama propia e independiente
 `feature/ux-projects-campaigns` (nace de `feature/campaigns-ux` `cb457e6`;
@@ -1000,4 +1063,6 @@ funcionalidad se pierde: se reubica.
 
 **Estado**: suite unitaria verde (**1299**), i18n 876 cadenas 0
 unfinished. Métricas: Projects con un SN abierto pasa de ~20 a ≤10
-acciones visibles; Campaigns de 19 a ≤4.
+acciones visibles; Campaigns de 19 a ≤4. **Tras el merge con
+`feature/campaigns-ux` (Track VU, mismo día)**: suite **1320**, i18n
+885 cadenas 0 unfinished.

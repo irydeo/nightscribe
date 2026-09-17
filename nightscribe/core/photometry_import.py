@@ -80,18 +80,41 @@ def _to_float(token):
         return None
 
 
+def _as_yyyymmdd(val):
+    # @args: val - a bare float like 20260909 or 20260909.85
+    # @return: MJD if val encodes a valid YYYYMMDD calendar day, else None.
+    # AIJ/Tycho exports hand us the date as a single number; before this
+    # branch existed every float >2.4M was read as a JD, so "20260909"
+    # came out as the nonsense MJD 17860908.5 (forensic 2026-09-17).
+    if not 19_500_101 <= val < 22_001_232:
+        return None
+    ival, frac = int(val), val % 1
+    y, rem = divmod(ival, 10000)
+    mo, d = divmod(rem, 100)
+    if not 1 <= mo <= 12 or not 1 <= d <= 31:
+        return None
+    try:
+        dt = datetime.datetime(y, mo, d, tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return None                       # e.g. 20261332, 20260230
+    return coords.jd_from_datetime(dt) + frac - 2_400_000.5
+
+
 def _parse_date_to_mjd(token):
-    # @args: token - a date string or a bare MJD/JD float
+    # @args: token - a date string or a bare MJD/JD/YYYYMMDD float
     # @return: (mjd_float, original_string) or (None, token) if unparseable
-    # Tries: bare float (MJD if 40000-70000, JD if >2M), "YYYY/MM/DD.fff",
-    # "YYYY-MM-DD[THH:MM:SS]", "DD/MM/YY"
+    # Tries: bare float (YYYYMMDD first, then JD 2.4M-3M, then MJD
+    # 40000-80000), "YYYY/MM/DD.fff", "YYYY-MM-DD[THH:MM:SS]", "DD/MM/YY"
     val = _to_float(token)
     if val is not None:
-        if val > 2_400_000:
+        mjd = _as_yyyymmdd(val)
+        if mjd is not None:
+            return mjd, token
+        if 2_400_000 < val < 3_000_000:
             return val - 2_400_000.5, token   # JD → MJD
         if 40000 < val < 80000:
             return val, token                 # already MJD
-        return None, token                    # a small float — not a date
+        return None, token                    # out of range for all — skip
     s = token.strip()
     # fractional day: "2020/09/08.853" (day 8 + 0.853 of the day)
     m = re.match(r"(\d{4})/(\d{2})/(\d{2})\.(\d+)", s)

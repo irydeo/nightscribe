@@ -288,7 +288,10 @@ class ResolveWorker(QThread):
 class SurveyWorker(QThread):
     # Downloads the ALeRCE/ZTF context points for one position, off the GUI
     # thread (UX-f) — the Follow-up survey button used to freeze on it.
-    finished = Signal(list)     # photometry point dicts ([] on failure)
+    # Always re-queries (force): a re-click must be a re-query, and the
+    # outcome (ok / empty / error) is part of the signal so the GUI can
+    # report it — the old silent success was the bug.
+    finished = Signal(dict)     # {"status": ok|empty|error, "points", "error"}
 
     def __init__(self, ra_deg, dec_deg):
         super().__init__()
@@ -297,8 +300,10 @@ class SurveyWorker(QThread):
     def run(self):
         from ..core.sources import surveys
         try:
-            self.finished.emit(surveys.fetch_points(self._ra, self._dec)
-                               or [])
-        except Exception as err:
+            out = surveys.fetch_points_detailed(
+                self._ra, self._dec, force=True)
+        except Exception as err:      # strict mode only re-raises known
+                                      # errors, but never crash the GUI
             logger.warning("survey worker failed: %s", err)
-            self.finished.emit([])
+            out = {"status": "error", "points": [], "error": str(err)}
+        self.finished.emit(out)

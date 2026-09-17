@@ -840,6 +840,7 @@ class ObjectPanel(QWidget):
                        peak_mjd=data.get("peak_mjd"),
                        peak_mag=data.get("peak_mag"),
                        fold_period_d=data.get("fold_period_d"),
+                       epoch_mjd=data.get("epoch_mjd"),
                        schematic=data.get("schematic"))
             return w
         return None
@@ -912,47 +913,18 @@ class ObjectPanel(QWidget):
             return {"elements": els, "jd": jd, "name": e.get("name", "")}
 
         elif key == "lightcurve":
-            fu = d.get("followup") or {}
-            pts = fu.get("points") or []
-            if not pts:
+            # One shared payload builder (2026-09-17): the fold, schematic
+            # and sn_type priority now live in core/lightcurve_data.py so
+            # this path, the Follow-up inline curve and the PNG cannot drift.
+            from ..core import lightcurve_data
+            out = lightcurve_data.build_payload(
+                d.get("followup"),
+                sn_type_fallback=(d.get("simbad") or {}).get("otype"),
+                hads=d.get("hads") or (self._ctx or {}).get("hads"),
+                variable=d.get("variable")
+                or (self._ctx or {}).get("variable"))
+            if not out.get("points"):
                 return None
-            out = {"points": pts,
-                   "sn_type": fu.get("sn_type")
-                   or (d.get("simbad") or {}).get("otype"),
-                   "peak_mjd": fu.get("peak_mjd"),
-                   "peak_mag": fu.get("peak_mag")}
-            # ADR-034 (D.4): a HADS star folds its own curve by its catalog
-            # period, with the schematic sawtooth as the shape reference
-            h = d.get("hads") or (self._ctx or {}).get("hads") or {}
-            if h.get("period_h"):
-                out["fold_period_d"] = h["period_h"] / 24.0
-                amp = h.get("amp")
-                if amp is None and h.get("max") is not None \
-                        and h.get("min") is not None:
-                    amp = h["min"] - h["max"]
-                if amp and h.get("max") is not None:
-                    from ..core import hads as hads_mod
-                    med = (h["max"] + h["min"]) / 2
-                    out["schematic"] = hads_mod.sawtooth_template(
-                        h["period_h"], amp, med)
-            # ADR-035: a long-period variable folds by its VSX period
-            # with the real epoch, and reuses the schematic sawtooth
-            v = d.get("variable") or (self._ctx or {}).get("variable") \
-                or {}
-            if "fold_period_d" not in out and v.get("period_d"):
-                out["fold_period_d"] = v["period_d"]
-                if v.get("epoch_mjd") is not None:
-                    out["epoch_mjd"] = v["epoch_mjd"]
-                amp = v.get("amp")
-                if amp is None and v.get("max") is not None \
-                        and v.get("min") is not None:
-                    amp = v["min"] - v["max"]
-                if amp and v.get("max") is not None \
-                        and v.get("min") is not None:
-                    from ..core import hads as hads_mod
-                    med = (v["max"] + v["min"]) / 2
-                    out["schematic"] = hads_mod.sawtooth_template(
-                        v["period_d"] * 24.0, amp, med)
             return out
 
         return None
@@ -993,6 +965,7 @@ class ObjectPanel(QWidget):
                        peak_mjd=data.get("peak_mjd"),
                        peak_mag=data.get("peak_mag"),
                        fold_period_d=data.get("fold_period_d"),
+                       epoch_mjd=data.get("epoch_mjd"),
                        schematic=data.get("schematic"))
             return w
         return None

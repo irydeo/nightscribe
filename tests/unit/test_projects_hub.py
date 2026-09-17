@@ -477,9 +477,10 @@ def test_explore_panel_lookup_injects_fallback_id(window, tmp_path):
 
 # ---------------- auto-refresh the hub list (2026-09-06) ------------
 #
-# Projects must be visible without pressing "Refresh": the list loads at
-# startup and refreshes again on every visit to the Projects tab. The
-# "Refresh" button stays as a just-in-case fallback.
+# Projects must be visible without pressing anything: the list loads at
+# startup and refreshes again on every visit to the Projects tab.
+# UX-PC (U1, 2026-09-17): the manual "Refresh" fallback is gone for good
+# — the list never goes stale.
 
 def test_projects_list_populated_at_startup():
     # A fresh MainWindow must show whatever projects already exist the
@@ -500,12 +501,33 @@ def test_projects_list_populated_at_startup():
         for _ in range(3):      # let the deferred startup refresh land
             QCoreApplication.processEvents()
         assert w.projects.lst_projects.count() > 0
-        # the manual fallback button is still there
-        assert w.projects.btn_refresh is not None
-        assert not w.projects.btn_refresh.isHidden()
+        # UX-PC (U1): the Refresh fallback is gone; the header row is just
+        # the state combo, the search field, the Filters ▸ toggle and New
+        assert not hasattr(w.projects, "btn_refresh")
+        assert not hasattr(w.projects, "btn_campaigns")
+        assert w.projects.btn_filters is not None
+        assert w.projects.filters_box.isHidden()   # collapsed by default
     finally:
         config.is_configured = orig_cfg
         w.close()
+
+
+def test_filters_toggle_shows_and_persists(window):
+    # UX-PC (U1): the advanced filters row collapses behind the Filters ▸
+    # toggle and the choice is remembered in config.
+    from nightscribe.config import config
+    box = window.projects.filters_box
+    btn = window.projects.btn_filters
+    assert box.isHidden() == (not btn.isChecked())
+    btn.setChecked(True)
+    window._project_filters_toggled(True)
+    assert not box.isHidden()
+    assert config.get("projects_filters_open") is True
+    assert "▾" in btn.text()
+    window._project_filters_toggled(False)
+    assert box.isHidden()
+    assert config.get("projects_filters_open") is False
+    assert "▸" in btn.text()
 
 
 def test_refresh_projects_populates_list_without_button(window):
@@ -775,20 +797,51 @@ def _reselect(window, pid):
     window._project_selected()
 
 
-def test_close_button_visible_when_active(window, panel):
+def _manage_actions(window):
+    # @args: window - MainWindow
+    # @return: {action text: QAction} of the header ⋯ manage menu,
+    #          rebuilt exactly as when the user opens it
+    window._rebuild_manage_menu()
+    menu = window.projects.btn_manage.menu()
+    return {a.text(): a for a in menu.actions() if a.text()}
+
+
+def test_manage_menu_close_enabled_when_active(window, panel):
+    # UX-PC (U1): the lifecycle actions live in the header ⋯ menu with
+    # state-aware enablement (the old footer buttons are gone).
     _create_and_select(window, "sn", "SN2026A2a", {"kind": "sn", "mag": 16.0})
-    assert not window.projects.btn_close.isHidden()
-    assert window.projects.btn_reopen.isHidden()
+    acts = _manage_actions(window)
+    close = next(a for t, a in acts.items() if "Close" in t or "Cerrar" in t)
+    reopen = next(a for t, a in acts.items()
+                  if "Reopen" in t or "Reabrir" in t)
+    assert close.isEnabled()
+    assert not reopen.isEnabled()
+    # the menu also carries tags + the two folder actions
+    assert any("tag" in t.lower() for t in acts)
+    assert any("folder" in t.lower() or "carpeta" in t.lower() for t in acts)
 
 
-def test_reopen_button_visible_when_done(window, panel):
+def test_manage_menu_reopen_enabled_when_done(window, panel):
     import nightscribe.core.db as dbmod
     from nightscribe.core import project
     p = _create_and_select(window, "sn", "SN2026A2b", {"kind": "sn"})
     project.close(dbmod.db, p["id"], "completed")
     _reselect(window, p["id"])
-    assert window.projects.btn_close.isHidden()
-    assert not window.projects.btn_reopen.isHidden()
+    acts = _manage_actions(window)
+    close = next(a for t, a in acts.items() if "Close" in t or "Cerrar" in t)
+    reopen = next(a for t, a in acts.items()
+                  if "Reopen" in t or "Reabrir" in t)
+    assert not close.isEnabled()
+    assert reopen.isEnabled()
+
+
+def test_manage_menu_empty_without_selection(window):
+    # UX-PC (U1): with nothing selected the ⋯ menu shows a single disabled
+    # hint — real enablement, no silent no-ops.
+    window._clear_project_detail()
+    acts = _manage_actions(window)
+    assert len(acts) == 1
+    assert not next(iter(acts.values())).isEnabled()
 
 
 def test_header_shows_closed_date_and_outcome(window, panel):

@@ -469,6 +469,15 @@ class MainWindow(QMainWindow):
             int(config.get("projects_filter_sort", 0)))
         self.projects.chk_favorites.setChecked(
             bool(config.get("projects_filter_fav", False)))
+        # UX-PC (U1): the advanced filters row starts collapsed; the toggle
+        # restores the user's last choice
+        filters_open = bool(config.get("projects_filters_open", False))
+        self.projects.filters_box.setVisible(filters_open)
+        self.projects.btn_filters.blockSignals(True)
+        self.projects.btn_filters.setChecked(filters_open)
+        self.projects.btn_filters.setText(
+            self.tr("Filters ▾") if filters_open else self.tr("Filters ▸"))
+        self.projects.btn_filters.blockSignals(False)
         # window-owned Observatory tab: build its controls once (UX, UD.2)
         self._build_observatory_tab()
 
@@ -498,8 +507,8 @@ class MainWindow(QMainWindow):
     def _connect(self):
         t = self.tonight
         # Refresh the Projects hub list every time the user enters that
-        # tab, so it is always up to date without pressing "Refresh" (which
-        # stays as a just-in-case fallback).
+        # tab, so it is always up to date (UX-PC U1: the manual Refresh
+        # fallback button is gone — the list never goes stale).
         from PySide6.QtWidgets import QTabWidget
         self.centralWidget().findChild(
             QTabWidget, "tabs").currentChanged.connect(
@@ -514,11 +523,17 @@ class MainWindow(QMainWindow):
         t.chk_show_observed.stateChanged.connect(lambda _s: self._fill_table())
         t.tbl_targets.cellDoubleClicked.connect(self._table_open_explore)
         p = self.projects
-        p.btn_refresh.clicked.connect(self.on_refresh_projects)
+        # UX-PC (U1): the list refreshes itself on every tab visit — no
+        # manual Refresh button; the advanced filters live collapsed
+        # behind the Filters ▸ toggle (state persisted in config).
         p.cmb_filter.currentIndexChanged.connect(self.on_refresh_projects)
-        p.btn_campaigns.clicked.connect(self._tools_campaigns)
         p.cmb_campaign.currentIndexChanged.connect(
             lambda _i: self.on_refresh_projects())
+        p.btn_filters.toggled.connect(self._project_filters_toggled)
+        from PySide6.QtWidgets import QMenu
+        manage = QMenu(self)
+        manage.aboutToShow.connect(self._rebuild_manage_menu)
+        p.btn_manage.setMenu(manage)
         p.lst_projects.itemSelectionChanged.connect(self._project_selected)
         # UX-c: one gesture language — double-click/Enter opens the
         # project at its current step, right-click offers every action,
@@ -560,20 +575,18 @@ class MainWindow(QMainWindow):
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
         p.lst_projects.itemClicked.connect(self._project_reclicked)
-        p.btn_archive.clicked.connect(self._project_archive)
-        p.btn_delete.clicked.connect(self._project_delete)
-        p.btn_close.clicked.connect(self._project_close)
-        p.btn_reopen.clicked.connect(self._project_reopen)
+        # UX-PC (U1): the lifecycle actions (close/reopen/archive/delete)
+        # live in the header's ⋯ manage menu now, not in footer buttons.
         p.cmb_kind.currentIndexChanged.connect(self.on_refresh_projects)
         p.edt_search.textChanged.connect(self.on_refresh_projects)
         p.edt_tag.textChanged.connect(self.on_refresh_projects)
         p.cmb_sort.currentIndexChanged.connect(self.on_refresh_projects)
         p.chk_favorites.stateChanged.connect(self.on_refresh_projects)
-        # A3: favorite star toggle + tags editor in the project header
+        # A3: favorite star toggle in the project header (tags live in the
+        # ⋯ manage menu since UX-PC U1)
         p.btn_favorite.clicked.connect(self._project_toggle_favorite)
         p.btn_next_go.clicked.connect(
             lambda: self._scroll_to_section(self._next_target))
-        p.edt_tags.editingFinished.connect(self._project_tags_edited)
         # A2: click on the advisor banner dismisses it for this session
         self._advisor_dismissed = None
         self.projects.lbl_advisor.mouseReleaseEvent = \
@@ -2241,15 +2254,10 @@ class MainWindow(QMainWindow):
             self._proj_files_list.itemDoubleClicked.connect(
                 self._open_project_file)
             sec.setContentWidget(self._proj_files_list)
-            # A4: "Show in folder" button (opens the file's parent folder)
-            btn_folder = QPushButton(self.tr("Show in folder"))
-            btn_folder.clicked.connect(self._open_project_folder)
-            sec.contentLayout().addWidget(btn_folder)
-            # ADR-032: re-home the project's container folder (future
-            # exports only; registered files keep their absolute paths)
-            btn_ch_folder = QPushButton(self.tr("Change folder…"))
-            btn_ch_folder.clicked.connect(self._change_project_folder)
-            sec.contentLayout().addWidget(btn_ch_folder)
+            # UX-PC (U1): the folder actions ("Show in folder" /
+            # "Change folder…", ADR-032) live in the header's ⋯ manage
+            # menu — one visible home per action; this section is the
+            # plain files list (double-click opens with the OS).
             sec.setCollapsed(True)
             det.addWidget(sec)
             self._proj_files_section = sec
@@ -2288,15 +2296,18 @@ class MainWindow(QMainWindow):
             QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
     def _open_project_folder(self):
-        # A4: "Show in folder" opens the selected file's parent folder.
+        # "Show in folder" (⋯ manage menu, UX-PC U1): opens the project's
+        # container folder, creating it on first use so it never fails
+        # silently. One behavior only — the old divergence (file's parent
+        # vs. project folder) is gone.
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
-        item = self._proj_files_list.currentItem()
-        if item is not None:
-            path = item.data(Qt.UserRole)
-            if path:
-                QDesktopServices.openUrl(
-                    QUrl.fromLocalFile(str(Path(path).parent)))
+        p = self._current_project
+        if not p:
+            return
+        folder = project.storage_dir(p)
+        folder.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def _change_project_folder(self):
         # ADR-032: re-home the current project's container folder. Future
@@ -2408,13 +2419,10 @@ class MainWindow(QMainWindow):
         if ctx.get("rate_arcsec_min"):
             parts.append(f"{ctx['rate_arcsec_min']:.1f}″/min")
         self.projects.lbl_context.setText(" · ".join(parts) or "—")
-        # A3: favorite star (☆/★) and tags editor in the header
+        # A3: favorite star (☆/★) in the header; the rest of the project
+        # management lives in the ⋯ menu next to it (UX-PC U1)
         self.projects.btn_favorite.setText("★" if p.get("favorite") else "☆")
-        self.projects.edt_tags.setText(p.get("tags") or "")
-        # Button visibility: Close when active, Reopen when done/archived.
         is_active = p["status"] == project.STATUS_ACTIVE
-        self.projects.btn_close.setVisible(is_active)
-        self.projects.btn_reopen.setVisible(not is_active)
         # Close advisor (T10): suggest closing when a project has been idle
         # for too long. v1: time-based; the evolution signal from track B
         # (B11) plugs into this same label later. Sugiere, nunca decide.
@@ -5249,14 +5257,63 @@ class MainWindow(QMainWindow):
         project.set_favorite(db, pid, fav)
         self.on_refresh_projects()
 
-    def _project_tags_edited(self):
-        # A3: tags editor — comma-separated free text, saved on Enter/focus-out.
-        if not self._current_project:
+    def _project_filters_toggled(self, checked):
+        # UX-PC (U1): the advanced filters row (type/tag/campaign/sort/
+        # favorites) collapses behind the Filters ▸ toggle; the choice is
+        # remembered across sessions.
+        # @args: checked - the toggle state
+        # @return: None
+        self.projects.filters_box.setVisible(checked)
+        self.projects.btn_filters.setText(
+            self.tr("Filters ▾") if checked else self.tr("Filters ▸"))
+        config.set("projects_filters_open", checked)
+
+    def _rebuild_manage_menu(self):
+        # UX-PC (U1): the ⋯ menu in the project header is the single home
+        # of project management — tags, folder and the whole lifecycle.
+        # Rebuilt on every open so Close/Reopen follow the live state.
+        # @return: None
+        menu = self.projects.btn_manage.menu()
+        menu.clear()
+        p = self._current_project
+        if not p:
+            menu.addAction(self.tr("(no project selected)")).setEnabled(False)
             return
-        pid = self._current_project["id"]
-        tags = self.projects.edt_tags.text().strip()
-        project.set_tags(db, pid, tags)
-        # refresh the list row (tags appear in the label)
+        act_tags = menu.addAction(self.tr("Edit tags…"))
+        act_tags.triggered.connect(self._project_edit_tags)
+        act_folder = menu.addAction(self.tr("Show in folder"))
+        act_folder.triggered.connect(self._open_project_folder)
+        act_chfolder = menu.addAction(self.tr("Change folder…"))
+        act_chfolder.triggered.connect(self._change_project_folder)
+        menu.addSeparator()
+        is_active = p["status"] == project.STATUS_ACTIVE
+        act_close = menu.addAction(self.tr("Close project…"))
+        act_close.setEnabled(is_active)
+        act_close.triggered.connect(self._project_close)
+        act_reopen = menu.addAction(self.tr("Reopen"))
+        act_reopen.setEnabled(not is_active)
+        act_reopen.triggered.connect(self._project_reopen)
+        act_archive = menu.addAction(self.tr("Archive…"))
+        act_archive.setEnabled(is_active)
+        act_archive.triggered.connect(self._project_archive)
+        act_delete = menu.addAction(self.tr("Delete…"))
+        act_delete.triggered.connect(self._project_delete)
+
+    def _project_edit_tags(self):
+        # A3 tags editor, UX-PC home: a small prompt from the ⋯ manage
+        # menu (comma-separated free text, saved on accept).
+        # @return: None
+        p = self._current_project
+        if not p:
+            return
+        text, ok = QInputDialog.getText(
+            self, self.tr("Edit tags"),
+            self.tr("Comma-separated tags:"), QLineEdit.Normal,
+            p.get("tags") or "")
+        if not ok:
+            return
+        project.set_tags(db, p["id"], text.strip())
+        # refresh the list row (the tag filter may depend on it)
         self.on_refresh_projects()
 
     def _project_close(self):

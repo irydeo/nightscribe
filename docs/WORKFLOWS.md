@@ -785,3 +785,65 @@ observatory watermark, shown in the ChartViewer) and the bilingual
 **Noted future idea**: a "night chronicle" generated from the journal
 (a post draft of what the session did). Pending live validation with
 the user's token: the AAVSO bright-vigil path (see 7septdecies).
+
+### 7noovies. Track VU — survey report & inline curve (2026-09-17, ADR-035 addendum)
+
+Branch `feature/campaigns-ux` (natural continuation of the B12 option that
+ADR-035 §7 closes).
+
+The Follow-up survey button was deliberately *silent*: click → nothing
+visible (no points, no confirmation), and on top of that the paste path
+had **stored wrong dates** (a paste with YMD integers had written 4 rows
+in a real project with MJDs four years in the past — fixed and repaired
+in the DB). The track delivers:
+
+- **Report, never silence** (`surveys.fetch_points_detailed`): the worker
+  returns `{status: ok|empty|error, points, error}` and the GUI always
+  reports in a human voice: ok → «%1 new, %2 updated, %3 unchanged, %4
+  removed; MJD min → max; bands (ZTF via ALeRCE)»; empty → «No survey
+  data for this position»; error → «Survey download failed — <reason>».
+- **Re-click = real re-query**: `force=True` always; the 30-day cache does
+  not hide the click. `fetch_points` (the vigils' path, ADR-037 SC4a)
+  keeps returning `[]` silently: a watch must not take the app down.
+- **Idempotent, protected upsert**
+  (`followup.upsert_survey_points`): keyed by `(mjd, filter)`; only ever
+  touches rows `source LIKE 'survey:%'` (never paste/manual/file/
+  quicklook) and only removes orphan `survey:%` rows **when** the result
+  is non-empty: an empty answer never wipes stored photometry. Only `sn`/
+  `variable` projects; anything else gets an explicit «Cannot store
+  survey points: <reason>».
+- **Inline curve on Follow-up** (`gui/widgets/lightcurve_widget.py`):
+  human labels per source («Manual entry», «Pasted data», «From file»,
+  «Quick-look · indicative», «Survey · ALeRCE/ZTF»); `sn` projects with
+  `sn_type`: SN template folded to the peak (toggle ON by default);
+  `variable`: period fold + sawtooth; link lines ON by default (manual =
+  solid, quick-look/survey = dashed — the same semantic convention as
+  the PNG, only the label wording differs).
+- **One payload, one place**
+  (`core/lightcurve_data.py::build_payload`): the inline widget,
+  `post.py` (PNG, via `viz/lightcurve_view.py`) and `overview.py` share
+  the build (points, `sn_type` priority, peak, folds, sawtooth); the
+  `TypeError` crash when `min` was `None` (overview branch) is fixed in
+  the common spot (min guard).
+- **Paste with feedback**: preview with a human date and a «⚠ date
+  outside 1966–2086 — check» warning for out-of-band MJDs (preview only;
+  the save path is unchanged), and the `core/photometry_import.py` parser
+  no longer confuses YMD integers with MJDs (`20260909 → 61292` instead
+  of `58107`), accepts JD (minus 2 400 000.5) and plain MJDs, and returns
+  `None` when it cannot decide (no exception).
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| VU.1 | paste parser YMD/MJD/JD fix + pid 18 row repair + tests | **Done** |
+| VU.2 | `fetch_points_detailed` + worker + ok/empty/error report | **Done** |
+| VU.3 | `upsert_survey_points` (idempotent, protected, kind-gated) + tests | **Done** |
+| VU.4 | inline curve (labels, template toggle, link lines) + shared `build_payload` | **Done** |
+| VU.5 | paste warning + ADR-035 addendum + this section | **Done** |
+
+**Status**: unit suite green (**1293**): 17 new tests
+(`test_lightcurve_data.py` 10, `test_surveys.py` +4,
+`test_lightcurve_widget.py` +3) and 3 tests updated to the dict payload
+(`test_workers.py` ×2, `test_projects_hub.py`). **Out of this
+iteration**: automatic download on project creation (the manual button
+remains the entry point), survey points in the AAVSO view (the
+`survey:%` rows stay reference-only, never uploaded to AAVSO).

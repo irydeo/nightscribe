@@ -59,6 +59,45 @@ heliocéntrica (HJD) vía formulario del grupo.
    verificado 2026-09-11) → puntos grises `source="survey:ztf"` que los
    renderers ya estilizan; nunca se mezclan con los propios; descarga
    idempotente.
+
+**Ampliación de surveys (2026-09-17)** — el silencio era el bug:
+
+- `surveys.fetch_points_detailed`: gemela habladora de `fetch_points`;
+  devuelve `{"status": "ok"|"empty"|"error", "points", "error"}`.
+  Por dentro, el helper de red va en modo estricto (un error conocido
+  es excepción, jamás una cadena vacía silenciosa) y la función lo
+  atrapa y lo envuelve en `status="error"`: el consumidor nunca se
+  estrella.
+- `fetch_points` (el camino de las vigilias) sigue devolviendo `[]` y
+  sin estricto: la vigilia nunca debe tumbar la app.
+- El botón sigue siendo re-consulta real: `force=True` (la caché de 30 d
+  no oculta el clic) y la GUI reporta siempre: ok → «%1 new, %2 updated,
+  %3 unchanged, %4 removed; MJD min → max; bands (ZTF via ALeRCE)»;
+  empty → «No survey data for this position»; error →
+  «Survey download failed — <razón>».
+- `followup.upsert_survey_points`: clave `(mjd, filter)`; **solo**
+  afecta a filas `source LIKE 'survey:%'` (jamás paste/manual/file/
+  quicklook) y solo elimina `survey:%` huérfanas **si** el resultado es
+  no vacío: una respuesta vacía nunca borra fotometría almacenada.
+- Curva inline de Follow-up (`gui/widgets/lightcurve_widget.py`):
+  etiquetas humanas por origen («Manual entry», «Pasted data», «From
+  file», «Quick-look · indicative», «Survey · ALeRCE/ZTF»);
+  proyectos `sn` con `sn_type`: plantilla de la SN plegada al pico
+  (toggle de plantilla ON por defecto); toggle de líneas de
+  conexión (manual = línea continuada, quick-look/survey =
+  discontinua, como en el PNG).
+- `core/lightcurve_data.py::build_payload`: el payload de la curva
+  (puntos, `sn_type`, pico, plegado por `hads.period_h/24` o por
+  `variable.period_d`/época, diente de sierra) se construye **una vez**,
+  por el widget inline, `post.py` (PNG, vía `viz/lightcurve_view.py`)
+  y `overview` — el crash por `TypeError` cuando `min` era `None` (rama del
+  overview) queda corregido en el sitio común (guarda de mínimos).
+- Vista previa de pegado con fecha humana y aviso «⚠ date outside
+  1966–2086 — check» para MJDs fuera de banda (solo vista previa; la
+  ruta de guardado, `source="paste"`, no cambia).
+- Alcance: proyectos `sn` y `variable` solo; los demás reciben un
+  «Cannot store survey points: <razón>» explícito (el `ValueError`
+  del tipo de proyecto, sin rastro de pila).
 8. **Reporte fotométrico**: por proyecto, CSV documentado
    (`name,hjd,mag,err,filter,comp_stars,observer,notes`) y **AAVSO Extended
    File Format**, con **HJD calculado en la app**
@@ -139,6 +178,43 @@ heliocentric Julian dates via the group's form.
    never survey context) → Follow-up warning + Tonight urgency boost.
 7. **Survey context** (closes the B12 option): on-demand ALeRCE ZTF points,
    grey, `source="survey:ztf"`, never mixed, idempotent.
+
+**Survey addendum (2026-09-17)** — silence was the bug:
+
+- `surveys.fetch_points_detailed`: the talking twin of `fetch_points`;
+  returns `{"status": "ok"|"empty"|"error", "points", "error"}`.
+  Inside, the network helper runs in *strict* mode (a known error is
+  an exception, never a silent empty string) and the function catches
+  it and wraps it into `status="error"` — a consumer can never crash.
+- `fetch_points` (the vigils' path) keeps returning `[]` and never
+  raising: a watch must not take the app down.
+- The button is always a real re-query: `force=True` (the 30-day cache
+  does not hide the click) and the GUI always reports: ok →
+  «%1 new, %2 updated, %3 unchanged, %4 removed; MJD min → max;
+  bands (ZTF via ALeRCE)»; empty → «No survey data for this position»;
+  error → «Survey download failed — <reason>».
+- `followup.upsert_survey_points`: keyed by `(mjd, filter)`; only ever
+  touches rows `source LIKE 'survey:%'` (never paste/manual/file/
+  quicklook) and only removes orphan `survey:%` rows **when** the
+  result is non-empty: an empty answer never wipes stored photometry.
+- Inline Follow-up curve (`gui/widgets/lightcurve_widget.py`): human
+  labels per source («Manual entry», «Pasted data», «From file»,
+  «Quick-look · indicative», «Survey · ALeRCE/ZTF»); `sn` projects
+  with `sn_type` fold the SN template to the peak (template toggle
+  ON by default); linking-lines toggle (manual = solid,
+  quick-look/survey = dashed, as in the PNG).
+- `core/lightcurve_data.py::build_payload`: the curve payload (points,
+  `sn_type`, peak, fold by `hads.period_h/24` or by
+  `variable.period_d`/epoch, sawtooth shape) is built **once**,
+  shared by the inline widget, `viz/lightcurve_view.py` (PNG),
+  `overview` and `post` — the `TypeError` crash when `min` was `None`
+  (overview branch) is fixed in the common spot (min guard).
+- Paste preview with a human date and a «⚠ date outside 1966–2086 —
+  check» warning for out-of-band MJDs (preview only; the save path,
+  `source="paste"`, is unchanged).
+- Scope: `sn` and `variable` projects only; anything else gets an
+  explicit «Cannot store survey points: <reason>» (the project-kind
+  `ValueError`, no stack trace).
 8. **Photometric report**: per-project CSV + AAVSO EFF with **in-app HJD**
    (Schlyter Sun; frozen reference values in tests). Quick-look points only
    with an explicit checkbox.

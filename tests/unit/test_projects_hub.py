@@ -743,25 +743,29 @@ def test_plan_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
 def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
     # Without a connection every CCDciel button is disabled and the status
     # line says so; the connect button is the one enabled thing.
+    # UX-PC (U3): the live-capture widgets are window-owned now — they
+    # live in the Observatory tab, not in the project's Plan section.
     _create_and_select(window, "neo", "ccd-section-target",
                        {"kind": "neo", "mag": 19.0})
-    obs = window._obs_widgets          # connection + mount: Observatory tab
-    w = window._project_widgets        # capture: still per project
+    obs = window._obs_widgets          # connection + mount + live capture
     assert obs["ccd_connect"].isEnabled()
     assert window._ccd_connected is False
-    for key in ("ccd_disconnect", "ccd_refresh", "ccd_goto", "ccd_sync"):
+    for key in ("ccd_disconnect", "ccd_refresh", "ccd_goto", "ccd_sync",
+                "ccd_push", "ccd_start"):
         assert not obs[key].isEnabled(), f"{key} should start disabled"
-    for key in ("ccd_push", "ccd_start"):
-        assert not w[key].isEnabled(), f"{key} should start disabled"
-    assert not w["cmb_ccd_filter"].isEnabled()
+    assert not obs["cmb_ccd_filter"].isEnabled()
     assert obs["ccd_status"].text() == window.tr("CCDciel: not connected")
+    # the Plan section keeps only its state link to the Observatory tab
+    assert "Not connected" in window._project_widgets["ccd_jump"].text() \
+        or "conect" in window._project_widgets["ccd_jump"].text().lower()
 
 
 def test_plan_tab_ccdciel_filter_fallback_list(window, panel):
-    # The wheel combo carries a sane static fallback until CCDciel answers.
+    # The wheel combo carries a sane static fallback until CCDciel answers
+    # (UX-PC U3: the combo is the Observatory tab's, window-owned).
     _create_and_select(window, "neo", "ccd-filter-target",
                        {"kind": "neo", "mag": 19.0})
-    cmb = window._project_widgets["cmb_ccd_filter"]
+    cmb = window._obs_widgets["cmb_ccd_filter"]
     items = [cmb.itemText(i) for i in range(cmb.count())]
     assert "L" in items and "Ha" in items and "OIII" in items
 
@@ -776,13 +780,71 @@ def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
     try:
         _create_and_select(window, "neo", "ccd-wheel-target",
                            {"kind": "neo", "mag": 19.0})
-        cmb = window._project_widgets["cmb_ccd_filter"]
+        cmb = window._obs_widgets["cmb_ccd_filter"]
         items = [cmb.itemText(i) for i in range(cmb.count())]
         assert items == ["Red", "Green", "Blue"]
     finally:
         window._ccd_connected = False
         window._ccd_client = None
         window._ccd_filter_names = []
+
+
+def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
+    # UX-PC (U3): "Send plan" (Observatory tab) stages the SELECTED target
+    # project's saved plan — no need to have it open in the hub.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _create_and_select(window, "sn", "SN2099send", {"kind": "sn"})
+    project.update_step_data(dbmod.db, p["id"], "plan",
+                             {"n_frames": 12, "exp_s": 45.0,
+                              "filter": "R"})
+    # hermetic: restore the wheel's fallback list (another test may have
+    # filled the combo with a fake wheel's names)
+    window._ccd_filter_names = []
+    window._ccd_fill_filters()
+    # pick it in the Observatory target combo
+    window._refresh_obs_targets()
+    cmb_t = window.observatory.cmb_obs_target
+    cmb_t.setCurrentIndex(cmb_t.findData(p["id"]))
+    sent = {}
+    monkeypatch.setattr(window, "_ccd_run",
+                        lambda slot, action, **kw: sent.update(
+                            slot=slot, action=action))
+
+    class _FakeClient:
+        def __init__(self):
+            self.filter_idx = None
+            self.plan = None
+
+        def set_filter(self, i):
+            self.filter_idx = i
+
+        def push_plan(self, n, e, name):
+            self.plan = (n, e, name)
+            return True
+
+    client = _FakeClient()
+    window._ccd_send_plan()
+    assert "action" in sent
+    sent["action"](client)
+    assert client.plan == (12, 45.0, "SN2099send")
+    # the wheel index follows the plan's filter ("R")
+    assert client.filter_idx == \
+        window._obs_widgets["cmb_ccd_filter"].findText("R")
+
+
+def test_send_plan_without_saved_plan_asks_for_one(window, panel,
+                                                   monkeypatch):
+    # UX-PC (U3): no saved plan -> a plain-words hint, no silent no-op.
+    p = _create_and_select(window, "neo", "2099noplan", {"kind": "neo"})
+    window._refresh_obs_targets()
+    cmb_t = window.observatory.cmb_obs_target
+    cmb_t.setCurrentIndex(cmb_t.findData(p["id"]))
+    monkeypatch.setattr(window, "_ccd_run",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            AssertionError("must not run")))
+    window._ccd_send_plan()
+    assert "plan" in window.statusBar().currentMessage().lower()
 
 
 # ---------------- fresh-ephemeris goto (moving targets) ----------------
@@ -895,7 +957,8 @@ def test_apply_position_updates_context_and_label(window, panel):
     assert c["coords_epoch"] == "2026-09-07 22:30:00"
     assert c["rate_arcsec_min"] == 5.0
     assert c["coords_source"] == "horizons"
-    assert "22:30:00" in window._project_widgets["ccd_coords"].text()
+    # UX-PC (U3): the coords/epoch label lives in the Observatory tab
+    assert "22:30:00" in window._obs_widgets["ccd_coords"].text()
 
 
 # ---------------- A2: close / reopen / advisor ----------------

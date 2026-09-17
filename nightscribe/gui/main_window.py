@@ -595,6 +595,10 @@ class MainWindow(QMainWindow):
         p.btn_favorite.clicked.connect(self._project_toggle_favorite)
         p.btn_next_go.clicked.connect(
             lambda: self._scroll_to_section(self._next_target))
+        # UX-PC (U3): the Next card is the step machine's command center —
+        # done/skip for the CURRENT step live beside Go →
+        p.btn_next_done.clicked.connect(self._next_done)
+        p.btn_next_skip.clicked.connect(self._next_skip)
         # UX-PC (U2): ⌂ goes back to the dashboard (clearing the selection
         # fires itemSelectionChanged -> the detail pane swaps itself)
         p.btn_home.clicked.connect(
@@ -2838,7 +2842,26 @@ class MainWindow(QMainWindow):
         # liveness and rebuilds it only if its C++ object really is gone.
         self._proj_files_list = None
         self._proj_files_section = None
+        self._next_step_key = None
         self._wipe_layout(self.projects.page_container.layout())
+
+    def _advanced_block(self, layout, title):
+        # A non-accordion collapsible sub-block for the advanced/secondary
+        # controls of a step section (UX-PC U3): starts collapsed, never
+        # joins the page accordion, plain-language title saying WHAT is
+        # inside (no generic "Advanced" drawers).
+        # @args: layout - the hosting section content layout,
+        #        title - the visible header
+        # @return: the block's content QLayout
+        from .widgets.collapsible_section import CollapsibleSection
+        sec = CollapsibleSection(title)
+        inner = QWidget()
+        v = QVBoxLayout(inner)
+        v.setContentsMargins(12, 0, 0, 0)
+        sec.setContentWidget(inner)
+        sec.setCollapsed(True)
+        layout.addWidget(sec)
+        return v
 
     def _next_target_key(self, p):
         # @return: the section key the Next card points at
@@ -2866,6 +2889,23 @@ class MainWindow(QMainWindow):
         target = self._next_target_key(p)
         self._next_target = target
         self.projects.btn_next_go.setVisible(target is not None)
+        # UX-PC (U3): done/skip apply to the current step only (follow-up
+        # and the close suggestion are not steps — nothing to mark there)
+        step_key = act["key"] if act["key"] in _STEP_KEYS else None
+        self._next_step_key = step_key
+        self.projects.btn_next_done.setVisible(step_key is not None)
+        self.projects.btn_next_skip.setVisible(step_key is not None)
+
+    def _next_done(self):
+        # The Next card's "✔ Mark done" (UX-PC U3): acts on the step the
+        # card is currently pointing at.
+        if self._current_project and self._next_step_key:
+            self._step_done(self._next_step_key)
+
+    def _next_skip(self):
+        # The Next card's "Skip" (UX-PC U3): same targeting as Mark done.
+        if self._current_project and self._next_step_key:
+            self._step_skip(self._next_step_key)
 
     def _on_page_toggled(self, key, expanded):
         # Page accordion: a genuine click opening ANY section (the
@@ -2923,6 +2963,12 @@ class MainWindow(QMainWindow):
         self._build_publish_tab(p, kind, ctx)
         if kind in FOLLOWUP_KINDS:
             self._build_followup_tab(p, ctx)
+        # UX-PC (U3): the discreet step footer (state in words + reopen /
+        # skip) goes at the END of each step section, after its content
+        for key in _STEP_KEYS:
+            sec = self._page_sections.get(key)
+            if sec is not None:
+                sec.contentLayout().addLayout(self._step_footer(p, key))
         # the Next card drives which section starts expanded: only the
         # next-action one, everything else collapsed (object card too —
         # the whole page is one exclusive accordion). A finished
@@ -2934,8 +2980,11 @@ class MainWindow(QMainWindow):
             sec.setCollapsed(key != target)
 
     def _step_section(self, key):
-        # Builds one step section with its state line + toggle inside
-        # (UX-i). @return: the section's content layout
+        # Builds one step section with its state chip in the header
+        # (UX-i). UX-PC (U3): the state ACTIONS moved out of the section
+        # top — done/skip for the current step live on the Next card, and
+        # each section carries only a discreet footer (_step_footer).
+        # @return: the section's content layout
         labels = {"plan": self._step_label("plan"),
                   "process": self._step_label("process"),
                   "publish": self._step_label("publish"),
@@ -2943,7 +2992,6 @@ class MainWindow(QMainWindow):
         layout = self._section_layout(key, labels[key])
         p = self._current_project
         if p and key in _STEP_KEYS:
-            layout.addLayout(self._step_toggle_row(p, key))
             # step state as a chip in the section header ("done <date>" /
             # "skipped" / "pending"). Real step sections only — follow-up
             # has no step row and shows nothing.
@@ -2967,40 +3015,39 @@ class MainWindow(QMainWindow):
                 .strftime("%Y-%m-%d") if step.get("updated") else "")
         return self.tr("done %1").replace("%1", when)
 
-    def _step_toggle_row(self, p, key):
-        # The step's own controls, in words (no more ✔/●/○/– icons):
-        # "done on <date>" / "skipped" / pending with its buttons.
+    def _step_footer(self, p, key):
+        # The step state in words, at the FOOT of its section (UX-PC U3):
+        # discreet, out of the way of the content. Done/skipped steps
+        # offer "Reopen step"; a pending step offers only "Skip step"
+        # (Mark done for the CURRENT step lives on the Next card).
         # @args: p - the project dict, key - step key ("plan"|...)
-        # @return: the QHBox row to add inside the step section
+        # @return: the QHBox row appended at the end of the step section
         row = QHBoxLayout()
         step = next((s for s in p["steps"] if s["step"] == key), None)
         status = step["status"] if step else "pending"
-        lbl = QLabel()
-        row.addWidget(lbl)
+        row.addStretch()
         if status in ("done", "skipped"):
             when = datetime.datetime.fromtimestamp(
                 step["updated"]).strftime("%Y-%m-%d") \
                 if step and step.get("updated") else ""
-            lbl.setText(
+            lbl = QLabel(
                 self.tr("✔ done on %1").replace("%1", when)
                 if status == "done" else self.tr("– skipped"))
+            lbl.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+            row.addWidget(lbl)
             btn_reopen = QPushButton(self.tr("Reopen step"))
             btn_reopen.setFlat(True)
+            btn_reopen.setCursor(Qt.PointingHandCursor)
             btn_reopen.clicked.connect(
                 lambda _=False, k=key: self._step_reopen(k))
             row.addWidget(btn_reopen)
         else:
-            lbl.setText(self.tr("pending"))
-            btn_done = QPushButton(self.tr("Mark done"))
-            btn_done.clicked.connect(
-                lambda _=False, k=key: self._step_done(k))
-            row.addWidget(btn_done)
             btn_skip = QPushButton(self.tr("Skip step"))
             btn_skip.setFlat(True)
+            btn_skip.setCursor(Qt.PointingHandCursor)
             btn_skip.clicked.connect(
                 lambda _=False, k=key: self._step_skip(k))
             row.addWidget(btn_skip)
-        row.addStretch()
         return row
 
     def _step_done(self, key):
@@ -3112,8 +3159,10 @@ class MainWindow(QMainWindow):
         self._project_widgets["cmb_filter"] = cmb_f
         # CCDciel calibration frames (ADR-021): the generated target list
         # appends a Dark and a Bias step from these counts (0 = omit).
-        grp = QGroupBox(self.tr("Calibration"))
-        cal_form = QFormLayout(grp)
+        # UX-PC (U3): secondary to the plan itself — lives collapsed.
+        cal = self._advanced_block(layout, self.tr("Calibration"))
+        cal_form = QFormLayout()
+        cal.addLayout(cal_form)
         spn_darks = PassiveSpinBox(); spn_darks.setMinimum(0); spn_darks.setMaximum(999)
         spn_darks.setValue(25)
         cal_form.addRow(self.tr("Darks:"), spn_darks)
@@ -3124,7 +3173,6 @@ class MainWindow(QMainWindow):
         spn_bias = PassiveSpinBox(); spn_bias.setMinimum(0); spn_bias.setMaximum(999)
         spn_bias.setValue(100)
         cal_form.addRow(self.tr("Bias:"), spn_bias)
-        layout.addWidget(grp)
         if plan_data.get("n_darks") is not None:
             spn_darks.setValue(int(plan_data["n_darks"]))
         if plan_data.get("exp_dark"):
@@ -3179,8 +3227,10 @@ class MainWindow(QMainWindow):
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
         layout.addWidget(btn_seq)
-        # UX-j: connection and mount live in the Observatory tab now; the
-        # plan section keeps only its capture buttons + a jump link
+        # UX-PC (U3): live capture moved to the Observatory tab for good
+        # (filter wheel, Send plan, Start capture, coords epoch). The Plan
+        # section keeps only a state line + jump link — the hardware has
+        # one home, the plan keeps its planning job.
         layout.addWidget(QLabel(""))
         btn_ccd_jump = QPushButton(
             self.tr("Not connected — open the Observatory tab →"))
@@ -3188,31 +3238,7 @@ class MainWindow(QMainWindow):
         btn_ccd_jump.setCursor(Qt.PointingHandCursor)
         btn_ccd_jump.clicked.connect(lambda: self._goto_tab(TAB_OBSERVATORY))
         layout.addWidget(btn_ccd_jump)
-        # filter wheel feeding the staged capture plan
-        f_row = QHBoxLayout()
-        f_row.addWidget(QLabel(self.tr("Filter on wheel:")))
-        cmb_ccd_filter = QComboBox()
-        for f in ("L", "R", "G", "B", "Ha", "OIII", "SII"):
-            cmb_ccd_filter.addItem(f)
-        f_row.addWidget(cmb_ccd_filter)
-        btn_ccd_push = QPushButton(self.tr("Send plan"))
-        btn_ccd_push.clicked.connect(self._ccd_send_plan)
-        f_row.addWidget(btn_ccd_push)
-        btn_ccd_start = QPushButton(self.tr("Start capture"))
-        btn_ccd_start.clicked.connect(self._ccd_start_capture)
-        f_row.addWidget(btn_ccd_start)
-        f_row.addStretch()
-        layout.addLayout(f_row)
-        lbl_ccd_coords = QLabel(self._ccd_coords_text(ctx, kind))
-        lbl_ccd_coords.setStyleSheet("color: #9aa0a6;")
-        lbl_ccd_coords.setWordWrap(True)
-        layout.addWidget(lbl_ccd_coords)
-        self._project_widgets.update({
-            "cmb_ccd_filter": cmb_ccd_filter,
-            "ccd_push": btn_ccd_push,
-            "ccd_start": btn_ccd_start,
-            "ccd_coords": lbl_ccd_coords,
-        })
+        self._project_widgets["ccd_jump"] = btn_ccd_jump
         self._ccd_apply_state()
         # NEO: also ephemeris export
         if kind in ("neo", "pccp"):
@@ -3277,10 +3303,11 @@ class MainWindow(QMainWindow):
     # -- CCDciel control (ADR-030) -----------------------------------------
 
     def _build_observatory_tab(self):
-        # The CCDciel control, window-owned (UX-j): it used to be
-        # rebuilt inside every project's Plan step (and orphaned on
-        # rebuild). Built ONCE here; the Plan section keeps only the
-        # capture buttons (send/start), which read this connection.
+        # The CCDciel control, window-owned (UX-j; UX-PC U3 completes the
+        # move: the live-capture row — filter wheel, Send plan, Start
+        # capture, coords epoch — lives here too, in the "Live capture"
+        # group, working on the target combo's project). Built ONCE here;
+        # the Plan section keeps only a state line + jump link.
         o = self.observatory
         self._obs_widgets = {
             "ccd_connect": o.btn_obs_connect,
@@ -3294,22 +3321,32 @@ class MainWindow(QMainWindow):
             "ccd_goto": o.btn_obs_goto,
             "ccd_sync": o.btn_obs_sync,
             "obs_target": o.cmb_obs_target,
+            "cmb_ccd_filter": o.cmb_obs_filter,
+            "ccd_push": o.btn_obs_send_plan,
+            "ccd_start": o.btn_obs_start,
+            "ccd_coords": o.lbl_obs_coords,
         }
         o.btn_obs_connect.clicked.connect(self._ccd_connect)
         o.btn_obs_disconnect.clicked.connect(self._ccd_disconnect)
         o.btn_obs_refresh.clicked.connect(self._ccd_refresh)
         o.btn_obs_goto.clicked.connect(self._ccd_goto)
         o.btn_obs_sync.clicked.connect(self._ccd_astrometry_goto)
+        o.btn_obs_send_plan.clicked.connect(self._ccd_send_plan)
+        o.btn_obs_start.clicked.connect(self._ccd_start_capture)
         o.cmb_obs_target.currentIndexChanged.connect(
-            lambda _i: self._ccd_apply_state())
+            lambda _i: (self._ccd_apply_state(),
+                        self._ccd_update_coords_label()))
         self._ccd_apply_state()
+        # the wheel combo starts on the static fallback list (a real wheel
+        # replaces it on connect via _ccd_fill_filters)
+        self._ccd_fill_filters()
         self._refresh_obs_targets()
 
     def _ccd_widgets(self):
-        # @return: one merged view of the CCDciel widgets — the
-        # window-owned Observatory tab ones plus the per-project
-        # capture ones (filter combo, send/start) when a project is
-        # open. All _ccd_* methods read through here.
+        # @return: one merged view of the CCDciel widgets — all
+        # window-owned since UX-PC U3 (Observatory tab); the merge with
+        # the per-project page registry survives so the Plan section's
+        # state link (ccd_jump) is reachable from _ccd_apply_state.
         w = dict(getattr(self, "_obs_widgets", {}) or {})
         w.update(self._project_widgets or {})
         return w
@@ -3353,6 +3390,13 @@ class MainWindow(QMainWindow):
         if cb is not None:
             cb.setEnabled(on)
         w["ccd_connect"].setEnabled(not on)
+        # UX-PC (U3): the Plan section's link mirrors the live state
+        jump = w.get("ccd_jump")
+        if jump is not None:
+            jump.setText(
+                self.tr("CCDciel connected — live capture in the "
+                        "Observatory tab →") if on else
+                self.tr("Not connected — open the Observatory tab →"))
         if not on:
             w["ccd_status"].setText(self.tr("CCDciel: not connected"))
             w["ccd_version"].setText(self.tr("—"))
@@ -3543,9 +3587,10 @@ class MainWindow(QMainWindow):
         return self.tr("Fixed coordinates")
 
     def _ccd_update_coords_label(self):
-        # Refreshes the coords/epoch label from the current project context.
-        p = self._current_project
-        lbl = self._project_widgets.get("ccd_coords")
+        # Refreshes the coords/epoch label (UX-PC U3: it lives in the
+        # Observatory tab now and follows the selected target project).
+        p = self._obs_target_project() or self._current_project
+        lbl = self._ccd_widgets().get("ccd_coords")
         if not p or not lbl:
             return
         lbl.setText(self._ccd_coords_text(p.get("context") or {},
@@ -3607,6 +3652,15 @@ class MainWindow(QMainWindow):
             upd["coords_source"] = pos["source"]
         project.update_context(db, p["id"], upd)
         p.setdefault("context", {}).update(upd)
+        # UX-PC (U3): the coords label lives in the Observatory tab and
+        # follows its target combo — point the combo at the project this
+        # position belongs to so the tab stays coherent
+        cmb = self.observatory.cmb_obs_target
+        idx = cmb.findData(p["id"])
+        if idx >= 0 and idx != cmb.currentIndex():
+            cmb.blockSignals(True)
+            cmb.setCurrentIndex(idx)
+            cmb.blockSignals(False)
         self._ccd_update_coords_label()
         if pos.get("fell_back"):
             self.statusBar().showMessage(
@@ -3686,16 +3740,36 @@ class MainWindow(QMainWindow):
             self.tr("Astrometric pointing finished."), 5000)
 
     def _ccd_send_plan(self):
-        # Stage the planned frames/exposure/filter inside CCDciel (Capture_set*).
-        spn = self._project_widgets.get("spn_nframes")
-        spn_exp = self._project_widgets.get("spn_exps")
-        cmb = self._project_widgets.get("cmb_ccd_filter")
-        if not (spn and spn_exp and cmb):
+        # Stage the planned frames/exposure/filter inside CCDciel
+        # (Capture_set*). UX-PC (U3): lives in the Observatory tab and
+        # reads the TARGET project's SAVED plan — no need to have the
+        # project open in the hub.
+        p = self._obs_target_project() or self._current_project
+        if not p:
+            self.statusBar().showMessage(
+                self.tr("Pick a target project in the Observatory tab"),
+                6000)
             return
-        n_frames = spn.value()
-        exp_s = spn_exp.value()
+        plan = next((s["data"] for s in p.get("steps", [])
+                     if s["step"] == "plan"), {})
+        n_frames, exp_s = plan.get("n_frames"), plan.get("exp_s")
+        if not n_frames or not exp_s:
+            self.statusBar().showMessage(
+                self.tr("Save the plan in the project's Plan section "
+                        "first"), 8000)
+            return
+        cmb = self._ccd_widgets().get("cmb_ccd_filter")
+        if not cmb:
+            return
         f_idx = cmb.currentIndex()
-        name = self._current_project["object_name"]
+        # prefer the plan's own filter when the wheel knows the name
+        pf = plan.get("filter")
+        if pf:
+            idx = cmb.findText(pf)
+            if idx >= 0:
+                cmb.setCurrentIndex(idx)
+                f_idx = idx
+        name = p["object_name"]
 
         def action(c):
             c.set_filter(f_idx)
@@ -3834,18 +3908,29 @@ class MainWindow(QMainWindow):
         # C0 (track C): NEO/PCCP/comet sessions produce files the observer
         # actually keeps (FITS, Tycho annotated images, MPC report) — they
         # are registered here so the project remembers them.
+        # UX-PC (U3): secondary to the measurement flow — collapsed by
+        # default with a plain-language title (no "Session products"
+        # jargon).
         if kind in ("neo", "pccp", "comet"):
-            self._build_products_block(layout, p)
+            adv = self._advanced_block(
+                layout, self.tr("What you kept from the session"))
+            self._build_products_block(adv, p)
         layout.addStretch()
 
     def _build_products_block(self, layout, p):
-        # C0: "Session products" group for the NEO/PCCP/comet Process step.
-        # Registration goes to project_files (visible in Details, A4) and a
-        # summary with the FITS metadata is persisted in the process step
-        # data. The MPC report needs no button: it is registered on save.
-        # @args: layout - the process tab layout, p - project dict
-        grp = QGroupBox(self.tr("Session products"))
-        gl = QVBoxLayout(grp)
+        # C0: "what you kept" block for the NEO/PCCP/comet Process step
+        # (lives collapsed since UX-PC U3). Registration goes to
+        # project_files (visible in Details, A4) and a summary with the
+        # FITS metadata is persisted in the process step data. The MPC
+        # report needs no button: it is registered on save.
+        # @args: layout - the host layout, p - project dict
+        gl = layout
+        hint = QLabel(self.tr(
+            "Register what you keep from the session: the FITS frames and "
+            "the annotated images (e.g. from Tycho). The MPC report is "
+            "registered automatically when you save it."))
+        hint.setWordWrap(True)
+        gl.addWidget(hint)
         hint = QLabel(self.tr(
             "Register what you keep from the session: the FITS frames and "
             "the annotated images (e.g. from Tycho). The MPC report is "
@@ -3886,7 +3971,6 @@ class MainWindow(QMainWindow):
         lst = PassiveList()
         lst.setMaximumHeight(120)
         gl.addWidget(lst)
-        layout.addWidget(grp)
         self._project_widgets["neo_products"] = lst
         self._project_widgets["neo_zoom"] = spn_zoom
         self._neo_populate_products(lst, p)

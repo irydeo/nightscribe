@@ -51,7 +51,24 @@
         <item><spacer name="hsp_mount"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
        </layout>
       </item>
-      <item><widget class="QLabel" name="lbl_obs_hint"><property name="text"><string>Capture plans are sent from each project's Plan section.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_capture">
+     <property name="title"><string>Live capture</string></property>
+     <layout class="QVBoxLayout" name="captureLayout">
+      <item>
+       <layout class="QHBoxLayout" name="rowCapture">
+        <item><widget class="QLabel" name="lbl_obs_filter"><property name="text"><string>Filter on wheel:</string></property></widget></item>
+        <item><widget class="QComboBox" name="cmb_obs_filter"/></item>
+        <item><widget class="QPushButton" name="btn_obs_send_plan"><property name="text"><string>Send plan</string></property><property name="toolTip"><string>Stage the selected target's saved plan (frames × exposure) in CCDciel's Capture module</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_obs_start"><property name="text"><string>Start capture</string></property><property name="toolTip"><string>Start the staged capture in CCDciel</string></property></widget></item>
+        <item><spacer name="hsp_cap"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+       </layout>
+      </item>
+      <item><widget class="QLabel" name="lbl_obs_coords"><property name="text"><string>—</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+      <item><widget class="QLabel" name="lbl_obs_cap_hint"><property name="text"><string>Uses the selected target's saved plan (its Plan section holds frames × exposure).</string></property><property name="wordWrap"><bool>true</bool></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
      </layout>
     </widget>
    </item>

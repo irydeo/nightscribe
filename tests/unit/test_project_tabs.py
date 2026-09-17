@@ -176,13 +176,22 @@ def test_page_has_sections_instead_of_tabs(window, panel):
 
 
 def test_sections_hold_exactly_one_control_set_after_rebuilds(window, panel):
+    # UX-PC (U3): "Mark done" lives once — on the Next card — and the
+    # per-section toggle rows are gone; only discreet "Skip step" footers
+    # remain inside the pending sections. Rebuilds must never pile up
+    # either control set.
     p = _mk_project(window)
     window._build_project_page(window._current_project)
     window._build_project_page(window._current_project)
     from PySide6.QtWidgets import QPushButton
     names = [b.text() for b in window.projects.page_container
              .findChildren(QPushButton)]
-    assert names.count("Mark done") + names.count("Marcar hecho") == 3
+    assert names.count("Mark done") + names.count("Marcar hecho") == 0
+    # the Next card carries the single command-center pair
+    assert not window.projects.btn_next_done.isHidden()
+    assert not window.projects.btn_next_skip.isHidden()
+    # and each pending section shows exactly one skip link in its footer
+    assert names.count("Skip step") + names.count("Saltar paso") == 3
 
 
 def test_page_is_scroll_wrapped(window, panel):
@@ -246,6 +255,71 @@ def test_next_card_followup_when_cadence_due(window, panel):
     assert "Measure" in window.projects.lbl_next.text() or \
         "Mide" in window.projects.lbl_next.text()
     assert window._page_sections["followup"].isCollapsed() is False
+    # UX-PC (U3): follow-up is not a step — the Next card hides done/skip
+    assert window.projects.btn_next_done.isHidden()
+    assert window.projects.btn_next_skip.isHidden()
+
+
+def test_next_card_done_advances_the_step(window, panel):
+    # UX-PC (U3): the Next card's "✔ Mark done" drives the step machine —
+    # it acts on the step the card points at (a fresh project: plan).
+    _mk_project(window, name="SN 2099nd")
+    assert window._next_step_key == "plan"
+    window.projects.btn_next_done.click()
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    steps = {s["step"]: s["status"]
+             for s in proj_mod.get(mw.db, window._current_project["id"])
+             ["steps"]}
+    assert steps["plan"] == "done"
+    assert window._next_step_key == "process"
+
+
+def test_next_card_skip_marks_the_step(window, panel):
+    # UX-PC (U3): same for "Skip" — the current step is skipped and the
+    # flow moves on.
+    _mk_project(window, name="SN 2099ns")
+    window.projects.btn_next_skip.click()
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    steps = {s["step"]: s["status"]
+             for s in proj_mod.get(mw.db, window._current_project["id"])
+             ["steps"]}
+    assert steps["plan"] == "skipped"
+    assert window._next_step_key == "process"
+
+
+def test_step_footer_reopens_a_done_step(window, panel):
+    # UX-PC (U3): a done step shows its state + a discreet "Reopen step"
+    # at the FOOT of its section (the only step control left inside).
+    from PySide6.QtWidgets import QPushButton
+    p = _mk_project(window, name="SN 2099rf")
+    window._step_done("plan")
+    sec = window._page_sections["plan"]
+    btns = [b for b in sec.findChildren(QPushButton)
+            if "Reopen" in b.text() or "Reabrir" in b.text()]
+    assert len(btns) == 1
+    btns[0].click()
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    steps = {s["step"]: s["status"]
+             for s in proj_mod.get(mw.db, p["id"])["steps"]}
+    assert steps["plan"] == "current"
+
+
+def test_calibration_and_products_start_collapsed(window, panel):
+    # UX-PC (U3): the advanced blocks (Calibration in Plan, "what you
+    # kept" in Process) are collapsed by default.
+    from nightscribe.gui.widgets.collapsible_section import \
+        CollapsibleSection
+    _mk_project(window, kind="neo", name="2099 Coll")
+    secs = window.projects.page_container.findChildren(CollapsibleSection)
+    titles = {s._btn.text(): s for s in secs}
+    cal = next((s for t, s in titles.items() if "alibr" in t.lower()), None)
+    assert cal is not None and cal.isCollapsed()
+    kept = next((s for t, s in titles.items()
+                 if "kept" in t.lower() or "guardaste" in t.lower()), None)
+    assert kept is not None and kept.isCollapsed()
 
 
 def test_go_button_expands_target(window, panel):

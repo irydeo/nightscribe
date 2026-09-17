@@ -61,7 +61,8 @@ def test_campaigns_tab_exists(window):
     from PySide6.QtWidgets import QTabWidget
     from nightscribe.gui.main_window import TAB_CAMPAIGNS
     tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 5      # ADR-036 J0: History left for the menu
+    assert tabs.count() == 4      # ADR-036 J0 + ADR-040: History and the
+    # Sun & sky live in the Tools menu (journal + sky calendar dialogs)
     assert tabs.widget(TAB_CAMPAIGNS) is window.campaigns
 
 

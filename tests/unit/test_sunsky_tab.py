@@ -43,17 +43,47 @@ def window(qapp):
 
 
 def test_tab_is_renamed(window):
-    # S1: "Solar system" becomes "Sun & sky" (ADR-036)
+    # SC2 (ADR-040): the tab bar is down to four — the Sun & sky content
+    # moved to the Tools menu as the "Sky calendar…" dialog
     from PySide6.QtWidgets import QTabWidget
-    from nightscribe.gui.main_window import TAB_OBSERVATORY, TAB_SOLAR
+    from nightscribe.gui.main_window import TAB_OBSERVATORY
     tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 5
-    assert tabs.tabText(TAB_SOLAR) in ("Sun & sky", "Sol y cielo")
+    assert tabs.count() == 4
     assert tabs.widget(TAB_OBSERVATORY) is window.observatory
+    titles = [tabs.tabText(i) for i in range(4)]
+    assert not any("sky" in t.lower() or "cielo" in t.lower()
+                   for t in titles)
+
+
+def test_skycal_dialog_opens_from_tools_menu(window):
+    # ADR-040: Tools → Sky calendar… builds the dialog once (lazy) and
+    # the old tab handlers re-home onto its content widget
+    assert window._menus.action_skycal is not None
+    window._menus.action_skycal.trigger()
+    dlg = window._skycal
+    assert dlg is not None
+    # the sun handlers' home is the dialog content now
+    assert window.solar is dlg.content
+    # opening again reuses the same dialog
+    window._menus.action_skycal.trigger()
+    assert window._skycal is dlg
+
+
+def test_skycal_sections_fill_on_open(window):
+    # SC1: the new local-math sections fill at open (no network): the
+    # 60-day list, the Moon calendar line, the week's Galilean windows
+    window._menus.action_skycal.trigger()
+    dlg = window._skycal
+    c = dlg.content
+    assert c.lst_events.count() > 10          # two lunar months of events
+    assert "·" in c.lbl_moon_cal.text()       # the next phases listed
+    assert c.lst_jupmoons.count() > 0         # Galilean windows this week
+    assert "10" in c.lbl_jup_note.text()      # the ±10 min honesty label
 
 
 def test_impact_line_with_aurora(window):
     # S1: the line ties the context to the night plan (Moon + Kp + link)
+    window._menus.action_skycal.trigger()
     window._last_sun = {"kp": 6.1}
     window._fill_almanac()
     text = window.solar.lbl_impact.text()
@@ -63,6 +93,7 @@ def test_impact_line_with_aurora(window):
 
 
 def test_impact_line_quiet_sky(window):
+    window._menus.action_skycal.trigger()
     window._last_sun = {"kp": 2.0}
     window._fill_almanac()
     text = window.solar.lbl_impact.text()

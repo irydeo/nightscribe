@@ -215,8 +215,9 @@ KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
 # Top-level tab indices (ui/main_window.ui order; ADR-036: History left
 # the bar for the Tools-menu journal dialog, J0): never use literals for
 # the main tabs.
-TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_SOLAR, TAB_OBSERVATORY = \
-    range(5)
+# UX-PC + SC2 (ADR-038/040): four tabs — the Sun & sky content moved to
+# the Tools menu as the "Sky calendar…" dialog
+TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_OBSERVATORY = range(4)
 
 
 class _ClickableFrame(QFrame):
@@ -300,8 +301,9 @@ class _ScoreBar(QFrame):
 
 
 class MainWindow(QMainWindow):
-    # UX v3.1: four tabs — Tonight (suggestion grid) · Projects (step tabs)
-    # · Solar · History. Contextual dialogs for Explore/Post/Blink.
+    # Four tabs (ADR-040): Tonight · Projects · Campaigns · Observatory.
+    # The Tools menu holds the Sky calendar, the observing journal, and
+    # the contextual Explore/Post/Blink dialogs.
 
     def __init__(self):
         super().__init__()
@@ -444,9 +446,9 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QTabWidget
         tabs = self.centralWidget().findChild(QTabWidget, "tabs")
         widgets = (self.tonight, self.projects, self.campaigns,
-                   self.solar, self.observatory) = (
+                   self.observatory) = (
             _load_ui("tonight_tab"), _load_ui("projects_tab"),
-            _load_ui("campaigns_tab"), _load_ui("solar_tab"),
+            _load_ui("campaigns_tab"),
             _load_ui("observatory_tab"))
         for i, w in enumerate(widgets):
             title = tabs.tabText(i)
@@ -463,8 +465,6 @@ class MainWindow(QMainWindow):
         tabs.setTabToolTip(TAB_CAMPAIGNS, self.tr(
             "Observing campaigns: several nights, several observatories, "
             "one shared goal"))
-        tabs.setTabToolTip(TAB_SOLAR, self.tr(
-            "The Sun and the sky conditions affecting your night"))
         tabs.setTabToolTip(TAB_OBSERVATORY, self.tr(
             "Live control of the observatory (CCDciel)"))
         # table starts collapsed
@@ -634,28 +634,17 @@ class MainWindow(QMainWindow):
         self.projects.lbl_advisor.mouseReleaseEvent = \
             lambda _e: self._advisor_dismiss()
         self.projects.lbl_advisor.setCursor(Qt.PointingHandCursor)
-        self.solar.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
-        self.solar.cmb_channel.currentIndexChanged.connect(self._channel_changed)
-        self.solar.btn_raben.clicked.connect(
-            lambda: self._open_url("https://www.raben.com/maps"))
-        self.solar.btn_solarmonitor.clicked.connect(
-            lambda: self._open_url("https://www.solarmonitor.org"))
-        self.solar.btn_sidc.clicked.connect(
-            lambda: self._open_url("https://sidc.be/uset"))
-        # ADR-036 S1: the impact line's link jumps to Tonight
-        self.solar.lbl_impact.linkActivated.connect(
-            lambda _u: self._goto_tab(TAB_TONIGHT))
-        # ADR-036 S2: today's Sun as a social-media PNG
-        self.solar.btn_sun_post.clicked.connect(self.on_render_sun_post)
-        # ADR-036 S3: the bilingual "sky today" draft
-        self.solar.btn_sky_post.clicked.connect(self.on_sky_post)
+        # SC2 (ADR-040): the Sun & sky content lives in the Tools menu as
+        # the "Sky calendar…" dialog — its widgets are wired when the
+        # dialog is first built (_skycal_build), not here.
         # ADR-036 (J0): the journal lives in the Tools menu, not in the
-        # tab bar; Ctrl+1..5 switches the five main tabs.
+        # tab bar; Ctrl+1..4 switches the four main tabs.
         self._menus.action_journal.triggered.connect(
             self._open_journal_dialog)
+        self._menus.action_skycal.triggered.connect(self._tools_skycal)
         from PySide6.QtGui import QKeySequence, QShortcut
         for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
-                                     TAB_CAMPAIGNS, TAB_SOLAR,
+                                     TAB_CAMPAIGNS,
                                      TAB_OBSERVATORY)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
@@ -7094,6 +7083,56 @@ class MainWindow(QMainWindow):
                     visible.append(f"{name.capitalize()} (mag {p['mag']}, "
                                    f"{alt:.0f}°)")
         return visible
+
+    # ---------------- Sky calendar (SC2, ADR-040) ----------------
+
+    def _skycal_build(self):
+        # Builds the «Sky calendar…» dialog once (lazy) and re-homes the
+        # old Sun & sky tab handlers onto its content widget — every
+        # existing `self.solar.*` handler keeps working unchanged.
+        # @return: the SkyCalendarDialog
+        if getattr(self, "_skycal", None) is not None:
+            return self._skycal
+        from .skycal_dialog import SkyCalendarDialog
+        content = _load_ui("sky_calendar")
+        self.solar = content      # the handlers' old home, dialog-owned now
+        dlg = SkyCalendarDialog(content, lang=self._lang(), parent=self)
+        # wire the Sun & outreach controls (moved verbatim from the tab)
+        content.btn_refresh_sun.clicked.connect(self.on_refresh_sun)
+        content.cmb_channel.currentIndexChanged.connect(
+            self._channel_changed)
+        content.btn_raben.clicked.connect(
+            lambda: self._open_url("https://www.raben.com/maps"))
+        content.btn_solarmonitor.clicked.connect(
+            lambda: self._open_url("https://www.solarmonitor.org"))
+        content.btn_sidc.clicked.connect(
+            lambda: self._open_url("https://sidc.be/uset"))
+        content.lbl_impact.linkActivated.connect(
+            lambda _u: self._goto_tab(TAB_TONIGHT))
+        content.btn_sun_post.clicked.connect(self.on_render_sun_post)
+        content.btn_sky_post.clicked.connect(self.on_sky_post)
+        self._skycal = dlg
+        return dlg
+
+    def _skycal_fill(self, dlg):
+        # Fills the dialog's local-math sections on every open: the 60-day
+        # events, the Moon calendar, the week's Galilean windows, and the
+        # almanac line (none of this touches the network — the Sun section
+        # keeps its own Refresh button).
+        from ..core import skyevents
+        evs = skyevents.events(float(config.get("lat")),
+                               float(config.get("lon")), days=60)
+        dlg.fill_events(evs, dlg.content)
+        dlg.fill_jupiter_moons(evs, dlg.content)
+        self._fill_almanac()
+
+    def _tools_skycal(self):
+        # Menu Tools → Sky calendar… (ADR-040)
+        dlg = self._skycal_build()
+        self._skycal_fill(dlg)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
 
     # ---------------- Observing journal (ADR-036) ----------------
 

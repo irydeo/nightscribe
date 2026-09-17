@@ -340,6 +340,7 @@ def moon(jd):
         "illum": illum,
         "phase_age_days": age,
         "elong_deg": elong,
+        "ecl_lat_deg": lat,  # ecliptic latitude (deg): the eclipse gate
     }
 
 

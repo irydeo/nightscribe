@@ -1,9 +1,11 @@
 # Plan — Track SC2 «Calendario del cielo» + U7 (cierre UX-PC) (2026-09-17)
 
-> **Pendiente de ejecutar** (plan escrito 2026-09-17, autocontenido: lo
-> puede retomar otro agente o persona sin más contexto). Todas las
-> decisiones ya están pactadas con el observador — **no re-preguntarlas**,
-> solo ejecutar. Ver §«Decisiones pactadas» y §«Reglas de la casa».
+> **EN EJECUCIÓN** (plan escrito 2026-09-17, autocontenido: lo puede
+> retomar otro agente o persona sin más contexto). U7 está comprometida;
+> el motor SC0 existe (sin tests) con **un bug conocido de oposiciones,
+> causa ya localizada** — empezar por §«Estado de la sesión». Las
+> decisiones del track están pactadas con el observador — **no
+> re-preguntarlas**. Ver §«Decisiones pactadas» y §«Reglas de la casa».
 
 **rama**: U7 en `feature/ux-projects-campaigns` (la rama activa, ya en
 GitHub); el track SC2 en rama nueva propia **`feature/sky-calendar`** que
@@ -20,6 +22,114 @@ ambas se decide con el usuario; **`main` no se toca** por ahora.
   unfinished.
 - Entorno: `.venv/bin/python`; tests sin red:
   `.venv/bin/python -m pytest tests/unit`.
+
+## Estado de la sesión (actualizado 2026-09-17 — empezar AQUÍ)
+
+> Resumen de la sesión de implementación: lo hecho, lo validado con
+> datos, el bug encontrado y su causa, y el orden exacto de lo que
+> falta. Los números del §«Estado actual del repo» son históricos (al
+> escribir el plan): hoy van **1322** tests en verde e i18n **890**
+> cadenas.
+
+**Hecho en esta sesión**
+
+- **U7: completada y comprometida** — commit `3a38c6d` en
+  `feature/ux-projects-campaigns` (tracking en GitHub ya configurado).
+- **SC0: motor `core/skyevents.py` escrito** (553 líneas, puro, sin red)
+  + extensión `ephem_minor.moon() → ecl_lat_deg`. **Aún sin tests y sin
+  commit** (ambos ficheros pendientes en el árbol).
+- Validación de la lista 2025–2026 contra astropy 7.0.1 (dist-packages,
+  vía venv) y almanaques.
+
+**Validado y confirmado por el observador (no re-litigar)**
+
+Conjunciones, máximas elongaciones de Mercurio/Venus y eclipses (el par
+2026-08-12 / 2026-08-28 incluido) — correctos. Oposiciones con tres
+fuentes de verdad (motor ✓ astropy ✓ almanaque ✓):
+
+| Oposición | Fecha | elong. pico | Dist. | Mag | Veredicto |
+|---|---|---|---|---|---|
+| Júpiter | 2026-01-10 | 179.7° | 4.23 UA | — | ✓ en el motor |
+| Neptuno | 2026-09-26 | 178.6° | 28.88 UA | 7.8 | ✓ (la lectura vieja "[Uranus] 09-26" era un malentendido; el código actual emite Neptuno, correcto) |
+| Urano | 2026-11-25/26 | 179.8° | 18.44 UA | 5.6 | ✓ — el "Júpiter 11-27" de la hoja del observador es ESTE, mal etiquetado |
+| Saturno | 2026-10-04 (12:21 UT, Pececito) | 177.28° | 8.43 UA | 0.3 (almanaque) | ✗ **el motor no la emite — el único bug real** |
+| Marte | — | máx. elong. ene–mar 2026: 11.7° | — | — | ✓ bien ausente: sin oposición en 2026 |
+
+**Marte 2026 — dictamen**: su evento de enero es la **conjunción**
+(2026-01-09/10, 2.40 UA), NO una oposición. Oposición anterior
+2025-01-16; próxima **2027-02-19**. El cálculo del observador ("~780 d
+después de 2024-01-19") es erróneo (780 d cae en ~16 ago 2026, no en
+enero) y 2024-01-19 ya no era una oposición de Marte. Explicárselo al
+observador; **no añadir ningún evento**.
+
+**Causa raíz del bug de Saturno (confirmada con datos)**
+
+Una oposición es oposición en **longitud eclíptica** (Δλ = 180°), no en
+elongación. Si Saturno está en oposición con latitud β ≈ −2.7°, su
+elongación = 180° − |β| → pico en **177.28°**, que nunca cruza el umbral
+`eln[i] < 180.0 − 1.5` de `_oppositions()`. Verificado el 2026-10-04:
+Δλ Sol–Saturno = 179.59° (oposición real) y astropy da el mismo pico
+177.2841° → la geometría del motor es **correcta**; el umbral es
+**equivocado**.
+
+- Código buggy: `core/skyevents.py::_oppositions()`, gate en
+  `if eln[i] < 180.0 - OPPOSITION_DEG: continue` (~línea 405).
+- **Fix**: detectar el cruce de longitud λ_planeta − λ_sol = 180°
+  reutilizando `_ecl_lon()` (~línea 149) + `_bisect_crossing()`
+  (~línea 120), el mismo patrón que usa ya el escaneo de conjunciones
+  lunares de este módulo. Seguir reportando `elong_deg` = elongación real (177.3 es el
+  valor verdadero, no un fallo de datos).
+- **Látent**: el gate `|elong| < 2°` de `_sun_conjunctions()` (~línea
+  443) puede perder conjunciones superiores de planetas de β alta
+  (Saturno llega a β ≈ 3.4° → elong. mín. hasta ~3.4°). Mismo fix.
+- La fila «Oposición» de la tabla de reglas de este doc queda
+  **superada** — actualizarla junto al fix.
+- Menor: magnitud de Saturno 0.6 (motor) vs ~0.3 (almanaque) — revisar
+  la fórmula de magnitud de `ephem_minor` (baja prioridad).
+
+**Tests de regresión que faltan** (`tests/unit/test_skyevents.py` NO
+existe; los invariantes de SC0 tampoco están escritos):
+
+- Júpiter opp 2026-01-10 ±1 d · Neptuno opp 2026-09-26 ±1 d ·
+  Urano opp 2026-11-25/26 ±1 d · **Saturno opp 2026-10-04 ±1 d**
+  (regresión del bug) · **ausencia** de oposición de Marte en 2026 ·
+  sin eventos dobles Neptuno/Urano.
+
+**Higiene del árbol (no mezclar commits)**
+
+- **Commit SC0** = `nightscribe/core/skyevents.py` (nuevo) +
+  `nightscribe/core/ephem_minor.py` (M, `moon(ecl_lat_deg)`) +
+  `tests/unit/test_skyevents.py` (nuevo) + plan/ADR.
+- **Otro stream, fuera de este commit**: `website/` (nuevo, sin
+  trackear), `docs/adr/ADR-039-features-accordion.md` (nuevo, sin
+  trackear), `docs/WORKFLOWS.es.md` (M, §7sexies del acordeón),
+  `ns_probe_gui_boot.py` (nuevo, raíz).
+- **ADR**: 039 lo ocupa ya el acordeón de la web → el ADR del cielo es
+  **ADR-040** (referencias de este doc actualizadas).
+
+**Rama**: hoy en `feature/ux-projects-campaigns` @ `3a38c6d`; crear
+`feature/sky-calendar` de aquí para los tracks SC.
+
+**Siguiente movimiento (orden exacto)**
+
+1. Fix de `_oppositions` + `_sun_conjunctions` con el patrón de longitud
+   (dejar `elong_deg` como dato).
+2. `tests/unit/test_skyevents.py` con la tabla de regresión de arriba.
+3. Regenerar la lista de 60 d y diff contra la tabla validada;
+   confirmar que Saturno aparece.
+4. Cerrar SC0 (invariantes del plan) → SD → SC1 → SC2 → SC3 con
+   **ADR-040**.
+5. Mensaje al observador: Marte (conjunción ≠ oposición), 09-26 =
+   Neptuno, 11-25/26 = Urano (su "Júpiter 11-27"), Saturno arreglada.
+
+**Notas de entorno**
+
+- astropy 7.0.1 (dist-packages, vía venv): `SkyCoord` tiene
+  `.separation()` pero **no** `.separation_to()`;
+  `angular_separation()` ya no acepta dos coords.
+- Los scripts de verificación vivieron en `/tmp/opencode/`
+  (state_capture, astropy_truth, sat_fine, opscan, elas) — **efímeros**;
+  todo lo necesario se re-deriva de la tabla validada de arriba.
 
 ## U7 — la franja «Está pasando ahora» se explica sola (cierre UX-PC)
 
@@ -63,7 +173,7 @@ día; «No signals right now» es jerga. Todo en `nightscribe/gui/`:
    sección 7vigies de `docs/WORKFLOWS.es.md`/`.md`.
 8. Commit + `git push` (tracking ya configurado).
 
-## Track SC2 — el sistema solar como fuente de eventos (ADR-039)
+## Track SC2 — el sistema solar como fuente de eventos (ADR-040; el 039 lo ocupa el acordeón de la web)
 
 **Visión pactada**: la pestaña «Sun & sky» pierde entidad como pestaña →
 la barra queda en **4** (Tonight · Projects · Campaigns · Observatory,
@@ -89,7 +199,7 @@ internamente como `lat`; basta añadirla al dict de salida).
 | Perigeo / apogeo | extremos de `moon.dist_km` (con la distancia) | 🌕 |
 | Luna–planeta | mínimo de separación < 4° (+ alt al anochecer + mag) | 🌙 |
 | Planeta–planeta | mínimo < 1.5° | ✨ |
-| Oposición (exteriores) | mínimo de \|elong−180°\| < ~1.5° | 🔴 |
+| Oposición (exteriores) | **SUPERADA —** cruce de longitud eclíptica λ_planeta−λ_sol = 180° (ver §Estado del bug de Saturno) | 🔴 |
 | Máx. elongación (Mercurio/Venus) | máximo local de \|elong\|, E (tarde) / O (mañana) | ☿♀ |
 | Conjunción con el Sol | \|elong\| < 2° | ☀️ |
 | Eclipse (aprox.) | llena/nueva con \|ecl_lat\| pequeña → «probable», SIN horas de contacto (etiqueta honesta) | 🌘 |
@@ -169,7 +279,7 @@ Tonight.
 | **SD** | `core/satellites.py` (galileanos, tránsito + sombra, filtro local, ±10 min etiquetado) + tests contra almanaques publicados |
 | **SC1** | diálogo + contenido solar re-hogareado intacto + barra a 4 pestañas + menú + Ctrl+1..4 + tests GUI retarget (`test_campaigns_tab::test_campaigns_tab_exists` espera 5 pestañas → 4; tests de solar/skypost al diálogo) |
 | **SC2** | chips en Tonight (prioridad, máx. 2-3, clic→diálogo) + tests |
-| **SC3** | i18n ES/EN (§Reglas) + **ADR-039** (sistema solar como fuente de eventos; Sun & sky → Herramientas; satélites galileanos locales ±10 min, Horizons como afinado futuro) + revisión **ADR-036** (barra a 4) + WORKFLOWS sección nueva + AGENTS.md (módulos `core/skyevents.py`, `core/satellites.py`, `gui/skycal_dialog.py`) + suite completa verde + push |
+| **SC3** | i18n ES/EN (§Reglas) + **ADR-040** (el 039 es el acordeón de la web) — sistema solar como fuente de eventos; Sun & sky → Herramientas; satélites galileanos locales ±10 min, Horizons como afinado futuro) + revisión **ADR-036** (barra a 4) + WORKFLOWS sección nueva + AGENTS.md (módulos `core/skyevents.py`, `core/satellites.py`, `gui/skycal_dialog.py`) + suite completa verde + push |
 
 ## Decisiones pactadas (2026-09-17; no re-preguntar)
 
@@ -209,10 +319,10 @@ Tonight.
 
 ## Punto de entrada para continuar
 
-1. Leer este documento entero.
-2. `git checkout feature/ux-projects-campaigns && git pull` → ejecutar
-   **U7** → commit + push.
-3. `git checkout -b feature/sky-calendar` → fases SC0 → SD → SC1 → SC2 →
-   SC3.
-4. Al terminar: push de la rama y avisar al observador para la decisión
+1. Leer §«Estado de la sesión» — el punto exacto de lo que falta y por
+   dónde (U7 ya está hecha y comprometida, `3a38c6d`).
+2. `git checkout feature/ux-projects-campaigns` (o su rama hija ya
+   creada) → fix de oposiciones → tests de regresión → resto de fases
+   SC0 → SD → SC1 → SC2 → SC3.
+3. Al terminar: push de la rama y avisar al observador para la decisión
    de merges.

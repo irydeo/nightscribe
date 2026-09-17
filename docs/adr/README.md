@@ -43,3 +43,4 @@
 | [035](ADR-035-variables-campaigns.md) | Variables de largo periodo y campañas de observación (kind `variable`, campaña 1:N, VSX/SIMBAD, HJD) / long-period variables and observing campaigns (`variable` kind, 1:N campaign, VSX/SIMBAD, HJD) |
 | [036](ADR-036-journal-and-sunsky.md) | Historial → Diario de observación (menú, vista derivada) y Solar → «Sol y cielo» (divulgación) / History → observing journal (menu, derived view) & Solar → "Sun & sky" (outreach) |
 | [037](ADR-037-campaign-signals.md) | Campañas = consola de señales; eventos de variables en tres pisos / Campaigns = signals console; variable-star events in three tiers |
+| [038](ADR-038-ux-prominence-attention.md) | Prominencia de acciones, lenguaje llano y el dashboard «Necesita tu atención» / action prominence, plain language and the attention dashboard |

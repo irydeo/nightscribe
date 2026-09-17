@@ -91,6 +91,8 @@ nightscribe/
                       #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
                      #   + fotometría de la comunidad con token (vigilias brillantes)
     journal.py       # Diario de observación: vista derivada por noche (ADR-036)
+    attention.py     # «Necesita tu atención»: qué proyecto te necesita y por qué
+                     #   (math local pura, sin red — ADR-038)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —
@@ -98,9 +100,13 @@ nightscribe/
    gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
                       # cinco pestañas: Tonight, Projects, **Campaigns**, **Sun & sky**,
                       # Observatory (ADR-019/035/036 rev.) — el **Diario de observación**
-                      # vive en el menú Herramientas (journal_dialog.py, ADR-036)
+                      # vive en el menú Herramientas (journal_dialog.py, ADR-036).
+                      # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
+                      # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
+                      # lenguaje llano + ayudas ⓘ, filas ricas
                       # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
-                      #   incl. timeline_widget: línea de tiempo del tránsito, Track D)
+                      #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
+                      #   y las filas ricas project_row / campaign_row + sparkline, U2/U5)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

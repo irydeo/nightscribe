@@ -957,3 +957,47 @@ unfinished. **Idea futura anotada**: la «crónica de la noche» generada
 desde el Diario (borrador de post con lo hecho en la sesión). Pendiente
 de validación con el token del usuario: el camino AAVSO de las vigilias
 brillantes (ver 7septdecies).
+
+### 7novdecies. Track UX-PC — Projects y Campaigns que dicen «Ohh» (2026-09-17, ADR-038)
+
+Plan: `docs/PLANS/ux-proyectos-campanas.md`. Rama propia e independiente
+`feature/ux-projects-campaigns` (nace de `feature/campaigns-ux` `cb457e6`;
+el merge se decide al cerrar el track).
+
+La auditoría de usabilidad del 2026-09-17 (el observador: «funcionalmente
+nada que reprochar, pero la UX está cargada; sin manual no es intuitiva —
+quiero que al abrir Proyectos o Campañas diga "Ohh, eso es lo que
+necesito"») entrega: el **dashboard «Necesita tu atención»** como panel
+derecho de Projects sin selección (3-5 tarjetas con la razón en palabras
+llanas y un botón que aterriza en la sección exacta; estados calma/vacío;
+fuente: el nuevo `core/attention.py`, math 100 % local y aditiva);
+**filas ricas** en ambas pestañas (banda de tipo, siguiente acción en
+palabras, puntos de progreso, chip «⊕ HH:MM–HH:MM esta noche» vía
+`planner.safe_window_for`, edad de actividad, **sparkline** de tus medidas
+en SN/variables, orden «Te necesita»); la **tarjeta Next como centro de
+mando** (Mark done/Skip junto a Go →; las secciones conservan solo un pie
+discreto); la **prominencia a tres niveles** (primario visible / menú ⋯ /
+bloque colapsable con título en lenguaje llano — Calibration y «Lo que
+guardaste de la sesión» arrancan cerrados; las herramientas de fotometría
+tras un ⋯); el **ciclo de vida consolidado** en el ⋯ de la cabecera del
+proyecto; el **control CCDciel completando su mudanza a Observatory**
+(grupo «Live capture» — Send plan lee el plan guardado del objetivo);
+**Campaigns como sala de guerra** («Está pasando ahora» — renombrado desde
+«Signals»— con frases completas ⚡/⏳/👁, tarjetas de salud ●●●○, acciones
+en la cabecera del detalle con enablement real, «Finish» → «Close»); y la
+**regla de lenguaje llano** con **ayudas ⓘ** (qué es una campaña/proyecto,
+tooltips en las cinco pestañas, estados vacíos que enseñan). Ninguna
+funcionalidad se pierde: se reubica.
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| U1 | cimiento Projects: Filters ▸ + ⋯ gestión; fuera Refresh/Campaigns…/pie | **Hecho** (`35f5a34`) |
+| U2 | `core/attention.py` + dashboard + filas ricas + sparkline | **Hecho** (`6145880`) |
+| U3 | Next card centro de mando + bloques colapsados + CCDciel → Observatory | **Hecho** (`1a08e2e`) |
+| U4 | Follow-up despejado (⋯ herramientas + bloque colapsado) | **Hecho** (`0b5f5b3`) |
+| U5 | Campaigns sala de guerra + ayudas ⓘ + «Close» | **Hecho** (`a0e09f7`) |
+| U6 | lenguaje llano + i18n ES/EN (876 cadenas) + ADR-038 + esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (**1299**), i18n 876 cadenas 0
+unfinished. Métricas: Projects con un SN abierto pasa de ~20 a ≤10
+acciones visibles; Campaigns de 19 a ≤4.

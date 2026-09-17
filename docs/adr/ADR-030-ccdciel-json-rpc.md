@@ -100,6 +100,13 @@ tests unitarios de interpolación, fallback y goto fresco. El control de
 foco/dome/guiding/weather queda para una iteración
 posterior (mismo transporte, más métodos).
 
+**Revisión (2026-09-17, ADR-038)**: la captura en vivo **completa** su
+mudanza a la pestaña **Observatorio** — el grupo «Live capture» (rueda de
+filtros, **Send plan** leyendo el plan *guardado* del proyecto elegido en
+el combo de objetivo, Start capture, etiqueta de época de coords) vive
+junto a la conexión y la montura; el paso Plan del proyecto conserva solo
+una línea de estado con enlace. El hardware tiene una sola casa.
+
 ## English
 
 **Context**: ADR-021 left "telescope control" out of scope (files only) and
@@ -185,3 +192,10 @@ nearest now (`ephem_epoch`); the project context carries
 `coords_epoch`/`coords_source`; unit tests for interpolation, fallback and the
 fresh goto. Focuser/dome/guiding/weather control is deferred to a later iteration
 (same transport, more methods).
+
+**Review (2026-09-17, ADR-038)**: live capture **completes** its move to the
+**Observatory** tab — the "Live capture" group (filter wheel, **Send plan**
+reading the *saved* plan of the project picked in the target combo, Start
+capture, coords epoch label) lives next to the connection and the mount; the
+project's Plan step keeps only a state line with a link. Hardware has a
+single home.

@@ -1768,7 +1768,7 @@ def test_variable_followup_keeps_quicklook_hides_animation(window):
     _build_page(window, proj_mod.get(mw.db, p["id"]))
     fu = window._page_sections["followup"]
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
-    assert "Run quick-look" in btns
+    assert "Quick analysis" in btns
     assert "Generate animation" not in btns
     assert "Export annotated FITS" not in btns
 

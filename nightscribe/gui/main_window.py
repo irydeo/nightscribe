@@ -4779,10 +4779,10 @@ class MainWindow(QMainWindow):
             # B5: the quick-look engine measures the stacked per-night
             # images (SN + variables; HADS runs its intra-night series in
             # FotoDif, ADR-034 D.3)
-            btn_quicklook = QPushButton(self.tr("Run quick-look"))
+            btn_quicklook = QPushButton(self.tr("Quick analysis"))
             btn_quicklook.setToolTip(self.tr(
                 "Differential magnitude vs. an automatic comparison "
-                "ensemble"))
+                "ensemble (indicative)"))
             btn_quicklook.clicked.connect(
                 lambda: self._fu_run_quicklook(pid))
             act_row.addWidget(btn_quicklook)

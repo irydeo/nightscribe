@@ -147,6 +147,17 @@ señales** del compromiso (eventos ⚡ y extremos ⏳ agregados), frente a
 Proyectos = ejecutar (ADR-037). El modelo de proyecto (3 pasos, página
 única, ciclo de vida) no cambia.
 
+**Revisión (2026-09-17, ADR-038)** — el hub aprende a hablar primero: sin
+selección, el panel derecho es el dashboard **«Necesita tu atención»**
+(alimentado por el nuevo `core/attention.py`, aditivo). La página del
+proyecto conserva las secciones en acordeón, pero la máquina de pasos se
+comanda desde la **tarjeta Next** (Mark done/Skip junto a Go →); las
+secciones conservan solo un pie discreto con «Reopen step»/«Skip step». El
+ciclo de vida se consolida en el menú **⋯** de la cabecera (tags, carpetas,
+Close/Reopen/Archive/Delete) y la lista pasa a filas ricas con filtros
+avanzados tras «Filters ▸». El modelo (3 pasos, ciclo de vida, página
+única) sigue sin cambiar.
+
 ## English
 
 **Context**: after v2 (ADR-017), a product reflection from the user: NightScribe must
@@ -289,3 +300,13 @@ output (ADR-036). The Campaigns tab's role is redefined as the
 commitment's **signals console** (aggregated ⚡ events and ⏳ extrema),
 versus Projects = execute (ADR-037). The project model (3 steps, single
 page, lifecycle) is unchanged.
+
+**Review (2026-09-17, ADR-038)** — the hub learns to speak first: with no
+selection, the right pane is the **"Needs your attention"** dashboard (fed
+by the new, additive `core/attention.py`). The project page keeps its
+accordion sections, but the step machine is commanded from the **Next
+card** (Mark done/Skip beside Go →); sections keep only a discreet footer
+("Reopen step"/"Skip step"). The lifecycle consolidates into the header
+**⋯** menu (tags, folders, Close/Reopen/Archive/Delete) and the list
+becomes rich rows with the advanced filters behind "Filters ▸". The model
+(3 steps, lifecycle, single page) still does not change.

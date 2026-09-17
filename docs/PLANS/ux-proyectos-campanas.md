@@ -1,9 +1,10 @@
 # Plan — UX de proyectos y campañas: el cuadro de mando que provoca el «Ohh» (Track UX-PC)
 
-> **Pendiente de ejecutar** (plan escrito 2026-09-17): 6 fases (U1–U6).
-> Una fase = un commit; cada fase deja la app funcional con sus tests en
-> verde. Decisiones pactadas con el observador el 2026-09-17 tras una
-> auditoría de usabilidad sobre `feature/campaigns-ux` HEAD `cb457e6`.
+> **Ejecutado completo el 2026-09-17**: 6 fases (U1–U6), una fase = un
+> commit (`35f5a34` U1 · `6145880` U2 · `1a08e2e` U3 · `0b5f5b3` U4 ·
+> `a0e09f7` U5 · cierre U6). Suite unitaria **1299** verde, i18n 876
+> cadenas 0 unfinished. Decisiones registradas: **ADR-038** + revisiones
+> de ADR-019 / ADR-030 / ADR-037.
 
 **rama**: `feature/ux-projects-campaigns` — rama **independiente** que nace
 de `feature/campaigns-ux` (HEAD `cb457e6`, con los tracks UX/SC/JO
@@ -212,12 +213,12 @@ claras ✨») y vacío («Empieza en Tonight…» + salto).
 
 | Fase | Entregable | Archivos principales | Estado |
 |---|---|---|---|
-| **U1** | Cimiento Projects: lista con Search+estado+`Filters ▾`+＋New; fuera Refresh/Campaigns…/pie-de-lista; menú `⋯` en cabecera (tags, carpetas, ciclo de vida); ☆ queda | `ui/projects_tab.ui`, `main_window.py` | Pendiente |
-| **U2** | **El "Ohh"**: `core/attention.py` + dashboard «Necesita tu atención» (panel derecho sin selección, estados calma/vacío) + filas ricas (acción, progreso, ⊕ esta noche, actividad, ⚑, sparkline SN/var, orden por necesidad) | `core/attention.py`, `main_window.py`, widgets de fila | Pendiente |
-| **U3** | Next card centro de mando (Mark done/Skip junto a Go→; fuera fila toggle; Reopen step discreto) + `Advanced ▸` en Plan (Calibration) y Process (productos de sesión) + CCDciel → Observatory (grupo Live capture con selector de proyecto) + línea-enlace en Plan | `main_window.py`, `ui/observatory_tab.ui` | Pendiente |
-| **U4** | Follow-up despejado: primarios Add visit / Análisis rápido / `⋯ Photometry tools`; animation + FITS anotado bajo `Advanced ▸` | `main_window.py` | Pendiente |
-| **U5** | Campaigns sala de guerra: «Está pasando ahora» arriba con frases completas, tarjetas de salud, acciones en cabecera del detalle con enablement, `Close`, `lbl_what` al estado vacío, **ayudas `ⓘ`** (pestaña, cabecera, diálogo New campaign, estado vacío) | `ui/campaigns_tab.ui`, `main_window.py` | Pendiente |
-| **U6** | Pase de lenguaje llano completo + i18n ES/EN (lupdate/lrelease) + tests offscreen + **ADR-038** (prominencia + lenguaje llano + dashboard) y enmiendas ADR-019 (hub), ADR-030 (CCDciel a Observatory), ADR-035/037 (rol de Campaigns, renombre Signals) + sección nueva en WORKFLOWS.es.md/.md | `gui/i18n/*`, `tests/unit/*`, `docs/` | Pendiente |
+| **U1** | Cimiento Projects: lista con Search+estado+`Filters ▾`+＋New; fuera Refresh/Campaigns…/pie-de-lista; menú `⋯` en cabecera (tags, carpetas, ciclo de vida); ☆ queda | `ui/projects_tab.ui`, `main_window.py` | **Hecho** |
+| **U2** | **El "Ohh"**: `core/attention.py` + dashboard «Necesita tu atención» (panel derecho sin selección, estados calma/vacío) + filas ricas (acción, progreso, ⊕ esta noche, actividad, ⚑, sparkline SN/var, orden por necesidad) | `core/attention.py`, `main_window.py`, widgets de fila | **Hecho** |
+| **U3** | Next card centro de mando (Mark done/Skip junto a Go→; fuera fila toggle; Reopen step discreto) + `Advanced ▸` en Plan (Calibration) y Process (productos de sesión) + CCDciel → Observatory (grupo Live capture con selector de proyecto) + línea-enlace en Plan | `main_window.py`, `ui/observatory_tab.ui` | **Hecho** |
+| **U4** | Follow-up despejado: primarios Add visit / Análisis rápido / `⋯ Photometry tools`; animation + FITS anotado bajo `Advanced ▸` | `main_window.py` | **Hecho** |
+| **U5** | Campaigns sala de guerra: «Está pasando ahora» arriba con frases completas, tarjetas de salud, acciones en cabecera del detalle con enablement, `Close`, `lbl_what` al estado vacío, **ayudas `ⓘ`** (pestaña, cabecera, diálogo New campaign, estado vacío) | `ui/campaigns_tab.ui`, `main_window.py` | **Hecho** |
+| **U6** | Pase de lenguaje llano completo + i18n ES/EN (lupdate/lrelease) + tests offscreen + **ADR-038** (prominencia + lenguaje llano + dashboard) y enmiendas ADR-019 (hub), ADR-030 (CCDciel a Observatory), ADR-035/037 (rol de Campaigns, renombre Signals) + sección nueva en WORKFLOWS.es.md/.md | `gui/i18n/*`, `tests/unit/*`, `docs/` | **Hecho** |
 
 El «Ohh» llega pronto a propósito: **U2** es la primera entrega visible
 tras el cimiento, para validar la dirección con el observador antes de

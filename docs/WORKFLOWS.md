@@ -785,3 +785,46 @@ observatory watermark, shown in the ChartViewer) and the bilingual
 **Noted future idea**: a "night chronicle" generated from the journal
 (a post draft of what the session did). Pending live validation with
 the user's token: the AAVSO bright-vigil path (see 7septdecies).
+
+### 7novdecies. Track UX-PC — Projects & Campaigns that say "Ohh" (2026-09-17, ADR-038)
+
+Plan: `docs/PLANS/ux-proyectos-campanas.md` (Spanish). Own independent
+branch `feature/ux-projects-campaigns` (branched off
+`feature/campaigns-ux` `cb457e6`; merge target decided at track close).
+
+The 2026-09-17 usability audit (the observer: "nothing to fault
+functionally, but the UX is crowded; without a manual it isn't intuitive —
+I want Projects/Campaigns to make you say 'Ohh, that's what I need'")
+delivers: the **"Needs your attention" dashboard** as the Projects right
+pane with no selection (3-5 cards with the reason in plain words and one
+button landing on the exact section; calm/empty states; source: the new,
+purely-local, additive `core/attention.py`); **rich rows** in both tabs
+(kind band, next action in words, progress dots, "up tonight HH:MM–HH:MM"
+chip via `planner.safe_window_for`, activity age, **sparkline** of your
+own measurements for SN/variables, the "Needs you" order); the **Next
+card as the step machine's command center** (Mark done/Skip beside Go →;
+sections keep only a discreet footer); **three-level action prominence**
+(primary visible / ⋯ menu / collapsed block with a plain-language title —
+Calibration and "What you kept from the session" start closed; photometry
+tools behind one ⋯); the **project lifecycle consolidated** into the
+header ⋯ menu; the **CCDciel live control completing its move to
+Observatory** ("Live capture" group — Send plan reads the selected
+target's saved plan); **Campaigns as the war room** ("Happening now" —
+renamed from "Signals" — with full-sentence ⚡/⏳/👁 rows, ●●●○ health
+cards, detail-header actions with real enablement, "Finish" → "Close");
+and the **plain-language rule** with **`ⓘ` helps** (what a
+campaign/project is, tooltips on all five tabs, teaching empty states).
+No feature is lost: everything is relocated.
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| U1 | Projects foundation: Filters ▸ + ⋯ manage menu; Refresh/Campaigns…/footer retired | **Done** (`35f5a34`) |
+| U2 | `core/attention.py` + dashboard + rich rows + sparkline | **Done** (`6145880`) |
+| U3 | Next card command center + collapsed advanced blocks + CCDciel → Observatory | **Done** (`1a08e2e`) |
+| U4 | Follow-up decluttered (⋯ tools + collapsed block) | **Done** (`0b5f5b3`) |
+| U5 | Campaigns war room + ⓘ helps + "Close" | **Done** (`a0e09f7`) |
+| U6 | plain language + i18n ES/EN (876 strings) + ADR-038 + this section | **Done** |
+
+**Status**: unit suite green (**1299**), i18n 876 strings 0 unfinished.
+Metrics: Projects with an SN open drops from ~20 to ≤10 visible actions;
+Campaigns from 19 to ≤4.

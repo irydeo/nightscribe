@@ -198,7 +198,7 @@ def test_followup_hides_sn_analysis_buttons_for_hads(window):
     _select(window, "V0392 UMa", _hads_ctx())
     sec = _section(window, "followup")
     texts = [b.text() for b in sec.findChildren(QPushButton)]
-    assert "Run quick-look" not in texts
+    assert "Quick analysis" not in texts
     assert "Generate animation" not in texts
     assert "Export annotated FITS" not in texts
     assert "Add visit" in texts

@@ -119,6 +119,15 @@ ayuda del editor). ASAS-SN Sky Patrol se evaluó como backend alternativo
 de brillantes y estaba **inalcanzable** durante el spike (timeout); queda
 como opción futura si se valida en vivo.
 
+**Revisión 3 (2026-09-17, ADR-038)**: la consola de señales se renombra
+**«Está pasando ahora»** (regla de lenguaje llano: «Signals» era jerga de
+desarrollador) y sus filas se escriben como frases completas con icono
+⚡/⏳/👁. La lista de campañas pasa a ser **tarjetas de salud** (●●●○ N de M
+al día + próxima acción en palabras) y las acciones de la campaña
+seleccionada viven en la cabecera del detalle (Edit… / Close|Reopen según
+estado / ⋯) con enablement real; «Finish» se unifica a **«Close»**. El
+modelo (señales, fusión SC-g, vigilias, canal AAVSO) no cambia.
+
 ## English
 
 **Context**: with the UX track closed, a review of the app with the observer
@@ -228,3 +237,12 @@ ZTF/ALeRCE. With no token configured, bright vigils stay silent
 Patrol was evaluated as the alternative bright backend and was
 **unreachable** during the spike (connect timeout); it remains a future
 option if validated live.
+
+**Review 3 (2026-09-17, ADR-038)**: the signals console is renamed
+**"Happening now"** (plain-language rule: "Signals" was developer jargon)
+and its rows read as full sentences with a ⚡/⏳/👁 icon. The campaign list
+becomes **health cards** (●●●○ N of M up to date + next action in words),
+and the selected campaign's actions live in the detail header (Edit… /
+Close|Reopen by state / ⋯) with real enablement; "Finish" is unified to
+**"Close"**. The model (signals, SC-g merge, vigils, AAVSO channel) is
+unchanged.

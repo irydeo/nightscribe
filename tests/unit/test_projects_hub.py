@@ -1758,6 +1758,9 @@ def test_variable_project_gets_followup_with_protocol(window):
 
 
 def test_variable_followup_keeps_quicklook_hides_animation(window):
+    # UX-PC (U4): a variable keeps the quick-look as a primary button;
+    # the SN-only animation/annotated-FITS pair is not created at all
+    # (it lives collapsed in SN projects, absent elsewhere).
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     from PySide6.QtWidgets import QPushButton
@@ -1765,11 +1768,9 @@ def test_variable_followup_keeps_quicklook_hides_animation(window):
     _build_page(window, proj_mod.get(mw.db, p["id"]))
     fu = window._page_sections["followup"]
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
-    # buttons self-hide via hide(); assert their own flag (a collapsed
-    # section would hide content anyway and hide the signal)
-    assert not btns["Run quick-look"].isHidden()
-    assert btns["Generate animation"].isHidden()
-    assert btns["Export annotated FITS"].isHidden()
+    assert "Run quick-look" in btns
+    assert "Generate animation" not in btns
+    assert "Export annotated FITS" not in btns
 
 
 def test_cadence_chip_ignores_campaign_projects(window):
@@ -1871,15 +1872,22 @@ def test_variable_without_campaign_keeps_clear_default(window):
 
 
 def test_followup_has_export_report_button(window):
+    # UX-PC (U4): the bulk photometry tools (paste/import/export/survey)
+    # live in the ⋯ Photometry tools menu of the Follow-up section.
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from PySide6.QtWidgets import QPushButton
+    from PySide6.QtWidgets import QToolButton
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    texts = [b.text()
-             for b in window._page_sections["followup"].findChildren(QPushButton)]
+    tools = [b for b in window._page_sections["followup"]
+             .findChildren(QToolButton) if "Photometry" in b.text()]
+    assert tools, "the ⋯ Photometry tools menu is missing"
+    texts = [a.text() for a in tools[0].menu().actions()]
     assert any("Export photometry report" in t or "Exportar" in t
                for t in texts)
+    assert any("Download survey photometry" in t for t in texts)
+    assert any("Paste photometry" in t for t in texts)
+    assert any("Import file" in t for t in texts)
 
 
 def test_download_survey_points_are_stored_and_deduped(window):

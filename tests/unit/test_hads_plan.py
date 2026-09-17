@@ -191,15 +191,22 @@ def test_followup_section_built_for_hads(window):
 
 
 def test_followup_hides_sn_analysis_buttons_for_hads(window):
-    from PySide6.QtWidgets import QPushButton
+    # UX-PC (U4): HADS never had the SN analysis — with the declutter
+    # those buttons are simply NOT created (no row of hidden buttons);
+    # the bulk tools live in the ⋯ Photometry tools menu.
+    from PySide6.QtWidgets import QPushButton, QToolButton
     _select(window, "V0392 UMa", _hads_ctx())
-    buttons = {b.text(): b for b in _section(window, "followup")
-               .findChildren(QPushButton)}
-    assert buttons["Run quick-look"].isHidden()
-    assert buttons["Generate animation"].isHidden()
-    assert buttons["Export annotated FITS"].isHidden()
-    assert not buttons["Add visit"].isHidden()
-    assert not buttons["Import file…"].isHidden()
+    sec = _section(window, "followup")
+    texts = [b.text() for b in sec.findChildren(QPushButton)]
+    assert "Run quick-look" not in texts
+    assert "Generate animation" not in texts
+    assert "Export annotated FITS" not in texts
+    assert "Add visit" in texts
+    tools = [b for b in sec.findChildren(QToolButton)
+             if "Photometry" in b.text()]
+    assert tools, "the ⋯ Photometry tools menu is missing"
+    actions = [a.text() for a in tools[0].menu().actions()]
+    assert any("Import file" in t for t in actions)
 
 
 def test_process_block_fotodif_webobs(window):

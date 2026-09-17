@@ -4643,34 +4643,54 @@ class MainWindow(QMainWindow):
             lbl_ev.setStyleSheet("color: #e0c060;")
             layout.addWidget(lbl_ev)
 
-        # add visit button
+        # UX-PC (U4): the primary row is the follow-up's daily work —
+        # add a visit, run the quick analysis; the bulk/file/report/survey
+        # tools live behind one ⋯ menu (nothing lost, nothing shouting)
+        act_row = QHBoxLayout()
         btn_add = QPushButton(self.tr("Add visit"))
         btn_add.clicked.connect(lambda: self._fu_add_session(pid))
-        layout.addWidget(btn_add)
-        # B3: paste bulk photometry + import file
-        fu_btns = QHBoxLayout()
-        btn_paste = QPushButton(self.tr("Paste photometry…"))
-        btn_paste.clicked.connect(lambda: self._fu_paste_dialog(pid))
-        fu_btns.addWidget(btn_paste)
-        btn_file = QPushButton(self.tr("Import file…"))
-        btn_file.clicked.connect(lambda: self._fu_import_file(pid))
-        fu_btns.addWidget(btn_file)
-        btn_export = QPushButton(self.tr("Export photometry report…"))
-        btn_export.setToolTip(self.tr(
+        act_row.addWidget(btn_add)
+        from PySide6.QtWidgets import QMenu, QToolButton
+        tools = QToolButton()
+        tools.setText(self.tr("⋯ Photometry tools"))
+        tools.setPopupMode(QToolButton.InstantPopup)
+        tools_menu = QMenu(tools)
+        act_paste = tools_menu.addAction(self.tr("Paste photometry…"))
+        act_paste.triggered.connect(lambda: self._fu_paste_dialog(pid))
+        act_file = tools_menu.addAction(self.tr("Import file…"))
+        act_file.triggered.connect(lambda: self._fu_import_file(pid))
+        act_export = tools_menu.addAction(
+            self.tr("Export photometry report…"))
+        act_export.setToolTip(self.tr(
             "CSV or AAVSO EFF with heliocentric dates, for the campaign "
             "form / WebObs"))
-        btn_export.clicked.connect(lambda: self._fu_export_report(pid))
-        fu_btns.addWidget(btn_export)
+        act_export.triggered.connect(lambda: self._fu_export_report(pid))
         if kind in ("sn", "variable"):
-            btn_survey = QPushButton(self.tr("Download survey photometry…"))
-            btn_survey.setToolTip(self.tr(
+            act_survey = tools_menu.addAction(
+                self.tr("Download survey photometry…"))
+            act_survey.setToolTip(self.tr(
                 "ASAS-SN/ZTF context points, drawn in grey and never "
                 "mixed with your own measurements"))
-            btn_survey.clicked.connect(
+            act_survey.triggered.connect(
                 lambda: self._fu_download_survey(pid))
-            fu_btns.addWidget(btn_survey)
-            self._project_widgets["fu_survey"] = btn_survey
-        layout.addLayout(fu_btns)
+            # the download toggles enabled-state mid-flight: the action
+            # carries the same registry key the old button had
+            self._project_widgets["fu_survey"] = act_survey
+        tools.setMenu(tools_menu)
+        if kind in ("sn", "variable"):
+            # B5: the quick-look engine measures the stacked per-night
+            # images (SN + variables; HADS runs its intra-night series in
+            # FotoDif, ADR-034 D.3)
+            btn_quicklook = QPushButton(self.tr("Run quick-look"))
+            btn_quicklook.setToolTip(self.tr(
+                "Differential magnitude vs. an automatic comparison "
+                "ensemble"))
+            btn_quicklook.clicked.connect(
+                lambda: self._fu_run_quicklook(pid))
+            act_row.addWidget(btn_quicklook)
+        act_row.addWidget(tools)
+        act_row.addStretch()
+        layout.addLayout(act_row)
 
         # sessions list
         grp = QGroupBox(self.tr("Visits"))
@@ -4695,37 +4715,28 @@ class MainWindow(QMainWindow):
         fu_detail_area.setWidget(self._fu_detail)
         grp.layout().addWidget(fu_detail_area)
         layout.addWidget(grp)
-        # B5/B6/B10: analysis buttons — quick-look, evolution animation,
-        # annotated FITS export. They operate on the registered stacked
-        # images and the follow-up photometry.
-        ana_row = QHBoxLayout()
-        btn_quicklook = QPushButton(self.tr("Run quick-look"))
-        btn_quicklook.setToolTip(self.tr(
-            "Differential magnitude vs. an automatic comparison ensemble"))
-        btn_quicklook.clicked.connect(lambda: self._fu_run_quicklook(pid))
-        ana_row.addWidget(btn_quicklook)
-        btn_evo = QPushButton(self.tr("Generate animation"))
-        btn_evo.setToolTip(self.tr(
-            "GIF/MP4 of the photometric evolution across visits"))
-        btn_evo.clicked.connect(lambda: self._fu_run_animation(pid))
-        ana_row.addWidget(btn_evo)
-        btn_annot = QPushButton(self.tr("Export annotated FITS"))
-        btn_annot.setToolTip(self.tr(
-            "Copy of the stacked FITS with annotation keywords (NS_)"))
-        btn_annot.clicked.connect(lambda: self._fu_export_annotated(pid))
-        ana_row.addWidget(btn_annot)
-        if kind == "hads":
-            # SN-only analysis: the quick-look engine measures stacked
-            # per-night images, not an intra-night series (ADR-034, D.3)
-            for b in (btn_quicklook, btn_evo, btn_annot):
-                b.hide()
-        elif kind == "variable":
-            # variables share the quick-look (the series engine serves
-            # them unchanged, V-g) but not the SN evolution animation or
-            # the annotated FITS
-            for b in (btn_evo, btn_annot):
-                b.hide()
-        layout.addLayout(ana_row)
+        # B6/B10: the SN evolution animation and the annotated FITS export
+        # — secondary analysis tools, collapsed by default (UX-PC U4).
+        # HADS never had them (intra-night series live in FotoDif,
+        # ADR-034 D.3) and variables keep only the quick-look (V-g), so
+        # this block is SN-only instead of a row of hidden buttons.
+        if kind == "sn":
+            adv = self._advanced_block(
+                layout, self.tr("Animation and annotated FITS"))
+            ana_row = QHBoxLayout()
+            btn_evo = QPushButton(self.tr("Generate animation"))
+            btn_evo.setToolTip(self.tr(
+                "GIF/MP4 of the photometric evolution across visits"))
+            btn_evo.clicked.connect(lambda: self._fu_run_animation(pid))
+            ana_row.addWidget(btn_evo)
+            btn_annot = QPushButton(self.tr("Export annotated FITS"))
+            btn_annot.setToolTip(self.tr(
+                "Copy of the stacked FITS with annotation keywords (NS_)"))
+            btn_annot.clicked.connect(
+                lambda: self._fu_export_annotated(pid))
+            ana_row.addWidget(btn_annot)
+            ana_row.addStretch()
+            adv.addLayout(ana_row)
         layout.addStretch()
         self._project_widgets["fu_sessions"] = lst
 

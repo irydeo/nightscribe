@@ -370,10 +370,12 @@ _PLANET_MAG0 = {"mercury": -0.36, "venus": -4.34, "mars": -1.51,
                 "neptune": -6.87}
 
 
-def planet(name, jd):
-    # Geocentric position and rough magnitude of a planet.
+def planet_heliocentric_xyz(name, jd):
+    # Heliocentric ecliptic (of-date) cartesian position of a planet —
+    # the 3D half of planet() factored out for the satellite geometry
+    # (core/satellites.py, Track SC2-SD). Additive: planet() untouched.
     # @args: name - planet name (lowercase, no Earth), jd - Julian date
-    # @return: dict with ra, dec (deg), dist_au (geocentric), mag
+    # @return: (x, y, z, r) in AU
     p = _PLANETS[name.lower()]
     d = jd - 2451543.5
     n = _rev(p[0] + p[1] * d)
@@ -382,7 +384,14 @@ def planet(name, jd):
     a = p[6] + p[7] * d
     e = p[8] + p[9] * d
     m = _rev(p[10] + p[11] * d)
-    xh, yh, zh, r = _elements_to_ecliptic(n, i, w, a, e, m)
+    return _elements_to_ecliptic(n, i, w, a, e, m)
+
+
+def planet(name, jd):
+    # Geocentric position and rough magnitude of a planet.
+    # @args: name - planet name (lowercase, no Earth), jd - Julian date
+    # @return: dict with ra, dec (deg), dist_au (geocentric), mag
+    xh, yh, zh, r = planet_heliocentric_xyz(name, jd)
 
     xe, ye, ze = earth_ecliptic_xyz(jd)
     xg, yg, zg = xh - xe, yh - ye, zh - ze

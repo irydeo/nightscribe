@@ -526,10 +526,19 @@ def _meteor_showers(jd_from, jd_to, date0, lat_deg, lon_deg):
 
 
 def _satellite_events(jd_from, jd_to, lat_deg, lon_deg):
-    # TODO(phase SD): Galilean moon transits and shadow transits —
-    # core/satellites.py (Meeus ch. 43) merges in here.
-    # @return: [] until phase SD ships the math
-    return []
+    # Phase SD: the Galilean moons' transits across Jupiter's disc and
+    # their shadows (core/satellites.py — IAU WGCCRE phases, planning
+    # grade ±10 min, labelled). @return: [event]
+    from . import satellites
+    out = []
+    for e in satellites.galilean_events(jd_from, jd_to, lat_deg, lon_deg):
+        out.append(_ev(e["jd0"], e["kind"], "🔭",
+                       [e["satellite"], "jupiter"],
+                       mag=e["mag"], alt_deg=e.get("alt_deg"),
+                       uncertainty_min=e["uncertainty_min"],
+                       observable=e["observable"],
+                       jd1=e["jd1"], t0=e["t0"], t1=e["t1"]))
+    return out
 
 
 def _tonight_flag(ev, lat_deg, lon_deg):
@@ -538,6 +547,10 @@ def _tonight_flag(ev, lat_deg, lon_deg):
     # @return: bool
     date = ev["date"].date()
     kind = ev["kind"]
+    if kind in ("sat_transit", "shadow_transit"):
+        # the satellites module already gates per-window (Jupiter above
+        # 0 deg + Sun down at some point of the transit) — its verdict
+        return bool(ev.get("observable"))
     if kind in ("new_moon", "first_quarter", "full_moon", "last_quarter",
                 "lunar_eclipse", "solar_eclipse"):
         pos = ephem_minor.moon(ev["jd"])

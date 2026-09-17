@@ -125,7 +125,17 @@ existe; los invariantes de SC0 tampoco están escritos):
    se midió primero: el rango físico 2026 es 11.9–15.9 d (no ~13.9 fijo).
 3. ~~Regenerar la lista y confirmar que Saturno aparece~~ ✓ (salida
    completa contrastada contra la tabla validada).
-4. Cerrar SC0 → **SD** → SC1 → SC2 → SC3 con **ADR-040**.
+4. ~~Cerrar SC0~~ ✓ → ~~**SD**~~ ✓ (**2026-09-17**): `core/satellites.py`
+   — IAU WGCCRE (NAIF pck00011) + radio JPL + fase empírica calibrada
+   (`phase_cal_deg`: la PM del IAU sigue la ROTACIÓN del cuerpo, que
+   libra; Ganímedes −2.13°, Calisto +0.62°). **Validación: 22 ventanas
+   contra Horizons q12 en sep/oct/nov 2026, todas ≤10 min (peor 9.6)**.
+   Convención W+180 documentada (Luna: 38.32 = 218.32−180). Sin
+   precesión del polo (ICRF inercial). La verdad horneada vive en
+   `tests/unit/test_satellites.py` (21 tests) + funcional
+   `test_skyevents_functional.py`. Sombra = rayo Sol→luna ∩ esfera
+   (asíncrono con la luna lejos de oposición, como debe). → SC1 → SC2 →
+   SC3 con **ADR-040**.
 5. Mensaje al observador: Marte (conjunción ≠ oposición), 09-26 =
    Neptuno, 11-25/26 = Urano (su "Júpiter 11-27"), Saturno arreglada.
 

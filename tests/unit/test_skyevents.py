@@ -66,12 +66,14 @@ def test_contract_keys_and_sorting(year2026):
 
 
 def test_every_family_appears_in_a_year(year2026):
-    # a full year must show every family at least once
+    # a full year must show every family at least once (the Galilean
+    # families joined in phase SD — 2026 has plenty of Io/Europa seasons)
     kinds = {e["kind"] for e in year2026}
     for kind in ("new_moon", "full_moon", "first_quarter", "last_quarter",
                  "perigee", "apogee", "moon_conjunction",
                  "planet_conjunction", "opposition", "max_elongation",
-                 "sun_conjunction", "meteor_shower"):
+                 "sun_conjunction", "meteor_shower",
+                 "sat_transit", "shadow_transit"):
         assert kind in kinds, f"family {kind} missing from a year scan"
 
 

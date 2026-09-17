@@ -885,8 +885,10 @@ No feature is lost: everything is relocated.
 | U4 | Follow-up decluttered (⋯ tools + collapsed block) | **Done** (`0b5f5b3`) |
 | U5 | Campaigns war room + ⓘ helps + "Close" | **Done** (`a0e09f7`) |
 | U6 | plain language + i18n ES/EN (876 strings) + ADR-038 + this section | **Done** |
+| U7 | "Happening now" explains itself: scope line + ⓘ icon legend, "Up to date: N of M campaign projects" (+tooltip), no-campaign guide, warm ✨ calm state | **Done** (2026-09-17) |
 
 **Status**: unit suite green (**1299**), i18n 876 strings 0 unfinished.
 Metrics: Projects with an SN open drops from ~20 to ≤10 visible actions;
 Campaigns from 19 to ≤4. **After the merge with `feature/campaigns-ux`
 (Track VU, same day)**: suite **1320**, i18n 885 strings 0 unfinished.
+**After U7**: suite **1322**, i18n 890 strings 0 unfinished.

@@ -386,15 +386,20 @@ def test_campaign_help_pops_with_plain_words(window, monkeypatch):
 
 
 def test_signals_console_empty_box(window):
+    # U7: with no campaigns the coverage line is a GUIDE (it says what to
+    # do, where), and the empty list is a calm STATE, not a dead one
     _wipe_campaigns()
     window._refresh_campaigns_tab()
     w = window.campaigns
+    cov = w.lbl_cov.text()
+    assert ("You follow no campaigns yet" in cov
+            or "Aún no sigues ninguna campaña" in cov)
+    assert w.lbl_cov.toolTip() == ""   # no numbers → nothing to explain
     assert w.lst_signals.count() == 1
     item = w.lst_signals.item(0)
     assert not item.flags()
-    text = w.lbl_cov.text()
-    assert ("No campaign projects to monitor yet" in text
-            or "Aún no hay proyectos de campaña que vigilar" in text)
+    text = item.text()
+    assert ("All calm" in text or "Todo en calma" in text)
     # empty-state rows carry no data: opening them is a no-op
     window._camp_signal_opened(item)
 
@@ -419,7 +424,13 @@ def test_signals_console_lists_event_with_coverage(window):
     assert w.lst_signals.count() == 1
     text = w.lst_signals.item(0).text()
     assert "0.9" in text and "V" in text
-    assert re.findall(r"\d+", w.lbl_cov.text()) == ["1", "1"]
+    # U7: the coverage line names WHAT it counts (numbers still N, M order)
+    cov = w.lbl_cov.text()
+    assert ("Up to date: " in cov or "Al día: " in cov)
+    assert re.findall(r"\d+", cov) == ["1", "1"]
+    tip = w.lbl_cov.toolTip()
+    assert ("Measured within their campaign's cadence" in tip
+            or "cadencia" in tip)
     # and the row points at the project, so a double-click can open it
     assert w.lst_signals.item(0).data(Qt.UserRole) == p["id"]
 
@@ -449,6 +460,55 @@ def test_signal_double_click_opens_project(window):
     assert tabs.currentIndex() == TAB_PROJECTS
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
+
+
+def test_signals_console_calm_with_campaigns(window):
+    # U7: members exist but nothing is firing — the list says "calm"
+    # (not "no signals"), and the coverage line explains what it counts
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    _wipe_campaigns()
+    cid = camp_mod.create(mw.db, "Campaña calma")
+    proj_mod.create(mw.db, "variable", "U Geminorum",
+                    {"ra_deg": 84.0, "dec_deg": 15.0}, campaign_id=cid)
+    window._refresh_campaigns_tab()
+    w = window.campaigns
+    cov = w.lbl_cov.text()
+    assert ("Up to date: 0 of 1 campaign projects" in cov
+            or "Al día: 0 de 1 proyectos de campaña" in cov)
+    tip = w.lbl_cov.toolTip()
+    assert ("Measured within their campaign's cadence" in tip
+            or "cadencia" in tip)
+    assert w.lst_signals.count() == 1
+    item = w.lst_signals.item(0)
+    assert not item.flags()
+    text = item.text()
+    assert ("All calm" in text or "Todo en calma" in text)
+
+
+def test_signals_scope_line_and_help(window):
+    # U7: the strip says its own scope in the .ui, and the ⓘ opens the
+    # icon legend (⚡ ⏳ 👁) — the plain-language rule, self-explanatory
+    from PySide6.QtWidgets import QMessageBox
+    w = window.campaigns
+    scope = w.lbl_signals_scope.text()
+    assert ("Outbursts, brightness drops and predicted extrema" in scope
+            or "Erupciones, caídas de brillo y máximos previstos" in scope)
+    captured = {}
+    orig = QMessageBox.information
+    def spy(*args, **kw):
+        captured["args"] = args
+    QMessageBox.information = staticmethod(spy)
+    try:
+        w.btn_signals_help.click()
+    finally:
+        QMessageBox.information = orig
+    title, body = captured["args"][1], captured["args"][2]
+    assert ("What do the icons mean?" in title
+            or "¿Qué significan los iconos?" in title)
+    for icon in ("⚡", "⏳", "👁"):
+        assert icon in body
 
 
 def _seed_vigil_cache(db, mag=9.0):

@@ -1,10 +1,11 @@
 # Plan — UX de proyectos y campañas: el cuadro de mando que provoca el «Ohh» (Track UX-PC)
 
-> **Ejecutado completo el 2026-09-17**: 6 fases (U1–U6), una fase = un
+> **Ejecutado completo el 2026-09-17**: 7 fases (U1–U7), una fase = un
 > commit (`35f5a34` U1 · `6145880` U2 · `1a08e2e` U3 · `0b5f5b3` U4 ·
-> `a0e09f7` U5 · cierre U6). Suite unitaria **1299** verde, i18n 876
-> cadenas 0 unfinished. Decisiones registradas: **ADR-038** + revisiones
-> de ADR-019 / ADR-030 / ADR-037.
+> `a0e09f7` U5 · cierre U6 · U7 franja «Está pasando ahora»). Suite
+> unitaria **1299→1322** verde, i18n 876→890 cadenas 0 unfinished (tras
+> el merge con Track VU y U7). Decisiones registradas: **ADR-038** +
+> revisiones de ADR-019 / ADR-030 / ADR-037.
 
 **rama**: `feature/ux-projects-campaigns` — rama **independiente** que nace
 de `feature/campaigns-ux` (HEAD `cb457e6`, con los tracks UX/SC/JO
@@ -219,7 +220,7 @@ claras ✨») y vacío («Empieza en Tonight…» + salto).
 | **U4** | Follow-up despejado: primarios Add visit / Análisis rápido / `⋯ Photometry tools`; animation + FITS anotado bajo `Advanced ▸` | `main_window.py` | **Hecho** |
 | **U5** | Campaigns sala de guerra: «Está pasando ahora» arriba con frases completas, tarjetas de salud, acciones en cabecera del detalle con enablement, `Close`, `lbl_what` al estado vacío, **ayudas `ⓘ`** (pestaña, cabecera, diálogo New campaign, estado vacío) | `ui/campaigns_tab.ui`, `main_window.py` | **Hecho** |
 | **U6** | Pase de lenguaje llano completo + i18n ES/EN (lupdate/lrelease) + tests offscreen + **ADR-038** (prominencia + lenguaje llano + dashboard) y enmiendas ADR-019 (hub), ADR-030 (CCDciel a Observatory), ADR-035/037 (rol de Campaigns, renombre Signals) + sección nueva en WORKFLOWS.es.md/.md | `gui/i18n/*`, `tests/unit/*`, `docs/` | **Hecho** |
-| **U7** | La franja «Está pasando ahora» se explica sola: subtítulo de ámbito + ⓘ ayuda, cobertura «Al día: N de M proyectos de campaña» (+tooltip), guía sin campañas, estado vacío cálido y pedagógico (adiós «No signals right now»). Especificación completa, cadena a cadena con traducciones ES pactadas, en `docs/PLANS/sky-calendar.md` §«U7» | `ui/campaigns_tab.ui`, `main_window.py`, `test_campaigns_tab.py` | **Pendiente** (decidida 2026-09-17) |
+| **U7** | La franja «Está pasando ahora» se explica sola: subtítulo de ámbito + ⓘ ayuda, cobertura «Al día: N de M proyectos de campaña» (+tooltip), guía sin campañas, estado vacío cálido y pedagógico (adiós «No signals right now»). Especificación completa en `docs/PLANS/sky-calendar.md` §«U7» | `ui/campaigns_tab.ui`, `main_window.py`, `test_campaigns_tab.py` | **Hecho** (2026-09-17) |
 
 El «Ohh» llega pronto a propósito: **U2** es la primera entrega visible
 tras el cimiento, para validar la dirección con el observador antes de

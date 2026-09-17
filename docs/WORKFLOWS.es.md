@@ -1060,9 +1060,11 @@ funcionalidad se pierde: se reubica.
 | U4 | Follow-up despejado (⋯ herramientas + bloque colapsado) | **Hecho** (`0b5f5b3`) |
 | U5 | Campaigns sala de guerra + ayudas ⓘ + «Close» | **Hecho** (`a0e09f7`) |
 | U6 | lenguaje llano + i18n ES/EN (876 cadenas) + ADR-038 + esta sección | **Hecho** |
+| U7 | la franja «Está pasando ahora» se explica sola: línea de ámbito + ayuda ⓘ de iconos, «Al día: N de M proyectos de campaña» (+tooltip), guía sin campañas, estado vacío cálido ✨ | **Hecho** (2026-09-17) |
 
 **Estado**: suite unitaria verde (**1299**), i18n 876 cadenas 0
 unfinished. Métricas: Projects con un SN abierto pasa de ~20 a ≤10
 acciones visibles; Campaigns de 19 a ≤4. **Tras el merge con
 `feature/campaigns-ux` (Track VU, mismo día)**: suite **1320**, i18n
-885 cadenas 0 unfinished.
+885 cadenas 0 unfinished. **Tras U7**: suite **1322**, i18n 890
+cadenas 0 unfinished.

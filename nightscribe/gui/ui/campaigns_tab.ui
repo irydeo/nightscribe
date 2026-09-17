@@ -8,6 +8,29 @@
      <property name="title"><string>Happening now</string></property>
      <layout class="QVBoxLayout" name="signalsLayout">
       <item>
+       <!-- U7: the strip explains itself — scope of the feed + icon help -->
+       <layout class="QHBoxLayout" name="signalsScopeRow">
+        <item>
+         <widget class="QLabel" name="lbl_signals_scope">
+          <property name="text"><string>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+          <property name="styleSheet"><string>color: #8a90a6; font-style: italic; font-size: 11px;</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="signalsScopeSpacer">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QToolButton" name="btn_signals_help">
+          <property name="text"><string>ⓘ</string></property>
+          <property name="toolTip"><string>What do the icons mean?</string></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
        <widget class="QLabel" name="lbl_cov">
         <property name="text"><string/></property>
         <property name="wordWrap"><bool>true</bool></property>

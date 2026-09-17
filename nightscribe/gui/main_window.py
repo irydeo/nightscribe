@@ -599,6 +599,8 @@ class MainWindow(QMainWindow):
         # ⓘ help (plain-language rule): what a campaign IS, right where
         # the user meets the concept
         c.btn_help.clicked.connect(self._campaign_help)
+        # U7: the "Happening now" strip explains its own icons (⚡ ⏳ 👁)
+        c.btn_signals_help.clicked.connect(self._campaign_signals_help)
         c.lst_campaigns.currentItemChanged.connect(
             self._campaign_row_selection_sync)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
@@ -2016,6 +2018,9 @@ class MainWindow(QMainWindow):
         # the live signal list — detector events first (the strongest
         # news), then upcoming extrema ordered by arrival. A double-click
         # on a row opens its project in the hub.
+        # U7 (UX-PC close): the strip says what it is BEFORE the numbers —
+        # the scope line sits in the .ui; the coverage line names WHAT is
+        # up to date, and an empty list is a calm state, not a dead one.
         from ..core import campaign as _camp
         w = self.campaigns
         rep = _camp.signals_report(
@@ -2023,10 +2028,16 @@ class MainWindow(QMainWindow):
             config.get("campaign_extremum_days", 3),
             config.get("event_mag_threshold", 0.5))
         if rep["members"] == 0:
-            w.lbl_cov.setText(tr("No campaign projects to monitor yet"))
-        else:
+            w.lbl_cov.setToolTip("")
             w.lbl_cov.setText(
-                tr("%1 of %2 up to date", rep["up_to_date"], rep["members"]))
+                tr("You follow no campaigns yet — create one below and "
+                   "its stars will show up here."))
+        else:
+            w.lbl_cov.setToolTip(tr("Measured within their campaign's "
+                                    "cadence"))
+            w.lbl_cov.setText(
+                tr("Up to date: %1 of %2 campaign projects",
+                   rep["up_to_date"], rep["members"]))
         lst = w.lst_signals
         lst.clear()
         for row in rep["signals"]:
@@ -2049,7 +2060,11 @@ class MainWindow(QMainWindow):
             item.setData(Qt.UserRole + 1, a["name"])
             lst.addItem(item)
         if lst.count() == 0:
-            item = QListWidgetItem(tr("No signals right now"))
+            # U7: calm is a STATE, not an absence — say what is being
+            # watched and what will make it appear
+            item = QListWidgetItem(
+                tr("✨ All calm — when a star you follow erupts, dims or "
+                   "nears a predicted extremum, it will show up here."))
             item.setFlags(Qt.NoItemFlags)   # empty state: not clickable
             lst.addItem(item)
 
@@ -6237,6 +6252,22 @@ class MainWindow(QMainWindow):
                     "report the results together.\n\n"
                     "A project is one object with its three steps: plan, "
                     "process, publish."))
+
+    def _campaign_signals_help(self):
+        # The ⓘ in "Happening now" (U7, plain-language rule): what the
+        # icons mean, how to act on a row, and — honest about the data —
+        # that this strip never touches the network.
+        QMessageBox.information(
+            self, self.tr("What do the icons mean?"),
+            self.tr("⚡ — something happened in YOUR measurements: an "
+                    "outburst or a brightness drop beyond our threshold.\n\n"
+                    "⏳ — a predicted extremum is approaching, with a "
+                    "countdown (maximum or minimum).\n\n"
+                    "👁 — a T CrB / R CrB vigil: the star is moving away "
+                    "from its quiescent level in a recent survey.\n\n"
+                    "Double-click a row to open its project. This strip "
+                    "reads the cache of the last Tonight run — it never "
+                    "touches the network."))
 
     def _campaign_member_menu(self, pos):
         # Right-click on a member row (UX-c): open its project or detach.

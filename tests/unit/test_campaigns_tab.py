@@ -296,6 +296,95 @@ def _wipe_campaigns():
         camp_mod.delete(mw.db, c["id"])
 
 
+# ---------------- UX-PC (U5): war room -------------------------------
+
+def test_campaign_actions_disabled_without_selection(window):
+    # UX-PC (U5): with no campaign selected the header actions are
+    # disabled (real enablement, no silent no-ops) and the detail teaches
+    # the concept instead of showing a blank.
+    _wipe_campaigns()
+    window._refresh_campaigns_tab()
+    window.campaigns.lst_campaigns.setCurrentRow(-1)
+    window.campaigns.lst_campaigns.clearSelection()
+    window._campaign_selected()
+    w = window.campaigns
+    for b in (w.btn_cedit, w.btn_cclose, w.btn_cmore):
+        assert not b.isEnabled()
+    assert "campaign" in w.lbl_cname.text().lower()
+    assert len(w.lbl_cgoal.text()) > 40      # the guide text is there
+
+
+def test_campaign_close_button_follows_state(window):
+    # UX-PC (U5): one lifecycle button — "Close" when active, "Reopen"
+    # when finished, enabled only with a selection.
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Estado U5")
+    window._goto_campaigns(cid)
+    btn = window.campaigns.btn_cclose
+    assert btn.isEnabled()
+    assert "Close" in btn.text() or "Cerrar" in btn.text()
+    camp_mod.finish(mw.db, cid)
+    window._refresh_campaigns_tab()
+    assert "Reopen" in btn.text() or "Reabrir" in btn.text()
+    window._camp_close_or_reopen()           # and it works
+    assert camp_mod.get(mw.db, cid)["status"] == camp_mod.CAMPAIGN_ACTIVE
+
+
+def test_campaign_cards_show_health(window):
+    # UX-PC (U5): each campaign row is a health card — dots, coverage and
+    # the next action in words — with the plain text kept on the item.
+    from PySide6.QtCore import Qt
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    _wipe_campaigns()
+    cid = camp_mod.create(mw.db, "Salud U5", group_name="obsSN")
+    proj_mod.create(mw.db, "variable", "V U5",
+                    {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
+    window._refresh_campaigns_tab()
+    lst = window.campaigns.lst_campaigns
+    item = next(lst.item(i) for i in range(lst.count())
+                if lst.item(i).data(Qt.UserRole) == cid)
+    row = lst.itemWidget(item)
+    assert row is not None
+    assert "Salud U5" in row.lbl_name.text()
+    assert "obsSN" in row.lbl_group.text()
+    assert "○" in row.lbl_dots.text()        # the member is due (never)
+    assert "V U5" in row.lbl_next.text()     # the next action names it
+    assert "Salud U5" in item.text()         # plain-text fallback intact
+
+
+def test_cmore_menu_carries_the_secondary_actions(window):
+    # UX-PC (U5): the ⋯ menu of the detail header holds the project-link
+    # actions + delete.
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Menú U5")
+    window._goto_campaigns(cid)
+    window._rebuild_cmore_menu()
+    texts = [a.text() for a in window.campaigns.btn_cmore.menu().actions()
+             if a.text()]
+    assert any("project" in t.lower() and "campaign" in t.lower()
+               for t in texts)                      # New project in this…
+    assert any("Attach" in t or "Vincular" in t for t in texts)
+    assert any("Detach" in t or "Desvincular" in t for t in texts)
+    assert any("Delete" in t or "Borrar" in t for t in texts)
+
+
+def test_campaign_help_pops_with_plain_words(window, monkeypatch):
+    # UX-PC (U5): the ⓘ help explains the concept with an example.
+    from PySide6.QtWidgets import QMessageBox
+    seen = {}
+    monkeypatch.setattr(
+        QMessageBox, "information",
+        staticmethod(lambda *a, **k: seen.update(args=a)))
+    window.campaigns.btn_help.click()
+    assert seen, "the ⓘ help did not open"
+    text = str(seen["args"][-1])
+    assert "T CrB" in text and "campaign" in text.lower()
+
+
 def test_signals_console_empty_box(window):
     _wipe_campaigns()
     window._refresh_campaigns_tab()

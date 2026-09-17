@@ -41,6 +41,7 @@ from .overview import ObjectPanel
 from .skeleton import ShimmerRow
 from .widgets.passive_wheel import (PassiveDoubleSpinBox, PassiveList,
                                     PassiveSpinBox)
+from .widgets.campaign_row import CampaignRow
 from .widgets.project_row import ProjectRow
 from .widgets.sparkline import sparkline_pixmap
 from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
@@ -452,6 +453,20 @@ class MainWindow(QMainWindow):
             tabs.removeTab(i)
             tabs.insertTab(i, w, title)
         tabs.setCurrentIndex(0)
+        # UX-PC (plain-language rule): every tab explains itself in one
+        # line on hover — no concept is taken for granted
+        tabs.setTabToolTip(TAB_TONIGHT, self.tr(
+            "Tonight's best objects from your observatory"))
+        tabs.setTabToolTip(TAB_PROJECTS, self.tr(
+            "Your projects: one object with its three steps (plan, "
+            "process, publish) — and what needs your attention"))
+        tabs.setTabToolTip(TAB_CAMPAIGNS, self.tr(
+            "Observing campaigns: several nights, several observatories, "
+            "one shared goal"))
+        tabs.setTabToolTip(TAB_SOLAR, self.tr(
+            "The Sun and the sky conditions affecting your night"))
+        tabs.setTabToolTip(TAB_OBSERVATORY, self.tr(
+            "Live control of the observatory (CCDciel)"))
         # table starts collapsed
         self.tonight.grp_list.setVisible(False)
         self._prepare_table()
@@ -572,13 +587,20 @@ class MainWindow(QMainWindow):
         c.lst_signals.itemActivated.connect(self._camp_signal_opened)
         c.lst_signals.viewport().setCursor(Qt.PointingHandCursor)
         c.btn_new.clicked.connect(self._camp_new)
-        c.btn_edit.clicked.connect(self._camp_edit)
-        c.btn_delete.clicked.connect(self._camp_delete)
-        c.btn_finish.clicked.connect(self._camp_finish)
-        c.btn_reopen.clicked.connect(self._camp_reopen)
-        c.btn_new_project.clicked.connect(self._camp_new_project)
-        c.btn_attach.clicked.connect(self._camp_attach)
-        c.btn_detach.clicked.connect(self._camp_detach)
+        # UX-PC (U5): the selected campaign's actions live in the detail
+        # header — Edit / Close|Reopen (one state-aware button) / ⋯ (the
+        # rest). Real enablement: disabled with no selection.
+        c.btn_cedit.clicked.connect(self._camp_edit)
+        c.btn_cclose.clicked.connect(self._camp_close_or_reopen)
+        from PySide6.QtWidgets import QMenu as _QMenu
+        cmore = _QMenu(self)
+        cmore.aboutToShow.connect(self._rebuild_cmore_menu)
+        c.btn_cmore.setMenu(cmore)
+        # ⓘ help (plain-language rule): what a campaign IS, right where
+        # the user meets the concept
+        c.btn_help.clicked.connect(self._campaign_help)
+        c.lst_campaigns.currentItemChanged.connect(
+            self._campaign_row_selection_sync)
         # U0.2: itemSelectionChanged is not re-emitted for the row that
         # is already selected, so a click on it used to be a no-op. It
         # now retries the detail load (e.g. after a failed enrich).
@@ -1899,18 +1921,25 @@ class MainWindow(QMainWindow):
     # ---------------- campaigns tab (UX-a) ----------------
 
     def _refresh_campaigns_tab(self):
-        # Refills the single campaign list (UX-g: finished ones dimmed
-        # and suffixed), keeping the selection. Each row carries the
-        # health summary from status_report (UX-b).
+        # Refills the campaign list as HEALTH CARDS (UX-PC U5): each row
+        # shows the cadence health as dots (● up to date / ○ due) and the
+        # next action in words; finished ones dim. The plain text stays on
+        # the item as the accessible/searchable fallback (same pattern as
+        # the projects hub rows, U2).
         from ..core import campaign as _camp
         lst = self.campaigns.lst_campaigns
         sel = lst.currentItem()
         keep_id = sel.data(Qt.UserRole) if sel is not None else None
+        # keep the caller's own signal block intact (blockSignals is a
+        # plain boolean — save/restore, never force)
+        was_blocked = lst.signalsBlocked()
+        lst.blockSignals(True)
         lst.clear()
         for c in _camp.list_campaigns(db):
             rep = _camp.status_report(db, c["id"])
             members = rep["members"] if rep else []
             due = sum(1 for m in members if m["due"])
+            finished = c["status"] == _camp.CAMPAIGN_FINISHED
             text = c["name"]
             if c.get("group_name"):
                 text += f"  ({c['group_name']})"
@@ -1918,18 +1947,69 @@ class MainWindow(QMainWindow):
                 .replace("%1", str(len(members))).replace("%2", str(due))
             if any(m.get("event") for m in members):
                 text += "  ⚡"
-            if c["status"] == _camp.CAMPAIGN_FINISHED:
+            if finished:
                 text += "  " + self.tr("(finished)")
             item = QListWidgetItem(text)
             item.setData(Qt.UserRole, c["id"])
-            if c["status"] == _camp.CAMPAIGN_FINISHED:
+            if finished:
                 item.setForeground(QColor(theme.C_TEXT_DIM))
+            item.setSizeHint(QSize(-1, 60))
             lst.addItem(item)
+            row = CampaignRow()
+            row.set_campaign(
+                name=c["name"], group=c.get("group_name") or "",
+                finished=finished, members=len(members),
+                up_to_date=len(members) - due,
+                next_text=self._campaign_next_text(members),
+                has_event=any(m.get("event") for m in members))
+            row.clicked.connect(
+                lambda it=item: self.campaigns.lst_campaigns
+                .setCurrentItem(it))
+            row.context_menu.connect(
+                lambda pos, it=item: self._campaign_row_menu(it, pos))
+            lst.setItemWidget(item, row)
             if c["id"] == keep_id:
                 lst.setCurrentItem(item)
-        if lst.count() == 0:
-            self._campaign_selected()     # clears the detail side
+        lst.blockSignals(was_blocked)
+        self._campaign_row_selection_sync(lst.currentItem(), None)
+        # the rebuild swallowed the selection signals: settle the detail
+        # explicitly (it also clears the detail side when nothing is
+        # selected and refreshes the Close/Reopen button's label)
+        self._campaign_selected()
         self._refresh_campaign_signals()
+
+    def _campaign_next_text(self, members):
+        # @args: members - status_report member rows
+        # @return: the campaign's next action in plain words: the firing
+        #          event first, then the most overdue member, else calm
+        ev = next((m for m in members if m.get("event")), None)
+        if ev:
+            return self.tr("measure %1 tonight").replace(
+                "%1", ev["object_name"])
+        due = [m for m in members if m["due"]]
+        if due:
+            m = max(due, key=lambda m: m["overdue_days"])
+            return self.tr("measure %1 — %2 d since the last visit") \
+                .replace("%1", m["object_name"]) \
+                .replace("%2", str(m["overdue_days"]))
+        if not members:
+            return ""
+        return self.tr("all up to date ✓")
+
+    def _campaign_row_selection_sync(self, current, _previous):
+        # Paints the selection on the campaign cards (the item widget
+        # covers the list's own highlight, so the rows do it themselves).
+        lst = self.campaigns.lst_campaigns
+        for i in range(lst.count()):
+            item = lst.item(i)
+            row = lst.itemWidget(item)
+            if row is not None:
+                row.set_selected(item is current)
+
+    def _campaign_row_menu(self, item, global_pos):
+        # Right-click on a campaign card: the same menu as the plain list.
+        self.campaigns.lst_campaigns.setCurrentItem(item)
+        self._open_campaign_menu(item, global_pos)
 
     def _refresh_campaign_signals(self):
         # Fills the signals console (ADR-037 SC2): the coverage line and
@@ -1950,8 +2030,11 @@ class MainWindow(QMainWindow):
         lst = w.lst_signals
         lst.clear()
         for row in rep["signals"]:
+            # UX-PC (U5): the icon leads the row (⚡ event / ⏳ extremum)
+            # and the text is a full sentence, never a code
+            icon = "⚡" if row.get("event") else "⏳"
             item = QListWidgetItem(
-                f"{row['project']['object_name']} · "
+                f"{icon} {row['project']['object_name']} · "
                 f"{row['campaign']} — {self._format_campaign_signal(row)}")
             item.setData(Qt.UserRole, row["project"]["id"])
             lst.addItem(item)
@@ -1978,11 +2061,11 @@ class MainWindow(QMainWindow):
         if ev:
             # inverted magnitude axis: a "drop" is the star dimming
             word = "down" if ev["direction"] == "drop" else "up"
-            return tr("%1 mag %2 in %3", ev["delta_mag"], tr(word),
-                      ev["filter"])
+            return tr("%1 mag %2 in %3 — measure tonight",
+                      ev["delta_mag"], tr(word), ev["filter"])
         if ex:
             word = "maximum" if ex["kind"] == "max" else "minimum"
-            return tr("%1 in %2 d", tr(word), f"{ex['days']:.1f}")
+            return tr("%1 expected in %2 d", tr(word), f"{ex['days']:.1f}")
         return ""
 
     @staticmethod
@@ -2024,16 +2107,31 @@ class MainWindow(QMainWindow):
         rep = _camp.status_report(db, cid) if cid is not None else None
         tbl = w.tbl_members
         if rep is None:
-            w.lbl_cname.setText(self.tr("Select a campaign."))
+            # UX-PC (U5): the empty state TEACHES the concept (this text
+            # used to sit as a permanent label above the list), and the
+            # action buttons stay disabled — no silent no-ops
+            w.lbl_cname.setText(self.tr("What is a campaign?"))
             w.lbl_cmeta.setText("—")
-            w.lbl_cgoal.setText("")
+            w.lbl_cgoal.setText(self.tr(
+                "A campaign groups the projects of one shared observation "
+                "effort — several nights, several observatories, one goal "
+                "(e.g. “T CrB 2026 eruption”). A project is one object "
+                "with its three steps: plan, process, publish."))
             w.lbl_urls.setText("")
             w.lbl_protocol.setText("—")
             tbl.setRowCount(0)
             tbl.setColumnCount(0)
+            for b in (w.btn_cedit, w.btn_cclose, w.btn_cmore):
+                b.setEnabled(False)
             return
         c = rep["campaign"]
         w.lbl_cname.setText(c["name"])
+        # UX-PC (U5): the header actions follow the campaign's state
+        is_active = c["status"] == _camp.CAMPAIGN_ACTIVE
+        for b in (w.btn_cedit, w.btn_cclose, w.btn_cmore):
+            b.setEnabled(True)
+        w.btn_cclose.setText(
+            self.tr("Close") if is_active else self.tr("Reopen"))
         status = self.tr("active") if c["status"] == \
             _camp.CAMPAIGN_ACTIVE else self.tr("finished")
         meta = [status]
@@ -5985,20 +6083,92 @@ class MainWindow(QMainWindow):
         if item is None or item.data(Qt.UserRole) is None:
             return
         self.campaigns.lst_campaigns.setCurrentItem(item)
+        self._open_campaign_menu(
+            item, self.campaigns.lst_campaigns.viewport()
+            .mapToGlobal(pos))
+
+    def _open_campaign_menu(self, item, global_pos):
+        # The campaign context menu body — shared by the plain list and
+        # the health cards (one gesture language), with state-aware
+        # labels/enablement (UX-PC U5: "Close", not "Finish").
+        # @args: item - the row's QListWidgetItem, global_pos - where to
+        #        pop the menu
+        # @return: None
+        from ..core import campaign as _camp
+        c = _camp.get(db, item.data(Qt.UserRole))
+        is_active = bool(c) and c["status"] == _camp.CAMPAIGN_ACTIVE
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
+        for label, slot, enabled in (
+                (self.tr("Edit…"), self._camp_edit, True),
+                (self.tr("Close campaign"), self._camp_finish, is_active),
+                (self.tr("Reopen"), self._camp_reopen, not is_active),
+                (self.tr("Delete…"), self._camp_delete, True),
+                ("SEP", None, True),
+                (self.tr("New project in this campaign…"),
+                 self._camp_new_project, True),
+                (self.tr("Attach project…"), self._camp_attach, True),
+                (self.tr("Detach project…"), self._camp_detach, True)):
+            if label == "SEP":
+                menu.addSeparator()
+                continue
+            act = menu.addAction(label)
+            act.setEnabled(enabled)
+            act.triggered.connect(slot)
+        menu.exec(global_pos)
+
+    def _camp_close_or_reopen(self):
+        # The detail header's lifecycle button (UX-PC U5): one button, the
+        # campaign's state decides — Close when active, Reopen when
+        # finished (same words as the projects' lifecycle).
+        from ..core import campaign as _camp
+        cid = self._selected_campaign_id()
+        c = _camp.get(db, cid) if cid is not None else None
+        if not c:
+            return
+        if c["status"] == _camp.CAMPAIGN_ACTIVE:
+            self._camp_finish()
+        else:
+            self._camp_reopen()
+
+    def _rebuild_cmore_menu(self):
+        # The ⋯ menu of the campaign detail header (UX-PC U5): the
+        # secondary project-link actions + delete. Rebuilt on open so it
+        # always matches the current selection.
+        # @return: None
+        menu = self.campaigns.btn_cmore.menu()
+        menu.clear()
+        if self._selected_campaign_id() is None:
+            menu.addAction(
+                self.tr("(no campaign selected)")).setEnabled(False)
+            return
         for label, slot in (
-                (self.tr("Edit…"), self._camp_edit),
-                (self.tr("Finish"), self._camp_finish),
-                (self.tr("Reopen"), self._camp_reopen),
-                (self.tr("Delete…"), self._camp_delete),
-                (self.tr("New project…"), self._camp_new_project),
+                (self.tr("New project in this campaign…"),
+                 self._camp_new_project),
                 (self.tr("Attach project…"), self._camp_attach),
-                (self.tr("Detach project…"), self._camp_detach)):
+                (self.tr("Detach project…"), self._camp_detach),
+                ("SEP", None),
+                (self.tr("Delete campaign…"), self._camp_delete)):
+            if label == "SEP":
+                menu.addSeparator()
+                continue
             act = menu.addAction(label)
             act.triggered.connect(slot)
-        menu.exec(self.campaigns.lst_campaigns.viewport()
-                  .mapToGlobal(pos))
+
+    def _campaign_help(self):
+        # The ⓘ next to "New campaign…" (UX-PC U5, plain-language rule):
+        # what a campaign IS, with a real example, right where the user
+        # meets the concept.
+        QMessageBox.information(
+            self, self.tr("What is a campaign?"),
+            self.tr("A campaign groups the projects of one shared "
+                    "observation effort — several nights, several "
+                    "observatories, one goal.\n\n"
+                    "Example: “T CrB 2026 eruption” (obsSN group) — every "
+                    "night you measure T CrB with the same protocol and "
+                    "report the results together.\n\n"
+                    "A project is one object with its three steps: plan, "
+                    "process, publish."))
 
     def _campaign_member_menu(self, pos):
         # Right-click on a member row (UX-c): open its project or detach.

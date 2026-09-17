@@ -1,11 +1,11 @@
 # Plan — Track SC2 «Calendario del cielo» + U7 (cierre UX-PC) (2026-09-17)
 
-> **EN EJECUCIÓN** (plan escrito 2026-09-17, autocontenido: lo puede
-> retomar otro agente o persona sin más contexto). U7 está comprometida;
-> el motor SC0 existe (sin tests) con **un bug conocido de oposiciones,
-> causa ya localizada** — empezar por §«Estado de la sesión». Las
-> decisiones del track están pactadas con el observador — **no
-> re-preguntarlas**. Ver §«Decisiones pactadas» y §«Reglas de la casa».
+> **EJECUTADO COMPLETO (2026-09-17)** — U7 (`3a38c6d`) + SC0 (`f06573a`,
+> `46acd46`) + SD (`9060ca9`) + SC1 (`27fd9da`) + SC2 (`4756416`) + SC3
+> (este cierre). Suite unitaria **1366** verde, i18n **940** cadenas 0
+> unfinished. Decisión documentada: **ADR-040** (+ revisión de ADR-036).
+> La tabla de validación de las oposiciones y las 22 ventanas Horizons de
+> los galileanos están en §«Estado de la sesión».
 
 **rama**: U7 en `feature/ux-projects-campaigns` (la rama activa, ya en
 GitHub); el track SC2 en rama nueva propia **`feature/sky-calendar`** que
@@ -292,10 +292,10 @@ Tonight.
 
 | Fase | Entregable |
 |---|---|
-| **SC0** | `core/skyevents.py` + tabla lluvias + `moon(ecl_lat_deg)` + tests de invariantes (fases ~7.38 d; perigeo/apogeo alternan ~13.9 d; oposiciones solo exteriores; elong. ≤28°/48°) + anclas reales verificadas al implementar (eclipse lunar total 2026-03-03 ±1 d; Perseidas 12-13 ago) |
-| **SD** | `core/satellites.py` (galileanos, tránsito + sombra, filtro local, ±10 min etiquetado) + tests contra almanaques publicados |
-| **SC1** | diálogo + contenido solar re-hogareado intacto + barra a 4 pestañas + menú + Ctrl+1..4 + tests GUI retarget (`test_campaigns_tab::test_campaigns_tab_exists` espera 5 pestañas → 4; tests de solar/skypost al diálogo) |
-| **SC2** | chips en Tonight (prioridad, máx. 2-3, clic→diálogo) + tests |
+| **SC0** | `core/skyevents.py` + tabla lluvias + `moon(ecl_lat_deg)` + tests de invariantes + anclas reales (eclipses 2026-03-03/08-12, Perseidas) + fix oposiciones por Δλ | **Hecho** |
+| **SD** | `core/satellites.py` (galileanos, tránsito + sombra, filtro local, ±10 min etiquetado) + tests contra Horizons (22 ventanas, peor 9.6 min) | **Hecho** |
+| **SC1** ✓ | diálogo + contenido solar re-hogareado intacto + barra a 4 pestañas + menú + Ctrl+1..4 + tests GUI retarget (`test_campaigns_tab::test_campaigns_tab_exists` espera 5 pestañas → 4; tests de solar/skypost al diálogo) |
+| **SC2** ✓ | chips en Tonight (prioridad, máx. 2-3, clic→diálogo) + tests | **Hecho** | **Hecho** |
 | **SC3** | i18n ES/EN (§Reglas) + **ADR-040** (el 039 es el acordeón de la web) — sistema solar como fuente de eventos; Sun & sky → Herramientas; satélites galileanos locales ±10 min, Horizons como afinado futuro) + revisión **ADR-036** (barra a 4) + WORKFLOWS sección nueva + AGENTS.md (módulos `core/skyevents.py`, `core/satellites.py`, `gui/skycal_dialog.py`) + suite completa verde + push |
 
 ## Decisiones pactadas (2026-09-17; no re-preguntar)

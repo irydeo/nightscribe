@@ -93,14 +93,22 @@ nightscribe/
     journal.py       # Diario de observación: vista derivada por noche (ADR-036)
     attention.py     # «Necesita tu atención»: qué proyecto te necesita y por qué
                      #   (math local pura, sin red — ADR-038)
+    skyevents.py     # calendario del cielo: motor de eventos 60 d, 100 % local
+                     #   (fases, conjunciones, oposiciones por Δλ, eclipses
+                     #   probables, lluvias — ADR-040)
+    satellites.py    # tránsitos de galileanos + sombras sobre Júpiter para el
+                     #   sitio del usuario (IAU WGCCRE + calibración Horizons,
+                     #   ±10 min etiquetado — ADR-040)
   viz/               # matplotlib: style, orbit_view, sky_view,
                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —
                      #   la "prueba de fuego", Track C)
    gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
-                      # cinco pestañas: Tonight, Projects, **Campaigns**, **Sun & sky**,
-                      # Observatory (ADR-019/035/036 rev.) — el **Diario de observación**
-                      # vive en el menú Herramientas (journal_dialog.py, ADR-036).
+                      # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
+                      # (ADR-019/035/036/040) — el **Diario de observación** y el
+                      # **Calendario del cielo** (skycal_dialog.py, ADR-040) viven en
+                      # el menú Herramientas; los chips de eventos del cielo viven en
+                      # la cabecera de Tonight (clic → diálogo)
                       # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
                       # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
                       # lenguaje llano + ayudas ⓘ, filas ricas

@@ -1068,3 +1068,40 @@ acciones visibles; Campaigns de 19 a ≤4. **Tras el merge con
 `feature/campaigns-ux` (Track VU, mismo día)**: suite **1320**, i18n
 885 cadenas 0 unfinished. **Tras U7**: suite **1322**, i18n 890
 cadenas 0 unfinished.
+
+### 7vigprim. Track SC2 — Calendario del cielo y lunas de Júpiter (2026-09-17, ADR-040)
+
+Plan: `docs/PLANS/sky-calendar.md` (con la tabla de validación). Rama propia
+`feature/sky-calendar` (nace de `feature/ux-projects-campaigns`).
+
+El sistema solar se convierte en **fuente de eventos**: la pestaña «Sun &
+sky» sale de la barra (quedan **cuatro**: Tonight · Projects · Campaigns ·
+Observatory, Ctrl+1..4) y todo su contenido se mueve **intacto** al diálogo
+de Herramientas **«Calendario del cielo…»**, enriquecido con secciones
+nuevas: próximos eventos (60 días) en palabras llanas, calendario lunar,
+planetas, y **las lunas de Júpiter esta semana**. El motor
+(`core/skyevents.py`, 100 % local) cubre fases (sizigias verdaderas),
+perigeo/apogeo, conjunciones Luna–planeta y planeta–planeta, **oposiciones
+y conjunciones solares por cruce de longitud eclíptica** (la lección de
+Saturno 2026-10-04: elongación máx. 177.28° con β≈−2.7°), máximas
+elongaciones, eclipses probables (etiqueta honesta) y lluvias de meteoros.
+`core/satellites.py` añade los **tránsitos de los galileanos y de sus
+sombras** para la localización del usuario — IAU WGCCRE + calibración
+empírica (`phase_cal_deg`) — **validado contra 22 ventanas Horizons q12,
+todo ≤10 min (peor 9.6)**, con la etiqueta «±10 min» visible. Titán queda
+documentado fuera de temporada (~2040). En Tonight, hasta 3 **chips de
+eventos** (lo grande primero, satélites solo si son observables, clic → el
+diálogo).
+
+| Sub | Entregable | Estado |
+|---|---|---|
+| SC0 | motor skyevents + fix de longitud (Saturno) + 16 tests regresión | **Hecho** (`f06573a` + `46acd46`) |
+| SD | `core/satellites.py` + 21 tests + funcional, validación Horizons | **Hecho** (`9060ca9`) |
+| SC1 | diálogo + contenido solar intacto + barra a 4 + tests retarget | **Hecho** (`27fd9da`) |
+| SC2 | chips en Tonight + 5 tests | **Hecho** (`4756416`) |
+| SC3 | i18n ES/EN (940 cadenas, 0 unfinished) + ADR-040 + revisión ADR-036 + esta sección | **Hecho** |
+
+**Estado**: suite unitaria verde (**1366**). **Fuera de esta iteración**:
+afinado Horizons de los fenómenos de satélites (~1 min, spike primero);
+horas de contacto de eclipses; ocultaciones estelares; la línea de «impacto»
+sigue leyendo solo Luna+Kp (los eventos podrían alimentarla en v2).

@@ -73,7 +73,7 @@
           <property name="title"><string>Planets</string></property>
           <layout class="QVBoxLayout">
            <item><widget class="QLabel" name="lbl_planets"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Planets: —</string></property></widget></item>
-           <item><widget class="QLabel" name="lbl_planets_next"><property name="wordWrap"><bool>true</bool></property><property name="text"><string/></property><property name="styleSheet"><string>color: #8a90a6; font-size: 11px;</string></property></widget></item>
+           <item><widget class="QLabel" name="lbl_planets_next"><property name="wordWrap"><bool>true</bool></property><property name="text"><string/></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
           </layout>
          </widget>
         </item>
@@ -87,7 +87,7 @@
              <property name="maximumHeight"><number>130</number></property>
             </widget>
            </item>
-           <item><widget class="QLabel" name="lbl_jup_note"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Local computation, planning grade: times to ±10 min. Saturn's moon transits (Titan) are out of season until ~2040.</string></property><property name="styleSheet"><string>color: #8a90a6; font-size: 11px; font-style: italic;</string></property></widget></item>
+           <item><widget class="QLabel" name="lbl_jup_note"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Local computation, planning grade: times to ±10 min. Saturn's moon transits (Titan) are out of season until ~2040.</string></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px; font-style: italic;</string></property></widget></item>
           </layout>
          </widget>
         </item>

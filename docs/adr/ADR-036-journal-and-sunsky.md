@@ -41,6 +41,10 @@ dos de ellas no terminaban de justificar su sitio:
    su sitio natural, y la barra se queda en **cinco pestañas**:
    *Esta noche · Proyectos · Campañas · Sol y cielo · Observatorio*
    (Ctrl+1..5).
+   *(Revisado 2026-09-17, ADR-040: «Sol y cielo» también sale de la barra —
+   pasa a Herramientas como el diálogo «Calendario del cielo…», enriquecido
+   con el motor de eventos. La barra queda en **cuatro** pestañas:
+   *Esta noche · Proyectos · Campañas · Observatorio* (Ctrl+1..4).)*
 2. **El Diario es una vista derivada, de solo lectura y auto-generada** —
    ya nadie «marca observado» a mano. Se construye como UNION de eventos que
    la app ya registra sola: proyectos creados/cerrados (con su resultado),
@@ -143,3 +147,8 @@ derived view when the track executes. Dropping the tab redefines the `TAB_*`
 constants (5 tabs, `TAB_OBSERVATORY` last) and the Ctrl+1..5 shortcuts.
 Mission 3 of the app ("report it") gains its own home on the bar: Sun & sky
 is the outreach tab, as opposed to Tonight ("what do I observe today").
+
+*(Reviewed 2026-09-17, ADR-040: "Sun & sky" leaves the bar too — it moves
+to the Tools menu as the enriched "Sky calendar…" dialog. The bar is down
+to **four** tabs: *Tonight · Projects · Campaigns · Observatory*
+(Ctrl+1..4).)*

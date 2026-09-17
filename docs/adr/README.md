@@ -44,3 +44,5 @@
 | [036](ADR-036-journal-and-sunsky.md) | Historial → Diario de observación (menú, vista derivada) y Solar → «Sol y cielo» (divulgación) / History → observing journal (menu, derived view) & Solar → "Sun & sky" (outreach) |
 | [037](ADR-037-campaign-signals.md) | Campañas = consola de señales; eventos de variables en tres pisos / Campaigns = signals console; variable-star events in three tiers |
 | [038](ADR-038-ux-prominence-attention.md) | Prominencia de acciones, lenguaje llano y el dashboard «Necesita tu atención» / action prominence, plain language and the attention dashboard |
+| [039](ADR-039-features-accordion.md) | *(reservado: acordeón de la web, stream paralelo / reserved: web accordion, parallel stream)* |
+| [040](ADR-040-sky-calendar-events.md) | El sistema solar como fuente de eventos: «Calendario del cielo» y lunas de Júpiter / the solar system as an event source: "Sky calendar" & Jupiter's moons |

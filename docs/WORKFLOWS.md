@@ -892,3 +892,40 @@ Metrics: Projects with an SN open drops from ~20 to ≤10 visible actions;
 Campaigns from 19 to ≤4. **After the merge with `feature/campaigns-ux`
 (Track VU, same day)**: suite **1320**, i18n 885 strings 0 unfinished.
 **After U7**: suite **1322**, i18n 890 strings 0 unfinished.
+
+### 7vigprim. Track SC2 — Sky calendar & Jupiter's moons (2026-09-17, ADR-040)
+
+Plan: `docs/PLANS/sky-calendar.md` (Spanish, with the validation table).
+Own branch `feature/sky-calendar` (branched off
+`feature/ux-projects-campaigns`).
+
+The solar system becomes an **event source**: the "Sun & sky" tab leaves
+the bar (four remain: Tonight · Projects · Campaigns · Observatory,
+Ctrl+1..4) and all its content moves **intact** into the Tools-menu
+**"Sky calendar…"** dialog, enriched with new sections: next events (60
+days) in plain words, the Moon calendar, the planets, and **Jupiter's
+moons this week**. The engine (`core/skyevents.py`, 100 % local) covers
+true-syzygy phases, perigee/apogee, Moon–planet and planet–planet
+conjunctions, **oppositions and Sun conjunctions as ecliptic-longitude
+crossings** (the Saturn 2026-10-04 lesson: elongation peaks at 177.28 deg
+with beta≈−2.7 deg), greatest elongations, likely eclipses (honest label)
+and meteor showers. `core/satellites.py` adds the **Galilean moon and
+shadow transits** for the observer's site — IAU WGCCRE phases + empirical
+calibration (`phase_cal_deg`) — **validated against 22 Horizons q12
+windows, all within ±10 min (worst 9.6)**, with the "±10 min" label
+visible. Titan is documented as out of season (~2040). In Tonight, up to 3
+**event chips** (big things first, satellites only when observable, click
+→ the dialog).
+
+| Sub | Deliverable | Status |
+|---|---|---|
+| SC0 | skyevents engine + longitude-crossing fix (Saturn) + 16 regression tests | **Done** (`f06573a` + `46acd46`) |
+| SD | `core/satellites.py` + 21 tests + functional, Horizons validation | **Done** (`9060ca9`) |
+| SC1 | dialog + intact solar content + 4-tab bar + retargeted tests | **Done** (`27fd9da`) |
+| SC2 | Tonight chips + 5 tests | **Done** (`4756416`) |
+| SC3 | i18n ES/EN (940 strings, 0 unfinished) + ADR-040 + ADR-036 review + this section | **Done** |
+
+**Status**: unit suite green (**1366**). **Out of this iteration**:
+Horizons refinement of satellite phenomena (~1 min, spike first); eclipse
+contact times; stellar occultations; the "impact" line still reads only
+Moon+Kp (events could feed it in v2).

@@ -185,6 +185,143 @@ def max_altitude_tonight(ra_deg, dec_deg, lat_deg, lon_deg, date=None):
     return best_alt, best_t
 
 
+def night_arc(position_fn, lat_deg, lon_deg, date=None, horizon_alt_deg=0.0,
+              step_min=5, search_hours=48.0):
+    # The object's arc around tonight's darkness: rise and set (crossings
+    # of the given horizon) plus the best altitude and when it happens.
+    # Two scales, kept apart on purpose:
+    #   * max_alt / max_utc are measured across the darkness window only —
+    #     the planner's "is it a naked-eye target tonight" rule;
+    #   * rise / set are searched `search_hours` before and after that
+    #     window, so a planet that rises at 00:30 or sets at 10:00 the
+    #     next day gets an honest time instead of a bare "—".
+    # A *moving* ephemeris is re-evaluated at every step, so planetary
+    # motion is tracked (a planet creeps a minute or two across the sky).
+    # @args: position_fn - callable jd -> (ra_deg, dec_deg) at that instant,
+    #        lat_deg, lon_deg - site, date - datetime.date (UTC, tonight),
+    #        horizon_alt_deg - altitude the arc crosses (flat 0 by default),
+    #        step_min - scan step in minutes,
+    #        search_hours - how far the rise/set search reaches beyond the
+    #          window (48 covers the next morning and evening too)
+    # @return: dict with rise_utc / set_utc (UTC datetimes, None when the
+    #          crossing falls outside the search), max_utc / max_alt
+    #          (window-based), and flags: above_at_dusk, up_all_night /
+    #          down_all_night (window-based), open_earlier / open_later
+    #          (no crossing found at the edge of the search, circumpolar),
+    #          below_band (never clears the horizon within the search)
+    window = tonight_window(lat_deg, lon_deg, date)
+    if not window:
+        return {"rise_utc": None, "max_utc": None, "set_utc": None,
+                "max_alt": None, "above_at_dusk": False,
+                "up_all_night": False, "down_all_night": True,
+                "open_earlier": False, "open_later": False,
+                "below_band": False, "search_hours": search_hours}
+    step = datetime.timedelta(minutes=step_min)
+    reach = datetime.timedelta(hours=search_hours)
+    lo = window[0] - reach
+    hi = window[1] + reach
+
+    def alt_at(t):
+        # @args: t - UTC datetime
+        # @return: altitude in degrees of the object at t
+        jd = jd_from_datetime(t)
+        ra, dec = position_fn(jd)
+        alt, _ = altaz(ra, dec, lat_deg, lst_degrees(jd, lon_deg))
+        return alt
+
+    samples = []
+    t = lo
+    while t <= hi:
+        samples.append((t, alt_at(t)))
+        t += step
+
+    # tonight's window as a slice of the larger search band
+    k0 = next(i for i, (ts, _a) in enumerate(samples) if ts >= window[0])
+    k1 = next(i for i in range(len(samples) - 1, -1, -1)
+              if samples[i][0] <= window[1])
+    win = samples[k0:k1 + 1]
+
+    # best altitude across the *window* only (the dim rule stays as is)
+    best_t, best_alt = None, -90.0
+    for ts, alt in win:
+        if alt > best_alt:
+            best_t, best_alt = ts, alt
+
+    above_in_win = [alt >= horizon_alt_deg for _ts, alt in win]
+    up_all_night = all(above_in_win)
+    down_all_night = not any(above_in_win)
+    above_at_dusk = samples[k0][1] >= horizon_alt_deg
+
+    def crossing(i_below, i_above):
+        # linear interpolation of the horizon crossing between one sample
+        # below and one above the horizon (either order)
+        (tb, ab), (ta, aa) = samples[i_below], samples[i_above]
+        frac = (horizon_alt_deg - ab) / (aa - ab)
+        dt = (ta - tb).total_seconds()
+        return tb + datetime.timedelta(seconds=abs(frac) * dt)
+
+    rise_utc = set_utc = None
+    open_earlier = open_later = False
+
+    if above_at_dusk:
+        # It is up now: the rise is the last ascending crossing going
+        # back in time, the set the first descending crossing going on.
+        for i in range(k0 - 1, -1, -1):
+            if samples[i][1] < horizon_alt_deg:
+                rise_utc = crossing(i, i + 1)
+                break
+        if rise_utc is None:
+            open_earlier = True
+        for i in range(k0, len(samples)):
+            if samples[i][1] < horizon_alt_deg:
+                set_utc = crossing(i - 1, i)
+                break
+        if set_utc is None:
+            open_later = True
+    else:
+        # It is down now: rise at the next ascending crossing, then set at
+        # the first descending crossing after that rise.
+        k_rise = None
+        for i in range(k0, len(samples)):
+            if samples[i][1] >= horizon_alt_deg:
+                k_rise = i
+                break
+        if k_rise is not None:
+            rise_utc = crossing(k_rise - 1, k_rise)
+            for i in range(k_rise, len(samples)):
+                if samples[i][1] < horizon_alt_deg:
+                    set_utc = crossing(i - 1, i)
+                    break
+            if set_utc is None:
+                open_later = True
+
+    below_band = not above_at_dusk and rise_utc is None
+
+    return {"rise_utc": rise_utc, "max_utc": best_t, "set_utc": set_utc,
+            "max_alt": best_alt, "above_at_dusk": above_at_dusk,
+            "up_all_night": up_all_night,
+            "down_all_night": down_all_night,
+            "open_earlier": open_earlier, "open_later": open_later,
+            "below_band": below_band, "search_hours": search_hours}
+
+
+def planet_rise_set_max_alt(name, lat_deg, lon_deg, date=None,
+                            horizon_alt_deg=0.0):
+    # Rise / set / best altitude of a planet tonight, tracking the planet's
+    # own motion (the ephemeris is re-evaluated at every scan step).
+    # @args: name - lowercase key of core.ephem_minor._PLANETS,
+    #        lat_deg, lon_deg - site, date - datetime.date (UTC, tonight),
+    #        horizon_alt_deg - altitude the arc crosses (flat 0 by default)
+    # @return: the dict from night_arc
+    from . import ephem_minor
+
+    def position(jd):
+        p = ephem_minor.planet(name, jd)
+        return p["ra"], p["dec"]
+
+    return night_arc(position, lat_deg, lon_deg, date, horizon_alt_deg)
+
+
 def current_altaz(ra_deg, dec_deg, lat_deg, lon_deg, when=None):
     # Altitude and azimuth of an object right now (or at a given instant).
     # @args: ra_deg, dec_deg - object, lat_deg, lon_deg - site,

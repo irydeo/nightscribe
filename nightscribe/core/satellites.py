@@ -282,6 +282,15 @@ def galilean_events(jd_from, jd_to, lat_deg=None, lon_deg=None):
     #          "uncertainty_min", "dist_au", "mag" (Jupiter),
     #          "observable" (None when no site), "alt_deg"}] by jd0
     out = []
+    # the site's own horizon (ADR-020): the one "is it up where I can use
+    # it" limit — the configured az/alt file or the flat min_alt — built
+    # once here and handed to the observability gate (None without a site)
+    alt_at, margin = None, 0.0
+    if lat_deg is not None:
+        from ..config import config as _cfg
+        from . import horizon as _horizon
+        alt_at = _horizon.from_config(_cfg).alt_at
+        margin = float(_cfg.get("horizon_margin_deg", 0.0))
     pad = 1.0                      # catch events straddling the window
     for name in GALILEANS:
         el = GALILEANS[name]
@@ -307,7 +316,8 @@ def galilean_events(jd_from, jd_to, lat_deg=None, lon_deg=None):
                 elif open_ev[which] is not None:  # egress closes it
                     out.append(_assemble(name, which, open_ev[which],
                                          edge, jd_from, jd_to,
-                                         lat_deg, lon_deg))
+                                         lat_deg, lon_deg,
+                                         alt_at, margin))
                     open_ev[which] = None
             prev, prev_jd = cur, jd
     out = [e for e in out if e is not None]
@@ -315,7 +325,8 @@ def galilean_events(jd_from, jd_to, lat_deg=None, lon_deg=None):
     return out
 
 
-def _assemble(name, which, jd0, jd1, jd_from, jd_to, lat_deg, lon_deg):
+def _assemble(name, which, jd0, jd1, jd_from, jd_to, lat_deg, lon_deg,
+              alt_at=None, margin=0.0):
     # One transit window -> the event dict (None when fully outside the
     # requested window). @return: dict or None
     if jd1 < jd_from or jd0 > jd_to:
@@ -332,26 +343,40 @@ def _assemble(name, which, jd0, jd1, jd_from, jd_to, lat_deg, lon_deg):
           "observable": None, "alt_deg": None}
     if lat_deg is not None:
         ev["observable"], ev["alt_deg"] = _observable(
-            jd0, jd1, lat_deg, lon_deg)
+            jd0, jd1, lat_deg, lon_deg, alt_at, margin)
     return ev
 
 
-def _observable(jd0, jd1, lat_deg, lon_deg):
-    # Is any of the transit visible from the site: Jupiter above 0 deg
-    # AND the Sun below the horizon (the calendar's honesty gate, same as
-    # skyevents). @return: (bool, best Jupiter altitude in deg)
-    best = None
-    ok = False
-    for jd in (jd0, 0.5 * (jd0 + jd1), jd1):
-        when = coords.datetime_from_jd(jd)
+def _observable(jd0, jd1, lat_deg, lon_deg, alt_at=None, margin=0.0):
+    # Is the transit usable from the site: AROUND THE CORE of the window
+    # Jupiter must clear the site's own horizon (ADR-020: the configured
+    # az/alt file or the flat min_alt) AND the Sun must be down. Judged on
+    # the core band — not the egress tail — so a transit whose middle has
+    # Jupiter behind the roof is never advertised as usable.
+    # @args: alt_at - horizon altitude callable (az->deg) or None (no site)
+    # @return: (bool, best Jupiter altitude in deg over the whole window)
+    def _jup(jd):
+        # @return: (jupiter_alt, az_jupiter, sun_alt) in degrees at `jd`
         p = ephem_minor.planet("jupiter", jd)
-        alt, _az = coords.altaz(p["ra"], p["dec"], lat_deg,
-                                coords.lst_degrees(jd, lon_deg))
+        alt, az = coords.altaz(p["ra"], p["dec"], lat_deg,
+                               coords.lst_degrees(jd, lon_deg))
         sra, sdec, _r = ephem_minor.sun_ra_dec(jd)
         salt, _saz = coords.altaz(sra, sdec, lat_deg,
                                   coords.lst_degrees(jd, lon_deg))
-        if best is None or alt > best:
-            best = alt
-        if alt > 0.0 and salt < 0.0:
+        return alt, az, salt
+    # best Jupiter altitude across the whole window (the honesty note)
+    best = None
+    for k in range(10):
+        a, _az, _s = _jup(jd0 + (jd1 - jd0) * k / 9.0)
+        best = a if best is None else max(best, a)
+    # core band: the middle third of the window — one clear sample is enough
+    mid = 0.5 * (jd0 + jd1)
+    half = 0.5 * (jd1 - jd0)
+    ok = False
+    for f in (-0.30, -0.15, 0.0, 0.15, 0.30):
+        a, az, salt = _jup(mid + f * half)
+        floor = alt_at(az) + margin if alt_at is not None else 0.0
+        if a >= floor and salt < 0.0:
             ok = True
+            break
     return ok, round(best, 1) if best is not None else None

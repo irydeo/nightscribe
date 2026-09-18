@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
 
 from ...core import orbit_math
 from ...viz import palette
+from .. import pretty
 from .base_chart import ChartView
 
 # Reference rings in AU (kept in sync with the "only if it fits" rule in
@@ -234,7 +235,9 @@ class OrbitChart(QWidget):
                                          tz=timezone.utc)
         except (ValueError, OverflowError, OSError):
             return ""
-        return utc.strftime("%d %b %Y")
+        # strftime("%d %b") is always English: go through the shared
+        # pretty tables, like the rest of the GUI.
+        return pretty.day(pretty.ui_lang(), utc, year=True)
 
     def _trend(self, els, jd):
         # @args: els - elements dict; jd - current Julian date
@@ -456,14 +459,17 @@ class OrbitChart(QWidget):
                 pname, palette.PLANET_COLORS.get("earth", palette.FG)))
             ex, ey = self._to_scene(x, y)
             self._add_dot(ex, ey, _DOT_PLANET, color, _Z_MARK)
-            self._add_label(pname.capitalize(), ex, ey,
+            # proper nouns come from the shared pretty tables (not
+            # .capitalize()), in the UI language
+            self._add_label(pretty.name(pretty.ui_lang(), pname), ex, ey,
                             QColor(palette.MUTED), bold=False)
 
         # the Sun (the ruler's reference point) — it sits at a focus, not at
         # the frame center, so map its AU origin through the same transform.
         sun_x, sun_y = self._to_scene(0.0, 0.0)
         self._add_dot(sun_x, sun_y, _DOT_SUN, QColor(palette.SUN), _Z_MARK)
-        self._add_label("Sun", sun_x, sun_y, QColor(palette.SUN), bold=True)
+        self._add_label(pretty.name(pretty.ui_lang(), "sun"), sun_x, sun_y,
+                        QColor(palette.SUN), bold=True)
 
         # the object's ellipse (a single polyline over the sampled orbit)
         xs, ys = orbit_math.orbit_xy(self._elements)

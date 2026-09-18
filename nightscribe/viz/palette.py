@@ -37,6 +37,9 @@ PLANET_COLORS = {
     "earth":   ACCENT2,
     "mars":    "#d1704f",
     "jupiter": "#c8a06e",
+    "saturn":  "#d8c9a3",
+    "uranus":  "#8fc7c9",
+    "neptune": "#5f7fcf",
 }
 
 

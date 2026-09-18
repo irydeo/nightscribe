@@ -104,3 +104,130 @@ def test_angular_separation():
     assert abs(sep - 180.0) < 1e-6
     # same point -> 0
     assert abs(coords.angular_separation(100.0, 40.0, 100.0, 40.0)) < 1e-6
+
+
+def test_neptune_arc_2026_09_18():
+    # The two outer planets must now be first-class in the almanac.
+    # On the night of 18/09/2026 Neptune is up the whole time from the Irydeo
+    # site (culminating just past midnight); with the 48 h search it now
+    # also hands over the *previous* rise (before dusk) and the *next* set
+    # (after dawn) instead of a bare "—".
+    arc = coords.planet_rise_set_max_alt("neptune", 40.55, -3.37,
+                                         datetime.date(2026, 9, 18))
+    assert arc["up_all_night"] is True
+    assert arc["down_all_night"] is False
+    assert arc["above_at_dusk"] is True
+    assert arc["open_earlier"] is False and arc["open_later"] is False
+    assert arc["below_band"] is False
+    w = coords.tonight_window(40.55, -3.37, datetime.date(2026, 9, 18))
+    assert arc["rise_utc"] is not None and arc["set_utc"] is not None
+    assert arc["rise_utc"] < w[0] < arc["set_utc"]
+    # culmination is ~49 deg, right around 00:35 UTC
+    assert 48.0 < arc["max_alt"] < 51.0
+    assert arc["max_utc"].hour == 0
+    assert 25 <= arc["max_utc"].minute <= 45
+
+
+def test_uranus_arc_2026_09_18():
+    # Uranus rises late in the evening and is still climbing at dawn. With
+    # the 48 h rise/set search it now has an honest *set* time too: the
+    # following forenoon, ~14 h after rise (its dec is ~+15).
+    arc = coords.planet_rise_set_max_alt("uranus", 40.55, -3.37,
+                                         datetime.date(2026, 9, 18))
+    assert arc["up_all_night"] is False and arc["down_all_night"] is False
+    assert arc["rise_utc"] is not None and arc["set_utc"] is not None
+    # rises around 21:20 UTC
+    assert arc["rise_utc"].hour in (21, 22)
+    assert arc["set_utc"] > arc["rise_utc"]
+    span = (arc["set_utc"] - arc["rise_utc"]).total_seconds() / 3600
+    assert 10.5 < span < 15.5
+    # best moment near the dawn edge, high in the sky
+    assert 68.0 < arc["max_alt"] < 72.5
+    assert arc["max_utc"] > arc["rise_utc"]
+
+
+def test_mars_arc_2026_09_18():
+    # Mars also rises late (after 00:00 UTC); with the 48 h search its *set*
+    # now falls the following afternoon, ~13 h after rise.
+    arc = coords.planet_rise_set_max_alt("mars", 40.55, -3.37,
+                                         datetime.date(2026, 9, 18))
+    assert arc["rise_utc"] is not None and arc["set_utc"] is not None
+    assert 36.0 < arc["max_alt"] < 42.0
+    # rise happens well after dusk (after 00:00 UTC)
+    assert arc["rise_utc"].hour in (0, 1)
+    assert arc["set_utc"] > arc["rise_utc"]
+    span = (arc["set_utc"] - arc["rise_utc"]).total_seconds() / 3600
+    assert 10.5 < span < 15.0
+
+
+def _dusk_lst(date, lat, lon):
+    # Local sidereal time at the start of tonight's darkness, for building
+    # synthetic RA targets relative to what is up at dusk.
+    window = coords.tonight_window(lat, lon, date)
+    jd = coords.jd_from_datetime(window[0])
+    return coords.lst_degrees(jd, lon), window
+
+
+def test_night_arc_up_at_dusk_synth():
+    # A fixed object on the celestial equator, HA -45 at dusk (south-east,
+    # still below its culmination) must be reported *above at dusk*, with a
+    # rise found a few hours back (before dusk) and a set the same night,
+    # both inside the search band.
+    date = datetime.date(2026, 9, 18)
+    lst, window = _dusk_lst(date, 40.5, -3.37)
+    ra_target = (lst + 45.0) % 360.0
+    fixed = lambda jd: (ra_target, 0.0)
+    arc = coords.night_arc(fixed, 40.5, -3.37, date)
+    assert arc["above_at_dusk"] is True
+    assert arc["down_all_night"] is False
+    assert arc["rise_utc"] is not None and arc["set_utc"] is not None
+    assert arc["rise_utc"] < window[0] < arc["set_utc"]
+    assert arc["open_earlier"] is False and arc["open_later"] is False
+
+
+def test_night_arc_down_at_dusk_rises_later_synth():
+    # The mirror case: fixed on the equator, HA +135 at dusk (morning side,
+    # below the horizon at dusk). It must rise later that same night —
+    # just after dawn — and set the following afternoon; both times found,
+    # neither edge open.
+    date = datetime.date(2026, 9, 18)
+    lst, window = _dusk_lst(date, 40.5, -3.37)
+    ra_target = (lst - 135.0) % 360.0
+    fixed = lambda jd: (ra_target, 0.0)
+    arc = coords.night_arc(fixed, 40.5, -3.37, date)
+    assert arc["above_at_dusk"] is False
+    assert arc["down_all_night"] is True   # below across tonight's darkness
+    assert arc["rise_utc"] is not None and arc["set_utc"] is not None
+    assert arc["rise_utc"] > window[0]
+    assert arc["set_utc"] > arc["rise_utc"]
+    assert arc["open_earlier"] is False and arc["open_later"] is False
+
+
+def test_night_arc_circumpolar_synth():
+    # dec +70 from 40.5 N never sets: min altitude ~20.5 deg, so the arc
+    # must flag the open edges on *both* sides and no crossing at all.
+    date = datetime.date(2026, 9, 18)
+    fixed = lambda jd: (120.0, 70.0)
+    arc = coords.night_arc(fixed, 40.5, -3.37, date)
+    assert arc["up_all_night"] is True and arc["down_all_night"] is False
+    assert arc["above_at_dusk"] is True
+    assert arc["rise_utc"] is None and arc["set_utc"] is None
+    assert arc["open_earlier"] is True and arc["open_later"] is True
+    assert arc["below_band"] is False
+    assert arc["max_alt"] > 20.0
+
+
+def test_night_arc_down_all_night_synth():
+    # A synthetic object fixed at dec -60 never clears the horizon from
+    # 40.5 N: the generic arc must report the down-all-night case cleanly,
+    # and the 48 h band stays below too (below_band).
+    fixed = lambda jd: (120.0, -60.0)
+    arc = coords.night_arc(fixed, 40.5, -3.37, datetime.date(2026, 9, 18))
+    assert arc["down_all_night"] is True
+    assert arc["up_all_night"] is False
+    assert arc["above_at_dusk"] is False
+    assert arc["below_band"] is True
+    assert arc["open_earlier"] is False and arc["open_later"] is False
+    assert arc["rise_utc"] is None and arc["set_utc"] is None
+    # it is below the geometric horizon at its best
+    assert arc["max_alt"] < 0.0

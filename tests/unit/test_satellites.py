@@ -159,6 +159,35 @@ def test_event_contract(engine_events):
         assert 0.5 <= (e["jd1"] - e["jd0"]) * 24 <= 6.0   # hours
 
 
+# ---------------- the observability gate (ADR-020 site limit) ----------------
+
+def test_gate_respects_the_site_limit():
+    # io 2026-09-25 01:32-03:52: a genuinely DARK window whose CORE has
+    # Jupiter at only ~3-7 deg yet whose EGRESS TAIL climbs to ~16 deg.
+    # The site's own limit (ADR-020) must drive the decision, judged on
+    # the core band — so a loose 5-deg floor lets it through, but a real
+    # 10-deg one hides it even though the tail clears 10 deg. The old
+    # 0-deg tail gate advertised both the same (the reported bug).
+    a, b = JD("2026-09-25 01:32"), JD("2026-09-25 03:52")
+    loose, _ = satellites._observable(a, b, LAT, LON,
+                                      alt_at=lambda az: 5.0, margin=0.0)
+    strict, best = satellites._observable(a, b, LAT, LON,
+                                          alt_at=lambda az: 10.0, margin=0.0)
+    assert loose is True      # above a 5-deg limit, dark -> usable
+    assert strict is False    # core (~7 deg) under a 10-deg limit -> hidden
+    assert best >= 10         # honesty note still reports the window's tail
+
+
+def test_gate_requires_dark_sky():
+    # io 2026-09-23 07:02-09:22: Jupiter high (~60 deg) but the Sun is up
+    # (~+27 deg) — a daytime window is never usable, however loose the
+    # altitude limit
+    ok, _ = satellites._observable(JD("2026-09-23 07:02"),
+                                   JD("2026-09-23 09:22"), LAT, LON,
+                                   alt_at=lambda az: 1.0, margin=0.0)
+    assert ok is False
+
+
 def test_no_site_means_no_observability():
     # without a site the event still computes, observability stays None
     evs = satellites.galilean_events(JD("2026-09-19 00:00"),

@@ -10,133 +10,231 @@
      <widget class="QWidget" name="sky_container">
       <layout class="QVBoxLayout" name="skyLayout">
        <item>
-        <layout class="QHBoxLayout">
-         <item><widget class="QPushButton" name="btn_refresh_sun"><property name="text"><string>Refresh the Sun</string></property></widget></item>
-         <item>
-          <widget class="QLabel" name="lbl_channel"><property name="text"><string>Channel:</string></property></widget>
-         </item>
-         <item>
-          <widget class="QComboBox" name="cmb_channel">
-           <item><property name="text"><string>Corona 193 Å</string></property></item>
-           <item><property name="text"><string>Chromosphere 304 Å</string></property></item>
-           <item><property name="text"><string>Corona 171 Å</string></property></item>
-           <item><property name="text"><string>Sunspots (visible)</string></property></item>
-           <item><property name="text"><string>Magnetogram</string></property></item>
-          </widget>
-         </item>
-          <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-          <item><widget class="QPushButton" name="btn_sun_post"><property name="text"><string>Render PNG for socials</string></property><property name="toolTip"><string>Write today's Sun panel (with the observatory watermark) for your networks</string></property></widget></item>
-         </layout>
-        </item>
-        <item>
-         <widget class="QLabel" name="lbl_impact">
-          <property name="wordWrap"><bool>true</bool></property>
-          <property name="text"><string/></property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_events">
-          <property name="title"><string>Coming up in the next 60 days</string></property>
-          <layout class="QVBoxLayout">
+        <widget class="QLabel" name="lbl_impact">
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="text"><string/></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QTabWidget" name="tab_sky">
+         <property name="tabPosition"><enum>QTabWidget::North</enum></property>
+         <widget class="QWidget" name="tab_moon">
+          <attribute name="title"><string>Moon</string></attribute>
+          <layout class="QVBoxLayout" name="moonTabLayout">
            <item>
-            <widget class="QListWidget" name="lst_events">
-             <property name="toolTip"><string>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</string></property>
-             <property name="maximumHeight"><number>170</number></property>
-            </widget>
-           </item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_moon">
-          <property name="title"><string>Moon calendar</string></property>
-          <layout class="QVBoxLayout">
-           <item>
-            <layout class="QHBoxLayout">
-             <item>
-              <widget class="QLabel" name="lbl_moon_icon">
-               <property name="maximumSize"><size><width>24</width><height>24</height></size></property>
-               <property name="alignment"><set>Qt::AlignVCenter|Qt::AlignLeft</set></property>
-               <property name="text"><string/></property>
-              </widget>
-             </item>
-             <item><widget class="QLabel" name="lbl_moon"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Moon: —</string></property></widget></item>
-             <item><spacer name="moonSpacer"><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-            </layout>
-           </item>
-           <item><widget class="QLabel" name="lbl_moon_cal"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>—</string></property></widget></item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_planets">
-          <property name="title"><string>Planets</string></property>
-          <layout class="QVBoxLayout">
-           <item><widget class="QLabel" name="lbl_planets"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Planets: —</string></property></widget></item>
-           <item><widget class="QLabel" name="lbl_planets_next"><property name="wordWrap"><bool>true</bool></property><property name="text"><string/></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property></widget></item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_jup">
-          <property name="title"><string>Jupiter's moons this week</string></property>
-          <layout class="QVBoxLayout">
-           <item>
-            <widget class="QListWidget" name="lst_jupmoons">
-             <property name="toolTip"><string>Transits of the Galilean moons and their shadows across Jupiter's disc — visible from your site at night</string></property>
-             <property name="maximumHeight"><number>130</number></property>
-            </widget>
-           </item>
-           <item><widget class="QLabel" name="lbl_jup_note"><property name="wordWrap"><bool>true</bool></property><property name="text"><string>Local computation, planning grade: times to ±10 min. Saturn's moon transits (Titan) are out of season until ~2040.</string></property><property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px; font-style: italic;</string></property></widget></item>
-          </layout>
-         </widget>
-        </item>
-        <item>
-         <widget class="QGroupBox" name="grp_sun">
-          <property name="title"><string>The Sun now</string></property>
-          <layout class="QVBoxLayout">
-           <item>
-            <layout class="QHBoxLayout" name="sunMain">
-             <item>
-              <widget class="QLabel" name="lbl_sun_image">
-               <property name="alignment"><enum>Qt::AlignCenter</enum></property>
-               <property name="minimumSize"><size><width>430</width><height>430</height></size></property>
-               <property name="maximumSize"><size><width>430</width><height>430</height></size></property>
-               <property name="text"><string>Press Refresh to load today's Sun (NASA SDO)</string></property>
-               <property name="wordWrap"><bool>true</bool></property>
-              </widget>
-             </item>
-             <item>
-               <widget class="QLabel" name="lbl_sun_map">
-                <property name="alignment"><enum>Qt::AlignCenter</enum></property>
-                <property name="minimumSize"><size><width>430</width><height>430</height></size></property>
-                <property name="maximumSize"><size><width>430</width><height>430</height></size></property>
-                <property name="text"><string>Active regions map (NOAA)</string></property>
+            <widget class="QGroupBox" name="grp_moon">
+             <property name="title"><string>Moon calendar</string></property>
+             <layout class="QVBoxLayout">
+              <item>
+               <layout class="QHBoxLayout">
+                <item>
+                 <widget class="QLabel" name="lbl_moon_icon">
+                  <property name="maximumSize"><size><width>24</width><height>24</height></size></property>
+                  <property name="alignment"><set>Qt::AlignVCenter|Qt::AlignLeft</set></property>
+                  <property name="text"><string/></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_moon">
+                  <property name="wordWrap"><bool>true</bool></property>
+                  <property name="text"><string>Moon: —</string></property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer name="moonSpacer">
+                  <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 </spacer>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <widget class="QLabel" name="lbl_moon_cal">
                 <property name="wordWrap"><bool>true</bool></property>
+                <property name="text"><string>—</string></property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_events">
+             <property name="title"><string>Coming up in the next 60 days</string></property>
+             <layout class="QVBoxLayout">
+              <item>
+               <widget class="QListWidget" name="lst_events">
+                <property name="toolTip"><string>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</string></property>
+                <property name="maximumHeight"><number>320</number></property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="tab_planets">
+          <attribute name="title"><string>Planets</string></attribute>
+          <layout class="QVBoxLayout" name="planetsTabLayout">
+           <item>
+            <widget class="QGroupBox" name="grp_planets">
+             <property name="title"><string>Planets tonight</string></property>
+             <layout class="QVBoxLayout">
+              <item>
+               <widget class="QTableWidget" name="tbl_planets">
+                <property name="toolTip"><string>Rise, set and best moment for each planet tonight (UTC times; your local time in the tooltip)</string></property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_jup">
+             <property name="title"><string>Jupiter's moons this week</string></property>
+             <layout class="QVBoxLayout">
+              <item>
+               <widget class="QListWidget" name="lst_jupmoons">
+                <property name="toolTip"><string>Transits of the Galilean moons and their shadows across Jupiter's disc — visible from your site at night</string></property>
+                <property name="maximumHeight"><number>190</number></property>
                </widget>
               </item>
               <item>
-               <widget class="QTextBrowser" name="txt_sun_data">
-                <property name="maximumWidth"><number>330</number></property>
-                <property name="maximumHeight"><number>430</number></property>
+               <widget class="QLabel" name="lbl_jup_note">
+                <property name="wordWrap"><bool>true</bool></property>
+                <property name="text"><string>Local computation, planning grade: times to ±10 min. Saturn's moon transits (Titan) are out of season until ~2040.</string></property>
+                <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px; font-style: italic;</string></property>
                </widget>
               </item>
-            </layout>
+             </layout>
+            </widget>
            </item>
           </layout>
          </widget>
-        </item>
-        <item>
-         <layout class="QHBoxLayout">
-          <item><widget class="QPushButton" name="btn_sky_post"><property name="text"><string>Sky post draft…</string></property><property name="toolTip"><string>Draft the bilingual "sky today" post (Sun + Moon + planets)</string></property></widget></item>
-          <item><widget class="QLabel" name="lbl_links"><property name="text"><string>More:</string></property></widget></item>
-         <item><widget class="QPushButton" name="btn_raben"><property name="text"><string>Raben maps</string></property></widget></item>
-         <item><widget class="QPushButton" name="btn_solarmonitor"><property name="text"><string>SolarMonitor</string></property></widget></item>
-         <item><widget class="QPushButton" name="btn_sidc"><property name="text"><string>SIDC</string></property></widget></item>
-         <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         <widget class="QWidget" name="tab_sun">
+          <attribute name="title"><string>Sun</string></attribute>
+          <layout class="QVBoxLayout" name="sunTabLayout">
+           <item>
+            <widget class="QGroupBox" name="grp_sun">
+             <property name="title"><string>The Sun now</string></property>
+             <layout class="QVBoxLayout">
+              <item>
+               <layout class="QHBoxLayout" name="sunMain">
+                <item>
+                 <widget class="QLabel" name="lbl_sun_image">
+                  <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+                  <property name="minimumSize"><size><width>430</width><height>430</height></size></property>
+                  <property name="maximumSize"><size><width>430</width><height>430</height></size></property>
+                  <property name="text"><string>Press Refresh to load today's Sun (NASA SDO)</string></property>
+                  <property name="wordWrap"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_sun_map">
+                  <property name="alignment"><enum>Qt::AlignCenter</enum></property>
+                  <property name="minimumSize"><size><width>430</width><height>430</height></size></property>
+                  <property name="maximumSize"><size><width>430</width><height>430</height></size></property>
+                  <property name="text"><string>Active regions map (NOAA)</string></property>
+                  <property name="wordWrap"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QTextBrowser" name="txt_sun_data">
+                  <property name="maximumWidth"><number>330</number></property>
+                  <property name="maximumHeight"><number>430</number></property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <layout class="QHBoxLayout">
+                <item>
+                 <widget class="QPushButton" name="btn_refresh_sun">
+                  <property name="text"><string>Refresh the Sun</string></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_channel">
+                  <property name="text"><string>Channel:</string></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QComboBox" name="cmb_channel">
+                  <property name="currentIndex"><number>3</number></property>
+                  <item>
+                   <property name="text"><string>Corona 193 Å</string></property>
+                  </item>
+                  <item>
+                   <property name="text"><string>Chromosphere 304 Å</string></property>
+                  </item>
+                  <item>
+                   <property name="text"><string>Corona 171 Å</string></property>
+                  </item>
+                  <item>
+                   <property name="text"><string>Sunspots (visible)</string></property>
+                  </item>
+                  <item>
+                   <property name="text"><string>Magnetogram</string></property>
+                  </item>
+                 </widget>
+                </item>
+                <item>
+                 <spacer>
+                  <property name="orientation"><enum>Qt::Horizontal</enum></property>
+                 </spacer>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btn_sun_post">
+                  <property name="text"><string>Render PNG for socials</string></property>
+                  <property name="toolTip"><string>Write today's Sun panel (with the observatory watermark) for your networks</string></property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout">
+         <item>
+          <widget class="QPushButton" name="btn_sky_post">
+           <property name="text"><string>Sky post draft…</string></property>
+           <property name="toolTip"><string>Draft the bilingual "sky today" post (Sun + Moon + planets)</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_links">
+           <property name="text"><string>More:</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_raben">
+           <property name="text"><string>Raben maps</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_solarmonitor">
+           <property name="text"><string>SolarMonitor</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_sidc">
+           <property name="text"><string>SIDC</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer>
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
         </layout>
        </item>
-       <item><spacer><property name="orientation"><enum>Qt::Vertical</enum></property></spacer></item>
+       <item>
+        <spacer>
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+        </spacer>
+       </item>
       </layout>
      </widget>
     </widget>

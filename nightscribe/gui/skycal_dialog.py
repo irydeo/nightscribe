@@ -27,28 +27,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QListWidgetItem,
                                QVBoxLayout)
 
-from . import theme
-
-# Moon names and planet names are proper nouns: translated by hand here
-# (the engine hands over lowercase keys, never display text).
-_MOON_NAMES = {"io": ("Io", "Io"), "europa": ("Europa", "Europa"),
-               "ganymede": ("Ganímedes", "Ganymede"),
-               "callisto": ("Calisto", "Callisto")}
-_PLANET_NAMES = {
-    "mercury": ("Mercurio", "Mercury"), "venus": ("Venus", "Venus"),
-    "mars": ("Marte", "Mars"), "jupiter": ("Júpiter", "Jupiter"),
-    "saturn": ("Saturno", "Saturn"), "uranus": ("Urano", "Uranus"),
-    "neptune": ("Neptuno", "Neptune"), "moon": ("la Luna", "the Moon"),
-    "sun": ("el Sol", "the Sun")}
-_SHOWER_NAMES = {
-    "quadrantids": ("Cuadrántidas", "Quadrantids"),
-    "lyrids": ("Líridas", "Lyrids"),
-    "eta_aquariids": ("Eta Acuáridas", "Eta Aquariids"),
-    "perseids": ("Perseidas", "Perseids"),
-    "orionids": ("Oriónidas", "Orionids"),
-    "leonids": ("Leónidas", "Leonids"),
-    "geminids": ("Gemínidas", "Geminids"),
-    "ursids": ("Úrsidas", "Ursids")}
+from . import pretty, theme
 
 
 class SkyCalendarDialog(QDialog):
@@ -75,11 +54,12 @@ class SkyCalendarDialog(QDialog):
     def _name(self, key):
         # @args: key - lowercase object key from the engine
         # @return: the proper noun in the dialog's language
-        pair = _MOON_NAMES.get(key) or _PLANET_NAMES.get(key) \
-            or _SHOWER_NAMES.get(key)
-        if pair is None:
-            return key
-        return pair[0] if self._lang == "es" else pair[1]
+        return pretty.name(self._lang, key)
+
+    def _day(self, dt):
+        # @args: dt - a datetime (UTC date of the event)
+        # @return: the localized short date, "18 sep" / "18 Sep"
+        return pretty.day(self._lang, dt)
 
     def event_row(self, ev):
         # One event of the 60-day list, in plain words.
@@ -188,7 +168,7 @@ class SkyCalendarDialog(QDialog):
             if ev["kind"] in ("sat_transit", "shadow_transit"):
                 continue
             icon, text = self.event_row(ev)
-            day = ev["date"].strftime("%d %b")
+            day = self._day(ev["date"])
             item = QListWidgetItem(f"{icon}  {day} — {text}")
             if ev.get("tonight"):
                 today = today or day
@@ -204,13 +184,15 @@ class SkyCalendarDialog(QDialog):
         bits = []
         for ev in ph:
             icon, text = self.event_row(ev)
-            bits.append(f"{icon} {text}: "
-                        + ev["date"].strftime("%d %b"))
+            bits.append(f"{icon} {text}: " + self._day(ev["date"]))
         content.lbl_moon_cal.setText("   ·   ".join(bits))
 
-    def fill_jupiter_moons(self, events, content):
-        # The week's Galilean windows from the site: observable first,
-        # then the rest dimmed. @return: None
+    def fill_jupiter_moons(self, events, content, show_unobserved=False):
+        # The week's Galilean windows from the site. By default only the
+        # observable ones (Jupiter above the horizon at the window); showing
+        # a transit you cannot see is noise. With `show_unobserved` the
+        # rest are appended dimmed, clearly flagged as not up.
+        # @return: None
         sats = [e for e in events
                 if e["kind"] in ("sat_transit", "shadow_transit")]
         lst = content.lst_jupmoons
@@ -219,12 +201,22 @@ class SkyCalendarDialog(QDialog):
         rest = [e for e in sats if not e.get("observable")]
         for ev in obs:
             icon, text = self.moon_row(ev)
-            day = ev["t0"].strftime("%d %b")
+            day = self._day(ev["t0"])
             item = QListWidgetItem(f"{icon}  {day} — {text}")
             lst.addItem(item)
-        for ev in rest:
-            icon, text = self.moon_row(ev)
-            day = ev["t0"].strftime("%d %b")
-            item = QListWidgetItem(f"{icon}  {day} — {text}")
-            item.setForeground(QColor(theme.C_TEXT_DIM))
-            lst.addItem(item)
+        if not obs and rest:
+            # honest empty note: the moons move but the planet is not up
+            lst.addItem(QListWidgetItem(self.tr(
+                "No transits are visible from your site this week — "
+                "Jupiter is below the horizon at all of them")))
+        if show_unobserved and rest:
+            note = QListWidgetItem(self.tr(
+                "Below — Jupiter is not up at these times"))
+            note.setForeground(QColor(theme.C_TEXT_DIM))
+            lst.addItem(note)
+            for ev in rest:
+                icon, text = self.moon_row(ev)
+                day = self._day(ev["t0"])
+                item = QListWidgetItem(f"{icon}  {day} — {text}")
+                item.setForeground(QColor(theme.C_TEXT_DIM))
+                lst.addItem(item)

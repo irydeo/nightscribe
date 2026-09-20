@@ -90,7 +90,10 @@ def test_project_close_event_carries_outcome(db):
 
 def test_days_cutoff(db):
     project.create(db, "sn", "SN 2099zz", {"mag": 15.0})
-    db.execute("UPDATE projects SET created=?", (0.0,))   # epoch: ancient
+    # 86400 = 1970-01-02 UTC: ancient enough for the cutoff check. Epoch 0 is
+    # pre-1970 in negative-offset timezones and the Windows CRT refuses it
+    # (OSError 22 in datetime.fromtimestamp), failing the CI gate there.
+    db.execute("UPDATE projects SET created=?", (86400.0,))
     db.commit()
     assert journal.build_journal(db, days=30,
                                  now=_ts(2026, 9, 17, 20)) == []

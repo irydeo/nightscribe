@@ -1,14 +1,19 @@
 ; NightScribe - Inno Setup script (Windows installer)
 ;
 ; Built by the "Windows preview" GitHub Actions workflow:
-;   ISCC.exe /DAppVersion=<version> installer\nightscribe.iss
+;   ISCC.exe /DAppVersion=<version> /DAppSuffix=-preview.<sha> installer\nightscribe.iss
 ; Input:  ..\dist\nightscribe\  (PyInstaller onedir output)
-; Output: ..\dist\NightScribeSetup-<version>.exe
+; Output: ..\dist\NightScribeSetup-<version><suffix>.exe
+;         (suffix is empty for manual builds, "-preview.<sha>" in CI)
 ;
 ; Per-user install under %LOCALAPPDATA%\Programs: no admin rights needed.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0"
+#endif
+
+#ifndef AppSuffix
+  #define AppSuffix ""
 #endif
 
 [Setup]
@@ -23,7 +28,7 @@ DefaultDirName={localappdata}\Programs\NightScribe
 DefaultGroupName=NightScribe
 PrivilegesRequired=lowest
 OutputDir=..\dist
-OutputBaseFilename=NightScribeSetup-{#AppVersion}
+OutputBaseFilename=NightScribeSetup-{#AppVersion}{#AppSuffix}
 LicenseFile=..\LICENSE
 Compression=lzma2
 SolidCompression=yes

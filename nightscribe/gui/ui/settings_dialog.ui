@@ -306,6 +306,7 @@
            </layout>
           </item>
           <item><widget class="QLabel" name="lblH_moonillum"><property name="text"><string>Fraction of the lunar disk lit above which the warning starts (0.5 = half Moon)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item><widget class="QCheckBox" name="chk_moons_all"><property name="text"><string>Also list Jupiter's moon transits when Jupiter is not up (dimmed)</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
          </layout>
         </widget>
        </item>

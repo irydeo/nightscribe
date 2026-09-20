@@ -31,6 +31,10 @@ logger = logging.getLogger(__name__)
 from . import palette
 _ORBIT_SPAN = {"mercury": 0.47, "venus": 0.73, "earth": 1.0, "mars": 1.67,
                "jupiter": 5.45}
+# The label per planet, hand-picked (ES, EN) — proper nouns, not .capitalize()
+_NAMES = {"mercury": ("Mercurio", "Mercury"), "venus": ("Venus", "Venus"),
+          "earth": ("Tierra", "Earth"), "mars": ("Marte", "Mars"),
+          "jupiter": ("Júpiter", "Jupiter")}
 
 
 def _orbit_xy(elements, n=360):
@@ -94,7 +98,11 @@ def draw_orbit(elements, jd=None, obj_name="", approach=None, out=None,
         xe, ye, _ze, _r = orbit_math.planet_heliocentric(pname, jd)
         ax.plot(xe, ye, "o", color=palette.PLANET_COLORS[pname], ms=7,
                 zorder=5)
-        ax.annotate(pname.capitalize(), (xe, ye), textcoords="offset points",
+        # proper nouns: hand-picked pair per planet (viz convention — see
+        # style.pick), not a blind .capitalize()
+        pair = _NAMES.get(pname, (pname.capitalize(),) * 2)
+        ax.annotate(style.pick(lang, *pair), (xe, ye),
+                    textcoords="offset points",
                     xytext=(6, 6), color=style.MUTED, fontsize=8)
 
     # the Sun at the origin

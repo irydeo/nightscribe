@@ -135,3 +135,40 @@ def test_real_list_chips_today(window):
     assert len(chips) <= 3
     for c in chips:
         assert c.text().strip()
+
+
+def test_planets_visible_tonight(window):
+    # the almanac answers "which planets will be up tonight" in a table:
+    # all seven rows, and exactly the naked-eye planets the *moving*
+    # ephemeris never pushes above 15° are dimmed (not hidden). The
+    # dimming is recomputed here offline from the same building blocks
+    # (Schlyter + core.coords), so the test holds for any date.
+    import re
+    from PySide6.QtGui import QColor
+    from nightscribe.config import config
+    from nightscribe.gui import pretty
+
+    lang = pretty.ui_lang()
+    lat, lon = float(config.get("lat")), float(config.get("lon"))
+    now = datetime.datetime.now(datetime.timezone.utc)
+    dim = QColor("#8a90a6")
+
+    window._menus.action_skycal.trigger()
+    tbl = window.solar.tbl_planets
+    assert tbl.rowCount() == 7
+    by_name = {}
+    for row in range(tbl.rowCount()):
+        name_it, mag_it = tbl.item(row, 1), tbl.item(row, 2)
+        assert name_it is not None and re.fullmatch(r"[A-Z]\w+", name_it.text())
+        assert mag_it is not None and re.fullmatch(r"-?\d+\.\d", mag_it.text())
+        by_name[name_it.text().lower()] = name_it
+
+    for name in ("mercury", "venus", "mars", "jupiter", "saturn"):
+        # the label is the UI-language proper noun (pretty, not tr())
+        disp = pretty.name(lang, name).lower()
+        assert disp in by_name, f"{name} missing from the table"
+        arc = coords.planet_rise_set_max_alt(name, lat, lon, now.date())
+        expect_dim = (arc["max_alt"] is None) or (arc["max_alt"] < 15.0)
+        got_dim = by_name[disp].foreground().color() == dim
+        assert got_dim == expect_dim, \
+            f"{name}: dim={got_dim} but best alt {arc['max_alt']}° tonight"

@@ -36,7 +36,7 @@ from ..version import full_version
 from ..core import (attention, dates, ephemeris, mpc_report, orbits,
                     project, sequence, suggest)
 from ..core.db import db
-from . import theme
+from . import pretty, theme
 from .overview import ObjectPanel
 from .skeleton import ShimmerRow
 from .widgets.passive_wheel import (PassiveDoubleSpinBox, PassiveList,
@@ -427,11 +427,8 @@ class MainWindow(QMainWindow):
     # ---------------- helpers ----------------
 
     def _lang(self):
-        from PySide6.QtCore import QLocale
-        lang = config.get("language", "system")
-        if lang == "system":
-            lang = QLocale.system().name()[:2]
-        return lang if lang in ("es", "en") else "en"
+        # @return: "es"|"en" — single source of truth in pretty.ui_lang()
+        return pretty.ui_lang()
 
     def _txt(self, pair):
         return orbits.pick(pair, self._lang())
@@ -729,6 +726,8 @@ class MainWindow(QMainWindow):
                                                         True)))
         dlg.spn_moon_sep.setValue(float(config.get("moon_min_sep_deg", 45)))
         dlg.spn_moon_illum.setValue(float(config.get("moon_max_illum", 0.5)))
+        dlg.chk_moons_all.setChecked(bool(
+            config.get("show_sat_moons_unobserved", False)))
         dlg.spn_overhead.setValue(float(config.get("overhead_s", 15)))
         dlg.spn_sn_cadence.setValue(int(config.get("sn_cadence_days", 3)))
         dlg.spn_event_mag.setValue(
@@ -805,6 +804,7 @@ class MainWindow(QMainWindow):
         config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
         config.set("moon_min_sep_deg", dlg.spn_moon_sep.value())
         config.set("moon_max_illum", dlg.spn_moon_illum.value())
+        config.set("show_sat_moons_unobserved", dlg.chk_moons_all.isChecked())
         config.set("overhead_s", dlg.spn_overhead.value())
         config.set("sn_cadence_days", dlg.spn_sn_cadence.value())
         config.set("event_mag_threshold", dlg.spn_event_mag.value())
@@ -1370,37 +1370,39 @@ class MainWindow(QMainWindow):
         kind = e["kind"]
         objs = e["objects"]
         when = self.tr("tonight") if e.get("tonight") \
-            else e["date"].strftime("%d %b")
+            else pretty.day(self._lang(), e["date"])
+
+        def nm(i):
+            # The chip's proper noun, in the UI's language (the engine
+            # hands over lowercase keys: "ganymede", "perseids", ...).
+            return pretty.name(self._lang(), objs[i])
+
         if kind == "lunar_eclipse":
             return self.tr("🌘 Lunar eclipse %1").replace("%1", when)
         if kind == "solar_eclipse":
             return self.tr("🌘 Solar eclipse %1").replace("%1", when)
         if kind == "shadow_transit":
             return self.tr("🔭 %1's shadow %2 UT").replace(
-                "%1", objs[0].capitalize()).replace(
-                "%2", e["t0"].strftime("%H:%M"))
+                "%1", nm(0)).replace("%2", e["t0"].strftime("%H:%M"))
         if kind == "sat_transit":
             return self.tr("🔭 %1 transit %2 UT").replace(
-                "%1", objs[0].capitalize()).replace(
-                "%2", e["t0"].strftime("%H:%M"))
+                "%1", nm(0)).replace("%2", e["t0"].strftime("%H:%M"))
         if kind == "opposition":
             return self.tr("🔴 %1 at opposition %2").replace(
-                "%1", objs[0].capitalize()).replace("%2", when)
+                "%1", nm(0)).replace("%2", when)
         if kind == "max_elongation":
             return self.tr("%1 %2 greatest elongation").replace(
-                "%1", e["icon"]).replace("%2", objs[0].capitalize())
+                "%1", e["icon"]).replace("%2", nm(0))
         if kind == "planet_conjunction":
             return self.tr("✨ %1–%2 %3°").replace(
-                "%1", objs[0].capitalize()).replace(
-                "%2", objs[1].capitalize()).replace(
+                "%1", nm(0)).replace("%2", nm(1)).replace(
                 "%3", str(e.get("sep_deg")))
         if kind == "moon_conjunction":
             return self.tr("🌙 Moon–%1 %2°").replace(
-                "%1", objs[1].capitalize()).replace(
-                "%2", str(e.get("sep_deg")))
+                "%1", nm(1)).replace("%2", str(e.get("sep_deg")))
         if kind == "meteor_shower":
             return self.tr("☄️ %1 %2").replace(
-                "%1", objs[0].capitalize()).replace("%2", when)
+                "%1", nm(0)).replace("%2", when)
         if kind in ("full_moon", "new_moon", "first_quarter",
                     "last_quarter"):
             words = {"full_moon": self.tr("🌕 Full moon"),
@@ -1853,7 +1855,7 @@ class MainWindow(QMainWindow):
                      "med-low": 4, "med": 5, "medium": 5, "med-high": 6,
                      "high": 7, "very high": 8, "critical": 9}
             rank = ranks.get(nf.lower())
-            label = nf.capitalize()
+            label = self.tr(nf).capitalize()
             return f"{rank} {label}" if rank is not None else nf
         if key == "nobs":
             return float(t["nobs"]) if str(t.get("nobs") or "").isdigit() else None
@@ -7164,34 +7166,30 @@ class MainWindow(QMainWindow):
             .replace("%1", f"{m['illum'] * 100:.0f}")
             .replace("%2", f"{m['dist_km']:,.0f}")
             .replace("%3", f"{m['phase_age_days']:.0f}"))
-        # ADR-036 S1: the "impact on your night" line — the tab connects
-        # its context to the observing plan (Moon -> faint targets, Kp ->
-        # auroras) instead of standing alone
+        # ADR-036 S1: the "impact on your night" line — the tab connects its
+        # context to the observing plan. The Moon phase now lives in the
+        # Moon calendar below, so only the space-weather signal stays here;
+        # with no Kp/aurora alert the line is dropped rather than left as a
+        # bare "See Tonight" link.
         parts = []
-        illum = m["illum"]
-        limit = float(config.get("moon_max_illum", 0.5))
-        if illum > limit:
-            parts.append(self.tr(
-                "Moon %1% lit — faint targets are penalised tonight")
-                .replace("%1", f"{illum * 100:.0f}"))
-        else:
-            parts.append(self.tr(
-                "Moon %1% lit — a good night for faint targets")
-                .replace("%1", f"{illum * 100:.0f}"))
         kp = (getattr(self, "_last_sun", None) or {}).get("kp")
         if kp is not None and kp >= 5:
             parts.append(self.tr(
                 "Kp %1 — mid-latitude auroras possible")
                 .replace("%1", f"{kp:.1f}"))
-        link = ("<a href='tonight://'>"
-                + self.tr("See Tonight →") + "</a>")
-        self.solar.lbl_impact.setText(" · ".join(parts) + " — " + link)
+        if parts:
+            link = ("<a href='tonight://'>"
+                    + self.tr("See Tonight →") + "</a>")
+            self.solar.lbl_impact.setText(" · ".join(parts) + " — " + link)
+            self.solar.lbl_impact.setVisible(True)
+        else:
+            self.solar.lbl_impact.setText("")
+            self.solar.lbl_impact.setVisible(False)
         self.solar.lbl_moon_icon.setPixmap(
             moon_icon.moon_pixmap(m["elong_deg"], 20))
-        self.solar.lbl_planets.setText(
-            self.tr("Planets at dusk: ")
-            + (", ".join(self._planets_at_dusk())
-               if self._planets_at_dusk() else self.tr("none above 15°")))
+        # the almanac's real "which planets are up tonight" answer: a
+        # seven-row table (icon, name, mag, rise, best moment, set)
+        self._fill_planets_table()
 
     def _planets_at_dusk(self):
         # The naked-eye planets above 15° at dusk (Schlyter, pure local
@@ -7208,9 +7206,114 @@ class MainWindow(QMainWindow):
                                        coords.lst_degrees(jd_dusk,
                                                           config.get("lon")))
                 if alt >= 15:
-                    visible.append(f"{name.capitalize()} (mag {p['mag']}, "
-                                   f"{alt:.0f}°)")
+                    visible.append(f"{pretty.name(self._lang(), name)} "
+                                   f"(mag {p['mag']}, {alt:.0f}°)")
         return visible
+
+    def _fill_planets_table(self):
+        # The almanac's planet table: all seven, the naked-eye five plus
+        # Uranus and Neptune. The drawn disc, the magnitude, the rise/set
+        # and the best moment come from the *moving* ephemeris (core.coords
+        # .planet_rise_set_max_alt), re-evaluated every 5 minutes across
+        # tonight's darkness window. A planet that never reaches 15°
+        # stays in the table, dimmed — not hidden: all seven are countable.
+        # Pure local maths; no network.
+        # @return: nothing
+        from PySide6.QtGui import QColor, QIcon
+        from PySide6.QtWidgets import (QAbstractItemView, QHeaderView,
+                                       QTableWidgetItem)
+        from ..core import coords, ephem_minor
+        from . import planet_icon
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        jd = coords.jd_from_datetime(now)
+        lat, lon = float(config.get("lat")), float(config.get("lon"))
+        dim_color = QColor("#8a90a6")           # the theme's muted grey
+
+        tbl = self.solar.tbl_planets
+        # a quiet, fixed, read-only table with rows in classical order
+        tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        tbl.setSelectionMode(QAbstractItemView.NoSelection)
+        tbl.setShowGrid(False)
+        tbl.verticalHeader().setVisible(False)
+        tbl.horizontalHeader().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Fixed)
+        tbl.setColumnWidth(0, 28)
+
+        def hm(dt):
+            # @return: the UTC clock, or the dash when the case is n/a
+            return dt.strftime("%H:%M") if dt else "—"
+
+        def tip_local(dt):
+            # tooltip: the same instant on the local clock (system tz)
+            if not dt:
+                return ""
+            return self.tr("{t} UTC  ·  {l} local").format(
+                t=dt.strftime("%H:%M"),
+                l=dt.astimezone().strftime("%H:%M"))
+
+        headers = ["", self.tr("Planet"), self.tr("Mag"),
+                   self.tr("Rise (UTC)"), self.tr("Max (alt · UTC)"),
+                   self.tr("Set (UTC)")]
+        tbl.setColumnCount(len(headers))
+        for c, h in enumerate(headers):
+            tbl.setHorizontalHeaderItem(c, QTableWidgetItem(h))
+        names = ("mercury", "venus", "mars", "jupiter", "saturn",
+                 "uranus", "neptune")
+        tbl.setRowCount(len(names))
+
+        for row, name in enumerate(names):
+            p = ephem_minor.planet(name, jd)
+            arc = coords.planet_rise_set_max_alt(name, lat, lon, now.date())
+            dim = arc["max_alt"] is None or arc["max_alt"] < 15.0
+            fg = dim_color if dim else None
+
+            def cell(text, tip=""):
+                # @return: the row's item, greyed with an explanation when
+                #          the planet never gets close to naked-eye range
+                it = QTableWidgetItem(text)
+                if fg is not None:
+                    it.setForeground(fg)
+                if tip:
+                    it.setToolTip(tip)
+                return it
+
+            # rise/set are now searched ±48 h around the darkness window,
+            # so an "—" only means an edge the search cannot close: the
+            # planet was up (or down) for over two days — never a bare gap.
+            # Each dash gets its own plain-language explanation.
+            never_up = self.tr(
+                "Never above the horizon within two days of tonight")
+            up_open_tip = self.tr(
+                "Up already two days ago — it never sets from your site")
+            down_open_tip = self.tr(
+                "Still up two days from now — it never sets from your site")
+            rise_tip = (tip_local(arc["rise_utc"]) if arc["rise_utc"]
+                        else up_open_tip if arc["open_earlier"]
+                        else never_up)
+            set_tip = (tip_local(arc["set_utc"]) if arc["set_utc"]
+                       else down_open_tip if arc["open_later"]
+                       else never_up)
+            name_tip = (self.tr("Best {alt}° tonight — below 15°, "
+                                "needs optics or a better season")
+                        .format(alt=f"{arc['max_alt']:.0f}")
+                        if dim and arc["max_alt"] is not None
+                        else "")
+            max_txt = ("—" if arc["max_alt"] is None else
+                       f"{arc['max_alt']:.0f}° · {hm(arc['max_utc'])}")
+
+            icon_it = QTableWidgetItem()
+            icon_it.setIcon(QIcon(planet_icon.planet_pixmap(name, 20)))
+
+            tbl.setItem(row, 0, icon_it)
+            # proper noun from the shared pretty tables (not .capitalize())
+            tbl.setItem(row, 1, cell(pretty.name(self._lang(), name), name_tip))
+            tbl.setItem(row, 2, cell(f"{p['mag']:.1f}"))
+            tbl.setItem(row, 3, cell(hm(arc["rise_utc"]), rise_tip))
+            tbl.setItem(row, 4, cell(max_txt, tip_local(arc["max_utc"])))
+            tbl.setItem(row, 5, cell(hm(arc["set_utc"]), set_tip))
+        tbl.resizeColumnsToContents()
+        tbl.setColumnWidth(0, 28)               # keep the disc column slim
 
     # ---------------- Sky calendar (SC2, ADR-040) ----------------
 
@@ -7251,7 +7354,10 @@ class MainWindow(QMainWindow):
         evs = skyevents.events(float(config.get("lat")),
                                float(config.get("lon")), days=60)
         dlg.fill_events(evs, dlg.content)
-        dlg.fill_jupiter_moons(evs, dlg.content)
+        dlg.fill_jupiter_moons(evs, dlg.content,
+                               show_unobserved=bool(
+                                   config.get("show_sat_moons_unobserved",
+                                              False)))
         self._fill_almanac()
 
     def _tools_skycal(self):

@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
 from ...core import approach_math
 from ...core import orbit_math
 from ...viz import palette
+from .. import pretty
 from .base_chart import ChartView
 from .orbit_widget import _play_icon, _pause_icon
 
@@ -216,14 +217,16 @@ class ApproachChart(QWidget):
 
     def _format_date(self, jd):
         # @args: jd - a Julian date
-        # @return: a short locale-aware date string (e.g. "03 Sep 2026").
+        # @return: a short localized date string (e.g. "03 sep 2026").
         from datetime import datetime, timezone
         try:
             utc = datetime.fromtimestamp(
                 (float(jd) - 2440587.5) * 86400.0, tz=timezone.utc)
         except (ValueError, OverflowError, OSError):
             return ""
-        return utc.strftime("%d %b %Y")
+        # strftime("%d %b") is always English: go through the shared
+        # pretty tables, like the rest of the GUI.
+        return pretty.day(pretty.ui_lang(), utc, year=True)
 
     def _trend(self, els, jd):
         # @args: els - elements dict; jd - current Julian date

@@ -260,14 +260,15 @@ def test_status_label_empty_before_set_elements(qapp):
 
 
 def test_format_date_shape(qapp):
-    # _format_date must produce a short, human date (e.g. "03 Sep 2026").
+    # _format_date must produce a short, human date (e.g. "3 ago 2026"
+    # in ES, "3 Aug 2026" in EN) — localized, never empty, year last.
     from nightscribe.gui.widgets.orbit_widget import OrbitChart
     w3 = OrbitChart()
     # 2461287.33 is 2026 Sep 3
     s = w3._format_date(2461287.33)
     assert s, "date must not be empty"
     assert len(s) <= 25
-    assert s[:2].isdigit() or s[:2].isalpha()
+    assert s[:1].isdigit()
     assert s[-4:].isdigit()
     w3.close()
 

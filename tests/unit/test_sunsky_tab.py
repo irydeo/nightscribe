@@ -81,23 +81,55 @@ def test_skycal_sections_fill_on_open(window):
     assert "10" in c.lbl_jup_note.text()      # the ±10 min honesty label
 
 
+def test_planets_table_all_7_rows(window):
+    # the almanac's planet table lists every planet — the naked-eye five
+    # plus Uranus and Neptune — each with its drawn disc and a well-formed
+    # magnitude. Below-15° planets stay in the table (dimmed, not
+    # hidden), so the row count never lies about the night.
+    import re
+    window._menus.action_skycal.trigger()
+    tbl = window.solar.tbl_planets
+    assert tbl.rowCount() == 7
+    names = set()
+    for row in range(7):
+        icon_it = tbl.item(row, 0)
+        name_it = tbl.item(row, 1)
+        mag_it = tbl.item(row, 2)
+        assert icon_it is not None
+        assert not icon_it.icon().pixmap(16, 16).isNull()
+        assert name_it is not None
+        names.add(name_it.text().lower())
+        assert mag_it is not None
+        assert re.fullmatch(r"-?\d+\.\d", mag_it.text()), mag_it.text()
+    # the row label is the proper noun in the UI language (pretty is the
+    # single source of truth — test whatever language the machine resolved)
+    from nightscribe.gui import pretty
+    assert names == {pretty.name(pretty.ui_lang(), n).lower()
+                     for n in ("mercury", "venus", "mars", "jupiter",
+                               "saturn", "uranus", "neptune")}
+
+
 def test_impact_line_with_aurora(window):
-    # S1: the line ties the context to the night plan (Moon + Kp + link)
+    # S1: with a Kp/aurora alert the line ties the context to the night
+    # plan (Kp + link). The Moon phase now lives in the Moon calendar, so
+    # the "%" lit figure must NOT be here any more.
     window._menus.action_skycal.trigger()
     window._last_sun = {"kp": 6.1}
     window._fill_almanac()
     text = window.solar.lbl_impact.text()
     assert "tonight://" in text
     assert "Kp 6.1" in text
-    assert "%" in text                       # the Moon part is always in
+    assert "%" not in text                    # the Moon phase is not here now
+    assert window.solar.lbl_impact.isVisible()
 
 
 def test_impact_line_quiet_sky(window):
+    # below Kp 5 there is no space-weather signal: the row is hidden,
+    # leaving no bare "See Tonight" link behind.
     window._menus.action_skycal.trigger()
     window._last_sun = {"kp": 2.0}
     window._fill_almanac()
-    text = window.solar.lbl_impact.text()
-    assert "Kp" not in text and "tonight://" in text
+    assert not window.solar.lbl_impact.isVisible()
 
 
 def test_render_png_needs_data_first(window):

@@ -53,6 +53,9 @@ DEFAULTS = {
     "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
     "moon_max_illum": 0.5,        # above this, faint targets get penalized
     "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
+    # Sky calendar (ADR-040): by default hide Galilean transits when Jupiter
+    # is not up; this checkbox re-enables them (dimmed, for completeness)
+    "show_sat_moons_unobserved": False,
     # Tonight filter (WORKFLOWS 7quater): the enabled object kinds are the
     # whitelist shown in the header combo and in Settings; missing means all.
     "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert",

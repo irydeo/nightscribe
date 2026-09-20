@@ -4,7 +4,7 @@
 # and publishes it as a rolling pre-release so external testers can try it.
 #
 # Triggers:
-#   - push to dev/v0.1 (the version in development)
+#   - push to main (v0.1 stabilizes there)
 #   - manual: Actions > Windows preview > Run workflow (pick any branch)
 #
 # The pre-release tag is preview-<branch> (e.g. preview-dev-v0.1) and is
@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - dev/v0.1
+      - main
 
 permissions:
   contents: write   # needed to publish the pre-release

@@ -105,6 +105,9 @@ def test_style_checkbox_indicator_is_visible_and_checked(qapp):
     # The checked state must reference the bundled tick asset and it must exist.
     assert theme.CHECK_SVG in qss, "checked indicator should paint check.svg"
     assert Path(theme.CHECK_SVG).is_file(), "check.svg asset missing"
+    # Windows regression guard: a native path ("C:\...") breaks the QSS url()
+    # (backslashes are CSS escapes) and the tick renders black on dark there.
+    assert "\\" not in theme.CHECK_SVG, "QSS url() needs a POSIX path"
     # And the boundary must actually read against the input background.
     assert _contrast(theme.C_EDGE, theme.C_BASE) >= 1.5
 

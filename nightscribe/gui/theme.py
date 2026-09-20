@@ -27,7 +27,11 @@ from pathlib import Path
 # moon_icon.py): the QSS references check.svg by URL to paint the tick inside
 # a checked indicator — files, not compiled qrc resources.
 _ASSETS = Path(__file__).resolve().parent.parent / "assets"
-CHECK_SVG = str(_ASSETS / "check.svg")
+# POSIX form on purpose: Qt's QSS parser reads backslashes as escape
+# characters, so a native Windows path ("C:\...") corrupts the url() and the
+# tick falls back to a black native check on the dark box. "C:/..." works
+# everywhere (identical to str(path) on Linux).
+CHECK_SVG = (_ASSETS / "check.svg").as_posix()
 
 
 # Per-kind accent colors, shared by cards, icons and table names.

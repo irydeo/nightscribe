@@ -44,6 +44,8 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 - **Voz humana**: comentarios cortos sobre cada método con `# @args:` / `# @return:`,
   como en el proyecto hermano `saas/`. Nada de docstrings robóticos ni sobre-ingeniería.
   Los TODOs se escriben como `# TODO: ...` donde apliquen.
+- **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
+  «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
 - **Mantenible por personas**: funciones cortas, dependencias mínimas, sin magia.
 - **Toda cadena visible en la GUI pasa por `self.tr()`** (ver CONTRIBUTING).
 - **Toda consulta de red pasa por `core/db.py` (caché)**: nunca llamar a `requests` desde
@@ -158,6 +160,8 @@ drafts + tweet + ready-to-attach PNG charts).
 - **The header block above goes in EVERY `.py` file** (adjust module name).
 - **Human voice**: short `# @args:` / `# @return:` comments above each method, in the
   spirit of the sibling project `saas/`. No robotic docstrings, no over-engineering.
+- **Docs in natural language**: never use the em dash ("—"); we write with ":", ","
+  and ";". The en dash ("–") stays reserved for numeric ranges (0–100).
 - **Every GUI-visible string goes through `self.tr()`** (see CONTRIBUTING).
 - **All network access goes through `core/db.py` (cache)**: never call `requests`
   outside `core/sources/`.

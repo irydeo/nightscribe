@@ -11,6 +11,10 @@
 #
 ############################################################
 
+import re
+import sys
+from pathlib import Path
+
 import platformdirs
 
 from . import __app_name__
@@ -41,5 +45,27 @@ def db_path():
 def image_cache_dir():
     # @return: Path to the cached image dir (SDO, cutouts...)
     p = data_dir() / "images"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def docs_dir():
+    # @return: Path to the documentation folder (docs/ bundled by the
+    # PyInstaller spec, or the repository one when running from source)
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS) / "docs"
+    return Path(__file__).resolve().parent.parent / "docs"
+
+
+def project_dir(project_id, slug="", root=""):
+    # @args: project_id - int, slug - object name (sanitised to a safe folder
+    #        name; non-alphanumeric chars become _, capped at 50 chars),
+    #        root - base folder hosting the project container; empty means the
+    #        legacy platformdirs data dir's projects/ folder (ADR-032)
+    # @return: Path to the per-project export folder (created if missing).
+    #          Exports go here instead of the flat exports/ dir (Track A, A4).
+    safe = re.sub(r'[^a-zA-Z0-9_-]', '_', slug or "")[:50]
+    base = Path(root) if root else data_dir() / "projects"
+    p = base / f"{project_id}-{safe}"
     p.mkdir(parents=True, exist_ok=True)
     return p

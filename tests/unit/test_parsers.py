@@ -11,7 +11,10 @@
 #
 ############################################################
 
-from nightscribe.core.sources import (esa_neo, pccp, rochester, sbdb)
+import pytest
+
+from nightscribe.core.sources import (esa_neo, neofixer, pccp, rochester,
+                                      sbdb)
 
 
 def test_parse_sbdb_apophis(sbdb_apophis):
@@ -23,10 +26,72 @@ def test_parse_sbdb_apophis(sbdb_apophis):
     assert abs(body["phys"]["diameter"] - 0.34) < 0.01
     assert abs(body["phys"]["H"] - 19.09) < 0.01
     assert body["elements"]["a"] > 0
+    # object-card plan 5a: discovery date — the fixture has no discovery
+    # record, so the orbit's first_obs ("2004-03-15") fills in
+    assert body["disc_date"] == "2004-03-15"
 
 
 def test_parse_sbdb_unknown():
     assert sbdb.parse_sbdb({}) is None
+
+
+def test_parse_sbdb_discovery_record_wins():
+    # when SBDB does send the discovery block (get() asks discovery=1),
+    # its "YYYY-Mmm-DD" date is normalised and preferred over first_obs
+    raw = {"object": {"des": "99942", "fullname": "99942 Apophis"},
+           "discovery": {"date": "2004-Jun-19", "who": "R. Tucker"},
+           "orbit": {"first_obs": "2004-03-15", "elements": []}}
+    body = sbdb.parse_sbdb(raw)
+    assert body["disc_date"] == "2004-06-19"
+
+
+def test_parse_sbdb_without_any_date():
+    # no discovery block and no first_obs: the key exists as None
+    raw = {"object": {"des": "X", "fullname": "X"}, "orbit": {}}
+    body = sbdb.parse_sbdb(raw)
+    assert body["disc_date"] is None
+
+
+def test_parse_neofixer_orbit(fixture_path):
+    import json
+    data = json.loads((fixture_path / "neofixer_orbit_sample.json")
+                      .read_text(encoding="utf-8"))
+    body = neofixer.parse_neofixer_orbit(data, "ST26H88")
+    assert body is not None
+    els = body["elements"]
+    # SBDB-shaped element keys must be present and sane
+    assert els["a"] > 0 and 0 < els["e"] < 1.0
+    assert 0 <= els["i"] < 180
+    assert els["q"] == pytest.approx(els["a"] * (1 - els["e"]), rel=1e-3)
+    assert els["om"] == pytest.approx(328.4813855513224)
+    assert els["w"] == pytest.approx(341.631989634389)
+    assert els["ma"] == pytest.approx(5.9850698674126)
+    assert els["tp"] == pytest.approx(2461259.60434909)
+    assert els["epoch"] == pytest.approx(2461277.5)
+    # sigmas kept under their own dict, keyed by element name
+    assert body["sigmas"]["e"] == pytest.approx(0.00308)
+    assert body["sigmas"]["a"] == pytest.approx(0.0131)
+    # MOID Earth drives pha; H feeds size estimates; arc from observations
+    assert body["moid"] == pytest.approx(0.002316)
+    assert body["pha"] is True and body["neo"] is True
+    assert body["phys"]["H"] == pytest.approx(26.74)
+    assert body["arc_days"] == pytest.approx(0.47, abs=0.01)
+    assert body["preliminary"] is True
+    # object-card plan 5b: first observation = the discovery night
+    # (NEOfixer's "earliest iso" is 2026-08-24T07:55:33Z)
+    assert body["disc_date"] == "2026-08-24"
+    # the parsed elements must propagate with our Kepler solver
+    from nightscribe.core import ephem_minor
+    out = ephem_minor.kepler_ra_dec(els, els["epoch"])
+    assert out is not None and out[2] > 0
+
+
+def test_parse_neofixer_orbit_missing(fixture_path):
+    import json
+    data = json.loads((fixture_path / "neofixer_orbit_none.json")
+                      .read_text(encoding="utf-8"))
+    assert neofixer.parse_neofixer_orbit(data, "XXXXXX") is None
+    assert neofixer.parse_neofixer_orbit({}, "XXXXXX") is None
 
 
 def test_parse_rochester(fixture_path):
@@ -72,6 +137,31 @@ def test_horizons_parser(fixture_path):
     assert rows[0]["delta"] > 0
     assert rows[0]["r"] > 0
     assert rows[0]["time"].startswith("2026-Aug-21")
+
+
+def test_horizons_parser_with_markers():
+    # Horizons inserts solar/lunar presence markers ("*", "m", "C/N/A")
+    # between the time and the RA — captured live from the API 2026-08-24.
+    # The parser must skip them instead of shifting every column.
+    from nightscribe.core.sources import horizons
+    text = (
+        "$$SOE\n"
+        " 2026-Aug-24 00:00  m  11 59 55.22 +00 14 00.2   "
+        "0.983762760826  -5.2106786  1.73047558770703  -4.5644460\n"
+        " 2026-Aug-25 00:00     12 03 19.81 -00 06 07.1   "
+        "0.980738618798  -5.2613019  1.72769565812394  -4.6944216\n"
+        " 2026-Aug-26 00:00*m   12 06 44.96 -00 26 17.6   "
+        "0.977685578196  -5.3107397  1.72484117431761  -4.8239993\n"
+        "$$EOE\n")
+    rows = horizons.parse_ephemeris(text)
+    assert len(rows) == 3
+    assert rows[0]["ra"] == "11 59 55.22"
+    assert rows[0]["dec"] == "+00 14 00.2"
+    assert rows[0]["r"] == pytest.approx(0.983762760826)
+    assert rows[0]["delta"] == pytest.approx(1.73047558770703)
+    assert rows[1]["dec"].startswith("-00 06")       # no marker column
+    assert rows[2]["time"] == "2026-Aug-26 00:00"    # glued "*m" markers
+    assert rows[2]["ra"] == "12 06 44.96"
 
 
 def test_exoclock_planets_parse(exoclock_sample):

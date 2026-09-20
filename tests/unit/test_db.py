@@ -43,6 +43,60 @@ def test_http_get_fetches_once(tmp_db):
     assert len(calls) == 1  # second call served from cache
 
 
+def test_http_get_survives_thread_pool(tmp_db):
+    # The planner's pools (comets, NEO discovery dates — object-card plan
+    # 5c) hammer the shared connection from several threads at once. One
+    # sqlite3 connection must never run two statements simultaneously;
+    # without the lock this raises "bad parameter or other API misuse".
+    import threading
+    errors = []
+
+    def hammer(tag):
+        def fetch():
+            time.sleep(0.001)      # widen the race window
+            return f"body-{tag}".encode(), "text/plain"
+        try:
+            for i in range(40):
+                tmp_db.http_get(f"key-{tag}-{i % 5}", "sbdb", fetch)
+                tmp_db.mark_observed(f"obj-{tag}")
+                tmp_db.is_observed(f"obj-{tag}")
+        except Exception as err:  # noqa: BLE001 - we assert on the list
+            errors.append(err)
+
+    threads = [threading.Thread(target=hammer, args=(t,)) for t in range(6)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert not errors, f"threaded access raised: {errors!r}"
+
+
+def test_cache_get_drops_poisoned_row(tmp_path):
+    # A row with NULL fetched/ttl (legacy DB, or an interrupted write from
+    # the pre-lock era) must not crash cache_get — it is dropped on sight
+    # and the caller refetches. The current schema forbids NULLs, so the
+    # legacy table is rebuilt by hand here.
+    import sqlite3
+    from nightscribe.core.db import Database
+    f = tmp_path / "legacy.db"
+    conn = sqlite3.connect(f)
+    conn.execute("CREATE TABLE http_cache (key TEXT PRIMARY KEY, source TEXT,"
+                 " fetched REAL, ttl REAL, body BLOB, content_type TEXT)")
+    conn.execute("INSERT INTO http_cache VALUES (?, ?, NULL, NULL, ?, ?)",
+                 ("old-key", "sbdb", b"x", ""))
+    conn.commit()
+    conn.close()
+    legacy = Database(f)
+    try:
+        assert legacy.cache_get("old-key") is None
+        # and the row is really gone (no second poisoning)
+        row = legacy._conn.execute(
+            "SELECT COUNT(*) FROM http_cache WHERE key='old-key'").fetchone()
+        assert row[0] == 0
+    finally:
+        legacy.close()
+
+
 def test_observations_flow(tmp_db):
     assert not tmp_db.is_observed("29P")
     tmp_db.mark_observed("29P", "comet", "2026-08-21")

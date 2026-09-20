@@ -1,6 +1,7 @@
-# ADR-010: matplotlib as the single render engine (GUI + PNG)
+# ADR-010: matplotlib as the single render engine (PNG/social-media)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-21
+**Estado / Status**: Accepted (partially superseded — GUI chart layer by ADR-029) ·
+**Fecha / Date**: 2026-08-21 · **Actualización / Update**: 2026-09-03 (Fase 5)
 
 ## Español
 
@@ -16,6 +17,14 @@ PySide6; backend `Agg` para export y tests). Estilo centralizado en `viz/style.p
 **Consecuencias**: un solo código por gráfico; tests de imagen con `Agg`; estilo
 consistente GUI/redes. matplotlib se instala en el `.venv`.
 
+### Alcance (2026-09-03, ADR-029)
+
+Esta ADR cubre el **renderizado de salida**: los PNGs de redes generados por
+`viz/*` y `core.post.build_charts`. Los **widgets interactivos de la GUI** (órbita,
+cielo, …) viven ahora en la capa `gui/widgets/*` (`QGraphicsView` nativos, sin
+matplotlib) — ver ADR-029. La exportación de redes se mantiene en matplotlib: es el
+único lugar donde se exige "una imagen estática final, lista para publicar".
+
 ## English
 
 **Context**: we want beautiful visualizations inside the GUI **and** PNGs ready for
@@ -29,3 +38,11 @@ dependency, HTML, not native); two different engines (double maintenance).
 
 **Consequences**: one code path per chart; image tests with `Agg`; consistent style
 across GUI/social. matplotlib is installed in the `.venv`.
+
+### Scope (2026-09-03, ADR-029)
+
+This ADR covers **output rendering**: the social-media PNGs produced by `viz/*` and
+`core.post.build_charts`. The **interactive GUI widgets** (orbit, sky, …) now live in
+the `gui/widgets/*` layer (native `QGraphicsView`, no matplotlib) — see ADR-029. Network
+export stays in matplotlib: it is the only place where "a final, publish-ready static
+image" is required.

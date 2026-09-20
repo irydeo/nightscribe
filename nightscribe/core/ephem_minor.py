@@ -29,14 +29,56 @@ def _rev(x):
 
 
 def _kepler_e(m_deg, e):
-    # Solves Kepler's equation by simple iteration (e < 0.8 always here).
+    # Solves Kepler's equation by Newton's method (works up to e < 1).
     # @args: m_deg - mean anomaly (degrees), e - eccentricity
     # @return: eccentric anomaly in degrees
     m = math.radians(m_deg)
-    ea = m + e * math.sin(m) * (1.0 + e * math.cos(m))
-    for _ in range(10):
-        ea = m + e * math.sin(ea)
+    ea = m if e < 0.8 else m + e * math.sin(m)
+    for _ in range(30):
+        f = ea - e * math.sin(ea) - m
+        fp = 1.0 - e * math.cos(ea)
+        delta = f / fp
+        ea -= delta
+        if abs(delta) < 1e-12:
+            break
     return math.degrees(ea)
+
+
+def _open_orbit_ecliptic(n, i, w, q, e, nu_deg):
+    # Open orbit (parabolic e=1 / hyperbolic e>1) position from true anomaly.
+    # r = q(1+e) / (1 + e*cos(nu))
+    # @args: n - node, i - inclination, w - arg perihelion,
+    #        q - perihelion distance (AU), e - eccentricity (>=1),
+    #        nu_deg - true anomaly (degrees)
+    # @return: (x, y, z, r) in AU
+    nu = math.radians(nu_deg)
+    r = q * (1 + e) / (1 + e * math.cos(nu))
+    ns, iw = math.radians(n), math.radians(i)
+    ww = math.radians(w)
+    x = r * (math.cos(ns) * math.cos(nu + ww)
+             - math.sin(ns) * math.sin(nu + ww) * math.cos(iw))
+    y = r * (math.sin(ns) * math.cos(nu + ww)
+             + math.cos(ns) * math.sin(nu + ww) * math.cos(iw))
+    z = r * math.sin(nu + ww) * math.sin(iw)
+    return x, y, z, r
+
+
+def _barker_true_anomaly(q, dt_days):
+    # Barker's equation for parabolic orbits: D + D³/3 = B*(t-T),
+    # D = tan(nu/2), B = k / (2*q^1.5), k = 0.01720209895
+    # @args: q - perihelion distance (AU), dt_days - days since perihelion
+    # @return: true anomaly in degrees
+    B = 0.01720209895 / (2 * q ** 1.5)
+    M = B * dt_days
+    D = M if abs(M) < 1 else math.copysign(1.0, M)
+    for _ in range(20):
+        f = D + D ** 3 / 3 - M
+        fp = 1 + D ** 2
+        delta = f / fp
+        D -= delta
+        if abs(delta) < 1e-12:
+            break
+    return 2 * math.degrees(math.atan(D))
 
 
 def _elements_to_ecliptic(n, i, w, a, e, m_deg):
@@ -57,15 +99,124 @@ def _elements_to_ecliptic(n, i, w, a, e, m_deg):
     return x, y, z, r
 
 
+def _ecliptic_to_equatorial(x, y, z, jd):
+    # Ecliptic -> equatorial J2000 rotation (same obliquity as _ecliptic_to_ra_dec).
+    # @return: (xe, ye, ze)
+    ecl = math.radians(23.4393 - 3.563e-7 * (jd - 2451543.5))
+    return x, y * math.cos(ecl) - z * math.sin(ecl), y * math.sin(ecl) + z * math.cos(ecl)
+
+
 def _ecliptic_to_ra_dec(x, y, z, jd):
     # Ecliptic rectangular -> equatorial RA/Dec (degrees).
-    ecl = math.radians(23.4393 - 3.563e-7 * (jd - 2451543.5))
-    xe = x
-    ye = y * math.cos(ecl) - z * math.sin(ecl)
-    ze = y * math.sin(ecl) + z * math.cos(ecl)
+    xe, ye, ze = _ecliptic_to_equatorial(x, y, z, jd)
     ra = _rev(math.degrees(math.atan2(ye, xe)))
     dec = math.degrees(math.atan2(ze, math.sqrt(xe * xe + ye * ye)))
     return ra, dec
+
+
+_KM_AU_DAY = AU_KM / 86400.0  # 1 AU/day in km/s
+
+
+def _mean_anomaly(elements, jd):
+    # Resolves the mean anomaly at jd from either ma+epoch or tp.
+    # @args: elements - dict with a, e, (ma or tp), (epoch), jd - Julian date
+    # @return: mean anomaly (degrees) in [0, 360), or None
+    a = elements.get("a")
+    if a is None or a <= 0:
+        return None
+    if elements.get("ma") is not None:
+        m0 = elements["ma"]
+        epoch = elements.get("epoch", jd)
+    elif elements.get("tp") is not None:
+        m0 = 0.0
+        epoch = elements["tp"]
+    else:
+        return None
+    n_deg_day = 0.9856076686 / (a ** 1.5)
+    return _rev(m0 + n_deg_day * (jd - epoch))
+
+
+def state_vector_j2000(elements, jd):
+    # Heliocentric state vector in the equatorial J2000 frame (two-body Kepler).
+    # @args: elements - dict like kepler_ra_dec (a, e, i, om, w, ma or tp),
+    #        jd - Julian date
+    # @return: (px, py, pz, vx, vy, vz) in (AU, AU/day), or None if invalid
+    m = _mean_anomaly(elements, jd)
+    if m is None:
+        return None
+    a = elements["a"]
+    e = elements.get("e", 0.0)
+    om = elements.get("om", 0.0)
+    inc = elements.get("i", 0.0)
+    w = elements.get("w", 0.0)
+    ea = math.radians(_kepler_e(m, e))
+    xv = a * (math.cos(ea) - e)
+    yv = a * math.sqrt(1 - e * e) * math.sin(ea)
+    r = math.sqrt(xv * xv + yv * yv)
+    if r <= 0:
+        return None
+    nu = math.atan2(yv, xv)
+    # velocity components in the orbital plane (AU/day): mu/h * (e*sin nu, 1+e*cos nu)
+    # where h = sqrt(mu * a * (1 - e^2)) is the specific angular momentum.
+    GAUSS = 0.01720209895  # sqrt(GM_sun) in AU^1.5/day^0.5
+    # specific angular momentum h = GAUSS * sqrt(a*(1-e^2));  mu/h = GAUSS/sqrt(a*(1-e^2))
+    mu_over_h = GAUSS / math.sqrt(a * (1.0 - e * e))
+    vr = mu_over_h * e * math.sin(nu)
+    vt = mu_over_h * (1.0 + e * math.cos(nu))
+    cos_nu, sin_nu = math.cos(nu), math.sin(nu)
+    px_o, py_o = r * cos_nu, r * sin_nu
+    vx_o, vy_o = (vr * cos_nu - vt * sin_nu, vr * sin_nu + vt * cos_nu)
+    # perifocal -> ecliptic
+    Cn, Sn = math.cos(math.radians(om)), math.sin(math.radians(om))
+    Ci, Si = math.cos(math.radians(inc)), math.sin(math.radians(inc))
+    Cw, Sw = math.cos(math.radians(w)), math.sin(math.radians(w))
+
+    def rot(xp, yp):
+        x = (Cn * Cw - Sn * Sw * Ci) * xp + (-Cn * Sw - Sn * Cw * Ci) * yp
+        y = (Sn * Cw + Cn * Sw * Ci) * xp + (-Sn * Sw + Cn * Cw * Ci) * yp
+        z = (Sw * Si * xp + Cw * Si * yp)
+        return x, y, z
+
+    px, py, pz = rot(px_o, py_o)
+    vx, vy, vz = rot(vx_o, vy_o)
+    # ecliptic -> equatorial J2000 (same obliquity as the RA/Dec path)
+    ecl = math.radians(23.4393 - 3.563e-7 * (jd - 2451543.5))
+    ce, se = math.cos(ecl), math.sin(ecl)
+
+    def to_eq(x, y, z):
+        return x, y * ce - z * se, y * se + z * ce
+
+    return to_eq(px, py, pz) + to_eq(vx, vy, vz)
+
+
+def _rotation_matrix_pq(om_deg, inc_deg, w_deg):
+    # The first two columns of the perifocal->ecliptic Euler rotation:
+    # P (toward perihelion) and Q (90 deg ahead, in the orbital plane).
+    # @return: (P, Q) as (x, y, z) triples, unit length, ecliptic frame
+    om = math.radians(om_deg)
+    i = math.radians(inc_deg)
+    w = math.radians(w_deg)
+    Cn, Sn = math.cos(om), math.sin(om)
+    Ci, Si = math.cos(i), math.sin(i)
+    Cw, Sw = math.cos(w), math.sin(w)
+    p = (Cn * Cw - Sn * Sw * Ci,
+         Sn * Cw + Cn * Sw * Ci,
+         Sw * Si)
+    q = (-Cn * Sw - Sn * Cw * Ci,
+         -Sn * Sw + Cn * Cw * Ci,
+         Cw * Si)
+    return p, q
+
+
+def pq_vectors_j2000(elements, jd):
+    # P and Q unit vectors of the orbit in the equatorial J2000 frame.
+    # @args: elements - dict with i, om, w, jd - Julian date (only fixes obliquity)
+    # @return: (P, Q) as (x,y,z) triples, or None if the orientation is missing
+    if elements.get("w") is None or elements.get("om") is None or elements.get("i") is None:
+        return None
+    p, q = _rotation_matrix_pq(elements.get("om", 0.0),
+                               elements.get("i", 0.0), elements.get("w", 0.0))
+    return (_ecliptic_to_equatorial(*p, jd), _ecliptic_to_equatorial(*q, jd))
 
 
 # ---------------- Sun ----------------
@@ -102,6 +253,22 @@ def earth_ecliptic_xyz(jd):
     ye = ys * math.cos(ecl) + zs * math.sin(ecl)
     ze = -ys * math.sin(ecl) + zs * math.cos(ecl)
     return -xe, -ye, -ze
+
+
+def earth_velocity_j2000(jd):
+    # Heliocentric velocity of Earth in the equatorial J2000 frame.
+    # Numerical derivative of earth_ecliptic_xyz (arcminute-level, matches the
+    # position propagator).
+    # @args: jd - Julian date
+    # @return: (vx, vy, vz) in AU/day
+    dt = 0.01  # 14.4 min — small enough for a 6-sig-fig derivative
+    x0, y0, z0 = earth_ecliptic_xyz(jd - dt)
+    x1, y1, z1 = earth_ecliptic_xyz(jd + dt)
+    vx = (x1 - x0) / (2 * dt)
+    vy = (y1 - y0) / (2 * dt)
+    vz = (z1 - z0) / (2 * dt)
+    # ecliptic -> equatorial J2000
+    return _ecliptic_to_equatorial(vx, vy, vz, jd)
 
 
 # ---------------- Moon ----------------
@@ -173,6 +340,7 @@ def moon(jd):
         "illum": illum,
         "phase_age_days": age,
         "elong_deg": elong,
+        "ecl_lat_deg": lat,  # ecliptic latitude (deg): the eclipse gate
     }
 
 
@@ -202,10 +370,12 @@ _PLANET_MAG0 = {"mercury": -0.36, "venus": -4.34, "mars": -1.51,
                 "neptune": -6.87}
 
 
-def planet(name, jd):
-    # Geocentric position and rough magnitude of a planet.
+def planet_heliocentric_xyz(name, jd):
+    # Heliocentric ecliptic (of-date) cartesian position of a planet —
+    # the 3D half of planet() factored out for the satellite geometry
+    # (core/satellites.py, Track SC2-SD). Additive: planet() untouched.
     # @args: name - planet name (lowercase, no Earth), jd - Julian date
-    # @return: dict with ra, dec (deg), dist_au (geocentric), mag
+    # @return: (x, y, z, r) in AU
     p = _PLANETS[name.lower()]
     d = jd - 2451543.5
     n = _rev(p[0] + p[1] * d)
@@ -214,10 +384,17 @@ def planet(name, jd):
     a = p[6] + p[7] * d
     e = p[8] + p[9] * d
     m = _rev(p[10] + p[11] * d)
-    xh, yh, zh, r = _elements_to_ecliptic(n, i, w, a, e, m)
+    return _elements_to_ecliptic(n, i, w, a, e, m)
+
+
+def planet(name, jd):
+    # Geocentric position and rough magnitude of a planet.
+    # @args: name - planet name (lowercase, no Earth), jd - Julian date
+    # @return: dict with ra, dec (deg), dist_au (geocentric), mag
+    xh, yh, zh, r = planet_heliocentric_xyz(name, jd)
 
     xe, ye, ze = earth_ecliptic_xyz(jd)
-    xg, yg, zg = xh + xe, yh + ye, zh + ze
+    xg, yg, zg = xh - xe, yh - ye, zh - ze
     dist = math.sqrt(xg * xg + yg * yg + zg * zg)
     ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
     mag = _PLANET_MAG0[name.lower()] + 5 * math.log10(max(r * dist, 1e-9))
@@ -226,32 +403,73 @@ def planet(name, jd):
 
 # ---------------- Minor bodies ----------------
 
-def kepler_ra_dec(elements, jd):
-    # Geocentric RA/Dec of a minor body from its orbital elements.
+def observer_offset_ecliptic(lat_deg, lon_deg, height_m, jd):
+    # Geocentric vector of the observer in the ecliptic J2000 frame.
+    # @args: lat_deg - geodetic latitude, lon_deg - geodetic longitude (east+),
+    #        height_m - height above sea level, jd - Julian date (TT, ~UT)
+    # @return: (x, y, z) in AU
+    d = jd - 2451543.5
+    gast = _rev(280.46061837 + 360.98564736629 * d)  # GMST, deg
+    phi = math.radians(lat_deg)
+    r_au = (6378.14 + height_m) / AU_KM
+    th = math.radians(gast + lon_deg)
+    xe = r_au * math.cos(phi) * math.cos(th)
+    ye = r_au * math.cos(phi) * math.sin(th)
+    ze = r_au * math.sin(phi)
+    # equatorial -> ecliptic (inverse of the _ecliptic_to_ra_dec rotation)
+    ecl = math.radians(23.4393 - 3.563e-7 * d)
+    ce, se = math.cos(ecl), math.sin(ecl)
+    return xe, ye * ce + ze * se, -ye * se + ze * ce
+
+
+def kepler_ra_dec(elements, jd, lat_deg=None, lon_deg=None, height_m=0.0):
+    # Geocentric (or topocentric) RA/Dec of a minor body from its elements.
     # @args: elements - dict with a (AU), e, i, om (node), w (arg. peri.),
     #        ma (mean anomaly at epoch), epoch (JD); or tp instead of ma,
-    #        jd - Julian date of interest
-    # @return: (ra_deg, dec_deg, r_au, delta_au) or None if hyperbolic/invalid
-    a = elements.get("a")
-    e = elements.get("e")
-    if a is None or e is None or e >= 0.99:
-        return None
-    epoch = elements.get("epoch", jd)
-    if elements.get("ma") is not None:
-        m0 = elements["ma"]
-    elif elements.get("tp") is not None:
-        n_deg_day = 0.9856076686 / (a ** 1.5)  # Gauss constant in deg/day
-        m0 = _rev(n_deg_day * (epoch - elements["tp"]))
-    else:
-        return None
-    n_deg_day = 0.9856076686 / (a ** 1.5)
-    m = _rev(m0 + n_deg_day * (jd - epoch))
+    #        jd - Julian date of interest,
+    #        lat_deg/lon_deg - observer site (when given, a topocentric
+    #        correction of order R_Earth/delta (~86" at delta = 0.1 AU) is
+    #        applied), height_m - site height, default 0
+    # @return: (ra_deg, dec_deg, r_au, delta_au) or None if invalid
+    topo = lat_deg is not None
 
+    def apply_topocentric(xg, yg, zg):
+        # object as seen from the observer = geocentric - observer offset
+        if not topo:
+            return xg, yg, zg
+        ox, oy, oz = observer_offset_ecliptic(lat_deg, lon_deg, height_m, jd)
+        return xg - ox, yg - oy, zg - oz
+
+    e = elements.get("e")
+    if e is None:
+        return None
+    # parabolic orbit (e = 1.0): use Barker's equation
+    if e >= 1.0:
+        q = elements.get("q")
+        tp = elements.get("tp")
+        if q is None or tp is None or q <= 0:
+            return None
+        nu = _barker_true_anomaly(q, jd - tp)
+        xo, yo, zo, r = _open_orbit_ecliptic(
+            elements.get("om", 0.0), elements.get("i", 0.0),
+            elements.get("w", 0.0), q, e, nu)
+        xe, ye, ze = earth_ecliptic_xyz(jd)
+        xg, yg, zg = apply_topocentric(xo - xe, yo - ye, zo - ze)
+        delta = math.sqrt(xg * xg + yg * yg + zg * zg)
+        ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
+        return ra, dec, r, delta
+    # bound orbit: Kepler
+    a = elements.get("a")
+    if a is None or a <= 0:
+        return None
+    m = _mean_anomaly(elements, jd)
+    if m is None:
+        return None
     xo, yo, zo, r = _elements_to_ecliptic(
         elements.get("om", 0.0), elements.get("i", 0.0), elements.get("w", 0.0),
         a, e, m)
     xe, ye, ze = earth_ecliptic_xyz(jd)
-    xg, yg, zg = xo + xe, yo + ye, zo + ze
+    xg, yg, zg = apply_topocentric(xo - xe, yo - ye, zo - ze)
     delta = math.sqrt(xg * xg + yg * yg + zg * zg)
     ra, dec = _ecliptic_to_ra_dec(xg, yg, zg, jd)
     return ra, dec, r, delta

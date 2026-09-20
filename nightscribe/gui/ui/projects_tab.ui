@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>ProjectsTab</class>
+ <widget class="QWidget" name="ProjectsTab">
+  <layout class="QHBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="grp_list">
+     <property name="title"><string>Projects</string></property>
+     <layout class="QVBoxLayout" name="listLayout">
+        <item>
+         <layout class="QHBoxLayout" name="searchLayout">
+          <item>
+           <widget class="QLineEdit" name="edt_search">
+            <property name="placeholderText"><string>Search…</string></property>
+           </widget>
+          </item>
+           <item><widget class="QPushButton" name="btn_new_project"><property name="text"><string>New project…</string></property></widget></item>
+         </layout>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="filterLayout">
+          <item>
+           <widget class="QComboBox" name="cmb_filter">
+            <item><property name="text"><string>Active</string></property></item>
+            <item><property name="text"><string>All</string></property></item>
+            <item><property name="text"><string>Done</string></property></item>
+            <item><property name="text"><string>Archived</string></property></item>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="btn_filters">
+            <property name="text"><string>Filters ▸</string></property>
+            <property name="checkable"><bool>true</bool></property>
+            <property name="toolTip"><string>Show or hide the advanced filters (type, tag, campaign, sort)</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="btn_hide_list">
+            <property name="text"><string>«</string></property>
+            <property name="maximumWidth"><number>36</number></property>
+            <property name="toolTip"><string>Hide the project list (bring it back with » on the details side)</string></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QWidget" name="filters_box" native="true">
+          <layout class="QVBoxLayout" name="filtersBoxLayout">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <item>
+            <layout class="QHBoxLayout" name="classifyLayout">
+             <item>
+              <widget class="QComboBox" name="cmb_kind">
+               <item><property name="text"><string>All types</string></property></item>
+               <item><property name="text"><string>SN</string></property></item>
+               <item><property name="text"><string>NEO</string></property></item>
+               <item><property name="text"><string>Comet</string></property></item>
+               <item><property name="text"><string>PCCP</string></property></item>
+               <item><property name="text"><string>Transit</string></property></item>
+               <item><property name="text"><string>HADS</string></property></item>
+               <item><property name="text"><string>Variable</string></property></item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="edt_tag">
+               <property name="placeholderText"><string>tag…</string></property>
+               <property name="maximumWidth"><number>80</number></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QComboBox" name="cmb_campaign">
+               <item><property name="text"><string>All campaigns</string></property></item>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="sortLayout">
+             <item>
+              <widget class="QComboBox" name="cmb_sort">
+               <item><property name="text"><string>Needs you</string></property></item>
+               <item><property name="text"><string>Updated</string></property></item>
+               <item><property name="text"><string>Created</string></property></item>
+               <item><property name="text"><string>Name</string></property></item>
+              </widget>
+             </item>
+             <item>
+              <widget class="QCheckBox" name="chk_favorites">
+               <property name="text"><string>★ Favorites first</string></property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       <item>
+        <widget class="QListWidget" name="lst_projects">
+         <property name="toolTip"><string>Select a project to see its guided steps</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_detail">
+      <property name="title"><string>Project details</string></property>
+      <layout class="QVBoxLayout" name="detailLayout">
+       <item>
+        <widget class="QStackedWidget" name="stack_detail">
+         <widget class="QWidget" name="page_dashboard">
+          <layout class="QVBoxLayout" name="dashOuterLayout">
+           <item>
+            <widget class="QLabel" name="lbl_dash_title">
+             <property name="text"><string>Needs your attention</string></property>
+             <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lbl_dash_sub">
+             <property name="wordWrap"><bool>true</bool></property>
+             <property name="text"><string>Your projects calling for action, most urgent first.</string></property>
+             <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QScrollArea" name="scroll_dash">
+             <property name="widgetResizable"><bool>true</bool></property>
+             <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+             <widget class="QWidget" name="dash_container">
+              <layout class="QVBoxLayout" name="dashLayout"/>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="page_detail">
+          <layout class="QVBoxLayout" name="pageDetailLayout">
+           <item>
+            <widget class="QWidget" name="masthead" native="true">
+             <layout class="QVBoxLayout" name="mastheadLayout">
+              <property name="leftMargin"><number>0</number></property>
+              <property name="topMargin"><number>0</number></property>
+              <property name="rightMargin"><number>0</number></property>
+              <property name="bottomMargin"><number>0</number></property>
+              <item>
+               <layout class="QHBoxLayout" name="mastRow1">
+                <item>
+                 <widget class="QLabel" name="lbl_mast_icon">
+                  <property name="minimumSize"><size><width>40</width><height>40</height></size></property>
+                  <property name="maximumSize"><size><width>40</width><height>40</height></size></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_mast_name">
+                  <property name="styleSheet"><string notr="true">font-size: 16px; font-weight: bold;</string></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_mast_kind"/>
+                </item>
+                <item>
+                 <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_mast_camp">
+                  <property name="text"><string/></property>
+                  <!-- openExternalLinks stays OFF: the campaign badge is an
+                        internal link (campaign://) served by
+                        linkActivated -> the Campaigns tab -->
+                  <property name="openExternalLinks"><bool>false</bool></property>
+                 </widget>
+                </item>
+               </layout>
+              </item>
+              <item>
+               <!-- ADR-041: the tab bar — the object card, the three
+                    steps and the follow-up view. One flat button per
+                    page; main_window paints the state (active / done /
+                    current / skipped / pending) per project kind. -->
+               <layout class="QHBoxLayout" name="tabLayout">
+                <item>
+                 <widget class="QPushButton" name="btn_tab_details">
+                  <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btn_tab_plan">
+                  <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btn_tab_process">
+                  <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btn_tab_publish">
+                  <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QPushButton" name="btn_tab_followup">
+                  <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+                </item>
+               </layout>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lbl_context">
+             <property name="wordWrap"><bool>true</bool></property>
+             <property name="text"><string>—</string></property>
+             <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="lbl_advisor">
+             <property name="wordWrap"><bool>true</bool></property>
+             <property name="text"><string></string></property>
+             <property name="styleSheet"><string notr="true">background-color: #3a3020; color: #e0c060; border: 1px solid #5a4a20; border-radius: 4px; padding: 6px;</string></property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="metaLayout">
+             <item>
+              <widget class="QToolButton" name="btn_show_list">
+               <property name="text"><string>»</string></property>
+               <property name="visible"><bool>false</bool></property>
+               <property name="maximumWidth"><number>36</number></property>
+               <property name="toolTip"><string>Bring back the project list</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="btn_home">
+               <property name="text"><string>⌂</string></property>
+               <property name="toolTip"><string>Back to the dashboard</string></property>
+               <property name="maximumWidth"><number>36</number></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btn_favorite">
+               <property name="text"><string>☆</string></property>
+               <property name="maximumWidth"><number>36</number></property>
+               <property name="toolTip"><string>Mark as favorite</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="btn_manage">
+               <property name="text"><string>⋯</string></property>
+               <property name="toolTip"><string>Manage this project (tags, folder, close, archive, delete)</string></property>
+               <property name="popupMode"><enum>QToolButton::InstantPopup</enum></property>
+               <property name="maximumWidth"><number>36</number></property>
+              </widget>
+             </item>
+             <item>
+              <spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QGroupBox" name="grp_next">
+             <property name="title"><string>Next</string></property>
+             <layout class="QHBoxLayout" name="nextLayout">
+              <item>
+               <widget class="QLabel" name="lbl_next">
+                <property name="text"><string>—</string></property>
+                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet"><string notr="true">font-size: 13px; font-weight: bold;</string></property>
+               </widget>
+              </item>
+             <item>
+              <widget class="QPushButton" name="btn_next_go">
+               <property name="text"><string>Go →</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="btn_next_done">
+               <property name="text"><string>✔ Mark done</string></property>
+               <property name="toolTip"><string>Mark the current step as done</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QToolButton" name="btn_next_skip">
+               <property name="text"><string>Skip</string></property>
+               <property name="toolTip"><string>Skip the current step</string></property>
+              </widget>
+             </item>
+            </layout>
+           </widget>
+          </item>
+           <item>
+            <widget class="QScrollArea" name="scroll_page">
+             <property name="widgetResizable"><bool>true</bool></property>
+             <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+             <widget class="QWidget" name="page_container">
+              <layout class="QVBoxLayout" name="pageLayout"/>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <resources/>
+  <connections/>
+</ui>

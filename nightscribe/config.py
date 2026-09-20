@@ -26,6 +26,9 @@ DEFAULTS = {
     "lon": -3.37,           # degrees east
     "height": 631,          # meters
     "aperture_inches": 10.0,
+    # hard gate: drop Tonight transits whose ExoClock minimum aperture is
+    # above ours (ADR-015 consequence, object-card plan subplan 6)
+    "transit_scope_filter": True,
     "limit_mag": 20.0,
     "min_alt": 30.0,        # degrees above horizon
     "language": "system",   # system | es | en
@@ -33,12 +36,63 @@ DEFAULTS = {
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
+    # Container root for the projects: empty -> platformdirs data dir's
+    # projects/ folder (the legacy location, see ADR-032)
+    "projects_root": "",
+    # UX v3 observing constraints (ADR-020 / ADR-021)
+    "horizon_file": "",         # TheSkyX-style az/alt file; empty -> flat min_alt
+    "horizon_margin_deg": 0.0,  # safety margin added on top of the horizon
+    "pixel_um": 3.76,           # camera pixel size in microns
+    "focal_mm": 2000.0,         # telescope focal length in mm
+    "overhead_s": 15.0,         # per-frame readout/slew overhead in seconds
+    # CCDciel JSON-RPC (ADR-030). Manual connect by default: the observatory
+    # software is a human decision, not an automatic one.
+    "ccdciel_host": "127.0.0.1",
+    "ccdciel_port": 3277,
+    "ccdciel_auto_connect": False,
+    "moon_limit_enabled": True,   # soft Moon constraint (warning + score penalty)
+    "moon_max_illum": 0.5,        # above this, faint targets get penalized
+    "moon_min_sep_deg": 45.0,     # below this separation, targets get penalized
+    # Sky calendar (ADR-040): by default hide Galilean transits when Jupiter
+    # is not up; this checkbox re-enables them (dimmed, for completeness)
+    "show_sat_moons_unobserved": False,
+    # Tonight filter (WORKFLOWS 7quater): the enabled object kinds are the
+    # whitelist shown in the header combo and in Settings; missing means all.
+    "enabled_kinds": ["neo", "sn", "comet", "pccp", "transit", "alert",
+                      "hads", "variable"],
+    "tonight_kind": "",           # last-used header filter; "" = "All"
+    "best_per_kind_n": 5,         # per-kind cap for the Tonight grid
+    # SN follow-up (Track B, B11): cadence threshold in days — the Tonight
+    # chip and the follow-up tab remind when a visit is due
+    "sn_cadence_days": 3,
+    # Track V (ADR-035, V-h): brightness-jump threshold for the variable
+    # event advisor (dip/outburst vs. the median of the previous points)
+    "event_mag_threshold": 0.5,
+    # ADR-037 (SC1): "extremum imminent" window for campaign signals (days)
+    "campaign_extremum_days": 3,
+    # ADR-037 (SC4a): the vigil watch list — None means the curated
+    # defaults in core/vigils.py (T CrB rise, R CrB drop); the settings
+    # editor stores a list of dicts here
+    "vigil_list": None,
+    # ADR-037 (SC4b): show the AAVSO editorial channel (forum alerts +
+    # active observing campaigns) in Tonight
+    "aavso_feed": True,
+    # ADR-037 (SC4a rev.): the AAVSO API token — the bright-star vigils
+    # read the community photometry, and that endpoint answers 401
+    # without it (empty = bright vigils stay silent, by design)
+    "aavso_api_token": "",
+    # EXOTIC handoff (Track D, subplan 4): camera identity and observer code
+    # for the inits.json; height above is reused as "Obs. Elevation (meters)"
+    "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
+    "pixel_binning": "1x1",
+    "aavso_code": "",           # AAVSO observer code; blank when none
 }
 
 
 class Config:
     # Tiny persistent configuration on top of a JSON file in the user
-    # config dir. Values are always strings/numbers/bools.
+    # config dir. Values are strings/numbers/bools, and lists of strings
+    # (enabled_kinds).
 
     def __init__(self):
         self._file = paths.config_dir() / "nightscribe.json"
@@ -54,6 +108,14 @@ class Config:
             pass
         except (json.JSONDecodeError, OSError) as err:
             logger.warning("Could not read config %s: %s", self._file, err)
+        # HADS/Track V rollout: a stored whitelist equal to any previous
+        # default gets the new kind(s) for free; a customised list is
+        # never touched
+        if self._data.get("enabled_kinds") in (
+                ["neo", "sn", "comet", "pccp", "transit", "alert"],
+                ["neo", "sn", "comet", "pccp", "transit", "alert",
+                 "hads"]):
+            self._data["enabled_kinds"] = list(DEFAULTS["enabled_kinds"])
 
     def save(self):
         # Writes the current configuration to disk

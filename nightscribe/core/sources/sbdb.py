@@ -16,6 +16,7 @@ import logging
 
 import requests
 
+from .. import dates
 from ..db import db
 
 logger = logging.getLogger(__name__)
@@ -39,6 +40,10 @@ def parse_sbdb(data):
             phys[p["name"]] = float(p["value"])
         except (KeyError, TypeError, ValueError):
             phys[p.get("name")] = p.get("value")  # keep strings (e.g. spectral class)
+    # discovery date ("2004-Mar-15") when asked for it, else the first
+    # observation of the orbit solution — both normalised to ISO
+    disc = (data.get("discovery") or {}).get("date")
+    first_obs = (data.get("orbit") or {}).get("first_obs")
     return {
         "fullname": obj.get("fullname") or obj.get("des"),
         "des": obj.get("des"),
@@ -50,19 +55,41 @@ def parse_sbdb(data):
         "elements": elements,
         "moid": elements.get("moid") or data.get("orbit", {}).get("moid"),
         "phys": phys,
+        "disc_date": dates.normalize_date(disc)
+        or dates.normalize_date(first_obs),
     }
 
 
-def get(name):
+def _fetch_one(sstr):
+    # @args: sstr - SBDB search string
+    # @return: (body bytes, content_type); raises on HTTP/network error
+    r = requests.get(URL, params={"sstr": sstr, "phys-par": "1",
+                                  "discovery": "1"}, timeout=30)
+    r.raise_for_status()
+    return r.content, "application/json"
+
+
+def get(name, force=False):
     # Fetches a small body (asteroid or comet) from JPL SBDB.
-    # @args: name - any designation ("Apophis", "2021EQ3", "29P")
+    # SBDB's sstr resolver rejects full comet names with a parenthetical
+    # ("P/2020 G1 (Pimentel)" -> 400); on a 400 we retry once with the
+    # parenthetical part dropped, which resolves fine. The retried lookup
+    # gets its own cache key, so the retry only ever happens once.
+    # @args: name - any designation ("Apophis", "2021EQ3", "29P"),
+    #        force - True bypasses the cache read (still stores the fresh copy)
     # @return: normalised dict or None
     def fetch():
-        r = requests.get(URL, params={"sstr": name, "phys-par": "1"}, timeout=30)
-        r.raise_for_status()
-        return r.content, "application/json"
+        try:
+            return _fetch_one(name)
+        except requests.HTTPError as err:
+            short = name.split("(")[0].strip()
+            if (err.response is not None and err.response.status_code == 400
+                    and short and short != name):
+                logger.info("SBDB 400 for %s; retrying as %s", name, short)
+                return _fetch_one(short)
+            raise
     try:
-        body, _ = db.http_get(f"sbdb:{name}", "sbdb", fetch)
+        body, _ = db.http_get(f"sbdb:{name}", "sbdb", fetch, force=force)
         return parse_sbdb(json.loads(body.decode("utf-8", "replace")))
     except (requests.RequestException, ValueError) as err:
         logger.warning("SBDB lookup failed for %s: %s", name, err)

@@ -15,6 +15,7 @@ import logging
 
 import requests
 
+from .. import coords
 from ..db import db
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,101 @@ def best_window(entries, min_alt=30.0):
         "max_time": best.get("ISO_time"),
         "window_start": up[0].get("ISO_time"),
         "window_end": up[-1].get("ISO_time"),
+    }
+
+
+def orbit(packed, force=False):
+    # Preliminary orbital elements for an (often unconfirmed) object,
+    # computed by NEOfixer with Bill Gray's Find_Orb from MPC astrometry.
+    # @args: packed - packed MPC designation (e.g. "6HJ1A21"),
+    #        force - True bypasses the cache read (still writes the fresh copy)
+    # @return: normalised dict shaped like sbdb.parse_sbdb, or None
+    import json
+
+    def fetch():
+        return requests.get(f"{BASE}/orbit/", params={"object": packed},
+                            timeout=40).content, "application/json"
+    try:
+        body, _ = db.http_get(f"neofixer:orbit:{packed}", "neofixer-orbit",
+                              fetch, force=force)
+        data = json.loads(body.decode("utf-8", "replace"))
+        return parse_neofixer_orbit(data, packed)
+    except (requests.RequestException, ValueError) as err:
+        logger.warning("NEOfixer orbit failed for %s: %s", packed, err)
+        return None
+
+
+def parse_neofixer_orbit(data, packed):
+    # Normalises a raw /orbit/ reply into the same shape as sbdb.parse_sbdb,
+    # so every downstream consumer (orbit chart, ephemeris, post)
+    # works unchanged. Element naming follows SBDB: M->ma, arg_per->w,
+    # asc_node->om, Tp->tp. Per-element sigmas are kept under "sigmas".
+    # @args: data - decoded NEOfixer JSON, packed - designation requested
+    # @return: dict or None if the object has no orbit
+    objects = (data.get("result") or {}).get("objects") or {}
+    obj = objects.get(packed)
+    if not obj:
+        return None
+    raw = obj.get("elements") or {}
+    if not raw.get("a") or raw.get("e") is None:
+        return None
+    elements = {
+        "a": raw["a"], "e": raw["e"], "i": raw.get("i", 0.0),
+        "om": raw.get("asc_node", 0.0), "w": raw.get("arg_per", 0.0),
+        "ma": raw.get("M"), "tp": raw.get("Tp"), "epoch": raw.get("epoch"),
+        "q": raw.get("q"), "Q": raw.get("Q"),
+    }
+    elements = {k: v for k, v in elements.items() if v is not None}
+    sigmas = {k[:-6]: v for k, v in raw.items()
+              if k.endswith(" sigma") and v is not None}
+    moids = {k: v for k, v in (raw.get("MOIDs") or {}).items()
+             if isinstance(v, (int, float))}
+    moid_earth = moids.get("Earth")
+    obs = obj.get("observations") or {}
+    arc_days = None
+    if obs.get("earliest") and obs.get("latest"):
+        arc_days = round(obs["latest"] - obs["earliest"], 2)
+    # first observation = the discovery night, for all practical purposes;
+    # NEOfixer hands us the ISO string (the JD float is the fallback)
+    disc_date = None
+    earliest_iso = obs.get("earliest iso")
+    if earliest_iso:
+        disc_date = str(earliest_iso)[:10]
+    elif obs.get("earliest"):
+        try:
+            disc_date = coords.datetime_from_jd(
+                obs["earliest"]).date().isoformat()
+        except (TypeError, ValueError, OverflowError):
+            disc_date = None
+    last_obs = None
+    latest_iso = obs.get("latest iso")
+    if latest_iso:
+        last_obs = str(latest_iso)[:10]
+    elif obs.get("latest"):
+        try:
+            last_obs = coords.datetime_from_jd(
+                obs["latest"]).date().isoformat()
+        except (TypeError, ValueError, OverflowError):
+            last_obs = None
+    return {
+        "fullname": packed,
+        "des": packed,
+        "kind": None,                   # unknown until MPC confirms
+        "neo": (raw.get("p_NEO") or 0) >= 50,
+        "pha": moid_earth is not None and moid_earth < 0.05,
+        "orbit_class": None,
+        "orbit_code": None,
+        "elements": elements,
+        "sigmas": sigmas,
+        "moid": moid_earth,
+        "moids": moids,
+        "phys": {"H": raw.get("H"), "G": raw.get("G")},
+        "rms_residual": raw.get("rms_residual"),
+        "n_resids": raw.get("n_resids"),
+        "arc_days": arc_days,
+        "disc_date": disc_date,
+        "last_obs": last_obs,
+        "preliminary": True,            # flag for narrative/UI wording
     }
 
 

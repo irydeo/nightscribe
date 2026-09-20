@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NightScribe — Observatory Terminal</title>
+  <meta name="description" content="NightScribe is a desktop application for amateur astronomical observatories. Plan your night, understand celestial objects, and create social media content.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Sans+Narrow:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/animations.css">
+</head>
+<body>
+  <noscript>
+    <div class="noscript-bar mono">
+      This site needs JavaScript to show its texts.<br>
+      Este sitio necesita JavaScript para mostrar sus textos.
+    </div>
+  </noscript>
+
+  <!-- ============================================================ -->
+  <!-- BACKGROUND LAYERS                                             -->
+  <!-- ============================================================ -->
+  <canvas id="stars-canvas"></canvas>
+  <div class="grid-overlay" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="spotlight" id="spotlight" aria-hidden="true"></div>
+  <div class="reticle" id="reticle" aria-hidden="true">
+    <span class="rx"></span><span class="ry"></span>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- ALTITUDE SCALE (right edge, scroll progress)                  -->
+  <!-- ============================================================ -->
+  <div class="alt-scale" id="alt-scale" aria-hidden="true">
+    <span class="alt-label top mono">90°</span>
+    <div class="alt-track">
+      <div class="alt-fill" id="alt-fill"></div>
+      <div class="alt-bubble" id="alt-bubble"></div>
+    </div>
+    <span class="alt-label bottom mono">0°</span>
+    <span class="alt-readout mono" id="alt-readout">0°</span>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- CONTROL BAR (sticky header)                                   -->
+  <!-- ============================================================ -->
+  <header class="control-bar" id="control-bar">
+    <div class="cb-left">
+      <span class="led led-on" id="led-status"></span>
+      <span class="cb-status mono" data-i18n="cb.status"></span>
+    </div>
+    <a href="#hero" class="cb-brand">NIGHT<span class="cb-brand-accent">SCRIBE</span></a>
+    <nav class="cb-nav">
+      <a href="#features" class="nav-link mono" data-i18n="nav.features"></a>
+      <a href="#sources"  class="nav-link mono" data-i18n="nav.sources"></a>
+      <a href="#about"    class="nav-link mono" data-i18n="nav.about"></a>
+    </nav>
+    <div class="cb-right">
+      <span class="cb-coords mono" id="cb-coords">RA 00:00:00 +00°00'</span>
+      <span class="cb-clock mono" id="cb-clock">00:00:00 UTC</span>
+      <button class="lang-toggle mono" id="lang-toggle" title="Toggle language"><span class="lang-label">ES</span></button>
+      <a href="#" class="btn-instrument btn-download mono" data-i18n="cb.get"></a>
+    </div>
+  </header>
+
+  <!-- ============================================================ -->
+  <!-- HERO — TELESCOPE APERTURE                                     -->
+  <!-- ============================================================ -->
+  <section class="hero" id="hero">
+    <div class="hero-content">
+      <div class="hero-kicker mono">
+        <span data-i18n="hero.kicker"></span>
+        <span class="kicker-dash">—</span>
+        <span class="kicker-ver mono" data-i18n="hero.version"></span>
+      </div>
+      <h1 class="hero-title">NIGHTSCRIBE</h1>
+      <p class="hero-tagline" data-i18n="hero.tagline"></p>
+      <p class="hero-sub mono" data-i18n="hero.sub"></p>
+      <div class="hero-cta">
+        <a href="#" class="btn-instrument btn-primary mono" data-i18n="hero.download"></a>
+        <a href="https://github.com" class="btn-instrument ghost mono" data-i18n="hero.github"></a>
+      </div>
+    </div>
+
+    <div class="hero-field">
+      <div class="field-wrap">
+        <img class="feature-screenshot" src="img/screens/hero.png" width="1520" height="980" alt="NightScribe — pestaña Tonight del observatorio" fetchpriority="high">
+        <span class="field-caption mono">FIELD 01 // TONIGHT TAB</span>
+      </div>
+    </div>
+
+    <div class="scroll-target">
+      <span class="st-label mono" data-i18n="hero.acquiring"></span>
+      <span class="st-cross"><i></i><i></i></span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FEATURES — CAPABILITY CATALOGUE                               -->
+  <!-- ============================================================ -->
+  <section class="features" id="features" aria-label="Capabilities">
+  <div class="section-header">
+    <div class="sh-kicker mono" data-i18n="head.cap.kick"></div>
+    <h2 class="sh-title" data-i18n="head.cap.title"></h2>
+    <div class="sh-rule"><span class="sh-diamond">&#9670;</span></div>
+  </div>
+
+  
+  <div class="feature-list">
+
+<details class="feature-row" id="feat-1">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-1</span>
+    <h3 class="feature-title" data-i18n="feat.1.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-1.png" width="1498" height="886" alt="NightScribe — pestaña Tonight: tarjetas de puntuación" loading="lazy">
+                                <span class="field-caption mono">FIELD 01 // TONIGHT</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">001</div>
+                              <h3 class="feature-title" data-i18n="feat.1.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.1.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.1.li.1"></li>
+                                  <li data-i18n="feat.1.li.2"></li>
+                                  <li data-i18n="feat.1.li.3"></li>
+                                  <li data-i18n="feat.1.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-2">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-2</span>
+    <h3 class="feature-title" data-i18n="feat.2.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-2.png" width="640" height="480" alt="NightScribe — pestaña Projects" loading="lazy">
+                                <span class="field-caption mono">SCORING ENGINE</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">002</div>
+                              <h3 class="feature-title" data-i18n="feat.2.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.2.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.2.li.1"></li>
+                                  <li data-i18n="feat.2.li.2"></li>
+                                  <li data-i18n="feat.2.li.3"></li>
+                                  <li data-i18n="feat.2.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-3">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-3</span>
+    <h3 class="feature-title" data-i18n="feat.3.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-3.png" width="640" height="480" alt="NightScribe — vista orbital (SBDB)" loading="lazy">
+                                <span class="field-caption mono">ORBIT VIEW // SBDB</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">003</div>
+                              <h3 class="feature-title" data-i18n="feat.3.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.3.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.3.li.1"></li>
+                                  <li data-i18n="feat.3.li.2"></li>
+                                  <li data-i18n="feat.3.li.3"></li>
+                                  <li data-i18n="feat.3.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-4">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-4</span>
+    <h3 class="feature-title" data-i18n="feat.4.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-4.png" width="640" height="480" alt="NightScribe — blink de supernova (PS1)" loading="lazy">
+                                <span class="field-caption mono">BLINK // PS1</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">004</div>
+                              <h3 class="feature-title" data-i18n="feat.4.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.4.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.4.li.1"></li>
+                                  <li data-i18n="feat.4.li.2"></li>
+                                  <li data-i18n="feat.4.li.3"></li>
+                                  <li data-i18n="feat.4.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-5">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-5</span>
+    <h3 class="feature-title" data-i18n="feat.5.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-5.png" width="640" height="480" alt="NightScribe — ventana de tránsito de exoplaneta" loading="lazy">
+                                <span class="field-caption mono">TRANSIT WINDOW</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">005</div>
+                              <h3 class="feature-title" data-i18n="feat.5.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.5.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.5.li.1"></li>
+                                  <li data-i18n="feat.5.li.2"></li>
+                                  <li data-i18n="feat.5.li.3"></li>
+                                  <li data-i18n="feat.5.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-6">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-6</span>
+    <h3 class="feature-title" data-i18n="feat.6.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-6.png" width="951" height="982" alt="NightScribe — curva de luz de variable (VSX)" loading="lazy">
+                                <span class="field-caption mono">LIGHT CURVE // VSX</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">006</div>
+                              <h3 class="feature-title" data-i18n="feat.6.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.6.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.6.li.1"></li>
+                                  <li data-i18n="feat.6.li.2"></li>
+                                  <li data-i18n="feat.6.li.3"></li>
+                                  <li data-i18n="feat.6.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-7">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-7</span>
+    <h3 class="feature-title" data-i18n="feat.7.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-7.png" width="1009" height="982" alt="NightScribe — borrador de post (ES+EN)" loading="lazy">
+                                <span class="field-caption mono">POST // ES+EN</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">007</div>
+                              <h3 class="feature-title" data-i18n="feat.7.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.7.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.7.li.1"></li>
+                                  <li data-i18n="feat.7.li.2"></li>
+                                  <li data-i18n="feat.7.li.3"></li>
+                                  <li data-i18n="feat.7.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-8">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-8</span>
+    <h3 class="feature-title" data-i18n="feat.8.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-8.png" width="1141" height="591" alt="NightScribe — flujo del proyecto" loading="lazy">
+                                <span class="field-caption mono">PROJECT FLOW</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">008</div>
+                              <h3 class="feature-title" data-i18n="feat.8.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.8.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.8.li.1"></li>
+                                  <li data-i18n="feat.8.li.2"></li>
+                                  <li data-i18n="feat.8.li.3"></li>
+                                  <li data-i18n="feat.8.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-9">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-9</span>
+    <h3 class="feature-title" data-i18n="feat.9.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-9.png" width="951" height="982" alt="NightScribe — panel de campañas" loading="lazy">
+                                <span class="field-caption mono">CAMPAIGN CTRL</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">009</div>
+                              <h3 class="feature-title" data-i18n="feat.9.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.9.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.9.li.1"></li>
+                                  <li data-i18n="feat.9.li.2"></li>
+                                  <li data-i18n="feat.9.li.3"></li>
+                                  <li data-i18n="feat.9.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-10">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-10</span>
+    <h3 class="feature-title" data-i18n="feat.10.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-10.png" width="1184" height="631" alt="NightScribe — panel solar" loading="lazy">
+                                <span class="field-caption mono">SOLAR // NOAA</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">010</div>
+                              <h3 class="feature-title" data-i18n="feat.10.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.10.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.10.li.1"></li>
+                                  <li data-i18n="feat.10.li.2"></li>
+                                  <li data-i18n="feat.10.li.3"></li>
+                                  <li data-i18n="feat.10.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-11">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-11</span>
+    <h3 class="feature-title" data-i18n="feat.11.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-11.png" width="160" height="160" alt="NightScribe — observatorio, CCDciel (JSON-RPC)" loading="lazy">
+                                <span class="field-caption mono">CCDciel // JSON-RPC</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">011</div>
+                              <h3 class="feature-title" data-i18n="feat.11.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.11.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.11.li.1"></li>
+                                  <li data-i18n="feat.11.li.2"></li>
+                                  <li data-i18n="feat.11.li.3"></li>
+                                  <li data-i18n="feat.11.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+
+<details class="feature-row" id="feat-12">
+  <summary class="feature-summary">
+    <span class="feature-number mono">FEAT-12</span>
+    <h3 class="feature-title" data-i18n="feat.12.title"></h3>
+  </summary>
+<div class="feature-block">
+                          <span class="ff-corner tl"></span><span class="ff-corner tr"></span>
+                          <span class="ff-corner bl"></span><span class="ff-corner br"></span>
+                          <div class="feature-inner">
+                            <div class="feature-visual">
+                              <div class="field-wrap">
+                                <img class="feature-screenshot" src="img/screens/feat-12.png" width="160" height="160" alt="NightScribe — módulos de visualización" loading="lazy">
+                                <span class="field-caption mono">VIZ MODULES</span>
+                              </div>
+                            </div>
+                            <div class="feature-text">
+                              <div class="feature-number mono">012</div>
+                              <h3 class="feature-title" data-i18n="feat.12.title"></h3>
+                              <p class="feature-subtitle" data-i18n="feat.12.sub"></p>
+                              <div class="feature-details">
+                                <ul>
+                                  <li data-i18n="feat.12.li.1"></li>
+                                  <li data-i18n="feat.12.li.2"></li>
+                                  <li data-i18n="feat.12.li.3"></li>
+                                  <li data-i18n="feat.12.li.4"></li>
+                                </ul>
+                              </div>
+                              <button class="btn-observe" aria-expanded="false">
+                                <span class="observe-led"></span>
+                                <span class="observe-label mono">OBSERVE</span>
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+</details>
+  </div>
+
+</section></section></section>
+
+  <!-- ============================================================ -->
+  <!-- DIVIDER                                                      -->
+  <!-- ============================================================ -->
+  <div class="divider" aria-hidden="true">
+    <span class="divider-line"></span>
+    <span class="divider-diamond">&#9670;</span>
+    <span class="divider-line"></span>
+  </div>
+
+  <!-- ============================================================ -->
+  <!-- DATA SOURCES — STAR CATALOGUE                                 -->
+  <!-- ============================================================ -->
+  <section class="sources-section" id="sources">
+    <div class="section-header">
+      <div class="sh-kicker mono" data-i18n="head.src.kick"></div>
+      <h2 class="sh-title" data-i18n="head.src.title"></h2>
+      <p class="sh-note mono" data-i18n="head.src.note"></p>
+    </div>
+    <div class="catalog">
+      <div class="catalog-head mono">
+        <span>#</span>
+        <span data-i18n="cat.head.source"></span>
+        <span data-i18n="cat.head.type"></span>
+        <span>TTL</span>
+      </div>
+      <div class="catalog-row mono"><span>001</span><span>NEOfixer</span><span data-i18n="type.catalogue">Catalogue</span><span>CACHE 1h</span></div>
+      <div class="catalog-row mono"><span>002</span><span>JPL SBDB</span><span data-i18n="type.orbital">Orbital</span><span>CACHE 7d</span></div>
+      <div class="catalog-row mono"><span>003</span><span>JPL Horizons</span><span data-i18n="type.ephemeris">Ephemeris</span><span>CACHE 4h</span></div>
+      <div class="catalog-row mono"><span>004</span><span>SIMBAD</span><span data-i18n="type.identifiers">Identifiers</span><span>CACHE 7d</span></div>
+      <div class="catalog-row mono"><span>005</span><span>Rochester SN</span><span data-i18n="type.transients">Transients</span><span>CACHE 24h</span></div>
+      <div class="catalog-row mono"><span>006</span><span>COBS</span><span data-i18n="type.comets">Comets</span><span>CACHE 6h</span></div>
+      <div class="catalog-row mono"><span>007</span><span>MPC PCCP</span><span data-i18n="type.candidates">Candidates</span><span>CACHE 12h</span></div>
+      <div class="catalog-row mono"><span>008</span><span>ESA NEOCC</span><span data-i18n="type.alerts">Alerts</span><span>CACHE 1h</span></div>
+      <div class="catalog-row mono"><span>009</span><span>ExoClock</span><span data-i18n="type.transits">Transits</span><span>CACHE 24h</span></div>
+      <div class="catalog-row mono"><span>010</span><span>HADS</span><span data-i18n="type.variables">Variables</span><span>CACHE 12h</span></div>
+      <div class="catalog-row mono"><span>011</span><span>AAVSO VSX</span><span data-i18n="type.variables">Variables</span><span>CACHE 7d</span></div>
+      <div class="catalog-row mono"><span>012</span><span>ALeRCE ZTF</span><span data-i18n="type.lightcurves">Light curves</span><span>CACHE 30d</span></div>
+      <div class="catalog-row mono"><span>013</span><span>TNS</span><span data-i18n="type.transients">Transients</span><span>CACHE 6h</span></div>
+      <div class="catalog-row mono"><span>014</span><span>Astrometry.net</span><span data-i18n="type.platesolve">Plate solve</span><span>REALTIME</span></div>
+      <div class="catalog-row mono"><span>015</span><span>NASA Exoplanet Archive</span><span data-i18n="type.exoplanets">Exoplanets</span><span>CACHE 24h</span></div>
+      <div class="catalog-row mono"><span>016</span><span>NOAA SWPC</span><span data-i18n="type.solar">Solar</span><span>CACHE 1h</span></div>
+      <div class="catalog-row mono"><span>017</span><span>SILSO</span><span data-i18n="type.sunspots">Sunspots</span><span>CACHE 24h</span></div>
+      <div class="catalog-row mono"><span>018</span><span>NASA SDO</span><span data-i18n="type.imagery">Imagery</span><span>CACHE 6h</span></div>
+      <div class="catalog-row mono"><span>019</span><span>DESI Legacy Survey</span><span data-i18n="type.cutouts">Cutouts</span><span>CACHE 30d</span></div>
+      <div class="catalog-row mono"><span>020</span><span>DSS via hips2fits</span><span data-i18n="type.cutouts">Cutouts</span><span>CACHE 30d</span></div>
+      <div class="catalog-row mono"><span>021</span><span>CCDciel</span><span data-i18n="type.local">Local</span><span>REALTIME</span></div>
+      <div class="catalog-row mono"><span>022</span><span>Schlyter Algorithms</span><span data-i18n="type.offline">Offline</span><span>N/A</span></div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- ABOUT — SYSTEM INFORMATION                                    -->
+  <!-- ============================================================ -->
+  <section class="about-section" id="about">
+    <div class="section-header">
+      <div class="sh-kicker mono" data-i18n="head.about.kick"></div>
+      <h2 class="sh-title" data-i18n="head.about.title"></h2>
+    </div>
+    <div class="about-grid">
+      <div class="about-card">
+        <div class="ac-icon mono">&#128187;</div>
+        <h4 data-i18n="about.1.title"></h4>
+        <p data-i18n="about.1.text"></p>
+      </div>
+      <div class="about-card">
+        <div class="ac-icon mono">&#127760;</div>
+        <h4 data-i18n="about.2.title"></h4>
+        <p data-i18n="about.2.text"></p>
+      </div>
+      <div class="about-card">
+        <div class="ac-icon mono">&#128274;</div>
+        <h4 data-i18n="about.3.title"></h4>
+        <p data-i18n="about.3.text"></p>
+      </div>
+      <div class="about-card">
+        <div class="ac-icon mono">&#128736;</div>
+        <h4 data-i18n="about.4.title"></h4>
+        <p data-i18n="about.4.text"></p>
+      </div>
+    </div>
+    <div class="about-author mono">
+      <span data-i18n="about.author"></span>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <!-- FOOTER — TERMINAL SESSION END                                 -->
+  <!-- ============================================================ -->
+  <footer class="site-footer">
+    <div class="footer-bar mono">
+      <span class="led led-dim" data-i18n="footer.bar"></span>
+    </div>
+    <div class="footer-inner">
+      <div class="footer-brand mono">NIGHT<span>SCRIBE</span></div>
+      <div class="footer-links mono">
+        <a href="#" data-i18n="footer.download"></a>
+        <a href="#" data-i18n="footer.docs"></a>
+        <a href="https://github.com" data-i18n="footer.github"></a>
+        <a href="#" data-i18n="footer.license"></a>
+      </div>
+      <div class="footer-copy mono">
+        <p>&copy; 2026 Francisco José Calvo Fernández · GNU GPL v3</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/i18n.js"></script>
+  <script src="js/stars.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

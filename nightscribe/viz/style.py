@@ -11,20 +11,39 @@
 #
 ############################################################
 
+import logging
+from pathlib import Path
+
 import matplotlib
 
+from . import palette
+
+logger = logging.getLogger(__name__)
+
 # One style for every chart, used by the GUI canvas and the PNG exports
-# alike (see ADR-010). Dark space theme, consistent accents.
+# alike (see ADR-010). The *colours* live in `viz.palette` (no matplotlib
+# dependency, importable from the PySide6-only GUI chart widgets); ADR-029.
 
-BG = "#0b0d17"
-FG = "#e8eaf2"
-ACCENT = "#ffb347"      # warm orange: the object
-ACCENT2 = "#6ec1ff"     # cool blue: Earth
-MUTED = "#8a90a6"       # labels and grids
-SUN = "#ffd76e"
-DANGER = "#ff6b6b"
+BG     = palette.BG
+FG     = palette.FG
+ACCENT = palette.ACCENT
+ACCENT2 = palette.ACCENT2
+MUTED  = palette.MUTED
+SUN    = palette.SUN
+DANGER = palette.DANGER
 
-SIZES = {"instagram": (1080, 1080), "facebook": (1200, 630)}
+SIZES = {"instagram": (1080, 1080), "facebook": (1200, 630),
+         "panel": (1200, 675)}
+
+
+def pick(lang, es, en):
+    # Single-language string: exported charts follow the configured UI
+    # language instead of hard-coding "es / en" (ADR-018, 2026-09-02).
+    # @args: lang - "es"|"en" (default "es"), es / en - the two strings
+    # @return: the Spanish one when lang is not "en", else the English
+    if (lang or "es") == "en":
+        return en
+    return es
 
 
 def apply_style():
@@ -46,13 +65,21 @@ def apply_style():
     })
 
 
-def new_fig(fmt="instagram", dpi=100):
-    # @args: fmt - "instagram" | "facebook", dpi - output dpi
+def new_fig(fmt="instagram", dpi=100, size=None):
+    # @args: fmt - "instagram" | "facebook" | "panel", dpi - output dpi,
+    #        size - (w, h) px overrides for the preset (the panel's
+    #        re-render mode draws 2× for crispness in big slots)
     # @return: (fig, ax) with the NightScribe style applied
     apply_style()
     w, h = SIZES.get(fmt, SIZES["instagram"])
+    if size:
+        w, h = size
     import matplotlib.pyplot as plt
     fig, ax = plt.subplots(figsize=(w / dpi, h / dpi), dpi=dpi)
+    if fmt == "panel":
+        # in-GUI chart: squeeze the default matplotlib margins down so the
+        # plot owns the PNG (the wasted dark border is space for nothing)
+        fig.subplots_adjust(left=0.06, right=0.985, top=0.855, bottom=0.115)
     return fig, ax
 
 
@@ -67,5 +94,9 @@ def watermark(fig, text):
 
 def save(fig, path):
     # @args: fig - matplotlib figure, path - output PNG path
-    fig.savefig(path, dpi=fig.dpi, facecolor=fig.get_facecolor(),
+    p = Path(path)
+    # Output folders are created on demand: a fresh install has none of them
+    # yet and savefig() would raise if the parent dir is missing.
+    p.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(p, dpi=fig.dpi, facecolor=fig.get_facecolor(),
                 bbox_inches="tight")

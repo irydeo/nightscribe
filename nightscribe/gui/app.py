@@ -28,13 +28,19 @@ def run():
 
     from ..config import config
     from .main_window import MainWindow
+    from .theme import apply_theme
     from .wizard import maybe_run_wizard
 
     app = QApplication(sys.argv)
     app.setApplicationName("NightScribe")
     app.setOrganizationName("NightScribe")
 
-    # UI language: configured or the OS one (see ADR-014)
+    # Dark identity for the whole app (ADR-026). Applied before any
+    # window is created so nothing paints with the platform style.
+    apply_theme(app)
+
+    # UI language: configured or the OS one (see ADR-014).
+    # Install before the wizard so its tr() strings resolve.
     lang = config.get("language", "system")
     if lang == "system":
         lang = QLocale.system().name()[:2]

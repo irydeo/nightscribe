@@ -16,21 +16,15 @@
       <widget class="QWidget" name="tab_tonight">
        <attribute name="title"><string>Tonight</string></attribute>
       </widget>
-      <widget class="QWidget" name="tab_explore">
-       <attribute name="title"><string>Explore</string></attribute>
+      <widget class="QWidget" name="tab_projects">
+       <attribute name="title"><string>Projects</string></attribute>
       </widget>
-      <widget class="QWidget" name="tab_post">
-       <attribute name="title"><string>Post</string></attribute>
+      <widget class="QWidget" name="tab_campaigns">
+       <attribute name="title"><string>Campaigns</string></attribute>
       </widget>
-      <widget class="QWidget" name="tab_solar">
-       <attribute name="title"><string>Solar system</string></attribute>
+      <widget class="QWidget" name="tab_observatory">
+       <attribute name="title"><string>Observatory</string></attribute>
       </widget>
-       <widget class="QWidget" name="tab_history">
-        <attribute name="title"><string>History</string></attribute>
-       </widget>
-       <widget class="QWidget" name="tab_blink">
-        <attribute name="title"><string>Blink</string></attribute>
-       </widget>
      </widget>
     </item>
    </layout>
@@ -44,50 +38,56 @@
     <property name="title"><string>File</string></property>
     <addaction name="action_quit"/>
    </widget>
-   <widget class="QMenu" name="menu_view">
-    <property name="title"><string>View</string></property>
-    <widget class="QMenu" name="menu_language">
-     <property name="title"><string>Language</string></property>
-     <addaction name="action_lang_system"/>
-     <addaction name="action_lang_es"/>
-     <addaction name="action_lang_en"/>
+     <widget class="QMenu" name="menu_tools">
+     <property name="title"><string>Tools</string></property>
+     <addaction name="action_settings"/>
+     <addaction name="separator"/>
+       <addaction name="action_skycal"/>
+       <addaction name="action_explore"/>
+       <addaction name="action_blink"/>
+       <addaction name="action_journal"/>
+       <addaction name="action_campaigns"/>
+      </widget>
+    <widget class="QMenu" name="menu_help">
+     <property name="title"><string>Help</string></property>
+     <addaction name="action_docs"/>
+     <addaction name="separator_help"/>
+     <addaction name="action_about"/>
+     <addaction name="action_sources"/>
     </widget>
-    <addaction name="menu_language"/>
-   </widget>
-   <widget class="QMenu" name="menu_tools">
-    <property name="title"><string>Tools</string></property>
-    <addaction name="action_settings"/>
-   </widget>
-   <widget class="QMenu" name="menu_help">
-    <property name="title"><string>Help</string></property>
-    <addaction name="action_about"/>
-    <addaction name="action_sources"/>
-   </widget>
-   <addaction name="menu_file"/>
-   <addaction name="menu_view"/>
-   <addaction name="menu_tools"/>
-   <addaction name="menu_help"/>
+    <addaction name="menu_file"/>
+    <addaction name="menu_tools"/>
+    <addaction name="menu_help"/>
   </widget>
   <action name="action_quit">
    <property name="text"><string>Quit</string></property>
   </action>
-  <action name="action_lang_system">
-   <property name="text"><string>System</string></property>
-  </action>
-  <action name="action_lang_es">
-   <property name="text"><string>Español</string></property>
-  </action>
-  <action name="action_lang_en">
-   <property name="text"><string>English</string></property>
-  </action>
   <action name="action_settings">
    <property name="text"><string>Settings…</string></property>
+  </action>
+  <action name="action_explore">
+   <property name="text"><string>Explore object…</string></property>
+  </action>
+  <action name="action_blink">
+   <property name="text"><string>Blink (ad-hoc)…</string></property>
+  </action>
+   <action name="action_journal">
+    <property name="text"><string>Observing journal…</string></property>
+   </action>
+   <action name="action_skycal">
+    <property name="text"><string>Sky calendar…</string></property>
+   </action>
+  <action name="action_campaigns">
+   <property name="text"><string>Campaigns…</string></property>
   </action>
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>
   </action>
   <action name="action_sources">
    <property name="text"><string>Data sources</string></property>
+  </action>
+  <action name="action_docs">
+    <property name="text"><string>Technical Documentation</string></property>
   </action>
  </widget>
  <resources/>

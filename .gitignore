@@ -1,7 +1,14 @@
 .venv/
+nightscribe/_version.py
 dist/
 build/
 __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
+.idea/
+
+# generated renders / test scratch output (real assets live in nightscribe/assets/)
+_overview_*.png
+_preview_*.png
+hat.png

@@ -15,10 +15,18 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   rate, uncertainty, NEOCP flag, impact/radar/NHATS/Yarkovsky flags.
 - `GET .../ephem/?site=<code>&object=<packed>` — public. Site-specific ephemeris
   (alt, az, mag, motion) precomputed by NEOfixer (Bill Gray's find_orb).
+- `GET .../orbit/?object=<packed>` — public. **Preliminary orbital elements** for
+  unconfirmed (NEOCP) objects, computed with Find_Orb from MPC astrometry: full
+  Keplerian elements (`a, e, q, Q, i, asc_node, arg_per, M, Tp, epoch`) with
+  per-element sigmas, per-planet MOIDs, `p_NEO`, residual count and observed arc.
+  Normalised by `parse_neofixer_orbit()` into the SBDB shape (ADR-023); feeds the
+  orbit chart, the params table (with sigmas) and the local ephemeris fallback in
+  `core/ephemeris.py`.
 - `GET .../report/?key=<api key>&site=<code>&object=<id>&status=<s>` — **requires
   the user's API key** (Settings). Reports `will_observe`/`observed`/... for
   community coordination. Optional.
-- TTL: 12 h. Note: `object` must be a *packed* designation.
+- TTL: 12 h (`targets`, `ephem`); 1.5 h (`orbit` — preliminary orbits change fast).
+  Note: `object` must be a *packed* designation.
 
 ### Rochester Astronomy (David Bishop) — `rochester.py` — recent supernovae
 
@@ -54,6 +62,68 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   priority, `min_telescope_inches`, O-C drift, star magnitude, coordinates.
 - TTL: 24 h. Transit times are computed locally (t0 + n·P) — see `core/transits.py`.
 
+### HADS catalogue (P. Wils / VVS) — `hads_sheet.py` — high-amplitude δ Scuti stars
+
+- `https://docs.google.com/spreadsheets/d/1oGA2HaEHE8L6eX19ZoHqQQTu0LYV56HX3Srg7oCtOHo/export?format=xlsx`
+  — public Google Sheets workbook (one tab per year, updated daily by the
+  programme coordinator): star name (with aliases), RA/Dec, Max/Min magnitudes,
+  period (h), **font-color priorities** (red/orange name = period changes
+  found/possible — priority!; blue coordinates = not yet observed; purple name
+  = multiperiodic) and the monthly observer-coverage cells.
+- TTL: 12 h, two-level cache (raw XLSX + parsed JSON). Parsed with stdlib
+  `zipfile`+`xml.etree` (no openpyxl at runtime). The bundled snapshot
+  `assets/HADS-stars.csv` (168 stars, rich aliases) is the offline fallback;
+  the merge lives in `core/hads.py` (ADR-034).
+
+### AAVSO VSX — `vsx.py` — variable stars (Track V, ADR-035)
+
+- `GET https://vsx.aavso.org/index.php?view=api.object&ident=<name>&format=json`
+  — public Variable Star Index API. **Note: the `www.aavso.org` domain sits
+  behind a Cloudflare challenge that blocks plain clients; the
+  `vsx.aavso.org` subdomain answers a clean 200** (verified 2026-09-11).
+  Extracted: name + AUID, RA/Dec, variable type, period (d), epoch (JD→MJD in
+  the parser), Max/Min with band, spectral class, constellation.
+- TTL: 7 d. **Degradation**: `lookup()` returns `None` on unknown/failure →
+  card via SIMBAD (coordinates) → manual entry; Tonight is local and never
+  breaks.
+
+### ALeRCE ZTF API v1 — `surveys.py` — light-curve context (V-f)
+
+- `GET https://api.alerce.online/ztf/v1/conesearch?_ra=..&_dec=..&_radius=..`
+  and `GET .../lightcurve?oid=<oid>` — two cached calls per object (oid →
+  light curve). Grey reference points `source="survey:ztf"` under the
+  observer's own, never mixed (ZTF g/r/i bands mapped to filters). Verified
+  2026-09-11.
+- TTL: 30 d for the light-curve context (survey photometry does not
+  change). The **vigils** (ADR-037) reuse the same calls under `vigils:*`
+  keys with a 12 h TTL: a watch needs the *latest* point, not the context.
+  Failure → `[]`/`None`; the survey button warns and nothing else breaks.
+
+### AAVSO editorial channel — `aavso.py` — forum alerts + campaigns (SC4b)
+
+- `GET https://forums.aavso.org/c/observing/alerts/50.json` — the forum is
+  Discourse and serves native per-category JSON (spike validated
+  2026-09-16: titles like "SU Tau is dimming", "T CRB Johnson V scores
+  below 8.5"). Topics with activity in the last 60 days are listed (the
+  pinned "About" post is discarded).
+- `GET https://apps.aavso.org/v2/campaigns/` — the observing-campaigns
+  list page (HTML); rows `<tr>` are parsed with the stdlib (id+link |
+  title | requester | start | end | kinds) and filtered to active ones
+  (start ≤ today ≤ end).
+- The star name is extracted from the free-text title with tolerant
+  patterns (`Nova Sgr 2026 No. 3`, `NSV 11664`, designation + genitive
+  like `SU Tau` / `T CRB`) and **validated via VSX** before anything is
+  shown: what does not resolve is not shown. TTL: 12 h. Failure → `[]`.
+- **Community photometry (bright vigils, SC4a rev. 2)**:
+  `GET https://apps.aavso.org/v2/api/observations/photometry/?target=<star>&start_date=..&end_date=..`
+  — official endpoint (docs.aavso.org), **requires the user's API token**
+  (`Authorization: Token …`, 401 without it; configured in Settings next
+  to the observer code). It is the backend of vigils with a baseline
+  under 11.5 mag: ZTF saturates there (verified 2026-09-16: T CrB/R CrB
+  have no ALeRCE object). Fields used: `jd_dbl`, `magnitude`, `band`
+  (DRF-paginated or bare list; tolerant parsing). TTL: 12 h. No token →
+  `None`, silent by design.
+
 ## Object data sources (feed "Explore" and "Post")
 
 ### JPL SBDB — `sbdb.py` — small-body identity and physical data
@@ -80,6 +150,11 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
 - `POST https://simbad.cds.unistra.fr/simbad/sim-script` — public script interface.
   Queries: `query id <name>` (otype, coordinates, V flux), `query around <name>
   radius=<r>` (host galaxy candidates with redshift via `%RV`). TTL: 7 d.
+  Fallback: on a network failure the same script is retried once against the
+  Harvard mirror (`https://simbad.harvard.edu/simbad/sim-script`) — heavy
+  `query around` scripts regularly exceed the 40 s read timeout on Strasbourg
+  while the mirror answers 3x faster (measured 2026-09); `around` scripts get
+  60 s, `id` scripts 40 s.
 
 ### TNS (Transient Name Server) — `tns.py` — freshest transient positions
 
@@ -156,3 +231,8 @@ NEOfixer web, TNS web. The app opens them in the browser.
 Sun, Moon and planets: Paul Schlyter's low-precision algorithms
 (`core/ephem_minor.py`) — pure math, arcminute accuracy, offline. Minor bodies:
 Kepler propagation from SBDB elements. See ADR-009.
+
+Moon *surface* (the phase icon only, no ephemeris): one bundled photograph,
+`nightscribe/assets/moon_disk.png` — Gregory H. Revera, "FullMoon2010",
+Wikimedia Commons, CC BY-SA 3.0 (full credit in `assets/ATTRIBUTION.txt`).
+Generated once at dev time; the app needs no network for it.

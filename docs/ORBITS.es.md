@@ -9,7 +9,7 @@ diferencia a NightScribe de las tablas de efemérides.
 ## Familias orbitales
 
 Clasificación a partir de los elementos SBDB (a, q, e) y el código de clase orbital.
-Cada familia trae una breve explicación bilingüe y su lugar en `viz/families_view.py`:
+Cada familia trae una breve explicación bilingüe (en `core/orbits.py`):
 
 | Familia | Regla aproximada | En una frase |
 |---|---|---|

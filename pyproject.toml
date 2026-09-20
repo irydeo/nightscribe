@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=68", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "nightscribe"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Plan your night, understand every object, tell your science. NEOs, comets, supernovae, exoplanet transits and the Sun for amateur observatories."
 readme = "README.md"
 license = {text = "GPL-3.0-only"}
@@ -47,11 +47,16 @@ nightscribe = "nightscribe.__main__:main"
 Homepage = "https://www.irydeo.com"
 Repository = "https://github.com/<pending>/nightscribe"
 
+[tool.setuptools_scm]
+version_scheme = "guess-next-dev"
+fallback_version = "0.0.0"
+
 [tool.setuptools.packages.find]
 include = ["nightscribe*"]
 
 [tool.setuptools.package-data]
 "nightscribe.gui" = ["ui/*.ui", "i18n/*.qm"]
+"nightscribe" = ["assets/*", "assets/hads-coverage/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

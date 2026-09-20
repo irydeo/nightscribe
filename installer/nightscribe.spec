@@ -13,7 +13,9 @@
 
 # Build with:  .venv/bin/pyinstaller installer/nightscribe.spec
 # Output:      dist/nightscribe/   (Linux binary; on Windows: nightscribe.exe)
-# Bundles: Qt Designer .ui files, compiled .qm translations, matplotlib style.
+# Bundles: Qt Designer .ui files, compiled .qm translations, the moon
+#          surface asset, matplotlib style
+#          and the docs/ folder (Help > Documentation).
 
 import glob
 import os
@@ -22,10 +24,15 @@ block_cipher = None
 ROOT = os.path.abspath(os.path.join(os.path.dirname(SPEC), ".."))
 
 datas = []
-for pattern in ("nightscribe/gui/ui/*.ui", "nightscribe/gui/i18n/*.qm"):
+for pattern in ("nightscribe/gui/ui/*.ui", "nightscribe/gui/i18n/*.qm",
+                "nightscribe/assets/*"):
     for f in glob.glob(os.path.join(ROOT, pattern)):
         sub = os.path.dirname(os.path.relpath(f, ROOT))
         datas.append((f, sub))
+# Whole docs/ tree, including adr/ (Help > Documentation viewer)
+for f in glob.glob(os.path.join(ROOT, "docs/**/*.md"), recursive=True):
+    sub = os.path.dirname(os.path.relpath(f, ROOT))
+    datas.append((f, sub))
 
 a = Analysis(
     [os.path.join(ROOT, "launcher.py")],

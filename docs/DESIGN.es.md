@@ -23,31 +23,57 @@ NightScribe **traduce, explica y dibuja bonito** — riguroso pero humano.
 La configuración por defecto usa la estación MPC **Z41** (Observatorio Irydeo) como
 ejemplo; todo es configurable para que cualquier observatorio lo adopte.
 
-## Las cinco vistas
+## Las vistas
+
+*(UX v3, ADR-019: la app se reorganiza alrededor de los **Proyectos**; pestañas:
+Esta noche · Proyectos · Sistema solar · Historial. Explora/Post/Blink pasan a ser
+paneles contextuales abiertos desde un proyecto, con acceso ad-hoc en Herramientas.
+Flujos guiados por tipo en WORKFLOWS.es.md.)*
 
 ### 1. Esta noche — la vista principal
 
-No es una tabla: es una **recomendación** (ver ADR-017 para el rediseño v2).
+No es una tabla: es una **recomendación** (ver ADR-017 para el rediseño v2, ADR-019
+para v3).
 
-- **Banda «Ahora mismo»**: objetivos sobre el horizonte en este instante, con
-  altitud y azimut en vivo, ordenados por score.
+ - **Banda «Ahora mismo»**: objetivos sobre el horizonte en este instante, con
+   altitud y azimut en vivo, ordenados por score. Además de la ventana, cada tarjeta
+   muestra el **rango de observación seguro** (ADR-020): chip verde
+   «⊕ HH:MM–HH:MM · ≤ HH:MM» (ventana del plan + último inicio posible) u
+   **chip rojo «⚠ no cabe»** cuando la sesión planificada no encaja antes de que el
+   objeto cruse el horizonte — nunca se fuerza el equipo.
 - **Top 3 unificado** con medallas y la frase generada «por qué esta noche»
   (en el idioma de la interfaz).
-- Listado completo: ordenable pulsando cabeceras, **columnas dinámicas según el
-  filtro de tipo** (NEOs muestran NObs/MOID/prioridad NEOfixer; supernovas
-  muestran tipo/galaxia/fecha de descubrimiento...), más panel de detalle con
-  acciones por objetivo (Explorar / Post / Observado).
-- Botones por objetivo: *Marcar observado* (reporta a NEOfixer si hay clave) y
-  *Post*.
+ - Listado completo: ordenable pulsando cabeceras, **columnas dinámicas según el
+   filtro de tipo** (NEOs muestran NObs/MOID/prioridad NEOfixer; supernovas
+   muestran tipo/galaxia/fecha de descubrimiento...), más panel de detalle con
+   acciones por objetivo (Explorar / Post / Observado).
+  - Punto de entrada a **Explorar** (UX v3, fase E): la fila, el doble clic en la
+    tabla y el botón de la tarjeta (🔭 Explorar / ▶ Continuar según si hay proyecto
+    `active`) abren siempre el diálogo *Explorar* pre-rellenado. Dentro, la pestaña
+    *Detalles* ofrece un **CTA único** a ancho completo: «Continuar proyecto»
+    (verde) si hay un activo para el objeto, «Crear proyecto» (naranja) si no;
+    se retiran la pareja de botones y el antiguo botón de post. El proyecto ya no se
+    crea desde la tarjeta, sino desde el diálogo.
 
 ### Estructura de la interfaz
 
 Barra de menú (Archivo / Vista / Herramientas / Ayuda); **Configuración vive en un
 diálogo modal** (Herramientas → Configuración…); cambio de idioma en Vista.
-Pestañas: Esta noche · Explora · Post · Sistema solar · Historial. La interfaz
-muestra un solo idioma cada vez; solo los posts generados son bilingües.
+Pestañas (UX v3, ADR-019): Esta noche · Proyectos · Sistema solar · Historial. La
+interfaz muestra un solo idioma cada vez; solo los posts generados son bilingües.
 
-### 2. Explora
+### 2. Proyectos — el flujo guiado (UX v3, ADR-019)
+
+Cada objetivo puede convertirse en un **proyecto**: un flujo guiado y persistente por
+ tipo de objeto (Plan → Captura → Procesado → Publicar) que lleva todo el
+contexto — sin volver a preguntar nombres, coordenadas o imágenes. Las secuencias de
+captura y las efemérides se exportan como ficheros para software externo (NINA,
+CCDciel, TheSkyX, Cartes du Ciel — ADR-021); la astrometría medida fuera se pega de
+vuelta, se valida y se empaqueta para el reporte al MPC (ADR-022). Restricciones que
+respeta el planificador: horizonte local real, Luna, viabilidad de la sesión y escala
+de placa de la cámara (ADR-020).
+
+### 3. Explora
 
 Escribe cualquier identificador (`2021EQ3`, `29P`, `SN2023ixf`, `HD 209458 b`, `sol`) y
 obtén la **ficha explicada del objeto**:
@@ -62,7 +88,7 @@ obtén la **ficha explicada del objeto**:
   imagen de referencia del campo con crosshair.
 - Exoplanetas: tipo, «su año dura X días», temperatura de equilibrio, estrella anfitriona.
 
-### 3. Post
+### 4. Post
 
 - Borradores en **español e inglés** más un tuit de 280 caracteres; siempre ambos idiomas
   independientemente del idioma de la interfaz (la audiencia es bilingüe).
@@ -72,7 +98,7 @@ obtén la **ficha explicada del objeto**:
 - Imagen propia opcional de la observación → lado a lado o GIF blink animado
   (survey de referencia vs. imagen del observatorio).
 
-### 4. Sistema solar ahora
+### 5. Sistema solar ahora
 
 - **Sol**: última imagen SDO (dominio público) en varias longitudes de onda, mapa propio
   de regiones activas a partir de coordenadas NOAA, número de manchas y tendencia
@@ -82,7 +108,7 @@ obtén la **ficha explicada del objeto**:
 - Recursos externos como enlaces (mapas Raben, SolarMonitor, SIDC, universemonitor) —
   nunca incrustados, por copyright.
 
-### 5. Configuración
+### 6. Configuración
 
 - Asistente de primer arranque: introduce tu **código de observatorio MPC** → coordenadas
   resueltas automáticamente (ObsCodes del MPC) — o localización manual completa
@@ -111,8 +137,13 @@ obtén la **ficha explicada del objeto**:
 | Tránsito de exoplaneta | ExoClock, NASA Exoplanet Archive | «esta noche un planeta eclipsa su estrella un 1,5% durante 3 h; tu curva de luz ayuda a la misión Ariel de la ESA» |
 | Sol | SDO, NOAA/GOES/DSCOVR, SILSO | estado del ciclo solar, regiones activas, fulguraciones, posibilidad de auroras |
 
-## Fuera de alcance (v1)
+## Fuera de alcance
 
-- Control de telescopios (eso lo hace el proyecto hermano `saas`).
-- Publicación automática en las APIs de Meta/X (copiar y pegar, por decisión de diseño).
+- Control de telescopios (eso lo hace el proyecto hermano `saas`). **Exportar
+  secuencias de captura y efemérides como ficheros** para software externo (NINA,
+  CCDciel, planetarios) **sí está dentro** del alcance — es generación de ficheros, no
+  control (ADR-021).
+- Publicación automática en las APIs de Meta/X (copiar y pegar, por decisión de
+  diseño; el reporte al MPC también se empaqueta para que lo envíe el usuario,
+  ADR-022).
 - Visualización 3D de órbitas (2D cenital por diseño; quizás más adelante).

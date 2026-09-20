@@ -1,0 +1,191 @@
+/* ============================================================
+ * NightScribe Landing Page — Observatory Terminal
+ * Scroll animations, reveals, crosshairs.
+ * ============================================================ */
+
+/* ---------- No-JS fallback ---------- */
+.no-js .feature-inner,
+.no-js .section-header,
+.no-js .about-card,
+.no-js .catalog {
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* ---------- Reveals (hidden only when JS is active) ---------- */
+.js .section-header {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+
+.section-header.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.js .feature-inner {
+  opacity: 0;
+  transform: translateY(46px);
+  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
+}
+
+.feature-block.revealed .feature-inner {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Corner brackets draw in when revealed */
+.ff-corner {
+  opacity: 0;
+  transition: opacity 0.4s var(--ease) 0.3s;
+}
+
+.feature-block.revealed .ff-corner { opacity: 1; }
+
+/* Feature number ticks in */
+.feature-number {
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.5s var(--ease) 0.25s, transform 0.5s var(--ease) 0.25s;
+}
+
+.feature-block.revealed .feature-number {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Staggered visual field */
+.feature-block.revealed .field-vignette {
+  animation: visualIn 0.8s var(--ease) both 0.15s;
+}
+
+@keyframes visualIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+/* ---------- About cards ---------- */
+.js .about-card {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+}
+
+.about-section.revealed .about-card {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.about-section.revealed .about-card:nth-child(1) { transition-delay: 0.05s; }
+.about-section.revealed .about-card:nth-child(2) { transition-delay: 0.13s; }
+.about-section.revealed .about-card:nth-child(3) { transition-delay: 0.21s; }
+.about-section.revealed .about-card:nth-child(4) { transition-delay: 0.29s; }
+
+/* ---------- Catalogue ---------- */
+.js .catalog {
+  opacity: 0;
+  transform: translateY(26px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+
+.sources-section.revealed .catalog {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Catalogue rows cascade in */
+.js .catalog-row {
+  opacity: 0;
+  transform: translateX(-14px);
+  transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.sources-section.revealed .catalog-row { opacity: 1; transform: translateX(0); }
+.sources-section.revealed .catalog-row:nth-child(1)  { transition-delay: 0.04s; }
+.sources-section.revealed .catalog-row:nth-child(2)  { transition-delay: 0.08s; }
+.sources-section.revealed .catalog-row:nth-child(3)  { transition-delay: 0.12s; }
+.sources-section.revealed .catalog-row:nth-child(4)  { transition-delay: 0.16s; }
+.sources-section.revealed .catalog-row:nth-child(5)  { transition-delay: 0.20s; }
+.sources-section.revealed .catalog-row:nth-child(6)  { transition-delay: 0.24s; }
+.sources-section.revealed .catalog-row:nth-child(7)  { transition-delay: 0.28s; }
+.sources-section.revealed .catalog-row:nth-child(8)  { transition-delay: 0.32s; }
+.sources-section.revealed .catalog-row:nth-child(9)  { transition-delay: 0.36s; }
+.sources-section.revealed .catalog-row:nth-child(10) { transition-delay: 0.40s; }
+.sources-section.revealed .catalog-row:nth-child(11) { transition-delay: 0.44s; }
+.sources-section.revealed .catalog-row:nth-child(12) { transition-delay: 0.48s; }
+.sources-section.revealed .catalog-row:nth-child(13) { transition-delay: 0.52s; }
+.sources-section.revealed .catalog-row:nth-child(14) { transition-delay: 0.56s; }
+.sources-section.revealed .catalog-row:nth-child(15) { transition-delay: 0.60s; }
+.sources-section.revealed .catalog-row:nth-child(16) { transition-delay: 0.64s; }
+.sources-section.revealed .catalog-row:nth-child(17) { transition-delay: 0.68s; }
+.sources-section.revealed .catalog-row:nth-child(18) { transition-delay: 0.72s; }
+.sources-section.revealed .catalog-row:nth-child(19) { transition-delay: 0.76s; }
+.sources-section.revealed .catalog-row:nth-child(20) { transition-delay: 0.80s; }
+.sources-section.revealed .catalog-row:nth-child(21) { transition-delay: 0.84s; }
+.sources-section.revealed .catalog-row:nth-child(22) { transition-delay: 0.88s; }
+.sources-section.revealed .catalog-row:nth-child(23) { transition-delay: 0.92s; }
+
+/* ---------- Hero entrance ---------- */
+.hero-content {
+  opacity: 0;
+  transform: translateY(26px);
+  animation: heroIn 0.9s var(--ease) forwards 0.15s;
+}
+
+.hero-field {
+  opacity: 0;
+  transform: translateY(32px);
+  animation: heroIn 1s var(--ease) forwards 0.45s;
+}
+
+@keyframes heroIn {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- Crosshair acquisition pulse (hero target) ---------- */
+.st-cross i:first-child,
+.st-cross i:last-child {
+  animation: crossPulse 2.6s var(--ease) infinite;
+}
+
+.st-cross i:last-child { animation-delay: 0.13s; }
+
+@keyframes crossPulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1; }
+}
+
+/* ---------- Spotlight transition ---------- */
+.spotlight { transition: opacity 0.4s var(--ease); }
+
+/* ---------- Scanlines subtle movement ---------- */
+.scanlines {
+  animation: scanDrift 16s linear infinite;
+}
+
+@keyframes scanDrift {
+  from { background-position: 0 0; }
+  to   { background-position: 0 -9px; }
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .js .feature-inner,
+  .js .section-header,
+  .js .about-card,
+  .js .catalog,
+  .js .catalog-row {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

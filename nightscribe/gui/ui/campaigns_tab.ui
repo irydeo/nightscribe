@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>CampaignsTab</class>
+ <widget class="QWidget" name="CampaignsTab">
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="grp_signals">
+     <property name="title"><string>Happening now</string></property>
+     <layout class="QVBoxLayout" name="signalsLayout">
+      <item>
+       <!-- U7: the strip explains itself — scope of the feed + icon help -->
+       <layout class="QHBoxLayout" name="signalsScopeRow">
+        <item>
+         <widget class="QLabel" name="lbl_signals_scope">
+          <property name="text"><string>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+          <property name="styleSheet"><string>color: #8a90a6; font-style: italic; font-size: 11px;</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="signalsScopeSpacer">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QToolButton" name="btn_signals_help">
+          <property name="text"><string>ⓘ</string></property>
+          <property name="toolTip"><string>What do the icons mean?</string></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_cov">
+        <property name="text"><string/></property>
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="styleSheet"><string>color: #8a90a6; font-style: italic; font-size: 11px;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QListWidget" name="lst_signals">
+        <property name="toolTip"><string>Double-click a row to open its project</string></property>
+        <property name="maximumHeight"><number>140</number></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="columnsLayout">
+     <item>
+      <widget class="QGroupBox" name="grp_list">
+       <property name="title"><string>Campaigns</string></property>
+       <property name="maximumWidth"><number>360</number></property>
+       <layout class="QVBoxLayout" name="listLayout">
+        <item>
+         <widget class="QListWidget" name="lst_campaigns">
+          <property name="toolTip"><string>Select a campaign to see its detail</string></property>
+         </widget>
+        </item>
+        <item>
+         <layout class="QHBoxLayout" name="rowNew">
+          <item><widget class="QPushButton" name="btn_new"><property name="text"><string>New campaign…</string></property></widget></item>
+          <item>
+           <widget class="QToolButton" name="btn_help">
+            <property name="text"><string>ⓘ</string></property>
+            <property name="toolTip"><string>What is a campaign?</string></property>
+           </widget>
+          </item>
+          <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
+         </layout>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QGroupBox" name="grp_detail">
+       <property name="title"><string>Campaign detail</string></property>
+       <layout class="QVBoxLayout" name="detailLayout">
+        <item>
+         <layout class="QHBoxLayout" name="cheadLayout">
+          <item>
+           <widget class="QLabel" name="lbl_cname">
+            <property name="text"><string>Select a campaign.</string></property>
+            <property name="styleSheet"><string>font-size: 15px; font-weight: bold;</string></property>
+            <property name="wordWrap"><bool>true</bool></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btn_cedit">
+            <property name="text"><string>Edit…</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QPushButton" name="btn_cclose">
+            <property name="text"><string>Close</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QToolButton" name="btn_cmore">
+            <property name="text"><string>⋯</string></property>
+            <property name="toolTip"><string>More campaign actions (delete, projects)</string></property>
+            <property name="popupMode"><enum>QToolButton::InstantPopup</enum></property>
+           </widget>
+          </item>
+         </layout>
+        </item>
+        <item><widget class="QLabel" name="lbl_cmeta"><property name="text"><string>—</string></property></widget></item>
+        <item>
+         <widget class="QLabel" name="lbl_cgoal">
+          <property name="text"><string/></property>
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lbl_urls">
+          <property name="text"><string/></property>
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="grp_protocol">
+          <property name="title"><string>Protocol</string></property>
+          <layout class="QVBoxLayout" name="protocolLayout">
+           <item>
+            <widget class="QLabel" name="lbl_protocol">
+             <property name="text"><string>—</string></property>
+             <property name="wordWrap"><bool>true</bool></property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="grp_members">
+          <property name="title"><string>Projects in this campaign</string></property>
+          <layout class="QVBoxLayout" name="membersLayout">
+           <item>
+            <widget class="QTableWidget" name="tbl_members">
+             <property name="toolTip"><string>Double-click a row to open its project</string></property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

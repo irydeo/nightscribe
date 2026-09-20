@@ -17,7 +17,7 @@ import logging
 import sys
 from pathlib import Path
 
-from . import __app_name__, __version__, config, paths
+from . import __app_name__, config, paths
 from .config import config as cfg
 from .core.db import db
 
@@ -43,14 +43,24 @@ def cmd_tonight(args):
     top, all_scored = suggest.top_n(targets, cfg, db, args.top)
     medals = ["🥇", "🥈", "🥉"] + ["•"] * max(args.top - 3, 0)
     print("\n=== LO MEJOR DE ESTA NOCHE / BEST OF TONIGHT ===")
+    n_beyond = 0
+    limit = float(cfg.get("limit_mag", 20.0))
     for i, (t, score, parts, phrase) in enumerate(top):
         mag = f"{t['mag']:.1f}" if t.get("mag") else "—"
-        alt = f"{t['max_alt']:.0f}°" if t.get("max_alt") else "—"
-        print(f"\n{medals[i]} {t['name']}  [{t['kind']}]  score {score}")
+        alt = t.get("safe_max_alt", t.get("max_alt"))
+        alt = f"{alt:.0f}°" if alt else "—"
+        beyond, _delta = suggest.beyond_limit(t, cfg)
+        if beyond:
+            n_beyond += 1
+        flag = f"  ▲ mag>{limit:.0f}" if beyond else ""
+        print(f"\n{medals[i]} {t['name']}  [{t['kind']}]  score {score}{flag}")
         print(f"   mag {mag} · alt. máx {alt}")
         print(f"   ES: {phrase['es']}")
         print(f"   EN: {phrase['en']}")
     print(f"\n({len(all_scored)} objetivos evaluados / targets evaluated)")
+    if n_beyond:
+        print(f"({n_beyond} objetivos por encima de la magnitud límite "
+              f"{limit:.0f} / targets beyond the mag {limit:.0f} limit)")
 
 
 def cmd_explore(args):
@@ -69,7 +79,9 @@ def cmd_explore(args):
 
 
 def cmd_post(args):
-    # Bilingual post drafts + tweet (+ PNGs in --png mode).
+    # Bilingual post drafts + tweet + PNG charts, and the ES/EN markdown
+    # always references every generated image (ready for a web page).
+    import re
     from .core import enrich, post
     e = enrich.enrich(args.objeto, site=cfg.get("mpc_code"))
     if not e or not e.get("data"):
@@ -77,7 +89,14 @@ def cmd_post(args):
         return 1
     rendered = post.render_post(e, cfg)
     outdir = args.salida or (paths.data_dir() / "posts")
-    written = post.save_outputs(rendered, outdir, args.objeto)
+    if args.png:
+        # build the charts and have the markdown reference them
+        safe = re.sub(r"[^\w.-]+", "_", args.objeto)
+        charts = post.build_charts(e, outdir, safe + "_", cfg=cfg)
+        written = post.save_outputs(rendered, outdir, args.objeto, e=e,
+                                    charts=charts, cfg=cfg)
+    else:
+        written = post.save_outputs(rendered, outdir, args.objeto)
     for k, p in written.items():
         print(f"[{k}] -> {p}")
     db.mark_posted(args.objeto)
@@ -97,21 +116,29 @@ def cmd_solar(args):
         from .core.sources import sdo
         from .viz import sun_panel
         img = sdo.latest_image("0193", 1024)
+        hmi = sdo.latest_image("HMII", 1024)
+        s["hmi_img"] = str(hmi) if hmi else None
         out = paths.data_dir() / "posts" / "sun.png"
-        sun_panel.draw_sun(img, s, out=out)
+        sun_panel.draw_sun(img, s, out=out,
+                           lang=cfg.ui_language() if hasattr(cfg, "ui_language")
+                           else "es")
         print(f"PNG -> {out}")
 
 
 def cmd_history(args):
-    # Observation history.
-    rows = db.history(50)
-    if not rows:
-        print("Sin observaciones registradas / No observations recorded yet")
+    # Observing journal (ADR-036): the derived activity view, grouped by
+    # observing night (noon-to-noon local).
+    from .core import journal
+    nights = journal.build_journal(db, days=90)
+    if not nights:
+        print("Sin actividad registrada / No activity recorded yet")
         return
-    print("== Historial / History ==")
-    for r in rows:
-        posted = "✓ post" if r["posted"] else "  —   "
-        print(f"{r['obs_date']}  {r['object']:<22s} [{r['type'] or '?':8s}] {posted}")
+    for n in nights[:14]:
+        print(f"== Noche / Night {n['night']} ==")
+        for e in n["events"]:
+            es, en = e["text"]
+            print(f"  {journal.hm_local(e['ts'])}  {e['object']:<22s} "
+                  f"{es} / {en}")
 
 
 def cmd_blink(args):
@@ -152,6 +179,7 @@ def cmd_blink(args):
                          ref_label=pair["ref_label"], out=png,
                          watermark=f"NightScribe · {pair['ref_label']}",
                          lang=lang, observatory=observatory, zoom=args.zoom)
+    mp4 = None
     print(f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:.5f}) "
           f"— {pair['ref_label']}")
     print(f"GIF -> {gif}")
@@ -166,12 +194,94 @@ def cmd_blink(args):
             lang=lang, observatory=observatory, zoom=args.zoom,
             interval_ms=args.intervalo)
         print(f"MP4 -> {mp4}")
+    if args.post:
+        # bilingual draft that references the blink resources, ready for a
+        # web page: the ES/EN markdown links the GIF/MP4/before-after PNG
+        from .core import enrich, post
+        en = enrich.enrich(pair["name"], site=cfg.get("mpc_code"))
+        if not en:
+            en = {"type": "transient", "name": pair["name"], "data": {}}
+        rendered = post.render_post(en, cfg)
+        resources = {"gif": gif, "pair": png}
+        if mp4:
+            resources["mp4"] = mp4
+        written = post.save_outputs(rendered, outdir, pair["name"], e=en,
+                                    resources=resources)
+        for k, p in written.items():
+            print(f"[{k}] -> {p}")
+        db.mark_posted(pair["name"])
 
 
 def cmd_gui(args):
     # Desktop application.
     from .gui import app
     return app.run()
+
+
+def cmd_project(args):
+    # Minimal project management from the CLI (ADR-019, GUI-first).
+    from .core import project as proj_mod
+    if args.action == "list":
+        projects = proj_mod.list_projects(db, args.status)
+        if not projects:
+            print("No projects / Sin proyectos")
+            return
+        for p in projects:
+            cur = proj_mod.current_step(db, p["id"])
+            step = cur or "done"
+            star = "★ " if p.get("favorite") else ""
+            outcome = f"  ({p['outcome']})" if p.get("outcome") else ""
+            print(f"  [{p['id']:3d}] {star}[{p['kind']:7s}] "
+                  f"{p['object_name']:<24s} {p['status']:8s} "
+                  f"step={step}{outcome}")
+    elif args.action == "create":
+        p = proj_mod.create(db, args.kind, args.name)
+        if p:
+            print(f"Created project {p['id']}: [{p['kind']}] {p['object_name']}")
+        else:
+            print(f"Bad kind '{args.kind}' (valid: {', '.join(proj_mod.VALID_KINDS)})")
+            return 1
+    elif args.action == "advance":
+        p = proj_mod.advance(db, args.id)
+        if p:
+            cur = proj_mod.current_step(db, p["id"]) or "done"
+            print(f"Project {p['id']} -> step={cur}, status={p['status']}")
+        else:
+            print(f"Project {args.id} not found")
+            return 1
+    elif args.action == "close":
+        p = proj_mod.close(db, args.id, outcome=args.outcome)
+        if p:
+            print(f"Closed project {p['id']}: status={p['status']}"
+                  f" outcome={p.get('outcome')}")
+        else:
+            print(f"Project {args.id} not found or not active")
+            return 1
+    elif args.action == "reopen":
+        p = proj_mod.reopen(db, args.id)
+        if p:
+            print(f"Reopened project {p['id']}: status={p['status']}")
+        else:
+            print(f"Project {args.id} not found")
+            return 1
+    elif args.action == "show":
+        p = proj_mod.get(db, args.id)
+        if not p:
+            print(f"Project {args.id} not found")
+            return 1
+        print(f"== [{p['kind']}] {p['object_name']} — {p['status']} ==")
+        print(f"  folder: {proj_mod.storage_dir(p)}")
+        for s in p["steps"]:
+            print(f"  {s['status']:8s} {s['step']}")
+        for f in p["files"]:
+            print(f"  file: {f['kind']:10s} {f['path']}")
+    elif args.action == "files":
+        files = proj_mod.list_files(db, args.id)
+        if not files:
+            print(f"Project {args.id} has no files")
+            return
+        for f in files:
+            print(f"  [{f['kind']:10s}] {f['path']}")
 
 
 def main(argv=None):
@@ -181,6 +291,9 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="nightscribe",
         description="Planifica tu noche, entiende cada objeto, cuenta tu ciencia.")
+    from .version import full_version
+    parser.add_argument("--version", action="version",
+                        version=f"{__app_name__} {full_version()}")
     parser.add_argument("--verbose", "-v", action="store_true")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -216,6 +329,8 @@ def main(argv=None):
                    help="duración de cada frame del blink (ms)")
     p.add_argument("--video", action="store_true",
                    help="exportar también el blink como vídeo MP4 (H.264)")
+    p.add_argument("--post", action="store_true",
+                   help="generar borrador ES/EN + tuit que referencia el blink")
     p.set_defaults(func=cmd_blink)
 
     p = sub.add_parser("history", help="historial de observaciones")
@@ -223,6 +338,29 @@ def main(argv=None):
 
     p = sub.add_parser("gui", help="aplicación de escritorio")
     p.set_defaults(func=cmd_gui)
+
+    p = sub.add_parser("project", help="gestión de proyectos (CLI mínimo)")
+    p_sub = p.add_subparsers(dest="action", required=True)
+    p_list = p_sub.add_parser("list", help="listar proyectos")
+    p_list.add_argument("--status", choices=["active", "done", "archived"],
+                        default=None)
+    p_create = p_sub.add_parser("create", help="crear un proyecto")
+    p_create.add_argument("--kind", required=True,
+                          help="sn|neo|comet|pccp|transit|hads|variable")
+    p_create.add_argument("--name", required=True, help="object name")
+    p_advance = p_sub.add_parser("advance", help="avanzar un paso")
+    p_advance.add_argument("id", type=int, help="project id")
+    p_show = p_sub.add_parser("show", help="mostrar un proyecto")
+    p_show.add_argument("id", type=int, help="project id")
+    p_close = p_sub.add_parser("close", help="cerrar un proyecto")
+    p_close.add_argument("id", type=int, help="project id")
+    p_close.add_argument("--outcome", default=None,
+                         help="resultado final (texto libre)")
+    p_reopen = p_sub.add_parser("reopen", help="reabrir un proyecto")
+    p_reopen.add_argument("id", type=int, help="project id")
+    p_files = p_sub.add_parser("files", help="listar ficheros del proyecto")
+    p_files.add_argument("id", type=int, help="project id")
+    p.set_defaults(func=cmd_project)
 
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

@@ -20,7 +20,12 @@
 ## Traducciones (GUI)
 
 ```bash
-pyside6-lupdate nightscribe/gui -ts nightscribe/gui/i18n/nightscribe_es.ts \
+# nota: lista las fuentes explícitamente — escanear el directorio omitiría los .py
+# (y las cartas vectoriales viven en gui/widgets/ — si las dejas fuera,
+# lupdate marca sus cadenas "vanished" y los tests de i18n fallan)
+pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
+    nightscribe/gui/ui/*.ui \
+    -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts
 pyside6-linguist nightscribe/gui/i18n/nightscribe_es.ts    # traduce
 pyside6-lrelease nightscribe/gui/i18n/nightscribe_*.ts     # compila .qm
@@ -32,8 +37,8 @@ fallan si queda alguna cadena `unfinished`.
 ## Tests
 
 ```bash
-.venv/bin/pytest tests/unit          # sin red, deben pasar siempre
-.venv/bin/pytest tests/functional    # con red, extremo a extremo por funcionalidad
+.venv/bin/python -m pytest tests/unit      # sin red, deben pasar siempre
+.venv/bin/python -m pytest tests/functional  # con red, extremo a extremo por funcionalidad
 ```
 
 Toda funcionalidad nueva llega con tests unitarios (los fixtures con respuestas

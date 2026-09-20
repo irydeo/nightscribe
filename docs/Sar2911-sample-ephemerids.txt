@@ -1,0 +1,36 @@
+2461291.37919 1.000000 1 0,1,1 Irydeo Observatory, Camarma de Esteruelas
+Sar2911 27.07  0.15 K2698 356.53233  182.66687  169.16454    7.94982  0.2881631  0.55726783   1.4624917    FO 260907    20   1 21.4 hrs  0.36         Find_Orb   0000 Sar2911                     20260907
+
+Created Mon Sep  7 21:06:03 2026
+Ephemeris start:  7 Sep 2026 21:06:02
+Ephemeris end:    8 Sep 2026 21:06:02
+Times are all TDT
+Positions/velocities are in equatorial J2000
+Orbital elements: 
+Sar2911
+   Perihelion 2026 Sep 14.222631 TT =  5:20:35 (JD 2461297.722631)
+Epoch 2026 Sep  8.0 TT = JDT 2461291.5   Earth MOID: 0.0348   Find_Orb
+M 356.53232776        (2000.0)            P               Q
+n   0.55726782     Peri.  182.66687     +0.98977021     +0.14028155     
+a   1.46249167     Node   169.16453     -0.12820475     +0.95447801     
+e   0.2881630      Incl.    7.94981     -0.06259756     +0.26323525     
+P   1.77/646.00d   H   27.1     U  8.1     q 1.04105554  Q 1.88392780
+From 20 observations 2026 Sept. 6-7 (21.4 hr); mean residual 0".36
+# State vector (heliocentric equatorial J2000):
+#   +1.008506846153  -0.246249758226  -0.096127752779 AU
+#   +4.347021406325 +17.954408927073  +4.905507244961 mAU/day
+# MOIDs: Me  0.6705 Ve  0.3169 Ea  0.0348 Ma  0.1846
+# MOIDs: Ju  3.5406 Sa  7.4074 Ur 16.4036 Ne 28.3056
+# Elements written:  7 Sep 2026 21:06:02 (JD 2461291.379190)
+# Full range of obs: 2026 Sept. 6-7 (21.4 hr) (20 observations)
+# Find_Orb ver: Jul 20 2021 09:21:55
+# Perturbers: 00000408 (Sun/Earth/Moon);  JPL DE-430
+# Tisserand relative to Earth: 2.97758
+# Barbee-style encounter velocity: 5.5974 km/s
+# Diameter 15.8 meters (assuming 10% albedo)
+# Score: 0.493319
+#  $Name=Sar2911  $Ty=2026  $Tm=09  $Td=14.222631  $MA=356.53233
+#  2881631  $Eqnx=2000.
+#  24917  $Peri=182.66687  $Node=169.16454  $Incl=7.94982
+#  461291.500  $q=1.041056  $T=2461297.722631  $H=27.1
+# Sigmas avail: 1

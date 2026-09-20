@@ -12,7 +12,8 @@ observatorio que reporta al MPC. No existe endpoint JSON público.
 con lxml en `core/sources/pccp.py` (columnas: designación temporal, score, RA/Dec, V,
 arco, notas...). Los candidatos entran en la lista unificada de «Esta noche» con bonus
 de urgencia alto. El NEOCP queda cubierto vía NEOfixer (flag `neocp`), sin duplicar
-fuentes.
+fuentes. **Ampliado por ADR-023 (2026-08-25)**: NEOfixer también aporta la órbita
+preliminar (`/orbit/`) de los objetos NEOCP — elementos, sigmas y efeméride local.
 
 **Alternativas**: ignorar PCCP (pierde una pata del observatorio); API no pública del
 MPC (no existe para PCCP).
@@ -30,6 +31,8 @@ reports to the MPC. No public JSON endpoint exists.
 with lxml in `core/sources/pccp.py` (columns: temporary designation, score, RA/Dec,
 V, arc, notes...). Candidates join the unified "Tonight" list with a high urgency
 bonus. NEOCP is covered via NEOfixer (`neocp` flag), without duplicating sources.
+**Extended by ADR-023 (2026-08-25)**: NEOfixer also provides the preliminary orbit
+(`/orbit/`) of NEOCP objects — elements, sigmas and local ephemeris.
 
 **Alternatives**: ignore PCCP (loses an observatory pillar); non-public MPC API
 (none exists for PCCP).

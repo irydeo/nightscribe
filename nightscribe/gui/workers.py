@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 class TonightWorker(QThread):
     # Builds tonight's target list and scores it in the background.
     finished = Signal(list, list, str)  # top, all_scored, error message
+    progress = Signal(dict)             # phase message {key, label, index, total}
 
     def __init__(self, cfg, db, date=None, top=3):
         super().__init__()
@@ -32,14 +33,26 @@ class TonightWorker(QThread):
         self._date = date
         self._top = top
 
+    def _phase(self, key):
+        # @args: key - one of core/PLANNER.PHASES (see planner.PHASES)
+        # Emits a phase index/total pair. The human label is chosen by the
+        # GUI from a literal self.tr() table (so lupdate picks it up, the way
+        # CONTRIBUTING rule 5 demands).
+        from ..core import planner
+        total = len(planner.PHASES)
+        index = planner.PHASES.index(key) + 1
+        self.progress.emit({"key": key, "index": index, "total": total})
+
     def run(self):
         # Does the heavy work off the GUI thread.
         from ..core import planner, suggest
         try:
-            targets = planner.build_tonight(self._cfg, self._date)
+            targets = planner.build_tonight(self._cfg, self._date,
+                                            on_phase=lambda i, k: self._phase(k))
             if not targets:
                 self.finished.emit([], [], "no sources answered")
                 return
+            self._phase("scoring")
             top, all_scored = suggest.top_n(targets, self._cfg, self._db,
                                             self._top)
             self.finished.emit(top, all_scored, "")
@@ -92,8 +105,9 @@ class PostWorker(QThread):
 
 
 class SunWorker(QThread):
-    # Fetches the Sun state and the latest SDO image in the background.
-    finished = Signal(dict, str)    # sun data, local image path
+    # Fetches the Sun state, the latest SDO image (selected channel) and
+    # the HMI continuum image (for the annotated region map) in the background.
+    finished = Signal(dict, str, str)    # sun data, channel image, HMII image
 
     def __init__(self, channel="0193"):
         super().__init__()
@@ -105,10 +119,13 @@ class SunWorker(QThread):
         try:
             data = solar.solar_now()
             img = sdo.latest_image(self._channel, 1024)
-            self.finished.emit(data, str(img) if img else "")
+            # always grab the visible-light continuum for the region map
+            hmi_img = img if self._channel == "HMII" else sdo.latest_image("HMII", 1024)
+            self.finished.emit(data, str(img) if img else "",
+                               str(hmi_img) if hmi_img else "")
         except Exception as err:
             logger.exception("sun worker failed: %s", err)
-            self.finished.emit({}, "")
+            self.finished.emit({}, "", "")
 
 
 class MpcResolveWorker(QThread):
@@ -205,3 +222,88 @@ class BlinkExportWorker(QThread):
         except Exception as err:  # never crash the GUI on render problems
             logger.exception("blink export failed: %s", err)
             self.finished.emit("", str(err))
+
+
+class CcdcielWorker(QThread):
+    # Runs a single CCDciel JSON-RPC action off the GUI thread and reports
+    # the result. The action receives the Client; anything network-shaped
+    # stays out of the UI thread (ADR-030). When poll_slew is set the worker
+    # also waits for Telescope_slewing to settle before emitting.
+    finished = Signal(object, str)  # result payload, error message
+
+    def __init__(self, client, action, poll_slew=False):
+        super().__init__()
+        self._client = client
+        self._action = action
+        self._poll_slew = poll_slew
+
+    def run(self):
+        # @return: emits (result, "") on success, (None, message) on failure
+        from ..core.sources import ccdciel
+        try:
+            result = self._action(self._client)
+            if self._poll_slew:
+                self._wait_slew()
+            self.finished.emit(result, "")
+        except ccdciel.CCDcielError as err:
+            logger.info("ccdciel command failed: %s", err)
+            self.finished.emit(None, str(err))
+        except Exception as err:  # never crash the GUI on daft payloads
+            logger.exception("ccdciel worker failed: %s", err)
+            self.finished.emit(None, str(err))
+
+    def _wait_slew(self):
+        # Polls Telescope_slewing (live, uncached) until the mount stops.
+        # The 300 s ceiling keeps a dead server from hanging the worker.
+        slept = 0.0
+        while slept < 300.0:
+            if not self._client.slewing():
+                return
+            self.msleep(900)
+            slept += 0.9
+
+
+class ResolveWorker(QThread):
+    # Resolves a target name against VSX, then SIMBAD (ADR-035, V-c), off
+    # the GUI thread (UX-f) — the campaign Add-target dialog used to freeze
+    # on these two network calls.
+    finished = Signal(dict)     # {"vsx": dict|None, "simbad": dict|None}
+
+    def __init__(self, name):
+        super().__init__()
+        self._name = name
+
+    def run(self):
+        from ..core.sources import simbad, vsx
+        out = {"vsx": None, "simbad": None}
+        try:
+            out["vsx"] = vsx.lookup(self._name)
+            if not out["vsx"]:
+                out["simbad"] = simbad.query_id(self._name)
+        except Exception as err:      # never crash the dialog on network
+            logger.warning("resolve worker failed: %s", err)
+        self.finished.emit(out)
+
+
+class SurveyWorker(QThread):
+    # Downloads the ALeRCE/ZTF context points for one position, off the GUI
+    # thread (UX-f) — the Follow-up survey button used to freeze on it.
+    # Always re-queries (force): a re-click must be a re-query, and the
+    # outcome (ok / empty / error) is part of the signal so the GUI can
+    # report it — the old silent success was the bug.
+    finished = Signal(dict)     # {"status": ok|empty|error, "points", "error"}
+
+    def __init__(self, ra_deg, dec_deg):
+        super().__init__()
+        self._ra, self._dec = ra_deg, dec_deg
+
+    def run(self):
+        from ..core.sources import surveys
+        try:
+            out = surveys.fetch_points_detailed(
+                self._ra, self._dec, force=True)
+        except Exception as err:      # strict mode only re-raises known
+                                      # errors, but never crash the GUI
+            logger.warning("survey worker failed: %s", err)
+            out = {"status": "error", "points": [], "error": str(err)}
+        self.finished.emit(out)

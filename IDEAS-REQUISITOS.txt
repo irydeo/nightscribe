@@ -1,0 +1,36 @@
+ 
+- Una vez se haga click sobre el objeto, además de presentar la información, se ha de presentar su posición en el cielo.
+- Habrá una zona de seguridad (opcional) que será compatible con la que genera TheSky
+- - Se mostrará si está en esa zona de seguridad
+ Se sugerirá la mejor hora para observar, teniendo en cuenta la duración de la observación se indicará dónde comienza y dónde termina, para garantizar que está en esa zona de seguridad.
+ - Se podrá ekegir la hora de inicio y la duración de la sesión.
+ - Se podrá exportar una secuencia simple para ccdciel y nina, que luego ya se editará desde el software, ahí no nos liamos.
+ - Para supernonas, fncionalidad de comparar con el survey:
+  - conocida el AR/DEC, se obtiene la imagen; posteriormente la imagen de referencia y la imagen mía se han de alinear, reeescalar adecuadamente y entonces es cuando se podrá hacer el blink. Esto lo mismo implica plate solve también.
+  - Se exportará a un vídeo o animación simple.
+  
+  ¿Puede que la interfaz web sea más atractiva? Debatir ¿más simple?
+  
+  - Para ser más útil, creo que tenemos que tener la idea de proyecto , en la que todo se enlace y se recuerde. Si vas a trabajar con una SN o un NEO, se fija el proyecto y ahí comienza a guiarte por el flujo. Importante el concepto de flujo y los pasos de cada uno, eso va a ser definitorio: 
+  - Si quiero hacer una SN:
+    1. Lo primero es identificar a la mejor, dependiendo del score, posición en el cielo, limitaciones de observación (zoa de seguridad...)
+    2. Luego se podrá generar una secuencia para usarla con Nina CCDCiel... a partir de ahí, nos olvidamos. La parte de captura no es el objetivo.
+    3 Posteriormente viene la fase de publicación y/o análisis, ahí, dependiendo del tipo de objeto podemos ayudar, por ejemplo, en las SN con el blick, catálogos surveys... obviamente el flujo y la usabilidad van a ser mejores, ya no tiene que preguntar por la SN, ya la cooce, ya sabe dónde están las imágenes... al formar todo parte de un proyecto con su CONTEXTO.
+    - Si son NEOs, podemos ayudar con el vídeo por ejemplo u otrs parámetros de publicación, como la interpretación de los datos de la órbita; la descarga de las efemérides para que estén listas para ser importadas por el sofware de captura o planetario, hacer las secuencias, o como con las SN seleccionar las mejores por su posición....
+    
+    Por tanto: Definir los flujos según el tipo de objeto y en cada uno ver la mejor manera de ayudar. La página inicial ha de reformarse y ser más un punto de entrada, con sugerencias más visuales y una opción de "selección detallada" más parecida a lo actual.
+    
+    
+    
+    Las funcionalidades que tenemos, se pueden seguir añadiendo, luego es recolocarlas.
+  
+  
+- Revisar el código de lo que ya teniamos en el observatorio.
+
+Hace cientos o miles de millones de años, en unas galaxias muy muy lejanas unas estrellas llegaron al final de su vida, generando una explosión de tal magnitud que brillan más que la propia galaxia en la que se encuentran. Ese es el caso de las dos que muestro, 2026zji y 2026zjn. Estas supernovas se descubrieron hace muy poquito, el día 21 de agosto de 2026; y las fotografías que vemos las capturé apenas unas horas después de su descubrimiento.
+
+No tenemos mucha más información sobre el tipo de supernova ni tampoco de la distancia a la que se encuentran las galaxias a las que pertenecen (LEDA 2640544 y LEDA 137128 respectivamente), pero por su tamaño, no es descabellado afirmar que hablamos de centenares o incluso millones de años luz, esto es, la explosión ocurrió hace centenares o millones de años y ahora nos llega su luz... una auténtica máquina del tiempo a nuestro alcance.
+
+La captura como he comentado, se realizó la noche del 21 de Agosto, desde el observatorio Irydeo MPC Z41 con el telescopio principal HO CDK17 y la cámara QHY42Pro.
+
+

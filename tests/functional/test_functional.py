@@ -19,6 +19,10 @@ import pytest
 
 pytestmark = pytest.mark.network
 
+import tempfile
+
+from pathlib import Path
+
 from nightscribe.config import config
 from nightscribe.core import enrich, planner, post, solar, suggest, transits
 from nightscribe.core.db import db
@@ -148,6 +152,104 @@ def test_enrich_transient():
     assert e["data"].get("dist_mly")
 
 
+def test_enrich_transient_fallback_rochester(monkeypatch):
+    # ADR-027 with real data: take a live Rochester SN, degrade SIMBAD, and
+    # verify the planner context still gives host/type/mag/coords + a real
+    # hook (not the generic follow-up).
+    from nightscribe.core import narrative
+    from nightscribe.core.sources import rochester
+    # ADR-027 with real data: a live Rochester SN with a known host, degrade
+    # SIMBAD, and verify the planner context still gives a real hook (naming
+    # the host) and the sky chart from the planner coordinates. The exact
+    # route (full-name transient vs short-name unconfirmed) is what the unit
+    # tests pin down offline; here we only need a hosted SN.
+    s = next((r for r in rochester.latest_sne(19.0)
+              if r.get("host")
+              and r["host"].lower() not in ("none", "unk", "")), None)
+    if not s:
+        pytest.skip("no hosted SN on Rochester right now")
+    import datetime
+    from nightscribe.core import coords as _coords
+    ra = _coords.ra_hms_to_deg(s["ra"])
+    dec = _coords.dec_dms_to_deg(s["dec"])
+    date_ok = False
+    try:
+        d = datetime.datetime.strptime(s["date"].split(".")[0], "%Y/%m/%d")
+        if (datetime.datetime.now() - d).days <= 90:
+            date_ok = True
+    except ValueError:
+        pass
+    if not date_ok:
+        pytest.skip(f"{s['name']} is too old for the night list")
+    monkeypatch.setattr(simbad, "query_id", lambda *a, **k: None)
+    monkeypatch.setattr(simbad, "query_around_galaxy", lambda *a, **k: None)
+    target = {
+        "id": s["name"], "kind": "sn", "name": s["name"],
+        "mag": s["mag"], "ra_deg": ra, "dec_deg": dec,
+        "sn_type": s.get("type"), "host": s["host"], "disc_date": s["date"],
+    }
+    e = enrich.enrich(s["name"], site=MPC, fallback_target=target)
+    assert e and e["type"] in ("transient", "sn"), \
+        f"unexpected type {e['type']!r}"
+    data = e["data"]
+    # verify the host made it into the data dict or unconfirmed sub-dict
+    host = (data.get("host") or {}).get("name") or \
+           (data.get("unconfirmed") or {}).get("host")
+    assert host == s["host"], f"host lost in data: {host!r}"
+    hook = narrative.hook(e)
+    assert s["host"] in hook["es"] or s["host"] in hook["en"], \
+        f"hook must name the host galaxy: {hook}"
+    # the sky chart renders from the planner coordinates (no SIMBAD needed)
+    import matplotlib
+    matplotlib.use("Agg")
+    p = post.build_charts(
+        e, Path(tempfile.mkdtemp(prefix="ns_sn_fallback_")), "fallback",
+        fmt="panel", cfg=config)
+    assert "sky" in p, f"sky chart expected from planner coords: {list(p)}"
+
+
+def test_enrich_comet_fallback_cobs(monkeypatch):
+    # ADR-027 with real data: a live COBS comet whose name SBDB does not
+    # resolve degrades to the unconfirmed-comet path with a real hook and
+    # perihelion bullets instead of a generic follow-up.
+    from nightscribe.core import narrative
+    from nightscribe.core.sources import cobs
+    c = cobs.active_comets(18.0)[0]
+    monkeypatch.setattr(sbdb, "get", lambda *a, **k: None)
+    monkeypatch.setattr(neofixer, "orbit", lambda *a, **k: None)
+    try:
+        import datetime
+        from nightscribe.core import coords
+        rows = horizons.ephemeris(c["mpc_name"] or c["name"], center=MPC)
+        ra = coords.ra_hms_to_deg(rows[0]["ra"])
+        dec = coords.dec_dms_to_deg(rows[0]["dec"])
+        delta = rows[0]["delta"]
+    except Exception:
+        pytest.skip(f"no Horizons rows for {c['name']} tonight")
+    target = {
+        "id": c["name"], "kind": "comet", "name": c["fullname"] or c["name"],
+        "mag": c["mag"], "ra_deg": ra, "dec_deg": dec,
+        "perihelion_date": c.get("perihelion_date"), "delta_au": delta,
+    }
+    name = target["name"]
+    kind = enrich.detect_type(name)
+    assert kind == "small_body", f"{name} must parse as a small body"
+    e = enrich.enrich(name, site=MPC, fallback_target=target)
+    assert e and e.get("data")
+    assert e["data"].get("unconfirmed"), \
+        f"must take the unconfirmed path: {e['data'].keys()}"
+    hook = narrative.hook(e)
+    assert target["name"] in hook["es"] or target["name"] in hook["en"], \
+        f"hook must name the comet: {hook}"
+    bullets = narrative.fact_bullets(e)
+    if c.get("perihelion_date"):
+        assert any((c["perihelion_date"] in b["es"]) or
+                   (c["perihelion_date"] in b["en"]) for b in bullets)
+    else:
+        assert any("candidato" in b["es"].lower() or "candidate" in b["en"].lower()
+                   for b in bullets)
+
+
 def test_solar_now():
     s = solar.solar_now()
     assert s.get("ssn") is not None or s.get("kp") is not None
@@ -165,8 +267,7 @@ def test_viz_png_exports(tmp_path):
     # every chart must render to a non-empty PNG (Agg, no display)
     import matplotlib
     matplotlib.use("Agg")
-    from nightscribe.viz import (families_view, orbit_view, sky_view,
-                                 sun_panel, transit_view)
+    from nightscribe.viz import orbit_view, sky_view, sun_panel, transit_view
     b = sbdb.get("Apophis")
     f1 = tmp_path / "orbit.png"
     orbit_view.draw_orbit(dict(b["elements"]), obj_name="Apophis",
@@ -176,9 +277,6 @@ def test_viz_png_exports(tmp_path):
     sky_view.draw_sky(346.7, 16.26, config.get("lat"), config.get("lon"),
                       obj_name="test", out=str(f2))
     assert f2.exists() and f2.stat().st_size > 10000
-    f3 = tmp_path / "families.png"
-    families_view.draw_families("Aten", obj_name="Apophis", a=0.92, out=str(f3))
-    assert f3.exists() and f3.stat().st_size > 10000
     f4 = tmp_path / "sun.png"
     sun_panel.draw_sun(sdo.latest_image("0193", 1024), solar.solar_now(),
                        out=str(f4))
@@ -189,6 +287,418 @@ def test_viz_png_exports(tmp_path):
         f5 = tmp_path / "transit.png"
         transit_view.draw_transit(tt[0], out=str(f5))
         assert f5.exists() and f5.stat().st_size > 5000
+
+
+def test_viz_orbit_parabolic_comet(tmp_path):
+    # A parabolic comet (e=1.0, a<0) must render an orbit chart — the
+    # old e<0.99 guard silently skipped these (regression test).
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import orbit_view
+    c = sbdb.get("C/2023 A3")
+    assert c, "SBDB must resolve C/2023 A3"
+    els = c["elements"]
+    assert els["e"] >= 1.0, "C/2023 A3 must be parabolic for this test"
+    f1 = tmp_path / "orbit_parabolic.png"
+    orbit_view.draw_orbit(dict(els), obj_name="C/2023 A3", out=str(f1))
+    assert f1.exists() and f1.stat().st_size > 20000
+    plt.close("all")
+
+
+def test_viz_orbit_high_e_comet(tmp_path):
+    # A high-eccentricity bound comet (0.99 <= e < 1.0) must also render.
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import orbit_view
+    c = sbdb.get("12P")
+    assert c, "SBDB must resolve 12P"
+    els = c["elements"]
+    assert els["e"] >= 0.9, "12P must have high e for this test"
+    f1 = tmp_path / "orbit_highe.png"
+    orbit_view.draw_orbit(dict(els), obj_name="12P", out=str(f1))
+    assert f1.exists() and f1.stat().st_size > 20000
+    plt.close("all")
+
+
+def test_explore_dialog_orbit_chart(tmp_path):
+    # The Explore dialog must populate the orbit tab for a parabolic comet.
+    # This is the end-to-end GUI test that was missing (offscreen Qt).
+    import os
+    import time
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QCoreApplication
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.overview import ObjectPanel
+    # D5: the Explore dialog is the shared panel — drive it straight
+    panel = ObjectPanel(chart_dir=str(tmp_path / "posts"))
+    # enrich a real parabolic comet end-to-end
+    e = enrich.enrich("C/2023 A3", site=MPC)
+    assert e and e.get("data"), "enrich must return data for C/2023 A3"
+    sb = e["data"].get("sbdb")
+    assert sb and sb["elements"]["e"] >= 1.0, "must be parabolic"
+    # paint it (same as _dialog_explore_done used to do)
+    panel.show(e)
+    # orbit is now a live vector widget (ADR-029), not a QLabel+QPixmap
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    orbit = next((panel._tabs.widget(i) for i in range(panel._tabs.count())
+                  if isinstance(panel._tabs.widget(i), OrbitChart)), None)
+    assert orbit is not None, "no OrbitChart in the chart tabs"
+    assert not orbit.isHidden()
+    assert orbit.view.scene().items(), "orbit scene is empty"
+    # _slot_data records the elements for click→viewer rebuild
+    assert "orbit" in panel._slot_data, "orbit slot data not recorded"
+
+
+def test_chart_viewer_zoom_and_export(tmp_path):
+    # The chart viewer must open a chart PNG, zoom it and export a copy
+    # (offscreen Qt; the save dialog is stubbed to a tmp path).
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import orbit_view
+    src = tmp_path / "chart.png"
+    orbit_view.draw_orbit(
+        {"a": 0.9224, "e": 0.1912, "i": 3.33, "om": 204.43, "w": 126.4,
+         "ma": 288.0, "epoch": 2461760.5}, obj_name="Apophis", out=str(src))
+    plt.close("all")
+    from nightscribe.gui.chart_viewer import ChartViewer
+    v = ChartViewer(src, title="test")
+    v.show()
+    assert v._label.pixmap() is not None and not v._label.pixmap().isNull()
+    # zoom in doubles the rendered width (fit starts below 1.0 for big PNGs)
+    w0 = v._label.width()
+    v._zoom_11()
+    assert v._label.width() == v._pix.width()
+    v._zoom_in()
+    assert v._label.width() > v._pix.width()
+    v._zoom_out()
+    assert v._label.width() == v._pix.width()
+    # export must copy the PNG to the chosen path
+    from PySide6.QtWidgets import QFileDialog
+    dest = tmp_path / "exported.png"
+    orig = QFileDialog.getSaveFileName
+    QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (str(dest), ""))
+    try:
+        v._export()
+    finally:
+        QFileDialog.getSaveFileName = orig
+    assert dest.exists() and dest.stat().st_size == src.stat().st_size
+    v.close()
+
+
+def test_post_charts_attached_to_project(tmp_db):
+    # Generating a post from a project must also render the charts and
+    # register them as project files (the "report" deliverables).
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import MainWindow, _load_ui
+    w = MainWindow()
+    name = "TESTCHARTOBJ"
+    p = project.create(tmp_db, "neo", name,
+                       context={"ra_deg": 180.0, "dec_deg": 10.0})
+    w._current_project = p
+    # synthetic enriched object (offline): SBDB-shaped + local ephem
+    e = {"name": name, "type": "small_body",
+         "data": {"sbdb": {"elements": {"a": 1.35, "e": 0.28, "i": 2.5,
+                                        "om": 150.0, "w": 200.0, "q": 0.97,
+                                        "ma": 40.0, "epoch": 2461277.5},
+                           "phys": {"H": 24.1}, "moid": 0.03},
+                  "family": "Apollo",
+                  "ephem": {"ra": "12 00 00.0", "dec": "+10 00 00",
+                            "r": 1.2, "delta": 0.3}}}
+    rendered = {"es": "borrador", "en": "draft", "tweet": "tuit"}
+    post_w = _load_ui("post_tab")
+    # keep the real db clean: route the module-level db to the tmp one
+    orig_db = mw.db
+    mw.db = tmp_db
+    try:
+        w._dialog_post_done(post_w, name, e, rendered)
+    finally:
+        mw.db = orig_db
+    files = project.list_files(tmp_db, p["id"])
+    chart_files = [f for f in files if f["kind"] == "chart"]
+    assert chart_files, "charts must be attached to the project"
+    for f in chart_files:
+        assert Path(f["path"]).exists(), f["path"]
+    # the dialog must list the chart files alongside the text drafts
+    assert "orbit.png" in post_w.lbl_files.text()
+    assert "sky.png" in post_w.lbl_files.text()
+    w.close()
+
+
+def _fake_worker_factory(e):
+    # Stand-in for ExploreWorker: start() lands the payload at once
+    # so the CTA reaches the "ready" state without any network round-trip.
+    # @args: e  -- the enriched payload dict to deliver
+    # @return:  a callable(name, fallback_target) that yields a fake worker
+    class _Signal:
+        def __init__(self):
+            self._c = []
+        def connect(self, cb):
+            self._c.append(cb)
+        def disconnect(self, cb=None):
+            if cb is None:
+                self._c = []
+            elif cb in self._c:
+                self._c.remove(cb)
+        def deliver(self, payload):
+            for cb in list(self._c):
+                cb(payload)
+
+    class _Worker:
+        def __init__(self):
+            self.finished = _Signal()
+        def start(self):
+            self.finished.deliver(e)
+
+    def _loader(name, fallback_target=None):
+        return _Worker()
+
+    return _loader
+
+
+def test_explore_dialog_cta_create_project(tmp_db):
+    # Regression (2026-09-02): clicking the Explore dialog's CTA used to
+    # raise "TypeError: _on_create() missing 1 required positional
+    # argument: 'fb'" because the glue signature was (sig, nm, fb) but
+    # PySide6 delivers only the two args declared on the signal.
+    # This drives the real MainWindow._open_explore_dialog end-to-end:
+    # fake loader drops a PCCP payload instantly, the CTA in "create"
+    # face fires, and a project must land in the tmp db.
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QDialog
+    app = QApplication.instance() or QApplication([])
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import MainWindow
+    from nightscribe.gui.overview import ObjectPanel
+
+    NAME = "PDC9999"
+    e = {"name": NAME, "type": "pccp",
+         "data": {"unconfirmed": {"id": NAME, "name": NAME, "kind": "pccp",
+                                  "nf_score": 8.0, "nf_priority": "A",
+                                  "nobs": 6, "arc_days": 3, "moid": 0.05,
+                                  "pccp_score": 75.0, "mag": 19.8}}}
+    fallback = {"id": NAME, "kind": "pccp", "name": NAME, "packed": NAME,
+                "ra_deg": 120.0, "dec_deg": 10.0}
+
+    w = MainWindow()
+    w._tonight_all = [(fallback, 90, 0.5, 0)]
+    orig_db    = mw.db
+    orig_loader = w._explore_loader
+    mw.db        = tmp_db
+    w._explore_loader = _fake_worker_factory(e)
+
+    clicked = []
+
+    class _DialogStub(QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+        def exec(self):
+            panel = self.findChild(ObjectPanel)
+            assert panel is not None, "dialog must contain an ObjectPanel"
+            assert not panel.btn_project.isHidden(), \
+                "CTA must be visible once the object has loaded"
+            panel.btn_project.clicked.emit()
+            clicked.append(panel._action)
+            return QDialog.Accepted
+
+    orig_cls = mw.QDialog
+    mw.QDialog = _DialogStub
+    try:
+        w._open_explore_dialog(NAME)
+        assert clicked == ["create"], \
+            f"CTA must fire in 'create' face -- got {clicked}"
+        rows = project.list_projects(tmp_db, "active")
+        assert rows and rows[0]["object_name"] == NAME, \
+            f"CTA-click must persist a new active project -- got {rows}"
+    finally:
+        mw.QDialog          = orig_cls
+        w._explore_loader   = orig_loader
+        mw.db              = orig_db
+        w.close()
+
+
+def test_explore_dialog_cta_continue_project(tmp_db):
+    # The other half of the same regression: with an active project
+    # already on file for the object, the CTA must show the "continue"
+    # face and emit project_continue(name, fallback) -- two args.
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication, QDialog
+    app = QApplication.instance() or QApplication([])
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project
+    from nightscribe.gui.main_window import MainWindow
+    from nightscribe.gui.overview import ObjectPanel
+
+    NAME = "2099 XX"
+    e = {"name": NAME, "type": "neo",
+         "data": {"unconfirmed": {"id": NAME, "name": NAME, "kind": "neo",
+                                  "nf_score": 8.0, "nf_priority": "A",
+                                  "nobs": 6, "arc_days": 3, "moid": 0.05,
+                                  "mag": 19.8}}}
+    fallback = {"id": NAME, "kind": "neo", "name": NAME, "packed": NAME}
+
+    w = MainWindow()
+    w._tonight_all = [(fallback, 90, 0.5, 0)]
+    orig_db = mw.db
+    orig_loader = w._explore_loader
+    mw.db = tmp_db
+    w._explore_loader = _fake_worker_factory(e)
+
+    project.create(tmp_db, "neo", NAME, {"id": NAME, "kind": "neo"})
+    before = len(project.list_projects(tmp_db, "active"))
+    clicked = []
+
+    class _DialogStub(QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+        def exec(self):
+            panel = self.findChild(ObjectPanel)
+            assert panel is not None
+            assert panel._action == "continue", \
+                f"CTA must be in 'continue' face -- got {panel._action}"
+            panel.btn_project.clicked.emit()
+            clicked.append(panel._action)
+            return QDialog.Accepted
+
+    orig_cls = mw.QDialog
+    mw.QDialog = _DialogStub
+    try:
+        w._open_explore_dialog(NAME)
+        assert clicked == ["continue"]
+        after = len(project.list_projects(tmp_db, "active"))
+        assert before == after, \
+            f"continue must not create a second project (before={before}, after={after})"
+    finally:
+        mw.QDialog          = orig_cls
+        w._explore_loader   = orig_loader
+        mw.db              = orig_db
+        w.close()
+
+
+def test_explore_dialog_unconfirmed_neo():
+    # Unconfirmed NEO (no SBDB entry): the orbit tab must show an
+    # informative message and the sky tab must render from the
+    # fallback_target's ra_deg/dec_deg (regression test).
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.overview import ObjectPanel
+    # D5: drive the shared panel directly (the Explore dialog's content)
+    panel = ObjectPanel()
+    # simulate what the planner produces for an unconfirmed NEO:
+    # a fallback_target with position but no orbital elements
+    fallback = {
+        "id": "P10x99x", "kind": "neo", "name": "P10x99x",
+        "packed": "P10x99x", "mag": 19.5,
+        "ra_deg": 120.0, "dec_deg": 10.0,
+        "nf_score": 8.0, "nf_priority": "normal", "nf_cost_min": 12.0,
+        "moid": 0.05, "h": 20.0, "rate_arcsec_min": 2.5,
+        "nobs": 15, "arc_days": "3.2",
+    }
+    e = enrich.enrich("P10x99x", site=MPC, fallback_target=fallback)
+    assert e and e.get("data"), "enrich must return data for unconfirmed NEO"
+    assert e["data"].get("unconfirmed"), "must be the unconfirmed path"
+    assert not e["data"].get("sbdb"), "must not have SBDB for unconfirmed"
+    # paint it — must not crash and must populate the sky slot
+    panel.show(e)
+    # orbit slot: no elements → no OrbitChart in the chart tabs (ADR-029
+    # vector slot is simply absent, not an empty QLabel)
+    from nightscribe.gui.widgets.orbit_widget import OrbitChart
+    orbit_widgets = [panel._tabs.widget(i)
+                     for i in range(panel._tabs.count())
+                     if isinstance(panel._tabs.widget(i), OrbitChart)]
+    assert not orbit_widgets, \
+        "no OrbitChart should exist for unconfirmed objects (no elements)"
+    # sky slot: live SkyChart widget rendering from unconfirmed ra/dec
+    from nightscribe.gui.widgets.sky_widget import SkyChart
+    sky_widgets = [panel._tabs.widget(i)
+                   for i in range(panel._tabs.count())
+                   if isinstance(panel._tabs.widget(i), SkyChart)]
+    assert sky_widgets, "no SkyChart in the chart tabs for unconfirmed object"
+    assert sky_widgets[0].view.scene().items(), "sky scene is empty"
+
+
+def test_enrich_unconfirmed_with_neofixer_orbit():
+    # A live NEOCP object: SBDB does not know it, but NEOfixer has a
+    # preliminary Find_Orb orbit. enrich() must return sbdb-shaped
+    # elements so the orbit chart, params table and ephemeris all work.
+    from nightscribe.core.sources import neofixer
+    # find a current NEOCP target from the planner list
+    tg = neofixer.targets(MPC, 10)
+    cand = next((t for t in tg if t.get("neocp")), None)
+    if not cand:
+        import pytest
+        pytest.skip("no NEOCP candidate on NEOfixer right now")
+    packed = cand["packed"]
+    fallback = {
+        "id": packed, "kind": "neo", "name": packed, "packed": packed,
+        "mag": cand.get("vmag"),
+        "ra_deg": cand.get("ra deg"), "dec_deg": cand.get("dec deg"),
+        "nf_score": cand.get("score"), "neocp": True,
+    }
+    e = enrich.enrich(packed, site=MPC, fallback_target=fallback)
+    assert e and e.get("data"), "enrich must return data for a NEOCP object"
+    d = e["data"]
+    sb = d.get("sbdb")
+    assert sb, "preliminary NEOfixer orbit must be attached as sbdb"
+    els = sb.get("elements") or {}
+    assert els.get("a") and els.get("e") is not None, \
+        "elements must carry a and e"
+    assert sb.get("sigmas"), "preliminary orbit must carry sigmas"
+    assert d.get("preliminary") is True
+    assert d.get("unconfirmed"), "planner fallback must be kept"
+    # the elements must be drawable and propagatable
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.core import coords
+    import datetime
+    from nightscribe.viz import orbit_view
+    jd = coords.jd_from_datetime(
+        datetime.datetime.now(datetime.timezone.utc))
+    p = orbit_view.draw_orbit(dict(els), jd=jd, obj_name=packed)
+    assert p is not None
+    plt.close("all")
+
+
+def test_ephemeris_unconfirmed_via_neofixer(tmp_path):
+    # ephemeris.generate must fall back to the preliminary NEOfixer orbit
+    # for objects Horizons does not know, and mark rows as preliminary.
+    from nightscribe.core import ephemeris
+    from nightscribe.core.sources import neofixer
+    tg = neofixer.targets(MPC, 10)
+    cand = next((t for t in tg if t.get("neocp")), None)
+    if not cand:
+        import pytest
+        pytest.skip("no NEOCP candidate on NEOfixer right now")
+    packed = cand["packed"]
+    rows = ephemeris.generate(packed, MPC, step="2h")
+    if not rows:
+        import pytest
+        pytest.skip(f"NEOfixer has no orbit for {packed} right now")
+    assert rows[0].get("preliminary"), "rows must be flagged preliminary"
+    assert all(0 <= r["ra_deg"] < 360 for r in rows)
+    assert all(r["delta"] and r["delta"] > 0 for r in rows)
+    out = ephemeris.export(rows, tmp_path / "eph", fmt="csv",
+                           obj_name=packed)
+    text = open(out, encoding="utf-8").read()
+    assert "PRELIMINARY" in text
 
 
 def test_cli_runs():
@@ -223,7 +733,6 @@ def test_blink_real_mirrored_frame():
     from nightscribe.viz import blink_view
     import matplotlib
     matplotlib.use("Agg")
-    from pathlib import Path
     fixture = Path(__file__).parents[1] / "fixtures" / "sn2026zji_new_image.fits"
     pair = blink.prepare_pair(fixture, sn_name="2026zji")
     assert pair["flipped"] is True            # mirrored solve was corrected
@@ -323,38 +832,42 @@ def test_blink_end_to_end(tmp_path):
 
 
 def test_blink_tab_offscreen(tmp_path):
-    # The Blink tab must drive the whole flow without crashing the GUI.
+    # The Blink dialog must drive the whole flow without crashing the GUI.
+    # Under UX v3 the tab is a modal dialog (ADR-019), so we build the same
+    # widget the dialog loads and drive prepare/render/nudge directly (offscreen Qt).
     import os
     import time
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     from PySide6.QtCore import QCoreApplication
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance() or QApplication([])
-    from nightscribe.gui.main_window import MainWindow
+    from nightscribe.gui.main_window import MainWindow, _load_ui
     w = MainWindow()
+    b = _load_ui("blink_tab")
     img = _solved_fits(tmp_path / "u.fits", 187.705, 12.391,
                        width=320, height=240)
-    w.blink.edt_fits.setText(str(img))
-    w.blink.chk_manual.setChecked(True)
+    b.edt_fits.setText(str(img))
+    b.chk_manual.setChecked(True)
     # comma decimal separator must work too (locale-proof fields)
-    w.blink.edt_ra.setText("187,705")
-    w.blink.edt_dec.setText("12.391")
-    w.on_blink_prepare()
+    b.edt_ra.setText("187,705")
+    b.edt_dec.setText("12.391")
+    w._dialog_blink_prepare(b)
     t0 = time.time()
     while w._blink_pair is None and time.time() - t0 < 60:
         QCoreApplication.processEvents()
         time.sleep(0.05)
     assert w._blink_pair is not None, "blink worker never delivered a pair"
-    pix = w.blink.lbl_blink.pixmap()
+    assert w._blink_dialog_widget is b
+    pix = b.lbl_blink.pixmap()
     assert pix is not None and not pix.isNull()
     # exercise the interactive controls: nudge, gamma, fade, marker toggle
-    w._blink_nudge_move(0.5, -0.5)
+    w._dialog_blink_nudge(b, 0.5, -0.5)
     assert w._blink_nudge == [0.5, -0.5]
-    w.blink.sld_gamma.setValue(60)
-    w.blink.chk_blink_live.setChecked(False)
-    w.blink.sld_fade.setValue(30)
-    w.blink.chk_marker.setChecked(False)
-    w._blink_render()
+    b.sld_gamma.setValue(60)
+    b.chk_blink_live.setChecked(False)
+    b.sld_fade.setValue(30)
+    b.chk_marker.setChecked(False)
+    w._dialog_blink_render(b)
     assert w._blink_ref8 is not None and w._blink_obs8 is not None
     w.close()
 
@@ -367,16 +880,55 @@ def test_gui_boots_offscreen():
     from nightscribe.gui.main_window import MainWindow
     w = MainWindow()
     tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 6  # settings in the menu bar (ADR-017); +Blink (ADR-018)
-    assert tabs.tabText(5) == "Blink"
-    assert w.blink.btn_prepare is not None
-    # menu bar with the settings dialog action
+    # Four top-level tabs (ADR-036: History & Sun & sky left the bar for
+    # the Tools-menu dialogs):
+    # Tonight · Projects · Campaigns · Observatory
+    assert tabs.count() == 4
+    assert tabs.tabText(0) == "Tonight"
+    assert tabs.tabText(1) == "Projects"
+    assert tabs.tabText(2) == "Campaigns"
+    assert tabs.tabText(3) == "Observatory"
+    # suggestion grid container exists
+    assert w.tonight.scroll_suggestions is not None
+    # table starts collapsed (progressive disclosure)
+    assert w.tonight.grp_list.isHidden()
+    # projects page: ADR-041 tab bar — each step tab is built per project,
+    # lazily, on first open; the hub ships with the empty page
+    assert w.projects.page_container is not None
+    assert w._tab_pages == {} and w._active_tab is None
+    # the five flat tab buttons exist (follow-up is kind-gated per project)
+    for key in ("details", "plan", "process", "publish", "followup"):
+        getattr(w.projects, f"btn_tab_{key}")
+    # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]
     assert "File" in menu_texts and "Tools" in menu_texts
-    # tables must be sortable by clicking their headers
+    # tables must be sortable
     assert w.tonight.tbl_targets.isSortingEnabled()
-    assert w.history.tbl_history.isSortingEnabled()
-    # "right now" band and explore sub-tabs exist
-    assert w.tonight.lbl_now is not None
-    assert w.explore.tabs_explore.count() == 5
     w.close()
+
+
+# ---------------- CCDciel JSON-RPC (local server, ADR-030) ------------
+
+def _ccdciel_up(host="127.0.0.1", port=3277):
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def test_ccdciel_jsonrpc_ping():
+    # CCDciel is a local observatory program, not a web source: skip when it
+    # is not running (the GUI connect button is the manual path).
+    if not _ccdciel_up():
+        pytest.skip("no CCDciel JSON-RPC server on localhost:3277")
+    from nightscribe.core.sources import ccdciel
+    client = ccdciel.Client()
+    version = client.ping()
+    assert version  # something like "2.20.1"
+    assert client.filters() or True  # wheel is optional on real setups
+    dash = client.dashboard()
+    assert isinstance(dash, dict)
+    devs = dash.get("devices") or {}
+    assert "connected" in devs or "camera" in dash

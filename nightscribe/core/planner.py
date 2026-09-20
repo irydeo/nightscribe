@@ -11,75 +11,270 @@
 #
 ############################################################
 
+import datetime
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
-from . import coords, transits
-from .sources import (cobs, esa_neo, exoclock, horizons, neofixer, pccp,
-                      rochester)
+from . import campaign, coords, dates, exposure, hads, horizon
+from . import transits, vigils
+from .sources import (aavso, cobs, esa_neo, exoclock, horizons, neofixer,
+                      pccp, rochester, sbdb)
 
 logger = logging.getLogger(__name__)
+
+# Load-phase order (single source of truth for the build_tonight stages and
+# the GUI progress bar total). Scoring is the final phase, emitted by the
+# worker after build_tonight returns. The GUI keeps the human labels (they
+# must be literal tr() strings so lupdate sees them).
+PHASES = ("neo", "sn", "comet", "pccp", "transit", "hads", "campaigns",
+          "vigils", "aavso", "approach", "scoring")
 
 # Builds the raw list of tonight's targets from every source. Each target is
 # a flat dict; scoring lives in suggest.py. A source that fails simply
 # contributes nothing (graceful degradation, see ARCHITECTURE).
 
 
-def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15):
+def build_tonight(cfg, date=None, n_neofixer=40, n_comets=15,
+                  session_duration_s=None, on_phase=None):
     # @args: cfg - Config instance, date - datetime.date (tonight, UTC),
-    #        n_neofixer - NEOfixer list size, n_comets - brightest comets to locate
+    #        n_neofixer - NEOfixer list size, n_comets - brightest comets
+    #        to locate, session_duration_s - planned capture session time
+    #        when known (the horizon is then sized to contain it, ADR-020),
+    #        on_phase - optional callback(idx, key) fired at the start of
+    #        each source block; used by the GUI to show per-phase progress
     # @return: list of target dicts
     lat, lon = cfg.get("lat"), cfg.get("lon")
     site = cfg.get("mpc_code")
-    min_alt = float(cfg.get("min_alt", 30.0))
     limit_mag = float(cfg.get("limit_mag", 20.0))
+    hor = horizon.from_config(cfg)
+    margin = float(cfg.get("horizon_margin_deg", 0.0))
     targets = []
-    targets += _neo_targets(site, n_neofixer, lat, lon, date)
-    targets += _sn_targets(limit_mag, lat, lon, date)
-    targets += _comet_targets(limit_mag, lat, lon, site, n_comets, date)
-    targets += _pccp_targets(lat, lon, date)
-    targets += _transit_targets(lat, lon, date, min_alt)
-    targets += _approach_alerts()
+    # vigil alerts (ADR-037 SC4a) are computed once per build and shared:
+    # the campaigns phase fuses them into existing projects (SC-g, never a
+    # duplicate row) and the vigils phase lists what is left standalone
+    vigil_state = {"alerts": None, "consumed": set()}
+
+    def _vigil_alerts():
+        if vigil_state["alerts"] is None:
+            vigil_state["alerts"] = vigils.check_vigils(cfg)
+        return vigil_state["alerts"]
+
+    # the AAVSO editorial channel (SC4b) shares the same compute-once +
+    # fusion machinery (SC-g)
+    aavso_state = {"items": None}
+
+    def _aavso_items():
+        if aavso_state["items"] is None:
+            aavso_state["items"] = _aavso_fetch(cfg)
+        return aavso_state["items"]
+
+    stages = (
+        (1, "neo",
+         lambda: _neo_targets(site, n_neofixer, lat, lon, date, hor, margin,
+                              session_duration_s)),
+        (2, "sn",
+         lambda: _sn_targets(limit_mag, lat, lon, date, hor, margin,
+                             session_duration_s, max_days=90)),
+        (3, "comet",
+         lambda: _comet_targets(limit_mag, lat, lon, site, n_comets, date,
+                                hor, margin, session_duration_s)),
+        (4, "pccp",
+         lambda: _pccp_targets(lat, lon, date, hor, margin,
+                               session_duration_s)),
+        (5, "transit",
+         lambda: _transit_targets(lat, lon, date, hor, limit_mag, margin,
+                                  _transit_aperture(cfg),
+                                  _transit_plate_scale(cfg))),
+        (6, "hads",
+         lambda: _hads_targets(lat, lon, date, hor, limit_mag, margin,
+                               _transit_plate_scale(cfg))),
+        (7, "campaigns",
+         lambda: _campaign_targets(cfg, lat, lon, date, hor, margin,
+                                   vigil_alerts=_vigil_alerts(),
+                                   vigil_consumed=vigil_state["consumed"],
+                                   aavso_items=_aavso_items())),
+        (8, "vigils",
+         lambda: _vigil_targets(_vigil_alerts(), lat, lon, date, hor,
+                                margin,
+                                consumed=vigil_state["consumed"])),
+        (9, "aavso",
+         lambda: _aavso_targets(_aavso_items(), cfg, lat, lon, date, hor,
+                                margin,
+                                consumed=vigil_state["consumed"])),
+        (10, "approach",
+         lambda: _approach_alerts()),
+    )
+    for idx, key, fetch in stages:
+        if on_phase:
+            on_phase(idx, key)  # GUI: "loading <key>" (i, N progress)
+        targets += fetch()
     # keep what is actually up tonight (alerts have no visibility info)
     visible = [t for t in targets
                if t["kind"] == "alert"
-               or (t.get("max_alt") is not None and t["max_alt"] >= min_alt)]
+               or t.get("window_start") is not None]
     return visible
 
 
 def visible_now(targets, cfg, when=None, min_alt=None):
     # Targets above the horizon *right now* (not just tonight).
     # @args: targets - list from build_tonight, cfg - Config,
-    #        when - UTC datetime (now), min_alt - threshold (config value)
+    #        when - UTC datetime (now), min_alt - override threshold (config)
     # @return: list of (target, alt, az) for the ones currently up
     lat, lon = cfg.get("lat"), cfg.get("lon")
-    min_alt = float(min_alt if min_alt is not None else cfg.get("min_alt", 30.0))
+    if min_alt is not None:
+        hor = horizon.FlatHorizon(min_alt)
+        margin = 0.0
+    else:
+        hor = horizon.from_config(cfg)
+        margin = float(cfg.get("horizon_margin_deg", 0.0))
     out = []
     for t in targets:
         if t.get("ra_deg") is None or t.get("dec_deg") is None:
             continue
         alt, az = coords.current_altaz(t["ra_deg"], t["dec_deg"], lat, lon, when)
-        if alt >= min_alt:
+        if alt >= hor.alt_at(az) + margin:
             out.append((t, round(alt, 1), round(az, 1)))
     out.sort(key=lambda x: -x[1])
     return out
 
 
-def _visibility(ra_deg, dec_deg, lat, lon, date, min_alt=30.0):
-    # Altitude summary for a fixed RA/Dec tonight.
-    # @return: dict with max_alt, max_time, hours_up
-    alt, t = coords.max_altitude_tonight(ra_deg, dec_deg, lat, lon, date)
-    hours = coords.hours_above(ra_deg, dec_deg, lat, lon, min_alt, date)
-    return {"max_alt": round(alt, 1) if alt else None,
-            "max_time": t.isoformat() if t else None,
-            "hours_up": round(hours, 1)}
+def _visibility(ra_deg, dec_deg, lat, lon, date, hor, margin=0.0,
+                duration_s=None):
+    # Altitude summary for a fixed RA/Dec tonight against the local horizon.
+    # One sample pass feeds the max-altitude, the hours above and the best
+    # safe span; the span is the longest contiguous run (still containing
+    # the session duration when one is given) and best_time is how to start
+    # inside it (ADR-020).
+    # @return: dict with max_alt, safe_max_alt, max_time, max_az, hours_up,
+    #          window_start/end, safe_window, best_time, latest_safe_start
+    samples = coords.samples_tonight(ra_deg, dec_deg, lat, lon, date)
+    if not samples:
+        return {"max_alt": None, "max_time": None, "max_az": None,
+                "hours_up": 0.0, "safe_max_alt": None,
+                "window_start": None, "window_end": None,
+                "safe_window": None, "best_time": None,
+                "latest_safe_start": None}
+    t_max, alt_max, az_max = max(samples, key=lambda s: s[1])
+    hours = sum(1 for (_t, alt, az) in samples
+                if alt >= hor.alt_at(az) + margin) / 6.0
+    # window = full span above the horizon (unchanged meaning for the list)
+    full = hor.best_span(samples, margin)
+    # safe span = the one that still contains the planned session, if any
+    safe = hor.best_span(samples, margin, duration_s) if duration_s else None
+    # highest altitude actually reachable tonight: best sample inside the
+    # full safe span — the raw peak may sit behind a local obstacle and
+    # must not advertise an altitude the telescope can never use
+    safe_alt = None
+    if full is not None:
+        f0, f1 = full[0], full[1]
+        inside = [alt for (t, alt, az) in samples
+                  if alt >= hor.alt_at(az) + margin and f0 <= t <= f1]
+        if inside:
+            safe_alt = round(max(inside), 1)
+    out = {"max_alt": round(alt_max, 1),
+           "max_time": t_max.isoformat(),
+           "max_az": round(az_max, 1),
+           "safe_max_alt": safe_alt,
+           "hours_up": round(hours, 1),
+           "window_start": full[0].isoformat() if full else None,
+           "window_end": full[1].isoformat() if full else None,
+           "safe_window": None, "best_time": None,
+           "latest_safe_start": None}
+    if duration_s and safe is not None:
+        s_start, _s_end, s_latest = safe
+        # recommended start: centre the session on the peak altitude,
+        # clamped so that the whole session stays inside the safe span
+        d = datetime.timedelta(seconds=float(duration_s))
+        ideal = t_max - d / 2
+        best = min(max(ideal, s_start), s_latest)
+        out["safe_window"] = "%s|%s" % (s_start.isoformat(), _s_end.isoformat())
+        out["best_time"] = best.isoformat()
+        out["latest_safe_start"] = s_latest.isoformat()
+    elif full is not None:
+        # no session planned yet: the highest altitude reached *inside the
+        # safe span* is the best time — the raw peak may sit behind a local
+        # obstacle, and recommending it would be a safety error (ADR-020)
+        f0, f1 = full[0], full[1]
+        inside = [(t, alt) for (t, alt, _az) in samples
+                  if alt >= hor.alt_at(_az) + margin
+                  and f0 <= t <= f1]
+        if inside:
+            t_best, _ = max(inside, key=lambda s: s[1])
+            out["best_time"] = t_best.isoformat()
+    return out
 
 
-def _neo_targets(site, n, lat, lon, date):
+def safe_window_for(ra_deg, dec_deg, cfg, duration_s, date=None):
+    # The session-safe span for one object given a planned capture duration:
+    # the longest run of the night that still clears the local horizon while
+    # containing the whole session (ADR-020). Lets the project hub and the
+    # narrative reuse the exact same maths as build_tonight.
+    # @args: ra_deg/dec_deg - object, cfg - Config (site + horizon),
+    #        duration_s - planned session seconds, date - date or None (today)
+    # @return: dict {safe_window, best_time, latest_safe_start,
+    #               window_start, window_end, fits: bool}, or its "does not
+    #               fit" shape when the duration cannot be placed
+    import datetime as _dt
+    if date is None:
+        date = _dt.datetime.now(_dt.timezone.utc).date()
+    lat, lon = cfg.get("lat"), cfg.get("lon")
+    hor = horizon.from_config(cfg)
+    margin = float(cfg.get("horizon_margin_deg", 0.0))
+    vis = _visibility(ra_deg, dec_deg, lat, lon, date, hor, margin,
+                      duration_s)
+    sw = vis.get("safe_window")
+    fits = sw is not None
+    out = {
+        "safe_window": sw,
+        "best_time": vis.get("best_time"),
+        "latest_safe_start": vis.get("latest_safe_start"),
+        "window_start": vis.get("window_start"),
+        "window_end": vis.get("window_end"),
+        "fits": fits,
+        "duration_s": int(duration_s),
+    }
+    return out
+
+
+def _disc_date_for(t):
+    # Exact discovery date for a NEO (object-card plan, subplan 5c):
+    # SBDB's discovery record first (or the orbit's first observation),
+    # else the NEOfixer preliminary orbit's earliest observation.
+    # @args: t - planner target dict ("name"/"packed" keys)
+    # @return: "YYYY-MM-DD" or None
+    name = t.get("name") or t.get("packed")
+    if not name:
+        return None
+    body = sbdb.get(name)
+    if body and body.get("disc_date"):
+        return body["disc_date"]
+    orb = neofixer.orbit(t.get("packed") or name)
+    if orb:
+        return orb.get("disc_date")
+    return None
+
+
+def _fill_disc_dates(targets):
+    # Resolves disc_date for each target in a small thread pool: SBDB is
+    # one HTTP call per object (cached for a week), so a serial loop
+    # would slow Tonight down on a cold cache (same pattern as comets).
+    # @args: targets - planner target dicts, mutated in place
+    if not targets:
+        return
+    with ThreadPoolExecutor(max_workers=min(4, len(targets))) as pool:
+        found = list(pool.map(_disc_date_for, targets))
+    for t, d in zip(targets, found):
+        if d:
+            t["disc_date"] = d
+
+
+def _neo_targets(site, n, lat, lon, date, hor, margin, duration_s=None):
     # NEOfixer priority list for the site (see ADR-003).
     out = []
     for t in neofixer.targets(site, n):
         try:
-            vis = _visibility(t["ra deg"], t["dec deg"], lat, lon, date)
+            vis = _visibility(t["ra deg"], t["dec deg"], lat, lon, date,
+                              hor, margin, duration_s)
             out.append({
                 "id": t.get("packed"), "kind": "neo",
                 "name": t.get("provisional") or t.get("packed"),
@@ -96,10 +291,12 @@ def _neo_targets(site, n, lat, lon, date):
             })
         except (TypeError, KeyError) as err:
             logger.debug("skipping NEO target: %s", err)
+    _fill_disc_dates(out)
     return out
 
 
-def _sn_targets(limit_mag, lat, lon, date, max_days=90):
+def _sn_targets(limit_mag, lat, lon, date, hor, margin, duration_s=None,
+                max_days=90):
     # Recent supernovae from Rochester (D. Bishop); only fresh ones make it
     # to the night list (the rest would just be noise).
     import datetime
@@ -120,19 +317,35 @@ def _sn_targets(limit_mag, lat, lon, date, max_days=90):
             "id": s["name"], "kind": "sn", "name": s["name"],
             "mag": s["mag"], "ra_deg": ra, "dec_deg": dec,
             "sn_type": s["type"], "host": s["host"], "disc_date": s["date"],
-            **_visibility(ra, dec, lat, lon, date),
+            **_visibility(ra, dec, lat, lon, date, hor, margin, duration_s),
         })
     return out
 
 
-def _comet_targets(limit_mag, lat, lon, site, n, date):
+def _comet_targets(limit_mag, lat, lon, site, n, date, hor, margin,
+                   duration_s=None):
     # Brightest active comets from COBS; position via Horizons (cached).
+    # The per-comet ephemeris is the slow network part, so it runs in a small
+    # thread pool (each comet queries a different object) while the cheap
+    # visibility maths stay sequential.
+    def fetch(name):
+        # @return: first Horizons row for the comet (may be None)
+        rows = horizons.ephemeris(name, center=site)
+        return rows[0] if rows else None
+
+    comets = list(cobs.active_comets(limit_mag)[:n])
+    if comets:
+        with ThreadPoolExecutor(max_workers=min(4, len(comets))) as pool:
+            rows = list(pool.map(lambda c: fetch(c["mpc_name"] or c["name"]),
+                                 comets))
+    else:
+        rows = []
+
     out = []
-    for c in cobs.active_comets(limit_mag)[:n]:
-        rows = horizons.ephemeris(c["mpc_name"] or c["name"], center=site)
-        if not rows:
+    for c, first in zip(comets, rows):
+        if first is None:
             continue
-        ra_s, dec_s = rows[0]["ra"], rows[0]["dec"]
+        ra_s, dec_s = first["ra"], first["dec"]
         try:
             ra = coords.ra_hms_to_deg(ra_s)
             dec = coords.dec_dms_to_deg(dec_s)
@@ -142,13 +355,13 @@ def _comet_targets(limit_mag, lat, lon, site, n, date):
             "id": c["name"], "kind": "comet", "name": c["fullname"] or c["name"],
             "mag": c["mag"], "ra_deg": ra, "dec_deg": dec,
             "perihelion_date": c.get("perihelion_date"),
-            "delta_au": rows[0]["delta"], "r_au": rows[0]["r"],
-            **_visibility(ra, dec, lat, lon, date),
+            "delta_au": first["delta"], "r_au": first["r"],
+            **_visibility(ra, dec, lat, lon, date, hor, margin, duration_s),
         })
     return out
 
 
-def _pccp_targets(lat, lon, date):
+def _pccp_targets(lat, lon, date, hor, margin, duration_s=None):
     # Possible-comet candidates from the MPC PCCP page (see ADR-012).
     out = []
     for c in pccp.candidates():
@@ -164,29 +377,314 @@ def _pccp_targets(lat, lon, date):
             "mag": mag, "ra_deg": ra, "dec_deg": dec,
             "pccp_score": c.get("score"), "arc_days": c.get("arc"),
             "nobs": c.get("nobs"),
-            **_visibility(ra, dec, lat, lon, date),
+            "disc_date": dates.normalize_date(c.get("discovery")),
+            **_visibility(ra, dec, lat, lon, date, hor, margin, duration_s),
         })
     return out
 
 
-def _transit_targets(lat, lon, date, min_alt):
+def _transit_aperture(cfg):
+    # The hard aperture gate for transits (ADR-015 consequence, object-card
+    # plan subplan 6): the user's aperture when the Settings toggle is on,
+    # else None (no gate). A missing/unparseable aperture also means no gate.
+    # @args: cfg - Config instance
+    # @return: float inches or None
+    if not cfg.get("transit_scope_filter", True):
+        return None
+    try:
+        ap = cfg.get("aperture_inches")
+        return float(ap) if ap else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _transit_plate_scale(cfg):
+    # The camera/telescope plate scale for the transit exposure heuristic
+    # (Track D). Returns None (no correction) when the camera profile is
+    # incomplete — plate_scale() gives 0.0 without a focal length.
+    # @args: cfg - Config instance
+    # @return: arcsec/pixel or None
+    ps = exposure.plate_scale(cfg.get("pixel_um"), cfg.get("focal_mm"))
+    return ps or None
+
+
+def _transit_targets(lat, lon, date, hor, limit_mag=14.0, margin=0.0,
+                     aperture_in=None, plate_scale_arcsec_px=None):
     # Exoplanet transits computed locally from the ExoClock catalogue.
+    # The star must clear the local horizon + margin at mid-transit
+    # (ADR-020) — the same safety rule as every other family.
     out = []
     for t in transits.transits_tonight(exoclock.planets(), lat, lon, date,
-                                       min_alt):
+                                        threshold_fn=hor.alt_at,
+                                        max_vmag=limit_mag, margin=margin,
+                                        aperture_in=aperture_in,
+                                        plate_scale_arcsec_px=
+                                        plate_scale_arcsec_px):
         out.append({
             "id": t["name"], "kind": "transit",
             "name": t["name"], "mag": t.get("v_mag"),
             "ra_deg": t["ra"], "dec_deg": t["dec"],
             "max_alt": t.get("max_alt"), "hours_up": None,
             "max_time": t["mid"].isoformat(),
+            "window_start": t["ingress"].isoformat(),
+            "window_end": t["egress"].isoformat(),
             "transit": t,
         })
     return out
 
 
-def _approach_alerts():
-    # Upcoming close approaches from ESA NEOCC (outreach alerts pillar).
+def _hads_targets(lat, lon, date, hor, limit_mag=20.0, margin=0.0,
+                  plate_scale_arcsec_px=None):
+    # HADS stars from the hybrid catalog (bundled snapshot + Wils' live
+    # sheet, core/hads.py). No phase is known for these pulsators, so the
+    # gate is not an event but a contiguous above-horizon span holding at
+    # least one full pulsation cycle; the recommended session (2P) is passed
+    # as the planned duration so safe_window/best_time answer "can I watch
+    # it repeat twice?" (ADR-020 safety stays in _visibility).
+    out = []
+    for star in hads.catalog():
+        if not star.get("period_h") or star.get("max") is None:
+            continue
+        mag_med = (star["max"] + star["min"]) / 2     # H-e: median gate
+        if mag_med > limit_mag:
+            continue
+        vis = _visibility(star["ra_deg"], star["dec_deg"], lat, lon, date,
+                          hor, margin, star["period_h"] * 2 * 3600)
+        span = hads.span_hours(vis["window_start"], vis["window_end"])
+        if span is None or span < star["period_h"]:
+            continue                                  # not even one cycle
+        d = hads.derive(star, vis["hours_up"], plate_scale_arcsec_px)
+        d["session_fits"] = vis["safe_window"] is not None
+        d["covered_this_month"] = hads.covered_this_month(star)
+        out.append({
+            "id": star["name"], "kind": "hads", "name": star["name"],
+            "mag": mag_med, "ra_deg": star["ra_deg"], "dec_deg": star["dec_deg"],
+            **vis,
+            "hads": {"period_h": star["period_h"], "max": star["max"],
+                     "min": star["min"], "amp": d["amp"],
+                     "cycles": d["cycles"], "cadence_s": d["cadence_s"],
+                     "session_req_h": d["session_req_h"],
+                     "session_fits": d["session_fits"], "exp_s": d["exp_s"],
+                     "priority": star.get("priority"),
+                     "observed": star.get("observed"),
+                     "multiperiodic": star.get("multiperiodic"),
+                     "non_radial": star.get("non_radial"),
+                     "covered_this_month": d["covered_this_month"]},
+        })
+    return out
+
+
+def _fuse_external(rows, items, attach_key, db_obj, extremum_days,
+                   event_threshold, consumed):
+    # The fusion rule (ADR-037 SC-g): an external signal (vigil alert,
+    # AAVSO item) about a star that is already a campaign project joins
+    # that project's listing reasons — and lists it even when nothing
+    # else fired — instead of creating a duplicate Tonight row.
+    # @args: rows - tonight_listable rows (extended in place), items -
+    #        external signal dicts with a "name", attach_key - "vigil" |
+    #        "aavso" (the row sub-key), consumed - normalized names the
+    #        standalone phases must skip
+    if not items:
+        return
+    by_name = {vigils.norm_name(r["project"]["object_name"]): r
+               for r in rows}
+    for camp in campaign.list_campaigns(db_obj,
+                                        status=campaign.CAMPAIGN_ACTIVE):
+        for proj in campaign.projects_of(db_obj, camp["id"],
+                                         status="active"):
+            key = vigils.norm_name(proj["object_name"])
+            hit = next((a for a in items
+                        if vigils.norm_name(a["name"]) == key), None)
+            if hit is None:
+                continue
+            if consumed is not None:
+                consumed.add(key)
+            row = by_name.get(key)
+            if row is not None:
+                row[attach_key] = hit
+                continue
+            sig = campaign.project_signal(db_obj, camp, proj,
+                                          extremum_days, event_threshold)
+            new = {"campaign": camp, "project": proj}
+            new.update(sig)
+            new[attach_key] = hit
+            new["reasons"] = sig["reasons"] + [attach_key]
+            rows.append(new)
+            by_name[key] = new
+
+
+def _campaign_targets(cfg, lat, lon, date, hor, margin, db_obj=None,
+                      vigil_alerts=None, vigil_consumed=None,
+                      aavso_items=None):
+    # Tonight from the observer's own commitments (ADR-037 SC1): a
+    # campaign project is listed when it is DUE, or a detector event
+    # fired, or an extremum is imminent (setting campaign_extremum_days).
+    # SC4a/SC-g: a vigil alert on a campaign project fuses into its
+    # listing reasons (provenance "vigil") and pulls it in even when
+    # nothing else fired — never a duplicate row. Fully local (SQLite +
+    # sky maths) — no network, and nothing breaks without one. Each
+    # target re-surfaces an EXISTING project, so the Explore CTA will
+    # offer "Continue project" (phase E machinery, gui/main_window.py).
+    # @args: db_obj - Database (tests inject a temp one; default: shared),
+    #        vigil_alerts - alerts from vigils.check_vigils (or None),
+    #        vigil_consumed - set of normalized names this call marks, so
+    #        the vigils phase skips the fused ones
+    if db_obj is None:
+        from .db import db as db_obj
+    limit_mag = float(cfg.get("limit_mag", 20.0))
+    extremum_days = float(cfg.get("campaign_extremum_days", 3))
+    event_threshold = float(cfg.get("event_mag_threshold", 0.5))
+    out = []
+    rows = campaign.tonight_listable(
+        db_obj, extremum_days=extremum_days, event_threshold=event_threshold)
+    # fusion (ADR-037 SC-g): external signals match by normalized name
+    # against every active campaign project; fused items never reach the
+    # standalone phases
+    _fuse_external(rows, list(vigil_alerts or []), "vigil", db_obj,
+                   extremum_days, event_threshold, vigil_consumed)
+    _fuse_external(rows, list(aavso_items or []), "aavso", db_obj,
+                   extremum_days, event_threshold, vigil_consumed)
+    for sig in rows:
+        camp, proj = sig["campaign"], sig["project"]
+        ctx = proj.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None or dec is None:
+            logger.debug("campaign %s: project %s has no coordinates",
+                         camp["name"], proj["object_name"])
+            continue
+        mag = ctx.get("mag")
+        try:
+            mag = float(mag) if mag is not None else None
+        except (TypeError, ValueError):
+            mag = None
+        if mag is not None and mag > limit_mag:
+            continue           # known brightness: hard gate (SN-style, ADR-025)
+        vis = _visibility(ra, dec, lat, lon, date, hor, margin)
+        if vis.get("window_start") is None:
+            continue           # not up tonight
+        t = {
+            "id": proj["object_name"], "kind": proj["kind"],
+            "name": proj["object_name"], "mag": mag,
+            "ra_deg": ra, "dec_deg": dec, "project_id": proj["id"],
+            **vis,
+            "campaign": {"id": camp["id"], "name": camp["name"],
+                         "overdue_days": sig["overdue_days"],
+                         "cadence_nights": sig["cadence_nights"],
+                         "never_visited": sig["never_visited"],
+                         "event": sig["event"],
+                         "imminent_extremum": sig["imminent_extremum"],
+                         "vigil": sig.get("vigil"),
+                         "aavso": sig.get("aavso")},
+        }
+        # variable sub-dict: the context snapshot + tonight's fresh values
+        # (the next extremum is pure local maths — same as the signal)
+        v = dict(ctx.get("variable") or {})
+        if v:
+            if v.get("amp") is None and v.get("max") is not None \
+                    and v.get("min") is not None:
+                v["amp"] = round(v["min"] - v["max"], 2)  # inverted axis
+            v["next_extremum"] = sig["extremum"]
+            t["variable"] = v
+        out.append(t)
+    return out
+
+
+def _vigil_targets(alerts, lat, lon, date, hor, margin, consumed=()):
+    # Standalone Tonight rows for vigil alerts with no project of their
+    # own (ADR-037 SC4a). An alert you cannot see tonight is noise, so
+    # the same visibility gate as every other kind applies; the Explore
+    # CTA offers "Create project" for them (phase E machinery).
+    # @args: alerts - from vigils.check_vigils, consumed - normalized
+    #        names already fused into campaign projects (SC-g)
+    # @return: list of target dicts (kind "variable", sub-dict "vigil")
+    out = []
+    for a in alerts:
+        if vigils.norm_name(a["name"]) in consumed:
+            continue
+        if a.get("ra_deg") is None or a.get("dec_deg") is None:
+            continue
+        vis = _visibility(a["ra_deg"], a["dec_deg"], lat, lon, date, hor,
+                          margin)
+        if vis.get("window_start") is None:
+            continue           # not up tonight
+        out.append({
+            "id": a["name"], "kind": "variable", "name": a["name"],
+            "mag": a["mag"], "ra_deg": a["ra_deg"], "dec_deg": a["dec_deg"],
+            **vis, "vigil": a,
+        })
+    return out
+
+
+def _aavso_fetch(cfg):
+    # The AAVSO editorial items with a star name attached (ADR-037 SC4b):
+    # forum alerts first (the freshest news), then the active observing
+    # campaigns. A title whose star does not parse is simply dropped —
+    # VSX validates the candidate downstream.
+    # @return: [{"name", "kind": "alert"|"campaign", "title", "url", ...}]
+    if not cfg.get("aavso_feed", True):
+        return []
+    out = []
+    for a in aavso.alerts():
+        name = aavso.extract_star_name(a["title"])
+        if name:
+            out.append({**a, "name": name, "kind": "alert"})
+    for c in aavso.campaigns():
+        name = aavso.extract_star_name(c["title"])
+        if name:
+            out.append({**c, "name": name, "kind": "campaign"})
+    return out
+
+
+def _vsx_retry_name(name):
+    # VSX wants the canonical mixed case ("T CrB", not the "T CRB" of an
+    # all-caps headline): retry with the constellation token title-cased
+    # and the known mixed-case genitives fixed.
+    # @return: the normalized name for a second VSX attempt
+    parts = name.split()
+    if len(parts) != 2:
+        return name
+    const = parts[1].capitalize()
+    const = {"Crb": "CrB", "Uma": "UMa", "Umi": "UMi", "Cvn": "CVn",
+             "Cma": "CMa", "Cmi": "CMi"}.get(const, const)
+    return f"{parts[0].upper()} {const}"
+
+
+def _aavso_targets(items, cfg, lat, lon, date, hor, margin, consumed=()):
+    # Tonight rows from the AAVSO editorial channel (ADR-037 SC4b): the
+    # star is resolved via VSX (7-day cached) and gated by tonight's
+    # visibility like everything else. Rows fused into campaign projects
+    # (SC-g) never reappear here.
+    # @args: items - from _aavso_fetch, consumed - normalized names fused
+    #        into campaign projects
+    # @return: list of target dicts (kind "variable", sub-dict "aavso")
+    from .sources import vsx
+    out = []
+    seen = set()
+    for it in items:
+        name = it.get("name")
+        key = vigils.norm_name(name)
+        if not name or key in consumed or key in seen:
+            continue
+        seen.add(key)
+        obj = vsx.lookup(name)
+        if obj is None and " " in name:
+            obj = vsx.lookup(_vsx_retry_name(name))
+        if not obj or obj.get("ra_deg") is None:
+            continue
+        vis = _visibility(obj["ra_deg"], obj["dec_deg"], lat, lon, date,
+                          hor, margin)
+        if vis.get("window_start") is None:
+            continue           # not up tonight
+        out.append({
+            "id": obj["name"] or name, "kind": "variable",
+            "name": obj["name"] or name, "mag": obj.get("max"),
+            "ra_deg": obj["ra_deg"], "dec_deg": obj["dec_deg"],
+            **vis, "aavso": it,
+        })
+    return out
+
+
+def _approach_alerts():    # Upcoming close approaches from ESA NEOCC (outreach alerts pillar).
     out = []
     for a in esa_neo.close_approaches(20.0)[:10]:
         out.append({

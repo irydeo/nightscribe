@@ -101,6 +101,32 @@ def diameter_from_h(h, albedo=DEFAULT_ALBEDO):
     return 1329.0 / math.sqrt(albedo) * 10 ** (-h / 5.0)
 
 
+def tisserand_earth(a, e, i_deg):
+    # Tisserand parameter w.r.t. Earth (a_p = 1 AU): T = 1/a + 2*sqrt(a*(1-e^2))*cos(i).
+    # T < 3 co-orbital / JFC regime for comets, T > 3 asteroid; valid for bound orbits.
+    # @args: a - semi-major axis (AU), e - eccentricity, i_deg - inclination (degrees)
+    # @return: T_E float, or None if elements are missing or non-bounded (a <= 0)
+    if a is None or e is None or i_deg is None:
+        return None
+    if a <= 0.0 or not (0.0 <= e < 1.0):
+        return None
+    cos_i = math.cos(math.radians(i_deg))
+    return 1.0 / a + 2.0 * math.sqrt(a * (1.0 - e * e)) * cos_i
+
+
+def encounter_velocity(v_obj, v_earth):
+    # Barbee-style encounter speed: |v_obj - v_earth| (heliocentric frame).
+    # @args: v_obj - (vx, vy, vz) km/s of the object,
+    #        v_earth - (vx, vy, vz) km/s of Earth
+    # @return: relative speed km/s, or None if inputs incomplete
+    if not v_obj or not v_earth or len(v_obj) < 3 or len(v_earth) < 3:
+        return None
+    dx = v_obj[0] - v_earth[0]
+    dy = v_obj[1] - v_earth[1]
+    dz = v_obj[2] - v_earth[2]
+    return math.sqrt(dx * dx + dy * dy + dz * dz)
+
+
 def pick(texts, lang):
     # Selects one language from a {"es", "en"} pair. The GUI always shows a
     # single language (ADR-017); only post.py keeps using both.
@@ -200,12 +226,15 @@ def _crossing_text(q, Q):
             "en": f"crosses the orbit of {names_en}"}
 
 
-def explain_elements(elements, phys=None, family=None, moid=None):
+def explain_elements(elements, phys=None, family=None, moid=None,
+                     sigmas=None, n_resids=None, arc_days=None):
     # Translates each orbital/physical parameter into *intuitive* language.
     # Every row has a "level": "basic" rows are the handful everyone should
     # see; "deep" rows appear under the "in depth" toggle (see ADR-017).
     # @args: elements - SBDB elements dict, phys - SBDB phys dict,
-    #        family - key from classify(), moid - MOID in AU if known
+    #        family - key from classify(), moid - MOID in AU if known,
+    #        sigmas - per-element uncertainties (preliminary NEOfixer orbits),
+    #        n_resids - number of astrometric residuals, arc_days - observed arc
     # @return: list of dicts: {"param", "value", "level", "es", "en"}
     phys = phys or {}
     out = []
@@ -217,6 +246,18 @@ def explain_elements(elements, phys=None, family=None, moid=None):
     Q = elements.get("Q") or (a * (1 + e) if a and e is not None else None)
     per = elements.get("per")
 
+    if sigmas:
+        out.append({
+            "param": {"es": "Órbita preliminar", "en": "Preliminary orbit"},
+            "value": "NEOfixer / Find_Orb", "level": "basic",
+            "es": "Este objeto aún no está confirmado por el MPC: la órbita es una "
+                  "solución preliminar calculada por NEOfixer (Find_Orb) con las pocas "
+                  "observaciones disponibles. Puede cambiar — tu medida de esta noche "
+                  "es justo lo que la mejora.",
+            "en": "This object is not yet MPC-confirmed: the orbit is a preliminary "
+                  "solution computed by NEOfixer (Find_Orb) from the few available "
+                  "observations. It can change — tonight's measurement is exactly "
+                  "what improves it."})
     if family and family_text(family):
         out.append({"param": {"es": "Familia", "en": "Family"},
                     "value": family, "level": "basic",
@@ -359,6 +400,37 @@ def explain_elements(elements, phys=None, family=None, moid=None):
             "en": f"From 0 (perfectly known) to 9 (almost lost): this one has {u}. "
                   + ("Tonight's observation helps bring it down." if u >= 5 else
                      "Its orbit is fairly well measured.")})
+    if sigmas:
+        bits = []
+        if a and sigmas.get("a") is not None:
+            bits.append(f"a ± {sigmas['a']:.4g} UA")
+        if e is not None and sigmas.get("e") is not None:
+            bits.append(f"e ± {sigmas['e']:.3g}")
+        if i is not None and sigmas.get("i") is not None:
+            bits.append(f"i ± {sigmas['i']:.3g}°")
+        if bits:
+            out.append({
+                "param": {"es": "Incertidumbre de los elementos (σ)",
+                          "en": "Element uncertainties (σ)"},
+                "value": ", ".join(bits), "level": "deep",
+                "es": "Cada elemento lleva su σ (desviación típica): cuánto puede "
+                      "moverse el valor real respecto al calculado. σ pequeñas = "
+                      "órbita sólida; σ grandes = aún se está perfilando.",
+                "en": "Each element carries its σ (standard deviation): how far the "
+                      "true value may stray from the fitted one. Small σ = solid "
+                      "orbit; large σ = still being pinned down."})
+    if n_resids is not None or arc_days is not None:
+        val = " · ".join(str(v) for v in
+                         (f"{arc_days} días" if arc_days is not None else None,
+                          f"{n_resids} obs." if n_resids is not None else None)
+                         if v)
+        out.append({
+            "param": {"es": "Arco y observaciones", "en": "Arc and observations"},
+            "value": val, "level": "deep",
+            "es": "La órbita se ajusta a esas medidas repartidas en ese arco de "
+                  "tiempo. Con arcos cortos, volverlo a medir esta noche vale oro.",
+            "en": "The orbit is fitted to those measurements spread over that time "
+                  "arc. With short arcs, measuring it again tonight is worth gold."})
     return out
 
 
@@ -403,4 +475,692 @@ def explain_neofixer(t):
             "value": f"{t['moid']:.4f} AU", "level": "deep",
             "es": "Mínimo acercamiento teórico entre su órbita y la terrestre, aún por confirmar.",
             "en": "Minimum theoretical approach between its orbit and Earth's, still to be confirmed."})
+    return out
+
+
+# ---------------- Transient (supernova) interpreter ----------------
+# (object-card plan, subplan 2: the SN card gets the same parameters
+# table the small bodies already had)
+
+def _sn_type_text(otype):
+    # @args: otype - SIMBAD/Rochester/TNS type string ("SN Ia", "II", ...)
+    # @return: {"es","en"} explaining the kind of explosion
+    t = (otype or "").strip().lower()
+    t = t[2:].strip() if t.startswith("sn") else t
+    if t.startswith("ia") and not t.startswith(("iax", "iin")):
+        return {"es": "una enana blanca que estalló por fusión termonuclear "
+                      "descontrolada: su brillo es tan uniforme que las usamos "
+                      "de «velas estándar» para medir distancias",
+                "en": "a white dwarf blown up by runaway thermonuclear "
+                      "fusion: their brightness is so uniform we use them as "
+                      "'standard candles' to measure distances"}
+    if t.startswith("iax"):
+        return {"es": "una prima hermana de la Ia, pero más débil y rápida: "
+                      "su curva de luz sube y baja casi igual, pero no tanto. "
+                      "Puede ser una explosión fallida",
+                "en": "a cousin of Ia but fainter and faster: its light "
+                      "curve rises and falls almost the same, but not quite. "
+                      "Possibly a failed explosion"}
+    if t.startswith("iin"):
+        return {"es": "una supernova de Tipo II con líneas de hidrógeno "
+                      "estrechas en su espectro: la estrella progenitora "
+                      "expulsó una capa de gas poco antes de colapsar",
+                "en": "a Type II supernova with narrow hydrogen lines "
+                      "in its spectrum: the progenitor shed a shell of "
+                      "gas shortly before collapsing"}
+    if t.startswith(("ib", "ic")):
+        return {"es": "el colapso de una estrella masiva que ya había perdido "
+                      "su envoltura de hidrógeno (y quizá de helio)",
+                "en": "the collapse of a massive star that had already shed "
+                      "its hydrogen (and maybe helium) envelope"}
+    if t.startswith(("ii-p", "ii p")):
+        return {"es": "el colapso de una supergigante que conservó su "
+                      "hidrógeno: tras el estallido, su brillo se mantiene "
+                      "estable semanas (la meseta) antes de decaer lentamente",
+                "en": "the collapse of a supergiant that kept its "
+                      "hydrogen: after the explosion, its brightness stays "
+                      "flat for weeks (the plateau) before fading slowly"}
+    if t.startswith(("ii-l", "ii l")):
+        return {"es": "el colapso de una supergigante que conservó su "
+                      "hidrógeno: su brillo decaer de forma lineal desde el "
+                      "principio, sin la meseta de las II-P",
+                "en": "the collapse of a supergiant that kept its "
+                      "hydrogen: its brightness declines linearly from "
+                      "the start, without the II-P plateau"}
+    if t.startswith("ii"):
+        return {"es": "el colapso de una estrella masiva que conservaba su "
+                      "hidrógeno: la muerte clásica de una gigante",
+                "en": "the collapse of a massive star that kept its "
+                      "hydrogen: the classic death of a giant"}
+    if t.startswith(("sln", "slsn")):
+        return {"es": "una supernova superluminosa: mucho más "
+                      "brillante que las demás y su curva de luz es "
+                      "ancha y lenta, de meses o años",
+                "en": "a superluminous supernova: far brighter "
+                      "than the rest and its light curve is broad "
+                      "and slow, lasting months or years"}
+    if t.startswith("kilonova"):
+        return {"es": "no la muerte de una estrella sino la "
+                      "fusión de dos estrellas de neutrones: "
+                      "un destello corto y rublicioso que produce "
+                      "oro y platino",
+                "en": "not the death of a star but the merger "
+                      "of two neutron stars: a short bright "
+                      "flash that forges gold and platinum"}
+    if t.startswith("i"):
+        return {"es": "el colapso de una estrella masiva sin rastro de "
+                      "hidrógeno en su luz",
+                "en": "the collapse of a massive star with no hydrogen left "
+                      "in its light"}
+    if t.startswith(("cv", "nova")):
+        return {"es": "no una supernova sino una nova: una erupción en la "
+                      "superficie de una enana blanca, mucho más tenue",
+                "en": "not a supernova but a nova: an eruption on a white "
+                      "dwarf's surface, far fainter"}
+    return {"es": "una explosión estelar cuyo tipo exacto aún se está "
+                  "clasificando (de ahí el nombre genérico)",
+            "en": "a stellar explosion whose exact type is still being "
+                  "classified (hence the generic name)"}
+
+
+def days_since(date_str):
+    # Kept for convenience: the single implementation lives in dates.py
+    # (object-card plan, subplan 5d).
+    # @args: date_str - any format dates.normalize_date accepts
+    # @return: whole days from that date to today, or None if unparseable
+    from . import dates
+    return dates.days_since(date_str)
+
+
+def explain_transient(d):
+    # Interprets what we know about a supernova/transient: event type, host
+    # galaxy, distance, redshift, current brightness, discovery date.
+    # @args: d - the enriched data dict (enrich._enrich_transient shape,
+    #        with the ADR-027 planner-context merge already applied)
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    sim = d.get("simbad") or {}
+    host = d.get("host") or {}
+
+    otype = (sim.get("otype") or d.get("otype") or "").strip()
+    if otype:
+        kind = _sn_type_text(otype)
+        out.append({
+            "param": {"es": "Tipo de evento", "en": "Event type"},
+            "value": otype, "level": "basic",
+            "es": f"Es {kind['es']}.",
+            "en": f"It is {kind['en']}."})
+
+    hname = host.get("name") if isinstance(host, dict) else None
+    if hname:
+        out.append({
+            "param": {"es": "Galaxia anfitriona", "en": "Host galaxy"},
+            "value": str(hname), "level": "basic",
+            "es": "La supernova no vive sola: explotó dentro de esta galaxia. "
+                  "En tus imágenes la verás como un puntito de luz nuevo junto "
+                  "a ella (o dentro).",
+            "en": "The supernova does not live alone: it exploded inside this "
+                  "galaxy. In your images it shows as a new pinpoint of light "
+                  "next to it (or within it)."})
+
+    dist = d.get("dist_mly")
+    if dist:
+        out.append({
+            "param": {"es": "Distancia", "en": "Distance"},
+            "value": f"{dist:.0f} Mly", "level": "basic",
+            "es": f"Su luz salió de viaje hace {dist:.0f} millones de años: "
+                  "la estrella que ves explotar murió cuando aquí aún no "
+                  "existía nada parecido a nosotros.",
+            "en": f"Its light set off {dist:.0f} million years ago: the star "
+                  "you see exploding died long before anything like us walked "
+                  "the Earth."})
+
+    mag = d.get("mag")
+    if mag is None:
+        mag = sim.get("vmag")
+    if mag is not None:
+        try:
+            mag = float(mag)
+        except (TypeError, ValueError):
+            mag = None
+    if mag is not None:
+        out.append({
+            "param": {"es": "Brillo actual", "en": "Current brightness"},
+            "value": f"{mag:.1f} mag", "level": "basic",
+            "es": f"Magnitud {mag:.1f}: cuanto menor el número, más fácil la "
+                  "captura. Las supernovas se desvanecen en semanas — cada "
+                  "noche cuenta para la curva de luz.",
+            "en": f"Magnitude {mag:.1f}: the lower the number, the easier the "
+                  "catch. Supernovae fade away over weeks — every night counts "
+                  "for the light curve."})
+
+    # B7: didactic note — why multi-filter matters (the observer's real
+    # workflow uses Clear + NIR because bands can behave differently,
+    # and colour evolution helps classify the type — interview block 2/4).
+    otype = (sim.get("otype") or d.get("otype") or "").strip()
+    if otype and otype.lower().startswith(("sn i", "ii", "ib", "ic")):
+        out.append({
+            "param": {"es": "¿Por qué varios filtros?",
+                      "en": "Why multiple filters?"},
+            "value": "", "level": "didactic",
+            "es": "Cada banda cuenta una historia distinta: el color "
+                      "(p. ej. Clear − NIR) revela cómo cambia la "
+                      "temperatura del estallido con el tiempo, y eso "
+                      "ayuda a clasificar la supernova. "
+                      "Seguirla en dos o más filtros vale la pena.",
+            "en": "Each band tells a different story: the colour "
+                      "(e.g. Clear − NIR) reveals how the explosion's "
+                      "temperature evolves over time, and that helps "
+                      "classify the supernova. Following it in two or more "
+                      "filters is worth the effort."})
+
+    disc = (d.get("disc_date") or "").strip()
+    if disc:
+        days = days_since(disc)
+        ago_es = f" — hace {days} días" if days is not None and days >= 0 else ""
+        ago_en = f" — {days} days ago" if days is not None and days >= 0 else ""
+        out.append({
+            "param": {"es": "Descubierta", "en": "Discovered"},
+            "value": disc, "level": "basic",
+            "es": f"Fecha de descubrimiento{ago_es}. Cuanto más joven la "
+                  "supernova, más valioso es medirla: la curva temprana dice "
+                  "cómo era la estrella que explotó.",
+            "en": f"Discovery date{ago_en}. The younger the supernova, the "
+                  "more valuable your measurement: the early curve tells what "
+                  "the exploded star was like."})
+
+    z = host.get("z") if isinstance(host, dict) else None
+    if z is None:
+        z = sim.get("z")
+    if z is not None:
+        try:
+            z = float(z)
+        except (TypeError, ValueError):
+            z = None
+    if z is not None:
+        out.append({
+            "param": {"es": "Corrimiento al rojo (z)", "en": "Redshift (z)"},
+            "value": f"z = {z:.4f}", "level": "deep",
+            "es": "La expansión del universo estira su luz un "
+                  f"{z*100:.2f}%. De ese estiramiento sale la distancia de "
+                  "la galaxia anfitriona.",
+            "en": "The expansion of the universe stretches its light by "
+                  f"{z*100:.2f}%. The host galaxy's distance comes from that "
+                  "stretching."})
+    return out
+
+
+# ---------------- Exoplanet transit interpreter ----------------
+# (object-card plan, subplan 3b: the transit card tells the event of
+# the night AND the planet's story, one same table idiom)
+
+def _hm(dt):
+    # @args: dt - datetime or ISO-8601 string
+    # @return: "HH:MM" string, or None
+    import datetime as _dt
+    if isinstance(dt, str):
+        try:
+            dt = _dt.datetime.fromisoformat(dt)
+        except ValueError:
+            return None
+    if isinstance(dt, _dt.datetime):
+        return dt.strftime("%H:%M")
+    return None
+
+
+_DISC_METHOD = {
+    "transit": {"es": "tránsitos (viéndola parpadear)", "en": "transits (watching it blink)"},
+    "radial velocity": {"es": "velocidad radial (el bamboleo de la estrella)", "en": "radial velocity (the star's wobble)"},
+    "imaging": {"es": "imagen directa (una foto del propio planeta)", "en": "direct imaging (an actual picture of the planet)"},
+    "microlensing": {"es": "microlente (un alineamiento cósmico de azar)", "en": "microlensing (a chance cosmic alignment)"},
+    "timing": {"es": "cronometraje (cambios en pulsos o tránsitos de otros)", "en": "timing (shifts in pulses or in other transits)"},
+}
+
+
+def explain_transit(d, aperture_in=None):
+    # Interprets an exoplanet transit: tonight's event first (start, end,
+    # depth, duration, telescope verdict), then the planet's story.
+    # @args: d - enriched data dict (Exoplanet Archive fields + the
+    #        planner's "transit" event merged by enrich, ADR-027 pattern),
+    #        aperture_in - the user's telescope aperture in inches (or None)
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    tr = d.get("transit") or {}
+
+    ing, mid, egr = (_hm(tr.get(k)) for k in ("ingress", "mid", "egress"))
+    if ing and egr:
+        mid_es = f" El momento central ({mid} UTC) es cuando más luz tapa: planifica alrededor de ese instante." if mid else ""
+        mid_en = f" Mid-transit ({mid} UTC) is when it blocks the most light: plan around that instant." if mid else ""
+        out.append({
+            "param": {"es": "Tránsito esta noche", "en": "Transit tonight"},
+            "value": f"{ing} – {egr} UTC", "level": "basic",
+            "es": f"El planeta cruza hoy el disco de su estrella entre las "
+                  f"{ing} y las {egr} UTC.{mid_es}",
+            "en": f"The planet crosses its star's disc tonight between "
+                  f"{ing} and {egr} UTC.{mid_en}"})
+
+    dur = tr.get("duration_h")
+    if dur:
+        out.append({
+            "param": {"es": "Duración del tránsito", "en": "Transit duration"},
+            "value": f"{dur:.1f} h", "level": "basic",
+            "es": f"El cruce completo dura unas {dur:.1f} horas: es la sesión "
+                  "mínima para ver la bajada y la subida de luz enteras, con "
+                  "un margen fuera de tránsito para comparar.",
+            "en": f"The full crossing lasts about {dur:.1f} hours: the minimum "
+                  "session to watch the whole dimming and recovery, plus some "
+                  "out-of-transit margin to compare."})
+
+    depth = tr.get("depth_mmag")
+    if depth:
+        pct = (1.0 - 10.0 ** (-float(depth) / 2500.0)) * 100.0
+        out.append({
+            "param": {"es": "Profundidad", "en": "Depth"},
+            "value": f"{depth:.1f} mmag ({pct:.1f}%)", "level": "basic",
+            "es": f"La estrella pierde un {pct:.1f}% de su brillo "
+                  f"({depth:.1f} milésimas de magnitud) mientras dura el "
+                  "cruce. Cualquier cosa por debajo del 1% ya pide fotometría "
+                  "cuidadosa: esto es exactamente lo que vas a medir.",
+            "en": f"The star loses {pct:.1f}% of its brightness "
+                  f"({depth:.1f} millimagnitudes) while the crossing lasts. "
+                  "Anything under 1% already calls for careful photometry: "
+                  "this is exactly what you are going to measure."})
+
+    vmag = tr.get("v_mag")
+    if vmag is None:
+        vmag = d.get("mag")
+    if vmag is not None:
+        try:
+            vmag = float(vmag)
+        except (TypeError, ValueError):
+            vmag = None
+    if vmag is not None:
+        out.append({
+            "param": {"es": "Brillo de la estrella", "en": "Star brightness"},
+            "value": f"{vmag:.1f} mag", "level": "basic",
+            "es": f"La estrella madre brilla con magnitud {vmag:.1f}: cuanto "
+                  "más brillante, más fotones por segundo y más fácil sale la "
+                  "pequeña caída de luz del tránsito.",
+            "en": f"The host star shines at magnitude {vmag:.1f}: the "
+                  "brighter it is, the more photons per second and the easier "
+                  "the tiny transit dip comes out."})
+
+    min_in = tr.get("min_telescope_in")
+    if min_in:
+        if aperture_in:
+            ok = float(aperture_in) >= float(min_in)
+            verdict_es = ("Tu equipo llega de sobra: este tránsito es para ti."
+                          if ok else
+                          "Tu equipo se queda corto: con mucha paciencia quizá "
+                          "roces la señal, pero lo sensato es dejárselo a "
+                          "telescopios mayores.")
+            verdict_en = ("Your telescope is up to it: this transit is yours."
+                          if ok else
+                          "Your telescope falls short: with a lot of patience "
+                          "you might graze the signal, but the sensible call "
+                          "is leaving it to bigger scopes.")
+            out.append({
+                "param": {"es": "Telescopio mínimo (el tuyo)",
+                          "en": "Min. telescope (yours)"},
+                "value": f"{min_in:.0f}″ / {float(aperture_in):.0f}″",
+                "level": "basic",
+                "es": f"ExoClock estima que hacen falta al menos {min_in:.0f}″ "
+                      f"de apertura para medir esta caída de luz. {verdict_es}",
+                "en": f"ExoClock estimates at least {min_in:.0f}″ of aperture "
+                      f"are needed to measure this dip. {verdict_en}"})
+        else:
+            out.append({
+                "param": {"es": "Telescopio mínimo", "en": "Min. telescope"},
+                "value": f"{min_in:.0f}″", "level": "basic",
+                "es": f"ExoClock estima un mínimo de {min_in:.0f}″ de apertura "
+                      "para este tránsito. Configura tu telescopio en Ajustes "
+                      "y te diré si llegas.",
+                "en": f"ExoClock estimates a minimum of {min_in:.0f}″ of "
+                      "aperture for this transit. Set up your telescope in "
+                      "Settings and I will tell you whether you make it."})
+
+    per = d.get("pl_orbper")
+    if per:
+        out.append({
+            "param": {"es": "Su año", "en": "Its year"},
+            "value": f"{per:.2f} d", "level": "deep",
+            "es": f"Da una vuelta a su estrella cada {per:.2f} días "
+                  "terrestres: por eso los tránsitos se repiten tan a menudo "
+                  "y puedes planearlos con calendario.",
+            "en": f"It laps its star every {per:.2f} Earth days: that is why "
+                  "transits repeat so often and you can plan them with a "
+                  "calendar."})
+
+    radj = d.get("pl_radj")
+    if radj:
+        out.append({
+            "param": {"es": "Tamaño del planeta", "en": "Planet size"},
+            "value": f"{radj:.2f} Rjup", "level": "deep",
+            "es": f"Radio de {radj:.2f} veces Júpiter (unas {radj*11.21:.0f} "
+                  "Tierras). Los gigantes gaseosos tapan más luz: son los "
+                  "favoritos para empezar en fotometría.",
+            "en": f"Radius {radj:.2f} times Jupiter (about {radj*11.21:.0f} "
+                  "Earths). Gas giants block more light: they are the "
+                  "favourite starters in photometry."})
+
+    mass = d.get("pl_bmassj")
+    if mass:
+        out.append({
+            "param": {"es": "Masa del planeta", "en": "Planet mass"},
+            "value": f"{mass:.2f} Mjup", "level": "deep",
+            "es": f"Pesa {mass:.2f} veces Júpiter. Junto con el radio dice si "
+                  "es un gigante hinchado o denso: una pista sobre su "
+                  "atmósfera.",
+            "en": f"It weighs {mass:.2f} Jupiters. Together with the radius "
+                  "it tells whether it is a puffy or a dense giant: a clue "
+                  "about its atmosphere."})
+
+    dist_pc = d.get("sy_dist")
+    if dist_pc:
+        ly = float(dist_pc) * 3.26156
+        out.append({
+            "param": {"es": "Distancia", "en": "Distance"},
+            "value": f"{dist_pc:.0f} pc", "level": "deep",
+            "es": f"A {ly:.0f} años luz ({dist_pc:.0f} pársecs): la luz que "
+                  "tapa el planeta salió de allí hace esos años.",
+            "en": f"{ly:.0f} light-years away ({dist_pc:.0f} parsecs): the "
+                  "light the planet blocks left there that many years ago."})
+
+    method = (d.get("discoverymethod") or "").strip()
+    year = d.get("disc_year")
+    if method or year:
+        how = _DISC_METHOD.get(method.lower(), {"es": method, "en": method})
+        out.append({
+            "param": {"es": "Descubrimiento", "en": "Discovery"},
+            "value": f"{method} ({year})" if year else method,
+            "level": "deep",
+            "es": f"Descubierto en {year} por {how['es']}." if year else
+                  f"Descubierto por {how['es']}.",
+            "en": f"Discovered in {year} by {how['en']}." if year else
+                  f"Discovered by {how['en']}."})
+
+    oc = tr.get("oc_min")
+    if oc is not None:
+        try:
+            oc = float(oc)
+        except (TypeError, ValueError):
+            oc = None
+    if oc is not None:
+        out.append({
+            "param": {"es": "Deriva del calendario (O-C)", "en": "Timetable drift (O-C)"},
+            "value": f"{oc:+.0f} min", "level": "deep",
+            "es": f"El tránsito llega {oc:+.0f} min respecto a la efeméride "
+                  "de referencia. Si la deriva crece, el calendario pide "
+                  "repaso: tu medida de esta noche es justo la que lo "
+                  "actualiza.",
+            "en": f"Mid-transit arrives {oc:+.0f} min off the reference "
+                  "ephemeris. If the drift grows, the timetable needs "
+                  "revision: tonight's measurement is exactly what updates "
+                  "it."})
+    return out
+
+
+# ---------------- HADS interpreter (ADR-034) ----------------
+
+def explain_hads(d):
+    # Interprets a HADS star: the session maths first (period, amplitude,
+    # range, cycles tonight), then its story (instability strip, dwarf
+    # Cepheids) and the monitoring-programme flags (P. Wils' legend).
+    # @args: d - enriched data dict with a "hads" sub-dict (bundle star or
+    #        tonight's planner values — the shapes differ, read defensively)
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    h = d.get("hads") or {}
+
+    per = h.get("period_h")
+    if per:
+        out.append({
+            "param": {"es": "Periodo", "en": "Period"},
+            "value": f"{per:.2f} h", "level": "basic",
+            "es": f"Cada {per:.2f} horas da un pulso completo de brillo: "
+                  "caben varios ciclos en una sola noche.",
+            "en": f"Every {per:.2f} hours it completes one full brightness "
+                  "pulse: several cycles fit in a single night."})
+
+    amp = h.get("amp")
+    if amp is None and h.get("max") is not None and h.get("min") is not None:
+        amp = h["min"] - h["max"]          # inverted magnitude axis
+    if amp:
+        out.append({
+            "param": {"es": "Amplitud", "en": "Amplitude"},
+            "value": f"Δ {amp:.1f} mag", "level": "basic",
+            "es": f"Cambia {amp:.1f} magnitudes de pico a valle: lo verás "
+                  "variar en tu propia curva de luz de esta noche.",
+            "en": f"It swings {amp:.1f} magnitudes peak to peak: you will "
+                  "watch it vary in your own light curve tonight."})
+
+    if h.get("max") is not None and h.get("min") is not None:
+        out.append({
+            "param": {"es": "Rango de brillo", "en": "Brightness range"},
+            "value": f"{h['max']:.1f}–{h['min']:.1f} mag", "level": "basic",
+            "es": "Del máximo al mínimo. La fase actual es impredecible: "
+                  "cuenta la mediana y la amplitud, no la hora del pico.",
+            "en": "From maximum to minimum. The current phase is "
+                  "unpredictable: the median and the amplitude matter, not "
+                  "when the peak happens."})
+
+    cyc = h.get("cycles")
+    if cyc:
+        fits = h.get("session_fits")
+        fits_es = "" if fits is None else (
+            " Los 2 ciclos recomendados caben de seguida." if fits else
+            " ⚠ Los 2 ciclos recomendados no caben de seguida.")
+        fits_en = "" if fits is None else (
+            " The recommended 2 cycles fit back to back." if fits else
+            " ⚠ The recommended 2 cycles do not fit back to back.")
+        out.append({
+            "param": {"es": "Ciclos esta noche", "en": "Cycles tonight"},
+            "value": f"{cyc:.1f}", "level": "basic",
+            "es": f"Caben {cyc:.1f} ciclos completos sobre tu límite local."
+                  + fits_es,
+            "en": f"{cyc:.1f} full cycles fit above your local limit."
+                  + fits_en})
+
+    modes = []
+    if h.get("multiperiodic"):
+        modes.append({"es": "multiperiódica", "en": "multiperiodic"})
+    if h.get("non_radial"):
+        modes.append({"es": "modos no radiales", "en": "non-radial modes"})
+    if modes:
+        txt = {"es": " + ".join(m["es"] for m in modes),
+               "en": " + ".join(m["en"] for m in modes)}
+        out.append({
+            "param": {"es": "Modos de pulsación", "en": "Pulsation modes"},
+            "value": txt["en"], "level": "basic",
+            "es": f"Es {txt['es']}. Las HADS pulsan en el modo fundamental o "
+                  "el primer armónico (ratio de periodos 0.76–0.78, diagrama "
+                  "de Petersen); si es multiperiódica, obsérvala en noches "
+                  "consecutivas para separar los modos.",
+            "en": f"It is {txt['en']}. HADS pulsate in the fundamental mode "
+                  "or the first overtone (period ratio 0.76–0.78, Petersen "
+                  "diagram); when multiperiodic, observe on consecutive "
+                  "nights to separate the modes."})
+
+    pr = h.get("priority")
+    if pr in ("period_change", "period_change_possible"):
+        found = pr == "period_change"
+        out.append({
+            "param": {"es": "Prioridad del programa", "en": "Programme priority"},
+            "value": "Priority!" if True else "", "level": "basic",
+            "es": ("El seguimiento de Patrick Wils (VVS/AAVSO-VSX) le ha "
+                   "encontrado cambios de periodo" if found else
+                   "El seguimiento de Patrick Wils (VVS/AAVSO-VSX) sospecha "
+                   "cambios de periodo") +
+                  ": tu curva de esta noche cuenta doble.",
+            "en": ("Patrick Wils' monitoring programme (VVS/AAVSO-VSX) has "
+                   "found period changes" if found else
+                   "Patrick Wils' monitoring programme (VVS/AAVSO-VSX) "
+                   "suspects period changes") +
+                  ": tonight's curve counts double."})
+
+    if h.get("observed") is False:
+        out.append({
+            "param": {"es": "Aún no observada", "en": "Not yet observed"},
+            "value": "—", "level": "basic",
+            "es": "El programa de seguimiento aún no tiene ninguna medida de "
+                  "esta estrella: serías de los primeros en registrarla.",
+            "en": "The monitoring programme has no measurement of this star "
+                  "yet: you would be among the first to record it."})
+
+    out.append({
+        "param": {"es": "Qué es", "en": "What it is"}, "level": "basic",
+        "value": "HADS",
+        "es": "Una δ Scuti de gran amplitud: pulsa en la franja de "
+              "inestabilidad del diagrama HR, la misma zona donde reinan las "
+              "cefeidas. La AAVSO las recomienda como primer objetivo de "
+              "fotometría digital.",
+        "en": "A high-amplitude δ Scuti star: it pulsates in the HR "
+              "instability strip, the same region where Cepheids rule. The "
+              "AAVSO recommends them as the first digital-photometry target."})
+    out.append({
+        "param": {"es": "Dato histórico", "en": "Historical note"},
+        "value": "dwarf Cepheid", "level": "deep",
+        "es": "Antes se llamaban «cefeidas enanas»: sus curvas en diente de "
+              "sierra (subida rápida, bajada lenta) recuerdan a las cefeidas "
+              "clásicas, pero pulsan en horas, no en días.",
+        "en": "They were once called 'dwarf Cepheids': their sawtooth light "
+              "curves (fast rise, slow decline) resemble classical Cepheids, "
+              "but they pulsate in hours, not days."})
+    return out
+
+
+# ---------------- variable star interpreter (ADR-035) ----------------
+
+def _variable_family_text(var_type):
+    # Didactic one-liner per variability family. The FIRST component of a
+    # composite VSX type decides (same rule as the epoch, V-e).
+    # @args: var_type - VSX type, e.g. "M", "NR+ELL", "E-DO", "UGSS"
+    # @return: ({"es","en"}, epoch_is_minimum: bool)
+    first = (var_type or "").split("+")[0].strip().upper()
+    if first == "E" or first.startswith(("EA", "EB", "EW", "E/", "E-")):
+        return ({"es": "Binaria eclipsante: una estrella pasa delante de la "
+                       "otra en cada vuelta, y el brillo cae en cada eclipse.",
+                 "en": "Eclipsing binary: one star passes in front of the "
+                       "other every orbit, and the brightness dips at each "
+                       "eclipse."}), True
+    if first == "M":
+        return ({"es": "Mira: una gigante roja que pulsa en meses — late "
+                       "como un corazón lento, con cambios de varias "
+                       "magnitudes.",
+                 "en": "Mira: a red giant pulsating over months — a slow "
+                       "heartbeat swinging several magnitudes."}), False
+    if first == "NR":
+        return ({"es": "Nova recurrente: un sistema binario que estalla "
+                       "cada pocas décadas (esta clase ha llegado a mag 2).",
+                 "en": "Recurrent nova: a binary system erupting every few "
+                       "decades (members of this class have reached mag 2)."}), False
+    if first == "N":
+        return ({"es": "Nova: un estallido termonuclear sobre una enana "
+                       "blanca en un sistema binario.",
+                 "en": "Nova: a thermonuclear outburst on a white dwarf in "
+                       "a binary system."}), False
+    if first.startswith("UG"):
+        return ({"es": "Nova enana: la acreción sobre la enana blanca se "
+                       "vuelve inestable y erupciona cada pocas semanas.",
+                 "en": "Dwarf nova: accretion onto the white dwarf turns "
+                       "unstable and erupts every few weeks."}), False
+    if first == "RCB":
+        return ({"es": "R Coronae Borealis: una supergigante que se apaga "
+                       "de golpe, ahogada por su propio hollín de carbono.",
+                 "en": "R Coronae Borealis: a supergiant suddenly fading, "
+                       "smothered by its own carbon soot."}), False
+    if first == "ELL":
+        return ({"es": "Elipsoidal: una estrella deformada por su compañera "
+                       "que gira mostrando distinta superficie.",
+                 "en": "Ellipsoidal: a star stretched by its companion, "
+                       "rotating and showing different surface."}), False
+    if first in ("DSCT", "HADS", "GDOR", "SXPHE"):
+        return ({"es": "Pulsante de la franja de inestabilidad (familia de "
+                       "las δ Scuti / Doradus).",
+                 "en": "Pulsating star of the instability strip (the "
+                       "δ Scuti / γ Doradus family."}), False
+    return ({"es": "Estrella variable: su brillo cambia con el tiempo.",
+             "en": "Variable star: its brightness changes with time."}), False
+
+
+def explain_variable(d):
+    # Interprets a variable star: variability family first, then the cycle
+    # (period, next extremum), the brightness range and the campaign it
+    # belongs to. Read defensively: the "variable" sub-dict may come from
+    # VSX (full), SIMBAD (coords only) or manual entry (nearly empty).
+    # @args: d - enriched data dict with a "variable" sub-dict
+    # @return: list of dicts {"param", "value", "level", "es", "en"}
+    out = []
+    v = d.get("variable") or {}
+    c = d.get("campaign") or {}
+
+    vt = v.get("var_type") or ""
+    fam, epoch_min = _variable_family_text(vt)
+    out.append({
+        "param": {"es": "Tipo de variable", "en": "Variable type"},
+        "value": vt or "—", "level": "basic",
+        "es": fam["es"], "en": fam["en"]})
+
+    per = v.get("period_d")
+    if per:
+        out.append({
+            "param": {"es": "Periodo", "en": "Period"},
+            "value": f"{per:.2f} d", "level": "basic",
+            "es": f"Cada {per:.1f} días repite su ciclo: la curva se "
+                  "construye noche a noche, no en una sesión.",
+            "en": f"Every {per:.1f} days it repeats its cycle: the light "
+                  "curve is built night after night, not in one session."})
+
+    nxt = v.get("next_extremum") or {}
+    if nxt.get("days") is not None:
+        lab_es = "Máximo" if nxt.get("kind") == "max" else "Mínimo"
+        lab_en = "Maximum" if nxt.get("kind") == "max" else "Minimum"
+        out.append({
+            "param": {"es": "Próximo extremo", "en": "Next extremum"},
+            "value": f"~{nxt['days']:.0f} d", "level": "basic",
+            "es": f"{lab_es} esperado en ~{nxt['days']:.0f} días (época del "
+                  "VSX). Planifica la noche en torno a él.",
+            "en": f"{lab_en} expected in ~{nxt['days']:.0f} days (VSX "
+                  "epoch). Plan the night around it."})
+
+    if v.get("max") is not None and v.get("min") is not None:
+        out.append({
+            "param": {"es": "Rango de brillo", "en": "Brightness range"},
+            "value": f"{v['max']:.1f}–{v['min']:.1f} mag", "level": "basic",
+            "es": "Del máximo al mínimo histórico del catálogo. Recuerda "
+                  "que en magnitudes el número mayor es el más débil.",
+            "en": "From catalogued maximum to minimum. Mind the inverted "
+                  "scale: the bigger number is the fainter one."})
+
+    amp = v.get("amp")
+    if amp is None and v.get("max") is not None and v.get("min") is not None:
+        amp = v["min"] - v["max"]              # inverted magnitude axis
+    if amp:
+        out.append({
+            "param": {"es": "Amplitud", "en": "Amplitude"},
+            "value": f"Δ {amp:.1f} mag", "level": "basic",
+            "es": f"Cambia {amp:.1f} magnitudes de pico a valle.",
+            "en": f"It swings {amp:.1f} magnitudes peak to peak."})
+
+    if v.get("spectral"):
+        out.append({
+            "param": {"es": "Tipo espectral", "en": "Spectral type"},
+            "value": v["spectral"], "level": "deep",
+            "es": "La firma del espectro: temperatura y clases de "
+                  "compañeras si las hay.",
+            "en": "The spectrum's signature: temperature and companion "
+                  "classes when present."})
+
+    if c.get("name"):
+        goal_es = f" Objetivo: {c['goal']}" if c.get("goal") else ""
+        goal_en = f" Goal: {c['goal']}" if c.get("goal") else ""
+        out.append({
+            "param": {"es": "Campaña", "en": "Campaign"},
+            "value": c["name"], "level": "basic",
+            "es": f"La observas dentro de la campaña «{c['name']}»"
+                  + (f" del grupo {c['group_name']}" if c.get("group_name")
+                     else "") + "." + goal_es,
+            "en": f"You observe it inside the “{c['name']}” campaign"
+                  + (f" by {c['group_name']}" if c.get("group_name") else "")
+                  + "." + goal_en})
     return out

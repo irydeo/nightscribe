@@ -1,0 +1,108 @@
+# NightScribe - Windows preview builds
+#
+# Builds the standalone Windows app (portable zip + Inno Setup installer)
+# and publishes it as a rolling pre-release so external testers can try it.
+#
+# Triggers:
+#   - push to dev/v0.1 (the version in development)
+#   - manual: Actions > Windows preview > Run workflow (pick any branch)
+#
+# The pre-release tag is preview-<branch> (e.g. preview-dev-v0.1) and is
+# replaced on every run; testers always download the latest build from the
+# Releases page, no GitHub account needed.
+
+name: Windows preview
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev/v0.1
+
+permissions:
+  contents: write   # needed to publish the pre-release
+
+concurrency:
+  group: windows-preview-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build Windows preview
+    runs-on: windows-latest
+    steps:
+      - name: Checkout (full history for setuptools-scm)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests (a red suite publishes nothing)
+        run: python -m pytest tests/unit -q
+
+      - name: Resolve the package version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = (python -c "from importlib.metadata import version; print(version('nightscribe'))").Trim()
+          $v = $v -replace '\+', '-'   # '+' is legal but awkward in file names and URLs
+          "version=$v" >> $env:GITHUB_OUTPUT
+          echo "version: $v"
+
+      - name: Build with PyInstaller
+        run: pyinstaller installer/nightscribe.spec --clean --noconfirm
+
+      - name: Smoke test the frozen binary
+        run: dist\nightscribe\nightscribe.exe --help
+
+      - name: Zip the portable build
+        shell: pwsh
+        run: |
+          $zip = "dist\NightScribe-${{ steps.ver.outputs.version }}-windows-x64.zip"
+          Compress-Archive -Path dist\nightscribe -DestinationPath $zip
+          echo "zip: $zip"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile the installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=${{ steps.ver.outputs.version }} installer\nightscribe.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish the rolling pre-release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+        run: |
+          $ver = "${{ steps.ver.outputs.version }}"
+          $sha = "${{ github.sha }}".Substring(0, 7)
+          $tag = "preview-" + ("${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-')
+          if (gh release view $tag 2>$null) {
+            gh release delete $tag --cleanup-tag --yes
+          }
+          $notes = @"
+          Preview build of branch **${{ github.ref_name }}** at commit ``$sha`` (version ``$ver``), built by GitHub Actions after the unit test suite passed.
+
+          - **NightScribeSetup-$ver.exe**: Windows installer (per-user, no admin rights needed).
+          - **NightScribe-$ver-windows-x64.zip**: portable build; unzip and run ``nightscribe.exe gui``.
+
+          The binaries are unsigned, so Windows SmartScreen will warn: choose *More info -> Run anyway*.
+
+          Report issues at https://github.com/irydeo/nightscribe/issues
+          "@
+          gh release create $tag --target "${{ github.sha }}" --prerelease `
+            --title "Preview ${{ github.ref_name }} ($sha)" --notes $notes `
+            "dist/NightScribeSetup-$ver.exe" "dist/NightScribe-$ver-windows-x64.zip"

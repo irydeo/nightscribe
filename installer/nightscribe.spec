@@ -20,10 +20,18 @@
 import glob
 import os
 
+from PyInstaller.utils.hooks import copy_metadata
+
 block_cipher = None
 ROOT = os.path.abspath(os.path.join(os.path.dirname(SPEC), ".."))
 
 datas = []
+# Bundle the installed dist-info so the frozen app reports the real
+# package version instead of the "not installed" fallback.
+try:
+    datas += copy_metadata("nightscribe")
+except Exception:
+    pass  # no installed metadata (bare source tree): keep the fallback
 for pattern in ("nightscribe/gui/ui/*.ui", "nightscribe/gui/i18n/*.qm",
                 "nightscribe/assets/*"):
     for f in glob.glob(os.path.join(ROOT, pattern)):

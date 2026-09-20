@@ -49,7 +49,10 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Unit tests (a red suite publishes nothing)
-        run: python -m pytest tests/unit -q
+        # Bounded on purpose: a test that stalls on the network must fail the
+        # gate, not hang the runner. -v so a timeout log names the culprit.
+        timeout-minutes: 12
+        run: python -m pytest tests/unit -v
 
       - name: Resolve the package version
         id: ver

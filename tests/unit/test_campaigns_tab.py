@@ -256,7 +256,7 @@ def test_header_badge_is_a_link(window):
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
     window._render_project_header(proj_mod.get(mw.db, p["id"]))
-    text = window.projects.lbl_header.text()
+    text = window.projects.lbl_mast_camp.text()
     assert f"campaign://{cid}" in text and "Campaña enlace" in text
 
 
@@ -277,11 +277,11 @@ def test_cadence_chip_navigates_to_followup(window):
     window._goto_project_followup(p["id"])
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
-    # UD.3: no more step tabs — "navigate to Follow-up" means the
-    # Follow-up section exists in the rebuilt page and is expanded.
-    sec = window._page_sections.get("followup")
-    assert sec is not None, "the Follow-up section was not built"
-    assert sec.isExpanded(), "the Follow-up section should be expanded"
+    # ADR-041: the project hub is a lazy tab bar — "navigate to
+    # Follow-up" builds the follow-up tab and activates it.
+    assert "followup" in window._tab_pages, "the Follow-up tab was not built"
+    assert not window._tab_pages["followup"].isHidden(), \
+        "the Follow-up tab should be active"
 
 
 # --- ADR-037 SC2: the signals console -------------------------------------

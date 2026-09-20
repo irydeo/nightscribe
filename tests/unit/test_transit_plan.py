@@ -102,6 +102,11 @@ def window(_point_db_at_tmpdir):
     w._now_timer.stop()
     w._blink_timer.stop()
     w._blink_render_timer.stop()
+    # drain the constructor's deferred singleShot (main_window L370:
+    # singleShot(0, on_refresh_projects)). If it fires LATER (inside a test's
+    # processEvents), the list rebuild finds no current selection and
+    # _clear_project_detail() wipes the page the test just built.
+    app.processEvents()
     yield w
     config.is_configured = orig_cfg
     w.close()
@@ -238,8 +243,9 @@ def _fake_enrich():
 def test_exotic_button_in_process_tab(window):
     from PySide6.QtWidgets import QPushButton
     _select(window, "WASP-994 b", _transit_ctx())
-    sec = window._page_sections["process"]
-    sec.setCollapsed(False)
+    # ADR-041: the process tab is lazy — open it, the user path
+    window.projects.btn_tab_process.click()
+    sec = window._tab_pages["process"]
     texts = [b.text() for b in sec.findChildren(QPushButton)]
     assert any("EXOTIC" in t for t in texts)
 
@@ -258,8 +264,158 @@ def test_transit_timeline_capped(window):
     _select(window, "WASP-990 b", _transit_ctx())
     tl = window.findChild(TransitTimeline)
     assert tl is not None and tl.maximumHeight() == 220
-    # the timeline lives inside the plan section of the project page (UD.5)
-    assert window._page_sections["plan"].findChild(TransitTimeline) is tl
+    # the timeline lives inside the plan tab of the project page (ADR-041)
+    assert window._tab_pages["plan"].findChild(TransitTimeline) is tl
+
+
+def test_timeline_fill_fits_the_panel(window):
+    # @args: none
+    # The old KeepAspectRatio fit letterboxed this chart into a thin strip
+    # (~30% of the height at a default 640x480 viewport). The fill fit must
+    # cover >=95% of BOTH viewport dimensions, with the labels re-fonted to
+    # a sane size (no stretched or microscopic text).
+    from PySide6.QtWidgets import QApplication, QGraphicsSimpleTextItem
+    app = QApplication.instance()
+    from nightscribe.gui.widgets.timeline_widget import TransitTimeline
+    _select(window, "WASP-989 b", _transit_ctx())
+    tl = window.findChild(TransitTimeline)
+    assert tl is not None
+    tl.resize(900, 220)          # as capped in the Plan tab
+    app.processEvents()
+    tl.fit_to_scene()
+    vp = tl.viewport()
+    assert vp.width() > 100 and vp.height() > 50
+    m0 = tl.mapFromScene(tl.sceneRect().topLeft())
+    m1 = tl.mapFromScene(tl.sceneRect().bottomRight())
+    assert abs(m1.x() - m0.x()) >= 0.95 * vp.width()
+    assert abs(m1.y() - m0.y()) >= 0.95 * vp.height()
+    for it in tl.scene().items():
+        if isinstance(it, QGraphicsSimpleTextItem):
+            assert 6 <= it.font().pixelSize() <= 30
+
+
+def test_timeline_uses_transit_night_not_next_night(window):
+    # @args: none
+    # A transit that straddles local midnight has `mid` on the NEXT calendar
+    # day; the block must still pick the PRIOR evening's night so the capture
+    # and the darkness share one axis. Regression for the HAT-P-53b
+    # "bunched-left" PNG (capture fill 53% vs 14%; axis 480 vs 1770 min).
+    _select(window, "HAT-P-53b", _transit_ctx())
+    kw = window._project_widgets["transit_timeline"]["kw"]
+    dusk, dawn, cs, ce = (kw["dusk"], kw["dawn"],
+                          kw["capture_start"], kw["capture_end"])
+    assert all(isinstance(x, datetime.datetime)
+               for x in (dusk, dawn, cs, ce))
+    # night (dusk->dawn ~8h) + baselines: one calendar night, far less than
+    # the ~30h the buggy next-night window produced
+    span_h = (max(dawn, ce) - min(dusk, cs)).total_seconds() / 3600.0
+    assert span_h < 14.0, (
+        f"night+capture span {span_h:.1f}h is not the transit's own night")
+    # and the darkness must bracket the transit itself
+    assert dusk <= cs and dawn >= ce, "transit not bracketed by the night"
+
+
+def test_timeline_click_opens_shared_viewer(window, monkeypatch):
+    # @args: none
+    # A plain click on the embedded timeline must open the same
+    # ChartViewer used elsewhere, around a FRESH widget (the one in the
+    # Plan tab must not be reparented out of its page).
+    from PySide6.QtCore import QPointF
+    from nightscribe.gui import chart_viewer
+    from nightscribe.gui.widgets.timeline_widget import TransitTimeline
+    _select(window, "WASP-988 b", _transit_ctx())
+    calls = []
+    def fake_open(parent, widget, title="", obj_name="", chart_key=""):
+        calls.append(dict(parent=parent, widget=widget, title=title,
+                          obj=obj_name, key=chart_key))
+    monkeypatch.setattr(chart_viewer, "open_chart_widget", fake_open)
+    tl = window.findChild(TransitTimeline)
+    home = tl.parentWidget()
+    tl.scene_clicked.emit(QPointF(10.0, 1.0))
+    assert len(calls) == 1
+    c = calls[0]
+    assert c["parent"] is window
+    assert c["widget"] is not tl and type(c["widget"]) is TransitTimeline
+    assert tl.parentWidget() is home                # still in its tab
+    assert "Transit capture plan" in c["title"]
+    assert c["obj"] == "WASP-988 b"
+    assert c["key"] == "transit_plan"
+    assert c["widget"]._items_registered            # the fresh copy drew
+    w = window._project_widgets["transit_timeline"]
+    assert w["kw"] and w["obj"] == "WASP-988 b"
+    c["widget"].deleteLater()
+
+
+def test_viewer_falls_back_to_bare_chartview():
+    # @args: none
+    # A bare ChartView widget (the timeline) has no .view attribute; the
+    # viewer must treat the widget itself as the interactive canvas, so
+    # Fit and the zoom steps keep working.
+    from PySide6.QtWidgets import QApplication
+    QApplication.instance() or QApplication([])
+    from nightscribe.gui.chart_viewer import ChartViewer
+    from nightscribe.gui.widgets.timeline_widget import TransitTimeline
+    tl = TransitTimeline()
+    tl.set_data(
+        dusk=datetime.datetime(2026, 8, 21, 20, 50,
+                               tzinfo=datetime.timezone.utc),
+        dawn=datetime.datetime(2026, 8, 22, 3, 50,
+                               tzinfo=datetime.timezone.utc),
+        capture_start=_MID - datetime.timedelta(hours=1, minutes=30),
+        capture_end=_MID + datetime.timedelta(hours=1, minutes=30),
+        ingress=_MID - datetime.timedelta(hours=1), mid=_MID,
+        egress=_MID + datetime.timedelta(hours=1))
+    dlg = ChartViewer(widget=tl, title="Transit capture plan",
+                      obj_name="WASP-987 b", chart_key="transit_plan")
+    assert dlg._view is tl
+    dlg._zoom_fit()
+    dlg._zoom_in()
+    dlg._zoom_out()
+    dlg.close()
+    dlg.deleteLater()
+
+
+def test_standalone_timeline_keeps_proportions():
+    # @args: none
+    # The window (the ChartViewer's fresh widget) shows the timeline with
+    # set_embedded left off, inside a TALL frame. The old un-conditional fill
+    # fit stretched it several times taller than wide (bloated bands: "lo
+    # estás ajustando y no se ve bien"). A standalone timeline must instead use
+    # the base's uniform KeepAspectRatio fit, so it keeps its natural
+    # wide-short proportions: the on-screen frame must have the same aspect as
+    # the scene. (test_timeline_fill_fits_the_panel pins the OPPOSITE for the
+    # embedded panel, where fill is the right call.)
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.widgets.timeline_widget import TransitTimeline
+    tl = TransitTimeline()            # standalone: the window never embeds it
+    assert tl._embedded is False
+    tl.set_data(
+        dusk=datetime.datetime(2026, 8, 21, 20, 50,
+                               tzinfo=datetime.timezone.utc),
+        dawn=datetime.datetime(2026, 8, 22, 3, 50,
+                               tzinfo=datetime.timezone.utc),
+        capture_start=_MID - datetime.timedelta(hours=1, minutes=30),
+        capture_end=_MID + datetime.timedelta(hours=1, minutes=30),
+        ingress=_MID - datetime.timedelta(hours=1), mid=_MID,
+        egress=_MID + datetime.timedelta(hours=1))
+    tl.resize(1000, 740)              # the tall ChartViewer frame
+    app.processEvents()
+    tl.fit_to_scene()
+    vp = tl.viewport()
+    assert vp.width() > 100 and vp.height() > 200
+    scene = tl.sceneRect()
+    m = tl.mapFromScene
+    tl_ = m(scene.topLeft())
+    tr_ = m(scene.topRight())
+    bl_ = m(scene.bottomLeft())
+    mapped_w = abs(tr_.x() - tl_.x())          # top edge: top-left .. top-right
+    mapped_h = abs(bl_.y() - tl_.y())          # left edge: top-left .. bottom-left
+    scene_aspect = scene.width() / scene.height()
+    # a wide-short, UNDISTORTED chart: its screen frame keeps the scene's
+    # aspect (the old fill fit would have squashed it to ~sx:sy of the width)
+    assert scene_aspect > 1.0
+    assert abs(mapped_w / mapped_h - scene_aspect) <= 0.05 * scene_aspect
 
 
 def test_exotic_write_registers_the_file(window, monkeypatch, tmp_path):

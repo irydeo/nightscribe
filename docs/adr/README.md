@@ -46,3 +46,4 @@
 | [038](ADR-038-ux-prominence-attention.md) | Prominencia de acciones, lenguaje llano y el dashboard «Necesita tu atención» / action prominence, plain language and the attention dashboard |
 | [039](ADR-039-features-accordion.md) | *(reservado: acordeón de la web, stream paralelo / reserved: web accordion, parallel stream)* |
 | [040](ADR-040-sky-calendar-events.md) | El sistema solar como fuente de eventos: «Calendario del cielo» y lunas de Júpiter / the solar system as an event source: "Sky calendar" & Jupiter's moons |
+| [041](ADR-041-project-tab-bar.md) | La página del proyecto como barra de pestañas perezosas (5 pestañas planas, una visible a la vez, deep-links y tarjeta «Siguiente» intactos) / the project page as a lazy tab bar (5 flat tabs, one visible at a time, deep links and the "Next" card intact) |

@@ -179,15 +179,20 @@ def test_checklist_persists_across_rebuild(window):
 # ---------------- follow-up + process (subplan D.3) ----------------
 
 def _section(window, key):
-    # @return: the project page section by key, expanded for poking
-    sec = window._page_sections[key]
-    sec.setCollapsed(False)
-    return sec
+    # @return: the project tab page by key, built + active (ADR-041:
+    #          tabs are lazy, so the test opens the tab like a user)
+    getattr(window.projects, f"btn_tab_{key}").click()
+    return window._tab_pages[key]
 
 
-def test_followup_section_built_for_hads(window):
+def test_followup_tab_gated_for_hads(window):
+    # ADR-041: hads is a follow-up kind (ADR-034 D3) — the tab is visible
+    # on the bar; its page stays lazy until first opened
     _select(window, "T UMa", _hads_ctx())
-    assert "followup" in window._page_sections
+    assert not window.projects.btn_tab_followup.isHidden()
+    assert "followup" not in window._tab_pages
+    _section(window, "followup")
+    assert "followup" in window._tab_pages
 
 
 def test_followup_hides_sn_analysis_buttons_for_hads(window):

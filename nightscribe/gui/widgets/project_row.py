@@ -13,11 +13,14 @@
 
 """The rich project row for the hub list (Track UX-PC, U2).
 
-One row answers, at a glance: WHAT it is (kind band + chip + name), WHAT
+One row answers, at a glance: WHAT it is (kind icon + chip + name), WHAT
 IT NEEDS (the next action in plain words + the step dots) and WHEN (the
 tonight-visibility chip, the days since the last activity, the sparkline
-of your own measurements for follow-up kinds). Same visual language as the
-Tonight rows (ADR-026 theme), so the app speaks with one voice.
+of your own measurements for follow-up kinds).
+
+The row follows the Tonight vocabulary (ADR-026): one saturated anchor
+per row — the kind hue on the icon tile, the chip, the step dots and the
+sparkline — and nothing else competes for colour.
 
 The widget is purely presentational: `MainWindow` computes every text and
 passes them to `set_project`; row interactions are re-emitted as signals
@@ -47,12 +50,14 @@ class ProjectRow(QFrame):
         self._selected = False
         self._kind_color = theme.C_TEXT_DIM
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(0, 0, 8, 0)
-        lay.setSpacing(8)
-        # the kind colour band, full height on the left edge
-        self._band = QFrame()
-        self._band.setFixedWidth(4)
-        lay.addWidget(self._band)
+        lay.setContentsMargins(8, 0, 8, 0)
+        lay.setSpacing(10)
+        # left: the kind icon tile — the row's colour anchor (the old thin
+        # band felt too quiet against the icon of the same hue)
+        self.lbl_icon = QLabel()
+        self.lbl_icon.setFixedSize(44, 44)
+        self.lbl_icon.setAlignment(Qt.AlignCenter)
+        lay.addWidget(self.lbl_icon)
         mid = QVBoxLayout()
         mid.setContentsMargins(0, 6, 0, 6)
         mid.setSpacing(3)
@@ -63,7 +68,8 @@ class ProjectRow(QFrame):
         self.lbl_kind = QLabel()
         line1.addWidget(self.lbl_kind)
         self.lbl_name = QLabel()
-        self.lbl_name.setStyleSheet("font-weight: bold;")
+        self.lbl_name.setStyleSheet(
+            f"font-size: 15px; font-weight: bold; color: {theme.C_TEXT};")
         line1.addWidget(self.lbl_name, 1)
         self.lbl_star = QLabel("★")
         self.lbl_star.setStyleSheet(f"color: {theme.C_WARN};")
@@ -89,6 +95,7 @@ class ProjectRow(QFrame):
         mid.addLayout(line2)
         # line 3: the tonight-visibility chip (hidden when not up)
         self.lbl_window = QLabel()
+        self.lbl_window.setStyleSheet(theme.chip_style(theme.C_OK))
         self.lbl_window.setVisible(False)
         mid.addWidget(self.lbl_window)
         # right: the sparkline of your own measurements (follow-up kinds)
@@ -102,31 +109,39 @@ class ProjectRow(QFrame):
 
     def set_project(self, *, kind_label, kind_color, name, favorite,
                     campaign_name, progress_text, next_text,
-                    activity_text, window_text, sparkline):
+                    activity_text, window_text, sparkline, icon=None):
         # @args: everything already rendered to words by the caller
         #        (kind_label/chips are plain text; sparkline is a QPixmap,
-        #        null when there is nothing to draw)
+        #        null when there is nothing to draw; icon is the kind's
+        #        QPixmap drawn by the caller — None leaves a flat colour wash
+        #        that still anchors the hue)
         # @return: None
         self._kind_color = kind_color
         self.lbl_kind.setText(kind_label)
         self.lbl_kind.setStyleSheet(theme.chip_style(kind_color))
         self.lbl_name.setText(name)
-        self.lbl_name.setStyleSheet(
-            f"font-weight: bold; color: {kind_color};")
+        # the icon tile carries the kind hue under the drawn glyph — a
+        # solid wash (the tile stands over the list's own item text, so
+        # it must stay opaque)
+        if icon is not None and not icon.isNull():
+            self.lbl_icon.setPixmap(icon)
+        self.lbl_icon.setStyleSheet(
+            f"background: {theme.composite(kind_color, '38')}; "
+            "border-radius: 6px;")
+        # the step dots speak in the row's hue like the icon does
+        self.lbl_progress.setText(progress_text)
+        self.lbl_progress.setStyleSheet(f"color: {kind_color};")
         self.lbl_star.setVisible(bool(favorite))
         self.lbl_camp.setVisible(bool(campaign_name))
         if campaign_name:
             self.lbl_camp.setText("⚑ " + campaign_name)
             self.lbl_camp.setToolTip(
                 self.tr("Part of this observing campaign"))
-        self.lbl_progress.setText(progress_text)
         self.lbl_next.setText(next_text)
         self.lbl_activity.setText(activity_text)
         self.lbl_window.setVisible(bool(window_text))
         if window_text:
             self.lbl_window.setText(window_text)
-            self.lbl_window.setStyleSheet(
-                f"color: {theme.C_OK}; font-size: 11px;")
         has_spark = sparkline is not None and not sparkline.isNull()
         self.lbl_spark.setVisible(has_spark)
         if has_spark:
@@ -148,12 +163,7 @@ class ProjectRow(QFrame):
             bg, edge = theme.C_SEL, theme.C_ACCENT
         else:
             bg, edge = theme.C_BASE, "transparent"
-        self.setStyleSheet(
-            f"QFrame#projectrow {{ background: {bg}; border-radius: 6px;"
-            f" border: 1px solid {edge}; }}"
-            f"QFrame#projectrow:hover {{ background: #1a1f30; }}")
-        self._band.setStyleSheet(
-            f"background: {self._kind_color}; border-radius: 2px;")
+        self.setStyleSheet(theme.row_skin("projectrow", bg, edge))
 
     # ---------------- mouse ----------------
 

@@ -880,27 +880,30 @@ def test_gui_boots_offscreen():
     from nightscribe.gui.main_window import MainWindow
     w = MainWindow()
     tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    # UX v3 + campaigns + observatory tabs:
-    # Tonight · Projects · Campaigns · Solar system · Observatory · History
-    assert tabs.count() == 6
+    # Four top-level tabs (ADR-036: History & Sun & sky left the bar for
+    # the Tools-menu dialogs):
+    # Tonight · Projects · Campaigns · Observatory
+    assert tabs.count() == 4
     assert tabs.tabText(0) == "Tonight"
     assert tabs.tabText(1) == "Projects"
     assert tabs.tabText(2) == "Campaigns"
-    assert tabs.tabText(4) == "Observatory"
+    assert tabs.tabText(3) == "Observatory"
     # suggestion grid container exists
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)
-    assert not w.tonight.grp_list.isVisible()
-    # projects page: the plan/process/publish sections are built per project
-    # (UD.5, retired the step tabs); the hub ships with the empty page
+    assert w.tonight.grp_list.isHidden()
+    # projects page: ADR-041 tab bar — each step tab is built per project,
+    # lazily, on first open; the hub ships with the empty page
     assert w.projects.page_container is not None
-    assert w._page_sections == {}
+    assert w._tab_pages == {} and w._active_tab is None
+    # the five flat tab buttons exist (follow-up is kind-gated per project)
+    for key in ("details", "plan", "process", "publish", "followup"):
+        getattr(w.projects, f"btn_tab_{key}")
     # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]
     assert "File" in menu_texts and "Tools" in menu_texts
     # tables must be sortable
     assert w.tonight.tbl_targets.isSortingEnabled()
-    assert w.history.tbl_history.isSortingEnabled()
     w.close()
 
 

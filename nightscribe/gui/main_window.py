@@ -58,11 +58,12 @@ UI_DIR = Path(__file__).parent / "ui"
 # is one step — Plan & Captura.
 _STEP_KEYS = ("plan", "process", "publish")
 
-# The whole project page is one exclusive accordion: the object card,
-# the three steps and follow-up — at most one section open at a time
-# (opening one closes every other open section; the Go button, cadence
-# chips and the other deep links land on it the same way).
-_PAGE_ACCORDION = ("details",) + _STEP_KEYS + ("followup", "files")
+# The pages of the project detail (ADR-041): the object card, the
+# three steps and the follow-up view (the latter only for the kinds
+# that keep a multi-night journal). ONE page is visible at a time —
+# the tab bar in the masthead decides which. The step pages are built
+# lazily on first open and cached until the project changes.
+_TAB_KEYS = ("details",) + _STEP_KEYS + ("followup",)
 
 # A2: outcome keys (from project.OUTCOMES) → human labels, by language.
 # The editable combo stores the key (English) and shows the label; «Otro»
@@ -332,7 +333,8 @@ class MainWindow(QMainWindow):
         self._project_widgets = {}
         self._skycal = None       # lazy Sky calendar dialog (SC2/ADR-040)
         self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
-        self._page_sections = {}  # key -> CollapsibleSection of the project page
+        self._tab_pages = {}  # ADR-041: key -> tab page QWidget ("details"|...)
+        self._active_tab = None  # key of the visible tab page (or None)
         self._advisor_dismissed = None  # A2: id of the project whose advisor
         #                                the user dismissed this session
 
@@ -582,9 +584,28 @@ class MainWindow(QMainWindow):
         p.lst_projects.customContextMenuRequested.connect(
             self._project_context_menu)
         p.lst_projects.viewport().setCursor(Qt.PointingHandCursor)
-        # UX-d: the project header campaign badge is a link to the tab
-        self.projects.lbl_header.linkActivated.connect(
+        # UX-d: the masthead campaign badge is a link to the Campaigns tab
+        # (openExternalLinks stays off in the .ui so linkActivated fires
+        # here instead of the browser)
+        self.projects.lbl_mast_camp.linkActivated.connect(
             self._campaign_link_clicked)
+        # ADR-041: the tab bar — the object card, the three steps and
+        # the follow-up view. A click opens that page (lazily built on
+        # first open), like any other deep link.
+        for key in _TAB_KEYS:
+            btn = getattr(p, f"btn_tab_{key}")
+            btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(
+                lambda _=False, k=key: self._show_tab(k))
+        # UX-i: « / » — fold the list column away for more detail room
+        # (and bring it back); the choice is remembered across sessions
+        p.btn_hide_list.clicked.connect(
+            lambda: self._toggle_project_list(False))
+        p.btn_show_list.clicked.connect(
+            lambda: self._toggle_project_list(True))
+        if config.get("projects_list_hidden", 0):
+            self._toggle_project_list(False)
         c = self.campaigns
         c.lst_campaigns.itemSelectionChanged.connect(
             self._campaign_selected)
@@ -1296,8 +1317,8 @@ class MainWindow(QMainWindow):
             header_layout.addWidget(more)
 
     def _goto_project_followup(self, pid):
-        # Opens the project's Follow-up section (the cadence chips land
-        # here, UX-d). The section is expanded, not navigated by index.
+        # Opens the project's Follow-up tab (the cadence chips land
+        # here, UX-d). The tab is activated, not navigated by index.
         if not self._goto_project_by_id(pid):
             return
         self._scroll_to_section("followup")
@@ -1530,11 +1551,9 @@ class MainWindow(QMainWindow):
         kind_color = self._KIND_COLORS.get(kind, "#888888")
         kind_label = self._KIND_LABELS.get(kind, kind)
         row = _ClickableFrame()
-        ring_css = " border: 1px solid #5a6478;" if ring else ""
-        row.setStyleSheet(
-            f"QFrame#tonightrow {{ background: {theme.C_BASE}"
-            f" border-radius: 8px;{ring_css} }}"
-            f"QFrame#tonightrow:hover {{ background: #1a1f30; }}")
+        edge = "#5a6478" if ring else "transparent"
+        row.setStyleSheet(theme.row_skin("tonightrow", theme.C_BASE, edge,
+                                         radius=8))
         row.setObjectName("tonightrow")
         row.setCursor(Qt.PointingHandCursor)
         row.clicked.connect(lambda t=t: self._open_explore_dialog(
@@ -1545,7 +1564,9 @@ class MainWindow(QMainWindow):
         # left: the kind icon, full height, kind-color tint
         lbl_icon = QLabel()
         lbl_icon.setPixmap(self._type_pixmap(kind, size=32))
-        lbl_icon.setStyleSheet(f"background: {kind_color}18; border-radius: 6px;")
+        # solid wash: QSS mis-parses bare 8-digit hexes (alpha-first), so
+        # composite() blends an opaque #rrggbb instead of an alpha tint
+        lbl_icon.setStyleSheet(f"background: {theme.composite(kind_color, '18')}; border-radius: 6px;")
         lbl_icon.setFixedSize(44, 44)
         layout.addWidget(lbl_icon)
         # center: the readable content
@@ -2074,7 +2095,12 @@ class MainWindow(QMainWindow):
             item.setData(Qt.UserRole, c["id"])
             if finished:
                 item.setForeground(QColor(theme.C_TEXT_DIM))
-            item.setSizeHint(QSize(-1, 60))
+            # the item's height must carry the row's fixed height (56): the
+            # list lays items out from this hint, NOT from the attached
+            # widget. A QSize(-1, h) is normalised to an *invalid* hint by
+            # PySide and silently ignored, which squeezed the rows to the
+            # text height — use a valid zero width instead.
+            item.setSizeHint(QSize(0, 56))
             lst.addItem(item)
             row = CampaignRow()
             row.set_campaign(
@@ -2417,7 +2443,12 @@ class MainWindow(QMainWindow):
                 item.setText(item.text() + " ⚑")
                 item.setToolTip(self.tr("Campaign: %1").replace(
                     "%1", camp_names.get(p["campaign_id"], "?")))
-            item.setSizeHint(QSize(-1, 78))
+            # the item's height must carry the row's fixed height (74): the
+            # list lays items out from this hint, NOT from the attached
+            # widget. A QSize(-1, h) is normalised to an *invalid* hint by
+            # PySide and silently ignored, which squeezed the rows to the
+            # text height — use a valid zero width instead.
+            item.setSizeHint(QSize(0, 74))
             lst.addItem(item)
             # UX-PC (U2): the rich row — the plain text above stays as the
             # accessible/searchable fallback under the widget
@@ -2428,10 +2459,10 @@ class MainWindow(QMainWindow):
             row.set_project(**payload)
             if urgency == "event":
                 row.lbl_next.setStyleSheet(
-                    f"color: #e05555; font-weight: bold;")
+                    f"color: {theme.C_EVENT}; font-weight: bold;")
             elif urgency == "due":
                 row.lbl_next.setStyleSheet(
-                    f"color: #e0c060; font-weight: bold;")
+                    f"color: {theme.C_WARN}; font-weight: bold;")
             row.clicked.connect(
                 lambda it=item: self.projects.lst_projects
                 .setCurrentItem(it))
@@ -2532,7 +2563,10 @@ class MainWindow(QMainWindow):
         urgency = (attn or {}).get("urgency")
         spark = None
         if kind in FOLLOWUP_KINDS:
-            spark = sparkline_pixmap(_fu.list_points(db, p["id"]))
+            # sparkline stroked in the row's kind hue (the anchor the chip
+            # and the icon tile already carry)
+            spark = sparkline_pixmap(
+                _fu.list_points(db, p["id"]), color=kind_color)
         return {
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),
@@ -2541,6 +2575,9 @@ class MainWindow(QMainWindow):
             "activity_text": self._activity_words(p),
             "window_text": self._project_window_chip(p, full),
             "sparkline": spark,
+            # the icon tile's glyph, drawn by the caller (unknown kinds
+            # render a flat tint tile instead)
+            "icon": self._type_pixmap(kind, size=28),
             # not a widget field: the urgency tint is applied after
             "_urgency": urgency,
         }
@@ -2622,7 +2659,7 @@ class MainWindow(QMainWindow):
         # @args: e - an attention_report entry
         # @return: a QFrame card: urgency band + the reason in words + one
         #          action button landing on the right section
-        colors = {"event": "#e05555", "due": "#e0c060",
+        colors = {"event": theme.C_EVENT, "due": theme.C_WARN,
                   "info": theme.C_OK}
         color = colors.get(e["urgency"], theme.C_OK)
         card = QFrame()
@@ -2829,14 +2866,6 @@ class MainWindow(QMainWindow):
             sec.setCollapsed(True)
             det.addWidget(sec)
             self._proj_files_section = sec
-            # page accordion: the nested files section joins the
-            # exclusivity group — clicking it opens it and closes the
-            # other open sections (its parent card stays open: it lives
-            # inside it), clicking anywhere else closes it.
-            self._page_sections["files"] = sec
-            sec.sectionToggled.connect(
-                lambda expanded: self._on_page_toggled("files",
-                                                       expanded))
 
     def _populate_project_files(self, pid):
         # A4: refresh the files list in the Details tab from project_files.
@@ -2945,39 +2974,45 @@ class MainWindow(QMainWindow):
         self._current_project = None
         self._reset_proj_panel()
         self._clear_project_page()
-        self.projects.lbl_header.setText(
-            self.tr("Select a project or create one from Tonight."))
+        # UX-i: reset the flat masthead (the old rich-text header is gone)
+        mast = self.projects
+        mast.lbl_mast_icon.clear()
+        mast.lbl_mast_name.setText("")
+        mast.lbl_mast_kind.setText("")
+        mast.lbl_mast_camp.setText("")
         self.projects.lbl_context.setText("—")
         self.projects.lbl_advisor.setVisible(False)
         self._show_dashboard()
 
     def _render_project_header(self, p):
-        kind_label = {"sn": "Supernova", "neo": "NEO", "comet": "Comet",
-                      "pccp": "Possible comet",
-                      "transit": "Exoplanet transit",
-                      "hads": "HADS", "variable": self.tr("Variable star")
-                      }.get(p["kind"], p["kind"])
-        cur = project.current_step(db, p["id"])
-        step_n = _STEP_KEYS.index(cur) + 1 if cur in _STEP_KEYS else 3
-        header = f"<b>[{kind_label}] {p['object_name']}</b>"
+        # UX-i: the flat masthead — icon, name, kind chip, campaign
+        # link. No rich-text header: the tab bar below (plus the Next
+        # card) tells you where the project stands.
+        mast = self.projects
+        mast.lbl_mast_icon.setPixmap(self._type_pixmap(p["kind"], 28))
+        name = p["object_name"]
         if p.get("closed_at"):
-            dt = datetime.datetime.fromtimestamp(p["closed_at"])
-            header += f" — <span style='color:#8a90a6'>{self.tr('closed')} {dt.strftime('%Y-%m-%d')}</span>"
+            when = datetime.datetime.fromtimestamp(
+                p["closed_at"]).strftime("%Y-%m-%d")
+            name += f"  —  {self.tr('closed')} {when}"
             if p.get("outcome"):
-                header += f" <span style='color:#8a90a6'>({p['outcome']})</span>"
-        else:
-            header += f" — {self.tr('step')} {step_n}/3"
+                name += f"  ({p['outcome']})"
+        mast.lbl_mast_name.setText(name)
+        # kind chip (the old "[Supernova]" tag, now a solid pill)
+        kind = p["kind"]
+        mast.lbl_mast_kind.setText(theme.KIND_LABELS.get(kind, kind))
+        mast.lbl_mast_kind.setStyleSheet(
+            theme.chip_style(theme.KIND_COLORS.get(kind, theme.C_PANEL)))
+        # campaign badge (UX-d): the old header link, now on its own label
         if p.get("campaign_id"):
             from ..core import campaign as _camp
             c = _camp.get(db, p["campaign_id"])
             if c:
-                lab = self.tr("campaign")
-                header += (" · <a href='campaign://%1' "
-                           "style='color:#65cf30; text-decoration:none'>"
-                           "⚑ %2: %3</a>").replace(
-                               "%1", str(c["id"])).replace(
-                               "%2", lab).replace("%3", c["name"])
-        self.projects.lbl_header.setText(header)
+                mast.lbl_mast_camp.setText(
+                    "<a href='campaign://{cid}'>⚑ {lab}: {nm}</a>".format(
+                        cid=c["id"], lab=self.tr("campaign"), nm=c["name"]))
+        else:
+            mast.lbl_mast_camp.setText("")
         ctx = p["context"]
         parts = []
         if ctx.get("mag") is not None:
@@ -3033,33 +3068,36 @@ class MainWindow(QMainWindow):
                 self._wipe_layout(item.layout())
 
     def _section_layout(self, key, title):
-        # One collapsible section of the project page (UX-i).
+        # One tab PAGE of the project detail (ADR-041): a flat page in
+        # the scroll area with a slim header (bold title + state chip)
+        # and the per-kind content below. Only one page is visible at a
+        # time — the tab bar in the masthead decides which.
         # @args: key - "details"|"plan"|"process"|"publish"|"followup",
-        #        title - the visible header
-        # @return: the section's content QLayout (where the per-kind
+        #        title - the visible header text
+        # @return: the page's content QLayout (where the per-kind
         #          builders add their widgets, exactly as before)
-        from .widgets.collapsible_section import CollapsibleSection
-        sec = CollapsibleSection(title)
-        page_container = self.projects.page_container
-        page_container.layout().addWidget(sec)
-        self._page_sections[key] = sec
-        # page accordion: a real header click drives the exclusivity
-        # (see _on_page_toggled); sectionToggled only fires from user
-        # clicks, so the initial collapse below stays silent and the
-        # programmatic sibling-closes never echo back (no recursion).
-        if key in _PAGE_ACCORDION:
-            sec.sectionToggled.connect(
-                lambda expanded, k=key: self._on_page_toggled(k, expanded))
-        inner = QWidget()
-        v = QVBoxLayout(inner)
-        v.setContentsMargins(0, 0, 0, 0)
-        sec.setContentWidget(inner)
+        page = QWidget(self.projects.page_container)
+        page._chip = QLabel(page)
+        page._chip.setStyleSheet(theme.chip_style(theme.C_PANEL))
+        page._chip.setVisible(False)  # _step_section lifts it with a badge
+        header = QHBoxLayout()
+        head = QLabel(title, page)
+        head.setStyleSheet("font-weight: bold;")
+        header.addWidget(head, 1)
+        header.addWidget(page._chip)
+        v = QVBoxLayout(page)
+        v.setContentsMargins(0, 6, 0, 0)
+        v.addLayout(header)
+        self._tab_pages[key] = page
+        self.projects.page_container.layout().addWidget(page)
+        page.setVisible(False)  # _show_tab() lifts the active one
         return v
 
     def _clear_project_page(self):
-        # Wipes the project page sections (one rebuild per project
+        # Wipes the project page (ADR-041: one rebuild per project
         # selection, same discipline as the old step tabs).
-        self._page_sections = {}
+        self._tab_pages = {}
+        self._active_tab = None
         # the registry belongs to the wiped page: stale keys must not
         # survive the rebuild (UD.5)
         self._project_widgets = {}
@@ -3102,22 +3140,55 @@ class MainWindow(QMainWindow):
                 "process": "process", "publish": "publish",
                 "close": None}.get(act["key"])
 
+    def _render_tab_bar(self, p):
+        # ADR-041: the masthead tab bar — one flat button per page.
+        # The ACTIVE tab is painted solid in the project's kind accent
+        # ("you are here"); the others keep the quiet state vocabulary
+        # (filled done, outlined current, dimmed skipped, plain
+        # pending). They say WHERE your steps are, not a to-do list.
+        # The follow-up tab is hidden for the kinds that have no
+        # multi-night journal.
+        # @args: p - the project dict
+        # @return: None
+        w = self.projects
+        cur = project.current_step(db, p["id"]) \
+            if p["status"] == project.STATUS_ACTIVE else None
+        steps = {s["step"]: s["status"] for s in p.get("steps", [])}
+        color = theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT)
+        active = getattr(self, "_active_tab", None)
+        for key in _TAB_KEYS:
+            btn = getattr(w, f"btn_tab_{key}")
+            if key == "followup":
+                # hidden for the kinds with no multi-night journal —
+                # and re-shown when the kind makes it back (the bar is
+                # re-rendered on every project change)
+                btn.setVisible(p.get("kind") in FOLLOWUP_KINDS)
+            if key == "followup" and p.get("kind") not in FOLLOWUP_KINDS:
+                continue
+            if key in _STEP_KEYS:
+                st = steps.get(key, "pending")
+                state = "current" if cur == key else st
+                if state not in ("current", "done", "skipped"):
+                    state = "pending"
+            else:
+                state = "pending"
+            label = self._tab_label(key)
+            btn.setText(label)
+            btn.setToolTip(self.tr("Open the {l} tab").replace(
+                "{l}", label))
+            btn.setChecked(active == key)
+            btn.setStyleSheet(theme.tab_state_style(state, color,
+                                                    active == key))
+
     def _refresh_next_card(self, p):
         # Fills the Next card from next_action() (UX-i): one bold line
-        # saying what to do, one small line with the steps in words,
-        # and the Go button scrolling to the right section.
+        # saying what to do, and the Go button opening the right tab.
+        # The per-step state lives in the masthead tab bar.
         # @args: p - the project dict
         # @return: None
         act = project.next_action(db, p)
         self.projects.lbl_next.setText("▶ " + self._next_action_text(act))
-        steps = {s["step"]: s["status"] for s in p.get("steps", [])}
-        words = []
-        for key in _STEP_KEYS:
-            st = steps.get(key, "pending")
-            mark = "✔" if st == "done" else "–" if st == "skipped" \
-                else "○"
-            words.append(f"{mark} {self._step_label(key)}")
-        self.projects.lbl_steps_line.setText("  ·  ".join(words))
+        self._render_tab_bar(p)
         target = self._next_target_key(p)
         self._next_target = target
         self.projects.btn_next_go.setVisible(target is not None)
@@ -3139,97 +3210,117 @@ class MainWindow(QMainWindow):
         if self._current_project and self._next_step_key:
             self._step_skip(self._next_step_key)
 
-    def _on_page_toggled(self, key, expanded):
-        # Page accordion: a genuine click opening ANY section (the
-        # object card or a step) closes the other open section (single
-        # landing spot, with the auto-scroll). A click that *closes* a
-        # section is left alone — 0 sections open is a perfectly legal
-        # state, nothing is force-opened.
-        # @args: key - the section key, expanded - the new state
-        # @return: None
-        if expanded:
-            self._scroll_to_section(key)
-
     def _scroll_to_section(self, key):
-        # Expands the section and scrolls the page to it (the landing
-        # spot of every deep link after UD.4, UX-i). It keeps the whole
-        # page accordion invariant: at most one section (object card or
-        # step) is open, so the other open ones close first (silent
-        # setCollapsed — no signal echo).
-        # @args: key - section key, e.g. "followup"|"plan"|None
+        # Deep link (Next card Go, dashboard, the ⋯ menu, cadence
+        # chips, double-click): land on the part of the project the
+        # caller asked for. With the tab bar (ADR-041) that means
+        # activating the tab; "files" is the nested list inside the
+        # object card.
+        # @args: key - section key, e.g. "followup"|"plan"|"files"|None
         # @return: None
-        if not key or key not in getattr(self, "_page_sections", {}):
+        if not key:
             return
-        if key in _PAGE_ACCORDION:
-            for other_key, other in self._page_sections.items():
-                if other_key != key and other_key in _PAGE_ACCORDION \
-                        and other.isExpanded():
-                    # "files" is nested INSIDE the object card: opening
-                    # it must not close its own parent
-                    if key == "files" and other_key == "details":
-                        continue
-                    other.setCollapsed(True)
-        sec = self._page_sections[key]
-        sec.setCollapsed(False)
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(0, lambda: self.projects.scroll_page
-                          .ensureWidgetVisible(sec))
+        self._show_tab("details" if key == "files" else key)
+
+    def _show_tab(self, key):
+        # ADR-041: activate one tab page — built on first open (lazy),
+        # the other pages of this project get hidden, and the bar is
+        # repainted so the active tab reads "you are here".
+        # @args: key - tab key ("details"|...|"followup")
+        # @return: None (a no-op when the page cannot exist here — the
+        #          follow-up of a kind that has no tab)
+        if key is None or self._current_project is None:
+            return
+        self._ensure_tab_built(key)
+        if key not in self._tab_pages:
+            return
+        self._active_tab = key
+        for k, page in self._tab_pages.items():
+            page.setVisible(k == key)
+        # each tab page is its own world: land at the top of the page
+        self.projects.scroll_page.verticalScrollBar().setValue(0)
+        self._render_tab_bar(self._current_project)
+
+    def _ensure_tab_built(self, key):
+        # ADR-041: the lazy build — tab pages are created on FIRST open
+        # and kept in _tab_pages until the project changes (the clear
+        # wipes them). Object card is already eager: it exists by the
+        # time anything calls this.
+        # @args: key - the tab key
+        # @return: None
+        if key in self._tab_pages or self._current_project is None:
+            return
+        p = self._current_project
+        kind, ctx = p["kind"], p["context"]
+        if key in _STEP_KEYS:
+            builders = {
+                "plan": self._build_plan_tab,
+                "process": self._build_process_tab,
+                "publish": self._build_publish_tab,
+            }
+            builders[key](p, kind, ctx)
+            # UX-PC (U3): the discreet step footer (state words + reopen
+            # / skip) goes at the END of the step page, after content
+            self._tab_pages[key].layout().addLayout(
+                self._step_footer(p, key))
+        elif key == "followup" and kind in FOLLOWUP_KINDS:
+            self._build_followup_tab(p, ctx)
 
     def _build_project_page(self, p):
-        # The project page (UX-i): one scroll with collapsible
-        # sections instead of step tabs + wizard. Same per-kind
-        # content builders, new container; the step state shows in
-        # words and its toggle lives INSIDE each step section.
+        # The project detail (ADR-041): the object card, the steps and
+        # follow-up are TAB PAGES under one scroll — one visible at a
+        # time (the tab bar in the masthead decides). The object card
+        # is the light page, so it builds eagerly; the step pages build
+        # lazily on first open and are cached in _tab_pages. The Next
+        # card still decides where you land.
         self._clear_project_page()
         kind, ctx = p["kind"], p["context"]
-        # section 0: the object card + project files (not a step)
-        det = self._section_layout("details", self.tr("Object card"))
+        # page 0: the object card + project files (not a step)
+        det = self._section_layout("details", self._tab_label("details"))
         panel = self._get_proj_panel()
         det.addWidget(panel)
         self._ensure_proj_files_list_section(det)
         self._populate_project_files(p["id"])
-        # step sections keep the old builders: each one's first line
-        # now asks for a section instead of a tab page
-        self._build_plan_tab(p, kind, ctx)
-        self._build_process_tab(p, kind, ctx)
-        self._build_publish_tab(p, kind, ctx)
-        if kind in FOLLOWUP_KINDS:
-            self._build_followup_tab(p, ctx)
-        # UX-PC (U3): the discreet step footer (state in words + reopen /
-        # skip) goes at the END of each step section, after its content
-        for key in _STEP_KEYS:
-            sec = self._page_sections.get(key)
-            if sec is not None:
-                sec.contentLayout().addLayout(self._step_footer(p, key))
-        # the Next card drives which section starts expanded: only the
-        # next-action one, everything else collapsed (object card too —
-        # the whole page is one exclusive accordion). A finished
-        # project (no target) opens with all sections collapsed, the
-        # user expands what they want to read.
+        # the Next card fills itself AND tells us which page starts
+        # active (a finished project — no target — lands on the object
+        # card); the other pages build on first click
         self._refresh_next_card(p)
-        target = self._next_target_key(p)
-        for key, sec in self._page_sections.items():
-            sec.setCollapsed(key != target)
+        self._show_tab(self._next_target or "details")
 
     def _step_section(self, key):
-        # Builds one step section with its state chip in the header
-        # (UX-i). UX-PC (U3): the state ACTIONS moved out of the section
-        # top — done/skip for the current step live on the Next card, and
-        # each section carries only a discreet footer (_step_footer).
-        # @return: the section's content layout
-        labels = {"plan": self._step_label("plan"),
-                  "process": self._step_label("process"),
-                  "publish": self._step_label("publish"),
-                  "followup": self.tr("Follow-up")}
-        layout = self._section_layout(key, labels[key])
+        # Builds one tab page with its state chip in the header
+        # (ADR-041). UX-PC (U3) still holds: the state ACTIONS live on
+        # the Next card; the page carries only the discreet footer
+        # (_step_footer).
+        # @args: key - "plan"|"process"|"publish"|"followup"
+        # @return: the page's content layout
+        layout = self._section_layout(key, self._tab_label(key))
         p = self._current_project
         if p and key in _STEP_KEYS:
-            # step state as a chip in the section header ("done <date>" /
-            # "skipped" / "pending"). Real step sections only — follow-up
-            # has no step row and shows nothing.
-            self._page_sections[key].setHeaderBadge(
-                self._step_chip_text(p, key))
+            # step state as a chip in the page header ("done <date>" /
+            # "skipped" / "pending"). Real step pages only — follow-up
+            # has no step row and its chip stays hidden.
+            self._set_tab_badge(key, self._step_chip_text(p, key))
         return layout
+
+    def _tab_label(self, key):
+        # @args: key - tab key
+        # @return: the visible tab text (the two non-step pages carry
+        #          their own labels; the steps reuse the step labels)
+        if key == "details":
+            return self.tr("Object card")
+        if key == "followup":
+            return self.tr("Follow-up")
+        return self._step_label(key)
+
+    def _set_tab_badge(self, key, text):
+        # @args: key - tab key, text - chip text ("" keeps it hidden)
+        # @return: None
+        page = self._tab_pages.get(key)
+        if page is None:
+            return
+        page._chip.setText(text or "")
+        page._chip.setVisible(bool(text))
 
     def _step_chip_text(self, p, key):
         # @args: p - the project dict, key - step key
@@ -4379,8 +4470,15 @@ class MainWindow(QMainWindow):
         dts = {k: _as_dt(tr.get(k)) for k in
                ("ingress", "mid", "egress", "capture_start", "capture_end")}
         # --- visual timeline: capture window vs darkness vs horizon -------
-        date = (dts["mid"] or datetime.datetime.now(
-            datetime.timezone.utc)).date()
+        # the night the transit belongs to = its EARIEST evening event (the
+        # capture opens the night), NOT mid.date(): a transit straddling a
+        # local midnight puts mid on the following date, so mid.date() pulled
+        # in the NEXT evening's dusk/dawn and stretched the axis ~3.6x (the
+        # capture bunched into a far-left sliver — HAT-P-53b: 480 vs 1770 min)
+        _ev = [dts[k] for k in ("capture_start", "ingress", "mid")
+               if dts[k] is not None]
+        date = (min(_ev) if _ev else
+                datetime.datetime.now(datetime.timezone.utc)).date()
         win = coords.tonight_window(config.get("lat"), config.get("lon"),
                                     date)
         safe = None
@@ -4391,14 +4489,28 @@ class MainWindow(QMainWindow):
                 ctx["ra_deg"], ctx["dec_deg"], config, dur, date=date
             ).get("safe_window")
         timeline = TransitTimeline()
-        # keep the night-view compact on very tall windows (the scene
-        # letterboxes inside the widget, so a hard cap costs nothing)
+        # keep the night-view compact on very tall windows: the scene now
+        # FILLS the widget (TransitTimeline._apply_fit), so the cap bounds
+        # the drawing area itself
         timeline.setMaximumHeight(220)
-        timeline.set_data(
-            dusk=win[0] if win else None, dawn=win[1] if win else None,
-            safe=safe, capture_start=dts["capture_start"],
-            capture_end=dts["capture_end"], ingress=dts["ingress"],
-            mid=dts["mid"], egress=dts["egress"])
+        kw = dict(dusk=win[0] if win else None, dawn=win[1] if win else None,
+                  safe=safe, capture_start=dts["capture_start"],
+                  capture_end=dts["capture_end"], ingress=dts["ingress"],
+                  mid=dts["mid"], egress=dts["egress"])
+        timeline.set_data(**kw)
+        # the timeline sits inside the Plan-tab scroll page: passive
+        # preview (wheel scrolls the page, no inline pan) and a plain click
+        # opens the shared ChartViewer (zoom / pan / export) — the same
+        # contract as the ObjectPanel chart slots
+        timeline.set_embedded(True)
+        timeline.setToolTip(self.tr(
+            "Click to open in the chart viewer (zoom, pan, export)"))
+        timeline.scene_clicked.connect(self._open_timeline_viewer)
+        # keep the draw inputs so the click handler can rebuild a FRESH
+        # copy for the viewer — reparenting the embedded one would rip it
+        # out of this tab
+        self._project_widgets["transit_timeline"] = {
+            "kw": kw, "obj": p.get("object_name") or ""}
         gl.addWidget(timeline)
         # --- the five key times, UTC + local -------------------------------
         def _hm(dt):
@@ -4504,6 +4616,26 @@ class MainWindow(QMainWindow):
             cbs.append(cb)
         self._project_widgets["transit_checklist"] = cbs
         layout.addWidget(grp)
+
+    def _open_timeline_viewer(self, _pos=None):
+        # Transit-timeline click: open the shared ChartViewer around a
+        # FRESH TransitTimeline rebuilt from the stored draw inputs (the
+        # embedded widget must not be reparented — it belongs to this tab).
+        # The viewer drives the live widget: fit / zoom / pan / export.
+        # @args: _pos - scene point under the click (unused: the whole
+        #        chart opens fitted)
+        from .chart_viewer import open_chart_widget
+        from .widgets.timeline_widget import TransitTimeline
+        stored = self._project_widgets.get("transit_timeline") or {}
+        kw = stored.get("kw") or {}
+        if not kw:
+            return
+        fresh = TransitTimeline()
+        fresh.set_data(**kw)
+        open_chart_widget(self, fresh,
+                          title=self.tr("Transit capture plan"),
+                          obj_name=stored.get("obj") or "",
+                          chart_key="transit_plan")
 
     def _transit_checklist_save(self, pid):
         # Persists the pre-flight checklist into the plan step data, so the
@@ -5984,6 +6116,16 @@ class MainWindow(QMainWindow):
         self.projects.btn_filters.setText(
             self.tr("Filters ▾") if checked else self.tr("Filters ▸"))
         config.set("projects_filters_open", checked)
+
+    def _toggle_project_list(self, visible):
+        # UX-i: the list column is a luxury, not the point — « folds it
+        # away so the project page gets the full width, » brings it back.
+        # The choice sticks for the next sessions.
+        # @args: visible - show or hide the list pane
+        # @return: None
+        self.projects.grp_list.setVisible(visible)
+        self.projects.btn_show_list.setVisible(not visible)
+        config.set("projects_list_hidden", int(not visible))
 
     def _rebuild_manage_menu(self):
         # UX-PC (U1): the ⋯ menu in the project header is the single home

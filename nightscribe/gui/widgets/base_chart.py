@@ -170,6 +170,19 @@ class ChartView(QGraphicsView):
         # centre and clip the chart. Anchoring it here keeps the fit exactly on
         # the chart's own frame, for every chart built on this base.
         self.setSceneRect(r)
+        self._apply_fit(r)
+
+    def _apply_fit(self, r):
+        # How the (already padded) scene rect fills the current viewport.
+        # Default: uniform-scale fitInView (KeepAspectRatio) — correct for
+        # charts with a natural aspect (orbit, sky, approach, …).
+        #
+        # A chart whose x span keeps growing (the transit timeline: 400-900
+        # scene units of night at a fixed ~114 of y) would letterbox into a
+        # thin, dead-margin strip under KeepAspectRatio at every panel
+        # width, so it overrides this method to fill the frame instead and
+        # re-font its own text so nothing ends up stretched.
+        # @args: r - the (already padded) scene rect to fit the viewport on
         self.fitInView(r, Qt.KeepAspectRatio)
 
     def reset_view(self):

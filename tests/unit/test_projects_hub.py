@@ -186,18 +186,39 @@ def _create_and_select(window, kind, name, ctx):
 def _build_page(window, p):
     # Build the project page with a fake panel loader slotted into the
     # hub's lazy slot, so the real ExploreWorker is never built; the
-    # previous state is restored afterwards.
+    # previous state is restored afterwards. The harness drives the page
+    # directly (no list selection), so the hub's current project is
+    # scoped for the build - the lazy tab machinery reads it.
     # @args: window - MainWindow, p - the project dict to page
     orig_panel = window._proj_panel
     orig_loader = window._proj_panel_loader
+    orig_current = window._current_project
     window._proj_panel = None
     window._proj_panel_loader = (lambda name, fallback_target=None:
                                  FakeWorker(FAKE_ELEMENT))
+    window._current_project = p
     try:
         window._build_project_page(p)
     finally:
         window._proj_panel = orig_panel
         window._proj_panel_loader = orig_loader
+        window._current_project = orig_current
+
+
+def _open_tab(window, p, key):
+    # ADR-041: the step and follow-up tabs are lazy, so the content
+    # tests open the tab they inspect through the tab bar (the user
+    # path), scoping the hub's current project so the build runs
+    # against the page under test.
+    # @args: window - MainWindow, p - the project dict, key - tab key
+    # @return: the tab page just opened (window._tab_pages[key])
+    orig_current = window._current_project
+    window._current_project = p
+    try:
+        getattr(window.projects, f"btn_tab_{key}").click()
+        return window._tab_pages[key]
+    finally:
+        window._current_project = orig_current
 
 
 # ---------------- D4 contracts ----------------
@@ -207,22 +228,21 @@ def test_select_project_drives_panel(window, panel):
     assert window._proj_panel is panel
     assert panel.state() == "ready"
     assert panel.lbl_hook.text()
-    # the project page built its sections ("details" + the three
-    # steps - capture merged into plan, ADR-030, no follow-up for a
-    # NEO - plus the nested "Project files" section inside the card)
-    # and the Next card took over the old wizard buttons
-    assert len(window._page_sections) == 5
-    assert window._page_sections["files"].isCollapsed()
-    # the page is one exclusive accordion: a fresh project opens on its
-    # next-action section (a fresh project is at "plan") and the object
-    # card stays folded until the user opens it
-    assert not window._page_sections["plan"].isCollapsed()
-    assert window._page_sections["details"].isCollapsed()
+    # the project page is a bar of tabs (ADR-041): object card + steps
+    # (no follow-up for a NEO), lazy-built per click; the object card
+    # carries the nested "Project files" block, and the Next card took
+    # over the old wizard buttons
+    assert set(window._tab_pages) == {"details", "plan"}  # rest lazy
+    assert window._proj_files_section.isCollapsed()
+    # a fresh project opens on its next-action tab (a fresh project is
+    # at "plan"); the object card stays hidden until the user opens it
+    assert not window._tab_pages["plan"].isHidden()
+    assert window._tab_pages["details"].isHidden()
     assert window._next_target == "plan"
     assert not window.projects.btn_next_go.isHidden()
     assert window.projects.lbl_next.text()
     assert window._current_project is not None
-    assert "443089" in window.projects.lbl_header.text()
+    assert "443089" in window.projects.lbl_mast_name.text()
 
 
 def test_panel_carries_project_context_chips(window, panel):
@@ -306,6 +326,7 @@ def test_lazy_build_panel_on_first_selection(window):
     # parented into that section's content widget, not a wrapper area.
     window._proj_panel = None
     orig_loader = window._proj_panel_loader
+    orig_current = window._current_project
     window._proj_panel_loader = (lambda name, fallback_target=None:
                                  FakeWorker(FAKE_ELEMENT))
     try:
@@ -315,9 +336,11 @@ def test_lazy_build_panel_on_first_selection(window):
         panel = window._get_proj_panel()
         assert window._proj_panel is panel
         # _get_proj_panel only builds; the project page does the docking
+        # (ADR-041: the hub reads _current_project for the lazy build)
+        window._current_project = proj_mod.get(dbmod.db, p["id"])
         window._build_project_page(proj_mod.get(dbmod.db, p["id"]))
-        # docked into the "details" section (walk the parents up to it)
-        sec = window._page_sections["details"]
+        # docked into the "details" tab page (walk the parents up to it)
+        sec = window._tab_pages["details"]
         node = panel.parentWidget()
         while node is not None and node is not sec:
             node = node.parentWidget()
@@ -325,6 +348,7 @@ def test_lazy_build_panel_on_first_selection(window):
     finally:
         window._proj_panel_loader = orig_loader
         window._proj_panel = None
+        window._current_project = orig_current
 
 
 def test_no_projects_clears_state(window):
@@ -593,8 +617,9 @@ def test_dashboard_attention_card_lands_on_followup(window, panel):
     assert window._current_project is not None
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_detail
-    assert "followup" in window._page_sections
-    assert not window._page_sections["followup"].isCollapsed()
+    # ADR-041: the deep link ends on the follow-up tab, built + active
+    assert "followup" in window._tab_pages
+    assert not window._tab_pages["followup"].isHidden()
 
 
 def test_rich_rows_carry_the_story(window, panel):
@@ -1036,9 +1061,9 @@ def test_header_shows_closed_date_and_outcome(window, panel):
     p = _create_and_select(window, "sn", "SN2026A2c", {"kind": "sn"})
     project.close(dbmod.db, p["id"], "confirmed_ia")
     _reselect(window, p["id"])
-    txt = window.projects.lbl_header.text().lower()
+    txt = window.projects.lbl_mast_name.text().lower()
     assert "closed" in txt or "cerrad" in txt
-    assert "confirmed_ia" in window.projects.lbl_header.text()
+    assert "confirmed_ia" in window.projects.lbl_mast_name.text()
 
 
 def test_advisor_banner_for_stale_project(window, panel):
@@ -1233,19 +1258,21 @@ def test_change_project_folder_rehomes_future_exports(window, panel,
 
 def test_followup_tab_visible_for_sn(window, panel):
     _create_and_select(window, "sn", "SN2026fu", {"kind": "sn"})
-    # the SN page gets a follow-up section, a NEO page does not
-    assert "followup" in window._page_sections
+    # ADR-041: the follow-up tab button is gated by kind on the tab bar
+    assert not window.projects.btn_tab_followup.isHidden()
 
 
 def test_followup_tab_hidden_for_non_sn(window, panel):
     _create_and_select(window, "neo", "NEO2026nofu", {"kind": "neo"})
-    assert "followup" not in window._page_sections
+    assert window.projects.btn_tab_followup.isHidden()
 
 
 def test_followup_add_session(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026sess", {"kind": "sn"})
+    # ADR-041: the follow-up content is a lazy tab — open it first
+    window.projects.btn_tab_followup.click()
     assert fu.days_since_last_session(dbmod.db, p["id"]) is None
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
@@ -1259,6 +1286,8 @@ def test_followup_session_notes_persist(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026notes", {"kind": "sn"})
+    # ADR-041: the follow-up content is a lazy tab — open it first
+    window.projects.btn_tab_followup.click()
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     sid = sessions[0]["id"]
@@ -1281,6 +1310,8 @@ def test_followup_notes_no_dual_identity(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026note2", {"kind": "sn"})
+    # ADR-041: the follow-up content is a lazy tab — open it first
+    window.projects.btn_tab_followup.click()
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     s1 = sessions[0]["id"]
@@ -1305,6 +1336,8 @@ def test_followup_add_measurement_has_real_mjd(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026mjd", {"kind": "sn"})
+    # ADR-041: the follow-up content is a lazy tab — open it first
+    window.projects.btn_tab_followup.click()
     # craft a session with NO parseable obs_date (empty string) so the old
     # code would have taken the mjd=0.0 branch
     sid = fu.create_session(dbmod.db, p["id"], obs_date="")
@@ -1338,6 +1371,8 @@ def test_followup_delete_session(window, panel):
     import nightscribe.core.db as dbmod
     from PySide6.QtWidgets import QMessageBox
     p = _create_and_select(window, "sn", "SN2026del", {"kind": "sn"})
+    # ADR-041: the follow-up content is a lazy tab — open it first
+    window.projects.btn_tab_followup.click()
     sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
     # attach an image + a point so the cascade / keep behaviour is observable
     fu.add_image(dbmod.db, sid, "V", "/tmp/fake.fits", date_obs="2026-09-01")
@@ -1423,10 +1458,10 @@ def test_followup_cadence_uses_config(window, panel, monkeypatch):
     from PySide6.QtWidgets import QLabel
 
     def last_visit_label():
-        # each build makes a fresh "followup" section; scope the search
+        # each build makes a fresh "followup" tab page; scope the search
         # to the newest one so stale rebuilds can never leak in
         window._build_followup_tab(p, {})
-        sec = window._page_sections["followup"]
+        sec = window._tab_pages["followup"]
         chips = [w for w in sec.findChildren(QLabel)
                  if "Last visit" in w.text()]
         return chips[0] if chips else None
@@ -1447,6 +1482,8 @@ def test_fu_add_measurement_quick(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026meas", {"kind": "sn"})
+    # ADR-041: the follow-up content is a lazy tab — open it first
+    window.projects.btn_tab_followup.click()
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     sid = sessions[0]["id"]
@@ -1702,7 +1739,7 @@ def test_project_header_shows_campaign_badge(window):
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
     window._render_project_header(proj_mod.get(mw.db, p["id"]))
-    assert "Campaña T CrB" in window.projects.lbl_header.text()
+    assert "Campaña T CrB" in window.projects.lbl_mast_camp.text()
 
 
 def test_hub_filters_projects_by_campaign(window):
@@ -1749,8 +1786,9 @@ def test_variable_project_gets_followup_with_protocol(window):
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    # a variable project gets a "followup" section on its page
-    fu = window._page_sections["followup"]
+    # a variable project gets a "follow-up" tab on its page (ADR-041:
+    # open the tab, the user path, then inspect it)
+    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
     texts = [l.text() for l in fu.findChildren(QLabel)]
     assert any("Campaña T CrB" in t for t in texts)
     assert any("B, V" in t for t in texts)
@@ -1766,7 +1804,7 @@ def test_variable_followup_keeps_quicklook_hides_animation(window):
     from PySide6.QtWidgets import QPushButton
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    fu = window._page_sections["followup"]
+    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
     assert "Quick analysis" in btns
     assert "Generate animation" not in btns
@@ -1809,8 +1847,8 @@ def test_followup_event_advisor_label(window):
     for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
         fu.add_point(mw.db, p["id"], 61000.0 + i, "V", m)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    texts = [l.text() for
-             l in window._page_sections["followup"].findChildren(QLabel)]
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    texts = [l.text() for l in page.findChildren(QLabel)]
     assert any("brightness drop" in t or "descenso" in t for t in texts)
 
 
@@ -1829,8 +1867,8 @@ def test_variable_plan_block_shows_protocol_and_extremum(window):
            "safe_window": "2026-09-11T22:00|2026-09-12T04:00"}
     p = proj_mod.create(mw.db, "variable", "T CrB", ctx, campaign_id=cid)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    texts = [l.text()
-             for l in window._page_sections["plan"].findChildren(QLabel)]
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "plan")
+    texts = [l.text() for l in page.findChildren(QLabel)]
     assert any("Campaña T CrB" in t for t in texts)
     assert any("3" in t and ("ays" in t or "ías" in t) for t in texts)
     # the saturation warning does NOT fire at mag 10.1
@@ -1843,8 +1881,8 @@ def test_variable_plan_block_saturation_warning(window):
     from PySide6.QtWidgets import QLabel, QWidget
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 9.0})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    texts = [l.text()
-             for l in window._page_sections["plan"].findChildren(QLabel)]
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "plan")
+    texts = [l.text() for l in page.findChildren(QLabel)]
     assert any("aturat" in t for t in texts)
 
 
@@ -1879,8 +1917,9 @@ def test_followup_has_export_report_button(window):
     from PySide6.QtWidgets import QToolButton
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    tools = [b for b in window._page_sections["followup"]
-             .findChildren(QToolButton) if "Photometry" in b.text()]
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    tools = [b for b in page.findChildren(QToolButton)
+             if "Photometry" in b.text()]
     assert tools, "the ⋯ Photometry tools menu is missing"
     texts = [a.text() for a in tools[0].menu().actions()]
     assert any("Export photometry report" in t or "Exportar" in t
@@ -1956,7 +1995,8 @@ def test_detail_cleared_when_selection_vanishes(window):
     lst.clearSelection()
     window._project_selected()
     assert window._current_project is None
-    assert "SN 2099aa" not in window.projects.lbl_header.text()
+    assert "SN 2099aa" not in window.projects.lbl_mast_name.text()
+    assert "SN 2099aa" not in window.projects.lbl_mast_camp.text()
 
 
 def test_reclick_selected_project_retries_load(window):
@@ -2023,11 +2063,11 @@ def test_project_activated_jumps_to_current_step(window, panel):
     item = next(lst.item(i) for i in range(lst.count())
                 if lst.item(i).data(Qt.UserRole) == p["id"])
     window._project_open_activated(item)
-    # a fresh project sits at step "plan" -> that section is the only
-    # expanded one (everything, object card included, starts collapsed)
-    assert "plan" in window._page_sections
-    assert not window._page_sections["plan"].isCollapsed()
-    assert window._page_sections["details"].isCollapsed()
+    # ADR-041: a fresh project sits at step "plan" -> that tab is the
+    # active one; the object card stays hidden until the user opens it
+    assert set(window._tab_pages) == {"details", "plan"}
+    assert not window._tab_pages["plan"].isHidden()
+    assert window._tab_pages["details"].isHidden()
 
 
 def test_projects_context_menu_offers_actions(window, panel, monkeypatch):

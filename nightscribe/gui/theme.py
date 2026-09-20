@@ -68,6 +68,10 @@ C_EDGE = "#3a4156"      # borders of interactive containers (checkbox frame,
                         # "this is clickable" against C_BASE/C_PANEL (>=1.5:1)
 C_HOVER = "#212739"     # push-button hover fill (was a hardcoded literal)
 C_DIM_FILL = "#141824"  # disabled button fills, alternate table rows
+C_ROW_HOVER = "#1a1f30" # list-row hover fill (was a literal in every row widget)
+# Urgent "event" red — the same hue as the SN red: one wheel, one meaning.
+# A detector event in a campaign, an "event" urgency in the dashboard.
+C_EVENT = "#e5484d"
 # Pills are solid badges (no alpha): the hue *is* the surface, and the label
 # is picked per hue for contrast (near-black on bright hues, white on dark).
 # Transparency over the dark card was exactly what made every chip read dim
@@ -142,6 +146,75 @@ def chip_style(color, font_size=11):
             f"font-size: {font_size}px; font-weight: bold;"
             f" padding: 2px 8px; border-radius: 8px;"
             f" background: {color};")
+
+
+def tint(color, alpha="18"):
+    # @args: color - a #rrggbb hex; alpha - 2 hex digits (default "18" ≈ 10%)
+    # @return: an #aarrggbb string for QSS. Qt reads 8-digit hexes
+    #          alpha-FIRST, so the alpha goes in front — suffixing it would
+    #          paint AA=RR, GG=GG, BB=BA…: a hue and opacity nobody asked
+    #          for. Surfaces that stand over painted list text should use
+    #          the opaque composite() instead.
+    return "#" + alpha + color[1:]
+
+
+def composite(color, alpha="18", over=C_BASE):
+    # @args: color - a #rrggbb hue; alpha - 2 hex digits (default "18" ≈
+    #        10%); over - the solid base the wash sits on
+    # @return: a solid #rrggbb — the hue blended over the base. Use it for
+    #          anything standing over a painted list item (row cards, icon
+    #          tiles): QListView still paints the item's own text under the
+    #          item widget, and a translucent fill would ghost it through.
+    a = int(alpha, 16) / 255.0
+    c = (int(color[i:i + 2], 16) for i in (1, 3, 5))
+    b = (int(over[i:i + 2], 16) for i in (1, 3, 5))
+    return "#%02x%02x%02x" % tuple(
+        int(round(x + a * (y - x))) for x, y in zip(b, c))
+
+
+def row_skin(name, bg, edge, radius=6):
+    # @args: name - the row's objectName (anchors the QFrame#… selector);
+    #        bg/edge - base fill and border ("transparent" for none);
+    #        radius - the corner radius in px
+    # @return: a row-skin stylesheet (base + hover). Every list in the app —
+    #          tonight, projects, campaigns — hovers in this one voice, so a
+    #          new row can't drift to its own shade.
+    return (f"QFrame#{name} {{ background: {bg}; border-radius: {radius}px;"
+            f" border: 1px solid {edge}; }}"
+            f"QFrame#{name}:hover {{ background: {C_ROW_HOVER}; }}")
+
+
+def tab_state_style(state, kind_color, active=False):
+    # @args: state - one of "done" | "current" | "skipped" | "pending",
+    #        kind_color - the project's accent (a KIND_COLORS hue); it tints
+    #          the two live states,
+    #        active - True for the page you are looking at (ADR-041): it
+    #          is painted SOLID in the accent so "you are here" reads at
+    #          a glance, whatever the step's state
+    # @return: a stylesheet for ONE tab-bar button in the project masthead
+    #          (ADR-041). The active tab shouts in the accent; the
+    #          inactive ones keep the quiet state vocabulary (filled done,
+    #          outlined current, dimmed skipped, plain pending) — they say
+    #          where your steps are.
+    if active:
+        bg = composite(kind_color, "59", over=C_PANEL)
+        edge = composite(kind_color, "cc", over=C_PANEL)
+        fg = chip_text_for(bg)
+    elif state == "done":
+        bg = composite(kind_color, "33", over=C_PANEL)
+        edge = composite(kind_color, "66", over=C_PANEL)
+        fg = C_TEXT_DIM
+    elif state == "current":
+        bg = composite(kind_color, "1f", over=C_PANEL)
+        edge = kind_color
+        fg = C_TEXT
+    elif state == "skipped":
+        bg, edge, fg = C_DIM_FILL, C_LINE, C_TEXT_DIM
+    else:  # pending
+        bg, edge, fg = "transparent", C_EDGE, C_TEXT_DIM
+    return (f"QPushButton {{ background: {bg}; color: {fg};"
+            f" border: 1px solid {edge}; border-radius: 11px;"
+            f" padding: 3px 12px; }}")
 
 
 def apply_theme(app):

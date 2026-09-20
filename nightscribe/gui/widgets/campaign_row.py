@@ -15,8 +15,14 @@
 
 A campaign is read at a glance: the name, the health of its cadence as
 dots (● up to date / ○ due, over the member count) and its next action in
-plain words («measure T CrB tonight ⚡»). Finished campaigns dim. Same
-visual language as the project rows (ADR-026 theme).
+plain words («measure T CrB tonight ⚡»).
+
+The row's identity IS its cadence health, exactly like a project row's
+identity is its kind (ADR-026, one saturated anchor per row): the left
+band, the dots and the action all speak in that hue — green when the
+cadence is kept, orange when observations are due, red when a detector
+event is firing. Finished campaigns dim to grey; same visual language as
+the project rows.
 """
 
 from PySide6.QtCore import Qt, Signal
@@ -38,9 +44,17 @@ class CampaignRow(QFrame):
         self.setCursor(Qt.PointingHandCursor)
         self.setFixedHeight(_ROW_H)
         self._selected = False
+        self._finished = False
+        self._has_event = False
+        self._members = 0
+        self._up_to_date = 0
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(10, 6, 10, 6)
+        lay.setContentsMargins(0, 6, 10, 6)
         lay.setSpacing(8)
+        # left: the health band — up to date / due / event / finished
+        self._band = QFrame()
+        self._band.setFixedWidth(4)
+        lay.addWidget(self._band)
         mid = QVBoxLayout()
         mid.setSpacing(3)
         lay.addLayout(mid, 1)
@@ -69,28 +83,64 @@ class CampaignRow(QFrame):
         mid.addLayout(line2)
         self._restyle()
 
+    def _health_color(self):
+        # @return: the campaign's identity hue — the cadence state: red
+        #          beats orange, orange beats green, and a finished or
+        #          still-empty campaign rests in calm grey.
+        if getattr(self, "_finished", False) \
+                or not getattr(self, "_members", 0):
+            return theme.C_TEXT_DIM
+        if getattr(self, "_has_event", False):
+            return theme.C_EVENT
+        if getattr(self, "_up_to_date", 0) < self._members:
+            return theme.C_WARN
+        return theme.C_GOOD
+
+    @staticmethod
+    def _dots_html(up_to_date, members):
+        # @args: how many members are up to date, over the total
+        # @return: one coloured dot per member (● green up to date,
+        #          ○ orange due); empty string when there are no members
+        if not members:
+            return ""
+        spans = []
+        for i in range(members):
+            if i < up_to_date:
+                ch, col = "●", theme.C_GOOD
+            else:
+                ch, col = "○", theme.C_WARN
+            spans.append(f'<span style="color: {col}; font-size: 13px;">'
+                         f"{ch}</span>")
+        return "".join(spans)
+
     def set_campaign(self, *, name, group, finished, members, up_to_date,
                      next_text, has_event):
         # @args: members/up_to_date - member count and how many are not
         #        due; next_text - the campaign's next action in words;
         #        has_event - a member's detector event is firing
         # @return: None
-        self._finished = finished
+        self._finished = bool(finished)
+        self._has_event = bool(has_event)
+        self._members = int(members or 0)
+        self._up_to_date = int(up_to_date or 0)
         self.lbl_name.setText(name)
         self.lbl_group.setText(group or "")
-        dots = ("●" * up_to_date) + ("○" * max(members - up_to_date, 0)) \
-            if members else ""
-        self.lbl_dots.setText(dots)
-        self.lbl_dots.setStyleSheet(
-            f"color: {theme.C_GOOD};" if up_to_date == members and members
-            else f"color: {theme.C_WARN};")
+        self.lbl_dots.setText(self._dots_html(self._up_to_date,
+                                              self._members))
         self.lbl_cov.setText(
             self.tr("%1 of %2 up to date").replace("%1", str(up_to_date))
-            .replace("%2", str(members)) if members else
+            .replace("%2", str(members)) if self._members else
             self.tr("no projects yet"))
-        self.lbl_next.setText(("⚡ " if has_event else "") + next_text)
-        self.lbl_next.setStyleSheet(
-            f"color: {'#e05555' if has_event else theme.C_TEXT_DIM};")
+        self.lbl_next.setText(("⚡ " if self._has_event else "") + next_text)
+        # the action speaks in the campaign's health: red when an event
+        # is firing, orange when observations are due, calm otherwise
+        if self._has_event:
+            nxt = f"color: {theme.C_EVENT}; font-weight: bold;"
+        elif self._members and self._up_to_date < self._members:
+            nxt = f"color: {theme.C_WARN}; font-weight: bold;"
+        else:
+            nxt = f"color: {theme.C_TEXT_DIM};"
+        self.lbl_next.setStyleSheet(nxt)
         self._restyle()
 
     def set_selected(self, on):
@@ -101,18 +151,22 @@ class CampaignRow(QFrame):
 
     def _restyle(self):
         # @return: None — base/hover/selected skin; finished campaigns dim
-        #          (disabled-grey labels, still readable, still clickable)
+        #          (disabled-grey labels, still readable, still clickable);
+        #          a row with a firing event gets a faint red wash
         if self._selected:
             bg, edge = theme.C_SEL, theme.C_ACCENT
+        elif not self._finished and self._has_event:
+            # the red wash baked over a solid base — the card must stay
+            # opaque, or the list's own item text ghosts through
+            bg, edge = theme.composite(theme.C_EVENT, "20"), "transparent"
         else:
             bg, edge = theme.C_BASE, "transparent"
-        self.setStyleSheet(
-            f"QFrame#campaignrow {{ background: {bg}; border-radius: 6px;"
-            f" border: 1px solid {edge}; }}"
-            f"QFrame#campaignrow:hover {{ background: #1a1f30; }}")
+        self.setStyleSheet(theme.row_skin("campaignrow", bg, edge))
+        self._band.setStyleSheet(
+            f"background: {self._health_color()}; border-radius: 2px;")
         for lbl in (self.lbl_name, self.lbl_group, self.lbl_dots,
                     self.lbl_cov, self.lbl_next):
-            lbl.setEnabled(not getattr(self, "_finished", False))
+            lbl.setEnabled(not self._finished)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:

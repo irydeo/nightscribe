@@ -1,7 +1,7 @@
 ############################################################
 # -*- coding: utf-8 -*-
 #
-# NightScribe - project page sections tests (offscreen)
+# NightScribe - project detail tab bar tests (offscreen)
 # Python  v3.12
 #
 # Francisco José Calvo Fernández
@@ -11,25 +11,35 @@
 #
 ############################################################
 
-"""Unit tests: project page sections (UX, UD.3).
+"""Unit tests: the project detail tab bar (ADR-041, offscreen).
 
-The project page's step tabs and wizard were replaced by collapsible
-sections (docs/PLANS/ux/fase-d-project-flow.md, UD.3). These tests drive a
-throwaway MainWindow offscreen and check the new contracts:
+The step accordion was replaced by a 5-tab bar in the masthead
+(Object card, the three steps, and Follow-up for the kinds that keep
+a multi-night journal). One page is visible at a time, each page
+builds lazily on first open, and a rebuild (project change or step
+action) wipes all of them:
 
-  * the page is a scroll area wrapping one content widget, and selecting a
-    project builds every section (details first, then the three steps, and
-    follow-up for the kinds that keep a multi-night journal)
-  * rebuilds wipe the previous control set (no piled "Mark done" buttons)
-  * the page accordion: a header click opening any section (object card
-    included) closes the other open section, all-closed is a legal state,
-    every deep link lands on the sole open section
-  * the chip on each step header mirrors the step state (done <date> /
-    skipped / pending); follow-up carries no chip at all
+  * lazy build + cache: a selection yields {"details", next-action
+    tab}; the rest build on first open and are cached in
+    `window._tab_pages`
+  * exactly one page visible at a time (object card included); the
+    tab bar buttons mirror the active page
+  * "Mark done" lives once — on the global Next card — and each
+    pending step page carries one discreet "Skip step" footer (done /
+    skipped steps show "Reopen step"); rebuilds never pile controls
+    up
+  * the Follow-up tab is hidden for kinds outside FOLLOWUP_KINDS; a
+    deep link to it there is a safe no-op
+  * every deep link (Next-card Go, the follow-up entry point, the
+    nested "Project files" list) lands on the right page and enforces
+    the one-visible-page rule
+  * the chip on each step page header mirrors the step state (done
+    <date> / skipped / pending); the object card and the follow-up
+    page carry no chip
 
 Same harness as test_projects_hub.py: a fake loader keeps the real
-ExploreWorker out, and the db singleton is pointed at a temp file so no
-test ever touches the real database.
+ExploreWorker out, and the db singleton is pointed at a temp file so
+no test ever touches the real database.
 """
 
 import datetime
@@ -168,30 +178,18 @@ def _mk_project(window, kind="sn", name="SN 2099pg"):
     return p
 
 
-def test_page_has_sections_instead_of_tabs(window, panel):
+def test_pages_build_lazily_per_selection(window, panel):
+    # ADR-041: on selection the page is wiped and rebuilt with the
+    # Object card (eager) plus the next-action tab auto-opened; the
+    # rest of the tab bar waits for its first click.
     _mk_project(window)
     assert hasattr(window.projects, "scroll_page")
-    assert set(window._page_sections) >= {"details", "plan", "process",
-                                          "publish", "followup"}
-
-
-def test_sections_hold_exactly_one_control_set_after_rebuilds(window, panel):
-    # UX-PC (U3): "Mark done" lives once — on the Next card — and the
-    # per-section toggle rows are gone; only discreet "Skip step" footers
-    # remain inside the pending sections. Rebuilds must never pile up
-    # either control set.
-    p = _mk_project(window)
-    window._build_project_page(window._current_project)
-    window._build_project_page(window._current_project)
-    from PySide6.QtWidgets import QPushButton
-    names = [b.text() for b in window.projects.page_container
-             .findChildren(QPushButton)]
-    assert names.count("Mark done") + names.count("Marcar hecho") == 0
-    # the Next card carries the single command-center pair
-    assert not window.projects.btn_next_done.isHidden()
-    assert not window.projects.btn_next_skip.isHidden()
-    # and each pending section shows exactly one skip link in its footer
-    assert names.count("Skip step") + names.count("Saltar paso") == 3
+    assert window.projects.scroll_page.widget() is \
+        window.projects.page_container
+    for key in ("details", "plan", "process", "publish", "followup"):
+        assert hasattr(window.projects, f"btn_tab_{key}")
+    assert set(window._tab_pages) == {"details", "plan"}
+    assert window._active_tab == "plan"
 
 
 def test_page_is_scroll_wrapped(window, panel):
@@ -200,11 +198,42 @@ def test_page_is_scroll_wrapped(window, panel):
         window.projects.page_container
 
 
-def test_followup_section_only_for_followup_kinds(window, panel):
+def test_pages_hold_exactly_one_control_set_after_rebuilds(window, panel):
+    # UX-PC (U3) + ADR-041: "Mark done" lives once — on the Next card —
+    # and each pending step page carries one discreet "Skip step"
+    # footer. Rebuilds and lazy builds must never pile controls up:
+    # open every page, rebuild the page twice, open everything again.
+    p = _mk_project(window)
+    window._build_project_page(window._current_project)
+    window._build_project_page(window._current_project)
+    for key in ("plan", "process", "publish"):
+        window._show_tab(key)
+    from PySide6.QtWidgets import QPushButton
+    names = [b.text() for b in window.projects.page_container
+             .findChildren(QPushButton)]
+    assert names.count(window.tr("Mark done")) == 0
+    # the Next card carries the single command-center pair
+    assert not window.projects.btn_next_done.isHidden()
+    assert not window.projects.btn_next_skip.isHidden()
+    # and each pending step page shows exactly one skip link in its
+    # footer (step footers never leak into other pages)
+    assert names.count(window.tr("Skip step")) == 3
+
+
+def test_followup_tab_only_for_followup_kinds(window, panel):
+    # ADR-041: the Follow-up tab (and its page) exists only for the
+    # kinds that keep a multi-night journal; for the rest the button
+    # is hidden and a deep link to it is a safe no-op.
     _mk_project(window, kind="neo", name="2099 PG1")
-    assert "followup" not in window._page_sections
+    assert window.projects.btn_tab_followup.isHidden()
+    window._show_tab("followup")  # off-kind: no page, no active switch
+    assert window._active_tab != "followup"
+    assert "followup" not in window._tab_pages
     _mk_project(window, kind="sn", name="SN 2099pg2")
-    assert "followup" in window._page_sections
+    assert not window.projects.btn_tab_followup.isHidden()
+    window._show_tab("followup")
+    assert window._active_tab == "followup"
+    assert "followup" in window._tab_pages
 
 
 def test_step_toggle_marks_done(window, panel):
@@ -230,16 +259,15 @@ def test_step_reopen(window, panel):
     assert steps["process"] == "pending"
 
 
-def test_next_card_points_at_pending_section(window, panel):
+def test_next_card_lands_on_next_action_tab(window, panel):
+    # ADR-041: a fresh project's Next card points at Plan, and the Plan
+    # tab is the one open — the Object card hides behind the bar.
     _mk_project(window)
     assert "Plan" in window.projects.lbl_next.text() or \
         "Planifica" in window.projects.lbl_next.text()
-    secs = window._page_sections
-    # fresh project: the next-action section (plan) is the only one open,
-    # the object card starts folded like everything else
-    assert secs["plan"].isCollapsed() is False
-    for key in ("details", "process", "publish", "followup"):
-        assert secs[key].isCollapsed() is True
+    assert window._active_tab == "plan"
+    assert not window._tab_pages["plan"].isHidden()
+    assert window._tab_pages["details"].isHidden()
 
 
 def test_next_card_followup_when_cadence_due(window, panel):
@@ -254,7 +282,8 @@ def test_next_card_followup_when_cadence_due(window, panel):
     window._build_project_page(window._current_project)
     assert "Measure" in window.projects.lbl_next.text() or \
         "Mide" in window.projects.lbl_next.text()
-    assert window._page_sections["followup"].isCollapsed() is False
+    assert window._active_tab == "followup"
+    assert not window._tab_pages["followup"].isHidden()
     # UX-PC (U3): follow-up is not a step — the Next card hides done/skip
     assert window.projects.btn_next_done.isHidden()
     assert window.projects.btn_next_skip.isHidden()
@@ -291,12 +320,13 @@ def test_next_card_skip_marks_the_step(window, panel):
 
 def test_step_footer_reopens_a_done_step(window, panel):
     # UX-PC (U3): a done step shows its state + a discreet "Reopen step"
-    # at the FOOT of its section (the only step control left inside).
+    # at the FOOT of its tab page (the only step control left inside).
     from PySide6.QtWidgets import QPushButton
     p = _mk_project(window, name="SN 2099rf")
     window._step_done("plan")
-    sec = window._page_sections["plan"]
-    btns = [b for b in sec.findChildren(QPushButton)
+    window._show_tab("plan")  # the done step's page builds on first open
+    page = window._tab_pages["plan"]
+    btns = [b for b in page.findChildren(QPushButton)
             if "Reopen" in b.text() or "Reabrir" in b.text()]
     assert len(btns) == 1
     btns[0].click()
@@ -308,11 +338,12 @@ def test_step_footer_reopens_a_done_step(window, panel):
 
 
 def test_calibration_and_products_start_collapsed(window, panel):
-    # UX-PC (U3): the advanced blocks (Calibration in Plan, "what you
-    # kept" in Process) are collapsed by default.
+    # UX-PC (U3): the advanced blocks (Calibration in the Plan page,
+    # "what you kept" in the Process page) are collapsed by default.
     from nightscribe.gui.widgets.collapsible_section import \
         CollapsibleSection
     _mk_project(window, kind="neo", name="2099 Coll")
+    window._show_tab("process")  # the Process page builds on first open
     secs = window.projects.page_container.findChildren(CollapsibleSection)
     titles = {s._btn.text(): s for s in secs}
     cal = next((s for t, s in titles.items() if "alibr" in t.lower()), None)
@@ -322,164 +353,202 @@ def test_calibration_and_products_start_collapsed(window, panel):
     assert kept is not None and kept.isCollapsed()
 
 
-def test_go_button_expands_target(window, panel):
+def test_go_button_lands_on_target_tab(window, panel):
+    # ADR-041: Go = activate the next-action's tab, no matter what
+    # page is open now.
     _mk_project(window)
-    window._page_sections["plan"].setCollapsed(True)
+    window.projects.btn_tab_details.click()
+    assert window._active_tab == "details"
     window.projects.btn_next_go.click()
-    assert window._page_sections["plan"].isCollapsed() is False
+    assert window._active_tab == "plan"
+    assert not window._tab_pages["plan"].isHidden()
+    assert window._tab_pages["details"].isHidden()
 
 
-# ------- page accordion: at most one section open at a time --------------
+# ---------------- tab bar: one page visible at a time (ADR-041) --------
 
 
-def test_header_click_closes_other_open_section(window, panel):
-    # Opening a step closes the other open section (exclusive accordion),
-    # object card included — one landing spot, no matter which one the
-    # user clicks.
+def test_activating_a_tab_hides_the_others(window, panel):
+    # Opening any tab page hides the rest (one landing spot, no matter
+    # which button the user clicks).
     _mk_project(window)
-    secs = window._page_sections
-    assert secs["plan"].isExpanded()
-    assert secs["details"].isCollapsed()
-    secs["process"]._btn.click()
-    assert secs["process"].isExpanded()
-    for key in ("plan", "details", "publish", "followup"):
-        assert secs[key].isCollapsed()
-    secs["publish"]._btn.click()
-    assert secs["publish"].isExpanded()
-    assert secs["process"].isCollapsed()
-    assert secs["details"].isCollapsed()
+    pages = window._tab_pages
+    assert not pages["plan"].isHidden()
+    window.projects.btn_tab_process.click()
+    assert not pages["process"].isHidden()
+    for key in ("plan", "details"):
+        assert pages[key].isHidden()
+    assert "publish" not in pages  # untouched tab: still unbuilt (lazy)
+    window.projects.btn_tab_publish.click()
+    assert not pages["publish"].isHidden()
+    assert pages["process"].isHidden()
+    assert pages["details"].isHidden()
+    assert pages["plan"].isHidden()
 
 
-def test_opening_object_card_closes_open_step(window, panel):
-    # The object card belongs to the same accordion: clicking its header
-    # while a step is open folds that step before expanding the card.
+def test_opening_object_card_hides_open_step(window, panel):
+    # The Object card is a tab like the steps: clicking it while a step
+    # is active lands on the card and hides the step.
     _mk_project(window)
-    secs = window._page_sections
-    assert secs["plan"].isExpanded()
-    secs["details"]._btn.click()
-    assert secs["details"].isExpanded()
-    for key in ("plan", "process", "publish", "followup"):
-        assert secs[key].isCollapsed()
+    assert window._active_tab == "plan"
+    window.projects.btn_tab_details.click()
+    assert window._active_tab == "details"
+    assert not window._tab_pages["details"].isHidden()
+    assert window._tab_pages["plan"].isHidden()
 
 
-def test_all_sections_can_be_closed(window, panel):
-    # Closing the only open section by hand is legal: nothing is forced
-    # open again (a 0-section state is a resting state, not an error).
+def test_tab_bar_buttons_mirror_the_active_tab(window, panel):
+    # The bar is the "you are here" vocabulary: the active button is
+    # checked, the others are not.
     _mk_project(window)
-    secs = window._page_sections
-    secs["plan"]._btn.click()
-    for key in ("details", "plan", "process", "publish", "followup"):
-        assert secs[key].isCollapsed()
+    btns = {key: getattr(window.projects, f"btn_tab_{key}")
+            for key in ("details", "plan", "process", "publish",
+                        "followup")}
+    assert btns["plan"].isChecked()
+    for key in ("details", "process", "publish", "followup"):
+        assert not btns[key].isChecked()
+    window.projects.btn_tab_details.click()
+    assert btns["details"].isChecked()
+    assert not btns["plan"].isChecked()
 
 
-def test_followup_deep_link_is_the_sole_open_section(window, panel):
-    # Cadence chips and the follow-up entry point land on Follow-up
-    # with every other section closed (the plan opened by the build
-    # and the object card are silenced, not echoed).
+def test_followup_deep_link_lands_on_followup(window, panel):
+    # Cadence chips and the follow-up entry point land on the Follow-up
+    # page; every page built along the way hides behind the bar.
     p = _mk_project(window)
-    window._page_sections["process"].setCollapsed(False)
-    window._page_sections["details"].setCollapsed(False)
+    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_details.click()
+    assert window._active_tab == "details"
     window._goto_project_followup(p["id"])
-    secs = window._page_sections
-    assert secs["followup"].isExpanded()
-    for key in ("plan", "process", "publish", "details"):
-        assert secs[key].isCollapsed()
+    assert window._active_tab == "followup"
+    assert not window._tab_pages["followup"].isHidden()
+    for key in ("plan", "process", "details"):
+        assert window._tab_pages[key].isHidden()
+    assert "publish" not in window._tab_pages  # lazy: never opened
 
 
-def test_go_button_closes_accidental_siblings(window, panel):
-    # Leaving several sections open by hand and then pressing Go for
-    # the next action enforces the invariant before landing.
+def test_go_button_enforces_single_active_page(window, panel):
+    # No matter what page you were on, Go lands on the next action's
+    # tab and enforces the one-visible-page rule before it.
     _mk_project(window)
-    secs = window._page_sections
-    secs["process"].setCollapsed(False)
-    secs["details"].setCollapsed(False)
-    assert secs["plan"].isExpanded() and secs["process"].isExpanded()
+    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_details.click()
+    assert window._active_tab == "details"
     window.projects.btn_next_go.click()
-    assert secs["plan"].isExpanded()
-    assert secs["process"].isCollapsed()
-    assert secs["details"].isCollapsed()
+    assert window._active_tab == "plan"
+    assert not window._tab_pages["plan"].isHidden()
+    for key in ("process", "details"):
+        assert window._tab_pages[key].isHidden()
 
 
-def test_opening_files_closes_open_step(window, panel):
-    # The nested "Project files" section joins the same accordion: a
-    # click opens it and folds the open step, but its parent object
-    # card stays open — the files list lives inside it.
+def test_exactly_one_page_visible(window, panel):
+    # The invariant across every path — step actions, tab clicks, deep
+    # links — is one and only one visible page in the scroll area.
+    p = _mk_project(window)
+    window._step_done("plan")
+    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_details.click()
+    window._goto_project_followup(p["id"])
+    shown = [k for k, pg in window._tab_pages.items() if not pg.isHidden()]
+    assert shown == ["followup"]
+
+
+def test_files_section_lives_in_the_object_card(window, panel):
+    # The nested "Project files" section lives inside the Object card's
+    # tab page: it starts folded and a header click expands it without
+    # moving the active tab.
     _mk_project(window)
-    secs = window._page_sections
-    assert secs["plan"].isExpanded()
-    secs["details"].setCollapsed(False)  # files is visible once the card opens
-    secs["files"]._btn.click()
-    assert secs["files"].isExpanded()
-    assert secs["details"].isExpanded()
-    for key in ("plan", "process", "publish", "followup"):
-        assert secs[key].isCollapsed()
+    window.projects.btn_tab_details.click()
+    sec = window._proj_files_section
+    assert sec is not None and sec.isCollapsed()
+    sec._btn.click()
+    assert sec.isExpanded()
+    assert window._active_tab == "details"
+    assert not window._tab_pages["details"].isHidden()
+    assert window._tab_pages["plan"].isHidden()
 
 
-def test_opening_a_step_closes_files(window, panel):
-    # The other way round: leaving the files section opened and clicking
-    # any other header (step or card) folds the files again.
+def test_switching_tabs_keeps_inner_fold_state(window, panel):
+    # ADR-041: each tab page is its own world — the fold state of the
+    # files list inside the Object card survives a round trip through
+    # another tab; only one page is visible at any moment.
     _mk_project(window)
-    secs = window._page_sections
-    secs["details"].setCollapsed(False)
-    secs["files"]._btn.click()
-    assert secs["files"].isExpanded()
-    secs["process"]._btn.click()
-    assert secs["process"].isExpanded()
-    assert secs["files"].isCollapsed()
-    assert secs["details"].isCollapsed()
+    window.projects.btn_tab_details.click()
+    sec = window._proj_files_section
+    sec._btn.click()  # expand the files list inside the card
+    assert sec.isExpanded()
+    window.projects.btn_tab_process.click()
+    assert window._active_tab == "process"
+    assert not window._tab_pages["process"].isHidden()
+    assert window._tab_pages["details"].isHidden()
+    assert sec.isExpanded()  # the card's fold state is kept, not reset
+    window.projects.btn_tab_details.click()
+    assert not window._tab_pages["details"].isHidden()
+    assert sec.isExpanded()
 
 
-def test_step_toggled_signal_fires_only_on_user_click(window, panel):
+def test_files_toggled_signal_fires_only_on_user_click(window, panel):
     # setCollapsed() stays silent (programmatic); a real header click
-    # emits the new state. The accordion recursion guard rests on this.
+    # emits the new state (the section's recursion guard rests on this).
     _mk_project(window)
-    sec = window._page_sections["process"]
+    sec = window._proj_files_section
     fires = []
     sec.sectionToggled.connect(fires.append)
     try:
-        sec.setCollapsed(False)
         sec.setCollapsed(True)
+        sec.setCollapsed(False)
         assert fires == []
         sec._btn.click()
+        assert fires == [False]
         sec._btn.click()
-        assert fires == [True, False]
+        assert fires == [False, True]
     finally:
         sec.sectionToggled.disconnect(fires.append)
 
 
-# ---------------- header chip: the step state on the accordion header ---
+# ---------------- chips: the step state on the tab page headers --------
 
 
 def test_chips_fresh_project(window, panel):
-    # pending on the three real steps, nothing on the follow-up section.
+    # pending on the three real step pages, nothing on the object card
+    # or the follow-up page.
     _mk_project(window)
-    secs = window._page_sections
+    for key in ("process", "publish", "followup"):
+        window._show_tab(key)  # the pages build on first open
+    pages = window._tab_pages
     for key in ("plan", "process", "publish"):
-        assert secs[key].headerBadge() == window.tr("pending")
-    assert secs["followup"].headerBadge() == ""
-    assert secs["followup"]._badge.isHidden()
+        assert not pages[key]._chip.isHidden()
+        assert pages[key]._chip.text() == window.tr("pending")
+    assert pages["details"]._chip.isHidden()
+    assert pages["followup"]._chip.isHidden()
 
 
 def test_done_chip_carries_the_date(window, panel):
     p = _mk_project(window)
-    window._step_done("plan")
-    secs = window._page_sections  # the step action rebuilds the page
+    window._step_done("plan")  # rebuilds: the next target (process) builds
+    window._show_tab("plan")   # the done step's page builds on first open
+    pages = window._tab_pages
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     step = next(s for s in proj_mod.get(mw.db, p["id"])["steps"]
                 if s["step"] == "plan")
     date = datetime.datetime.fromtimestamp(step["updated"]).strftime(
         "%Y-%m-%d")
-    assert secs["plan"].headerBadge() == \
+    assert pages["plan"]._chip.text() == \
         window.tr("done %1").replace("%1", date)
-    assert secs["process"].headerBadge() == window.tr("pending")
-    assert secs["publish"].headerBadge() == window.tr("pending")
+    window._show_tab("process")
+    assert pages["process"]._chip.text() == window.tr("pending")
+    window._show_tab("publish")
+    assert pages["publish"]._chip.text() == window.tr("pending")
 
 
 def test_skipped_chip(window, panel):
     _mk_project(window)
-    window._step_skip("process")
-    secs = window._page_sections
-    assert secs["process"].headerBadge() == window.tr("skipped")
-    assert secs["plan"].headerBadge() == window.tr("pending")
-    assert secs["publish"].headerBadge() == window.tr("pending")
+    window._step_skip("process")  # rebuilds: plan stays the target
+    window._show_tab("process")
+    pages = window._tab_pages
+    assert pages["process"]._chip.text() == window.tr("skipped")
+    window._show_tab("plan")
+    assert pages["plan"]._chip.text() == window.tr("pending")
+    window._show_tab("publish")
+    assert pages["publish"]._chip.text() == window.tr("pending")

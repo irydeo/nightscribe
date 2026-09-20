@@ -123,6 +123,8 @@ def test_register_fits_records_files_and_step_data(window, monkeypatch):
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project
     p = _select_project(window, "neo", "2016 XYZ")
+    # ADR-041: the products summary lives on the lazy Process tab — open it
+    window.projects.btn_tab_process.click()
     monkeypatch.setattr(
         QFileDialog, "getOpenFileNames",
         staticmethod(lambda *a, **k: (["/tmp/a.fits", "/tmp/b.fit"], "")))
@@ -152,6 +154,8 @@ def test_register_images_records_image_kind(window, monkeypatch):
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project
     p = _select_project(window, "neo", "2026 AB1")
+    # ADR-041: the products summary lives on the lazy Process tab — open it
+    window.projects.btn_tab_process.click()
     monkeypatch.setattr(
         QFileDialog, "getOpenFileNames",
         staticmethod(lambda *a, **k: (["/tmp/tycho1.png"], "")))
@@ -174,6 +178,8 @@ def test_products_accumulate_and_survive_rebuild(window, monkeypatch):
     import nightscribe.gui.main_window as mw
     from nightscribe.core import project
     p = _select_project(window, "pccp", "P11ABCD")
+    # ADR-041: the products summary lives on the lazy Process tab — open it
+    window.projects.btn_tab_process.click()
     monkeypatch.setattr(
         "nightscribe.core.fits_meta.read_meta", _fake_fits_meta)
     monkeypatch.setattr(
@@ -190,6 +196,9 @@ def test_products_accumulate_and_survive_rebuild(window, monkeypatch):
     fresh = project.get(mw.db, p["id"])
     window._current_project = fresh
     _build(window, fresh)
+    # the rebuild wiped the page and the Process tab is lazy again —
+    # opening it must restore the full summary from the database
+    window.projects.btn_tab_process.click()
     lst = window._project_widgets["neo_products"]
     assert lst.count() == 3
 
@@ -205,6 +214,9 @@ def test_comet_gets_products_block_without_mpc(window):
     # Comets keep the same products (FITS + annotated images) but have no
     # MPC report block.
     _select_project(window, "comet", "C/2026 A1")
+    # ADR-041: the products block builds with the lazy Process tab —
+    # open it, the user path, then probe
+    window.projects.btn_tab_process.click()
     assert "neo_products" in window._project_widgets
     assert "txt_mpc" not in window._project_widgets
 

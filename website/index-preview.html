@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en" class="no-js">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NightScribe — Observatory Terminal (Preview)</title>
+  <meta name="description" content="NightScribe is a desktop application for amateur astronomical observatories. Preview version.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=PT+Serif:wght@400;700&family=PT+Sans:ital,wght@0,400;0,700;1,400&family=PT+Sans+Narrow:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/animations.css">
+  <style>
+    .hero { min-height: calc(100vh - 80px); display: flex; flex-direction: column; justify-content: center; }
+    .hero-field { display: none; }
+    .scroll-target { display: none; }
+    .divider { display: none; }
+    .about-section { padding: 2rem 0; }
+    .about-grid { gap: 1.5rem; }
+    .abt-card { padding: 1.5rem; }
+    .site-footer { position: fixed; bottom: 0; width: 100%; padding: 1rem; background: var(--bg-panel); border-top: 1px solid var(--line); z-index: 100; }
+
+    .modal {
+      position: fixed; top: 50%; left: 50%;
+      transform: translate(-50%, -50%) scale(0.9);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      z-index: 2000; max-width: 420px; width: 90%;
+    }
+    .modal.open { opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 2px solid var(--terracotta); background: rgba(201,141,126,0.15); }
+    .modal-title { font-size: 1.15rem; color: var(--terracotta); text-shadow: 0 0 10px rgba(201,141,126,0.5); }
+    .modal-close { background: none; border: none; color: #fff; font-size: 1.8rem; line-height: 1; cursor: pointer; padding: 0.25rem 0.5rem; }
+    .modal-close:hover { color: var(--pink); }
+    .modal-body { padding: 1.5rem 2rem; background: #1a181d; }
+    .modal-text { margin-bottom: 1rem; color: #fff; line-height: 1.7; font-size: 1.1rem; }
+    .modal-text:last-child { margin-bottom: 0; }
+    .modal-text .accent { color: var(--terracotta); font-weight: 700; }
+    .modal-text.mono { font-family: var(--font-mono); color: #e8e0d0; }
+    .modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem; border-top: 2px solid var(--terracotta); background: rgba(201,141,126,0.1); }
+    .modal-footer .btn-instrument { min-width: 120px; padding: 0.75rem 1.5rem; font-size: 1rem; }
+    .modal-content { background: #1a181d; border: 3px solid var(--terracotta); border-radius: 4px; box-shadow: 0 0 0 6px rgba(201,141,126,0.5), 0 30px 60px rgba(0,0,0,0.9); }
+  </style>
+</head>
+<body>
+  <noscript><div class="noscript-bar mono">This site needs JavaScript to show its texts.<br>Este sitio necesita JavaScript para mostrar sus textos.</div></noscript>
+
+  <canvas id="stars-canvas"></canvas>
+  <div class="grid-overlay" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="spotlight" id="spotlight" aria-hidden="true"></div>
+  <div class="reticle" id="reticle" aria-hidden="true"><span class="rx"></span><span class="ry"></span></div>
+
+  <div class="alt-scale" id="alt-scale" aria-hidden="true"><span class="alt-label top mono">90°</span><div class="alt-track"><div class="alt-fill" id="alt-fill"></div><div class="alt-bubble" id="alt-bubble"></div></div><span class="alt-label bottom mono">0°</span><span class="alt-readout mono" id="alt-readout">0°</span></div>
+
+  <header class="control-bar" id="control-bar"><div class="cb-left"><span class="led led-on" id="led-status"></span><span class="cb-status mono" data-i18n="cb.status"></span><span class="preview-badge mono">PREVIEW</span></div><a href="#hero" class="cb-brand">NIGHT<span class="cb-brand-accent">SCRIBE</span></a><nav class="cb-nav"><a href="#about" class="nav-link mono" data-i18n="nav.about"></a></nav><div class="cb-right"><span class="cb-coords mono" id="cb-coords">RA 00:00:00 +00°00'</span><span class="cb-clock mono" id="cb-clock">00:00:00 UTC</span><a href="https://github.com" class="btn-instrument ghost mono" data-i18n="footer.github"></a></div></header>
+
+  <section class="hero" id="hero"><div class="hero-content"><div class="hero-kicker mono"><span data-i18n="hero.kicker"></span><span class="kicker-dash">—</span><span class="kicker-ver mono" data-i18n="hero.version"></span></div><h1 class="hero-title">NIGHTSCRIBE</h1><p class="hero-tagline" data-i18n="hero.tagline"></p><p class="hero-sub mono" data-i18n="hero.sub"></p><div class="hero-cta"><button id="btn-download" class="btn-instrument btn-primary mono">Download</button><a href="https://github.com/irydeo/nightscribe/" class="btn-instrument ghost mono">GitHub</a></div></div><div class="hero-field"><div class="field-wrap"><img class="feature-screenshot" src="img/screens/hero.png" width="1520" height="980" alt="NightScribe — pestaña Tonight del observatorio" fetchpriority="high"><span class="field-caption mono">FIELD 01 // TONIGHT TAB</span></div></div><div class="scroll-target"><span class="st-label mono" data-i18n="hero.acquiring"></span><span class="st-cross"><i></i><i></i></span></div></section>
+
+  <footer class="site-footer"><div class="footer-links"><a href="https://github.com" data-i18n="footer.github"></a><a href="https://www.gnu.org/licenses/gpl-3.0.html" data-i18n="footer.license"></a><a href="https://irydeo.com" target="_blank" rel="noopener">IRYDEO OBSERATORY</a></div></footer>
+
+  <div class="modal" id="modal-download" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-content"><header class="modal-header"><h3 id="modal-title" class="modal-title mono">No Public Release</h3><button class="modal-close" id="modal-close" aria-label="Close">&times;</button></header><div class="modal-body"><p class="modal-text" style="color:#fff;">No public releases available yet.</p><p class="modal-text mono" style="color:#e8e0d0;">Click the <span class="accent">GitHub</span> button to access the development code.</p></div><footer class="modal-footer"><button class="btn-instrument btn-primary mono" id="modal-ok">Understood</button></footer></div></div>
+
+  <script>const modal=document.getElementById('modal-download');const downloadBtn=document.getElementById('btn-download');const closeBtn=document.getElementById('modal-close');const okBtn=document.getElementById('modal-ok');function open(){modal.classList.add('open');okBtn.focus();}function close(){modal.classList.remove('open');}downloadBtn.addEventListener('click',e=>{e.preventDefault();open();});document.getElementById('modal-close').addEventListener('click',close);okBtn.addEventListener('click',close);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&modal.classList.contains('open'))close();});</script><script src="js/i18n.js"></script><script src="js/main.js"></script></body></html>

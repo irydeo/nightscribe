@@ -81,6 +81,13 @@ class ChartViewer(QDialog):
             # the widget's interactive canvas (ChartView) — the thing the
             # toolbar's Zoom / Fit buttons drive.
             self._view = getattr(widget, "view", None)
+            if self._view is None:
+                # a bare ChartView widget (the Plan-tab transit timeline)
+                # IS its own view — same convention as
+                # overview._mark_embedded
+                from .widgets.base_chart import ChartView
+                if isinstance(widget, ChartView):
+                    self._view = widget
             self._key = title or type(widget).__name__
             self.setWindowTitle(title or type(widget).__name__)
 

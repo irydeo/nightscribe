@@ -865,7 +865,12 @@ cierra al fallar).
 | UD.1–UD.5 | proyecto como página única + pestaña Observatory | **Hecho** |
 | UC.1–UC.2 | i18n + cierre documental (este track) | **Hecho** |
 
-**Estado**: suite unitaria verde (**1146**). **Fuera de esta iteración**:
+> Emenda (2026-09-19, **ADR-041**): la «página única plegable» del sub UD
+> (acordeón de 5 secciones) pasó a ser una **barra de 5 pestañas planas y
+> perezosas** sobre la página — *Object card · Plan · Proceso · Publicar ·
+> Follow-up* —; el resto de este track no cambia.
+
+**Estado**: suite unitaria verde (**1394**). **Fuera de esta iteración**:
 exportación fotométrica a nivel de campaña, compartir campañas, el
 add-on de descubrimiento de variables destacadas (aprobado el
 2026-09-12, su propio track).
@@ -1105,3 +1110,28 @@ diálogo).
 afinado Horizons de los fenómenos de satélites (~1 min, spike primero);
 horas de contacto de eclipses; ocultaciones estelares; la línea de «impacto»
 sigue leyendo solo Luna+Kp (los eventos podrían alimentarla en v2).
+
+### 7sexies. Rediseño features — acordeón nativo `<details>`, zigzag, hero banner (2026-09-17, ADR-039)
+
+Motivación: la sección «Features» usaba masonry 2 columnas (`.features-masonry` + `.feature-col` + `.feature-col--stagger`) con 12 tarjetas que requerían scroll horizontal en móvil y no explicaban su propósito hasta hacer click en «Observe». El observador pidió: **una columna**, **filas alternadas con zigzag**, **solo el titular visible** (clic despliega todo), **todas cerradas al cargar**, **hero fijo arriba** (LCP intacto).
+
+| Fase | Entregable | Estado |
+|---|---|---|
+| A | CSS zigzag/accordion en `website/css/style.css` (marca ADR-039, idempotente) | **Hecho (2026-09-17)** |
+| B | `ns_features_accordion.py` walker anclado en `id="feat-N"` (12/12), balance 0, 13 imgs CLS-cero, i18n ×24 (sin claves nuevas), HTML → `feature-list` + 12 `<details>/<summary>` | **Hecho (2026-09-17)** |
+| C | Validación contractual + idempotencia inyector + serve-check 200/0 404 + ADR-039 + anotación §7 | **Hecho (2026-09-17)** |
+
+**Decisiones pactadas (2026-09-17)**:
+1. Acordeón nativo `<details>/<summary>` (sin JS nuevo), caret `▸/▾` CSS `::after` (no i18n).
+2. Todas cerradas al inicio, varias abiertas a la vez.
+3. Hero fijo como banner arriba (fuera del acordeón, `fetchpriority="high"` eager).
+4. Zigzag: filas pares `margin-left: clamp(24px, 6vw, 96px)` (móvil no rompe).
+5. `<summary>` reutiliza `feat.N.title` (misma clave i18n, 0 cadenas nuevas).
+6. JS `main.js` intacto; acordeón interno `.feature-block.expanded` sigue operando en el bloque abierto (capa interior).
+7. Balance 0 garantizado por walker anclado en `id="feat-N"` único (12/12).
+
+**Validación contractual (2026-09-17)**:
+- `feature-row` 12 · `nth-child(even)` presente · balance 0 · i18n ×129 intacto
+- Serve-check: index 200 + 13 PNGs 200 + 0 404 en `127.0.0.1:8765`
+- Inyector idempotente (`ns_inject_screens.py` no re-toca capturas ni rompe balance)
+cadenas 0 unfinished.

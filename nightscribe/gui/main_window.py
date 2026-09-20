@@ -5128,7 +5128,8 @@ class MainWindow(QMainWindow):
             ana_row.addWidget(btn_evo)
             btn_annot = QPushButton(self.tr("Export annotated FITS"))
             btn_annot.setToolTip(self.tr(
-                "Copy of the stacked FITS with annotation keywords (NS_)"))
+                "Preview the stacked FITS, place the SN marker and save "
+                "an annotated copy (AIJ readable)"))
             btn_annot.clicked.connect(
                 lambda: self._fu_export_annotated(pid))
             ana_row.addWidget(btn_annot)
@@ -5250,10 +5251,10 @@ class MainWindow(QMainWindow):
                 self.tr("Animation failed: %1").replace("%1", str(err)), 8000)
 
     def _fu_export_annotated(self, pid):
-        # B10: export a copy of the first registered stacked FITS with the
-        # annotation keywords injected (NS_SN_X, NS_SCALE, etc.).
+        # B10: open the preview dialog; a copy of the first registered
+        # stacked FITS is written with the SN marked (AIJ ANNOTATE card)
+        # once the observer confirms.
         from ..core import followup as fu
-        from ..core import fits_annotate
         p = project.get(db, pid)
         if not p:
             return
@@ -5270,6 +5271,8 @@ class MainWindow(QMainWindow):
         sn_ra = ctx.get("ra_deg")
         sn_dec = ctx.get("dec_deg")
         sn_xy = None
+        scale = None
+        north_pa = None
         if sn_ra is not None and sn_dec is not None:
             try:
                 from ..core import fits_io, wcs as wcs_mod
@@ -5277,24 +5280,45 @@ class MainWindow(QMainWindow):
                 wcs = wcs_mod.Wcs.from_header(header)
                 if wcs:
                     sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec)
+                    scale = wcs.pixel_scale()
+                    # PA of north in the image: sky-north (xi, eta) =
+                    # (0, 1) projected on the image axes (right, up)
+                    import math
+                    r = math.hypot(wcs.cd[0][0], wcs.cd[1][0])
+                    u = math.hypot(wcs.cd[0][1], wcs.cd[1][1])
+                    if r > 1e-12 and u > 1e-12:
+                        north_pa = math.degrees(math.atan2(
+                            wcs.cd[1][0] / r, wcs.cd[1][1] / u))
             except Exception:
                 pass
-        out = project.storage_dir(p) / \
-            f"{p['object_name']}_annotated.fits"
+        # Preview first: the observer checks the marker, the overlays and
+        # the stretch, and only then confirms name and destination.
+        from .sn_annotate_dialog import SnAnnotateDialog
         try:
-            fits_annotate.write_annotated_fits(
-                fits_paths[0], str(out), sn_xy=sn_xy,
-                obj_name=p["object_name"], ra_deg=sn_ra, dec_deg=sn_dec,
-                notes=self.tr("SN follow-up"))
-            project.add_file(db, pid, str(out), "fits")
-            self._populate_project_files(pid)
-            self.statusBar().showMessage(
-                self.tr("Annotated FITS written to %1").replace("%1", str(out)),
-                8000)
+            dlg = SnAnnotateDialog(
+                self, fits_paths[0], p, p["object_name"],
+                sn_xy=sn_xy, scale=scale, north_pa=north_pa,
+                ra_deg=sn_ra, dec_deg=sn_dec,
+                default_notes=self.tr("SN follow-up"))
         except Exception as err:
             self.statusBar().showMessage(
-                self.tr("Annotated FITS failed: %1").replace("%1", str(err)),
-                8000)
+                self.tr("Could not open the FITS for annotation: %1")
+                .replace("%1", str(err)), 8000)
+            return
+        dlg.saved.connect(lambda path: self._fu_annotated_saved(pid, path))
+        dlg.exec()
+
+    def _fu_annotated_saved(self, pid, path):
+        # @args: pid - project id, path - annotated copy just written
+        try:
+            project.add_file(db, pid, path, "fits")
+            self._populate_project_files(pid)
+        except Exception as err:
+            logger.warning("annotated FITS saved but not registered: %s",
+                           err)
+        self.statusBar().showMessage(
+            self.tr("Annotated FITS written to %1")
+            .replace("%1", str(path)), 8000)
 
     def _fu_populate_sessions(self, lst, pid):
         # @args: lst - QListWidget, pid - project id

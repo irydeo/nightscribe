@@ -121,6 +121,10 @@ tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta
 docs/                # diseño, arquitectura, fuentes, scoring, órbitas, viz, ADRs
+installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Setup)
+.github/workflows/   # windows-preview.yml: build Windows de preview (tests unitarios,
+                     #   PyInstaller, zip portable + instalador Inno, pre-release
+                     #   rodante preview-<rama>; push a dev/v0.1 o manual)
 ```
 
 ### Cómo trabajar

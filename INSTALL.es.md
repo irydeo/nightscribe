@@ -87,9 +87,18 @@ pip install nightscribe
 nightscribe gui
 ```
 
-## Opción C — instalador autónomo (sin Python)
+## Opción C: instalador autónomo (sin Python)
 
-Los paquetes precompilados están en la página de Releases. Para generar el tuyo:
+Los paquetes precompilados están en la
+[página de Releases](https://github.com/irydeo/nightscribe/releases): busca
+las pre-releases `preview-*`, regeneradas en cada push a la rama de
+desarrollo. Cada una trae un instalador de Windows (`NightScribeSetup-*.exe`,
+por usuario, sin permisos de administrador) y un zip portable
+(`NightScribe-*-windows-x64.zip`: descomprímelo y ejecuta
+`nightscribe.exe gui`). Los binarios no están firmados, así que Windows
+SmartScreen avisará: elige *Más información → Ejecutar de todas formas*.
+
+Para generar el tuyo:
 
 ```bash
 .venv/bin/pip install -r requirements-dev.txt   # incluye pyinstaller

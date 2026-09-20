@@ -20,6 +20,44 @@ from PySide6.QtWidgets import QLabel
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+# Borrowed from test_projects_hub.py (UD.5): stand-in for the real
+# ExploreWorker, so building a project page never spawns a QThread that
+# touches the network. A worker still in flight at interpreter exit aborts
+# the process locally and hung the Windows CI runner; deliver=False leaves
+# the object card in its loading state, which these tests never inspect.
+class FakeWorker:
+    def __init__(self, payload, deliver=True):
+        self.payload = payload
+        self.deliver = deliver
+        self._cbs = []
+
+    class _finished:
+        # just the connect / disconnect / emit surface the panel needs
+        def __init__(self, w):
+            self._w = w
+
+        def connect(self, cb):
+            self._w._cbs.append(cb)
+
+        def disconnect(self, cb=None):
+            if cb is None:
+                self._w._cbs = []
+            else:
+                self._w._cbs = [c for c in self._w._cbs if c is not cb]
+
+        def emit(self, p):
+            for cb in list(self._w._cbs):
+                cb(p)
+
+    @property
+    def finished(self):
+        return self._finished(self)
+
+    def start(self):
+        if self.deliver:
+            self._finished(self).emit(self.payload)
+
+
 # ---------------- harness ----------------
 
 @pytest.fixture(scope="module", autouse=True)
@@ -52,7 +90,12 @@ def window(_point_db_at_tmpdir):
     w._now_timer.stop()
     w._blink_timer.stop()
     w._blink_render_timer.stop()
+    # hermetic object card: the fake loader means no ExploreWorker QThread
+    orig_loader = w._proj_panel_loader
+    w._proj_panel_loader = (lambda name, fallback_target=None:
+                            FakeWorker({}, deliver=False))
     yield w
+    w._proj_panel_loader = orig_loader
     config.is_configured = orig_cfg
     w.close()
 

@@ -59,8 +59,16 @@ def window():
     app = QApplication.instance() or QApplication([])
     from nightscribe.gui import theme
     theme.apply_theme(app)
+    from nightscribe.config import config
     from nightscribe.gui.main_window import MainWindow
+    # headless: hide the first-run flag so __init__ does not schedule the
+    # TonightWorker (QTimer.singleShot -> on_compute_tonight -> live network
+    # in a QThread; a worker still in flight at exit hangs the Windows CI
+    # runner and aborts the process locally)
+    orig_cfg = config.is_configured
+    config.is_configured = lambda: False
     w = MainWindow()
+    config.is_configured = orig_cfg
     yield w
     w.close()
 

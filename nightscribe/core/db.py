@@ -15,6 +15,7 @@ import json
 import logging
 import sqlite3
 import time
+from pathlib import Path
 
 from .. import paths
 
@@ -265,6 +266,28 @@ def _migrate(conn):
     conn.commit()
 
 
+# Plain-language note per schema step, for the update wizard's "Data and
+# compatibility" report (ADR-042): what the user gains at each version.
+# Keys match the user_version values above, so the report can list every
+# step a given database actually had to walk through.
+MIGRATION_NOTES = {
+    1: ("Projects introduced: every target you choose gets its own "
+        "folder and a plan, capture, process, publish flow."),
+    2: ("The \"analyse\" step left the project flow; the projects stopped "
+        "on it continue at the publish step."),
+    3: ("The \"capture\" step was merged into \"plan\"; whatever work was "
+        "saved on it is now part of the plan."),
+    4: ("Projects gained their final state: close date, outcome, tags "
+        "and favourites."),
+    5: ("Supernova follow-up: the observing sessions, the images of each "
+        "night and your photometry points, all tied to the project."),
+    6: ("Every project keeps its own container folder, in the place it "
+        "already was."),
+    7: ("Observing campaigns: a first-class list your projects can hang "
+        "from, with cadence, filters and shared data links."),
+}
+
+
 class Database:
     # Single SQLite access point: HTTP cache plus the observatory's own
     # observation history. Everything persistent lives here (see ADR-002).
@@ -425,6 +448,48 @@ class Database:
                 (obj, time.time() - days * DAY),
             ).fetchone()
             return bool(row)
+
+
+def backup_db(src=None, keep=3):
+    # ADR-042: snapshot the database before the update wizard migrates
+    # anything. Uses SQLite's online backup API, so the copy is a
+    # consistent image even while the app still holds its connection open.
+    # The last `keep` copies are retained, older ones are dropped.
+    # @args: src - Path of the database to copy (default: the app's own)
+    #        keep - how many old backups to retain (default 3)
+    # @return: Path of the new backup file, or None when there is nothing
+    #          to back up or the copy could not be written
+    src = Path(src) if src is not None else paths.db_path()
+    if not src.exists():
+        return None
+    try:
+        src_conn = sqlite3.connect(str(src))
+        ver = src_conn.execute("PRAGMA user_version").fetchone()[0]
+        bakdir = paths.backups_dir()
+        base = f"nightscribe_{time.strftime('%Y-%m-%d_%H%M')}_v{ver}"
+        dst = bakdir / (base + ".db")
+        n = 1
+        while dst.exists():  # same-minute reruns: numbered, never overwrite
+            dst = bakdir / f"{base}_{n}.db"
+            n += 1
+        dst_conn = sqlite3.connect(str(dst))
+        try:
+            src_conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+        src_conn.close()
+    except (sqlite3.Error, OSError) as err:
+        logger.warning("db backup failed: %s", err)
+        return None
+    # keep the newest `keep`, drop the rest
+    try:
+        old = sorted(bakdir.glob("nightscribe_*_v*.db"),
+                     key=lambda p: p.stat().st_mtime, reverse=True)
+        for extra in old[keep:]:
+            extra.unlink(missing_ok=True)
+    except OSError:
+        pass
+    return dst
 
 
 # Shared instance (tests build their own with a temp file)

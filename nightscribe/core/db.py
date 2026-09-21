@@ -64,6 +64,8 @@ SOURCE_TTL = {
     "exoplanet_archive": 7 * DAY,
     "obscodes": 30 * DAY,
     "cutouts": 30 * DAY,
+    "vizier": 30 * DAY,   # VizieR catalog cone searches (Gaia/APASS/VSX):
+                          # reference photometry is stable for months
     "tns": 6 * HOUR,
     "astrometry": 30 * DAY,
     "ccdciel": 60,  # local JSON-RPC: covers quick reads (temp, filters,

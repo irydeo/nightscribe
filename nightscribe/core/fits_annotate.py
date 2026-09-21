@@ -13,18 +13,26 @@
 
 """Annotated FITS export for the SN follow-up.
 
-The observer keeps "la imagen anotada, resuelta astrométricamente": AIJ
-stores annotation data in the FITS header and renders it on load. NightScribe
-produces a **copy** of the stacked FITS with annotation keywords (crosshair
-at the SN, scale bar, north arrow, labels) so the user's original is never
-modified, and the annotated copy can be opened in AIJ (if our keywords match
-AIJ's format — investigation flagged as a risk in the plan) or any FITS viewer.
+The observer keeps "la imagen anotada, resuelta astrometricamente": AIJ
+stores annotation data in the FITS header and renders it on load. An AIJ
+annotation is a repeated ANNOTATE card whose value is "x,y,size,...,color"
+and whose comment is the label, e.g.
 
-Writing is pure Python (ADR-004: no astropy): we copy the input file
-and inject annotation cards into the header by manipulating the raw 2880-byte
-blocks. This is enough for simple TAN headers (the format the blink pipeline
-already handles); no checksum is needed for image HDUs (FITS headers
-carry no mandatory checksum in practice).
+    ANNOTATE= '876.74,868.43,30,1,0,1,1,orange' / NGC 7325
+
+NightScribe produces a **copy** of the stacked FITS: it rewrites the first
+header with an ANNOTATE card (position + SN name) and a short tail of
+NS_* cards (RA/DEC, plate scale, north PA, night notes). Everything else
+is copied verbatim, including every other header card (NAXIS, BSCALE/BZERO,
+WCS, ...), the image data bytes, and any extension HDUs after it. The
+observer's original file is never modified.
+
+Writing is pure Python (ADR-004: no astropy). The whole header is rebuilt
+block by block (headers span several 2880-byte blocks; a single-block edit
+would shred the rest of it) with a latin-1 decode/encode round trip, so
+accented comments the observer (or AIJ) wrote survive byte for byte.
+Savings are idempotent: cards we own are stripped before the new ones go
+in, so annotating twice leaves one clean set.
 """
 
 import logging
@@ -34,99 +42,136 @@ from . import fits_io
 
 logger = logging.getLogger(__name__)
 
-# Annotation keywords written into the header. AIJ-compatible where
-# feasible (AIJ stores aperture/annotation info in custom keywords); otherwise
-# NightScribe's own documented keywords.
-_KEYWORDS = {
-    "NS_SN_X": "pixel x of the SN on the reference frame",
-    "NS_SN_Y": "pixel y of the SN on the reference frame",
-    "NS_SCALE": "plate scale in arcsec/pixel",
-    "NS_NORTH": "north arrow PA in degrees (East of North)",
-    "NS_OBJ": "object name (SN designation)",
-    "NS_RA": "SN right ascension (degrees, J2000)",
-    "NS_DEC": "SN declination (degrees, J2000)",
-    "NS_NOTES": "free-text night notes (seeing, clouds…)",
-}
+_CARD = 80      # FITS header card, chars
+_BLOCK = 2880   # FITS header block, bytes
+
+# Keys NightScribe owns in the header. On a re-save they are dropped
+# (even if left by an earlier run) and re-emitted, so the file never
+# accumulates stale annotations.
+_OWNED = {"ANNOTATE", "NS_RA", "NS_DEC", "NS_SCALE", "NS_NORTH", "NS_NOTES"}
+
+# AIJ annotation flags after the size: marker on, no background, label on,
+# "highlight" flag, orange. NightScribe follows the same convention.
+_AIJ_FLAGS = "30,1,0,1,1,orange"
 
 
-def _inject_cards(header_bytes, cards):
-    # @args: header_bytes - raw 2880-byte header block (bytes),
-    #        cards - list of (key, value) strings to inject before END
-    # @return: new header bytes (2880, padded) with the cards inserted
-    text = header_bytes.decode("ascii", "replace")
-    # find the END card and build the new card section
-    new_cards = []
-    for key, value in cards:
-        card = f"{key:<8}= "
-        if isinstance(value, (int, float)):
-            card += str(value)
-        else:
-            s = str(value)
-            if len(s) > 68:
-                s = s[:68]
-            card += f"'{s}'"
-        card = card.ljust(80)
-        new_cards.append(card)
-    # insert before END
-    end_pos = text.find("END")
-    if end_pos < 0:
-        return header_bytes   # no END? leave as-is
-    pre = text[:end_pos]
-    post = text[end_pos:]
-    new_text = pre + "".join(new_cards) + post
-    # pad/truncate to 2880
-    new_bytes = new_text.encode("ascii", "replace")
-    if len(new_bytes) < 2880:
-        new_bytes += b" " * (2880 - len(new_bytes))
-    else:
-        new_bytes = new_bytes[:2880]
-    return new_bytes
+def _num(value):
+    # Compact number for a FITS card: a bare number (never a string), with
+    # no trailing ".0" when it is whole.
+    # @args: value - int or float
+    # @return: int when whole, float otherwise
+    f = float(value)
+    if f == int(f) and abs(f) < 1e15:
+        return int(f)
+    return float(f"{f:.6g}")
+
+
+def _format_card(key, value, comment=""):
+    # One 80-column card the way AIJ writes one: "KEY     = value / comment".
+    # Strings are quoted; the value (then the comment) is trimmed to fit.
+    # @args: key - FITS keyword (<= 8 chars), value - str or number,
+    #        comment - trailing comment after " / "
+    # @return: the card, exactly 80 chars
+    key = (key or "KEYWORD").upper()[:8]
+    val = str(value).strip()
+    comment = (comment or "").strip()
+    is_str = isinstance(value, str)
+    overhead = 10                               # "KEY     = " ("=" in col. 9)
+    if is_str:
+        overhead += 2                           # the quotes
+    if comment:
+        overhead += 3 + len(comment)            # " / comment"
+    max_val = max(_CARD - overhead, 1)
+    if len(val) > max_val:
+        val = val[:max_val]
+    # The "=" always sits in column 9, even for 8-character keywords:
+    # "ANNOTATE= '…'" the way AIJ writes it, "NS_RA    = 1" otherwise.
+    card = f"{key.ljust(8)}= " + (f"'{val}'" if is_str else val)
+    if comment:
+        card += f" / {comment}"
+    return card[:_CARD].ljust(_CARD)
+
+
+def _split_header(raw):
+    # Walks the first HDU header (consecutive 2880-byte blocks up to its END
+    # card) and returns it as a list of 80-char card strings, decoded
+    # latin-1 so accented comments survive a byte-exact round trip.
+    # @args: raw - the whole file as bytes
+    # @return: (cards_before_end, data_offset) - byte offset of the data
+    cards = []
+    off = 0
+    while True:
+        block = raw[off:off + _BLOCK]
+        if len(block) < _BLOCK:
+            raise fits_io.FitsError("Truncated FITS header")
+        off += _BLOCK
+        text = block.decode("latin-1")
+        for c in range(0, _BLOCK, _CARD):
+            card = text[c:c + _CARD]
+            if card[:8].strip() == "END":
+                return cards, off
+            cards.append(card)
 
 
 def write_annotated_fits(input_path, output_path, sn_xy=None, scale=None,
-                           north_pa=None, obj_name=None, ra_deg=None, dec_deg=None,
-                           notes=""):
-    # Copies the input FITS to output_path with annotation keywords injected
-    # into the header. The input file is never modified.
+                         north_pa=None, obj_name=None, ra_deg=None,
+                         dec_deg=None, notes=""):
+    # Writes an annotated **copy** of the FITS (module doc for the format).
+    # With nothing to annotate it copies the bytes verbatim. The input
+    # file is never modified.
     # @args: input_path - original stacked FITS, output_path - annotated copy,
-    #        sn_xy - (x, y) pixel of the SN, scale - arcsec/pixel,
-    #        north_pa - north arrow PA in degrees, obj_name - SN name,
-    #        ra_deg/dec_deg - SN position, notes - free-text night notes
+    #        sn_xy - (x, y) 0-based pixel of the SN (drives the ANNOTATE
+    #        card), scale - arcsec/pixel, north_pa - degrees east of north,
+    #        obj_name - SN name (ANNOTATE label), ra_deg/dec_deg - J2000,
+    #        notes - free-text night notes
     # @return: output Path
     input_path = Path(input_path)
     output_path = Path(output_path)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    # read the raw bytes
     raw = input_path.read_bytes()
-    # parse the first header to find END and the data offset
-    with open(input_path, "rb") as fh:
-        header = fits_io._read_header(fh)
-    if header is None:
-        raise fits_io.FitsError("Cannot read FITS header")
-    # build the annotation cards
-    cards = []
-    if sn_xy is not None:
-        cards.append(("NS_SN_X", sn_xy[0]))
-        cards.append(("NS_SN_Y", sn_xy[1]))
-    if scale is not None:
-        cards.append(("NS_SCALE", scale))
-    if north_pa is not None:
-        cards.append(("NS_NORTH", north_pa))
-    if obj_name:
-        cards.append(("NS_OBJ", obj_name))
-    if ra_deg is not None:
-        cards.append(("NS_RA", ra_deg))
-    if dec_deg is not None:
-        cards.append(("NS_DEC", dec_deg))
-    if notes:
-        cards.append(("NS_NOTES", notes))
-    if not cards:
-        # nothing to annotate: just copy
+
+    # Nothing to annotate: keep the existing contract, a verbatim copy.
+    if (sn_xy is None and scale is None and north_pa is None
+            and not str(obj_name or "").strip()
+            and ra_deg is None and dec_deg is None
+            and not str(notes or "").strip()):
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(raw)
         return output_path
-    # inject into the first 2880-byte block
-    first_block = raw[:2880]
-    new_block = _inject_cards(first_block, cards)
-    output_path.write_bytes(new_block + raw[2880:])
+
+    cards, data_start = _split_header(raw)
+    # Drop our own cards from a previous pass (or any the observer left)
+    # so a re-save of the annotated copy stays clean; keep all the rest.
+    kept = [c for c in cards if c[:8].strip() not in _OWNED]
+
+    tail = []
+    if sn_xy is not None:
+        x, y = sn_xy
+        tail.append(_format_card(
+            "ANNOTATE", f"{float(x):.2f},{float(y):.2f},{_AIJ_FLAGS}",
+            str(obj_name or "").strip()))
+    if ra_deg is not None:
+        tail.append(_format_card("NS_RA", _num(ra_deg)))
+    if dec_deg is not None:
+        tail.append(_format_card("NS_DEC", _num(dec_deg)))
+    if scale is not None:
+        tail.append(_format_card("NS_SCALE", _num(scale), "arcsec per pixel"))
+    if north_pa is not None:
+        tail.append(_format_card("NS_NORTH", _num(north_pa),
+                                 "deg east of north"))
+    notes_s = str(notes or "").strip()
+    if notes_s:
+        tail.append(_format_card("NS_NOTES", notes_s))
+
+    # Rebuild: kept cards + new tail + END, padded to a whole number of
+    # blocks; the data (and any extensions after it) are copied verbatim.
+    header = "".join(kept + tail + ["END".ljust(_CARD)])
+    try:
+        header_bytes = header.encode("latin-1")
+    except UnicodeEncodeError:
+        header_bytes = header.encode("latin-1", "replace")
+    header_bytes += b" " * ((_BLOCK - len(header_bytes) % _BLOCK) % _BLOCK)
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(header_bytes + raw[data_start:])
     logger.info("annotated FITS written to %s", output_path)
     return output_path

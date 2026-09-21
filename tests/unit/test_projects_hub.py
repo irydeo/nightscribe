@@ -1692,11 +1692,11 @@ def test_fu_annotated_fits_button_writes_copy(window, panel, tmp_path,
         # folder (the default destination the real dialog computes).
         saved = Signal(str)
 
-        def __init__(self, parent, fits_path, project, label, **kw):
+        def __init__(self, parent, images, project, label, **kw):
             super().__init__(parent)
             self._project = project
             self._label = label or "image"
-            seen.update({"fits_path": str(fits_path), "label": label, **kw})
+            seen.update({"images": list(images), "label": label, **kw})
 
         def exec(self):
             # @return: 1 (the AcceptRole of a confirmed dialog)
@@ -1710,8 +1710,13 @@ def test_fu_annotated_fits_button_writes_copy(window, panel, tmp_path,
     monkeypatch.setattr(dlg_mod, "SnAnnotateDialog", _StubDialog)
     window._fu_export_annotated(p["id"])
 
-    # the dialog got the right image and the project's coordinates
-    assert seen["fits_path"] == str(fits_in)
+    # the dialog got the registered stack (with its metadata) and the
+    # project's coordinates
+    assert len(seen["images"]) == 1
+    assert seen["images"][0]["fits_path"] == str(fits_in)
+    assert seen["images"][0]["date_obs"] == "2026-09-08"
+    assert seen["images"][0]["filter"] == "Clear"
+    assert seen["images"][0]["exptime_s"] == 60.0
     assert seen["label"] == "SN2026ann"
     assert seen["ra_deg"] == 10.0 and seen["dec_deg"] == 20.0
     # and confirming it registered the copy in the project files

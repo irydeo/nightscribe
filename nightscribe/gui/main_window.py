@@ -5251,53 +5251,40 @@ class MainWindow(QMainWindow):
                 self.tr("Animation failed: %1").replace("%1", str(err)), 8000)
 
     def _fu_export_annotated(self, pid):
-        # B10: open the preview dialog; a copy of the first registered
-        # stacked FITS is written with the SN marked (AIJ ANNOTATE card)
-        # once the observer confirms.
+        # B10: open the preview dialog; the observer picks which of the
+        # registered stacked FITS to annotate (several visits => several
+        # plates), checks the marker, overlays and stretch, and only then
+        # confirms: a copy is written with the SN marked (AIJ ANNOTATE
+        # card) at that moment.
         from ..core import followup as fu
         p = project.get(db, pid)
         if not p:
             return
-        fits_paths = []
+        images = []
         for s in fu.list_sessions(db, pid):
             for img in fu.list_images(db, s["id"]):
                 if img["fits_path"]:
-                    fits_paths.append(img["fits_path"])
-        if not fits_paths:
+                    images.append({
+                        "fits_path": img["fits_path"],
+                        "date_obs": img.get("date_obs") or s.get("obs_date"),
+                        "filter": img.get("filter"),
+                        "exptime_s": img.get("exptime_s"),
+                    })
+        if not images:
             self.statusBar().showMessage(
                 self.tr("No stacked images registered"), 5000)
             return
         ctx = p.get("context") or {}
         sn_ra = ctx.get("ra_deg")
         sn_dec = ctx.get("dec_deg")
-        sn_xy = None
-        scale = None
-        north_pa = None
-        if sn_ra is not None and sn_dec is not None:
-            try:
-                from ..core import fits_io, wcs as wcs_mod
-                header, _ = fits_io.read_fits(fits_paths[0])
-                wcs = wcs_mod.Wcs.from_header(header)
-                if wcs:
-                    sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec)
-                    scale = wcs.pixel_scale()
-                    # PA of north in the image: sky-north (xi, eta) =
-                    # (0, 1) projected on the image axes (right, up)
-                    import math
-                    r = math.hypot(wcs.cd[0][0], wcs.cd[1][0])
-                    u = math.hypot(wcs.cd[0][1], wcs.cd[1][1])
-                    if r > 1e-12 and u > 1e-12:
-                        north_pa = math.degrees(math.atan2(
-                            wcs.cd[1][0] / r, wcs.cd[1][1] / u))
-            except Exception:
-                pass
-        # Preview first: the observer checks the marker, the overlays and
-        # the stretch, and only then confirms name and destination.
+        # Preview first: the observer chooses the plate, checks the marker,
+        # the overlays and the stretch. The dialog resolves the WCS from
+        # the chosen frame's header (each visit may carry the SN on a
+        # different plate) and writes the copy only on confirm.
         from .sn_annotate_dialog import SnAnnotateDialog
         try:
             dlg = SnAnnotateDialog(
-                self, fits_paths[0], p, p["object_name"],
-                sn_xy=sn_xy, scale=scale, north_pa=north_pa,
+                self, images, p, p["object_name"],
                 ra_deg=sn_ra, dec_deg=sn_dec,
                 default_notes=self.tr("SN follow-up"))
         except Exception as err:

@@ -1,6 +1,6 @@
 # ADR-042: Secuencias fotométricas y cartas de comparación (fuentes VizieR, transformaciones Gaia/APASS, propuesta automática)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-21
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-21 · **rev. 2026-09-21** (tras la ejecución: las cuatro fases están implantadas; ver el mapa en `docs/WORKFLOWS.es.md`, track SF)
 
 **Ver / See**: [docs/DATA_SOURCES.es.md](../DATA_SOURCES.es.md) · [docs/DATA_SOURCES.md](../DATA_SOURCES.md)
 

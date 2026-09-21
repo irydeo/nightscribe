@@ -1135,3 +1135,45 @@ Motivación: la sección «Features» usaba masonry 2 columnas (`.features-mason
 - Serve-check: index 200 + 13 PNGs 200 + 0 404 en `127.0.0.1:8765`
 - Inyector idempotente (`ns_inject_screens.py` no re-toca capturas ni rompe balance)
 cadenas 0 unfinished.
+
+### 7vigbis. Track SF — Secuencias fotométricas y cartas de comparación (2026-09-21, ADR-042)
+
+Motivación: el seguimiento de variables/HADS/SN es fotometría diferencial y su
+pregunta previa es «¿con qué comparo?»; hasta aquí la app la dejaba al usuario
+(protocolo `comp_stars` como texto libre, EFF con `CNAME/CMAG/KNAME/KMAG=na`).
+La herramienta web **SecFot** (González Farfán & González Carballo 2026)
+resuelve justo eso; el track la integra nativa (sin webview, con caché y tema
+propios), centrada en el proyecto: el campo nace del objetivo, nadie teclea
+coordenadas.
+
+**Decisiones pactadas (2026-09-21)**:
+1. **Sin paso nuevo** en la máquina (plan/process/publish siguen solos): vive
+   en la pestaña **Seguimiento** como **botón primario** junto a «Añadir
+   visita» + línea de estado en palabras (ADR-038); el diálogo carga el peso.
+2. **Catálogo por defecto Gaia EDR3 (G)**, APASS DR9 (V) seleccionable; VSX
+   (`B/vsx/vsx` vía VizieR) cruza el campo y **descalifica** variables.
+3. **Propuesta automática** con criterios fotométricos (margen de brillo,
+   |Δ(B−V)| ≤ 0,4, aisladas 10″, repartidas) y frase «por qué esta estrella».
+4. **Objetivo = centro marcado + ficha propia** (retícula + nombre), jamás
+   numerado como comp.
+5. **Fondo DSS2 por defecto o el FITS del propio usuario** (WCS nativo o
+   resuelto con `astrometry.py` como blink; el original nunca se modifica; si
+   el objetivo cae fuera del encuadre, aviso y caída a DSS2).
+6. Una sola vía de guardado: el worker no escribe nada; el diálogo confirma.
+
+| Fase | Entregable | Estado |
+|---|---|---|
+| 1 | `core/sources/vizier.py` (asu-tsv Gaia/APASS/VSX, sonda de columnas + reintento `-out.all`, TTL 30 d), `core/phototrans.py` (Riello 2021, B−V con procedencia, clases bilingües), `core/compstars.py` (campo, cruce VSX 5″, `propose_comps` con razones, CSV), fixtures + 30 tests, ADR-042 + DATA_SOURCES | **Hecho (2026-09-21)** |
+| 2 | `core/field_math.py` (TAN ida/vuelta, ticks, escala, `label_layout`), `viz/finder_view.py` (carta matplotlib bilingüe, fondo DSS2 o FITS), CLI `nightscribe sequence`, 19 tests | **Hecho (2026-09-21)** |
+| 3 | Botón primario + línea de estado en Seguimiento, diálogo de opciones, `SequenceWorker`, secuencia al contexto del proyecto y `protocol.comp_stars`, EFF con comps reales, i18n ES/EN, 8 tests | **Hecho (2026-09-21)** |
+| 4 | `gui/widgets/finder_widget.py` (ChartView sin matplotlib: hover con bandas/VSX, clic añade/quita Comp/Check) + `gui/seqchart_dialog.py` (tabla editable, export CSV/PNG, guardar en el proyecto), 16 tests | **Hecho (2026-09-21)** |
+
+**Punto de entrada (para quien retome)**:
+- Ampliaciones baratas: ATLAS Refcat2 como tercer catálogo (entrada nueva en
+  `vizier.CATALOGS` + `describe_atlas` en `phototrans`/`compstars`, el PS1→JC
+  de Tonry 2012 ya está identificado en SecFot); el tipo `transit` podría
+  mostrar la carta desde su pestaña; tamaño del sensor en el perfil de cámara
+  daría el campo por defecto exacto del encuadre del usuario.
+- La carta PNG del CLI (`--fits`) y la escena del widget comparten matemática
+  (`core/field_math.py`): cualquier mejora visual va en ambos o en ninguno.
+- Suite unitaria verde: **1461**.

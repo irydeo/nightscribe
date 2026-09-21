@@ -38,7 +38,7 @@ _TT_PAD = 6            # px
 _TT_BG = QColor(0, 0, 0, 170)
 _TT_BORDER = QColor("#2a2f42")
 _TT_TEXT = QColor(palette.FG)
-_TT_FONT_PT = 10.5     # screen points (≈14 px), constant at any zoom
+_TT_FONT_PT = 13.0     # screen points (≈17 px), constant at any zoom
 
 # wheel zoom: one step = this many percent, capped by setZoomLimits(0.05, 8).
 _WHEEL = 1.25
@@ -81,8 +81,10 @@ class ChartView(QGraphicsView):
 
     # Zoom limits as class attributes so a subclass can retune them (the
     # finder chart needs pixel-level zoom, the orbit chart does not).
+    # WHEEL_STEP is one wheel notch's factor for the same reason.
     ZOOM_MIN = _ZOOM_MIN
     ZOOM_MAX = _ZOOM_MAX
+    WHEEL_STEP = _WHEEL
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -263,7 +265,8 @@ class ChartView(QGraphicsView):
         if self._embedded or event.angleDelta().y() == 0:
             event.ignore()
             return
-        self._zoom_by(_WHEEL if event.angleDelta().y() > 0 else 1.0 / _WHEEL)
+        step = self.WHEEL_STEP
+        self._zoom_by(step if event.angleDelta().y() > 0 else 1.0 / step)
         event.accept()
 
     def mousePressEvent(self, event):

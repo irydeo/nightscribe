@@ -180,6 +180,29 @@ def test_zoom_goes_to_pixel_level(qapp):
     chart.close()
 
 
+def test_wheel_zooms_with_the_bolder_finder_step(qapp):
+    # one wheel notch must move visibly: the finder's 1.5 step, not the
+    # base's shy 1.25
+    from PySide6.QtCore import QPoint
+    chart = _chart(qapp)
+    seen = []
+    chart._zoom_by = seen.append
+
+    class Wheel:
+        def angleDelta(self):
+            return QPoint(0, 120)
+
+        def accept(self):
+            pass
+
+        def ignore(self):
+            pass
+
+    chart.wheelEvent(Wheel())
+    assert seen == [1.5]
+    chart.close()
+
+
 def test_pick_radius_is_screen_constant(qapp):
     # ~11 screen px at any zoom: a fixed scene radius would cover a third
     # of the view at deep zoom; a fixed screen radius stays precise

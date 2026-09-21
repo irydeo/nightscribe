@@ -83,6 +83,8 @@ class FinderChart(ChartView):
     sequence_changed = Signal()
 
     ZOOM_MAX = 30.0   # pixel-level inspection of close pairs (base keeps 8)
+    WHEEL_STEP = 1.5  # a bolder notch: 30x must be reachable without endless
+                      # scrolling (the base's 1.25 felt like nothing moved)
 
     def __init__(self, parent=None, lang="es"):
         super().__init__(parent)

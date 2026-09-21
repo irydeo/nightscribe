@@ -127,13 +127,14 @@ def test_style_lists_read_as_containers(qapp):
 def test_style_pushbutton_has_a_visible_edge(qapp):
     # The borderless C_PANEL button on a C_BG dialog read as bare text (the
     # comparison chart's "Remove all" was impossible to find): buttons get
-    # the same subtle 1px edge as the rest of the interactive chrome.
+    # the same visible 1px edge as the checkbox indicator (C_LINE proved
+    # too subtle on a real monitor).
     from nightscribe.gui import theme
 
     theme.apply_theme(qapp)
     qss = qapp.styleSheet()
     assert "QPushButton" in qss
-    assert f"border: 1px solid {theme.C_LINE}" in qss, \
+    assert f"border: 1px solid {theme.C_EDGE}" in qss, \
         "buttons need a visible edge against the dialog background"
 
 

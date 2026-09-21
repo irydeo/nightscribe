@@ -180,6 +180,20 @@ through the SQLite HTTP cache (`core/db.py`) with the TTL listed below.
   `format=json`) on `pscomppars`: period, radius, mass, equilibrium temperature,
   system distance, host star. TTL: 7 d.
 
+### VizieR (CDS) — `vizier.py` — catalog photometry for sequences (ADR-042)
+
+- `GET https://vizier.cds.unistra.fr/viz-bin/asu-tsv?-source=<cat>&-c=<ra>+<dec>&
+  -c.r=<arcmin>...` — TSV cone search over the catalogs: **Gaia EDR3**
+  (`I/350/gaiaedr3`: G/BP/RP plus errors), **APASS DR9** (`II/336/apass9`: direct
+  B,V and g′r′i′) and **AAVSO VSX** (`B/vsx/vsx`: type, period, max/min) for the
+  field's variable cross-match. Feeds the photometric sequences and comparison
+  charts (the follow-up's "with what do I compare?" question).
+- Tolerant parsing (SecFot's pattern): an explicit column list is requested
+  first; when a probed column is missing the query is repeated with `-out.all`
+  and the richer answer wins, so a renamed column breaks nothing.
+- TTL: 30 d (reference photometry is quasi-static). Failure → `None`; the user
+  gets the honest notice and nothing else breaks.
+
 ## Sun and environment
 
 ### NOAA SWPC — `noaa.py`

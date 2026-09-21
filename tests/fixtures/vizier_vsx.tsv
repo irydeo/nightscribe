@@ -1,0 +1,5 @@
+# VizieR asu-tsv answer (synthetic test fixture, B/vsx/vsx shape)
+# Center 19h25m27.9s +42d47m03s, 18' field
+OID	Name	RAJ2000	DEJ2000	Type	l_max	max	u_max	n_max	f_min	min	u_min	n_min	Epoch	Period	Sp
+300001	V0001 Cyg	291.36650	42.78420	EA	(	12.9		V					15.6			2451234.5	2.3456789	G0V
+300002	V0002 Cyg	291.50000	42.75000	RRAB	(	13.4		V					14.2			2452345.6	0.56789012	A7V

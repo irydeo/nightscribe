@@ -104,3 +104,33 @@ def test_export_report_dispatch(db, tmp_path):
     o2 = photometry_export.export_report(pts, tmp_path / "a.txt", fmt="eff",
                                          name="WeSb 1", obscode="ZABC")
     assert o1.exists() and o2.exists()
+
+
+def test_eff_fills_comp_and_check_from_the_sequence(db, tmp_path):
+    # ADR-042: a saved sequence lands in CNAME/CMAG/KNAME/KMAG
+    pid = _pid_with_points(db)
+    pts = photometry_export.collect_points(db, pid)
+    out = tmp_path / "report.txt"
+    photometry_export.export_eff(
+        pts, out, "WeSb 1", ra_deg=15.2254, dec_deg=55.0667,
+        obscode="ZABC", comp={"name": "Comp1", "mag": 12.34},
+        check={"name": "Check", "mag": 11.98})
+    row = out.read_text().splitlines()[7].split(",")
+    assert row[7] == "Comp1" and row[8] == "12.340"
+    assert row[9] == "Check" and row[10] == "11.980"
+
+
+def test_eff_without_sequence_keeps_na(db, tmp_path):
+    pid = _pid_with_points(db)
+    pts = photometry_export.collect_points(db, pid)
+    out = tmp_path / "report.txt"
+    photometry_export.export_eff(pts, out, "WeSb 1", ra_deg=15.2254,
+                                 dec_deg=55.0667)
+    row = out.read_text().splitlines()[7].split(",")
+    assert row[7:11] == ["na", "na", "na", "na"]
+    # a comp without magnitude writes "na" in the mag cell, never "None"
+    photometry_export.export_eff(
+        pts, out, "WeSb 1", ra_deg=15.2254, dec_deg=55.0667,
+        comp={"name": "Comp1", "mag": None})
+    row = out.read_text().splitlines()[7].split(",")
+    assert row[7] == "Comp1" and row[8] == "na"

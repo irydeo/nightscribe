@@ -1,0 +1,5 @@
+# Truncated answer: the asked BP/RP columns are missing (renamed upstream),
+# only Gmag survives. Triggers the -out.all retry of vizier.cone_search.
+Source	RAJ2000	DEJ2000	Gmag	e_Gmag
+2100000000000001	291.36600	42.78400	12.340	0.003
+2100000000000004	291.40000	42.74000	11.050	0.002

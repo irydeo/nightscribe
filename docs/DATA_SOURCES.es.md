@@ -183,6 +183,20 @@ por la caché HTTP de SQLite (`core/db.py`) con el TTL indicado.
   `format=json`) sobre `pscomppars`: período, radio, masa, temperatura de equilibrio,
   distancia del sistema, estrella anfitriona. TTL: 7 d.
 
+### VizieR (CDS) — `vizier.py` — fotometría de catálogo para secuencias (ADR-042)
+
+- `GET https://vizier.cds.unistra.fr/viz-bin/asu-tsv?-source=<cat>&-c=<ra>+<dec>&
+  -c.r=<arcmin>...` — cone search TSV sobre los catálogos: **Gaia EDR3**
+  (`I/350/gaiaedr3`: G/BP/RP + errores), **APASS DR9** (`II/336/apass9`: B,V y
+  g′r′i′ directos) y **AAVSO VSX** (`B/vsx/vsx`: tipo, periodo, máx/mín) para el
+  cruce de variables del campo. Alimenta las secuencias fotométricas y las cartas
+  de comparación (la pregunta «¿con qué comparo?» del seguimiento).
+- Parseo tolerante (patrón de SecFot): se pide una lista explícita de columnas; si
+  falta alguna de las sondeadas, la consulta se repite con `-out.all` y gana la
+  respuesta más rica, de modo que un renombre de columna no rompe nada.
+- TTL: 30 d (la fotometría de referencia es cuasi-estática). Fallo → `None`; el
+  usuario ve el aviso honesto y nada más se rompe.
+
 ## Sol y entorno
 
 ### NOAA SWPC — `noaa.py`

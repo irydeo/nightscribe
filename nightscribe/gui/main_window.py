@@ -5143,7 +5143,8 @@ class MainWindow(QMainWindow):
             ana_row.addWidget(btn_evo)
             btn_annot = QPushButton(self.tr("Export annotated FITS"))
             btn_annot.setToolTip(self.tr(
-                "Copy of the stacked FITS with annotation keywords (NS_)"))
+                "Preview the stacked FITS, place the SN marker and save "
+                "an annotated copy (AIJ readable)"))
             btn_annot.clicked.connect(
                 lambda: self._fu_export_annotated(pid))
             ana_row.addWidget(btn_annot)
@@ -5265,51 +5266,61 @@ class MainWindow(QMainWindow):
                 self.tr("Animation failed: %1").replace("%1", str(err)), 8000)
 
     def _fu_export_annotated(self, pid):
-        # B10: export a copy of the first registered stacked FITS with the
-        # annotation keywords injected (NS_SN_X, NS_SCALE, etc.).
+        # B10: open the preview dialog; the observer picks which of the
+        # registered stacked FITS to annotate (several visits => several
+        # plates), checks the marker, overlays and stretch, and only then
+        # confirms: a copy is written with the SN marked (AIJ ANNOTATE
+        # card) at that moment.
         from ..core import followup as fu
-        from ..core import fits_annotate
         p = project.get(db, pid)
         if not p:
             return
-        fits_paths = []
+        images = []
         for s in fu.list_sessions(db, pid):
             for img in fu.list_images(db, s["id"]):
                 if img["fits_path"]:
-                    fits_paths.append(img["fits_path"])
-        if not fits_paths:
+                    images.append({
+                        "fits_path": img["fits_path"],
+                        "date_obs": img.get("date_obs") or s.get("obs_date"),
+                        "filter": img.get("filter"),
+                        "exptime_s": img.get("exptime_s"),
+                    })
+        if not images:
             self.statusBar().showMessage(
                 self.tr("No stacked images registered"), 5000)
             return
         ctx = p.get("context") or {}
         sn_ra = ctx.get("ra_deg")
         sn_dec = ctx.get("dec_deg")
-        sn_xy = None
-        if sn_ra is not None and sn_dec is not None:
-            try:
-                from ..core import fits_io, wcs as wcs_mod
-                header, _ = fits_io.read_fits(fits_paths[0])
-                wcs = wcs_mod.Wcs.from_header(header)
-                if wcs:
-                    sn_xy = wcs.sky_to_pixel(sn_ra, sn_dec)
-            except Exception:
-                pass
-        out = project.storage_dir(p) / \
-            f"{p['object_name']}_annotated.fits"
+        # Preview first: the observer chooses the plate, checks the marker,
+        # the overlays and the stretch. The dialog resolves the WCS from
+        # the chosen frame's header (each visit may carry the SN on a
+        # different plate) and writes the copy only on confirm.
+        from .sn_annotate_dialog import SnAnnotateDialog
         try:
-            fits_annotate.write_annotated_fits(
-                fits_paths[0], str(out), sn_xy=sn_xy,
-                obj_name=p["object_name"], ra_deg=sn_ra, dec_deg=sn_dec,
-                notes=self.tr("SN follow-up"))
-            project.add_file(db, pid, str(out), "fits")
-            self._populate_project_files(pid)
-            self.statusBar().showMessage(
-                self.tr("Annotated FITS written to %1").replace("%1", str(out)),
-                8000)
+            dlg = SnAnnotateDialog(
+                self, images, p, p["object_name"],
+                ra_deg=sn_ra, dec_deg=sn_dec,
+                default_notes=self.tr("SN follow-up"))
         except Exception as err:
             self.statusBar().showMessage(
-                self.tr("Annotated FITS failed: %1").replace("%1", str(err)),
-                8000)
+                self.tr("Could not open the FITS for annotation: %1")
+                .replace("%1", str(err)), 8000)
+            return
+        dlg.saved.connect(lambda path: self._fu_annotated_saved(pid, path))
+        dlg.exec()
+
+    def _fu_annotated_saved(self, pid, path):
+        # @args: pid - project id, path - annotated copy just written
+        try:
+            project.add_file(db, pid, path, "fits")
+            self._populate_project_files(pid)
+        except Exception as err:
+            logger.warning("annotated FITS saved but not registered: %s",
+                           err)
+        self.statusBar().showMessage(
+            self.tr("Annotated FITS written to %1")
+            .replace("%1", str(path)), 8000)
 
     def _fu_populate_sessions(self, lst, pid):
         # @args: lst - QListWidget, pid - project id

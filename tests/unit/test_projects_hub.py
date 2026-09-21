@@ -1664,34 +1664,66 @@ def test_fu_animation_button_writes_files(window, panel):
     assert "evo_mp4" in kinds
 
 
-def test_fu_annotated_fits_button_writes_copy(window, panel):
-    # B10 fix: the annotated FITS button writes a copy with NS_ keywords.
+def test_fu_annotated_fits_button_writes_copy(window, panel, tmp_path,
+                                              monkeypatch):
+    # B10 preview flow: the button opens the annotation dialog over the
+    # first stacked FITS; confirming it registers an annotated copy in
+    # the project folder.
+    import numpy as np
+    from PySide6.QtCore import QObject, Signal
     from nightscribe.core import project, followup as fu
     import nightscribe.core.db as dbmod
+    from nightscribe.gui import sn_annotate_dialog as dlg_mod
+
     p = _create_and_select(window, "sn", "SN2026ann", {"kind": "sn",
-                                                          "ra_deg": 10.0,
-                                                          "dec_deg": 20.0})
+                                                       "ra_deg": 10.0,
+                                                       "dec_deg": 20.0})
     sid = fu.create_session(dbmod.db, p["id"], "2026-09-08")
-    fu.add_image(dbmod.db, sid, "Clear", "/tmp/fu_fake.fits",
+    fits_in = tmp_path / "stacked.fits"
+    _write_simple_fits(fits_in, np.arange(64, dtype=np.float32).reshape(8, 8))
+    fu.add_image(dbmod.db, sid, "Clear", str(fits_in),
                  date_obs="2026-09-08", exptime_s=60.0)
-    # mock the annotated writer: writes a fake file without reading the FITS
-    from nightscribe.core import fits_annotate
-    orig = fits_annotate.write_annotated_fits
-    import pathlib
-    written = []
-    def fake_write(inp, out, **kw):
-        pathlib.Path(out).write_bytes(b"ANNOTATED fake")
-        written.append(out)
-        return out
-    fits_annotate.write_annotated_fits = fake_write
-    try:
-        window._fu_export_annotated(p["id"])
-    finally:
-        fits_annotate.write_annotated_fits = orig
+
+    seen = {}
+
+    class _StubDialog(QObject):
+        # SnAnnotateDialog with the same contract the hub uses: a saved
+        # signal and an exec() that confirms the save to the project
+        # folder (the default destination the real dialog computes).
+        saved = Signal(str)
+
+        def __init__(self, parent, images, project, label, **kw):
+            super().__init__(parent)
+            self._project = project
+            self._label = label or "image"
+            seen.update({"images": list(images), "label": label, **kw})
+
+        def exec(self):
+            # @return: 1 (the AcceptRole of a confirmed dialog)
+            out = project.storage_dir(self._project) / \
+                f"{self._label}_annotated.fits"
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(b"ANNOTATED fake")
+            self.saved.emit(str(out))
+            return 1
+
+    monkeypatch.setattr(dlg_mod, "SnAnnotateDialog", _StubDialog)
+    window._fu_export_annotated(p["id"])
+
+    # the dialog got the registered stack (with its metadata) and the
+    # project's coordinates
+    assert len(seen["images"]) == 1
+    assert seen["images"][0]["fits_path"] == str(fits_in)
+    assert seen["images"][0]["date_obs"] == "2026-09-08"
+    assert seen["images"][0]["filter"] == "Clear"
+    assert seen["images"][0]["exptime_s"] == 60.0
+    assert seen["label"] == "SN2026ann"
+    assert seen["ra_deg"] == 10.0 and seen["dec_deg"] == 20.0
+    # and confirming it registered the copy in the project files
     files = project.list_files(dbmod.db, p["id"])
-    kinds = [f["kind"] for f in files]
-    assert "fits" in kinds
-    assert any("annotated" in f["path"] for f in files)
+    assert any(f["kind"] == "fits"
+               and f["path"].endswith("SN2026ann_annotated.fits")
+               for f in files)
 
 
 def _write_simple_fits(path, data):

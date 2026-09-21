@@ -23,7 +23,10 @@ Thanks for your interest! These rules keep the project maintainable by humans.
 # note: list sources explicitly — scanning the directory silently skips .py files
 # (and the chart widgets live in gui/widgets/ — leaving them out makes
 # lupdate mark their strings "vanished" and the i18n tests fail)
+# core/kinds.py and core/db.py carry runtime strings (NSKinds, NSMigrations),
+# not widget tr() calls, so they must be named here too
 pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
+    nightscribe/core/kinds.py nightscribe/core/db.py \
     nightscribe/gui/ui/*.ui \
     -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts

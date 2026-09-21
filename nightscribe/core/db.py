@@ -285,25 +285,25 @@ def _migrate(conn):
 _MIG = "NSMigrations"
 
 MIGRATION_NOTES = {
-    1: QT_TRANSLATE_NOOP(_MIG,
+    1: QT_TRANSLATE_NOOP("NSMigrations",
         "Projects introduced: every target you choose gets its own "
         "folder and a plan, capture, process, publish flow."),
-    2: QT_TRANSLATE_NOOP(_MIG,
+    2: QT_TRANSLATE_NOOP("NSMigrations",
         "The \"analyse\" step left the project flow; the projects stopped "
         "on it continue at the publish step."),
-    3: QT_TRANSLATE_NOOP(_MIG,
+    3: QT_TRANSLATE_NOOP("NSMigrations",
         "The \"capture\" step was merged into \"plan\"; whatever work was "
         "saved on it is now part of the plan."),
-    4: QT_TRANSLATE_NOOP(_MIG,
+    4: QT_TRANSLATE_NOOP("NSMigrations",
         "Projects gained their final state: close date, outcome, tags "
         "and favourites."),
-    5: QT_TRANSLATE_NOOP(_MIG,
+    5: QT_TRANSLATE_NOOP("NSMigrations",
         "Supernova follow-up: the observing sessions, the images of each "
         "night and your photometry points, all tied to the project."),
-    6: QT_TRANSLATE_NOOP(_MIG,
+    6: QT_TRANSLATE_NOOP("NSMigrations",
         "Every project keeps its own container folder, in the place it "
         "already was."),
-    7: QT_TRANSLATE_NOOP(_MIG,
+    7: QT_TRANSLATE_NOOP("NSMigrations",
         "Observing campaigns: a first-class list your projects can hang "
         "from, with cadence, filters and shared data links."),
 }

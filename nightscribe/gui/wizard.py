@@ -19,10 +19,11 @@
 #
 # i18n: the runtime strings below are translated as the "NSWizard" context.
 # lupdate collects them from the QT_TRANSLATE_NOOP marks (the same pattern
-# as core/kinds.py and gui/overview.py). Do not use wizard.tr(): lupdate
-# attributes widget.tr() to the variable name, which decouples the strings
-# from the "NSUpdateWizard" context Qt looks up at runtime, and they
-# silently go untranslated.
+# as core/kinds.py and gui/overview.py). Two quirks to keep: the context in
+# the marks is a string literal (this lupdate silently skips a variable
+# context), and wizard.tr() is never used (lupdate attributes widget.tr()
+# to the variable name, which decouples the strings from the "NSUpdateWizard"
+# context Qt looks up at runtime, and they silently go untranslated).
 
 import logging
 from pathlib import Path
@@ -47,46 +48,46 @@ _K = "NSWizard"
 
 # Strings shown while the wizard is open. lupdate reads them from these
 # marks; tr() translates them and fills the {placeholders}.
-S_LOOKING = QT_TRANSLATE_NOOP(_K,
+S_LOOKING = QT_TRANSLATE_NOOP("NSWizard",
     "Finding your observatory, this may take a few seconds...")
-S_FOUND = QT_TRANSLATE_NOOP(_K,
+S_FOUND = QT_TRANSLATE_NOOP("NSWizard",
     "Location found: {name} ({lat}, {lon}). Adjust the numbers if they "
     "are off.")
-S_OFFLINE = QT_TRANSLATE_NOOP(_K,
+S_OFFLINE = QT_TRANSLATE_NOOP("NSWizard",
     "The location service did not answer (offline?). No problem: type "
     "the coordinates by hand, or use your MPC code.")
-S_RESOLVED = QT_TRANSLATE_NOOP(_K,
+S_RESOLVED = QT_TRANSLATE_NOOP("NSWizard",
     "MPC code {code} resolved to {name} ({lat}, {lon}).")
-S_CODE_BAD = QT_TRANSLATE_NOOP(_K,
+S_CODE_BAD = QT_TRANSLATE_NOOP("NSWizard",
     "MPC codes are three characters, for example Z41.")
-S_CODE_MISS = QT_TRANSLATE_NOOP(_K,
+S_CODE_MISS = QT_TRANSLATE_NOOP("NSWizard",
     "Code {code} is not in the MPC list. Check it at "
     "minorplanetcenter.net, or type the coordinates by hand.")
-S_NEW = QT_TRANSLATE_NOOP(_K, "new")
-S_SOURCE = QT_TRANSLATE_NOOP(_K, "Source: {source}")
+S_NEW = QT_TRANSLATE_NOOP("NSWizard", "new")
+S_SOURCE = QT_TRANSLATE_NOOP("NSWizard", "Source: {source}")
 
-S_VERSION = QT_TRANSLATE_NOOP(_K,
+S_VERSION = QT_TRANSLATE_NOOP("NSWizard",
     "Running NightScribe {version}.")
-S_BACKUP_OK = QT_TRANSLATE_NOOP(_K,
+S_BACKUP_OK = QT_TRANSLATE_NOOP("NSWizard",
     "A backup of your database was written and verified: {file} ({size}).")
-S_BACKUP_BAD = QT_TRANSLATE_NOOP(_K,
+S_BACKUP_BAD = QT_TRANSLATE_NOOP("NSWizard",
     "The backup was written but could not be read back cleanly: {file}. "
     "Your data is intact, but keep a manual copy just in case:")
-S_NO_DB = QT_TRANSLATE_NOOP(_K,
+S_NO_DB = QT_TRANSLATE_NOOP("NSWizard",
     "No previous database found. NightScribe will create a new one at "
     "{path} on first use.")
-S_MIG_OK = QT_TRANSLATE_NOOP(_K,
+S_MIG_OK = QT_TRANSLATE_NOOP("NSWizard",
     "Your database is already in the latest format, so there is nothing "
     "to migrate.")
-S_MIG_NEWER = QT_TRANSLATE_NOOP(_K,
+S_MIG_NEWER = QT_TRANSLATE_NOOP("NSWizard",
     "Your database is in format {old}, which is newer than the one this "
     "version writes ({new}). Nothing was changed: to keep using it, go "
     "back to the newer NightScribe.")
-S_MIG_RUN = QT_TRANSLATE_NOOP(_K,
+S_MIG_RUN = QT_TRANSLATE_NOOP("NSWizard",
     "This version moves your database from format {old} to format {new}. "
     "Everything you have saved (observations, projects, campaigns, cached "
     "data) is kept. The steps this run applied:")
-S_MIG_STEP = QT_TRANSLATE_NOOP(_K, "v{v}: {note}")
+S_MIG_STEP = QT_TRANSLATE_NOOP("NSWizard", "v{v}: {note}")
 
 
 def tr(text, **values):

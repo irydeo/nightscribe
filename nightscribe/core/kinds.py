@@ -44,106 +44,106 @@ _K = "NSKinds"
 KINDS = [
     {
         "id": "neo",
-        "label": QT_TRANSLATE_NOOP(_K, "Near-Earth objects (NEOs)"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Near-Earth objects (NEOs)"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "Asteroids and comets on paths that pass close to Earth: "
             "the confirmed ones with score, priority, apparent rate, "
             "sky uncertainty and flags (NEOCP, impact risk, radar, "
             "NHATS), plus the unconfirmed candidates with preliminary "
-            "orbits computed from the MPC astrometry.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
+            "orbits computed from the MPC astrometry." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
             "NEOfixer's site-specific list + NEOCP (MPC); positions "
-            "from NASA Horizons")),
+            "from NASA Horizons" ),
         "since": "0.0.1",
     },
     {
         "id": "sn",
-        "label": QT_TRANSLATE_NOOP(_K, "Supernovae"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Supernovae"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "The newest discoveries, with the complete follow-up: a "
             "confirmation blink of your FITS against a PanSTARRS "
             "reference, the light curve drawn against the typical "
             "templates of each type, an evolution animation, exports "
-            "and cadence reminders to know when to go back.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
+            "and cadence reminders to know when to go back." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
             "Rochester Astronomy discovery list + a PanSTARRS (MAST) "
-            "reference for the blink")),
+            "reference for the blink" ),
         "since": "0.0.1",
     },
     {
         "id": "comet",
-        "label": QT_TRANSLATE_NOOP(_K, "Comets"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Comets"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "Comets visible tonight with their live observed "
             "magnitude, perihelion date and activity flags, so you "
-            "know how each one is doing now, not last month.")),
-        "source": QT_TRANSLATE_NOOP(_K, "COBS (MPC) live magnitudes + NASA Horizons"),
+            "know how each one is doing now, not last month." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds", "COBS (MPC) live magnitudes + NASA Horizons"),
         "since": "0.0.1",
     },
     {
         "id": "pccp",
-        "label": QT_TRANSLATE_NOOP(_K, "Comet candidates (PCCP)"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Comet candidates (PCCP)"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "Objects reported as asteroids that might actually be "
             "comets, with their comet score: the MPC's Possible "
-            "Comet Confirmation Page. Getting there first matters.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
-            "MPC PCCP (minorplanetcenter.net) + NASA Horizons")),
+            "Comet Confirmation Page. Getting there first matters." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
+            "MPC PCCP (minorplanetcenter.net) + NASA Horizons" ),
         "since": "0.0.1",
     },
     {
         "id": "transit",
-        "label": QT_TRANSLATE_NOOP(_K, "Exoplanet transits"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Exoplanet transits"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "Exoplanets crossing their star tonight from your site, "
             "with the transit time, how much the observed timing is "
             "drifting from the prediction (O-C), whether the whole "
             "transit fits in your night, the maximum trail-free "
-            "exposure and a pre-filled export for EXOTIC.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
+            "exposure and a pre-filled export for EXOTIC." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
             "ExoClock (ESA Ariel ephemeris programme) + NASA "
-            "Exoplanet Archive; times from NASA Horizons (HJD)")),
+            "Exoplanet Archive; times from NASA Horizons (HJD)" ),
         "since": "0.0.1",
     },
     {
         "id": "alert",
-        "label": QT_TRANSLATE_NOOP(_K, "Close approaches and alerts"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Close approaches and alerts"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "Upcoming close approaches from ESA NEOCC (how the "
             "visitor gets by, roughly how big, how bright at the "
             "closest pass) to catch the week's fast mover, plus the "
             "AAVSO editorial channel: community alerts and the "
-            "campaigns currently running.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
+            "campaigns currently running." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
             "ESA NEOCC + the AAVSO editorial channel "
-            "(alerts and campaigns)")),
+            "(alerts and campaigns)" ),
         "since": "0.0.2",
     },
     {
         "id": "hads",
-        "label": QT_TRANSLATE_NOOP(_K, "HADS stars"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "HADS stars"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "High-amplitude delta Scuti variables: they pulse so "
             "fast and so strongly that you can watch them vary in a "
             "single session; your run folds by phase into the "
             "classic saw-tooth. Priorities are colour coded: period "
-            "changes, never-observed stars, coverage gaps.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
-            "The living HADS catalogue maintained by P. Wils")),
+            "changes, never-observed stars, coverage gaps." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
+            "The living HADS catalogue maintained by P. Wils" ),
         "since": "0.0.3",
     },
     {
         "id": "variable",
-        "label": QT_TRANSLATE_NOOP(_K, "Variable stars and duties"),
-        "blurb": QT_TRANSLATE_NOOP(_K, (
+        "label": QT_TRANSLATE_NOOP("NSKinds", "Variable stars and duties"),
+        "blurb": QT_TRANSLATE_NOOP("NSKinds",
             "Your campaign members that are due by cadence, stars "
             "with an event in progress, stars nearing a predicted "
             "extremum, and your standing vigils (the T CrB eruption, "
             "the R CrB fade) checked day by day against the "
-            "observatories and the community.")),
-        "source": QT_TRANSLATE_NOOP(_K, (
+            "observatories and the community." ),
+        "source": QT_TRANSLATE_NOOP("NSKinds",
             "AAVSO VSX + AAVSO community photometry + a ZTF check "
-            "for the vigils")),
+            "for the vigils" ),
         "since": "0.0.4",
     },
 ]

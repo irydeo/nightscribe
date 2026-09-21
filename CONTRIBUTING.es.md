@@ -23,7 +23,10 @@
 # nota: lista las fuentes explícitamente — escanear el directorio omitiría los .py
 # (y las cartas vectoriales viven en gui/widgets/ — si las dejas fuera,
 # lupdate marca sus cadenas "vanished" y los tests de i18n fallan)
+# core/kinds.py y core/db.py llevan cadenas de runtime (NSKinds, NSMigrations),
+# no tr() de widgets, así que también hay que listarlas aquí
 pyside6-lupdate nightscribe/gui/*.py nightscribe/gui/widgets/*.py \
+    nightscribe/core/kinds.py nightscribe/core/db.py \
     nightscribe/gui/ui/*.ui \
     -ts nightscribe/gui/i18n/nightscribe_es.ts \
     nightscribe/gui/i18n/nightscribe_en.ts

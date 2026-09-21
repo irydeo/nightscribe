@@ -210,12 +210,140 @@ def cmd_blink(args):
         for k, p in written.items():
             print(f"[{k}] -> {p}")
         db.mark_posted(pair["name"])
-
-
 def cmd_gui(args):
     # Desktop application.
     from .gui import app
     return app.run()
+
+
+def _resolve_target(name):
+    # @args: name - object name (variable, star)
+    # @return: (ra_deg, dec_deg, vsx_dict_or_None) or None when unknown
+    from .core.sources import simbad, vsx
+    from .core import coords
+    v = vsx.lookup(name)
+    if v and v.get("ra_deg") is not None:
+        return v["ra_deg"], v["dec_deg"], v
+    s = simbad.query_id(name)
+    if s:
+        try:
+            return (coords.ra_hms_to_deg(s["ra"]),
+                    coords.dec_dms_to_deg(s["dec"]), None)
+        except (ValueError, TypeError):
+            pass
+    return None
+
+
+def _fits_background(path, progress):
+    # The user's own FITS as chart background: stretched luminance plus its
+    # WCS, blind-solved with Astrometry.net when the header lacks one (the
+    # blink flow, ADR-018; the original file is never modified).
+    # @args: path - FITS path, progress - callable(str) for stage messages
+    # @return: (numpy array 0..1, Wcs) or (None, None) with the reason
+    #          logged
+    from .core import blink, fits_io
+    from .core.sources import astrometry
+    from .core.wcs import Wcs
+    from .viz import blink_view
+    try:
+        header, data = fits_io.read_fits(path)
+    except fits_io.FitsError as err:
+        logger.warning("cannot read the FITS: %s", err)
+        return None, None
+    w = Wcs.from_header(header)
+    if w is None:
+        progress("Sin WCS: resolviendo con Astrometry.net / "
+                 "no WCS: solving with Astrometry.net")
+        cards = astrometry.solve(Path(path))
+        if cards:
+            w = Wcs.from_header(blink.merge_solved_wcs(header, cards))
+    if w is None:
+        logger.warning("no WCS available for %s", path)
+        return None, None
+    stretched = blink_view.apply_stretch(data, *blink_view.auto_limits(data))
+    return stretched, w
+
+
+def cmd_sequence(args):
+    # Photometric sequence + comparison chart around a target (ADR-042).
+    from .core import compstars
+    from .core.sources import cutouts
+    from .viz import finder_view
+    lang = cfg.ui_language()
+    if args.ra is not None and args.dec is not None:
+        ra, dec, v = args.ra, args.dec, None
+        name = args.objeto or f"J{ra:.4f}{dec:+.4f}"
+    else:
+        if not args.objeto:
+            print("ES: falta el objetivo (nombre o --ra/--dec)\n"
+                  "EN: missing target (name or --ra/--dec)")
+            return 1
+        resolved = _resolve_target(args.objeto)
+        if not resolved:
+            print(f"ES: no se pudo resolver «{args.objeto}» (VSX/SIMBAD)\n"
+                  f"EN: could not resolve '{args.objeto}' (VSX/SIMBAD)")
+            return 1
+        ra, dec, v = resolved
+        name = (v or {}).get("name") or args.objeto
+    fov = max(3.0, min(60.0, args.fov))
+    field = compstars.load_field(args.catalog, ra, dec, fov)
+    if field is None:
+        print("ES: VizieR no respondió; inténtalo de nuevo en unos minutos\n"
+              "EN: VizieR did not answer; try again in a few minutes")
+        return 1
+    if field["vsx_warning"]:
+        print("⚠ ES: sin consulta VSX (las variables del campo no se marcan)\n"
+              "  EN: no VSX query (field variables are not flagged)")
+    # background: the user's FITS when given (its WCS rules), else DSS2
+    image, wcs, img_label = None, None, "DSS2 color (CDS)"
+    if args.fits:
+        image, wcs = _fits_background(args.fits, print)
+        if wcs is not None:
+            x, y = wcs.sky_to_pixel(ra, dec)
+            if not (0 <= x < wcs.naxis1 and 0 <= y < wcs.naxis2):
+                print("⚠ ES: el objetivo cae fuera de tu imagen; uso DSS2\n"
+                      "  EN: the target falls outside your image; using DSS2")
+                image, wcs = None, None
+            else:
+                img_label = Path(args.fits).name
+        if wcs is None:
+            print("⚠ ES: sin astrometría en tu FITS; uso DSS2\n"
+                  "  EN: no astrometry for your FITS; using DSS2")
+    if wcs is None and not args.sin_imagen:
+        pixscale = fov * 60.0 / 1000.0
+        image = cutouts.reference_cutout(ra, dec, size=1000,
+                                         pixscale=pixscale)
+    # the proposal needs a target magnitude: VSX max, --mag, or the
+    # field median as an honest middle
+    target_mag = args.mag
+    if target_mag is None and v and v.get("max") is not None:
+        target_mag = v["max"]
+    if target_mag is None and field["stars"]:
+        mags = sorted(s["mag"] for s in field["stars"])
+        target_mag = mags[len(mags) // 2]
+    seq = compstars.propose_comps(field["stars"], target_mag, n=args.comps)
+    entries = seq["comps"] + ([seq["check"]] if seq["check"] else [])
+    outdir = Path(args.salida) if args.salida else paths.data_dir() / "sequences"
+    outdir.mkdir(parents=True, exist_ok=True)
+    import re
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", name)
+    csv_path = compstars.export_sequence_csv(
+        entries, outdir / f"{safe}_secuencia.csv", target_name=name,
+        catalog_label=field["catalog_name"])
+    png_path = outdir / f"{safe}_carta.png"
+    target = {"name": name, "ra": ra, "dec": dec}
+    finder_view.draw_finder(field, target=target, entries=entries,
+                            image=image, wcs=wcs, out=png_path, lang=lang,
+                            watermark=f"NightScribe · {img_label}")
+    print(f"{name} @ ({ra:.5f}, {dec:+.5f}) — {field['catalog_name']}, "
+          f"{len(entries)} estrellas / stars (objetivo mag "
+          f"{target_mag:.2f} / target)")
+    for e in entries:
+        star = e["star"]
+        print(f"  {e['name']:<7s} {star['band']} {star['mag']:.2f}  "
+              f"ES: {e['why']['es']}  /  EN: {e['why']['en']}")
+    print(f"CSV -> {csv_path}")
+    print(f"PNG -> {png_path}")
 
 
 def cmd_project(args):
@@ -335,6 +463,28 @@ def main(argv=None):
 
     p = sub.add_parser("history", help="historial de observaciones")
     p.set_defaults(func=cmd_history)
+
+    p = sub.add_parser("sequence",
+                       help="secuencia fotométrica + carta de comparación")
+    p.add_argument("objeto", nargs="?", default=None,
+                   help="nombre del objetivo (VSX/SIMBAD)")
+    p.add_argument("--ra", type=float, help="RA del centro (grados)")
+    p.add_argument("--dec", type=float, help="Dec del centro (grados)")
+    p.add_argument("--catalog", choices=["gaia", "apass"], default="gaia",
+                   help="catálogo de magnitudes (por defecto Gaia EDR3)")
+    p.add_argument("--fov", type=float, default=18.0,
+                   help="campo de visión en minutos de arco (3-60)")
+    p.add_argument("--comps", type=int, default=8,
+                   help="número de estrellas de comparación propuestas")
+    p.add_argument("--mag", type=float,
+                   help="magnitud del objetivo (por defecto: máx. VSX o "
+                        "mediana del campo)")
+    p.add_argument("--fits", help="tu FITS como fondo (WCS propio o "
+                                  "resuelto con Astrometry.net)")
+    p.add_argument("--sin-imagen", action="store_true",
+                   help="sin imagen de fondo (solo anotaciones)")
+    p.add_argument("--salida", help="directorio de salida")
+    p.set_defaults(func=cmd_sequence)
 
     p = sub.add_parser("gui", help="aplicación de escritorio")
     p.set_defaults(func=cmd_gui)

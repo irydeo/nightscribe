@@ -285,6 +285,8 @@ def load_field(catalog, ra_deg, dec_deg, fov_arcmin, max_rows=12000,
                                     fov_arcmin / 60.0)
         match_vsx(stars, variables)
     return {"stars": stars, "variables": variables, "catalog": catalog,
+            "catalog_name": vizier.CATALOGS[catalog]["name"],
+            "band": vizier.CATALOGS[catalog]["band"],
             "center": center, "fov_arcmin": float(fov_arcmin),
             "vsx_warning": vsx_res is None}
 

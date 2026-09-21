@@ -89,15 +89,18 @@ def _raw_ephemeris(command, center, start, stop, step, force=False):
     return parse_ephemeris(text)
 
 
-def ephemeris(command, center="Z41", start=None, stop=None, step="1 d",
+def ephemeris(command, center="", start=None, stop=None, step="1 d",
               force=False):
     # Observer ephemeris for a small body. Periodic comets need the CAP
     # clause (current apparition), so we retry with it when the plain
     # designation finds nothing.
-    # @args: command - Horizons target (designation), center - MPC code or
-    #        '500@399', start/stop - 'YYYY-MM-DD' strings, step - e.g. '1 d',
-    #        force - True bypasses the cache read
+    # @args: command - Horizons target (designation), center - MPC code
+    #        (empty means "no site": geocenter "500", the single fallback
+    #        point for every caller, ADR-042), start/stop - 'YYYY-MM-DD'
+    #        strings, step - e.g. '1 d', force - True bypasses the cache
+    #        read
     # @return: list of rows (see parse_ephemeris); empty on failure
+    center = center or "500"
     import datetime
     today = datetime.datetime.now(datetime.timezone.utc)
     start = start or today.strftime("%Y-%m-%d")

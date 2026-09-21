@@ -23,7 +23,7 @@ import re
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
                                QFileDialog, QHBoxLayout, QLabel,
                                QPushButton, QRadioButton, QCheckBox,
@@ -56,7 +56,7 @@ class SeqChartDialog(QDialog):
         self._saved = None
         self.setWindowTitle(self.tr("Comparison chart — %1").replace(
             "%1", target_name))
-        self.resize(1100, 760)
+        self.resize(1180, 780)
 
         root = QHBoxLayout(self)
         self.chart = FinderChart(self, lang=lang)
@@ -78,6 +78,15 @@ class SeqChartDialog(QDialog):
             src = QLabel(img_label)
             src.setStyleSheet("color: #8a90a6; font-size: 12px;")
             side.addWidget(src)
+        elif image is None:
+            # honest about the empty pane: no survey answered, the dots
+            # are the catalog itself (plain language, ADR-038)
+            miss = QLabel(self.tr(
+                "No field image could be downloaded; the background dots "
+                "are the catalog stars"))
+            miss.setWordWrap(True)
+            miss.setStyleSheet("color: #8a90a6; font-size: 12px;")
+            side.addWidget(miss)
         hint = QLabel(self.tr(
             "Click a star to add or remove it. Known variables (red "
             "rings) can never be comparisons."))
@@ -132,10 +141,15 @@ class SeqChartDialog(QDialog):
         side.addWidget(box)
         side_widget = QWidget()
         side_widget.setLayout(side)
-        side_widget.setFixedWidth(340)
+        side_widget.setMinimumWidth(360)
         root.addWidget(side_widget)
 
         self.chart.sequence_changed.connect(self._from_chart)
+
+        # never clip a translation: the window cannot shrink below what
+        # its widgets actually need (buttons, hints, the button box)
+        self.setMinimumSize(self.minimumSizeHint().expandedTo(
+            QSize(1000, 680)))
 
     # --------------------------- table <-> entries ---------------------------
 

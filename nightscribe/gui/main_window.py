@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
                                 QListWidget, QListWidgetItem, QMainWindow,
-                                QMessageBox, QProgressBar,
+                                QMessageBox, QProgressBar, QProgressDialog,
                                 QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 from .. import paths
 from ..config import config
 from ..version import full_version
-from ..core import (attention, dates, ephemeris, mpc_report, orbits,
+from ..core import (attention, dates, ephemeris, kinds, mpc_report, orbits,
                     project, sequence, suggest)
 from ..core.db import db
 from . import pretty, theme
@@ -221,10 +221,10 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
                       ("NObs", "nobs"), ("Discovered", "disc"),
                       ("Covered", "obs")]
 
-# Canonical kind order (theme.KIND_LABELS order, ADR-026): the tonight filter
-# combo and the settings whitelist stay in the same order wherever shown.
-KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
-              "variable"]
+# Canonical kind order (core/kinds.py catalogue, ADR-042): the tonight
+# filter, the settings whitelist and the update wizard all read it, so
+# the kinds stay in the same order wherever they are shown.
+KIND_ORDER = list(kinds.ids())
 
 # Top-level tab indices (ui/main_window.ui order; ADR-036: History left
 # the bar for the Tools-menu journal dialog, J0): never use literals for
@@ -3934,7 +3934,7 @@ class MainWindow(QMainWindow):
         kind = ctx.get("kind") or p.get("kind")
         obj_id = (ctx.get("id") or ctx.get("packed")
                   or p.get("object_name") or ctx.get("object_name"))
-        site = config.get("mpc_code", "Z41")
+        site = config.get("mpc_code", "")
         if kind in ("neo", "comet", "pccp"):
             def action(c):
                 pos = ephemeris.position_at(obj_id, site,
@@ -4377,7 +4377,7 @@ class MainWindow(QMainWindow):
             return
         ctx = p.get("context") or {}
         obj_id = ctx.get("id") or ctx.get("packed") or p["object_name"]
-        site = config.get("mpc_code", "Z41")
+        site = config.get("mpc_code", "")
         lang = config.get("language", "es")
         spn = self._project_widgets.get("neo_zoom")
         zoom = spn.value() if spn else 2
@@ -5808,14 +5808,36 @@ class MainWindow(QMainWindow):
                            spn_comps.value(), spn_mag.value(),
                            Path(fits_path) if fits_path else None,
                            self._lang())
+        # The build takes seconds (VizieR + image download): a modal busy
+        # dialog says so plainly — the status bar alone reads as "nothing
+        # is happening". No Cancel: a download cannot be aborted halfway,
+        # so the dialog never promises what it cannot keep.
+        wait = QProgressDialog(
+            self.tr("Building the comparison chart…"), "", 0, 0, self)
+        wait.setWindowTitle(self.tr("Comparison chart"))
+        wait.setWindowModality(Qt.WindowModal)
+        wait.setCancelButton(None)
+        wait.setMinimumDuration(0)
+        w.progress.connect(wait.setLabelText)
         w.progress.connect(lambda m: self.statusBar().showMessage(m, 0))
         save_camp = chk_camp is not None and chk_camp.isChecked()
         w.finished.connect(
-            lambda out: self._fu_sequence_done(pid, out, save_camp))
+            lambda out: self._fu_sequence_landed(wait, pid, out, save_camp))
         self._keep(w)
         self.statusBar().showMessage(
             self.tr("Building the comparison chart…"), 0)
         w.start()
+
+    def _fu_sequence_landed(self, wait, pid, out, save_campaign):
+        # The SequenceWorker finished: the wait dialog is closed and reaped
+        # BEFORE anything else runs — the picker's exec() spins a nested
+        # loop, so any pending dialog would otherwise linger on top of it.
+        # close()+deleteLater(): the reap discipline of e31f394.
+        # @args: wait - the busy QProgressDialog, pid - project id,
+        #        out - worker payload, save_campaign - protocol flag
+        wait.close()
+        wait.deleteLater()
+        self._fu_sequence_done(pid, out, save_campaign)
 
     def _fu_sequence_done(self, pid, out, save_campaign):
         # Lands the SequenceWorker result: warnings on the status bar and

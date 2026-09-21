@@ -42,6 +42,14 @@ def db_path():
     return data_dir() / "nightscribe.db"
 
 
+def backups_dir():
+    # @return: the backups folder (SQLite copies the update wizard keeps
+    #          before touching the database, ADR-042)
+    p = data_dir() / "backups"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def image_cache_dir():
     # @return: Path to the cached image dir (SDO, cutouts...)
     p = data_dir() / "images"

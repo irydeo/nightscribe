@@ -24,6 +24,7 @@ AppVersion={#AppVersion}
 AppPublisher=Francisco José Calvo Fernández (Irydeo Observatory, MPC Z41)
 AppPublisherURL=https://www.irydeo.com
 AppSupportURL=https://github.com/irydeo/nightscribe/issues
+SetupIconFile=..\nightscribe\assets\appicon.ico
 DefaultDirName={localappdata}\Programs\NightScribe
 DefaultGroupName=NightScribe
 PrivilegesRequired=lowest

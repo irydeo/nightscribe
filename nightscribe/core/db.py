@@ -20,6 +20,19 @@ from .. import paths
 
 logger = logging.getLogger(__name__)
 
+# The update wizard translates the migration notes (context
+# "NSMigrations"); the CLI never does, so keep a Qt-free fallback and
+# mark the strings where they are defined (same pattern as core/kinds.py).
+try:
+    from PySide6.QtCore import QT_TRANSLATE_NOOP, QCoreApplication
+except ImportError:
+    QCoreApplication = None
+
+    def QT_TRANSLATE_NOOP(context, string):
+        # @args: context - the translation context, unused here
+        # @return: the source text, so the CLI reads it as-is
+        return string
+
 # One hour/day in seconds, just to read the TTL table below at a glance
 HOUR = 3600
 DAY = 24 * HOUR
@@ -57,6 +70,8 @@ SOURCE_TTL = {
     "astrometry": 30 * DAY,
     "ccdciel": 60,  # local JSON-RPC: covers quick reads (temp, filters,
                     # slewing) without hammering the observatory software
+    "geo": 1 * HOUR,         # IP geolocation for the wizard (per provider)
+    "elevation": 30 * DAY,   # open-meteo terrain height: static per place
 }
 
 _SCHEMA = """
@@ -265,6 +280,48 @@ def _migrate(conn):
     conn.commit()
 
 
+# Plain-language note per schema step, for the update wizard's "Data and
+# compatibility" report (ADR-042): what the user gains at each version.
+# Keys match the user_version values above, so the report can list every
+# step a given database actually had to walk through.
+_MIG = "NSMigrations"
+
+MIGRATION_NOTES = {
+    1: QT_TRANSLATE_NOOP("NSMigrations",
+        "Projects introduced: every target you choose gets its own "
+        "folder and a plan, capture, process, publish flow."),
+    2: QT_TRANSLATE_NOOP("NSMigrations",
+        "The \"analyse\" step left the project flow; the projects stopped "
+        "on it continue at the publish step."),
+    3: QT_TRANSLATE_NOOP("NSMigrations",
+        "The \"capture\" step was merged into \"plan\"; whatever work was "
+        "saved on it is now part of the plan."),
+    4: QT_TRANSLATE_NOOP("NSMigrations",
+        "Projects gained their final state: close date, outcome, tags "
+        "and favourites."),
+    5: QT_TRANSLATE_NOOP("NSMigrations",
+        "Supernova follow-up: the observing sessions, the images of each "
+        "night and your photometry points, all tied to the project."),
+    6: QT_TRANSLATE_NOOP("NSMigrations",
+        "Every project keeps its own container folder, in the place it "
+        "already was."),
+    7: QT_TRANSLATE_NOOP("NSMigrations",
+        "Observing campaigns: a first-class list your projects can hang "
+        "from, with cadence, filters and shared data links."),
+}
+
+
+def tr_note(note):
+    # Translates a migration note for the wizard's report (context
+    # "NSMigrations"); the CLI never calls this, so without Qt the
+    # source text comes back unchanged.
+    # @args: note - one of the QT_TRANSLATE_NOOP values above
+    # @return: the note in the current language
+    if QCoreApplication is None:
+        return note
+    return QCoreApplication.translate(_MIG, note)
+
+
 class Database:
     # Single SQLite access point: HTTP cache plus the observatory's own
     # observation history. Everything persistent lives here (see ADR-002).
@@ -427,5 +484,7 @@ class Database:
             return bool(row)
 
 
-# Shared instance (tests build their own with a temp file)
+# Shared instance (tests build their own with a temp file). The pre-update
+# database snapshot lives in core/backup.py: it must run before this module
+# is ever imported (the first import migrates the schema in place).
 db = Database()

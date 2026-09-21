@@ -31,9 +31,25 @@ def _setup_logging(verbose):
         format="%(levelname)s %(name)s: %(message)s")
 
 
+def _no_site():
+    # ADR-042: no observatory configured. The CLI keeps its honesty and
+    # tells the user what to do, instead of silently computing everything
+    # around the geocenter (the wizard fixes it in a couple of minutes).
+    # @return: True when the site is missing (the command should stop)
+    if cfg.is_configured():
+        return False
+    print("No site configured / No hay observatorio configurado.")
+    print("Run the GUI once: a short wizard sets up your observatory.")
+    print(f"You can also edit {paths.config_dir() / 'nightscribe.json'} "
+          "with your coordinates and MPC code (optional).")
+    return True
+
+
 def cmd_tonight(args):
     # Best targets for tonight at the configured site.
     from .core import planner, suggest
+    if _no_site():
+        return 1
     date = datetime.date.fromisoformat(args.fecha) if args.fecha else None
     print(f"{__app_name__} — {cfg.get('observatory_name')} "
           f"(MPC {cfg.get('mpc_code')})")
@@ -66,6 +82,8 @@ def cmd_tonight(args):
 def cmd_explore(args):
     # Explained object card.
     from .core import enrich, narrative, orbits
+    if _no_site():
+        return 1
     e = enrich.enrich(args.objeto, site=cfg.get("mpc_code"))
     if not e or not e.get("data"):
         print(f"No se encontró / Not found: {args.objeto}")
@@ -83,6 +101,8 @@ def cmd_post(args):
     # always references every generated image (ready for a web page).
     import re
     from .core import enrich, post
+    if _no_site():
+        return 1
     e = enrich.enrich(args.objeto, site=cfg.get("mpc_code"))
     if not e or not e.get("data"):
         print(f"No se encontró / Not found: {args.objeto}")
@@ -284,8 +304,9 @@ def cmd_sequence(args):
     if field["vsx_warning"]:
         print("⚠ ES: sin consulta VSX (las variables del campo no se marcan)\n"
               "  EN: no VSX query (field variables are not flagged)")
-    # background: the user's FITS when given (its WCS rules), else DSS2
-    image, wcs, img_label = None, None, "DSS2 color (CDS)"
+    # background: the user's FITS when given (its WCS rules), else a survey
+    # cutout; img_label names the source that actually served ("" = none)
+    image, wcs, img_label = None, None, ""
     if args.fits:
         image, wcs = _fits_background(args.fits, print)
         if wcs is not None:
@@ -301,8 +322,10 @@ def cmd_sequence(args):
                   "  EN: no astrometry for your FITS; using DSS2")
     if wcs is None and not args.sin_imagen:
         pixscale = fov * 60.0 / 1000.0
-        image = cutouts.reference_cutout(ra, dec, size=1000,
-                                         pixscale=pixscale)
+        image, src_label = cutouts.reference_cutout(ra, dec, size=1000,
+                                                    pixscale=pixscale)
+        if src_label:
+            img_label = src_label
     # the proposal needs a target magnitude: VSX max, --mag, or the
     # field median as an honest middle
     target_mag = args.mag
@@ -322,9 +345,10 @@ def cmd_sequence(args):
         catalog_label=field["catalog_name"])
     png_path = outdir / f"{safe}_carta.png"
     target = {"name": name, "ra": ra, "dec": dec}
+    wm = f"NightScribe · {img_label}" if img_label else "NightScribe"
     finder_view.draw_finder(field, target=target, entries=entries,
                             image=image, wcs=wcs, out=png_path, lang=lang,
-                            watermark=f"NightScribe · {img_label}")
+                            watermark=wm)
     print(f"{name} @ ({ra:.5f}, {dec:+.5f}) — {field['catalog_name']}, "
           f"{len(entries)} estrellas / stars (objetivo mag "
           f"{target_mag:.2f} / target)")

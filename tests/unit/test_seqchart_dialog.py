@@ -105,3 +105,22 @@ def test_save_into_project_writes_and_hands_over(qapp, tmp_path):
     assert "# target: V0001 Cyg" in text and "Comp1" in text
     assert Path(files["png"]).stat().st_size > 0
     assert dlg.saved_files() == files
+
+
+def test_no_image_says_so_in_plain_words(qapp, tmp_path):
+    # the fixture passes image=None and no source label: the side panel
+    # must say what the background dots are instead of staying silent
+    from PySide6.QtWidgets import QLabel
+    dlg = _dialog(qapp, tmp_path)
+    texts = [lbl.text() for lbl in dlg.findChildren(QLabel)]
+    assert any("No field image could be downloaded" in t for t in texts)
+    dlg.close()
+
+
+def test_window_minimum_size_keeps_all_text_visible(qapp, tmp_path):
+    # the window can never shrink below what its (translated) widgets need
+    dlg = _dialog(qapp, tmp_path)
+    hint = dlg.minimumSizeHint()
+    assert dlg.minimumWidth() >= 1000 and dlg.minimumHeight() >= 680
+    assert dlg.minimumWidth() >= hint.width()
+    dlg.close()

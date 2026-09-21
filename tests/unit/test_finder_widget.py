@@ -135,3 +135,86 @@ def test_names_stay_unique_after_removals(qapp):
     chart._toggle_at(QPointF(chart._stars[3]["_sx"], chart._stars[3]["_sy"]))
     names = [e["name"] for e in chart.entries()]
     assert len(names) == len(set(names)) == 2
+
+
+def test_synthetic_sky_when_no_image(qapp):
+    # No survey image (all downloads failed or answered flat tiles): the
+    # catalog stars themselves are the background, one soft dot each, so
+    # the chart never opens on an empty black pane.
+    from PySide6.QtWidgets import QGraphicsEllipseItem
+    chart = _chart(qapp)                     # _chart passes image=None
+    dots = [it for it in chart.scene().items()
+            if it.zValue() == -1
+            and isinstance(it, QGraphicsEllipseItem)]
+    assert len(dots) == len(chart._stars) == 4
+    chart.close()
+
+
+def test_real_image_replaces_the_synthetic_sky(qapp):
+    from PySide6.QtGui import QColor, QImage
+    from PySide6.QtWidgets import (QGraphicsEllipseItem,
+                                   QGraphicsPixmapItem)
+    from nightscribe.gui.widgets.finder_widget import FinderChart
+    img = QImage(8, 8, QImage.Format_Grayscale8)
+    img.fill(QColor(40, 40, 40))
+    chart = FinderChart(lang="en")
+    chart.set_field(_field(), target={"name": "V0001 Cyg", "ra": CENTER[0],
+                                      "dec": CENTER[1]},
+                    entries=[], image=img)
+    items = chart.scene().items()
+    assert any(isinstance(it, QGraphicsPixmapItem) for it in items)
+    dots = [it for it in items if it.zValue() == -1
+            and isinstance(it, QGraphicsEllipseItem)]
+    assert dots == []
+    chart.close()
+
+
+def test_zoom_goes_to_pixel_level(qapp):
+    # the finder overrides the base ceiling (8x) with pixel-level zoom
+    chart = _chart(qapp)
+    assert chart.ZOOM_MAX == 30.0
+    for _ in range(60):
+        chart._zoom_by(1.25)
+    scale = chart.transform().m11()
+    assert 8.0 < scale <= 30.0
+    chart.close()
+
+
+def test_wheel_zooms_with_the_bolder_finder_step(qapp):
+    # one wheel notch must move visibly: the finder's 1.5 step, not the
+    # base's shy 1.25
+    from PySide6.QtCore import QPoint
+    chart = _chart(qapp)
+    seen = []
+    chart._zoom_by = seen.append
+
+    class Wheel:
+        def angleDelta(self):
+            return QPoint(0, 120)
+
+        def accept(self):
+            pass
+
+        def ignore(self):
+            pass
+
+    chart.wheelEvent(Wheel())
+    assert seen == [1.5]
+    chart.close()
+
+
+def test_pick_radius_is_screen_constant(qapp):
+    # ~11 screen px at any zoom: a fixed scene radius would cover a third
+    # of the view at deep zoom; a fixed screen radius stays precise
+    chart = _chart(qapp)
+    star = chart._stars[0]
+    scale1 = chart.transform().m11()
+    r1 = 11.0 / scale1               # the pick radius in scene units
+    assert chart._nearest_star(star["_sx"] + r1 * 0.5, star["_sy"]) is star
+    assert chart._nearest_star(star["_sx"] + r1 * 2.0, star["_sy"]) is None
+    chart.scale(2.0, 2.0)            # the same scene distance is now
+    # twice as many screen px: what was a hit becomes a miss, and the
+    # precise pick needs half the scene distance
+    assert chart._nearest_star(star["_sx"] + r1 * 0.75, star["_sy"]) is None
+    assert chart._nearest_star(star["_sx"] + r1 * 0.25, star["_sy"]) is star
+    chart.close()

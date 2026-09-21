@@ -285,7 +285,7 @@ def build_charts(e, outdir, safe, cfg=None, fmt="instagram", size=None,
             charts["sky"] = p
     if sim and ra_deg is not None:
         from .sources import cutouts
-        img = cutouts.reference_cutout(ra_deg, dec_deg)
+        img, _src = cutouts.reference_cutout(ra_deg, dec_deg)
         if img:
             p = outdir / f"{safe}field.png"
             sn_view.draw_sn_field(img, sn_name=e["name"], out=str(p),

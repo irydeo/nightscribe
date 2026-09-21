@@ -315,7 +315,13 @@ class SequenceWorker(QThread):
     # when it lacks WCS, else the DSS2 cutout) and the automatic proposal.
     # It writes NO files: the SeqChartDialog owns the exports, so the user
     # can adjust the sequence before anything lands on disk.
-    finished = Signal(dict)     # {"status": ok|error, "error", ...}
+    # The payload is {"status": ok|error, "error", field, entries, image,
+    # wcs, ...}: a Path / Wcs / numpy image plus hundreds of star dicts.
+    # Signal(object) passes it through untouched; Signal(dict) would force
+    # a recursive QVariant conversion at emit — a var<->star reference
+    # cycle in the field once recursed that conversion into a C stack
+    # overflow (SIGSEGV on "Generate").
+    finished = Signal(object)
     progress = Signal(str)      # stage message for the dialog's status line
 
     def __init__(self, name, ra_deg, dec_deg, catalog, fov_arcmin,
@@ -358,7 +364,10 @@ class SequenceWorker(QThread):
         from ..viz import blink_view
         out = {"status": "ok", "field": field, "vsx_warning":
                field["vsx_warning"]}
-        image, wcs, img_label = None, None, "DSS2 color (CDS)"
+        # img_label tells the truth about the background: the FITS name,
+        # the survey that actually served ("Legacy Survey DR10" / "DSS2
+        # color (CDS)"), or "" when no image could be fetched at all
+        image, wcs, img_label = None, None, ""
         if self._fits:
             self.progress.emit(
                 "Leyendo tu FITS…" if self._lang != "en"
@@ -383,9 +392,11 @@ class SequenceWorker(QThread):
             self.progress.emit(
                 "Descargando la imagen del campo…" if self._lang != "en"
                 else "Downloading the field image…")
-            image = cutouts.reference_cutout(self._ra, self._dec, size=1000,
-                                             pixscale=self._fov * 60.0
-                                             / 1000.0)
+            image, src = cutouts.reference_cutout(self._ra, self._dec,
+                                                  size=1000,
+                                                  pixscale=self._fov * 60.0
+                                                  / 1000.0)
+            img_label = src or ""
         self.progress.emit(
             "Proponiendo la secuencia…" if self._lang != "en"
             else "Proposing the sequence…")

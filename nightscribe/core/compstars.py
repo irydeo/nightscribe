@@ -228,8 +228,15 @@ def build_variables(rows, center, field_deg):
 def match_vsx(stars, variables, tol_arcsec=VSX_MATCH_ARCSEC):
     # Cross-matches VSX variables with catalog stars: a star within
     # tol_arcsec of a variable IS that variable, and can never be a comp.
+    # The link is one-way on purpose: the star carries the full VSX dict
+    # ("this star is V0001 Cyg") while the variable keeps only a light
+    # counterpart snapshot {id, ra, dec, mag} — never the star itself. A
+    # var<->star reference cycle recursed forever inside QVariant when the
+    # field crossed a Signal(dict) emission and blew the C stack (SIGSEGV
+    # at the follow-up's "Generate"); acyclic also keeps the field
+    # JSON-serialisable.
     # @args: stars - build_stars list (mutated: "vsx" set on a match),
-    #        variables - build_variables list (mutated: "star" set)
+    #        variables - build_variables list (mutated: "star" snapshot)
     # @return: the variables list, each with "star"/"distance" filled
     for var in variables:
         nearest, best = None, float("inf")
@@ -237,10 +244,13 @@ def match_vsx(stars, variables, tol_arcsec=VSX_MATCH_ARCSEC):
             dist = separation_arcsec(var, star)
             if dist < best:
                 nearest, best = star, dist
-        var["star"] = nearest if best <= tol_arcsec else None
+        if nearest is not None and best <= tol_arcsec:
+            var["star"] = {"id": nearest["id"], "ra": nearest["ra"],
+                           "dec": nearest["dec"], "mag": nearest["mag"]}
+            nearest["vsx"] = var
+        else:
+            var["star"] = None
         var["distance_arcsec"] = best
-        if var["star"] is not None:
-            var["star"]["vsx"] = var
     return variables
 
 

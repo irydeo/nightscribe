@@ -62,6 +62,7 @@ exe = EXE(
     [],
     exclude_binaries=True,
     name="nightscribe",
+    icon=os.path.join(ROOT, "nightscribe", "assets", "appicon.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -215,7 +215,8 @@ def test_sequence_worker_with_faked_field(tmp_path, monkeypatch):
     from nightscribe.core import compstars
     from nightscribe.core.sources import cutouts
     monkeypatch.setattr(compstars, "load_field", _fake_field)
-    monkeypatch.setattr(cutouts, "reference_cutout", lambda *a, **k: None)
+    monkeypatch.setattr(cutouts, "reference_cutout", lambda *a, **k:
+                        (None, None))
     from nightscribe.gui.workers import SequenceWorker
     center = (291.366, 42.784)
     w = SequenceWorker("V0001 Cyg", center[0], center[1], "gaia", 18.0,
@@ -230,3 +231,92 @@ def test_sequence_worker_with_faked_field(tmp_path, monkeypatch):
     assert out["field"]["stars"]
     assert out["image"] is None and out["wcs"] is None
     assert "csv" not in out and "png" not in out
+
+
+def test_sequence_generate_shows_then_closes_a_wait_dialog(window,
+                                                           monkeypatch):
+    # While the worker runs, a modal busy dialog tells the user (the status
+    # bar alone read as "nothing is happening"); it must be closed BEFORE
+    # the picker opens — the picker's exec() spins a nested loop over
+    # whatever is still on screen.
+    import nightscribe.gui.main_window as mw
+    import nightscribe.gui.seqchart_dialog as sd
+    from PySide6.QtCore import QObject, Qt, Signal
+    from PySide6.QtWidgets import QApplication, QDialog
+
+    events = []
+
+    class FakeWorker(QObject):
+        progress = Signal(str)
+        finished = Signal(object)
+
+        def __init__(self, *a, **k):
+            super().__init__()
+
+        def start(self):
+            self.progress.emit("stage one")
+            self.progress.emit("stage two")
+            self.finished.emit(_fake_payload(None))
+
+    class FakeWait:
+        def __init__(self, label, cancel_text, minimum, maximum, parent):
+            self.labels = [label]
+            self.range = (minimum, maximum)
+            self.cancel_removed = False
+            events.append("wait.create")
+
+        def setWindowTitle(self, t):
+            self.title = t
+
+        def setWindowModality(self, m):
+            self.modality = m
+
+        def setCancelButton(self, b):
+            self.cancel_removed = b is None
+
+        def setMinimumDuration(self, ms):
+            self.min_duration = ms
+
+        def setLabelText(self, m):
+            self.labels.append(m)
+            events.append(f"wait.label:{m}")
+
+        def close(self):
+            events.append("wait.close")
+
+        def deleteLater(self):
+            events.append("wait.deleteLater")
+
+    class FakePicker:
+        def __init__(self, *a, **k):
+            pass
+
+        def exec(self):
+            events.append("picker.exec")
+            return 0
+
+    waits = []
+    monkeypatch.setattr("nightscribe.gui.workers.SequenceWorker",
+                        FakeWorker)
+    monkeypatch.setattr(mw, "QProgressDialog",
+                        lambda *a, **k: waits.append(
+                            FakeWait(*a, **k)) or waits[-1])
+    monkeypatch.setattr(sd, "SeqChartDialog", FakePicker)
+    # the options dialog auto-accepts (it is the only real exec() here)
+    monkeypatch.setattr(QDialog, "exec", lambda _self: QDialog.Accepted)
+
+    p = _variable_project()
+    window._fu_sequence_dialog(p["id"])
+
+    assert len(waits) == 1
+    wait = waits[0]
+    assert wait.labels[0] == "Building the comparison chart…"
+    assert wait.range == (0, 0)                 # busy, indeterminate
+    assert wait.cancel_removed                  # no false promises
+    assert wait.modality == Qt.WindowModal
+    assert wait.min_duration == 0               # shown immediately
+    assert "stage one" in wait.labels and "stage two" in wait.labels
+    # closed and reaped before the picker ever opened
+    assert events.index("wait.close") < events.index("picker.exec")
+    assert events.index("wait.deleteLater") < events.index("picker.exec")
+    QApplication.processEvents()                # flush _keep's timers

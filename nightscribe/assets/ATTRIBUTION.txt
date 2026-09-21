@@ -34,3 +34,9 @@ reference data for a future "coverage gap" feature (not consumed at runtime in
 v1). Science reference for the feature:
 Kotysz, K. 2020, "Variability of HADS stars in TESS", PTA Proceedings 10,
 180-182, https://pta.edu.pl/proc/v10p180
+
+appicon.svg, appicon-*.png, appicon.ico, appicon.icns: the NightScribe
+application icon, "quill drawing a comet trail into a star" on a night-navy
+tile. Original graphic drawn by the project, 2026-09-21; no third-party data.
+The SVG master is the source of truth; the PNG/ICO/ICNS set is rendered from
+it (QtSvg rasterisation with supersampled downscaling, one-off dev script).

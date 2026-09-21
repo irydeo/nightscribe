@@ -33,7 +33,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
 from .. import paths
 from ..config import config
 from ..version import full_version
-from ..core import (attention, dates, ephemeris, mpc_report, orbits,
+from ..core import (attention, dates, ephemeris, kinds, mpc_report, orbits,
                     project, sequence, suggest)
 from ..core.db import db
 from . import pretty, theme
@@ -221,10 +221,10 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
                       ("NObs", "nobs"), ("Discovered", "disc"),
                       ("Covered", "obs")]
 
-# Canonical kind order (theme.KIND_LABELS order, ADR-026): the tonight filter
-# combo and the settings whitelist stay in the same order wherever shown.
-KIND_ORDER = ["neo", "sn", "comet", "pccp", "transit", "alert", "hads",
-              "variable"]
+# Canonical kind order (core/kinds.py catalogue, ADR-042): the tonight
+# filter, the settings whitelist and the update wizard all read it, so
+# the kinds stay in the same order wherever they are shown.
+KIND_ORDER = list(kinds.ids())
 
 # Top-level tab indices (ui/main_window.ui order; ADR-036: History left
 # the bar for the Tools-menu journal dialog, J0): never use literals for

@@ -1,53 +1,144 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>WizardDialog</class>
- <widget class="QDialog" name="WizardDialog">
-  <property name="windowTitle"><string>Welcome to NightScribe</string></property>
-  <property name="modal"><bool>true</bool></property>
-  <layout class="QVBoxLayout" name="verticalLayout">
-   <item>
-    <widget class="QLabel" name="lbl_welcome">
-     <property name="wordWrap"><bool>true</bool></property>
-     <property name="text"><string>Welcome to NightScribe! To get started, tell us your observatory. If you have an MPC code, coordinates fill in automatically.</string></property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="grp_wiz_mpc">
-     <property name="title"><string>With MPC code</string></property>
-     <layout class="QHBoxLayout">
-      <item><widget class="QLineEdit" name="edt_wiz_mpc"><property name="placeholderText"><string>p. ej. Z41</string></property><property name="maxLength"><number>3</number></property></widget></item>
-      <item><widget class="QPushButton" name="btn_wiz_resolve"><property name="text"><string>Resolve</string></property></widget></item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="grp_wiz_manual">
-     <property name="title"><string>Or manual</string></property>
-     <layout class="QFormLayout">
-      <item row="0" column="0"><widget class="QLabel" name="lbl_wiz_name"><property name="text"><string>Name:</string></property></widget></item>
-      <item row="0" column="1"><widget class="QLineEdit" name="edt_wiz_name"/></item>
-      <item row="1" column="0"><widget class="QLabel" name="lbl_wiz_lat"><property name="text"><string>Latitude (°):</string></property></widget></item>
-      <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_wiz_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
-      <item row="2" column="0"><widget class="QLabel" name="lbl_wiz_lon"><property name="text"><string>Longitude (°, east):</string></property></widget></item>
-      <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_wiz_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
-      <item row="3" column="0"><widget class="QLabel" name="lbl_wiz_h"><property name="text"><string>Height (m):</string></property></widget></item>
-      <item row="3" column="1"><widget class="QSpinBox" name="spn_wiz_height"><property name="maximum"><number>9000</number></property></widget></item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QLabel" name="lbl_wiz_status">
-     <property name="wordWrap"><bool>true</bool></property>
-     <property name="text"><string></string></property>
-    </widget>
-   </item>
-   <item>
-    <layout class="QHBoxLayout">
-     <item><spacer><property name="orientation"><enum>Qt::Horizontal</enum></property></spacer></item>
-     <item><widget class="QPushButton" name="btn_wiz_ok"><property name="text"><string>Start</string></property><property name="default"><bool>true</bool></property></widget></item>
-    </layout>
-   </item>
-  </layout>
+ <class>NSUpdateWizard</class>
+ <widget class="QWizard" name="NSUpdateWizard">
+  <property name="windowTitle"><string>NightScribe - Setup</string></property>
+  <property name="wizardStyle"><enum>QWizard::ClassicStyle</enum></property>
+  <property name="minimumSize"><size><width>760</width><height>620</height></size></property>
+  <widget class="QWizardPage" name="page_site">
+   <property name="title"><string>Your observatory</string></property>
+   <property name="subTitle"><string>Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</string></property>
+   <layout class="QVBoxLayout" name="site_layout">
+    <item>
+     <widget class="QGroupBox" name="grp_site_detect">
+      <property name="title"><string>Detect my location (online)</string></property>
+      <layout class="QVBoxLayout" name="grp_site_detect_layout">
+       <item>
+        <layout class="QHBoxLayout" name="detect_row">
+         <item>
+          <widget class="QPushButton" name="btn_detect">
+           <property name="text"><string>Find my location</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_site_status">
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="text"><string></string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="detect_spacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_site_privacy">
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="text"><string>Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</string></property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_site_mpc">
+      <property name="title"><string>Or with an MPC code (optional)</string></property>
+      <layout class="QHBoxLayout" name="grp_site_mpc_layout">
+       <item>
+        <widget class="QLineEdit" name="edt_site_mpc">
+         <property name="maxLength"><number>3</number></property>
+         <property name="placeholderText"><string>e.g. Z41</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_resolve">
+         <property name="text"><string>Resolve</string></property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="mpc_spacer">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="grp_site_manual">
+      <property name="title"><string>Or type the coordinates</string></property>
+      <layout class="QFormLayout" name="grp_site_manual_layout">
+       <item row="0" column="0"><widget class="QLabel"><property name="text"><string>Name:</string></property></widget></item>
+       <item row="0" column="1"><widget class="QLineEdit" name="edt_site_name"/></item>
+       <item row="1" column="0"><widget class="QLabel"><property name="text"><string>Latitude (degrees):</string></property></widget></item>
+       <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_site_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
+       <item row="2" column="0"><widget class="QLabel"><property name="text"><string>Longitude (degrees east):</string></property></widget></item>
+       <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_site_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+       <item row="3" column="0"><widget class="QLabel"><property name="text"><string>Height (m):</string></property></widget></item>
+       <item row="3" column="1"><widget class="QSpinBox" name="spn_site_height"><property name="maximum"><number>9000</number></property></widget></item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <spacer name="site_bottom_spacer">
+      <property name="orientation"><enum>Qt::Vertical</enum></property>
+     </spacer>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWizardPage" name="page_kinds">
+   <property name="title"><string>Your targets</string></property>
+   <property name="subTitle"><string>Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</string></property>
+   <layout class="QVBoxLayout" name="kinds_page_layout">
+    <item>
+     <widget class="QScrollArea" name="kinds_scroll">
+      <property name="widgetResizable"><bool>true</bool></property>
+      <widget class="QFrame" name="kinds_container">
+       <layout class="QVBoxLayout" name="kinds_layout">
+        <item>
+         <spacer name="kinds_bottom_spacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="lbl_kinds_rule">
+      <property name="wordWrap"><bool>true</bool></property>
+      <property name="text"><string>Keep at least one kind checked.</string></property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QWizardPage" name="page_data">
+   <property name="title"><string>Your data, safe</string></property>
+   <property name="subTitle"><string>Before touching anything, NightScribe copies your database and reports in plain words what this version changes.</string></property>
+   <layout class="QVBoxLayout" name="data_page_layout">
+    <item>
+     <widget class="QScrollArea" name="data_scroll">
+      <property name="widgetResizable"><bool>true</bool></property>
+      <widget class="QFrame" name="data_container">
+       <layout class="QVBoxLayout" name="data_layout">
+        <item>
+         <spacer name="data_bottom_spacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </widget>
+    </item>
+    <item>
+     <widget class="QLabel" name="lbl_data_closing">
+      <property name="wordWrap"><bool>true</bool></property>
+      <property name="text"><string>Nothing changes until you leave this window.</string></property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
  </widget>
  <resources/>
  <connections/>

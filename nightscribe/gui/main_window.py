@@ -5014,6 +5014,15 @@ class MainWindow(QMainWindow):
         btn_add = QPushButton(self.tr("Add visit"))
         btn_add.clicked.connect(lambda: self._fu_add_session(pid))
         act_row.addWidget(btn_add)
+        # ADR-042: the photometry prerequisite, «with what do I compare?»,
+        # as a primary action (ADR-038 prominence), never buried in the menu
+        btn_seq = QPushButton(self.tr("Comparison chart…"))
+        btn_seq.setToolTip(self.tr(
+            "Pick the reference stars for this target: NightScribe "
+            "proposes them over the field image (brighter, of similar "
+            "colour, never a known variable)"))
+        btn_seq.clicked.connect(lambda: self._fu_sequence_dialog(pid))
+        act_row.addWidget(btn_seq)
         from PySide6.QtWidgets import QMenu, QToolButton
         tools = QToolButton()
         tools.setText(self.tr("⋯ Photometry tools"))
@@ -5055,6 +5064,12 @@ class MainWindow(QMainWindow):
         act_row.addWidget(tools)
         act_row.addStretch()
         layout.addLayout(act_row)
+
+        # ADR-042: the comparison-sequence status in one plain line
+        lbl_seq = QLabel(self._fu_sequence_status_text(p))
+        lbl_seq.setStyleSheet("color: #8a90a6; font-size: 12px;")
+        layout.addWidget(lbl_seq)
+        self._project_widgets["fu_sequence"] = lbl_seq
 
         # Inline light curve (2026-09-17): all the project's photometry —
         # manual, pasted, file, quick-look, survey — with the SN template
@@ -5664,6 +5679,188 @@ class MainWindow(QMainWindow):
                           err=p["err"], source="file")
         self._populate_project_files(pid)
 
+    def _fu_sequence_status_text(self, p):
+        # One plain line with the comparison-sequence status (ADR-042).
+        # @args: p - project dict
+        # @return: the status sentence (plain language, ADR-038)
+        seq = (p.get("context") or {}).get("sequence") or {}
+        entries = seq.get("entries") or []
+        if not entries:
+            return self.tr(
+                "No comparison sequence yet — «Comparison chart…» answers "
+                "the question: with what do I compare?")
+        n_comp = sum(1 for e in entries if e.get("kind") != "check")
+        has_check = any(e.get("kind") == "check" for e in entries)
+        text = self.tr("Sequence: %1 comparison stars").replace(
+            "%1", str(n_comp))
+        if has_check:
+            text += self.tr(" + check star")
+        if seq.get("catalog_name"):
+            text += " · " + seq["catalog_name"]
+        return text
+
+    def _fu_sequence_dialog(self, pid):
+        # Options dialog + launch of the comparison chart (ADR-042). The
+        # heavy work (VizieR, image, render) runs in a SequenceWorker: the
+        # GUI never blocks.
+        p = project.get(db, pid)
+        if not p:
+            return
+        ctx = p.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None or dec is None:
+            self.statusBar().showMessage(self.tr(
+                "This project has no coordinates: cannot build the chart"),
+                8000)
+            return
+        camp = None
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            camp = _camp.get(db, p["campaign_id"])
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Comparison chart"))
+        form = QFormLayout(dlg)
+        intro = QLabel(self.tr(
+            "«With what do I compare?» Choose the catalog and NightScribe "
+            "proposes the reference stars over the field image: brighter "
+            "than the target, of similar colour when known, and never a "
+            "known variable."))
+        intro.setWordWrap(True)
+        form.addRow(intro)
+        cmb_cat = QComboBox()
+        cmb_cat.addItem("Gaia EDR3 (G)", "gaia")
+        cmb_cat.addItem("APASS DR9 (V)", "apass")
+        form.addRow(self.tr("Catalog:"), cmb_cat)
+        spn_fov = QSpinBox()
+        spn_fov.setRange(3, 60)
+        spn_fov.setValue(18)
+        spn_fov.setSuffix(" \u2032")
+        form.addRow(self.tr("Field of view:"), spn_fov)
+        spn_comps = QSpinBox()
+        spn_comps.setRange(2, 15)
+        spn_comps.setValue(8)
+        form.addRow(self.tr("Comparison stars:"), spn_comps)
+        mag0 = ctx.get("mag")
+        if mag0 is None:
+            mag0 = (ctx.get("variable") or {}).get("max")
+        spn_mag = QDoubleSpinBox()
+        spn_mag.setRange(-2.0, 25.0)
+        spn_mag.setDecimals(2)
+        spn_mag.setValue(float(mag0) if mag0 is not None else 12.0)
+        spn_mag.setToolTip(self.tr(
+            "Used to propose brighter comparisons; the current best "
+            "estimate comes pre-filled"))
+        form.addRow(self.tr("Target magnitude:"), spn_mag)
+        fits_row = QHBoxLayout()
+        ed_fits = QLineEdit()
+        ed_fits.setPlaceholderText(self.tr(
+            "Optional: your stacked FITS as the background"))
+        fits_row.addWidget(ed_fits)
+
+        def _browse():
+            path, _ = QFileDialog.getOpenFileName(
+                dlg, self.tr("Your FITS image"), "",
+                "FITS (*.fits *.fit *.fts);;" + self.tr("All files (*)"))
+            if path:
+                ed_fits.setText(path)
+
+        btn_browse = QPushButton(self.tr("Browse…"))
+        btn_browse.clicked.connect(_browse)
+        fits_row.addWidget(btn_browse)
+        form.addRow(self.tr("Background:"), fits_row)
+        lbl_fits_hint = QLabel(self.tr(
+            "If your FITS has no astrometry we solve it with "
+            "Astrometry.net (your file is never modified); without it, "
+            "the background is the DSS2 survey image"))
+        lbl_fits_hint.setWordWrap(True)
+        lbl_fits_hint.setStyleSheet("color: #8a90a6; font-size: 12px;")
+        form.addRow(lbl_fits_hint)
+        chk_camp = None
+        if camp is not None:
+            chk_camp = QCheckBox(self.tr(
+                "Also save the sequence to the campaign protocol"))
+            chk_camp.setChecked(True)
+            form.addRow(chk_camp)
+        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        box.button(QDialogButtonBox.Ok).setText(self.tr("Generate"))
+        box.accepted.connect(dlg.accept)
+        box.rejected.connect(dlg.reject)
+        form.addRow(box)
+        if dlg.exec() != QDialog.Accepted:
+            return
+
+        from .workers import SequenceWorker
+        fits_path = ed_fits.text().strip()
+        outdir = project.storage_dir(p)
+        outdir.mkdir(parents=True, exist_ok=True)
+        w = SequenceWorker(p["object_name"], ra, dec,
+                           cmb_cat.currentData(), float(spn_fov.value()),
+                           spn_comps.value(), spn_mag.value(),
+                           Path(fits_path) if fits_path else None,
+                           outdir, self._lang())
+        w.progress.connect(lambda m: self.statusBar().showMessage(m, 0))
+        save_camp = chk_camp is not None and chk_camp.isChecked()
+        w.finished.connect(
+            lambda out: self._fu_sequence_done(pid, out, save_camp))
+        self._keep(w)
+        self.statusBar().showMessage(
+            self.tr("Building the comparison chart…"), 0)
+        w.start()
+
+    def _fu_sequence_done(self, pid, out, save_campaign):
+        # Lands the SequenceWorker result: files registered, sequence into
+        # the project context (and the campaign protocol when asked),
+        # status line refreshed, chart opened in the viewer.
+        # @args: pid - project id, out - worker payload, save_campaign -
+        #        write the sequence into the campaign protocol too
+        self.statusBar().clearMessage()
+        if out.get("status") != "ok":
+            self.statusBar().showMessage(
+                out.get("error") or self.tr("Could not build the chart"),
+                10000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        entries = out["entries"]
+        project.add_file(db, pid, out["csv"], "report")
+        project.add_file(db, pid, out["png"], "chart")
+        project.update_context(db, pid, {"sequence": {
+            "catalog": out["catalog"], "catalog_name": out["catalog_name"],
+            "fov_arcmin": out["fov_arcmin"], "target_mag":
+            out["target_mag"], "entries": entries, "csv": out["csv"],
+            "png": out["png"]}})
+        if save_campaign and p.get("campaign_id"):
+            from ..core import campaign as _camp
+            c = _camp.get(db, p["campaign_id"])
+            if c:
+                prot = c.get("protocol") or {}
+                prot["comp_stars"] = [
+                    f"{e['name']} {e['star']['band']} "
+                    f"{e['star']['mag']:.2f}" for e in entries]
+                _camp.update(db, c["id"], protocol=prot)
+        notes = []
+        if out.get("vsx_warning"):
+            notes.append(self.tr(
+                "VSX did not answer: field variables are not flagged"))
+        if out.get("fits_error"):
+            notes.append(out["fits_error"])
+        if out.get("target_outside"):
+            notes.append(self.tr(
+                "the target falls outside your image: DSS2 used instead"))
+        self.statusBar().showMessage(
+            self.tr("Comparison chart ready") +
+            (": " + ". ".join(notes) if notes else ""), 10000)
+        p = project.get(db, pid)
+        lbl = self._project_widgets.get("fu_sequence")
+        if lbl is not None and p:
+            lbl.setText(self._fu_sequence_status_text(p))
+        self._populate_project_files(pid)
+        from .chart_viewer import open_chart
+        open_chart(self, out["png"], title=self.tr("Comparison chart"),
+                   obj_name=p["object_name"], chart_key="finder")
+
     def _fu_export_report(self, pid):
         # Exports the project's photometry to CSV or AAVSO EFF (HJD in-app,
         # ADR-035 V-i) and registers the file in the project.
@@ -5694,9 +5891,23 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("No photometry points to export"), 6000)
             return
-        # comparison stars and observer code come from the campaign/config
+        # comparison stars: the project's saved sequence wins (ADR-042);
+        # the campaign protocol strings are the fallback
         comps, observer = [], config.get("aavso_code", "")
-        if p.get("campaign_id"):
+        comp, check = None, None
+        seq_entries = (ctx.get("sequence") or {}).get("entries") or []
+        if seq_entries:
+            comps = [e["name"] for e in seq_entries
+                     if e.get("kind") == "comp"]
+            first = next((e for e in seq_entries
+                          if e.get("kind") == "comp"), None)
+            chk = next((e for e in seq_entries
+                        if e.get("kind") == "check"), None)
+            if first:
+                comp = {"name": first["name"], "mag": first["star"]["mag"]}
+            if chk:
+                check = {"name": chk["name"], "mag": chk["star"]["mag"]}
+        if not comps and p.get("campaign_id"):
             from ..core import campaign as _camp
             camp = _camp.get(db, p["campaign_id"])
             if camp:
@@ -5713,6 +5924,7 @@ class MainWindow(QMainWindow):
                 "dec_deg": ctx.get("dec_deg")}
         if cmb_fmt.currentData() == "eff":
             path = photometry_export.export_eff(pts, out, obscode=observer,
+                                                comp=comp, check=check,
                                                 **meta)
         else:
             path = photometry_export.export_csv(pts, out, observer=observer,

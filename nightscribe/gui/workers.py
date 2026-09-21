@@ -307,3 +307,112 @@ class SurveyWorker(QThread):
             logger.warning("survey worker failed: %s", err)
             out = {"status": "error", "points": [], "error": str(err)}
         self.finished.emit(out)
+
+
+class SequenceWorker(QThread):
+    # Builds the photometric sequence + comparison chart off the GUI thread
+    # (ADR-042): VizieR field, optional user FITS background (solved with
+    # Astrometry.net when it lacks WCS), automatic proposal, CSV + PNG.
+    finished = Signal(dict)     # {"status": ok|error, "error", ...}
+    progress = Signal(str)      # stage message for the dialog's status line
+
+    def __init__(self, name, ra_deg, dec_deg, catalog, fov_arcmin,
+                 n_comps, target_mag, fits_path, outdir, lang):
+        super().__init__()
+        self._name = name
+        self._ra, self._dec = ra_deg, dec_deg
+        self._catalog = catalog
+        self._fov = fov_arcmin
+        self._n = n_comps
+        self._mag = target_mag
+        self._fits = fits_path
+        self._outdir = outdir
+        self._lang = lang
+
+    def run(self):
+        from ..core import compstars
+        try:
+            field = compstars.load_field(self._catalog, self._ra,
+                                         self._dec, self._fov)
+        except Exception as err:      # never crash the GUI
+            logger.warning("sequence field failed: %s", err)
+            field = None
+        if field is None:
+            self.finished.emit({
+                "status": "error",
+                "error": ("VizieR no respondió; inténtalo de nuevo en "
+                          "unos minutos") if self._lang != "en" else
+                         ("VizieR did not answer; try again in a few "
+                          "minutes")})
+            return
+        try:
+            self._build(field)
+        except Exception as err:      # render/disk problems warn, never
+            logger.exception("sequence worker failed: %s", err)  # crash
+            self.finished.emit({"status": "error", "error": str(err)})
+
+    def _build(self, field):
+        import re
+        import matplotlib
+        matplotlib.use("Agg")
+        from ..core import blink, compstars
+        from ..core.sources import cutouts
+        from ..viz import blink_view, finder_view
+        out = {"status": "ok", "field": field, "vsx_warning":
+               field["vsx_warning"]}
+        image, wcs, img_label = None, None, "DSS2 color (CDS)"
+        if self._fits:
+            self.progress.emit(
+                "Leyendo tu FITS…" if self._lang != "en"
+                else "Reading your FITS…")
+            try:
+                img = blink.load_user_image(
+                    self._fits,
+                    progress=lambda m: self.progress.emit(
+                        m["en"] if self._lang == "en" else m["es"]))
+                x, y = img["wcs"].sky_to_pixel(self._ra, self._dec)
+                if 0 <= x < img["wcs"].naxis1 and 0 <= y < img["wcs"].naxis2:
+                    image = blink_view.apply_stretch(
+                        img["data"], *blink_view.auto_limits(img["data"]))
+                    wcs = img["wcs"]
+                    img_label = self._fits.name
+                else:
+                    out["target_outside"] = True
+            except blink.BlinkError as err:
+                out["fits_error"] = err.messages.get(self._lang) or \
+                    err.messages["en"]
+        if wcs is None:
+            self.progress.emit(
+                "Descargando la imagen del campo…" if self._lang != "en"
+                else "Downloading the field image…")
+            image = cutouts.reference_cutout(self._ra, self._dec, size=1000,
+                                             pixscale=self._fov * 60.0
+                                             / 1000.0)
+        self.progress.emit(
+            "Proponiendo la secuencia…" if self._lang != "en"
+            else "Proposing the sequence…")
+        mag = self._mag
+        if mag is None and field["stars"]:
+            mags = sorted(s["mag"] for s in field["stars"])
+            mag = mags[len(mags) // 2]
+        seq = compstars.propose_comps(field["stars"], mag, n=self._n)
+        entries = seq["comps"] + ([seq["check"]] if seq["check"] else [])
+        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", self._name)
+        csv_path = compstars.export_sequence_csv(
+            entries, self._outdir / f"{safe}_secuencia.csv",
+            target_name=self._name, catalog_label=field["catalog_name"])
+        png_path = self._outdir / f"{safe}_carta.png"
+        self.progress.emit(
+            "Dibujando la carta…" if self._lang != "en"
+            else "Drawing the chart…")
+        finder_view.draw_finder(
+            field, target={"name": self._name, "ra": self._ra,
+                           "dec": self._dec},
+            entries=entries, image=image, wcs=wcs, out=png_path,
+            lang=self._lang, watermark=f"NightScribe · {img_label}")
+        out.update(entries=entries, png=str(png_path), csv=str(csv_path),
+                   target_mag=mag, catalog=field["catalog"],
+                   catalog_name=field["catalog_name"],
+                   fov_arcmin=field["fov_arcmin"],
+                   n_variables=len(field["variables"]))
+        self.finished.emit(out)

@@ -237,31 +237,21 @@ def _resolve_target(name):
 def _fits_background(path, progress):
     # The user's own FITS as chart background: stretched luminance plus its
     # WCS, blind-solved with Astrometry.net when the header lacks one (the
-    # blink flow, ADR-018; the original file is never modified).
+    # shared blink loader, ADR-018; the original file is never modified).
     # @args: path - FITS path, progress - callable(str) for stage messages
     # @return: (numpy array 0..1, Wcs) or (None, None) with the reason
-    #          logged
-    from .core import blink, fits_io
-    from .core.sources import astrometry
-    from .core.wcs import Wcs
+    #          printed by the caller-visible BlinkError message
+    from .core import blink
     from .viz import blink_view
     try:
-        header, data = fits_io.read_fits(path)
-    except fits_io.FitsError as err:
-        logger.warning("cannot read the FITS: %s", err)
+        img = blink.load_user_image(
+            path, progress=lambda m: progress(f"{m['es']} / {m['en']}"))
+    except blink.BlinkError as err:
+        logger.warning("no usable FITS background: %s", err.messages["en"])
         return None, None
-    w = Wcs.from_header(header)
-    if w is None:
-        progress("Sin WCS: resolviendo con Astrometry.net / "
-                 "no WCS: solving with Astrometry.net")
-        cards = astrometry.solve(Path(path))
-        if cards:
-            w = Wcs.from_header(blink.merge_solved_wcs(header, cards))
-    if w is None:
-        logger.warning("no WCS available for %s", path)
-        return None, None
+    data = img["data"]
     stretched = blink_view.apply_stretch(data, *blink_view.auto_limits(data))
-    return stretched, w
+    return stretched, img["wcs"]
 
 
 def cmd_sequence(args):

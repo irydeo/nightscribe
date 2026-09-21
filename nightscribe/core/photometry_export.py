@@ -74,13 +74,27 @@ EFF_FIELDS = ("NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,"
               "AMASS,GROUP,CHART,NOTES")
 
 
-def export_eff(points, out, name, ra_deg=None, dec_deg=None, obscode=""):
+def export_eff(points, out, name, ra_deg=None, dec_deg=None, obscode="",
+               comp=None, check=None):
     # AAVSO Extended File Format (the WebObs/FotoDif interchange): header
     # lines starting with '#', then one line per point. Dates are HJD
     # (#DATE=HJD). Points without a full HJD are skipped — EFF has no
     # empty-date concept.
-    # @args: obscode - the AAVSO observer code (config aavso_code)
+    # @args: obscode - the AAVSO observer code (config aavso_code),
+    #        comp - optional {"name", "mag"} of the first comparison star
+    #        (ADR-042: from the project's saved sequence; CNAME/CMAG),
+    #        check - optional {"name", "mag"} of the check star (KNAME/KMAG)
     # @return: Path written
+    def _fmt(star):
+        # @return: (name, mag) EFF cells for a sequence star, "na" without it
+        if not star:
+            return "na", "na"
+        mag = star.get("mag")
+        return (star.get("name") or "na",
+                f"{mag:.3f}" if mag is not None else "na")
+
+    cname, cmag = _fmt(comp)
+    kname, kmag = _fmt(check)
     lines = ["#TYPE=EXTENDED",
              f"#OBSCODE={obscode or 'UNKNOWN'}",
              "#SOFTWARE=NightScribe",
@@ -96,7 +110,8 @@ def export_eff(points, out, name, ra_deg=None, dec_deg=None, obscode=""):
         merr = f"{p['err']:.3f}" if p.get("err") is not None else "0.000"
         filt = p.get("filter") or "Clear"
         lines.append(f"{name.upper()},{hjd:.5f},{p['mag']:.3f},{merr},"
-                     f"{filt},NA,STD,na,na,na,na,na,na,na,")
+                     f"{filt},NA,STD,{cname},{cmag},{kname},{kmag},"
+                     "na,na,na,")
         n += 1
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
     logger.info("photometry EFF written: %s (%d points)", out, n)

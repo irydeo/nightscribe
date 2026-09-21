@@ -287,7 +287,7 @@ def draw_finder(field, target=None, entries=None, image=None, wcs=None,
     if image is None:
         ax.set_facecolor(style.BG)
     else:
-        if isinstance(image, (str, bytes)):
+        if isinstance(image, (str, bytes)) or hasattr(image, "__fspath__"):
             import matplotlib.image as mpimg
             image = mpimg.imread(image)
         img = np.asarray(image)

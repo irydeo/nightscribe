@@ -18,13 +18,15 @@ from . import paths
 
 logger = logging.getLogger(__name__)
 
-# Defaults: the author's own observatory, used as a working example.
+# Defaults: no site pre-filled. A fresh install goes through the wizard
+# (ADR-042), which asks for the observatory and offers an optional
+# geolocation hint. Existing configs keep whatever they already saved.
 DEFAULTS = {
-    "mpc_code": "Z41",
-    "observatory_name": "Irydeo Observatory",
-    "lat": 40.55,           # geodetic degrees
-    "lon": -3.37,           # degrees east
-    "height": 631,          # meters
+    "mpc_code": "",           # MPC observatory code; optional, may stay empty
+    "observatory_name": "",
+    "lat": 0.0,               # geodetic degrees (the wizard fills them)
+    "lon": 0.0,               # degrees east (the wizard fills them)
+    "height": 0,              # meters (the wizard fills it, best effort)
     "aperture_inches": 10.0,
     # hard gate: drop Tonight transits whose ExoClock minimum aperture is
     # above ours (ADR-015 consequence, object-card plan subplan 6)
@@ -32,6 +34,7 @@ DEFAULTS = {
     "limit_mag": 20.0,
     "min_alt": 30.0,        # degrees above horizon
     "language": "system",   # system | es | en
+    "app_version": "",      # last app version the update wizard ran for
     "neofixer_key": "",     # optional, for reporting observing status
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
@@ -147,8 +150,19 @@ class Config:
         self.save()
 
     def is_configured(self):
-        # @return: True once the first-run wizard has been completed
-        return bool(self._data.get("mpc_code") and self._data.get("observatory_name"))
+        # "Configured" means: we know where the user looks at the sky.
+        # Coordinates are the real requirement; an MPC code alone counts
+        # too (e.g. a hand-edited config: ephemeris just falls back to the
+        # geocenter, which is honest and valid).
+        # @return: True if lat + lon are usable, or an MPC code is present
+        try:
+            has_coords = (float(self._data.get("lat")) != 0.0
+                          and float(self._data.get("lon")) != 0.0)
+        except (TypeError, ValueError):
+            has_coords = False
+        if has_coords:
+            return True
+        return bool((self._data.get("mpc_code") or "").strip())
 
     def resolve_from_mpc_code(self, code):
         # Fills lat/lon/height (height stays as-is; MPC gives lon + parallax

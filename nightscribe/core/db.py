@@ -55,6 +55,8 @@ SOURCE_TTL = {
     "astrometry": 30 * DAY,
     "ccdciel": 60,  # local JSON-RPC: covers quick reads (temp, filters,
                     # slewing) without hammering the observatory software
+    "geo": 1 * HOUR,         # IP geolocation for the wizard (per provider)
+    "elevation": 30 * DAY,   # open-meteo terrain height: static per place
 }
 
 _SCHEMA = """

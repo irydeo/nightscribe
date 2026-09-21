@@ -3934,7 +3934,7 @@ class MainWindow(QMainWindow):
         kind = ctx.get("kind") or p.get("kind")
         obj_id = (ctx.get("id") or ctx.get("packed")
                   or p.get("object_name") or ctx.get("object_name"))
-        site = config.get("mpc_code", "Z41")
+        site = config.get("mpc_code", "")
         if kind in ("neo", "comet", "pccp"):
             def action(c):
                 pos = ephemeris.position_at(obj_id, site,
@@ -4377,7 +4377,7 @@ class MainWindow(QMainWindow):
             return
         ctx = p.get("context") or {}
         obj_id = ctx.get("id") or ctx.get("packed") or p["object_name"]
-        site = config.get("mpc_code", "Z41")
+        site = config.get("mpc_code", "")
         lang = config.get("language", "es")
         spn = self._project_widgets.get("neo_zoom")
         zoom = spn.value() if spn else 2

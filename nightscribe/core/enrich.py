@@ -76,10 +76,11 @@ def _looks_like_variable(n):
         return False
 
 
-def enrich(name, date=None, site="Z41", fallback_target=None):
+def enrich(name, date=None, site="", fallback_target=None):
     # Gathers every interesting fact about an object.
     # @args: name - identifier, date - reference date (today),
-    #        site - MPC code, fallback_target - planner target dict used
+    #        site - MPC code (empty means geocenter, ADR-042),
+    #        fallback_target - planner target dict used
     #        when SBDB does not know the object (unconfirmed NEOCP/PCCP)
     # @return: dict with "type" and a "data" section per type
     kind = detect_type(name)

@@ -31,9 +31,25 @@ def _setup_logging(verbose):
         format="%(levelname)s %(name)s: %(message)s")
 
 
+def _no_site():
+    # ADR-042: no observatory configured. The CLI keeps its honesty and
+    # tells the user what to do, instead of silently computing everything
+    # around the geocenter (the wizard fixes it in a couple of minutes).
+    # @return: True when the site is missing (the command should stop)
+    if cfg.is_configured():
+        return False
+    print("No site configured / No hay observatorio configurado.")
+    print("Run the GUI once: a short wizard sets up your observatory.")
+    print(f"You can also edit {paths.config_dir() / 'nightscribe.json'} "
+          "with your coordinates and MPC code (optional).")
+    return True
+
+
 def cmd_tonight(args):
     # Best targets for tonight at the configured site.
     from .core import planner, suggest
+    if _no_site():
+        return 1
     date = datetime.date.fromisoformat(args.fecha) if args.fecha else None
     print(f"{__app_name__} — {cfg.get('observatory_name')} "
           f"(MPC {cfg.get('mpc_code')})")
@@ -66,6 +82,8 @@ def cmd_tonight(args):
 def cmd_explore(args):
     # Explained object card.
     from .core import enrich, narrative, orbits
+    if _no_site():
+        return 1
     e = enrich.enrich(args.objeto, site=cfg.get("mpc_code"))
     if not e or not e.get("data"):
         print(f"No se encontró / Not found: {args.objeto}")
@@ -83,6 +101,8 @@ def cmd_post(args):
     # always references every generated image (ready for a web page).
     import re
     from .core import enrich, post
+    if _no_site():
+        return 1
     e = enrich.enrich(args.objeto, site=cfg.get("mpc_code"))
     if not e or not e.get("data"):
         print(f"No se encontró / Not found: {args.objeto}")

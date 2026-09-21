@@ -113,7 +113,9 @@ def test_vsx_crossmatch_disqualifies_variables():
     unmatched = next(v for v in variables if v["name"] == "V0002 Cyg")
     assert matched["star"] is not None
     assert matched["star"]["id"] == "2100000000000008"
-    assert matched["star"]["vsx"] is matched
+    # one-way link: the snapshot never points back at the star (a var<->star
+    # cycle segfaulted the SequenceWorker's Signal(dict) emission)
+    assert "vsx" not in matched["star"]
     assert unmatched["star"] is None
     assert unmatched["distance_arcsec"] > compstars.VSX_MATCH_ARCSEC
 
@@ -137,6 +139,27 @@ def test_load_field_orchestrates_both_queries(monkeypatch):
     # the matched star carries its VSX tag
     s8 = next(s for s in field["stars"] if s["id"] == "2100000000000008")
     assert s8["vsx"]["name"] == "V0001 Cyg"
+
+
+def test_load_field_is_json_serializable(monkeypatch):
+    # Regression for the "Generate" segfault: a var<->star reference cycle
+    # in the field recursed forever in QVariant conversion when the worker
+    # emitted it. json.dumps refuses cycles, so a passing dump pins the
+    # structure acyclic (and keeps context saves safe too).
+    import json
+    bodies = {
+        "gaia": (FIX / "vizier_gaia.tsv").read_bytes(),
+        "vsx": (FIX / "vizier_vsx.tsv").read_bytes(),
+    }
+
+    def fake_http_get(key, source, fetch, force=False):
+        catalog = "vsx" if "B/vsx" in key else "gaia"
+        return bodies[catalog], "text/tab-separated-values"
+
+    monkeypatch.setattr(vizier.db, "http_get", fake_http_get)
+    field = compstars.load_field("gaia", CENTER[0], CENTER[1], 18.0)
+    assert field["variables"]           # the fixture does cross-match
+    json.dumps(field)
 
 
 def test_load_field_catalog_failure_is_none(monkeypatch):

@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
                                 QListWidget, QListWidgetItem, QMainWindow,
-                                QMessageBox, QProgressBar,
+                                QMessageBox, QProgressBar, QProgressDialog,
                                 QPushButton, QScrollArea,
                                 QSpinBox, QDoubleSpinBox, QComboBox,
                                 QCheckBox, QDialogButtonBox, QTextEdit,
@@ -5808,14 +5808,36 @@ class MainWindow(QMainWindow):
                            spn_comps.value(), spn_mag.value(),
                            Path(fits_path) if fits_path else None,
                            self._lang())
+        # The build takes seconds (VizieR + image download): a modal busy
+        # dialog says so plainly — the status bar alone reads as "nothing
+        # is happening". No Cancel: a download cannot be aborted halfway,
+        # so the dialog never promises what it cannot keep.
+        wait = QProgressDialog(
+            self.tr("Building the comparison chart…"), "", 0, 0, self)
+        wait.setWindowTitle(self.tr("Comparison chart"))
+        wait.setWindowModality(Qt.WindowModal)
+        wait.setCancelButton(None)
+        wait.setMinimumDuration(0)
+        w.progress.connect(wait.setLabelText)
         w.progress.connect(lambda m: self.statusBar().showMessage(m, 0))
         save_camp = chk_camp is not None and chk_camp.isChecked()
         w.finished.connect(
-            lambda out: self._fu_sequence_done(pid, out, save_camp))
+            lambda out: self._fu_sequence_landed(wait, pid, out, save_camp))
         self._keep(w)
         self.statusBar().showMessage(
             self.tr("Building the comparison chart…"), 0)
         w.start()
+
+    def _fu_sequence_landed(self, wait, pid, out, save_campaign):
+        # The SequenceWorker finished: the wait dialog is closed and reaped
+        # BEFORE anything else runs — the picker's exec() spins a nested
+        # loop, so any pending dialog would otherwise linger on top of it.
+        # close()+deleteLater(): the reap discipline of e31f394.
+        # @args: wait - the busy QProgressDialog, pid - project id,
+        #        out - worker payload, save_campaign - protocol flag
+        wait.close()
+        wait.deleteLater()
+        self._fu_sequence_done(pid, out, save_campaign)
 
     def _fu_sequence_done(self, pid, out, save_campaign):
         # Lands the SequenceWorker result: warnings on the status bar and

@@ -72,6 +72,10 @@ nightscribe/
     vigils.py        # vigilias de variables (ADR-037 SC4a): lista curada editable
                      #   (T CrB/R CrB), chequeo ZTF vs basal (caché propia 12 h)
     photometry_export.py  # reporte fotométrico: CSV + AAVSO EFF (TTL n/a, local)
+    phototrans.py     # transformaciones Gaia->Johnson-Cousins (Riello 2021),
+                      #   B-V directo/estimado, clase de color (ADR-042)
+    compstars.py      # secuencias fotométricas: campo de catálogo, cruce VSX,
+                      #   propuesta automática de comps, CSV (ADR-042)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
@@ -87,6 +91,8 @@ nightscribe/
                       # + ccdciel.py: cliente JSON-RPC local del observatorio (ADR-030,
                       #   solo comanda con CCDciel abierto; lecturas cacheadas TTL 60s)
                       # + vsx.py: AAVSO VSX (subdominio vsx.aavso.org, TTL 7 d; ADR-035)
+                      # + vizier.py: cone searches VizieR asu-tsv (Gaia EDR3,
+                      #   APASS DR9, VSX B/vsx; TTL 30 d; ADR-042)
                       # + surveys.py: contexto ALeRCE/ZTF en curvas (TTL 30 d; ADR-035)
                       #   y última magnitud para vigilias (claves "vigils:", TTL 12 h)
                       # + aavso.py: canal editorial AAVSO — alertas del foro (JSON

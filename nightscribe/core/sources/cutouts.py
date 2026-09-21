@@ -13,6 +13,8 @@
 
 import logging
 
+import io
+
 import requests
 
 from ... import paths
@@ -42,11 +44,28 @@ def _save(body, name):
         return None
 
 
+def _flat_image(body):
+    # A "no coverage" answer is a valid 200 JPEG, just flat (Legacy Survey
+    # fills with uniform gray 32): detect it by the luminance spread of a
+    # small thumbnail, no numpy needed. Undecodable bodies count as flat.
+    # @args: body - JPEG bytes
+    # @return: True when the image carries no structure
+    try:
+        from PIL import Image
+        lo, hi = Image.open(io.BytesIO(body)).convert("L") \
+            .resize((128, 128)).getextrema()
+        return hi - lo < 8
+    except Exception:
+        return True
+
+
 def reference_cutout(ra, dec, size=512, pixscale=2.0):
     # Colour reference image of a sky field (public services, see ADR-016).
-    # Tries DESI Legacy Survey first, falls back to DSS colour via hips2fits.
+    # Tries DESI Legacy Survey first, falls back to DSS colour via
+    # hips2fits; a flat "no coverage" tile falls through to the next source
+    # so the caller never shows an empty pane believing it is the sky.
     # @args: ra, dec - degrees, size - pixels, pixscale - arcsec/pixel
-    # @return: local Path to a JPEG, or None
+    # @return: (local Path to the JPEG, source label) or (None, None)
     ra, dec = float(ra), float(dec)
 
     def fetch_ls():
@@ -56,8 +75,15 @@ def reference_cutout(ra, dec, size=512, pixscale=2.0):
         r.raise_for_status()
         return r.content, "image/jpeg"
     try:
-        body, _ = db.http_get(f"cutouts:ls:{ra}:{dec}:{size}", "cutouts", fetch_ls)
-        return _save(body, f"cutout_{ra:.4f}_{dec:.4f}_{size}.jpg")
+        body, _ = db.http_get(f"cutouts:ls:{ra}:{dec}:{size}", "cutouts",
+                              fetch_ls)
+        if _flat_image(body):
+            logger.info("Legacy Survey cutout is a flat tile at %.4f,%+.4f"
+                        " (no coverage?); trying DSS", ra, dec)
+        else:
+            out = _save(body, f"cutout_{ra:.4f}_{dec:.4f}_{size}.jpg")
+            if out is not None:
+                return out, "Legacy Survey DR10"
     except requests.RequestException:
         logger.info("Legacy Survey cutout failed, trying DSS")
 
@@ -72,10 +98,16 @@ def reference_cutout(ra, dec, size=512, pixscale=2.0):
     try:
         body, _ = db.http_get(f"cutouts:dss:{ra}:{dec}:{size}", "cutouts",
                               fetch_dss)
-        return _save(body, f"cutout_dss_{ra:.4f}_{dec:.4f}_{size}.jpg")
+        if _flat_image(body):
+            logger.warning("DSS cutout is a flat tile too at %.4f,%+.4f",
+                           ra, dec)
+        else:
+            out = _save(body, f"cutout_dss_{ra:.4f}_{dec:.4f}_{size}.jpg")
+            if out is not None:
+                return out, "DSS2 color (CDS)"
     except requests.RequestException as err:
         logger.warning("DSS cutout failed: %s", err)
-        return None
+    return None, None
 
 
 def _hips_fits(hips, ra, dec, width, height, pixscale, rotation, tag):

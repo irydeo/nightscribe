@@ -304,8 +304,9 @@ def cmd_sequence(args):
     if field["vsx_warning"]:
         print("⚠ ES: sin consulta VSX (las variables del campo no se marcan)\n"
               "  EN: no VSX query (field variables are not flagged)")
-    # background: the user's FITS when given (its WCS rules), else DSS2
-    image, wcs, img_label = None, None, "DSS2 color (CDS)"
+    # background: the user's FITS when given (its WCS rules), else a survey
+    # cutout; img_label names the source that actually served ("" = none)
+    image, wcs, img_label = None, None, ""
     if args.fits:
         image, wcs = _fits_background(args.fits, print)
         if wcs is not None:
@@ -321,8 +322,10 @@ def cmd_sequence(args):
                   "  EN: no astrometry for your FITS; using DSS2")
     if wcs is None and not args.sin_imagen:
         pixscale = fov * 60.0 / 1000.0
-        image = cutouts.reference_cutout(ra, dec, size=1000,
-                                         pixscale=pixscale)
+        image, src_label = cutouts.reference_cutout(ra, dec, size=1000,
+                                                    pixscale=pixscale)
+        if src_label:
+            img_label = src_label
     # the proposal needs a target magnitude: VSX max, --mag, or the
     # field median as an honest middle
     target_mag = args.mag
@@ -342,9 +345,10 @@ def cmd_sequence(args):
         catalog_label=field["catalog_name"])
     png_path = outdir / f"{safe}_carta.png"
     target = {"name": name, "ra": ra, "dec": dec}
+    wm = f"NightScribe · {img_label}" if img_label else "NightScribe"
     finder_view.draw_finder(field, target=target, entries=entries,
                             image=image, wcs=wcs, out=png_path, lang=lang,
-                            watermark=f"NightScribe · {img_label}")
+                            watermark=wm)
     print(f"{name} @ ({ra:.5f}, {dec:+.5f}) — {field['catalog_name']}, "
           f"{len(entries)} estrellas / stars (objetivo mag "
           f"{target_mag:.2f} / target)")

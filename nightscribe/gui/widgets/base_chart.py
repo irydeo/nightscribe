@@ -31,12 +31,14 @@ from ...viz import palette
 # and deliberately knows nothing about the concrete chart.
 
 # The tooltip box is a semi-transparent panel with a 1px border; it follows
-# the cursor while the hover probe answers "yes".
+# the cursor while the hover probe answers "yes". The font size is a SCREEN
+# size: the tooltip is a scene item, so _show_tooltip compensates by the
+# current view scale (a fixed scene size read tiny at fit and huge zoomed in).
 _TT_PAD = 6            # px
 _TT_BG = QColor(0, 0, 0, 170)
 _TT_BORDER = QColor("#2a2f42")
 _TT_TEXT = QColor(palette.FG)
-_TT_FONT_PX = 12
+_TT_FONT_PT = 10.5     # screen points (≈14 px), constant at any zoom
 
 # wheel zoom: one step = this many percent, capped by setZoomLimits(0.05, 8).
 _WHEEL = 1.25
@@ -76,6 +78,11 @@ class ChartView(QGraphicsView):
                                        # drag); the QPointF is in *scene*
                                        # coordinates so a subclass can hit-test
                                        # it (e.g. SkyChart's safe-window band).
+
+    # Zoom limits as class attributes so a subclass can retune them (the
+    # finder chart needs pixel-level zoom, the orbit chart does not).
+    ZOOM_MIN = _ZOOM_MIN
+    ZOOM_MAX = _ZOOM_MAX
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -245,7 +252,7 @@ class ChartView(QGraphicsView):
         # @args: factor — a positive number; applied to the current scale
         old = self.transform().m11()
         new = old * factor
-        if new < _ZOOM_MIN or new > _ZOOM_MAX:
+        if new < self.ZOOM_MIN or new > self.ZOOM_MAX:
             return
         super().scale(factor, factor)
 
@@ -342,9 +349,6 @@ class ChartView(QGraphicsView):
         join = "\n".join(str(x) for x in lines)
         if self._tooltip is None:
             self._tooltip = QGraphicsSimpleTextItem()
-            f = QFont()
-            f.setPointSize(_TT_FONT_PX)
-            self._tooltip.setFont(f)
             self._tooltip.setBrush(QBrush(_TT_TEXT))
             self._tooltip.setZValue(100)
             self._scene.addItem(self._tooltip)
@@ -354,6 +358,12 @@ class ChartView(QGraphicsView):
             self._tip_panel.setPen(QPen(_TT_BORDER, 1))
             self._tip_panel.setZValue(99)
             self._scene.addItem(self._tip_panel)
+        # constant screen size at any zoom: the tooltip is a scene item,
+        # so font, gaps and padding are divided by the view scale
+        scale = max(self.transform().m11(), 1e-3)
+        f = QFont()
+        f.setPointSizeF(max(0.5, _TT_FONT_PT / scale))
+        self._tooltip.setFont(f)
         self._tooltip.setText(join)
         br = self._tooltip.boundingRect()
         # the tooltip sits a short offset from the cursor, flipping sides
@@ -363,16 +373,19 @@ class ChartView(QGraphicsView):
         view_h = self.viewport().height()
         # approximate the visible scene width to decide the flip
         edge = self.mapToScene(view_w, 0).x()
-        if cursor.x() + 14 + br.width() > edge:
-            x = cursor.x() - br.width() - 14
+        gap = 14.0 / scale
+        if cursor.x() + gap + br.width() > edge:
+            x = cursor.x() - br.width() - gap
         else:
-            x = cursor.x() + 14
-        y = cursor.y() - br.height() - 8
+            x = cursor.x() + gap
+        y = cursor.y() - br.height() - 8.0 / scale
         top = self.mapToScene(0, 0).y()
         if y < top:
-            y = cursor.y() + 14
+            y = cursor.y() + gap
         self._tooltip.setPos(x, y)
-        self._tip_panel.setRect(br.adjusted(-_TT_PAD, -_TT_PAD, _TT_PAD, _TT_PAD).translated(x, y))
+        pad = _TT_PAD / scale
+        self._tip_panel.setRect(
+            br.adjusted(-pad, -pad, pad, pad).translated(x, y))
         if not self._tip_emitted:
             self._tip_emitted = True
             self.hover_changed.emit(True)

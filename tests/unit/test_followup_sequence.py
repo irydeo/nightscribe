@@ -215,7 +215,8 @@ def test_sequence_worker_with_faked_field(tmp_path, monkeypatch):
     from nightscribe.core import compstars
     from nightscribe.core.sources import cutouts
     monkeypatch.setattr(compstars, "load_field", _fake_field)
-    monkeypatch.setattr(cutouts, "reference_cutout", lambda *a, **k: None)
+    monkeypatch.setattr(cutouts, "reference_cutout", lambda *a, **k:
+                        (None, None))
     from nightscribe.gui.workers import SequenceWorker
     center = (291.366, 42.784)
     w = SequenceWorker("V0001 Cyg", center[0], center[1], "gaia", 18.0,

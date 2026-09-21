@@ -240,7 +240,7 @@ QWidget {{ color: {C_TEXT}; }}
 
 /* ---- buttons --------------------------------------------------------- */
 QPushButton {{
-    background: {C_PANEL}; color: {C_TEXT}; border: none;
+    background: {C_PANEL}; color: {C_TEXT}; border: 1px solid {C_LINE};
     border-radius: 4px; padding: 6px 16px;
 }}
 QPushButton:hover {{ background: {C_HOVER}; }}

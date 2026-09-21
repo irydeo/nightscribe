@@ -130,7 +130,8 @@ def test_sequence_worker_emits_a_crossmatched_field(qapp, monkeypatch):
              "center": (238.786, 25.92), "fov_arcmin": 18.0,
              "vsx_warning": False}
     monkeypatch.setattr(compstars, "load_field", lambda *a, **k: field)
-    monkeypatch.setattr(cutouts, "reference_cutout", lambda *a, **k: None)
+    monkeypatch.setattr(cutouts, "reference_cutout", lambda *a, **k:
+                        (None, None))
 
     w = SequenceWorker("T CrB", 238.786, 25.92, "gaia", 18.0, 8, 10.0,
                        None, "en")

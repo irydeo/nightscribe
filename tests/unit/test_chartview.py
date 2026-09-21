@@ -199,6 +199,36 @@ def test_hover_probe_can_be_disabled(qapp):
     v.close()
 
 
+def test_tooltip_font_tracks_zoom_for_a_constant_screen_size(qapp):
+    # The tooltip is a scene item: its font is divided by the view scale
+    # so it reads the same on screen at fit and at deep zoom (a fixed
+    # scene size read tiny at fit and huge when zoomed in).
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+
+    def move(v):
+        evt = QMouseEvent(QEvent.Type.MouseMove, QPointF(300, 200),
+                          QPointF(300, 200), QPointF(300, 200),
+                          Qt.NoButton, Qt.NoButton, Qt.NoModifier)
+        v.mouseMoveEvent(evt)
+
+    v = _mk_view(qapp)
+    v.set_hover_probe(lambda x, y: (True, "probe"))
+    move(v)
+    scale1 = v.transform().m11()
+    size1 = v._tooltip.font().pointSizeF()
+    v.scale(2.0, 2.0)
+    move(v)
+    scale2 = v.transform().m11()
+    size2 = v._tooltip.font().pointSizeF()
+    assert scale2 == pytest.approx(scale1 * 2.0)
+    # the scene-unit font halves when the view doubles: the on-screen
+    # size stays put
+    assert size2 == pytest.approx(size1 / 2.0, rel=0.02)
+    assert size1 * scale1 == pytest.approx(size2 * scale2, rel=0.02)
+    v.close()
+
+
 def test_clear_drops_registered_items(qapp):
     from PySide6.QtWidgets import QGraphicsRectItem
     from nightscribe.gui.widgets.base_chart import ChartView

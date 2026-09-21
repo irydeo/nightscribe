@@ -46,7 +46,7 @@ C_VAR = "#ff6378"
 C_RING = "#58d68d"
 
 _MAX_LABELS = 34
-_PICK_R = 16.0        # hover/click radius in scene units (1000-wide scene)
+_PICK_PX = 11.0       # hover/click radius in SCREEN px (constant at any zoom)
 
 
 def _pen(hex_color, width=1.6, cosmetic=True):
@@ -81,6 +81,8 @@ class FinderChart(ChartView):
     # every click that adds/removes a star so the parent dialog can keep
     # its table in sync.
     sequence_changed = Signal()
+
+    ZOOM_MAX = 30.0   # pixel-level inspection of close pairs (base keeps 8)
 
     def __init__(self, parent=None, lang="es"):
         super().__init__(parent)
@@ -130,7 +132,6 @@ class FinderChart(ChartView):
             bg.setPixmap(QPixmap.fromImage(qimg))
             bg.setZValue(-1)
             self.add_item(bg)
-        self.set_scene_rect(0, 0, self._w, self._h)
         # catalog stars carry their scene position for hover/click/labels
         self._stars = []
         for star in field.get("stars", []):
@@ -138,6 +139,9 @@ class FinderChart(ChartView):
             if 0 <= x <= self._w and 0 <= y <= self._h:
                 star["_sx"], star["_sy"] = x, y
                 self._stars.append(star)
+        if qimg is None:
+            self._draw_synthetic_sky()
+        self.set_scene_rect(0, 0, self._w, self._h)
         self._draw_frame()
         self._draw_ticks()
         self._draw_scale()
@@ -198,6 +202,21 @@ class FinderChart(ChartView):
         frame = QGraphicsRectItem(1, 1, self._w - 2, self._h - 2)
         frame.setPen(_pen(palette.FG, 2.0))
         self.add_item(frame)
+
+    def _draw_synthetic_sky(self):
+        # No field image at all (the downloads failed or every survey tile
+        # was flat): the catalog itself becomes the background, one soft
+        # dot per star, so the chart never opens on an empty black pane.
+        brush = QBrush(QColor(223, 228, 238, 150))
+        for star in self._stars:
+            r = max(0.9, min(4.5, (19.0 - star["mag"]) * 0.42))
+            r *= self._w / field_math.CANVAS
+            dot = QGraphicsEllipseItem(star["_sx"] - r, star["_sy"] - r,
+                                       2 * r, 2 * r)
+            dot.setBrush(brush)
+            dot.setPen(Qt.NoPen)
+            dot.setZValue(-1)
+            self.add_item(dot)
 
     def _draw_ticks(self):
         count = 250
@@ -407,7 +426,9 @@ class FinderChart(ChartView):
 
     def _nearest_star(self, sx, sy):
         # @return: the catalog star within pick radius of (sx, sy), or None
-        radius = _PICK_R * self._w / field_math.CANVAS
+        # the radius is a constant SCREEN distance (~11 px): a fixed scene
+        # radius would cover a third of the view at deep zoom
+        radius = _PICK_PX / max(self.transform().m11(), 1e-3)
         best, best_d = None, radius * radius
         for s in self._stars:
             dx, dy = s["_sx"] - sx, s["_sy"] - sy

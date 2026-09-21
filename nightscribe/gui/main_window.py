@@ -5792,13 +5792,11 @@ class MainWindow(QMainWindow):
 
         from .workers import SequenceWorker
         fits_path = ed_fits.text().strip()
-        outdir = project.storage_dir(p)
-        outdir.mkdir(parents=True, exist_ok=True)
         w = SequenceWorker(p["object_name"], ra, dec,
                            cmb_cat.currentData(), float(spn_fov.value()),
                            spn_comps.value(), spn_mag.value(),
                            Path(fits_path) if fits_path else None,
-                           outdir, self._lang())
+                           self._lang())
         w.progress.connect(lambda m: self.statusBar().showMessage(m, 0))
         save_camp = chk_camp is not None and chk_camp.isChecked()
         w.finished.connect(
@@ -5809,11 +5807,9 @@ class MainWindow(QMainWindow):
         w.start()
 
     def _fu_sequence_done(self, pid, out, save_campaign):
-        # Lands the SequenceWorker result: files registered, sequence into
-        # the project context (and the campaign protocol when asked),
-        # status line refreshed, chart opened in the viewer.
-        # @args: pid - project id, out - worker payload, save_campaign -
-        #        write the sequence into the campaign protocol too
+        # Lands the SequenceWorker result: warnings on the status bar and
+        # the interactive picker dialog (ADR-042 phase 4); files/context
+        # are only written when the user saves from the dialog.
         self.statusBar().clearMessage()
         if out.get("status") != "ok":
             self.statusBar().showMessage(
@@ -5823,23 +5819,6 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if not p:
             return
-        entries = out["entries"]
-        project.add_file(db, pid, out["csv"], "report")
-        project.add_file(db, pid, out["png"], "chart")
-        project.update_context(db, pid, {"sequence": {
-            "catalog": out["catalog"], "catalog_name": out["catalog_name"],
-            "fov_arcmin": out["fov_arcmin"], "target_mag":
-            out["target_mag"], "entries": entries, "csv": out["csv"],
-            "png": out["png"]}})
-        if save_campaign and p.get("campaign_id"):
-            from ..core import campaign as _camp
-            c = _camp.get(db, p["campaign_id"])
-            if c:
-                prot = c.get("protocol") or {}
-                prot["comp_stars"] = [
-                    f"{e['name']} {e['star']['band']} "
-                    f"{e['star']['mag']:.2f}" for e in entries]
-                _camp.update(db, c["id"], protocol=prot)
         notes = []
         if out.get("vsx_warning"):
             notes.append(self.tr(
@@ -5849,17 +5828,51 @@ class MainWindow(QMainWindow):
         if out.get("target_outside"):
             notes.append(self.tr(
                 "the target falls outside your image: DSS2 used instead"))
+        if notes:
+            self.statusBar().showMessage(". ".join(notes), 10000)
+        from .seqchart_dialog import SeqChartDialog
+        dlg = SeqChartDialog(
+            self, p["object_name"], out["field"], out["entries"],
+            image=out.get("image"), wcs=out.get("wcs"),
+            img_label=out.get("img_label", ""), lang=self._lang(),
+            default_dir=project.storage_dir(p),
+            on_save=lambda entries, files: self._fu_sequence_save(
+                pid, entries, files, out, save_campaign))
+        dlg.exec()
+
+    def _fu_sequence_save(self, pid, entries, files, out, save_campaign):
+        # Persists the sequence the user confirmed in the picker dialog:
+        # files registered, sequence into the project context (and the
+        # campaign protocol when asked), status line refreshed.
+        # @args: pid - project id, entries - sequence entries, files -
+        #        {"csv", "png"} written by the dialog, out - the worker
+        #        payload (catalog metadata), save_campaign - protocol flag
+        p = project.get(db, pid)
+        if not p:
+            return
+        project.add_file(db, pid, files["csv"], "report")
+        project.add_file(db, pid, files["png"], "chart")
+        project.update_context(db, pid, {"sequence": {
+            "catalog": out["catalog"], "catalog_name": out["catalog_name"],
+            "fov_arcmin": out["fov_arcmin"], "target_mag":
+            out["target_mag"], "entries": entries, "csv": files["csv"],
+            "png": files["png"]}})
+        if save_campaign and p.get("campaign_id"):
+            from ..core import campaign as _camp
+            c = _camp.get(db, p["campaign_id"])
+            if c:
+                prot = c.get("protocol") or {}
+                prot["comp_stars"] = [
+                    f"{e['name']} {e['star']['band']} "
+                    f"{e['star']['mag']:.2f}" for e in entries]
+                _camp.update(db, c["id"], protocol=prot)
         self.statusBar().showMessage(
-            self.tr("Comparison chart ready") +
-            (": " + ". ".join(notes) if notes else ""), 10000)
+            self.tr("Comparison chart ready"), 8000)
         p = project.get(db, pid)
         lbl = self._project_widgets.get("fu_sequence")
         if lbl is not None and p:
             lbl.setText(self._fu_sequence_status_text(p))
         self._populate_project_files(pid)
-        from .chart_viewer import open_chart
-        open_chart(self, out["png"], title=self.tr("Comparison chart"),
-                   obj_name=p["object_name"], chart_key="finder")
 
     def _fu_export_report(self, pid):
         # Exports the project's photometry to CSV or AAVSO EFF (HJD in-app,

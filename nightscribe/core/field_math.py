@@ -153,6 +153,24 @@ def format_dec_tick(arcsec, step):
     return f"{sign}{d}\u00b0{m:02d}\u2032{s:02d}\u2033"
 
 
+def label_layout(points, clear, cap):
+    # The label collision rule (SecFot): the caller sorts by priority
+    # (brightest first); a point keeps its label when no kept point sits
+    # closer than `clear` (same units); at most `cap` labels survive.
+    # @args: points - [(x, y, payload)...] in priority order, clear -
+    #        minimum separation, cap - maximum labels
+    # @return: list of kept payloads
+    kept, occupied = [], []
+    for x, y, payload in points:
+        if any(math.hypot(ox - x, oy - y) < clear for ox, oy in occupied):
+            continue
+        occupied.append((x, y))
+        kept.append(payload)
+        if len(kept) >= cap:
+            break
+    return kept
+
+
 def nice_scale(field_arcmin):
     # Round scale-bar length: the largest round option under ~29% of the
     # field (SecFot's rule).

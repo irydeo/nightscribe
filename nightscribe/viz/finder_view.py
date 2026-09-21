@@ -128,22 +128,18 @@ def _halo_text(ax, x, y, text, size=9, color=None, ha="left", bold=False,
 
 
 def _label_positions(stars, geo):
-    # SecFot's collision rule: brightest first, a star keeps its label when
-    # no labelled star sits closer than _LABEL_CLEAR (canvas-scaled).
+    # The label collision rule lives in core/field_math (shared with the
+    # GUI widget, ADR-029); here we only project and crop to the frame.
     # @return: the stars that keep a label
     clear = _LABEL_CLEAR * geo.width / field_math.CANVAS
-    occupied = []
+    points = []
     for star in stars:
         x, y = geo.to_xy(star["ra"], star["dec"])
         if not (8 <= x <= geo.width - 8 and 8 <= y <= geo.height - 8):
             continue
-        if any(math.hypot(ox - x, oy - y) < clear for ox, oy in occupied):
-            continue
-        occupied.append((x, y))
         star["_x"], star["_y"] = x, y
-        if len(occupied) >= MAX_LABELS:
-            break
-    return [s for s in stars if "_x" in s]
+        points.append((x, y, star))
+    return field_math.label_layout(points, clear, MAX_LABELS)
 
 
 def _draw_ticks(ax, geo):

@@ -55,7 +55,8 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 
 ```
 nightscribe/
-  __main__.py        # CLI: tonight | explore | post | solar | blink | history | gui
+  __main__.py        # CLI: tonight | explore | post | solar | blink | history |
+                     #   sequence (secuencia fotométrica + carta, ADR-042) | gui
   config.py          # configuración persistente (observatorio, idioma, claves)
   paths.py           # rutas por SO (platformdirs)
   core/
@@ -76,6 +77,8 @@ nightscribe/
                       #   B-V directo/estimado, clase de color (ADR-042)
     compstars.py      # secuencias fotométricas: campo de catálogo, cruce VSX,
                       #   propuesta automática de comps, CSV (ADR-042)
+    field_math.py     # proyección TAN de la carta, ticks de borde, escala,
+                      #   anti-colisión de rótulos (compartido viz/widget, ADR-042)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
@@ -107,22 +110,27 @@ nightscribe/
     satellites.py    # tránsitos de galileanos + sombras sobre Júpiter para el
                      #   sitio del usuario (IAU WGCCRE + calibración Horizons,
                      #   ±10 min etiquetado — ADR-040)
-  viz/               # matplotlib: style, orbit_view, sky_view,
-                     # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
-                     # + evolution_view (evolución SN) y motion_view (movimiento NEO —
-                     #   la "prueba de fuego", Track C)
-   gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
-                      # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
-                      # (ADR-019/035/036/040) — el **Diario de observación** y el
-                      # **Calendario del cielo** (skycal_dialog.py, ADR-040) viven en
-                      # el menú Herramientas; los chips de eventos del cielo viven en
-                      # la cabecera de Tonight (clic → diálogo)
-                      # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
-                      # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
-                      # lenguaje llano + ayudas ⓘ, filas ricas
-                      # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
-                      #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
-                      #   y las filas ricas project_row / campaign_row + sparkline, U2/U5)
+   viz/               # matplotlib: style, orbit_view, sky_view,
+                      # sun_panel, transit_view, sn_view, blink_view (GIF/MP4/PNG blink)
+                      # + evolution_view (evolución SN) y motion_view (movimiento NEO —
+                      #   la "prueba de fuego", Track C)
+                      # + finder_view (carta de comparación: secuencia fotométrica
+                      #   sobre DSS2 o el FITS del usuario — ADR-042)
+    gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
+                       # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
+                       # (ADR-019/035/036/040) — el **Diario de observación** y el
+                       # **Calendario del cielo** (skycal_dialog.py, ADR-040) viven en
+                       # el menú Herramientas; los chips de eventos del cielo viven en
+                       # la cabecera de Tonight (clic → diálogo)
+                       # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
+                       # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
+                       # lenguaje llano + ayudas ⓘ, filas ricas
+                       # + la **pestaña Seguimiento** lleva la «Carta de comparación…»
+                       #   (seqchart_dialog.py + widgets/finder_widget.py, picker
+                       #   interactivo de comps — ADR-042)
+                       # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
+                       #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
+                       #   y las filas ricas project_row / campaign_row + sparkline, U2/U5)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

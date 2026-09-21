@@ -310,14 +310,16 @@ class SurveyWorker(QThread):
 
 
 class SequenceWorker(QThread):
-    # Builds the photometric sequence + comparison chart off the GUI thread
-    # (ADR-042): VizieR field, optional user FITS background (solved with
-    # Astrometry.net when it lacks WCS), automatic proposal, CSV + PNG.
+    # Gathers the photometric sequence off the GUI thread (ADR-042):
+    # VizieR field, the background (user FITS solved with Astrometry.net
+    # when it lacks WCS, else the DSS2 cutout) and the automatic proposal.
+    # It writes NO files: the SeqChartDialog owns the exports, so the user
+    # can adjust the sequence before anything lands on disk.
     finished = Signal(dict)     # {"status": ok|error, "error", ...}
     progress = Signal(str)      # stage message for the dialog's status line
 
     def __init__(self, name, ra_deg, dec_deg, catalog, fov_arcmin,
-                 n_comps, target_mag, fits_path, outdir, lang):
+                 n_comps, target_mag, fits_path, lang):
         super().__init__()
         self._name = name
         self._ra, self._dec = ra_deg, dec_deg
@@ -326,7 +328,6 @@ class SequenceWorker(QThread):
         self._n = n_comps
         self._mag = target_mag
         self._fits = fits_path
-        self._outdir = outdir
         self._lang = lang
 
     def run(self):
@@ -352,12 +353,9 @@ class SequenceWorker(QThread):
             self.finished.emit({"status": "error", "error": str(err)})
 
     def _build(self, field):
-        import re
-        import matplotlib
-        matplotlib.use("Agg")
         from ..core import blink, compstars
         from ..core.sources import cutouts
-        from ..viz import blink_view, finder_view
+        from ..viz import blink_view
         out = {"status": "ok", "field": field, "vsx_warning":
                field["vsx_warning"]}
         image, wcs, img_label = None, None, "DSS2 color (CDS)"
@@ -397,21 +395,9 @@ class SequenceWorker(QThread):
             mag = mags[len(mags) // 2]
         seq = compstars.propose_comps(field["stars"], mag, n=self._n)
         entries = seq["comps"] + ([seq["check"]] if seq["check"] else [])
-        safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", self._name)
-        csv_path = compstars.export_sequence_csv(
-            entries, self._outdir / f"{safe}_secuencia.csv",
-            target_name=self._name, catalog_label=field["catalog_name"])
-        png_path = self._outdir / f"{safe}_carta.png"
-        self.progress.emit(
-            "Dibujando la carta…" if self._lang != "en"
-            else "Drawing the chart…")
-        finder_view.draw_finder(
-            field, target={"name": self._name, "ra": self._ra,
-                           "dec": self._dec},
-            entries=entries, image=image, wcs=wcs, out=png_path,
-            lang=self._lang, watermark=f"NightScribe · {img_label}")
-        out.update(entries=entries, png=str(png_path), csv=str(csv_path),
-                   target_mag=mag, catalog=field["catalog"],
+        out.update(entries=entries, image=image, wcs=wcs,
+                   img_label=img_label, target_mag=mag,
+                   catalog=field["catalog"],
                    catalog_name=field["catalog_name"],
                    fov_arcmin=field["fov_arcmin"],
                    n_variables=len(field["variables"]))

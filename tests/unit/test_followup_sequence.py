@@ -92,14 +92,15 @@ def _fake_payload(tmp_path, n=4):
     from nightscribe.core import compstars
     entries = [_fake_entry(i) for i in range(1, n + 1)]
     entries.append(_fake_entry(0, "check"))
-    csv_path = tmp_path / "seq.csv"
-    csv_path.write_text("# test\n", encoding="utf-8")
-    png_path = tmp_path / "carta.png"
-    png_path.write_bytes(b"\x89PNG\r\n\x1a\n")
-    return {"status": "ok", "entries": entries, "csv": str(csv_path),
-            "png": str(png_path), "target_mag": 13.5, "catalog": "gaia",
-            "catalog_name": "Gaia EDR3", "fov_arcmin": 18.0,
-            "n_variables": 1, "vsx_warning": False}
+    return {"status": "ok", "entries": entries, "target_mag": 13.5,
+            "catalog": "gaia", "catalog_name": "Gaia EDR3",
+            "fov_arcmin": 18.0, "n_variables": 1, "vsx_warning": False,
+            "image": None, "wcs": None, "img_label": "DSS2 color (CDS)",
+            "field": {"stars": [e["star"] for e in entries],
+                      "variables": [], "catalog": "gaia",
+                      "catalog_name": "Gaia EDR3", "band": "G",
+                      "center": (291.366, 42.784), "fov_arcmin": 18.0,
+                      "vsx_warning": False}}
 
 
 def _open_followup(window, p):
@@ -123,18 +124,48 @@ def test_followup_shows_the_primary_button(window):
     assert "No comparison sequence yet" in lbl.text()
 
 
-def test_sequence_done_registers_and_updates(window, tmp_path,
-                                             monkeypatch):
-    import nightscribe.core.db as dbmod
-    import nightscribe.gui.chart_viewer as cv
-    from nightscribe.core import project
-    opened = []
-    monkeypatch.setattr(cv, "open_chart",
-                        lambda *a, **k: opened.append((a, k)))
+def test_sequence_done_opens_the_picker(window, tmp_path, monkeypatch):
+    # on the worker's ok payload the interactive dialog opens; nothing is
+    # saved until the user confirms inside it
+    import nightscribe.gui.seqchart_dialog as sd
+    seen = []
+
+    class FakeDialog:
+        def __init__(self, *args, **kwargs):
+            seen.append((args, kwargs))
+
+        def exec(self):
+            return 0
+
+    monkeypatch.setattr(sd, "SeqChartDialog", FakeDialog)
     p = _variable_project()
     _open_followup(window, p)
     out = _fake_payload(tmp_path)
     window._fu_sequence_done(p["id"], out, save_campaign=False)
+    assert len(seen) == 1
+    args, kwargs = seen[0]
+    # (parent, target_name, field, entries, ...)
+    assert args[2] is out["field"] and args[3] is out["entries"]
+    # nothing persisted yet
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p2 = project.get(dbmod.db, p["id"])
+    assert "sequence" not in (p2.get("context") or {})
+
+
+def test_sequence_save_registers_and_updates(window, tmp_path):
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _variable_project()
+    _open_followup(window, p)
+    out = _fake_payload(tmp_path)
+    csv_path = tmp_path / "seq.csv"
+    csv_path.write_text("# test\n", encoding="utf-8")
+    png_path = tmp_path / "carta.png"
+    png_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+    window._fu_sequence_save(p["id"], out["entries"],
+                             {"csv": str(csv_path), "png": str(png_path)},
+                             out, save_campaign=False)
     # the context carries the sequence
     p2 = project.get(dbmod.db, p["id"])
     seq = p2["context"]["sequence"]
@@ -147,8 +178,6 @@ def test_sequence_done_registers_and_updates(window, tmp_path,
     # the status line now names the sequence
     lbl = window._project_widgets.get("fu_sequence")
     assert "4" in lbl.text() and "Gaia EDR3" in lbl.text()
-    # and the chart opened in the viewer
-    assert opened and opened[0][0][1] == out["png"]
 
 
 def test_sequence_done_error_only_warns(window, tmp_path):
@@ -181,9 +210,8 @@ def _fake_field(catalog, ra, dec, fov):
 
 
 def test_sequence_worker_with_faked_field(tmp_path, monkeypatch):
-    # the worker runs the full build (proposal + CSV + PNG over a dark
-    # canvas) with the network parts faked
-    from pathlib import Path as _P
+    # the worker runs field + proposal + background off-GUI with the
+    # network parts faked, and writes no files (the dialog owns exports)
     from nightscribe.core import compstars
     from nightscribe.core.sources import cutouts
     monkeypatch.setattr(compstars, "load_field", _fake_field)
@@ -191,12 +219,14 @@ def test_sequence_worker_with_faked_field(tmp_path, monkeypatch):
     from nightscribe.gui.workers import SequenceWorker
     center = (291.366, 42.784)
     w = SequenceWorker("V0001 Cyg", center[0], center[1], "gaia", 18.0,
-                       4, 13.5, None, tmp_path, "en")
+                       4, 13.5, None, "en")
     seen = []
     w.finished.connect(seen.append)
     w.run()
     assert len(seen) == 1
     out = seen[0]
     assert out["status"] == "ok"
-    assert _P(out["csv"]).exists() and _P(out["png"]).exists()
     assert len(out["entries"]) == 5          # 4 comps + check
+    assert out["field"]["stars"]
+    assert out["image"] is None and out["wcs"] is None
+    assert "csv" not in out and "png" not in out

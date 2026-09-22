@@ -187,3 +187,38 @@ def test_keep_stretch_on_preserves_everything(state):
     state.load(AIJ)
     assert state.black == 3000.0 and state.white == 9000.0
     assert state.gamma == pytest.approx(0.7) and state.inverted
+
+
+_FAKE_CARDS = {"CRVAL1": 300.0, "CRVAL2": 60.0, "CRPIX1": 8.0,
+               "CRPIX2": 8.0, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+               "CD1_1": -0.0003, "CD1_2": 0.0, "CD2_1": 0.0,
+               "CD2_2": 0.0003}
+
+
+def test_annotations_read_on_load(state):
+    state.load(AIJ)
+    assert len(state.annotations) == 13
+    state.load(MONO)
+    assert state.annotations == []
+
+
+def test_set_wcs_cards_brings_a_solution(state, tmp_path):
+    from test_fits_annotate import _make_fits
+    plate = tmp_path / "nowcs.fits"
+    _make_fits(plate)
+    state.load(plate)
+    assert state.wcs is None
+    seen = []
+    state.wcs_changed.connect(lambda: seen.append(True))
+    assert state.set_wcs_cards(_FAKE_CARDS)
+    assert state.wcs is not None
+    assert state.wcs.pixel_scale() == pytest.approx(1.08, rel=1e-3)
+    assert seen == [True]
+    # the probe now answers with sky coordinates
+    hit, lines = state.probe_text(8.0, 8.0)
+    assert hit and any(l.startswith("RA ") for l in lines)
+
+
+def test_set_wcs_cards_without_a_plate_is_a_noop(state):
+    assert not state.set_wcs_cards(_FAKE_CARDS)
+    assert state.wcs is None

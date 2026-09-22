@@ -26,6 +26,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
 MONO = FIXTURES / "sn2026zji_new_image.fits"
+AIJ = FIXTURES / "sample_annotated_image_from_aij.fits"
 
 
 @pytest.fixture(scope="module")
@@ -134,3 +135,44 @@ def test_double_click_returns_to_fit(view, qapp):
     QTest.mouseDClick(view.viewport(), Qt.LeftButton)
     qapp.processEvents()
     assert 0 < view.transform().m11() < 1.0
+
+
+def test_annotate_cards_paint_as_a_read_only_layer(view):
+    view._state.load(AIJ)
+    assert len(view._annotation_items) == 26       # 13 circles + 13 labels
+    view.clear_overlays()                          # tabs own nothing here
+    assert len(view._annotation_items) == 26       # the layer survives
+    # labels keep a constant screen size: zooming in shrinks the scene pt
+    f_fit = view._annotation_labels[0][0].font().pointSizeF()
+    view.fit_to_factor(4.0)
+    f_zoom = view._annotation_labels[0][0].font().pointSizeF()
+    assert f_zoom < f_fit
+
+
+def test_round_arcsec_picks_125_steps(view):
+    # the rounding is in log space (the legacy annotate dialog's rule):
+    # 93 sits nearer 50 than 100 there, 37 nearer 50, 1.4 nearer 1
+    from nightscribe.gui.widgets.ufe_image_view import _round_arcsec
+    assert _round_arcsec(93.0) == pytest.approx(50.0)
+    assert _round_arcsec(1.4) == pytest.approx(1.0)
+    assert _round_arcsec(37.0) == pytest.approx(50.0)
+    assert _round_arcsec(0.0) > 0.0              # degenerate input stays safe
+
+
+def test_hud_paints_with_and_without_wcs(view, tmp_path):
+    view._state.load(MONO)
+    view.repaint()                                 # WCS: arrow + bar paint
+    from test_fits_annotate import _make_fits
+    view._state.load(_make_fits(tmp_path / "plain.fits"))
+    view.repaint()                                 # no WCS: HUD no-ops
+    assert True                                    # nothing exploded
+
+
+def test_export_png_stamps_the_hud(view, tmp_path):
+    view._state.load(MONO)
+    out = view.export_png(tmp_path / "hud.png")
+    assert out.exists() and out.stat().st_size > 0
+    view.set_hud(north=False, scale=False)
+    assert not view.show_north and not view.show_scale
+    out2 = view.export_png(tmp_path / "plain.png")
+    assert out2.exists()

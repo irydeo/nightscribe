@@ -36,7 +36,7 @@ import logging
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
-from ..core import coords, fits_io, stretch, wcs as wcs_mod
+from ..core import coords, fits_annotate, fits_io, stretch, wcs as wcs_mod
 
 logger = logging.getLogger("nightscribe.gui.ufe_state")
 
@@ -50,6 +50,7 @@ class UfeImageState(QObject):
 
     image_loaded = Signal()      # a new plate (or none) is ready
     stretch_changed = Signal()   # black/white/gamma/invert changed
+    wcs_changed = Signal()       # an astrometric solve landed (or went)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -65,6 +66,7 @@ class UfeImageState(QObject):
         self.inverted = False
         self.keep_stretch = False  # True: loads keep black/white/gamma/
                                    # invert instead of the auto percentiles
+        self.annotations = []     # ANNOTATE cards read at load (read-only)
         self._disp_scale = 1      # plate px per display px (2x2 steps)
 
     # ------------------------------------------------------------- load
@@ -92,6 +94,7 @@ class UfeImageState(QObject):
         else:
             self.d_min, self.d_max = 0.0, 1.0
         self._disp_scale = self._compute_scale()
+        self.annotations = fits_annotate.read_annotations(self.path)
         if not self.keep_stretch:
             self.inverted = False
             self.gamma = 1.0
@@ -104,7 +107,26 @@ class UfeImageState(QObject):
         self.header = None
         self.data = None
         self.wcs = None
+        self.annotations = []
         self.image_loaded.emit()
+
+    def set_wcs_cards(self, cards):
+        # Merges a freshly solved astrometry.net solution into the header
+        # (in memory: the file on disk is never touched) and re-reads the
+        # WCS, so the probe, the HUD and the tabs pick it up.
+        # @args: cards - WCS header cards from core/sources/astrometry
+        # @return: True when the merged WCS is usable
+        if self.header is None:
+            return False
+        from ..core import blink
+        self.header = blink.merge_solved_wcs(self.header, cards)
+        try:
+            self.wcs = wcs_mod.Wcs.from_header(self.header)
+        except Exception as err:
+            logger.warning("solved WCS unusable: %s", err)
+            self.wcs = None
+        self.wcs_changed.emit()
+        return self.wcs is not None
 
     @property
     def has_image(self):

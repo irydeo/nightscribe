@@ -168,6 +168,27 @@ class BlinkWorker(QThread):
             self.finished.emit({}, {"es": str(err), "en": str(err)})
 
 
+class UfeSolveWorker(QThread):
+    # Blind-solves the UFE's current plate with Astrometry.net in the
+    # background (ADR-044: astrometric solving is a common UFE feature).
+    finished = Signal(dict)         # solved WCS cards, or {} on failure
+    progress = Signal(str)          # stage text for the solve button
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+
+    def run(self):
+        from ..core.sources import astrometry
+        try:
+            cards = astrometry.solve(self._path,
+                                     progress=self.progress.emit)
+        except Exception as err:    # never crash the GUI on solve problems
+            logger.exception("ufe solve worker failed: %s", err)
+            cards = None
+        self.finished.emit(cards or {})
+
+
 class BlinkExportWorker(QThread):
     # Renders the blink GIF/MP4/PNG off the GUI thread (matplotlib is slow).
     finished = Signal(str, str)     # output path, error message

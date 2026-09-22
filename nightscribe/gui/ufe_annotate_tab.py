@@ -59,6 +59,7 @@ class UfeAnnotateTab(QWidget):
         self._items = []             # the marker's scene items
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
+        state.wcs_changed.connect(self._update_readout)
         if view is not None:
             view.scene_clicked.connect(self._on_scene_clicked)
             view.zoom_changed.connect(lambda _f: self._refresh_marker())
@@ -307,14 +308,21 @@ class UfeAnnotateTab(QWidget):
     def _save_one(self, input_path, output_path, ra_deg, dec_deg):
         # Writes one annotated copy; the marker maps through the plate's
         # own WCS when the sky position is known (visits land right).
+        # The CURRENT plate uses the state's in-memory header, so an
+        # astrometry solved this session counts even though the file on
+        # disk is never modified.
         # @return: the Path written
         xy = None
         scale = north_pa = None
-        try:
-            header = fits_io.read_header(input_path)
-            wc = wcs_mod.Wcs.from_header(header)
-        except Exception:
-            wc = None
+        if str(input_path) == str(self._state.path):
+            wc = self._state.wcs
+            header = self._state.header or {}
+        else:
+            try:
+                header = fits_io.read_header(input_path)
+                wc = wcs_mod.Wcs.from_header(header)
+            except Exception:
+                wc = None
         if wc is not None:
             try:
                 scale = wc.pixel_scale()

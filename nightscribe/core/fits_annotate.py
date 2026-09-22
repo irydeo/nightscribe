@@ -175,3 +175,60 @@ def write_annotated_fits(input_path, output_path, sn_xy=None, scale=None,
     output_path.write_bytes(header_bytes + raw[data_start:])
     logger.info("annotated FITS written to %s", output_path)
     return output_path
+
+
+def read_annotations(path):
+    # Parses the ANNOTATE cards of a plate (ours or AIJ's) so the editor
+    # can show them. The label lives in the card COMMENT, which fits_io's
+    # header dict drops, so this walks the raw 80-char cards itself.
+    # @args: path - FITS file path
+    # @return: list of {"x", "y", "size", "color", "label"}; x, y are
+    #          0-based data coordinates (row 0 = FITS bottom), the same
+    #          frame AIJ writes in (a possible 1-px origin difference is
+    #          invisible at display scale); size is the radius in plate px
+    try:
+        raw = Path(path).read_bytes()
+        cards, _off = _split_header(raw)
+    except (fits_io.FitsError, OSError):
+        return []
+    out = []
+    for card in cards:
+        if card[:8].strip() != "ANNOTATE" or "=" not in card[:10]:
+            continue
+        body = card[card.index("=") + 1:].strip()
+        label = ""
+        if body.startswith("'"):                # quoted string value
+            end = body.find("'", 1)
+            if end < 0:
+                continue
+            value = body[1:end]
+            rest = body[end + 1:]
+            if "/" in rest:
+                label = rest.split("/", 1)[1].strip()
+        else:                                   # bare value / comment
+            value, _sep, comment = body.partition("/")
+            value = value.strip()
+            label = comment.strip()
+        parts = [p.strip() for p in value.split(",")]
+        if len(parts) < 2:
+            continue
+        try:
+            x, y = float(parts[0]), float(parts[1])
+        except ValueError:
+            continue
+        size, color = 30.0, "orange"
+        tail = parts[2:]
+        if tail:
+            try:
+                size = float(tail[0])
+                tail = tail[1:]
+            except ValueError:
+                pass
+        if tail:
+            try:                                # flags stay unread
+                float(tail[-1])
+            except ValueError:
+                color = tail[-1]                # the trailing colour name
+        out.append({"x": x, "y": y, "size": size,
+                    "color": color, "label": label})
+    return out

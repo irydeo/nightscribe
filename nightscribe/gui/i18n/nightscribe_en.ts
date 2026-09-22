@@ -6195,99 +6195,99 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeAnnotateTab</name>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="72"/>
+        <location filename="../ufe_annotate_tab.py" line="73"/>
         <source>Label:</source>
         <translation>Label:</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="74"/>
+        <location filename="../ufe_annotate_tab.py" line="75"/>
         <source>Annotation label</source>
         <translation>Annotation label</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="79"/>
+        <location filename="../ufe_annotate_tab.py" line="80"/>
         <source>Notes:</source>
         <translation>Notes:</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="85"/>
+        <location filename="../ufe_annotate_tab.py" line="86"/>
         <source>Marker size:</source>
         <translation>Marker size:</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="102"/>
+        <location filename="../ufe_annotate_tab.py" line="103"/>
         <source>Nudge</source>
         <translation>Nudge</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="104"/>
+        <location filename="../ufe_annotate_tab.py" line="105"/>
         <source>Shift the marker by that many pixels (or click the image)</source>
         <translation>Shift the marker by that many pixels (or click the image)</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="107"/>
+        <location filename="../ufe_annotate_tab.py" line="108"/>
         <source>Marker</source>
         <translation>Marker</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="109"/>
+        <location filename="../ufe_annotate_tab.py" line="110"/>
         <source>Show the annotation marker</source>
         <translation>Show the annotation marker</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="118"/>
+        <location filename="../ufe_annotate_tab.py" line="119"/>
         <source>Also annotate (visits):</source>
         <translation>Also annotate (visits):</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="123"/>
+        <location filename="../ufe_annotate_tab.py" line="124"/>
         <source>Add…</source>
         <translation>Add…</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="126"/>
+        <location filename="../ufe_annotate_tab.py" line="127"/>
         <source>Remove</source>
         <translation>Remove</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="131"/>
+        <location filename="../ufe_annotate_tab.py" line="132"/>
         <source>Save annotated copy…</source>
         <translation>Save annotated copy…</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="248"/>
+        <location filename="../ufe_annotate_tab.py" line="249"/>
         <source>marker {0:.1f}, {1:.1f}</source>
         <translation>marker {0:.1f}, {1:.1f}</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="284"/>
+        <location filename="../ufe_annotate_tab.py" line="285"/>
         <source>Plates to annotate with the same marker</source>
         <translation>Plates to annotate with the same marker</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="285"/>
+        <location filename="../ufe_annotate_tab.py" line="286"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="351"/>
+        <location filename="../ufe_annotate_tab.py" line="359"/>
         <source>Save annotated FITS as</source>
         <translation>Save annotated FITS as</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="367"/>
+        <location filename="../ufe_annotate_tab.py" line="375"/>
         <source>Save failed</source>
         <translation>Save failed</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="368"/>
+        <location filename="../ufe_annotate_tab.py" line="376"/>
         <source>Could not write the annotated FITS to {0}.
 {1}</source>
         <translation>Could not write the annotated FITS to {0}.
 {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_annotate_tab.py" line="373"/>
+        <location filename="../ufe_annotate_tab.py" line="381"/>
         <source>Saved {0} annotated copy(ies). Last: {1}</source>
         <translation>Saved {0} annotated copy(ies). Last: {1}</translation>
     </message>
@@ -6295,104 +6295,158 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeDialog</name>
     <message>
-        <location filename="../ufe_dialog.py" line="56"/>
-        <location filename="../ufe_dialog.py" line="177"/>
-        <location filename="../ufe_dialog.py" line="274"/>
-        <location filename="../ufe_dialog.py" line="276"/>
+        <location filename="../ufe_dialog.py" line="57"/>
+        <location filename="../ufe_dialog.py" line="203"/>
+        <location filename="../ufe_dialog.py" line="302"/>
+        <location filename="../ufe_dialog.py" line="304"/>
+        <location filename="../ufe_dialog.py" line="324"/>
+        <location filename="../ufe_dialog.py" line="349"/>
+        <location filename="../ufe_dialog.py" line="358"/>
         <source>FITS editor</source>
         <translation>FITS editor</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="86"/>
+        <location filename="../ufe_dialog.py" line="88"/>
         <source>Load FITS…</source>
         <translation>Load FITS…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="87"/>
+        <location filename="../ufe_dialog.py" line="89"/>
         <source>Open a FITS image (Ctrl+O)</source>
         <translation>Open a FITS image (Ctrl+O)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="90"/>
+        <location filename="../ufe_dialog.py" line="92"/>
         <source>Invert</source>
         <translation>Invert</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="93"/>
+        <location filename="../ufe_dialog.py" line="95"/>
         <source>Swap black for white: faint objects pop against the sky</source>
         <translation>Swap black for white: faint objects pop against the sky</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="97"/>
+        <location filename="../ufe_dialog.py" line="99"/>
         <source>Export PNG…</source>
         <translation>Export PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="99"/>
+        <location filename="../ufe_dialog.py" line="101"/>
         <source>Save the visible scene as a PNG (Ctrl+E)</source>
         <translation>Save the visible scene as a PNG (Ctrl+E)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="104"/>
+        <location filename="../ufe_dialog.py" line="106"/>
+        <source>N</source>
+        <translation>N</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="109"/>
+        <source>North arrow (needs a WCS)</source>
+        <translation>North arrow (needs a WCS)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="114"/>
+        <source>Scale</source>
+        <translation>Scale</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="117"/>
+        <source>Scale bar (needs a WCS)</source>
+        <translation>Scale bar (needs a WCS)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="122"/>
+        <location filename="../ufe_dialog.py" line="344"/>
+        <source>Solve astrometry…</source>
+        <translation>Solve astrometry…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="124"/>
+        <source>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</source>
+        <translation>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="130"/>
         <source>Zoom:</source>
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="108"/>
+        <location filename="../ufe_dialog.py" line="134"/>
         <source>Fit the plate to the window</source>
         <translation>Fit the plate to the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="110"/>
+        <location filename="../ufe_dialog.py" line="136"/>
         <source>Zoom {0} % (1:1 at 100)</source>
         <translation>Zoom {0} % (1:1 at 100)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="119"/>
+        <location filename="../ufe_dialog.py" line="145"/>
         <source>Current zoom: 100 % is one plate pixel per screen pixel</source>
         <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="325"/>
+        <source>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</source>
+        <translation>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="340"/>
+        <source>Solving: {0}…</source>
+        <translation>Solving: {0}…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="350"/>
+        <source>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</source>
+        <translation>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="359"/>
+        <source>The Astrometry.net solution is not usable (non-TAN WCS).</source>
+        <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
     <message>
         <source>Histogram (phase B)</source>
         <translation type="vanished">Histogram (phase B)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="127"/>
+        <location filename="../ufe_dialog.py" line="153"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="128"/>
+        <location filename="../ufe_dialog.py" line="154"/>
         <source>Compare</source>
         <translation>Compare</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="139"/>
+        <location filename="../ufe_dialog.py" line="165"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="131"/>
+        <location filename="../ufe_dialog.py" line="157"/>
         <source>Arrives in phase {0}</source>
         <translation>Arrives in phase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="167"/>
+        <location filename="../ufe_dialog.py" line="193"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="168"/>
+        <location filename="../ufe_dialog.py" line="194"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="178"/>
+        <location filename="../ufe_dialog.py" line="204"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="194"/>
+        <location filename="../ufe_dialog.py" line="220"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>
@@ -6400,12 +6454,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeImageView</name>
     <message>
-        <location filename="../widgets/ufe_image_view.py" line="70"/>
+        <location filename="../widgets/ufe_image_view.py" line="93"/>
         <source>FITS image view</source>
         <translation>FITS image view</translation>
     </message>
     <message>
-        <location filename="../widgets/ufe_image_view.py" line="206"/>
+        <location filename="../widgets/ufe_image_view.py" line="390"/>
         <source>Open a FITS image to start</source>
         <translation>Open a FITS image to start</translation>
     </message>

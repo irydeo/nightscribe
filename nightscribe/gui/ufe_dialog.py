@@ -51,6 +51,7 @@ class UfeDialog(QDialog):
         super().__init__(parent)
         self._lang = lang
         self._last_dir = ""
+        self._solve_worker = None   # UfeSolveWorker while a solve runs
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("FITS editor"))
@@ -60,6 +61,7 @@ class UfeDialog(QDialog):
         self.setMinimumSize(900, 600)
         self.state.image_loaded.connect(self._on_image_loaded)
         self.state.stretch_changed.connect(self._sync_invert_button)
+        self.state.wcs_changed.connect(self._sync_wcs_buttons)
         self.view.zoom_changed.connect(self._on_zoom_changed)
 
     # ------------------------------------------------------------- layout
@@ -100,6 +102,30 @@ class UfeDialog(QDialog):
         self.btn_export.setEnabled(False)
         self.btn_export.clicked.connect(self._on_export_png)
         bar.addWidget(self.btn_export)
+        bar.addSpacing(16)
+        self.btn_north = QPushButton(self.tr("N"))
+        self.btn_north.setCheckable(True)
+        self.btn_north.setChecked(True)
+        self.btn_north.setToolTip(self.tr("North arrow (needs a WCS)"))
+        self.btn_north.setEnabled(False)
+        self.btn_north.toggled.connect(
+            lambda checked: self.view.set_hud(north=checked))
+        bar.addWidget(self.btn_north)
+        self.btn_scale = QPushButton(self.tr("Scale"))
+        self.btn_scale.setCheckable(True)
+        self.btn_scale.setChecked(True)
+        self.btn_scale.setToolTip(self.tr("Scale bar (needs a WCS)"))
+        self.btn_scale.setEnabled(False)
+        self.btn_scale.toggled.connect(
+            lambda checked: self.view.set_hud(scale=checked))
+        bar.addWidget(self.btn_scale)
+        self.btn_solve = QPushButton(self.tr("Solve astrometry…"))
+        self.btn_solve.setToolTip(self.tr(
+            "Blind-solve the plate with Astrometry.net (the file on disk "
+            "is never modified)"))
+        self.btn_solve.setEnabled(False)
+        self.btn_solve.clicked.connect(self._on_solve)
+        bar.addWidget(self.btn_solve)
         bar.addSpacing(16)
         bar.addWidget(QLabel(self.tr("Zoom:")))
         self.btn_zoom = {}
@@ -269,11 +295,69 @@ class UfeDialog(QDialog):
         self._sync_invert_button()
         self.btn_invert.setEnabled(self.state.has_image)
         self.btn_export.setEnabled(self.state.has_image)
+        self.btn_solve.setEnabled(self.state.has_image)
+        self._sync_wcs_buttons()
         if self.state.has_image:
             self.setWindowTitle(
                 self.tr("FITS editor") + " · " + Path(self.state.path).name)
         else:
             self.setWindowTitle(self.tr("FITS editor"))
+
+    def _sync_wcs_buttons(self):
+        # North arrow / scale bar need a WCS (present at load or after a
+        # solve); the state reports both moments.
+        has_wcs = self.state.has_image and self.state.wcs is not None
+        self.btn_north.setEnabled(has_wcs)
+        self.btn_scale.setEnabled(has_wcs)
+
+    # --------------------------------------------------------- solving
+
+    def _on_solve(self):
+        # Solve astrometry…: blind-solve the current plate with
+        # Astrometry.net on a worker (network off the GUI thread). The
+        # solution lands in memory only; the file on disk stays untouched.
+        if not self.state.has_image:
+            return
+        from ..config import config
+        if not (config.get("astrometry_key") or "").strip():
+            QMessageBox.information(
+                self, self.tr("FITS editor"),
+                self.tr("Set your Astrometry.net API key in Settings to "
+                        "solve plates automatically, or solve them with "
+                        "ASTAP, NINA, Ekos or PixInsight and save them "
+                        "again."))
+            return
+        from .workers import UfeSolveWorker
+        self._solve_worker = UfeSolveWorker(Path(self.state.path))
+        self._solve_worker.progress.connect(self._on_solve_stage)
+        self._solve_worker.finished.connect(self._on_solved)
+        self.btn_solve.setEnabled(False)
+        self._on_solve_stage("login")
+        self._solve_worker.start()
+
+    def _on_solve_stage(self, stage):
+        # @args: stage - the worker's stage text, mirrored on the button
+        self.btn_solve.setText(self.tr("Solving: {0}…").format(stage))
+
+    def _on_solved(self, cards):
+        # @args: cards - solved WCS cards, or {} when the solve failed
+        self.btn_solve.setText(self.tr("Solve astrometry…"))
+        self.btn_solve.setEnabled(self.state.has_image)
+        self._solve_worker = None
+        if not cards:
+            QMessageBox.warning(
+                self, self.tr("FITS editor"),
+                self.tr("Astrometry.net could not solve the plate (or is "
+                        "offline). Check the key in Settings or solve it "
+                        "with ASTAP/NINA/Ekos/PixInsight."))
+            return
+        if self.state.set_wcs_cards(cards):
+            logger.info("UFE: astrometry solved for %s", self.state.path)
+        else:
+            QMessageBox.warning(
+                self, self.tr("FITS editor"),
+                self.tr("The Astrometry.net solution is not usable "
+                        "(non-TAN WCS)."))
 
     def _sync_invert_button(self):
         # The top-bar Invert mirrors state.inverted; the histogram strip

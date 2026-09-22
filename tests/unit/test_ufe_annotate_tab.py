@@ -187,3 +187,28 @@ def test_save_cancel_writes_nothing(dlg, tmp_path, monkeypatch):
     _stub_save_dialog(monkeypatch, "")
     dlg.tab_annotate._save()
     assert list(tmp_path.iterdir()) == []
+
+
+def test_save_uses_the_in_memory_solved_wcs(dlg, tmp_path, monkeypatch):
+    # A plate solved this session (in memory; the disk file is never
+    # touched) still writes NS_SCALE/NS_NORTH and the marker.
+    from test_fits_annotate import _make_fits
+    from nightscribe.core import fits_io
+    plate = _make_fits(tmp_path / "plain.fits")
+    dlg.state.load(plate)
+    assert dlg.state.wcs is None
+    cards = {"CRVAL1": 300.0, "CRVAL2": 60.0, "CRPIX1": 8.0,
+             "CRPIX2": 8.0, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+             "CD1_1": -0.0003, "CD1_2": 0.0, "CD2_1": 0.0,
+             "CD2_2": 0.0003}
+    assert dlg.state.set_wcs_cards(cards)
+    tab = dlg.tab_annotate
+    tab.edit_label.setText("SN x")
+    out = tmp_path / "out.fits"
+    _stub_save_dialog(monkeypatch, out)
+    tab._save()
+    header = fits_io.read_header(out)
+    assert "ANNOTATE" in header                     # marker at the click
+    assert abs(header["NS_SCALE"] - 1.08) < 0.01    # from the solved WCS
+    assert "NS_NORTH" in header
+    assert "NS_RA" in header and "NS_DEC" in header

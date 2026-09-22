@@ -194,3 +194,57 @@ def test_accessible_names(dlg):
     assert dlg.view.accessibleName()
     assert dlg.histogram.canvas.accessibleName()
     assert dlg.histogram.spn_black.accessibleName()
+
+
+_FAKE_CARDS = {"CRVAL1": 300.0, "CRVAL2": 60.0, "CRPIX1": 8.0,
+               "CRPIX2": 8.0, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+               "CD1_1": -0.0003, "CD1_2": 0.0, "CD2_1": 0.0,
+               "CD2_2": 0.0003}
+
+
+def test_hud_buttons_follow_the_wcs(dlg, tmp_path):
+    from test_fits_annotate import _make_fits
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))
+    assert not dlg.btn_north.isEnabled()           # no WCS: no HUD toggles
+    assert not dlg.btn_scale.isEnabled()
+    assert dlg.btn_solve.isEnabled()               # but solving is offered
+    dlg.state.load(MONO)
+    assert dlg.btn_north.isEnabled() and dlg.btn_scale.isEnabled()
+    dlg.btn_north.setChecked(False)
+    assert not dlg.view.show_north                 # button drives the HUD
+
+
+def test_solve_without_api_key_explains(dlg, monkeypatch):
+    from nightscribe import config
+    from PySide6.QtWidgets import QMessageBox
+    seen = []
+    monkeypatch.setattr(config.config, "get",
+                        lambda *a, **k: "")
+    monkeypatch.setattr(QMessageBox, "information",
+                        lambda *a, **k: seen.append(a))
+    dlg.state.load(MONO)
+    dlg._on_solve()
+    assert seen                                     # pointed at Settings
+    assert dlg._solve_worker is None
+
+
+def test_solved_cards_land_in_memory(dlg, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: None)
+    dlg.state.load(MONO)
+    old_scale = dlg.state.wcs.pixel_scale()
+    dlg._on_solved(_FAKE_CARDS)                    # the worker's payload
+    assert dlg.state.wcs.pixel_scale() != old_scale
+    assert dlg.btn_solve.isEnabled()
+    assert dlg.btn_solve.text() == "Solve astrometry…"
+
+
+def test_solve_failure_warns(dlg, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    seen = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: seen.append(a))
+    dlg.state.load(MONO)
+    dlg._on_solved({})
+    assert seen

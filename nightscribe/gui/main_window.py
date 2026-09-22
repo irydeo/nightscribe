@@ -55,7 +55,7 @@ UI_DIR = Path(__file__).parent / "ui"
 # Three guided steps for every project kind. The old "analyse" step (ADR-019,
 # review 2026-08-28) was dropped, and "capture" merged into "plan" (ADR-030,
 # 2026-09-06): planning the session and exporting/running it against CCDciel
-# is one step — Plan & Captura.
+# is one step (it now reads "Captura" under the ADR-043 rename).
 _STEP_KEYS = ("plan", "process", "publish")
 
 # The pages of the project detail (ADR-041): the object card, the
@@ -96,10 +96,13 @@ _SKY_CHIP_PRIORITY = {
 # SN-only analysis buttons hide for the others)
 # Track V: variables join (V-g: the quick-look engine serves them unchanged)
 FOLLOWUP_KINDS = project.FOLLOWUP_KINDS
-_STEP_LABELS_ES = {"plan": "Plan & Captura", "process": "Procesado",
-                   "publish": "Publicar"}
-_STEP_LABELS_EN = {"plan": "Plan & Capture", "process": "Process",
-                   "publish": "Publish"}
+# ADR-043: the bar reads left to right like the night itself runs
+# (captura → seguimiento → follow-up), so the tabs carry the plain action
+# word and the "→" separators do the connecting
+_STEP_LABELS_ES = {"plan": "Captura", "process": "Seguimiento",
+                   "publish": "Follow-up"}
+_STEP_LABELS_EN = {"plan": "Capture", "process": "Track",
+                   "publish": "Follow-up"}
 
 
 def _load_ui(name, parent=None):
@@ -229,9 +232,10 @@ KIND_ORDER = list(kinds.ids())
 # Top-level tab indices (ui/main_window.ui order; ADR-036: History left
 # the bar for the Tools-menu journal dialog, J0): never use literals for
 # the main tabs.
-# UX-PC + SC2 (ADR-038/040): four tabs — the Sun & sky content moved to
-# the Tools menu as the "Sky calendar…" dialog
-TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS, TAB_OBSERVATORY = range(4)
+# UX-PC + SC2 (ADR-038/040): the Sun & sky content moved to the Tools
+# menu as the "Sky calendar…" dialog; ADR-043 folds the Observatory tab
+# into the project's Capture step, leaving three top-level tabs
+TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS = range(3)
 
 
 class _ClickableFrame(QFrame):
@@ -315,9 +319,10 @@ class _ScoreBar(QFrame):
 
 
 class MainWindow(QMainWindow):
-    # Four tabs (ADR-040): Tonight · Projects · Campaigns · Observatory.
-    # The Tools menu holds the Sky calendar, the observing journal, and
-    # the contextual Explore/Post/Blink dialogs.
+    # Three tabs (ADR-043): Tonight · Projects · Campaigns: the CCDciel
+    # control now lives inside the project's Capture step. The Tools menu
+    # holds the Sky calendar, the observing journal, and the contextual
+    # Explore/Post/Blink dialogs.
 
     def __init__(self):
         super().__init__()
@@ -331,6 +336,9 @@ class MainWindow(QMainWindow):
         self._blink_phase = False
         self._current_project = None
         self._project_widgets = {}
+        # ADR-043: the CCD block lives inside the open project's Capture
+        # step, so this registry dies with the page (and rebirths with it)
+        self._obs_widgets = {}
         self._skycal = None       # lazy Sky calendar dialog (SC2/ADR-040)
         self._proj_panel = None   # reusable ObjectPanel (phase D4), lazy
         self._tab_pages = {}  # ADR-041: key -> tab page QWidget ("details"|...)
@@ -461,11 +469,9 @@ class MainWindow(QMainWindow):
     def _build_tabs(self):
         from PySide6.QtWidgets import QTabWidget
         tabs = self.centralWidget().findChild(QTabWidget, "tabs")
-        widgets = (self.tonight, self.projects, self.campaigns,
-                   self.observatory) = (
+        widgets = (self.tonight, self.projects, self.campaigns) = (
             _load_ui("tonight_tab"), _load_ui("projects_tab"),
-            _load_ui("campaigns_tab"),
-            _load_ui("observatory_tab"))
+            _load_ui("campaigns_tab"))
         for i, w in enumerate(widgets):
             title = tabs.tabText(i)
             tabs.removeTab(i)
@@ -476,13 +482,11 @@ class MainWindow(QMainWindow):
         tabs.setTabToolTip(TAB_TONIGHT, self.tr(
             "Tonight's best objects from your observatory"))
         tabs.setTabToolTip(TAB_PROJECTS, self.tr(
-            "Your projects: one object with its three steps (plan, "
-            "process, publish) — and what needs your attention"))
+            "Your projects: one object with its three steps: capture, "
+            "track, follow-up — and what needs your attention"))
         tabs.setTabToolTip(TAB_CAMPAIGNS, self.tr(
             "Observing campaigns: several nights, several observatories, "
             "one shared goal"))
-        tabs.setTabToolTip(TAB_OBSERVATORY, self.tr(
-            "Live control of the observatory (CCDciel)"))
         # table starts collapsed
         self.tonight.grp_list.setVisible(False)
         self._prepare_table()
@@ -517,8 +521,6 @@ class MainWindow(QMainWindow):
         self.projects.btn_filters.setText(
             self.tr("Filters ▾") if filters_open else self.tr("Filters ▸"))
         self.projects.btn_filters.blockSignals(False)
-        # window-owned Observatory tab: build its controls once (UX, UD.2)
-        self._build_observatory_tab()
 
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
@@ -654,10 +656,10 @@ class MainWindow(QMainWindow):
         p.btn_favorite.clicked.connect(self._project_toggle_favorite)
         p.btn_next_go.clicked.connect(
             lambda: self._scroll_to_section(self._next_target))
-        # UX-PC (U3): the Next card is the step machine's command center —
-        # done/skip for the CURRENT step live beside Go →
+        # UX-PC (U3): the Next card is the step machine's command center:
+        # "Mark done" for the CURRENT step lives beside Go (skip stays a
+        # discreet option at the foot of each step page, ADR-043)
         p.btn_next_done.clicked.connect(self._next_done)
-        p.btn_next_skip.clicked.connect(self._next_skip)
         # UX-PC (U2): ⌂ goes back to the dashboard (clearing the selection
         # fires itemSelectionChanged -> the detail pane swaps itself)
         p.btn_home.clicked.connect(
@@ -673,14 +675,14 @@ class MainWindow(QMainWindow):
         # the "Sky calendar…" dialog — its widgets are wired when the
         # dialog is first built (_skycal_build), not here.
         # ADR-036 (J0): the journal lives in the Tools menu, not in the
-        # tab bar; Ctrl+1..4 switches the four main tabs.
+        # tab bar; Ctrl+1..3 switches the three main tabs (ADR-043 cut
+        # the fourth).
         self._menus.action_journal.triggered.connect(
             self._open_journal_dialog)
         self._menus.action_skycal.triggered.connect(self._tools_skycal)
         from PySide6.QtGui import QKeySequence, QShortcut
         for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
-                                     TAB_CAMPAIGNS,
-                                     TAB_OBSERVATORY)):
+                                     TAB_CAMPAIGNS)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
             sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
@@ -1304,8 +1306,7 @@ class MainWindow(QMainWindow):
                 self.tr("SN due: %1 (%2 d)").replace(
                     "%1", name).replace("%2", str(days)),
                 "#e0c060",
-                self.tr("Due for a revisit — click to open its "
-                        "Follow-up"))
+                self.tr("Due for a revisit: click to open its Worklog"))
             chip.setObjectName("ns_cadence_chip")
             chip.clicked.connect(
                 lambda _p=pid: self._goto_project_followup(_p))
@@ -1317,8 +1318,9 @@ class MainWindow(QMainWindow):
             header_layout.addWidget(more)
 
     def _goto_project_followup(self, pid):
-        # Opens the project's Follow-up tab (the cadence chips land
-        # here, UX-d). The tab is activated, not navigated by index.
+        # Opens the project's Worklog tab (ADR-043: the multi-night
+        # journal keeps its "followup" key, its label is now Worklog /
+        # Bitácora). The cadence chips land here (UX-d).
         if not self._goto_project_by_id(pid):
             return
         self._scroll_to_section("followup")
@@ -2276,7 +2278,7 @@ class MainWindow(QMainWindow):
                 "A campaign groups the projects of one shared observation "
                 "effort — several nights, several observatories, one goal "
                 "(e.g. “T CrB 2026 eruption”). A project is one object "
-                "with its three steps: plan, process, publish."))
+                "with its three steps: capture, track, follow-up."))
             w.lbl_urls.setText("")
             w.lbl_protocol.setText("—")
             tbl.setRowCount(0)
@@ -2482,7 +2484,7 @@ class MainWindow(QMainWindow):
         # that mutate projects rebuild the page themselves.
         if lst.currentItem() is None:
             self._clear_project_detail()
-        # the Observatory tab's target combo follows the active projects
+        # the Capture step's target combo follows the active projects
         self._refresh_obs_targets()
 
     # ---------------- UX-PC (U2): rich rows + dashboard ----------------
@@ -2711,8 +2713,9 @@ class MainWindow(QMainWindow):
                 self.tr("Your projects live here"))
             self.projects.lbl_dash_sub.setText(
                 self.tr("A project is one object with its three steps: "
-                        "plan, process, publish. Pick an object in Tonight "
-                        "and it becomes a project that guides you."))
+                        "capture, track, follow-up. Pick an object in "
+                        "Tonight and it becomes a project that guides "
+                        "you."))
             box = QLabel(
                 self.tr("No projects yet — tonight's best objects are on "
                         "the Tonight tab."))
@@ -2808,7 +2811,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
         act_open = menu.addAction(self.tr("Open"))
-        act_fu = menu.addAction(self.tr("Follow-up"))
+        act_fu = menu.addAction(self.tr("Worklog"))
         act_fu.setEnabled(p["kind"] in FOLLOWUP_KINDS)
         act_fav = menu.addAction(
             self.tr("Unstar") if p.get("favorite")
@@ -3101,6 +3104,10 @@ class MainWindow(QMainWindow):
         # the registry belongs to the wiped page: stale keys must not
         # survive the rebuild (UD.5)
         self._project_widgets = {}
+        # ADR-043: the CCDciel block lives inside the Capture step of this
+        # page, so its registry dies with it: worker slots guard through
+        # _ccd_widgets() and a wiped registry is an empty dict
+        self._obs_widgets = {}
         # the wipe below also destroys whatever the page hosted, including
         # the lazily-cached project-files list (UD.5: nothing from a wiped
         # page survives): drop those caches so the next build creates fresh
@@ -3156,6 +3163,10 @@ class MainWindow(QMainWindow):
         steps = {s["step"]: s["status"] for s in p.get("steps", [])}
         color = theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT)
         active = getattr(self, "_active_tab", None)
+        # ADR-043: the "→" separators make the bar read like the night
+        # runs; the last one goes away with the Worklog for the kinds
+        # that have no journal
+        w.lbl_sep_followup.setVisible(p.get("kind") in FOLLOWUP_KINDS)
         for key in _TAB_KEYS:
             btn = getattr(w, f"btn_tab_{key}")
             if key == "followup":
@@ -3197,7 +3208,6 @@ class MainWindow(QMainWindow):
         step_key = act["key"] if act["key"] in _STEP_KEYS else None
         self._next_step_key = step_key
         self.projects.btn_next_done.setVisible(step_key is not None)
-        self.projects.btn_next_skip.setVisible(step_key is not None)
 
     def _next_done(self):
         # The Next card's "✔ Mark done" (UX-PC U3): acts on the step the
@@ -3205,10 +3215,7 @@ class MainWindow(QMainWindow):
         if self._current_project and self._next_step_key:
             self._step_done(self._next_step_key)
 
-    def _next_skip(self):
-        # The Next card's "Skip" (UX-PC U3): same targeting as Mark done.
-        if self._current_project and self._next_step_key:
-            self._step_skip(self._next_step_key)
+
 
     def _scroll_to_section(self, key):
         # Deep link (Next card Go, dashboard, the ⋯ menu, cadence
@@ -3310,7 +3317,9 @@ class MainWindow(QMainWindow):
         if key == "details":
             return self.tr("Object card")
         if key == "followup":
-            return self.tr("Follow-up")
+            # ADR-043: the multi-night journal is now called Worklog
+            # (Bitácora in Spanish, via the .ts)
+            return self.tr("Worklog")
         return self._step_label(key)
 
     def _set_tab_badge(self, key, text):
@@ -3550,19 +3559,6 @@ class MainWindow(QMainWindow):
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
         layout.addWidget(btn_seq)
-        # UX-PC (U3): live capture moved to the Observatory tab for good
-        # (filter wheel, Send plan, Start capture, coords epoch). The Plan
-        # section keeps only a state line + jump link — the hardware has
-        # one home, the plan keeps its planning job.
-        layout.addWidget(QLabel(""))
-        btn_ccd_jump = QPushButton(
-            self.tr("Not connected — open the Observatory tab →"))
-        btn_ccd_jump.setFlat(True)
-        btn_ccd_jump.setCursor(Qt.PointingHandCursor)
-        btn_ccd_jump.clicked.connect(lambda: self._goto_tab(TAB_OBSERVATORY))
-        layout.addWidget(btn_ccd_jump)
-        self._project_widgets["ccd_jump"] = btn_ccd_jump
-        self._ccd_apply_state()
         # NEO: also ephemeris export
         if kind in ("neo", "pccp"):
             layout.addWidget(QLabel(""))
@@ -3571,10 +3567,21 @@ class MainWindow(QMainWindow):
             btn_eph.clicked.connect(self._project_export_ephem)
             layout.addWidget(btn_eph)
         self._project_widgets["cmb_seqfmt"] = cmb_fmt
-        # save plan button
-        btn_save = QPushButton(self.tr("Save plan"))
-        btn_save.clicked.connect(self._project_save_plan)
-        layout.addWidget(btn_save)
+        # ADR-043: the live CCDciel control lives in the Capture step
+        # itself (the Observatory tab is gone): the hardware has one home,
+        # and it is the step that plans its capture
+        self._build_capture_ccd_block(layout)
+        # ADR-043: the plan auto-saves: every input writes the same payload
+        # the "Save plan" button used to, silently (the project bar is the
+        # visible truth). The connects sit after every build-time
+        # setValue()/setCurrentIndex() above, so the signals only fire on
+        # real user interaction.
+        spn.valueChanged.connect(self._project_save_plan)
+        spn_exp.valueChanged.connect(self._project_save_plan)
+        cmb_f.currentIndexChanged.connect(self._project_save_plan)
+        spn_darks.valueChanged.connect(self._project_save_plan)
+        spn_darkexp.valueChanged.connect(self._project_save_plan)
+        spn_bias.valueChanged.connect(self._project_save_plan)
         layout.addStretch()
 
     def _project_save_plan(self):
@@ -3621,42 +3628,125 @@ class MainWindow(QMainWindow):
                     panel._ctx = ctx
                     panel._render_capture(panel._e)
                     panel._render_charts(panel._e)
-            self.statusBar().showMessage(self.tr("Plan saved"), 5000)
+            # ADR-043: silent by design: the plan auto-saves from the
+            # Capture step inputs; the project bar is the visible truth
 
     # -- CCDciel control (ADR-030) -----------------------------------------
 
-    def _build_observatory_tab(self):
-        # The CCDciel control, window-owned (UX-j; UX-PC U3 completes the
-        # move: the live-capture row — filter wheel, Send plan, Start
-        # capture, coords epoch — lives here too, in the "Live capture"
-        # group, working on the target combo's project). Built ONCE here;
-        # the Plan section keeps only a state line + jump link.
-        o = self.observatory
+    def _build_capture_ccd_block(self, layout):
+        # ADR-043: the Observatory tab is gone; this is its whole control
+        # panel, rebuilt per project page inside the Capture step. Built
+        # in code (not a .ui) because it is small and per-project now;
+        # the tr() sources keep the old ObservatoryTab strings as
+        # anchors for the existing translations.
+        grp = QGroupBox(self.tr("CCDciel control"))
+        gv = QVBoxLayout(grp)
+        gv.setContentsMargins(12, 9, 12, 9)
+        row = QHBoxLayout()
+        btn_c = QPushButton(self.tr("Connect CCDciel"))
+        btn_d = QPushButton(self.tr("Disconnect"))
+        btn_r = QPushButton(self.tr("Refresh"))
+        lbl_s = QLabel(self.tr("CCDciel: not connected"))
+        row.addWidget(btn_c)
+        row.addWidget(btn_d)
+        row.addWidget(btn_r)
+        row.addWidget(lbl_s)
+        row.addStretch()
+        gv.addLayout(row)
+        layout.addWidget(grp)
+
+        grp = QGroupBox(self.tr("Observatory status"))
+        form = QFormLayout(grp)
+        lbl_v = QLabel("—")
+        lbl_t = QLabel("—")
+        lbl_tr = QLabel("—")
+        lbl_sl = QLabel("—")
+        form.addRow(self.tr("Version:"), lbl_v)
+        form.addRow(self.tr("CCD temperature:"), lbl_t)
+        form.addRow(self.tr("Tracking:"), lbl_tr)
+        form.addRow(self.tr("Slew:"), lbl_sl)
+        layout.addWidget(grp)
+
+        grp = QGroupBox(self.tr("Telescope"))
+        gv = QVBoxLayout(grp)
+        gv.setContentsMargins(12, 9, 12, 9)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Target:")))
+        cmb_t = QComboBox()
+        row.addWidget(cmb_t)
+        row.addStretch()
+        gv.addLayout(row)
+        row = QHBoxLayout()
+        btn_goto = QPushButton(self.tr("Point telescope"))
+        btn_goto.setToolTip(self.tr(
+            "Quick slew to the freshly-computed position of a moving "
+            "target: J2000_to_Apparent + Telescope_slewasync, no "
+            "plate-solve. Fast, but assumes the ephemeris is already "
+            "accurate."))
+        btn_sync = QPushButton(self.tr("Astrometric Goto"))
+        btn_sync.setToolTip(self.tr(
+            "Slew + capture + plate-solve and correct to the true sky "
+            "position. Absorbs residual ephemeris error; the reliable "
+            "route for NEOCPs and preliminary orbits."))
+        row.addWidget(btn_goto)
+        row.addWidget(btn_sync)
+        row.addStretch()
+        gv.addLayout(row)
+        layout.addWidget(grp)
+
+        grp = QGroupBox(self.tr("Live capture"))
+        gv = QVBoxLayout(grp)
+        gv.setContentsMargins(12, 9, 12, 9)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Filter on wheel:")))
+        cmb_f = QComboBox()
+        btn_push = QPushButton(self.tr("Send plan"))
+        btn_push.setToolTip(self.tr(
+            "Stage the selected target's saved plan (frames × exposure) "
+            "in CCDciel's Capture module"))
+        btn_start = QPushButton(self.tr("Start capture"))
+        btn_start.setToolTip(self.tr("Start the staged capture in CCDciel"))
+        row.addWidget(cmb_f)
+        row.addWidget(btn_push)
+        row.addWidget(btn_start)
+        row.addStretch()
+        gv.addLayout(row)
+        lbl_co = QLabel("—")
+        lbl_co.setWordWrap(True)
+        gv.addWidget(lbl_co)
+        lbl_h = QLabel(self.tr(
+            "Uses the selected target's saved plan (its Capture step "
+            "holds frames × exposure)."))
+        lbl_h.setWordWrap(True)
+        lbl_h.setStyleSheet("color: #8a90a6; font-size: 11px;")
+        gv.addWidget(lbl_h)
+        layout.addWidget(grp)
+
         self._obs_widgets = {
-            "ccd_connect": o.btn_obs_connect,
-            "ccd_disconnect": o.btn_obs_disconnect,
-            "ccd_refresh": o.btn_obs_refresh,
-            "ccd_status": o.lbl_obs_status,
-            "ccd_version": o.lbl_obs_version,
-            "ccd_temp": o.lbl_obs_temp,
-            "ccd_tracking": o.lbl_obs_tracking,
-            "ccd_slew": o.lbl_obs_slew,
-            "ccd_goto": o.btn_obs_goto,
-            "ccd_sync": o.btn_obs_sync,
-            "obs_target": o.cmb_obs_target,
-            "cmb_ccd_filter": o.cmb_obs_filter,
-            "ccd_push": o.btn_obs_send_plan,
-            "ccd_start": o.btn_obs_start,
-            "ccd_coords": o.lbl_obs_coords,
+            "ccd_connect": btn_c,
+            "ccd_disconnect": btn_d,
+            "ccd_refresh": btn_r,
+            "ccd_status": lbl_s,
+            "ccd_version": lbl_v,
+            "ccd_temp": lbl_t,
+            "ccd_tracking": lbl_tr,
+            "ccd_slew": lbl_sl,
+            "ccd_goto": btn_goto,
+            "ccd_sync": btn_sync,
+            "obs_target": cmb_t,
+            "cmb_ccd_filter": cmb_f,
+            "ccd_push": btn_push,
+            "ccd_start": btn_start,
+            "ccd_coords": lbl_co,
         }
-        o.btn_obs_connect.clicked.connect(self._ccd_connect)
-        o.btn_obs_disconnect.clicked.connect(self._ccd_disconnect)
-        o.btn_obs_refresh.clicked.connect(self._ccd_refresh)
-        o.btn_obs_goto.clicked.connect(self._ccd_goto)
-        o.btn_obs_sync.clicked.connect(self._ccd_astrometry_goto)
-        o.btn_obs_send_plan.clicked.connect(self._ccd_send_plan)
-        o.btn_obs_start.clicked.connect(self._ccd_start_capture)
-        o.cmb_obs_target.currentIndexChanged.connect(
+        btn_c.clicked.connect(self._ccd_connect)
+        btn_d.clicked.connect(self._ccd_disconnect)
+        btn_r.clicked.connect(self._ccd_refresh)
+        btn_goto.clicked.connect(self._ccd_goto)
+        btn_sync.clicked.connect(self._ccd_astrometry_goto)
+        btn_push.clicked.connect(self._ccd_send_plan)
+        btn_start.clicked.connect(self._ccd_start_capture)
+        cmb_t.currentIndexChanged.connect(
             lambda _i: (self._ccd_apply_state(),
                         self._ccd_update_coords_label()))
         self._ccd_apply_state()
@@ -3666,26 +3756,30 @@ class MainWindow(QMainWindow):
         self._refresh_obs_targets()
 
     def _ccd_widgets(self):
-        # @return: one merged view of the CCDciel widgets — all
-        # window-owned since UX-PC U3 (Observatory tab); the merge with
-        # the per-project page registry survives so the Plan section's
-        # state link (ccd_jump) is reachable from _ccd_apply_state.
-        w = dict(getattr(self, "_obs_widgets", {}) or {})
-        w.update(self._project_widgets or {})
-        return w
+        # @return: the CCDciel widget registry of the open Capture step
+        #          (ADR-043: the block lives inside the project page, so
+        #          it is empty until a plan tab has been built — every
+        #          consumer guard-checks its keys against that).
+        return dict(getattr(self, "_obs_widgets", {}) or {})
 
     def _obs_target_project(self):
-        # @return: the active project dict chosen in the Observatory
-        #          tab's target combo, or None
+        # @return: the active project dict chosen in the Capture step's
+        #          target combo, or None (combo absent until the block
+        #          is built)
         from ..core import project as _p
-        pid = self.observatory.cmb_obs_target.currentData()
+        cmb = self._obs_widgets.get("obs_target")
+        if cmb is None:
+            return None
+        pid = cmb.currentData()
         return _p.get(db, pid) if pid else None
 
     def _refresh_obs_targets(self):
-        # Refills the Observatory tab's target combo with the active
+        # Refills the Capture step's target combo with the active
         # projects, keeping the selection (same keep-id pattern as
         # the campaigns list).
-        cmb = self.observatory.cmb_obs_target
+        cmb = self._obs_widgets.get("obs_target")
+        if cmb is None:
+            return
         current = cmb.currentData()
         cmb.blockSignals(True)
         cmb.clear()
@@ -3702,8 +3796,6 @@ class MainWindow(QMainWindow):
         if not w.get("ccd_connect"):
             return
         on = self._ccd_connected
-        # the per-project capture widgets are only present when a project is
-        # open — skip whatever is missing
         for key in ("ccd_disconnect", "ccd_refresh", "ccd_push",
                     "ccd_start", "ccd_goto", "ccd_sync"):
             widget = w.get(key)
@@ -3713,13 +3805,6 @@ class MainWindow(QMainWindow):
         if cb is not None:
             cb.setEnabled(on)
         w["ccd_connect"].setEnabled(not on)
-        # UX-PC (U3): the Plan section's link mirrors the live state
-        jump = w.get("ccd_jump")
-        if jump is not None:
-            jump.setText(
-                self.tr("CCDciel connected — live capture in the "
-                        "Observatory tab →") if on else
-                self.tr("Not connected — open the Observatory tab →"))
         if not on:
             w["ccd_status"].setText(self.tr("CCDciel: not connected"))
             w["ccd_version"].setText(self.tr("—"))
@@ -3910,8 +3995,8 @@ class MainWindow(QMainWindow):
         return self.tr("Fixed coordinates")
 
     def _ccd_update_coords_label(self):
-        # Refreshes the coords/epoch label (UX-PC U3: it lives in the
-        # Observatory tab now and follows the selected target project).
+        # Refreshes the coords/epoch label (ADR-043: it lives in the
+        # Capture step now and follows the selected target project).
         p = self._obs_target_project() or self._current_project
         lbl = self._ccd_widgets().get("ccd_coords")
         if not p or not lbl:
@@ -3975,10 +4060,13 @@ class MainWindow(QMainWindow):
             upd["coords_source"] = pos["source"]
         project.update_context(db, p["id"], upd)
         p.setdefault("context", {}).update(upd)
-        # UX-PC (U3): the coords label lives in the Observatory tab and
-        # follows its target combo — point the combo at the project this
-        # position belongs to so the tab stays coherent
-        cmb = self.observatory.cmb_obs_target
+        # ADR-043: the coords label lives in the Capture step and follows
+        # its target combo — point the combo at the project this position
+        # belongs to so the step stays coherent
+        cmb = self._obs_widgets.get("obs_target")
+        if cmb is None:
+            self._ccd_update_coords_label()
+            return
         idx = cmb.findData(p["id"])
         if idx >= 0 and idx != cmb.currentIndex():
             cmb.blockSignals(True)
@@ -3997,7 +4085,7 @@ class MainWindow(QMainWindow):
         p = self._obs_target_project()
         if not p:
             self.statusBar().showMessage(
-                self.tr("Pick a target project in the Observatory tab"),
+                self.tr("Pick a target project in the Capture step"),
                 6000)
             return
         ctx = dict(p.get("context") or {})
@@ -4008,6 +4096,8 @@ class MainWindow(QMainWindow):
                 self.tr("This object has no coordinates yet."), 5000)
             return
         w = self._ccd_widgets()
+        if not w.get("ccd_goto"):
+            return
         w["ccd_slew"].setText(self.tr("Slewing…"))
         w["ccd_goto"].setEnabled(False)
         action = self._ccd_point_action(
@@ -4019,11 +4109,12 @@ class MainWindow(QMainWindow):
         w = self._ccd_widgets()
         if w.get("ccd_goto"):
             w["ccd_goto"].setEnabled(True)
+        if w.get("ccd_slew"):
+            w["ccd_slew"].setText(
+                self.tr("Failed") if error else self.tr("Idle"))
         if error:
-            w["ccd_slew"].setText(self.tr("Failed"))
             self.statusBar().showMessage(error, 8000)
             return
-        w["ccd_slew"].setText(self.tr("Idle"))
         self._ccd_apply_position(result)
         self.statusBar().showMessage(
             self.tr("Telescope pointed at the object."), 5000)
@@ -4037,7 +4128,7 @@ class MainWindow(QMainWindow):
         p = self._obs_target_project()
         if not p:
             self.statusBar().showMessage(
-                self.tr("Pick a target project in the Observatory tab"),
+                self.tr("Pick a target project in the Capture step"),
                 6000)
             return
         ctx = dict(p.get("context") or {})
@@ -4064,13 +4155,13 @@ class MainWindow(QMainWindow):
 
     def _ccd_send_plan(self):
         # Stage the planned frames/exposure/filter inside CCDciel
-        # (Capture_set*). UX-PC (U3): lives in the Observatory tab and
+        # (Capture_set*). ADR-043: lives in the Capture step and
         # reads the TARGET project's SAVED plan — no need to have the
         # project open in the hub.
         p = self._obs_target_project() or self._current_project
         if not p:
             self.statusBar().showMessage(
-                self.tr("Pick a target project in the Observatory tab"),
+                self.tr("Pick a target project in the Capture step"),
                 6000)
             return
         plan = next((s["data"] for s in p.get("steps", [])
@@ -4187,19 +4278,19 @@ class MainWindow(QMainWindow):
             lbl_exotic = QLabel(self.tr(
                 "After the reduction, upload EXOTIC's output file to "
                 "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
-                "Database — and tell the story in the Publish step."))
+                "Database — and tell the story in the Follow-up step."))
             lbl_exotic.setWordWrap(True)
             layout.addWidget(lbl_exotic)
         elif kind == "hads":
             # ADR-034 (D.3): publication photometry is external — FotoDif
             # (its AUTO mode watches the capture folder live) or AIJ.
-            # NightScribe registers the measurements (Follow-up tab) and
+            # NightScribe registers the measurements (Worklog tab) and
             # points to the AAVSO submission.
             lbl = QLabel(self.tr(
                 "Reduce the series with FotoDif (its AUTO mode follows the "
                 "capture live) or AIJ. FotoDif writes the AAVSO Extended "
-                "File Format report directly; the cadence and exposure are "
-                "in the Plan step."))
+                "File Format report directly; the cadence and exposure "
+                "are in the Capture step."))
             lbl.setWordWrap(True)
             layout.addWidget(lbl)
             code = config.get("aavso_code", "")
@@ -4221,7 +4312,7 @@ class MainWindow(QMainWindow):
             layout.addWidget(btn_webobs)
             lbl_imp = QLabel(self.tr(
                 "Import the FotoDif measurements («JD mag …» text) with "
-                "«Import file…» in the Follow-up tab — the light curve and "
+                "«Import file…» in the Worklog tab — the light curve and "
                 "the phase-folded view update themselves."))
             lbl_imp.setWordWrap(True)
             layout.addWidget(lbl_imp)

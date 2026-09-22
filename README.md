@@ -440,7 +440,7 @@ you so. Configure them in **Tools → Settings → Integrations**.
 
 | Integration | What it unlocks |
 |---|---|
-| **CCDciel** (local, host/port) | The Observatory tab: status, point telescope, astrometric goto, live capture. Only while CCDciel is running. First observatory integration; NINA and others are planned |
+| **CCDciel** (local, host/port) | The Capture step of each project: status, point telescope, astrometric goto, staging the saved plan, live capture. Only while CCDciel is running. First observatory integration; NINA and others are planned |
 | **NEOfixer API key** | Report `will_observe` / `observed` back for community coordination |
 | **Astrometry.net key** (free) | Blind solve of WCS-less FITS in the blink |
 | **TNS bot credentials** | Discovery images shown inside the app (respecting each survey's licence) |

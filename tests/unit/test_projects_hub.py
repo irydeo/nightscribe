@@ -768,8 +768,8 @@ def test_plan_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
 def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
     # Without a connection every CCDciel button is disabled and the status
     # line says so; the connect button is the one enabled thing.
-    # UX-PC (U3): the live-capture widgets are window-owned now — they
-    # live in the Observatory tab, not in the project's Plan section.
+    # ADR-043: the controls live in the Capture step of the project page
+    # (window._obs_widgets), there is no Observatory tab any more.
     _create_and_select(window, "neo", "ccd-section-target",
                        {"kind": "neo", "mag": 19.0})
     obs = window._obs_widgets          # connection + mount + live capture
@@ -780,9 +780,6 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
         assert not obs[key].isEnabled(), f"{key} should start disabled"
     assert not obs["cmb_ccd_filter"].isEnabled()
     assert obs["ccd_status"].text() == window.tr("CCDciel: not connected")
-    # the Plan section keeps only its state link to the Observatory tab
-    assert "Not connected" in window._project_widgets["ccd_jump"].text() \
-        or "conect" in window._project_widgets["ccd_jump"].text().lower()
 
 
 def test_plan_tab_ccdciel_filter_fallback_list(window, panel):
@@ -827,9 +824,9 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     # filled the combo with a fake wheel's names)
     window._ccd_filter_names = []
     window._ccd_fill_filters()
-    # pick it in the Observatory target combo
+    # pick it in the Capture step's target combo
     window._refresh_obs_targets()
-    cmb_t = window.observatory.cmb_obs_target
+    cmb_t = window._obs_widgets["obs_target"]
     cmb_t.setCurrentIndex(cmb_t.findData(p["id"]))
     sent = {}
     monkeypatch.setattr(window, "_ccd_run",
@@ -863,7 +860,7 @@ def test_send_plan_without_saved_plan_asks_for_one(window, panel,
     # UX-PC (U3): no saved plan -> a plain-words hint, no silent no-op.
     p = _create_and_select(window, "neo", "2099noplan", {"kind": "neo"})
     window._refresh_obs_targets()
-    cmb_t = window.observatory.cmb_obs_target
+    cmb_t = window._obs_widgets["obs_target"]
     cmb_t.setCurrentIndex(cmb_t.findData(p["id"]))
     monkeypatch.setattr(window, "_ccd_run",
                         lambda *a, **k: (_ for _ in ()).throw(
@@ -2148,7 +2145,7 @@ def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
         lst.visualItemRect(item).center())
     texts = seen["actions"]
     assert any("Open" in t or "Abrir" in t for t in texts)
-    assert any("Follow" in t or "Seguimiento" in t for t in texts)
+    assert any("Worklog" in t or "Bitácora" in t for t in texts)
     assert any("Delete" in t or "Eliminar" in t for t in texts)
 
 

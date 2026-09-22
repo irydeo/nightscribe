@@ -61,6 +61,13 @@ cambian. Tests: `tests/unit/test_project_tabs.py` (25) + `test_projects_hub.py`
 (97) + 55 tests de hads/transit/neo/campaigns re-dirigidos a la API de
 pestañas.
 
+**Enmendado por ADR-043 (2026-09-21)**: los nombres *Plan · Proceso ·
+Publicar · Follow-up* eran solo de pantalla (ahora *Captura · Seguimiento
+· Follow-up · Bitácora*; las claves `plan/process/publish/followup` se
+mantienen estables); el Skip de la tarjeta «Siguiente» se jubila (cada
+paso conserva su pie «Skip step»); la pestaña Observatory del main window
+desaparece y su control pasa al paso Captura.
+
 ## English
 
 **Context**: the UX track (UD) folded the step tabs into a **single page of
@@ -108,3 +115,10 @@ lives in `project.steps` (the chips paint, the tabs navigate).
 place). `project_row`/`campaign_row` unchanged. Tests:
 `tests/unit/test_project_tabs.py` (25) + `test_projects_hub.py` (97) + 55
 hads/transit/neo/campaigns tests re-pointed to the tab API.
+
+**Amended by ADR-043 (2026-09-21)**: the tab names *Plan · Process ·
+Publish · Follow-up* were display-only (now *Capture · Track · Follow-up
+· Worklog*; the keys `plan/process/publish/followup` stay stable); the
+"Next" card's Skip retires (each step keeps its "Skip step" footer); the
+main window's Observatory tab is gone and its control moves into the
+Capture step.

@@ -43,14 +43,13 @@ def window(qapp):
 
 
 def test_tab_is_renamed(window):
-    # SC2 (ADR-040): the tab bar is down to four — the Sun & sky content
-    # moved to the Tools menu as the "Sky calendar…" dialog
+    # SC2 (ADR-040): the Sun & sky content moved to the Tools menu as the
+    # "Sky calendar…" dialog; ADR-043 removed the Observatory tab, so the
+    # bar is down to three
     from PySide6.QtWidgets import QTabWidget
-    from nightscribe.gui.main_window import TAB_OBSERVATORY
     tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 4
-    assert tabs.widget(TAB_OBSERVATORY) is window.observatory
-    titles = [tabs.tabText(i) for i in range(4)]
+    assert tabs.count() == 3
+    titles = [tabs.tabText(i) for i in range(3)]
     assert not any("sky" in t.lower() or "cielo" in t.lower()
                    for t in titles)
 

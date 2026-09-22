@@ -212,9 +212,9 @@ def test_pages_hold_exactly_one_control_set_after_rebuilds(window, panel):
     names = [b.text() for b in window.projects.page_container
              .findChildren(QPushButton)]
     assert names.count(window.tr("Mark done")) == 0
-    # the Next card carries the single command-center pair
+    # the Next card carries the single "Mark done" command (ADR-043: the
+    # card-level Skip is gone; "Mark done" lives once)
     assert not window.projects.btn_next_done.isHidden()
-    assert not window.projects.btn_next_skip.isHidden()
     # and each pending step page shows exactly one skip link in its
     # footer (step footers never leak into other pages)
     assert names.count(window.tr("Skip step")) == 3
@@ -284,9 +284,9 @@ def test_next_card_followup_when_cadence_due(window, panel):
         "Mide" in window.projects.lbl_next.text()
     assert window._active_tab == "followup"
     assert not window._tab_pages["followup"].isHidden()
-    # UX-PC (U3): follow-up is not a step — the Next card hides done/skip
+    # UX-PC (U3): follow-up is not a step — the Next card hides "Mark done"
+    # (ADR-043: there is no card-level Skip any more)
     assert window.projects.btn_next_done.isHidden()
-    assert window.projects.btn_next_skip.isHidden()
 
 
 def test_next_card_done_advances_the_step(window, panel):
@@ -305,10 +305,17 @@ def test_next_card_done_advances_the_step(window, panel):
 
 
 def test_next_card_skip_marks_the_step(window, panel):
-    # UX-PC (U3): same for "Skip" — the current step is skipped and the
-    # flow moves on.
+    # UX-PC (U3): same for "Skip" — the step's own footer "Skip step"
+    # skips the current step and the flow moves on (ADR-043: the card-level
+    # Skip is gone; the per-step footer is the only one).
+    from PySide6.QtWidgets import QPushButton
     _mk_project(window, name="SN 2099ns")
-    window.projects.btn_next_skip.click()
+    window._show_tab("plan")
+    page = window._tab_pages["plan"]
+    btns = [b for b in page.findChildren(QPushButton)
+            if b.text() == window.tr("Skip step")]
+    assert len(btns) == 1
+    btns[0].click()
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     steps = {s["step"]: s["status"]

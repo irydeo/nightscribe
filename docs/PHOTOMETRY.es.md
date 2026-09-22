@@ -271,6 +271,11 @@ Por orden de impacto habitual:
 **Veredicto**: con placa reducida y buena secuencia, 0,02–0,05 mag de
 precisión total realista; lo publicable en AAVSO vive en ese rango.
 
+¿Y para bajar de ahí? Qué hace falta para la fotometría de precisión
+(incluidos los tránsitos de exoplanetas), explicado para el observador
+y con apéndice técnico de implementación:
+[docs/PRECISION.es.md](PRECISION.es.md).
+
 ---
 
 ## 8. Buenas prácticas (checklist del observador)

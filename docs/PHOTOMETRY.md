@@ -272,6 +272,10 @@ In the usual order of impact:
 precision of 0.02–0.05 mag; publishable-in-AAVSO work lives in that
 range.
 
+And to go below that? What precision photometry takes (exoplanet
+transits included), explained for the observer with a technical
+implementation appendix: [docs/PRECISION.md](PRECISION.md).
+
 ---
 
 ## 8. Good practices (the observer's checklist)

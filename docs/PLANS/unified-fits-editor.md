@@ -1,10 +1,11 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: EN CURSO, FASE A SIN EMPEZAR.** Nada de código escrito todavía;
-> la rama `feature/ufe` está en `ffca32c` (igual que `main`), árbol limpio.
-> Toda la sesión previa fue: requisitos, decisiones firmadas con el usuario y
-> exploración exhaustiva del código. **Empezar en la sección «Estado de la
-> sesión» de este fichero e implementar la fase A desde ahí.**
+> **ESTADO: FASE A CERRADA (2026-09-22).** Esqueleto, carga y vista
+> implantados: `gui/ufe_state.py`, `gui/widgets/ufe_image_view.py`,
+> `gui/ufe_dialog.py`, entrada «FITS editor…» en el menú Herramientas,
+> ADR-044, 34 tests nuevos (suite 1528 verde), i18n ES/EN completo.
+> **La próxima sesión empieza en la fase B** (motor de estiramiento
+> `core/stretch.py` + histograma visual con tiradores).
 >
 > Documento vivo: se actualiza al cierre de cada fase. Requisitos del
 > observador en `docs/unified-fits-editor.md`.
@@ -101,6 +102,46 @@
    diseño de la vista de imagen.
 
 ## Decisiones de diseño
+
+### Mejoras firmadas en la revisión previa a la fase A (2026-09-22)
+
+Revisión del diseño contra el código real antes de escribir nada; las
+siete quedaron firmadas con el usuario y mandan sobre el texto original
+cuando difieran:
+
+1. **Orientación FITS centralizada**: `core/fits_io.read_fits` devuelve la
+   fila 0 abajo (convención FITS) y la pantalla necesita `flipud` (patrón
+   `sn_annotate_dialog.py:429`). La escena vive en píxeles de placa con y
+   hacia abajo (convención de pantalla), y `UfeImageState` ofrece la única
+   pareja de conversores `scene_to_data(x, y)` / `data_to_scene(col, row)`
+   (`row = H-1-y`). Ninguna pestaña de las fases D/E/F hace flips a mano.
+2. **Render síncrono + coalescencia, no QThread**: el patrón real de
+   `sn_annotate_dialog.py` es timer single-shot de 120 ms + estiramiento
+   síncrono en el hilo GUI. Con el cap de 4096 px el render cuesta del
+   orden de 50-150 ms; un QThread solo añade carreras y riesgo de segfault
+   shiboken al cerrar. Fase A: coalesce + síncrono; el worker diferido
+   queda como opción documentada para la fase C si el profiling lo pide.
+3. **Motor de estiramiento provisional sin tocar legacy**: la fase A
+   reutiliza `viz/blink_view.auto_limits/apply_stretch/to_uint8` (ya
+   testados) más helpers privados de downscale e inversión (`1.0 - x`
+   sobre el float 0-1). En la fase B `core/stretch.py` los absorbe y la
+   UFE solo cambia un import.
+4. **Pixmap con `setScale` + `FastTransformation`**: el pixmap reducido se
+   inserta con `item.setScale(pasos)` de modo que la escena siga en
+   píxeles de placa (zoom 100 % = 1:1 exacto; overlays precisos).
+   `Qt.FastTransformation` (vecino más próximo): a 200/400 % se ven los
+   píxeles reales, no interpolados (pixel-peeping estilo AstroImageJ).
+5. **Regla QImage**: siempre
+   `QImage(buf, w, h, w, Format_Grayscale8).copy()` (patrón
+   `sn_annotate_dialog.py:437`); nunca depender del buffer numpy vivo.
+6. **Probe con valor DN**: el hover muestra píxel x/y, valor DN y RA/Dec
+   (`core/coords.ra_deg_to_hms` / `dec_deg_to_dms`) cuando hay WCS; el DN
+   es justo lo que el ajuste fino del histograma de la fase B necesita.
+7. **Invariante white > black por clamp, no por excepción**
+   (`white = max(white, black + eps)`) para que sliders y spinners no se
+   peleen en la fase B. Los percentiles auto se calculan sobre la imagen
+   reducida (<= 4096 px): visualmente idénticos y mucho más baratos que
+   ordenar decenas de Mpx; `d_min/d_max` salen de la placa completa.
 
 ### Modelo de escena y zoom
 
@@ -269,22 +310,22 @@ Referencia para la fase A; no rehacer la exploración.
 
 - [x] Rama `feature/ufe` desde `main`.
 - [x] Plan + documentos en `docs/`.
-- [ ] `gui/ufe_state.py`: controller de estado + load de FITS
+- [x] `gui/ufe_state.py`: controller de estado + load de FITS
       (mono/RGB).
-- [ ] `gui/widgets/ufe_image_view.py`: vista con zoom completo y
+- [x] `gui/widgets/ufe_image_view.py`: vista con zoom completo y
       overlays.
-- [ ] `gui/ufe_dialog.py`: layout, barra superior (cargar, zoom,
+- [x] `gui/ufe_dialog.py`: layout, barra superior (cargar, zoom,
       invertir, export PNG de lo visible), área de pestañas vacía
       (placeholder por funcionalidad para no romper la rejilla),
       histograma en fase B.
-- [ ] Menú Herramientas: «Editor FITS…» (lazy, patrón
-      `_skycal_build`).
-- [ ] ADR-044 (bilingüe, estilo ADR-042).
-- [ ] Tests unitarios: `UfeImageState` (carga mono/RGB, límites auto,
+- [x] Menú Herramientas: «FITS editor…» (lazy, patrón
+      `_skycal_build`; al final del menú, tras «Campaigns…»).
+- [x] ADR-044 (bilingüe, estilo ADR-042).
+- [x] Tests unitarios: `UfeImageState` (carga mono/RGB, límites auto,
       estirar, invertir) con Qt offscreen + fixtures FITS de tests
-      existentes.
-- [ ] i18n: todas las cadenas por `self.tr()` + `.ts` actualizado +
-      `.qm` recompilado.
+      existentes; más humo de vista y diálogo (34 tests, suite 1528).
+- [x] i18n: todas las cadenas por `self.tr()` + `.ts` actualizado +
+      `.qm` recompilado (1100 cadenas, 0 unfinished).
 
 ### B: Motor de estiramiento + histograma visual
 

@@ -118,8 +118,10 @@ nightscribe/
                       #   sobre DSS2 o el FITS del usuario — ADR-042)
     gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
                        # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
-                       # (ADR-019/035/036/040) — el **Diario de observación** y el
-                       # **Calendario del cielo** (skycal_dialog.py, ADR-040) viven en
+                       # (ADR-019/035/036/040) — el **Diario de observación**, el
+                       # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
+                       # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
+                       # widgets/ufe_image_view.py, ADR-044) viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
@@ -153,7 +155,7 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-037, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-044, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
 **Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
@@ -187,7 +189,7 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-037, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-044, bilingual). Read the ADR before
 changing a decision; update it if you do.
 
 **Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow

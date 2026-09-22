@@ -1,15 +1,14 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: FASES A y B CERRADAS (2026-09-22).** Esqueleto/carga/vista
-> (A) y motor de estiramiento + histograma visual (B) implantados:
-> `core/stretch.py` con sus cinco consumidores migrados y los re-exports
-> de compatibilidad en `viz/blink_view.py`; tira de histograma con
-> tiradores estilo AstroImageJ, DN finos, gamma, Auto e Invertir
-> (`gui/widgets/histogram_widget.py`); 56 tests UFE/stretch, suite 1550
-> verde, i18n 1106 cadenas.
-> **La próxima sesión empieza en la fase C** (comunes pulidas: teclado,
-> persistencia del stretch entre cargas, accesibilidad) o salta a la D
-> (pestaña Anotar) si se prefiere funcionalidad antes que pulido.
+> **ESTADO: FASES A, B y C CERRADAS (2026-09-22).** Esqueleto/carga/vista
+> (A), motor de estiramiento + histograma visual (B) y comunes pulidas
+> (C): teclado completo (F, 1, +, -, flechas, Ctrl+O, Ctrl+E),
+> persistencia del stretch entre cargas (checkbox «Mantener
+> estiramiento al cargar»), etiqueta de zoom %, título con el nombre del
+> fichero, doble clic = Fit, accessibleNames y tooltips, doc de usuario
+> `docs/UFE.es.md`/`UFE.md`. Suite 1560 verde, i18n 1116 cadenas.
+> **La próxima sesión empieza en la fase D** (pestaña Anotar sobre
+> `core/fits_annotate`).
 >
 > Documento vivo: se actualiza al cierre de cada fase. Requisitos del
 > observador en `docs/unified-fits-editor.md`.
@@ -349,9 +348,16 @@ Referencia para la fase A; no rehacer la exploración.
 
 ### C: Comunes pulidas
 
-- [ ] Teclado completo, persistencia del estiramiento entre cargas,
-      accesibilidad, pulido.
-- [ ] Docs de usuario en `docs/` si procede.
+- [x] Teclado completo (F fit, 1 a 1:1, +/- en pasos de rueda, flechas
+      pan de un cuarto de ventana, Ctrl+O cargar, Ctrl+E exportar; el
+      QPA offscreen no entrega activación de ventana, así que los tests
+      disparan `activated.emit()` sobre los atajos registrados: mismo
+      punto ciego que los Ctrl+1..4 de main_window), persistencia del
+      estiramiento entre cargas (`state.keep_stretch` + checkbox),
+      accesibilidad (accessibleName en vista, canvas y spins; tooltips
+      con atajos) y pulido (etiqueta de zoom %, título con el fichero,
+      doble clic = Fit).
+- [x] Docs de usuario: `docs/UFE.es.md` y `docs/UFE.md`.
 
 ### D: Pestaña Anotar
 

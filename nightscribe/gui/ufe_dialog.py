@@ -122,11 +122,10 @@ class UfeDialog(QDialog):
         return bar
 
     def _add_placeholder_tabs(self):
-        # One placeholder per legacy feature so the grid never changes
-        # shape; phases D/E/F swap each for the real tab widget.
+        # One placeholder per legacy feature not yet migrated (phases E/F
+        # swap theirs in); the Annotate tab is real since phase D.
         for title, phase in ((self.tr("Blink"), "E"),
-                             (self.tr("Compare"), "F"),
-                             (self.tr("Annotate"), "D")):
+                             (self.tr("Compare"), "F")):
             page = QWidget()
             v = QVBoxLayout(page)
             lbl = QLabel(self.tr("Arrives in phase {0}").format(phase))
@@ -134,6 +133,22 @@ class UfeDialog(QDialog):
             lbl.setWordWrap(True)
             v.addWidget(lbl)
             self.tabs.addTab(page, title)
+        from .ufe_annotate_tab import UfeAnnotateTab
+        self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
+                                           view=self.view)
+        self.tabs.addTab(self.tab_annotate, self.tr("Annotate"))
+        # only the current tab owns the view's clicks and overlays
+        self.tabs.currentChanged.connect(self._on_feature_tab_changed)
+        self._on_feature_tab_changed(self.tabs.currentIndex())
+
+    def _on_feature_tab_changed(self, idx):
+        # Hands the stage to the freshly selected tab (set_active) and
+        # takes it from the others; placeholders carry no method.
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            setter = getattr(w, "set_active", None)
+            if callable(setter):
+                setter(i == idx)
 
     # -------------------------------------------------------- extension
 

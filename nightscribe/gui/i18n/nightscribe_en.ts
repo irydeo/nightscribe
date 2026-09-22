@@ -6193,12 +6193,112 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
 </context>
 <context>
+    <name>UfeAnnotateTab</name>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="72"/>
+        <source>Label:</source>
+        <translation>Label:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="74"/>
+        <source>Annotation label</source>
+        <translation>Annotation label</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="79"/>
+        <source>Notes:</source>
+        <translation>Notes:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="85"/>
+        <source>Marker size:</source>
+        <translation>Marker size:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="102"/>
+        <source>Nudge</source>
+        <translation>Nudge</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="104"/>
+        <source>Shift the marker by that many pixels (or click the image)</source>
+        <translation>Shift the marker by that many pixels (or click the image)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="107"/>
+        <source>Marker</source>
+        <translation>Marker</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="109"/>
+        <source>Show the annotation marker</source>
+        <translation>Show the annotation marker</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="118"/>
+        <source>Also annotate (visits):</source>
+        <translation>Also annotate (visits):</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="123"/>
+        <source>Add…</source>
+        <translation>Add…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="126"/>
+        <source>Remove</source>
+        <translation>Remove</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="131"/>
+        <source>Save annotated copy…</source>
+        <translation>Save annotated copy…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="248"/>
+        <source>marker {0:.1f}, {1:.1f}</source>
+        <translation>marker {0:.1f}, {1:.1f}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="284"/>
+        <source>Plates to annotate with the same marker</source>
+        <translation>Plates to annotate with the same marker</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="285"/>
+        <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
+        <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="351"/>
+        <source>Save annotated FITS as</source>
+        <translation>Save annotated FITS as</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="367"/>
+        <source>Save failed</source>
+        <translation>Save failed</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="368"/>
+        <source>Could not write the annotated FITS to {0}.
+{1}</source>
+        <translation>Could not write the annotated FITS to {0}.
+{1}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_annotate_tab.py" line="373"/>
+        <source>Saved {0} annotated copy(ies). Last: {1}</source>
+        <translation>Saved {0} annotated copy(ies). Last: {1}</translation>
+    </message>
+</context>
+<context>
     <name>UfeDialog</name>
     <message>
         <location filename="../ufe_dialog.py" line="56"/>
-        <location filename="../ufe_dialog.py" line="162"/>
-        <location filename="../ufe_dialog.py" line="259"/>
-        <location filename="../ufe_dialog.py" line="261"/>
+        <location filename="../ufe_dialog.py" line="177"/>
+        <location filename="../ufe_dialog.py" line="274"/>
+        <location filename="../ufe_dialog.py" line="276"/>
         <source>FITS editor</source>
         <translation>FITS editor</translation>
     </message>
@@ -6267,32 +6367,32 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Compare</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="129"/>
+        <location filename="../ufe_dialog.py" line="139"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="132"/>
+        <location filename="../ufe_dialog.py" line="131"/>
         <source>Arrives in phase {0}</source>
         <translation>Arrives in phase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="152"/>
+        <location filename="../ufe_dialog.py" line="167"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="153"/>
+        <location filename="../ufe_dialog.py" line="168"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="163"/>
+        <location filename="../ufe_dialog.py" line="178"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="179"/>
+        <location filename="../ufe_dialog.py" line="194"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>

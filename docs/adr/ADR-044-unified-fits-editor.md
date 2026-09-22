@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-22** (fases A, B, C, D implementadas; en D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5, puntualización del observador: las tarjetas ANNOTATE se leen y pintan al cargar, la flecha de norte y la barra de escala son overlays comunes de viewport que también salen en el PNG, y la resolución astrométrica es común y en memoria: `set_wcs_cards` nunca toca el archivo en disco; fases E-F pendientes)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-22** (fases A-E implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override` a la vista: la pestaña en escena posee el frame mostrado y el estiramiento compartido en DN absolutos manda también sobre el blink; fase F pendiente)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 

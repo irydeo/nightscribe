@@ -1,18 +1,18 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: FASES A, B, C, D y D.5 CERRADAS (2026-09-22).** Esqueleto/
-> carga/vista (A), motor de estiramiento + histograma visual (B), comunes
-> pulidas (C), pestaña Anotar real (D) y la puntualización del
-> observador (D.5): las placas anotadas muestran sus tarjetas ANNOTATE al
-> cargar (`core/fits_annotate.read_annotations` + capa de solo lectura en
-> la vista), la flecha de norte y la barra de escala son overlays COMUNES
-> (HUD en coords de viewport, también en el PNG exportado) y la
-> resolución astrométrica es funcionalidad común (botón «Resolver
-> astrometría…» + `UfeSolveWorker` + `state.set_wcs_cards`, en memoria:
-> el archivo en disco jamás se toca). Suite 1586 verde, i18n 1145
-> cadenas.
-> **La próxima sesión empieza en la fase E** (pestaña Blink sobre
-> `core/blink`).
+> **ESTADO: FASES A-E y D.5 CERRADAS (2026-09-22).** La fase E trajo la
+> pestaña Blink real (`gui/ufe_blink_tab.py` sobre `core/blink` +
+> `BlinkWorker`/`BlinkExportWorker`): la pestaña en escena posee el frame
+> de la vista por `set_frame_override`, el obs se estira con los DN
+> absolutos compartidos de la tira de histograma, la referencia PS1 con
+> sus percentiles propios por la ganancia de balance; gamma e invertir
+> comunes; blink vivo por timer, fundido estático, nudge de la referencia,
+> marcador mapeado por el WCS de la placa (placas espejadas: ambos frames
+> se des-espejan para la vista y el SN se mapea por cielo), exports
+> GIF/MP4/PNG lado a lado idénticos al legacy. Suite 1600 verde, i18n
+> 1173 cadenas.
+> **La próxima sesión empieza en la fase F** (pestaña Comparar sobre
+> `core/compstars` + overlays estilo `FinderChart`).
 
 > **Nota de la fase D (resuelta en D.5)**: la flecha de norte y la barra
 > de escala llegaron como overlay COMÚN (HUD de viewport, también en el
@@ -409,10 +409,18 @@ Referencia para la fase A; no rehacer la exploración.
 
 ### E: Pestaña Blink
 
-- [ ] Sobre `core/blink.prepare_pair` + `BlinkWorker`: resolver
+- [x] Sobre `core/blink.prepare_pair` + `BlinkWorker`: resolver
       SN/manual, blink vivo (timer), marcador con nudge, balance, export
-      GIF/MP4/PNG lado a lado del par.
-- [ ] El diálogo legacy de blink sigue vivo.
+      GIF/MP4/PNG lado a lado del par. Notas de la migración: la pestaña
+      posee el frame de la vista por `set_frame_override` (nuevo gancho
+      de `UfeImageView`); la placa es la del estado (la carga es común);
+      el estiramiento del obs son los DN absolutos compartidos (la tira
+      de histograma manda también sobre el blink); placas espejadas se
+      des-espejan para la vista y el marcador va por cielo
+      (`state.wcs.sky_to_pixel` sobre ra/dec resueltos); la registración
+      en proyecto del export queda en el legacy (el UFE es agnóstico de
+      proyecto).
+- [x] El diálogo legacy de blink sigue vivo (suite verde sin tocarlo).
 
 ### F: Pestaña Comparación
 

@@ -24,9 +24,28 @@ comparación, FITS anotados), que siguen disponibles donde siempre.
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
   coordenadas RA/Dec si la placa trae WCS.
-* **Pestañas**: una por funcionalidad. **Anotar** ya está disponible
-  (abajo); Blink y Comparación llegan en las siguientes fases del plan.
-  Solo la pestaña visible responde a los clics sobre la imagen.
+* **Pestañas**: una por funcionalidad. **Blink** y **Anotar** ya están
+  disponibles (abajo); Comparación llega en la fase F del plan. Solo la
+  pestaña visible responde a los clics sobre la imagen.
+
+## Blink
+
+La pestaña **Blink** parpadea tu placa contra la referencia PanSTARRS
+DR1 g (supernovas y transitorios; la placa es la que cargaste con
+«Cargar FITS…»):
+
+* Escribe el nombre de la SN (o marca «Coordenadas manuales» y da
+  RA/Dec) y pulsa **Preparar pareja**: resuelve el objetivo, descarga la
+  referencia con la geometría de tu placa y arranca el blink en vivo.
+* El **estiramiento es el común** (la tira de histograma manda también
+  sobre el blink); **Balance** multiplica la referencia para igualar el
+  fondo de cielo (botón Auto); **Ajuste ref** desplaza la referencia a
+  sub-píxel si el registro no es perfecto.
+* **Blink** (alterna con el intervalo elegido) o **Fundido** (mezcla
+  estática con el deslizador); el marcador ámbar marca la posición de la
+  SN mapeada por el WCS de tu placa.
+* **GIF… / MP4… / PNG…** exportan el par (lado a lado el PNG), con el
+  zoom de recorte sobre la SN que elijas.
 * **Anotaciones al vuelo**: si la placa ya trae tarjetas ANNOTATE
   (escritas por NightScribe o por AstroImageJ), se dibujan al cargar:
   círculos con su tamaño en píxeles de placa y rótulos legibles a

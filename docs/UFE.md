@@ -24,9 +24,28 @@ FITS), which stay where they always were.
   the cursor; dragging pans; double-click returns to the fit. Hovering
   shows a tooltip with the pixel, its DN value and the RA/Dec when the
   plate carries a WCS.
-* **Tabs**: one per feature. **Annotate** is already available (below);
-  Blink and Compare arrive in the plan's next phases. Only the visible
-  tab answers clicks on the image.
+* **Tabs**: one per feature. **Blink** and **Annotate** are already
+  available (below); Compare arrives in the plan's phase F. Only the
+  visible tab answers clicks on the image.
+
+## Blink
+
+The **Blink** tab blinks your plate against the PanSTARRS DR1 g
+reference (supernovae and transients; the plate is the one you loaded
+with "Load FITS…"):
+
+* Type the SN name (or tick "Manual coordinates" and give RA/Dec) and
+  press **Prepare pair**: it resolves the target, downloads the
+  reference in your plate's geometry and starts the live blink.
+* The **stretch is the common one** (the histogram strip drives the
+  blink too); **Balance** multiplies the reference to match the sky
+  background (Auto button); **Nudge ref** shifts the reference by
+  sub-pixel steps when the registration is not perfect.
+* **Blink** (alternates at the chosen interval) or **Fade** (static
+  blend with the slider); the amber marker sits at the SN position
+  mapped through your plate's WCS.
+* **GIF… / MP4… / PNG…** export the pair (side by side for PNG), with
+  the crop zoom on the SN of your choice.
 * **Annotations on load**: if the plate already carries ANNOTATE cards
   (written by NightScribe or AstroImageJ), they are drawn on load:
   circles with their plate-pixel sizes and labels readable at any zoom.

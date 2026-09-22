@@ -1,11 +1,15 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: FASE A CERRADA (2026-09-22).** Esqueleto, carga y vista
-> implantados: `gui/ufe_state.py`, `gui/widgets/ufe_image_view.py`,
-> `gui/ufe_dialog.py`, entrada «FITS editor…» en el menú Herramientas,
-> ADR-044, 34 tests nuevos (suite 1528 verde), i18n ES/EN completo.
-> **La próxima sesión empieza en la fase B** (motor de estiramiento
-> `core/stretch.py` + histograma visual con tiradores).
+> **ESTADO: FASES A y B CERRADAS (2026-09-22).** Esqueleto/carga/vista
+> (A) y motor de estiramiento + histograma visual (B) implantados:
+> `core/stretch.py` con sus cinco consumidores migrados y los re-exports
+> de compatibilidad en `viz/blink_view.py`; tira de histograma con
+> tiradores estilo AstroImageJ, DN finos, gamma, Auto e Invertir
+> (`gui/widgets/histogram_widget.py`); 56 tests UFE/stretch, suite 1550
+> verde, i18n 1106 cadenas.
+> **La próxima sesión empieza en la fase C** (comunes pulidas: teclado,
+> persistencia del stretch entre cargas, accesibilidad) o salta a la D
+> (pestaña Anotar) si se prefiere funcionalidad antes que pulido.
 >
 > Documento vivo: se actualiza al cierre de cada fase. Requisitos del
 > observador en `docs/unified-fits-editor.md`.
@@ -329,15 +333,19 @@ Referencia para la fase A; no rehacer la exploración.
 
 ### B: Motor de estiramiento + histograma visual
 
-- [ ] `core/stretch.py`; migración de los cinco consumidores;
-      `blink_view` re-exporta para compatibilidad.
-- [ ] `gui/widgets/histogram_widget.py`: histograma QPainter 256 bins,
-      tiradores arrastrables (estilo AstroImageJ), gamma, DN con paso
-      fino, Auto, Invertir.
-- [ ] Export PNG de lo visible como funcionalidad de serie (ya en barra
-      superior).
-- [ ] Tests de `core/stretch.py` (percentiles, gamma, invertir,
-      downscale).
+- [x] `core/stretch.py`; migración de los consumidores
+      (`evolution_view`, `motion_view`, `__main__.py`,
+      `sn_annotate_dialog`; `seqchart_dialog` no lo usaba);
+      `blink_view` re-exporta para compatibilidad (tests legacy intactos).
+- [x] `gui/widgets/histogram_widget.py`: histograma QPainter 256 bins
+      (escala log), tiradores arrastrables (estilo AstroImageJ, con salto
+      del tirador más cercano al clic), gamma, DN con paso fino
+      (rango/decimales adaptativos), Auto, Invertir.
+- [x] Export PNG de lo visible como funcionalidad de serie (barra
+      superior, desde la fase A).
+- [x] Tests de `core/stretch.py` (percentiles, gamma, invertir,
+      downscale, histograma, re-exports) y del widget (tiradores, spins,
+      Auto, Invertir, estados vacío/lleno).
 
 ### C: Comunes pulidas
 

@@ -87,6 +87,8 @@ nightscribe/
     post.py          # plantillas -> post_ES / post_EN / tuit
     fits_io.py       # lector FITS mínimo (numpy, sin astropy — ADR-018)
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
+    stretch.py       # motor de estiramiento: percentiles, lineal+gamma, invertir,
+                     #   histograma, downscale 2×2 (ADR-044; blink_view re-exporta)
     blink.py         # blink de SN: resuelve nombre->coords, pareja alineada PS1-g
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
                      # + hads_sheet.py: libro HADS de P. Wils (Google Sheets XLSX,
@@ -121,7 +123,8 @@ nightscribe/
                        # (ADR-019/035/036/040) — el **Diario de observación**, el
                        # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
                        # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
-                       # widgets/ufe_image_view.py, ADR-044) viven en
+                       # widgets/ufe_image_view.py + widgets/histogram_widget.py,
+                       # ADR-044) viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,

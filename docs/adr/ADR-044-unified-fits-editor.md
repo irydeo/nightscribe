@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 (fase A: esqueleto, carga y vista; fases B-F pendientes)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-22** (fases A y B implementadas: esqueleto/carga/vista y motor de estiramiento `core/stretch.py` + histograma visual; fases C-F pendientes)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 

@@ -189,6 +189,31 @@ class UfeSolveWorker(QThread):
         self.finished.emit(cards or {})
 
 
+class UfeFieldWorker(QThread):
+    # Loads the comparison-star field (VizieR catalog + VSX) around the
+    # UFE plate's centre in the background (ADR-044, phase F). Signal
+    # object on purpose: the field is a nested dict that Signal(dict)
+    # would drag through a QVariantMap copy.
+    finished = Signal(object)       # compstars.load_field result or {}
+
+    def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin):
+        super().__init__()
+        self._catalog = catalog
+        self._ra = ra_deg
+        self._dec = dec_deg
+        self._fov = fov_arcmin
+
+    def run(self):
+        from ..core import compstars
+        try:
+            field = compstars.load_field(self._catalog, self._ra,
+                                         self._dec, self._fov)
+        except Exception as err:    # never crash the GUI on data problems
+            logger.exception("ufe field worker failed: %s", err)
+            field = None
+        self.finished.emit(field or {})
+
+
 class BlinkExportWorker(QThread):
     # Renders the blink GIF/MP4/PNG off the GUI thread (matplotlib is slow).
     finished = Signal(str, str)     # output path, error message

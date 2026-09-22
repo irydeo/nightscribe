@@ -14,9 +14,10 @@
 """The Unified FITS Editor dialog (ADR-044): the single place where
 NightScribe shows and works FITS images. The image owns most of the
 window; the right column carries one tab per feature (Blink, Compare,
-Annotate; phase A ships them as placeholders) and the bottom strip will
-hold the visual histogram (phase B). The top bar carries the common
-actions: load, invert, PNG export of the visible scene and zoom presets.
+Annotate) and the bottom strip is the visual histogram. The top bar
+carries the common actions: load, invert, PNG export of the visible
+scene, the north arrow / scale bar HUD toggles, astrometric solving and
+zoom presets.
 
 Extensibility rule: a new feature is a new tab. The tab widget receives
 (state, lang) and subscribes to the state's signals; the dialog only
@@ -80,7 +81,7 @@ class UfeDialog(QDialog):
         lay.addWidget(self.splitter, 1)
         self.histogram = HistogramWidget(self.state)
         lay.addWidget(self.histogram)
-        self._add_placeholder_tabs()
+        self._build_feature_tabs()
 
     def _build_topbar(self):
         # @return: the common-actions row (load / invert / export / zoom)
@@ -147,20 +148,16 @@ class UfeDialog(QDialog):
         bar.addStretch(1)
         return bar
 
-    def _add_placeholder_tabs(self):
-        # The Blink (phase E) and Annotate (phase D) tabs are real; the
-        # Compare placeholder waits for phase F.
+    def _build_feature_tabs(self):
+        # All three feature tabs are real now (phases D, E, F).
         from .ufe_blink_tab import UfeBlinkTab
         self.tab_blink = UfeBlinkTab(self.state, self._lang,
                                      view=self.view)
         self.tabs.addTab(self.tab_blink, self.tr("Blink"))
-        page = QWidget()
-        v = QVBoxLayout(page)
-        lbl = QLabel(self.tr("Arrives in phase {0}").format("F"))
-        lbl.setAlignment(Qt.AlignCenter)
-        lbl.setWordWrap(True)
-        v.addWidget(lbl)
-        self.tabs.addTab(page, self.tr("Compare"))
+        from .ufe_compare_tab import UfeCompareTab
+        self.tab_compare = UfeCompareTab(self.state, self._lang,
+                                         view=self.view)
+        self.tabs.addTab(self.tab_compare, self.tr("Compare"))
         from .ufe_annotate_tab import UfeAnnotateTab
         self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
                                            view=self.view)

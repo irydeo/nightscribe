@@ -26,9 +26,9 @@ Two conventions keep every future tab honest:
   the frame fits the display cap, then the linear stretch, then gamma,
   then inversion, then the vertical flip to screen orientation.
 
-Phase A reuses viz/blink_view's stretch engine (auto_limits /
-apply_stretch / to_uint8) verbatim; phase B moves it to core/stretch.py
-and this module only changes the import.
+The engine is core/stretch.py (ADR-044, phase B); the legacy
+dialogs reach the same functions through viz/blink_view's compatibility
+re-exports.
 """
 
 import logging
@@ -36,12 +36,10 @@ import logging
 import numpy as np
 from PySide6.QtCore import QObject, Signal
 
-from ..core import coords, fits_io, wcs as wcs_mod
-from ..viz import blink_view
+from ..core import coords, fits_io, stretch, wcs as wcs_mod
 
 logger = logging.getLogger("nightscribe.gui.ufe_state")
 
-_DISPLAY_CAP = 4096   # max display side in px; bigger plates get 2x2 steps
 _EPS = 1e-6           # min white-black separation (the clamp invariant)
 
 
@@ -124,7 +122,7 @@ class UfeImageState(QObject):
         # @return: None; emits stretch_changed when a plate is loaded
         if self.data is None:
             return
-        self.black, self.white = blink_view.auto_limits(
+        self.black, self.white = stretch.auto_limits(
             self._downscaled(), 1.0, 99.5)
         self.stretch_changed.emit()
 
@@ -169,12 +167,12 @@ class UfeImageState(QObject):
         if self.data is None:
             return None
         small = self._downscaled()
-        img = blink_view.apply_stretch(small, self.black, self.white,
-                                       self.gamma)
+        img = stretch.apply_stretch(small, self.black, self.white,
+                                    self.gamma)
         if self.inverted:
-            img = 1.0 - img
+            img = stretch.invert(img)
         return np.ascontiguousarray(
-            np.flipud(blink_view.to_uint8(img)))
+            np.flipud(stretch.to_uint8(img)))
 
     @property
     def display_scale(self):
@@ -189,23 +187,31 @@ class UfeImageState(QObject):
             return 1
         scale = 1
         h, w = self.data.shape
-        while max(h, w) > _DISPLAY_CAP and min(h, w) >= 2:
+        while max(h, w) > stretch.DISPLAY_CAP and min(h, w) >= 2:
             scale *= 2
             h //= 2
             w //= 2
         return scale
 
     def _downscaled(self, cap=None):
-        # 2x2 block-average steps until the frame fits the display cap
-        # (odd edges are cropped before each reshape). No new deps.
-        # @args: cap - override of _DISPLAY_CAP (tests use a small cap)
+        # The display frame before any stretch: 2x2 block-average steps
+        # until it fits the cap (core/stretch.display_downscale).
+        # @args: cap - override of stretch.DISPLAY_CAP (tests use small)
         # @return: 2D float32 array, the original when it already fits
-        cap = _DISPLAY_CAP if cap is None else int(cap)
-        out = self.data
-        while out is not None and max(out.shape) > cap and \
-                min(out.shape) >= 2:
-            out = _downscale2x2(out)
-        return out
+        if self.data is None:
+            return None
+        return stretch.display_downscale(
+            self.data, stretch.DISPLAY_CAP if cap is None else int(cap))
+
+    def histogram(self, nbins=256):
+        # Histogram of the display frame over the FULL plate data range,
+        # for the bottom strip (phase B).
+        # @args: nbins - bin count
+        # @return: (edges, counts) or (None, None) when no plate is loaded
+        if self.data is None:
+            return None, None
+        return stretch.histogram(self._downscaled(), nbins,
+                                 (self.d_min, self.d_max))
 
     # --------------------------------------------------- scene <-> data
 
@@ -249,12 +255,3 @@ class UfeImageState(QObject):
                 pass                          # off-frame TAN: pixels only
         return True, lines
 
-
-def _downscale2x2(arr):
-    # One 2x2 averaging step; odd rows/cols are cropped before the reshape.
-    # @args: arr - 2D array
-    # @return: 2D float32 array with half the size on each axis
-    h, w = arr.shape
-    arr = arr[:h // 2 * 2, :w // 2 * 2]
-    return arr.reshape(h // 2 * 2 // 2, 2, w // 2 * 2 // 2,
-                       2).mean(axis=(1, 3), dtype=np.float32)

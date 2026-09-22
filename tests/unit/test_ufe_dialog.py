@@ -52,7 +52,7 @@ def test_layout_three_placeholder_tabs(dlg):
     assert dlg.tabs.count() == 3
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
     assert titles == ["Blink", "Compare", "Annotate"]
-    assert dlg.frm_histogram is not None
+    assert dlg.histogram is not None      # the phase-B histogram strip
     # the image dominates: at 1280 px the view is wider than the tab column
     assert dlg.view.width() > dlg.tabs.width()
 

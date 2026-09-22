@@ -634,6 +634,39 @@
     </message>
 </context>
 <context>
+    <name>HistogramWidget</name>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="194"/>
+        <source>Black:</source>
+        <translation>Negro:</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="195"/>
+        <source>White:</source>
+        <translation>Blanco:</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="197"/>
+        <source>Gamma:</source>
+        <translation>Gamma:</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="207"/>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="209"/>
+        <source>Black and white at the 1 / 99.5 percentiles</source>
+        <translation>Negro y blanco en los percentiles 1 / 99,5</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="212"/>
+        <source>Invert</source>
+        <translation>Invertir</translation>
+    </message>
+</context>
+<context>
     <name>HistoryTab</name>
     <message>
         <source>Refresh</source>
@@ -6152,78 +6185,77 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>UfeDialog</name>
     <message>
-        <location filename="../ufe_dialog.py" line="54"/>
-        <location filename="../ufe_dialog.py" line="156"/>
+        <location filename="../ufe_dialog.py" line="55"/>
+        <location filename="../ufe_dialog.py" line="147"/>
         <source>FITS editor</source>
         <translation>Editor FITS</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="80"/>
+        <location filename="../ufe_dialog.py" line="83"/>
         <source>Load FITS…</source>
         <translation>Cargar FITS…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="83"/>
+        <location filename="../ufe_dialog.py" line="86"/>
         <source>Invert</source>
         <translation>Invertir</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="86"/>
+        <location filename="../ufe_dialog.py" line="89"/>
         <source>Swap black for white: faint objects pop against the sky</source>
         <translation>Cambia negro por blanco: los objetos débiles resaltan sobre el cielo</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="90"/>
+        <location filename="../ufe_dialog.py" line="93"/>
         <source>Export PNG…</source>
         <translation>Exportar PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="95"/>
+        <location filename="../ufe_dialog.py" line="98"/>
         <source>Zoom:</source>
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="113"/>
         <source>Histogram (phase B)</source>
-        <translation>Histograma (fase B)</translation>
+        <translation type="vanished">Histograma (fase B)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="121"/>
+        <location filename="../ufe_dialog.py" line="112"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="122"/>
+        <location filename="../ufe_dialog.py" line="113"/>
         <source>Compare</source>
         <translation>Comparar</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="123"/>
+        <location filename="../ufe_dialog.py" line="114"/>
         <source>Annotate</source>
         <translation>Anotar</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="126"/>
+        <location filename="../ufe_dialog.py" line="117"/>
         <source>Arrives in phase {0}</source>
         <translation>Llega en la fase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="146"/>
+        <location filename="../ufe_dialog.py" line="137"/>
         <source>Open FITS image</source>
         <translation>Abrir imagen FITS</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="147"/>
+        <location filename="../ufe_dialog.py" line="138"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>Imágenes FITS (*.fits *.fit *.fts *.fz);;Todos los archivos (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="157"/>
+        <location filename="../ufe_dialog.py" line="148"/>
         <source>Could not read the FITS file:</source>
         <translation>No se pudo leer el archivo FITS:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="173"/>
+        <location filename="../ufe_dialog.py" line="164"/>
         <source>Export PNG</source>
         <translation>Exportar PNG</translation>
     </message>
@@ -6281,6 +6313,14 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>Start</source>
         <translation type="vanished">Empezar</translation>
+    </message>
+</context>
+<context>
+    <name>_HistogramCanvas</name>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="96"/>
+        <source>Load a plate to see its histogram</source>
+        <translation>Carga una placa para ver su histograma</translation>
     </message>
 </context>
 <context>

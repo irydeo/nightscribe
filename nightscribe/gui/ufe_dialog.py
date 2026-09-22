@@ -28,12 +28,13 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QFileDialog, QFrame, QHBoxLayout,
-                               QLabel, QMessageBox, QPushButton, QSplitter,
+from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
+                               QMessageBox, QPushButton, QSplitter,
                                QTabWidget, QVBoxLayout, QWidget)
 
 from ..core import fits_io
 from .ufe_state import UfeImageState
+from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
 
 logger = logging.getLogger("nightscribe.gui.ufe_dialog")
@@ -56,6 +57,7 @@ class UfeDialog(QDialog):
         self.resize(1280, 860)
         self.setMinimumSize(900, 600)
         self.state.image_loaded.connect(self._on_image_loaded)
+        self.state.stretch_changed.connect(self._sync_invert_button)
 
     # ------------------------------------------------------------- layout
 
@@ -71,7 +73,8 @@ class UfeDialog(QDialog):
         self.splitter.setStretchFactor(1, 0)
         self.tabs.setMinimumWidth(280)
         lay.addWidget(self.splitter, 1)
-        lay.addWidget(self._build_histogram_strip())
+        self.histogram = HistogramWidget(self.state)
+        lay.addWidget(self.histogram)
         self._add_placeholder_tabs()
 
     def _build_topbar(self):
@@ -102,18 +105,6 @@ class UfeDialog(QDialog):
             self.btn_zoom[label] = btn
         bar.addStretch(1)
         return bar
-
-    def _build_histogram_strip(self):
-        # @return: the bottom strip; a framed placeholder until phase B
-        #          lands the visual histogram with draggable handles
-        self.frm_histogram = QFrame()
-        self.frm_histogram.setFrameShape(QFrame.StyledPanel)
-        self.frm_histogram.setFixedHeight(120)
-        inner = QHBoxLayout(self.frm_histogram)
-        lbl = QLabel(self.tr("Histogram (phase B)"))
-        lbl.setAlignment(Qt.AlignCenter)
-        inner.addWidget(lbl)
-        return self.frm_histogram
 
     def _add_placeholder_tabs(self):
         # One placeholder per legacy feature so the grid never changes
@@ -190,8 +181,14 @@ class UfeDialog(QDialog):
 
     def _on_image_loaded(self):
         # A fresh plate resets the inversion (state already did its half).
+        self._sync_invert_button()
+        self.btn_invert.setEnabled(self.state.has_image)
+        self.btn_export.setEnabled(self.state.has_image)
+
+    def _sync_invert_button(self):
+        # The top-bar Invert mirrors state.inverted; the histogram strip
+        # carries its own Invert and both follow the state, never each
+        # other (the toggled handler no-ops when already in sync).
         self.btn_invert.blockSignals(True)
         self.btn_invert.setChecked(self.state.inverted)
         self.btn_invert.blockSignals(False)
-        self.btn_invert.setEnabled(self.state.has_image)
-        self.btn_export.setEnabled(self.state.has_image)

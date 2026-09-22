@@ -63,13 +63,17 @@ class UfeImageState(QObject):
         self.white = 1.0
         self.gamma = 1.0
         self.inverted = False
+        self.keep_stretch = False  # True: loads keep black/white/gamma/
+                                   # invert instead of the auto percentiles
         self._disp_scale = 1      # plate px per display px (2x2 steps)
 
     # ------------------------------------------------------------- load
 
     def load(self, path):
-        # Loads a FITS plate (mono or RGB-collapsed by fits_io) and resets
-        # the stretch to the auto percentiles.
+        # Loads a FITS plate (mono or RGB-collapsed by fits_io). The
+        # stretch resets to the auto percentiles unless keep_stretch is
+        # on, in which case black/white/gamma/invert carry over verbatim
+        # (same-camera frame series are the use case).
         # @args: path - FITS file path
         # @return: None; raises fits_io.FitsError on unreadable files
         header, data = fits_io.read_fits(path)
@@ -87,10 +91,11 @@ class UfeImageState(QObject):
             self.d_max = float(finite.max())
         else:
             self.d_min, self.d_max = 0.0, 1.0
-        self.inverted = False
-        self.gamma = 1.0
         self._disp_scale = self._compute_scale()
-        self.auto()
+        if not self.keep_stretch:
+            self.inverted = False
+            self.gamma = 1.0
+            self.auto()
         self.image_loaded.emit()
 
     def clear(self):

@@ -30,7 +30,7 @@ Differences from the plain ChartView:
 
 import logging
 
-from PySide6.QtCore import QRectF, Qt, QTimer
+from PySide6.QtCore import QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QImage, QPixmap, QTransform
 from PySide6.QtWidgets import (QGraphicsPixmapItem, QGraphicsSimpleTextItem,
                                QGraphicsView)
@@ -51,6 +51,8 @@ class UfeImageView(ChartView):
     ZOOM_MAX = 40.0    # pixel-level inspection of subtle targets
     WHEEL_STEP = 1.5   # a bolder notch: 40x must be reachable by wheel
 
+    zoom_changed = Signal(float)   # the absolute scale after any zoom move
+
     def __init__(self, state, parent=None):
         super().__init__(parent)
         self._state = state
@@ -65,6 +67,7 @@ class UfeImageView(ChartView):
         state.image_loaded.connect(self._on_image_loaded)
         state.stretch_changed.connect(self._render_soon)
         self.set_hover_probe(state.probe_text)
+        self.setAccessibleName(self.tr("FITS image view"))
         self._show_hint()
 
     # ------------------------------------------------------------ image
@@ -124,6 +127,7 @@ class UfeImageView(ChartView):
             w, h = self._state.plate_shape
             self.setSceneRect(QRectF(-0.25 * w, -0.25 * h,
                                      1.5 * w, 1.5 * h))
+        self.zoom_changed.emit(self.current_factor())
 
     def fit_to_factor(self, factor):
         # Absolute zoom presets: 1.0 shows one plate pixel per device
@@ -134,10 +138,35 @@ class UfeImageView(ChartView):
         self.resetTransform()
         self.scale(factor, factor)
         self.centerOn(centre)
+        self.zoom_changed.emit(self.current_factor())
+
+    def _zoom_by(self, factor):
+        # Wheel / +/- key zoom through the base clamp, then report.
+        old = self.transform().m11()
+        super()._zoom_by(factor)
+        new = self.transform().m11()
+        if new != old:
+            self.zoom_changed.emit(new)
+
+    def mouseDoubleClickEvent(self, event):
+        # Double-click returns to the fit (the base's reset_view).
+        if event.button() == Qt.LeftButton and self._state.has_image:
+            self.fit_to_scene()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
 
     def current_factor(self):
         # @return: the current absolute scale (1.0 = 100 %)
         return self.transform().m11()
+
+    def zoom_in(self):
+        # One wheel-notch up (the +/- keys and the wheel share the step).
+        self._zoom_by(self.WHEEL_STEP)
+
+    def zoom_out(self):
+        # One wheel-notch down.
+        self._zoom_by(1.0 / self.WHEEL_STEP)
 
     def resizeEvent(self, event):
         # Overrides the base's auto-fit-on-resize: the observer's zoom

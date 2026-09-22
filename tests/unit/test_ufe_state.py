@@ -168,3 +168,22 @@ def test_clear_returns_to_empty(state):
     state.clear()
     assert not state.has_image
     assert seen == [True]
+
+
+def test_keep_stretch_off_resets_on_load(state):
+    state.load(MONO)
+    state.set_stretch(black=3000.0, white=9000.0, gamma=0.7)
+    state.toggle_invert()
+    state.load(AIJ)                       # default: fresh auto stretch
+    assert not state.inverted and state.gamma == 1.0
+    assert (state.black, state.white) != (3000.0, 9000.0)
+
+
+def test_keep_stretch_on_preserves_everything(state):
+    state.load(MONO)
+    state.set_stretch(black=3000.0, white=9000.0, gamma=0.7)
+    state.toggle_invert()
+    state.keep_stretch = True
+    state.load(AIJ)
+    assert state.black == 3000.0 and state.white == 9000.0
+    assert state.gamma == pytest.approx(0.7) and state.inverted

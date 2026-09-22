@@ -28,6 +28,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
                                QMessageBox, QPushButton, QSplitter,
                                QTabWidget, QVBoxLayout, QWidget)
@@ -54,10 +55,12 @@ class UfeDialog(QDialog):
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("FITS editor"))
         self._build_ui()
+        self._build_shortcuts()
         self.resize(1280, 860)
         self.setMinimumSize(900, 600)
         self.state.image_loaded.connect(self._on_image_loaded)
         self.state.stretch_changed.connect(self._sync_invert_button)
+        self.view.zoom_changed.connect(self._on_zoom_changed)
 
     # ------------------------------------------------------------- layout
 
@@ -81,6 +84,7 @@ class UfeDialog(QDialog):
         # @return: the common-actions row (load / invert / export / zoom)
         bar = QHBoxLayout()
         self.btn_load = QPushButton(self.tr("Load FITS…"))
+        self.btn_load.setToolTip(self.tr("Open a FITS image (Ctrl+O)"))
         self.btn_load.clicked.connect(self._on_load)
         bar.addWidget(self.btn_load)
         self.btn_invert = QPushButton(self.tr("Invert"))
@@ -91,6 +95,8 @@ class UfeDialog(QDialog):
         self.btn_invert.setEnabled(False)
         bar.addWidget(self.btn_invert)
         self.btn_export = QPushButton(self.tr("Export PNG…"))
+        self.btn_export.setToolTip(self.tr(
+            "Save the visible scene as a PNG (Ctrl+E)"))
         self.btn_export.setEnabled(False)
         self.btn_export.clicked.connect(self._on_export_png)
         bar.addWidget(self.btn_export)
@@ -99,10 +105,19 @@ class UfeDialog(QDialog):
         self.btn_zoom = {}
         for factor, label in _ZOOM_PRESETS:
             btn = QPushButton(label)
+            btn.setToolTip(self.tr("Fit the plate to the window")
+                           if factor is None else
+                           self.tr("Zoom {0} % (1:1 at 100)").format(
+                               int(factor * 100)))
             btn.clicked.connect(
                 lambda _checked=False, f=factor: self._on_zoom_preset(f))
             bar.addWidget(btn)
             self.btn_zoom[label] = btn
+        self.lbl_zoom = QLabel("–")
+        self.lbl_zoom.setMinimumWidth(44)
+        self.lbl_zoom.setToolTip(self.tr(
+            "Current zoom: 100 % is one plate pixel per screen pixel"))
+        bar.addWidget(self.lbl_zoom)
         bar.addStretch(1)
         return bar
 
@@ -179,11 +194,71 @@ class UfeDialog(QDialog):
         else:
             self.view.fit_to_factor(factor)
 
+    def _on_zoom_changed(self, factor):
+        # The view reports the absolute scale after any zoom move (wheel,
+        # presets, keys, double-click fit); the top bar mirrors it.
+        # @args: factor - absolute scale, 1.0 = 100 %
+        self.lbl_zoom.setText(f"{factor * 100:.0f} %")
+
+    # --------------------------------------------------------- keyboard
+
+    def _build_shortcuts(self):
+        # Full keyboard control (ADR-044 phase C): F fit, 1 back to 1:1,
+        # +/- zoom in wheel steps, arrows pan a quarter viewport, Ctrl+O
+        # loads, Ctrl+E exports the visible scene. WidgetWithChildren so
+        # the keys work wherever the focus sits inside the dialog.
+        ctx = Qt.WidgetWithChildrenShortcut
+        for key, fn in (
+                (Qt.Key_F, lambda: self._key(self.view.fit_to_scene)),
+                (Qt.Key_1, lambda: self._key(
+                    lambda: self.view.fit_to_factor(1.0))),
+                (Qt.Key_Plus, lambda: self._key(self.view.zoom_in)),
+                (Qt.Key_Equal, lambda: self._key(self.view.zoom_in)),
+                (Qt.Key_Minus, lambda: self._key(self.view.zoom_out)),
+                (Qt.Key_Left, lambda: self._key(
+                    lambda: self._pan_step(-1, 0))),
+                (Qt.Key_Right, lambda: self._key(
+                    lambda: self._pan_step(1, 0))),
+                (Qt.Key_Up, lambda: self._key(
+                    lambda: self._pan_step(0, -1))),
+                (Qt.Key_Down, lambda: self._key(
+                    lambda: self._pan_step(0, 1)))):
+            sc = QShortcut(QKeySequence(key), self)
+            sc.setContext(ctx)
+            sc.activated.connect(fn)
+        for seq, fn in (("Ctrl+O", self._on_load),
+                        ("Ctrl+E", self._on_export_png)):
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.setContext(ctx)
+            sc.activated.connect(fn)
+
+    def _key(self, fn):
+        # Zoom/pan keys no-op on the empty state (never zoom the hint).
+        if self.state.has_image:
+            fn()
+
+    def _pan_step(self, dx, dy):
+        # Arrow-key pan: a quarter of the viewport per press, so the step
+        # feels the same at any zoom level.
+        # @args: dx, dy - step direction in {-1, 0, 1}
+        hbar = self.view.horizontalScrollBar()
+        vbar = self.view.verticalScrollBar()
+        hbar.setValue(hbar.value()
+                      + dx * max(1, self.view.viewport().width() // 4))
+        vbar.setValue(vbar.value()
+                      + dy * max(1, self.view.viewport().height() // 4))
+
     def _on_image_loaded(self):
-        # A fresh plate resets the inversion (state already did its half).
+        # A fresh plate resets the inversion (state already did its half)
+        # and puts its file name in the title bar.
         self._sync_invert_button()
         self.btn_invert.setEnabled(self.state.has_image)
         self.btn_export.setEnabled(self.state.has_image)
+        if self.state.has_image:
+            self.setWindowTitle(
+                self.tr("FITS editor") + " · " + Path(self.state.path).name)
+        else:
+            self.setWindowTitle(self.tr("FITS editor"))
 
     def _sync_invert_button(self):
         # The top-bar Invert mirrors state.inverted; the histogram strip

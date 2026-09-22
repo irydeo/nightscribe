@@ -24,8 +24,9 @@ import math
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
-from PySide6.QtWidgets import (QDoubleSpinBox, QFrame, QHBoxLayout,
-                               QLabel, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QDoubleSpinBox, QFrame,
+                               QHBoxLayout, QLabel, QPushButton,
+                               QVBoxLayout, QWidget)
 
 from ...viz import palette
 
@@ -51,6 +52,10 @@ class _HistogramCanvas(QWidget):
         self._drag = None               # "black" | "white" while dragging
         self.setMinimumHeight(96)
         self.setMouseTracking(False)
+        self.setAccessibleName(self.tr("Histogram"))
+        self.setToolTip(self.tr(
+            "Drag the blue (black) and orange (white) handles; a plain "
+            "click moves the nearest one"))
 
     # ------------------------------------------------------------ data
 
@@ -214,6 +219,13 @@ class HistogramWidget(QFrame):
         self.btn_invert.toggled.connect(self._on_invert_toggled)
         row_b.addWidget(self.btn_invert)
         col.addLayout(row_b)
+        self.chk_keep = QCheckBox(self.tr("Keep stretch on load"))
+        self.chk_keep.setToolTip(self.tr(
+            "The next plate keeps these black, white, gamma and invert "
+            "values instead of the auto percentiles"))
+        self.chk_keep.toggled.connect(
+            lambda checked: setattr(self._state, "keep_stretch", checked))
+        col.addWidget(self.chk_keep)
         return col
 
     def _dn_spin(self, label, col):
@@ -223,6 +235,7 @@ class HistogramWidget(QFrame):
         row.addWidget(QLabel(label))
         spn = QDoubleSpinBox()
         spn.setKeyboardTracking(False)   # fire on commit, not per keystroke
+        spn.setAccessibleName(label.rstrip(":"))
         row.addWidget(spn)
         col.addLayout(row)
         spn.valueChanged.connect(self._on_dn_edited)

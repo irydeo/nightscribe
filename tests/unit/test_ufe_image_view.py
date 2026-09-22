@@ -111,3 +111,26 @@ def test_export_png_writes_a_file(view, tmp_path):
     view._state.load(MONO)
     out = view.export_png(tmp_path / "ufe.png")
     assert out.exists() and out.stat().st_size > 0
+
+
+def test_zoom_changed_signal_reports_absolute_scale(view):
+    seen = []
+    view.zoom_changed.connect(seen.append)
+    view._state.load(MONO)                 # the load-time fit reports
+    assert seen and seen[-1] < 1.0
+    seen.clear()
+    view.fit_to_factor(2.0)
+    view.zoom_in()
+    assert seen[-2:] == [pytest.approx(2.0), pytest.approx(3.0)]
+    view.zoom_out()
+    assert seen[-1] == pytest.approx(2.0)
+
+
+def test_double_click_returns_to_fit(view, qapp):
+    from PySide6.QtCore import Qt
+    from PySide6.QtTest import QTest
+    view._state.load(MONO)
+    view.fit_to_factor(4.0)
+    QTest.mouseDClick(view.viewport(), Qt.LeftButton)
+    qapp.processEvents()
+    assert 0 < view.transform().m11() < 1.0

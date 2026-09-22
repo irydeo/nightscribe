@@ -636,34 +636,44 @@
 <context>
     <name>HistogramWidget</name>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="194"/>
+        <location filename="../widgets/histogram_widget.py" line="199"/>
         <source>Black:</source>
         <translation>Black:</translation>
     </message>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="195"/>
+        <location filename="../widgets/histogram_widget.py" line="200"/>
         <source>White:</source>
         <translation>White:</translation>
     </message>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="197"/>
+        <location filename="../widgets/histogram_widget.py" line="202"/>
         <source>Gamma:</source>
         <translation>Gamma:</translation>
     </message>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="207"/>
+        <location filename="../widgets/histogram_widget.py" line="212"/>
         <source>Auto</source>
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="209"/>
+        <location filename="../widgets/histogram_widget.py" line="214"/>
         <source>Black and white at the 1 / 99.5 percentiles</source>
         <translation>Black and white at the 1 / 99.5 percentiles</translation>
     </message>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="212"/>
+        <location filename="../widgets/histogram_widget.py" line="217"/>
         <source>Invert</source>
         <translation>Invert</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="222"/>
+        <source>Keep stretch on load</source>
+        <translation>Keep stretch on load</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="224"/>
+        <source>The next plate keeps these black, white, gamma and invert values instead of the auto percentiles</source>
+        <translation>The next plate keeps these black, white, gamma and invert values instead of the auto percentiles</translation>
     </message>
 </context>
 <context>
@@ -6185,77 +6195,104 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeDialog</name>
     <message>
-        <location filename="../ufe_dialog.py" line="55"/>
-        <location filename="../ufe_dialog.py" line="147"/>
+        <location filename="../ufe_dialog.py" line="56"/>
+        <location filename="../ufe_dialog.py" line="162"/>
+        <location filename="../ufe_dialog.py" line="259"/>
+        <location filename="../ufe_dialog.py" line="261"/>
         <source>FITS editor</source>
         <translation>FITS editor</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="83"/>
+        <location filename="../ufe_dialog.py" line="86"/>
         <source>Load FITS…</source>
         <translation>Load FITS…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="86"/>
+        <location filename="../ufe_dialog.py" line="87"/>
+        <source>Open a FITS image (Ctrl+O)</source>
+        <translation>Open a FITS image (Ctrl+O)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="90"/>
         <source>Invert</source>
         <translation>Invert</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="89"/>
+        <location filename="../ufe_dialog.py" line="93"/>
         <source>Swap black for white: faint objects pop against the sky</source>
         <translation>Swap black for white: faint objects pop against the sky</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="93"/>
+        <location filename="../ufe_dialog.py" line="97"/>
         <source>Export PNG…</source>
         <translation>Export PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="98"/>
+        <location filename="../ufe_dialog.py" line="99"/>
+        <source>Save the visible scene as a PNG (Ctrl+E)</source>
+        <translation>Save the visible scene as a PNG (Ctrl+E)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="104"/>
         <source>Zoom:</source>
         <translation>Zoom:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="108"/>
+        <source>Fit the plate to the window</source>
+        <translation>Fit the plate to the window</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="110"/>
+        <source>Zoom {0} % (1:1 at 100)</source>
+        <translation>Zoom {0} % (1:1 at 100)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="119"/>
+        <source>Current zoom: 100 % is one plate pixel per screen pixel</source>
+        <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
         <source>Histogram (phase B)</source>
         <translation type="vanished">Histogram (phase B)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="112"/>
+        <location filename="../ufe_dialog.py" line="127"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="113"/>
+        <location filename="../ufe_dialog.py" line="128"/>
         <source>Compare</source>
         <translation>Compare</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="114"/>
+        <location filename="../ufe_dialog.py" line="129"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="117"/>
+        <location filename="../ufe_dialog.py" line="132"/>
         <source>Arrives in phase {0}</source>
         <translation>Arrives in phase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="137"/>
+        <location filename="../ufe_dialog.py" line="152"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="138"/>
+        <location filename="../ufe_dialog.py" line="153"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="148"/>
+        <location filename="../ufe_dialog.py" line="163"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="164"/>
+        <location filename="../ufe_dialog.py" line="179"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>
@@ -6263,7 +6300,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeImageView</name>
     <message>
-        <location filename="../widgets/ufe_image_view.py" line="177"/>
+        <location filename="../widgets/ufe_image_view.py" line="70"/>
+        <source>FITS image view</source>
+        <translation>FITS image view</translation>
+    </message>
+    <message>
+        <location filename="../widgets/ufe_image_view.py" line="206"/>
         <source>Open a FITS image to start</source>
         <translation>Open a FITS image to start</translation>
     </message>
@@ -6318,7 +6360,17 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>_HistogramCanvas</name>
     <message>
-        <location filename="../widgets/histogram_widget.py" line="96"/>
+        <location filename="../widgets/histogram_widget.py" line="55"/>
+        <source>Histogram</source>
+        <translation>Histogram</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="57"/>
+        <source>Drag the blue (black) and orange (white) handles; a plain click moves the nearest one</source>
+        <translation>Drag the blue (black) and orange (white) handles; a plain click moves the nearest one</translation>
+    </message>
+    <message>
+        <location filename="../widgets/histogram_widget.py" line="101"/>
         <source>Load a plate to see its histogram</source>
         <translation>Load a plate to see its histogram</translation>
     </message>

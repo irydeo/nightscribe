@@ -127,3 +127,70 @@ def test_add_feature_tab_is_the_whole_extension_api(dlg):
     idx = dlg.add_feature_tab("Future", QLabel("soon"))
     assert dlg.tabs.count() == 4
     assert dlg.tabs.tabText(idx) == "Future"
+
+
+def _fire(dlg, seq):
+    # The offscreen QPA never delivers window-activation, so synthetic
+    # key events cannot reach the shortcut map; emitting the registered
+    # shortcut's signal exercises the same wiring (the house's other
+    # shortcuts, Ctrl+1..4 in main_window, share this blind spot).
+    from PySide6.QtGui import QKeySequence, QShortcut
+    for sc in dlg.findChildren(QShortcut):
+        if sc.key() == QKeySequence(seq):
+            sc.activated.emit()
+            return True
+    return False
+
+
+def test_keyboard_shortcuts_registered_and_wired(dlg):
+    dlg.state.load(MONO)
+    assert _fire(dlg, "1")
+    assert dlg.view.transform().m11() == pytest.approx(1.0)
+    assert _fire(dlg, "+")
+    assert dlg.view.transform().m11() == pytest.approx(1.5)
+    assert _fire(dlg, "-")
+    assert dlg.view.transform().m11() == pytest.approx(1.0)
+    assert _fire(dlg, "F")
+    assert 0 < dlg.view.transform().m11() < 1.0
+    # arrows pan a quarter viewport per press
+    dlg.view.fit_to_factor(4.0)
+    h0 = dlg.view.horizontalScrollBar().value()
+    assert _fire(dlg, "Right")
+    assert dlg.view.horizontalScrollBar().value() - h0 > 100
+    # the load/export shortcuts exist too
+    for seq in ("Ctrl+O", "Ctrl+E", "=", "Left", "Up", "Down"):
+        from PySide6.QtGui import QKeySequence, QShortcut
+        assert any(sc.key() == QKeySequence(seq)
+                   for sc in dlg.findChildren(QShortcut))
+
+
+def test_zoom_keys_noop_on_empty_state(dlg):
+    assert _fire(dlg, "1")              # registered...
+    assert dlg.view._pix_item is None   # ...but nothing to zoom
+
+
+def test_zoom_label_follows_the_view(dlg):
+    dlg.state.load(MONO)
+    dlg.view.fit_to_factor(2.0)
+    assert dlg.lbl_zoom.text() == "200 %"
+
+
+def test_title_carries_the_file_name(dlg):
+    assert dlg.windowTitle() == "FITS editor"
+    dlg.state.load(MONO)
+    assert "sn2026zji_new_image.fits" in dlg.windowTitle()
+
+
+def test_keep_stretch_checkbox_drives_the_state(dlg):
+    dlg.state.load(MONO)
+    dlg.state.set_stretch(black=3000.0, white=9000.0)
+    dlg.histogram.chk_keep.setChecked(True)
+    assert dlg.state.keep_stretch
+    dlg.state.load(MONO)
+    assert dlg.state.black == 3000.0 and dlg.state.white == 9000.0
+
+
+def test_accessible_names(dlg):
+    assert dlg.view.accessibleName()
+    assert dlg.histogram.canvas.accessibleName()
+    assert dlg.histogram.spn_black.accessibleName()

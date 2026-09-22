@@ -812,8 +812,8 @@ def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
 
 
 def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
-    # UX-PC (U3): "Send plan" (Observatory tab) stages the SELECTED target
-    # project's saved plan — no need to have it open in the hub.
+    # UX-PC (U3, ADR-043): "Send plan" stages the CURRENT project's saved
+    # plan; the project is the one selected in the hub.
     import nightscribe.core.db as dbmod
     from nightscribe.core import project
     p = _create_and_select(window, "sn", "SN2099send", {"kind": "sn"})
@@ -824,10 +824,6 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     # filled the combo with a fake wheel's names)
     window._ccd_filter_names = []
     window._ccd_fill_filters()
-    # pick it in the Capture step's target combo
-    window._refresh_obs_targets()
-    cmb_t = window._obs_widgets["obs_target"]
-    cmb_t.setCurrentIndex(cmb_t.findData(p["id"]))
     sent = {}
     monkeypatch.setattr(window, "_ccd_run",
                         lambda slot, action, **kw: sent.update(
@@ -858,10 +854,7 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
 def test_send_plan_without_saved_plan_asks_for_one(window, panel,
                                                    monkeypatch):
     # UX-PC (U3): no saved plan -> a plain-words hint, no silent no-op.
-    p = _create_and_select(window, "neo", "2099noplan", {"kind": "neo"})
-    window._refresh_obs_targets()
-    cmb_t = window._obs_widgets["obs_target"]
-    cmb_t.setCurrentIndex(cmb_t.findData(p["id"]))
+    _create_and_select(window, "neo", "2099noplan", {"kind": "neo"})
     monkeypatch.setattr(window, "_ccd_run",
                         lambda *a, **k: (_ for _ in ()).throw(
                             AssertionError("must not run")))
@@ -2145,7 +2138,7 @@ def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
         lst.visualItemRect(item).center())
     texts = seen["actions"]
     assert any("Open" in t or "Abrir" in t for t in texts)
-    assert any("Worklog" in t or "Bitácora" in t for t in texts)
+    assert any("Follow-up" in t or "Seguimiento" in t for t in texts)
     assert any("Delete" in t or "Eliminar" in t for t in texts)
 
 

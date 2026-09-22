@@ -187,8 +187,8 @@
                   <property name="flat"><bool>true</bool></property>
                  </widget>
                 </item>
-                <!-- ADR-043: the bar reads left to right (object ->
-                     Capture -> Track -> Follow-up -> Worklog); the
+                <!-- ADR-043: the bar reads left to right (object card ->
+                     Capture -> Process -> Publish -> Follow-up); the
                      follow-up separator is only shown for the kinds
                      that have one (main_window._render_tab_bar) -->
                 <item>

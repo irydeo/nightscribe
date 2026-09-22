@@ -1,7 +1,10 @@
 # ADR-043: La pestaña Observatory se pliega en el paso Captura / the Observatory tab folds into the Capture step
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-09-21 · **ejecutado /
-executed**: 2026-09-21 (suite unitaria 1494 green, i18n 0 unfinished)
+executed**: 2026-09-21 (suite unitaria 1494 green, i18n 0 unfinished) ·
+**Enmendado / Amended**: 2026-09-22 (los nombres de paso pasan a la lista
+autoritativa del observador; se retira por completo el Skip de la UI; el
+bloque CCD se ata directamente al proyecto actual, sin combo de objetivos)
 
 **Ver / See**: ADR-030 (cliente CCDciel JSON-RPC; el control de hardware no
 cambia) · ADR-038 (prominencia a 3 niveles y lenguaje llano) · ADR-041 (la
@@ -39,10 +42,15 @@ observador quedó clara la fricción:
 2. **El paso Captura es dueño del hardware**: `main_window.py` construye
    el panel completo (conexión, estado del observatorio, telescopio,
    captura) con `_build_capture_ccd_block`, **dentro de la pestaña
-   *plan* de cada página de proyecto**. El panel registra sus 15
+   *plan* de cada página de proyecto**. El panel registra sus 14
    controles en `window._obs_widgets`; `_clear_project_page` lo vacía a
    `{}` y cada slot de CCD se guarda contra la ausencia (el bloque muere
-   con la página; los slots nunca tocan widgets muertos). El cliente
+   con la página; los slots nunca tocan widgets muertos). El bloque
+   trabaja directo sobre el **proyecto actual**
+   (`window._current_project`): no hay combo de objetivos, y sin
+   proyecto abierto los botones de captura y goto se deshabilitan con la
+   pista «Abre primero un proyecto (el paso Captura lo necesita)». El
+   cliente
    (`core/sources/ccdciel.py`, caché 60 s) y los workers no cambian
    (ADR-030). Las cadenas `tr()` re-utilizan las antiguas anclas de
    «ObservatoryTab», que quedan en el contexto «MainWindow» sin
@@ -59,20 +67,25 @@ observador quedó clara la fricción:
 
    | clave estable | antes ES | ahora ES | antes EN | ahora EN |
    |---|---|---|---|---|
+   | `details` | Ficha | Ficha | Details | **Object card** |
    | `plan` | Plan | **Captura** | Plan | **Capture** |
-   | `process` | Proceso | **Seguimiento** | Process | **Track** |
-   | `publish` | Publicar | **Follow-up** | Publish | **Follow-up** |
-   | `followup` | Follow-up | **Bitácora** | Follow-up | **Worklog** |
+   | `process` | Proceso | **Procesado** | Process | Process |
+   | `publish` | Publicar | Publicar | Publish | Publish |
+   | `followup` | Follow-up | **Seguimiento** | Follow-up | **Follow-up** |
 
    Los dicts viven en `main_window.py` (`_STEP_LABELS_ES/EN`): las
-   claves de paso `plan/process/publish/followup` y los nombres de
-   botones `btn_tab_*` de `projects_tab.ui` se mantienen, de modo que
-   deep-links, tests y la API de pestañas no cambian. El menú Herramientas y el menú
-   contextual del hub dicen ahora «Worklog» / «Bitácora».
-5. **Un solo Skip, el local**: la tarjeta «Siguiente» queda a **Go +
-   Mark done** (`btn_next_skip` se retira de `projects_tab.ui`); cada
-   paso pendiente conserva su pie «Skip step» (y «Reopen step» si está
-   hecho). Omitir es un acto sobre el paso, no sobre el flujo.
+   claves de paso `details/plan/process/publish/followup` y los nombres
+   de botones `btn_tab_*` de `projects_tab.ui` se mantienen, de modo que
+   deep-links, tests y la API de pestañas no cambian. El menú
+   Herramientas y el menú contextual del hub dicen ahora «Seguimiento» /
+   «Follow-up».
+5. **El Skip desaparece de la UI**: el botón de la tarjeta «Siguiente» y
+   el pie «Skip step» de cada paso se retiran del código (la tarjeta
+   queda a **Go + Mark done**). El estado `STEP_SKIPPED` de la API del
+   core y de la base de datos **se conserva** (las filas antiguas quedan
+   legibles y reabribles con «Reopen step», que aparece también en los
+   pasos hechos). Saltar un paso deja de ser una acción que la app
+   ofrezca.
 6. **La barra se lee como una flecha**: separadores «→» entre los
    botones de la barra (`lbl_sep_plan/process/publish` en
    `projects_tab.ui`); el último (`lbl_sep_followup`) solo se muestra
@@ -85,10 +98,12 @@ pestaña *plan* pesa un poco más al construirse. i18n: el contexto
 «ObservatoryTab» desaparece de las tablas compiladas (innocuo); las 10
 cadenas nuevas del contexto «MainWindow» van traducidas ES/EN. Tests:
 `test_observatory_tab.py` re-escrito sobre el bloque embebido
-(3 pestañas + `_obs_widgets` + estado desconectado + combo de
-objetivos); `test_project_tabs.py` (tarjeta a 2 botones + Skip de pie);
-`test_projects_hub.py`, `test_campaigns_tab.py`, `test_sunsky_tab.py` y
-el test de arranque funcional pasan de 4 a 3 pestañas.
+(3 pestañas + `_obs_widgets` + estado desconectado + atado al proyecto
+actual); `test_project_tabs.py` (tarjeta a 2 botones + reabrir paso
+hizo/saltado); `test_projects_hub.py` (envío de plan al proyecto
+actual, menú con «Seguimiento»; sin combo de objetivos),
+`test_campaigns_tab.py`, `test_sunsky_tab.py` y el test de arranque
+funcional pasan de 4 a 3 pestañas.
 
 ## English
 
@@ -122,10 +137,14 @@ clear:
 2. **The Capture step owns the hardware**: `main_window.py` builds the
    whole panel (connection, observatory status, telescope, capture)
    with `_build_capture_ccd_block`, **inside the *plan* tab of each
-   project page**. The panel registers its 15 controls in
+   project page**. The panel registers its 14 controls in
    `window._obs_widgets`; `_clear_project_page` empties it to `{}` and
    every CCD slot guard-checks its keys against absence (the block dies
-   with the page; slots never touch dead widgets). The client
+   with the page; slots never touch dead widgets). The block works
+   straight on the **current project**
+   (`window._current_project`): there is no target combo, and with no
+   project open the capture and goto buttons stay disabled with the
+   hint "Open a project first (the Capture step needs one)". The client
    (`core/sources/ccdciel.py`, 60 s cache) and the workers do not
    change (ADR-030). The `tr()` strings reuse the old
    «ObservatoryTab» anchors, so they land in the «MainWindow» context
@@ -142,20 +161,23 @@ clear:
 
    | stable key | ES before | ES now | EN before | EN now |
    |---|---|---|---|---|
+   | `details` | Ficha | Ficha | Details | **Object card** |
    | `plan` | Plan | **Captura** | Plan | **Capture** |
-   | `process` | Proceso | **Seguimiento** | Process | **Track** |
-   | `publish` | Publicar | **Follow-up** | Publish | **Follow-up** |
-   | `followup` | Follow-up | **Bitácora** | Follow-up | **Worklog** |
+   | `process` | Proceso | **Procesado** | Process | Process |
+   | `publish` | Publicar | Publicar | Publish | Publish |
+   | `followup` | Follow-up | **Seguimiento** | Follow-up | **Follow-up** |
 
    They live in `_STEP_LABELS_ES/EN`: the step keys
-   `plan/process/publish/followup` and the `btn_tab_*` names of
+   `details/plan/process/publish/followup` and the `btn_tab_*` names of
    `projects_tab.ui` stay, so deep links, tests and the tab API do not
    change. The Tools menu and the hub context menu now say
-   "Worklog" / «Bitácora».
-5. **One Skip, the local one**: the "Next" card is down to **Go +
-   Mark done** (`btn_next_skip` retires from `projects_tab.ui`); each
-   pending step keeps its "Skip step" footer (and "Reopen step" once
-   done). Skipping is an act on the step, not on the flow.
+   "Follow-up" / «Seguimiento».
+5. **The Skip disappears from the UI**: the "Next" card button and the
+   per-step "Skip step" footer are removed from the code (the card is
+   down to **Go + Mark done**). The `STEP_SKIPPED` state of the core API
+   and of the database is **kept** (legacy rows stay readable and
+   reopenable with "Reopen step", which now also appears on done
+   steps). Skipping a step is no longer an action the app offers.
 6. **The bar reads like an arrow**: "→" separators between the bar's
    buttons (`lbl_sep_plan/process/publish` in `projects_tab.ui`); the
    last one (`lbl_sep_followup`) is only shown for the kinds that have
@@ -165,10 +187,13 @@ clear:
 hanging off it; the hardware has one home (the step that uses it) and
 dies with the page, which is the price of building it per project. The
 *plan* tab is a little heavier to build. i18n: the «ObservatoryTab»
-context drops out of the compiled tables (harmless); the 10 new
-«MainWindow» context strings are translated ES/EN. Tests:
-`test_observatory_tab.py` re-written on the in-page block (3 tabs +
-`_obs_widgets` + disconnected state + target combo);
-`test_project_tabs.py` (card down to 2 buttons + footer Skip);
-`test_projects_hub.py`, `test_campaigns_tab.py`, `test_sunsky_tab.py`
-and the functional boot test drop from 4 to 3 tabs.
+context drops out of the compiled tables (harmless); the new
+«MainWindow» context strings are translated ES/EN (the vanished anchors
+«Skip step», «Target:», «Worklog» are left as-is, lrelease drops them).
+Tests: `test_observatory_tab.py` re-written on the in-page block (3
+tabs + `_obs_widgets` + disconnected state + bound to the current
+project); `test_project_tabs.py` (card down to 2 buttons + reopen for
+done/skipped steps); `test_projects_hub.py` (send plan to the current
+project, menu with "Follow-up"; no target combo),
+`test_campaigns_tab.py`, `test_sunsky_tab.py` and the functional boot
+test drop from 4 to 3 tabs.

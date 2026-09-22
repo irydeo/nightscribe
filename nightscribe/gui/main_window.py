@@ -96,13 +96,17 @@ _SKY_CHIP_PRIORITY = {
 # SN-only analysis buttons hide for the others)
 # Track V: variables join (V-g: the quick-look engine serves them unchanged)
 FOLLOWUP_KINDS = project.FOLLOWUP_KINDS
-# ADR-043: the bar reads left to right like the night itself runs
-# (captura → seguimiento → follow-up), so the tabs carry the plain action
-# word and the "→" separators do the connecting
-_STEP_LABELS_ES = {"plan": "Captura", "process": "Seguimiento",
-                   "publish": "Follow-up"}
-_STEP_LABELS_EN = {"plan": "Capture", "process": "Track",
-                   "publish": "Follow-up"}
+# ADR-043: the bar reads left to right like the night itself runs, so the
+# tabs carry the plain action word and the "→" separators do the
+# connecting. The five names are fixed by the project owner (Ficha,
+# Captura, Procesado, Publicar, Seguimiento), so they live here as plain
+# per-language pairs instead of tr() anchors
+_STEP_LABELS_ES = {"details": "Ficha", "plan": "Captura",
+                   "process": "Procesado", "publish": "Publicar",
+                   "followup": "Seguimiento"}
+_STEP_LABELS_EN = {"details": "Object card", "plan": "Capture",
+                   "process": "Process", "publish": "Publish",
+                   "followup": "Follow-up"}
 
 
 def _load_ui(name, parent=None):
@@ -657,8 +661,8 @@ class MainWindow(QMainWindow):
         p.btn_next_go.clicked.connect(
             lambda: self._scroll_to_section(self._next_target))
         # UX-PC (U3): the Next card is the step machine's command center:
-        # "Mark done" for the CURRENT step lives beside Go (skip stays a
-        # discreet option at the foot of each step page, ADR-043)
+        # "Mark done" for the CURRENT step lives beside Go (the foot of a
+        # step page only offers "Reopen step" on finished steps, ADR-043)
         p.btn_next_done.clicked.connect(self._next_done)
         # UX-PC (U2): ⌂ goes back to the dashboard (clearing the selection
         # fires itemSelectionChanged -> the detail pane swaps itself)
@@ -1306,7 +1310,7 @@ class MainWindow(QMainWindow):
                 self.tr("SN due: %1 (%2 d)").replace(
                     "%1", name).replace("%2", str(days)),
                 "#e0c060",
-                self.tr("Due for a revisit: click to open its Worklog"))
+                self.tr("Due for a revisit: click to open its Follow-up"))
             chip.setObjectName("ns_cadence_chip")
             chip.clicked.connect(
                 lambda _p=pid: self._goto_project_followup(_p))
@@ -1318,9 +1322,9 @@ class MainWindow(QMainWindow):
             header_layout.addWidget(more)
 
     def _goto_project_followup(self, pid):
-        # Opens the project's Worklog tab (ADR-043: the multi-night
-        # journal keeps its "followup" key, its label is now Worklog /
-        # Bitácora). The cadence chips land here (UX-d).
+        # Opens the project's Follow-up tab (ADR-043: the multi-night
+        # journal keeps its "followup" key; its label is Seguimiento /
+        # Follow-up). The cadence chips land here (UX-d).
         if not self._goto_project_by_id(pid):
             return
         self._scroll_to_section("followup")
@@ -2484,8 +2488,6 @@ class MainWindow(QMainWindow):
         # that mutate projects rebuild the page themselves.
         if lst.currentItem() is None:
             self._clear_project_detail()
-        # the Capture step's target combo follows the active projects
-        self._refresh_obs_targets()
 
     # ---------------- UX-PC (U2): rich rows + dashboard ----------------
 
@@ -2811,7 +2813,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
         act_open = menu.addAction(self.tr("Open"))
-        act_fu = menu.addAction(self.tr("Worklog"))
+        act_fu = menu.addAction(self._tab_label("followup"))
         act_fu.setEnabled(p["kind"] in FOLLOWUP_KINDS)
         act_fav = menu.addAction(
             self.tr("Unstar") if p.get("favorite")
@@ -3164,8 +3166,8 @@ class MainWindow(QMainWindow):
         color = theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT)
         active = getattr(self, "_active_tab", None)
         # ADR-043: the "→" separators make the bar read like the night
-        # runs; the last one goes away with the Worklog for the kinds
-        # that have no journal
+        # runs; the last one goes away with the Follow-up page for the
+        # kinds that have no journal
         w.lbl_sep_followup.setVisible(p.get("kind") in FOLLOWUP_KINDS)
         for key in _TAB_KEYS:
             btn = getattr(w, f"btn_tab_{key}")
@@ -3203,8 +3205,9 @@ class MainWindow(QMainWindow):
         target = self._next_target_key(p)
         self._next_target = target
         self.projects.btn_next_go.setVisible(target is not None)
-        # UX-PC (U3): done/skip apply to the current step only (follow-up
-        # and the close suggestion are not steps — nothing to mark there)
+        # UX-PC (U3): "Mark done" applies to the current step only
+        # (follow-up and the close suggestion are not steps — nothing to
+        # mark there)
         step_key = act["key"] if act["key"] in _STEP_KEYS else None
         self._next_step_key = step_key
         self.projects.btn_next_done.setVisible(step_key is not None)
@@ -3267,7 +3270,8 @@ class MainWindow(QMainWindow):
             }
             builders[key](p, kind, ctx)
             # UX-PC (U3): the discreet step footer (state words + reopen
-            # / skip) goes at the END of the step page, after content
+            # on finished steps) goes at the END of the step page, after
+            # content
             self._tab_pages[key].layout().addLayout(
                 self._step_footer(p, key))
         elif key == "followup" and kind in FOLLOWUP_KINDS:
@@ -3312,14 +3316,9 @@ class MainWindow(QMainWindow):
 
     def _tab_label(self, key):
         # @args: key - tab key
-        # @return: the visible tab text (the two non-step pages carry
-        #          their own labels; the steps reuse the step labels)
-        if key == "details":
-            return self.tr("Object card")
-        if key == "followup":
-            # ADR-043: the multi-night journal is now called Worklog
-            # (Bitácora in Spanish, via the .ts)
-            return self.tr("Worklog")
+        # @return: the visible tab text. All five pages share the fixed
+        #          label pairs (_STEP_LABELS_ES/EN): Ficha/Captura/
+        #          Procesado/Publicar/Seguimiento
         return self._step_label(key)
 
     def _set_tab_badge(self, key, text):
@@ -3350,8 +3349,10 @@ class MainWindow(QMainWindow):
     def _step_footer(self, p, key):
         # The step state in words, at the FOOT of its section (UX-PC U3):
         # discreet, out of the way of the content. Done/skipped steps
-        # offer "Reopen step"; a pending step offers only "Skip step"
-        # (Mark done for the CURRENT step lives on the Next card).
+        # offer "Reopen step" (skipping a step interactively went out:
+        # it had no real purpose, so a "skipped" row now only ever
+        # comes from old databases); a pending step carries no footer
+        # action (Mark done for the CURRENT step lives on the Next card).
         # @args: p - the project dict, key - step key ("plan"|...)
         # @return: the QHBox row appended at the end of the step section
         row = QHBoxLayout()
@@ -3373,13 +3374,6 @@ class MainWindow(QMainWindow):
             btn_reopen.clicked.connect(
                 lambda _=False, k=key: self._step_reopen(k))
             row.addWidget(btn_reopen)
-        else:
-            btn_skip = QPushButton(self.tr("Skip step"))
-            btn_skip.setFlat(True)
-            btn_skip.setCursor(Qt.PointingHandCursor)
-            btn_skip.clicked.connect(
-                lambda _=False, k=key: self._step_skip(k))
-            row.addWidget(btn_skip)
         return row
 
     def _step_done(self, key):
@@ -3407,16 +3401,6 @@ class MainWindow(QMainWindow):
                 self.tr("All steps are done. Close this project?"))
             if ans == QMessageBox.Yes:
                 self._project_close()
-
-    def _step_skip(self, key):
-        # Marks the step skipped and rebuilds the page.
-        # @args: key - step key
-        # @return: None
-        project.set_step_status(db, self._current_project["id"], key,
-                                project.STEP_SKIPPED)
-        p = project.get(db, self._current_project["id"])
-        self._current_project = p
-        self._build_project_page(p)
 
     def _step_reopen(self, key):
         # Reopens a done/skipped step (moves it back to current) + rebuild.
@@ -3526,8 +3510,16 @@ class MainWindow(QMainWindow):
                     f" · {self.tr('guide, not SNR — confirm with a test shot')}"
                     f"</small>"))
                 spn_exp.setValue(min(sn_exp, 60.0))
-            # multi-filter rows: add/remove (filter × N × exp) steps
-            layout.addWidget(QLabel(self.tr("Filters (add rows for multi-band)")))
+            # multi-filter rows: add/remove (filter × N × exp) steps.
+            # The "Add filter" button shares the header row (right side),
+            # so we save one full row for the button alone
+            filt_head = QHBoxLayout()
+            filt_head.addWidget(QLabel(self.tr("Filters (add rows for multi-band)")))
+            filt_head.addStretch()
+            btn_add_filt = QPushButton(self.tr("Add filter"))
+            btn_add_filt.clicked.connect(lambda: self._sn_add_step_row(steps_vlay))
+            filt_head.addWidget(btn_add_filt)
+            layout.addLayout(filt_head)
             steps_container = QWidget()
             steps_vlay = QVBoxLayout(steps_container)
             steps_vlay.setContentsMargins(2, 2, 2, 2)
@@ -3542,23 +3534,22 @@ class MainWindow(QMainWindow):
                     default_filters = tuple(prot_filters)
             for filt in default_filters:
                 self._sn_add_step_row(steps_vlay, filt, 30, spn_exp.value())
-            add_row = QHBoxLayout()
-            btn_add_filt = QPushButton(self.tr("Add filter"))
-            btn_add_filt.clicked.connect(lambda: self._sn_add_step_row(steps_vlay))
-            add_row.addWidget(btn_add_filt)
-            steps_vlay.addLayout(add_row)
             layout.addWidget(steps_container)
             self._project_widgets["sn_steps_container"] = steps_container
-        # sequence export (all kinds)
-        layout.addWidget(QLabel(self.tr("Export capture sequence")))
+        # sequence export (all kinds): the format combo and the
+        # right-aligned "Export sequence…" button share one row
+        seq_row = QHBoxLayout()
+        seq_row.addWidget(QLabel(self.tr("Export format")))
         cmb_fmt = QComboBox()
         cmb_fmt.addItem(self.tr("CCDciel (targets)"))
         cmb_fmt.addItem(self.tr("NINA (JSON)"))
         cmb_fmt.addItem(self.tr("CSV (generic)"))
-        layout.addWidget(cmb_fmt)
+        seq_row.addWidget(cmb_fmt)
+        seq_row.addStretch()
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
-        layout.addWidget(btn_seq)
+        seq_row.addWidget(btn_seq)
+        layout.addLayout(seq_row)
         # NEO: also ephemeris export
         if kind in ("neo", "pccp"):
             layout.addWidget(QLabel(""))
@@ -3638,7 +3629,11 @@ class MainWindow(QMainWindow):
         # panel, rebuilt per project page inside the Capture step. Built
         # in code (not a .ui) because it is small and per-project now;
         # the tr() sources keep the old ObservatoryTab strings as
-        # anchors for the existing translations.
+        # anchors for the existing translations. The block always works
+        # on the CURRENT project: listing projects inside the observatory
+        # had no purpose, so there is no target-selection combo (a
+        # project that is not open is not what you are looking at that
+        # night).
         grp = QGroupBox(self.tr("CCDciel control"))
         gv = QVBoxLayout(grp)
         gv.setContentsMargins(12, 9, 12, 9)
@@ -3671,12 +3666,6 @@ class MainWindow(QMainWindow):
         gv = QVBoxLayout(grp)
         gv.setContentsMargins(12, 9, 12, 9)
         row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Target:")))
-        cmb_t = QComboBox()
-        row.addWidget(cmb_t)
-        row.addStretch()
-        gv.addLayout(row)
-        row = QHBoxLayout()
         btn_goto = QPushButton(self.tr("Point telescope"))
         btn_goto.setToolTip(self.tr(
             "Quick slew to the freshly-computed position of a moving "
@@ -3702,7 +3691,7 @@ class MainWindow(QMainWindow):
         cmb_f = QComboBox()
         btn_push = QPushButton(self.tr("Send plan"))
         btn_push.setToolTip(self.tr(
-            "Stage the selected target's saved plan (frames × exposure) "
+            "Stage the current project's saved plan (frames × exposure) "
             "in CCDciel's Capture module"))
         btn_start = QPushButton(self.tr("Start capture"))
         btn_start.setToolTip(self.tr("Start the staged capture in CCDciel"))
@@ -3715,7 +3704,7 @@ class MainWindow(QMainWindow):
         lbl_co.setWordWrap(True)
         gv.addWidget(lbl_co)
         lbl_h = QLabel(self.tr(
-            "Uses the selected target's saved plan (its Capture step "
+            "Uses the current project's saved plan (its Capture step "
             "holds frames × exposure)."))
         lbl_h.setWordWrap(True)
         lbl_h.setStyleSheet("color: #8a90a6; font-size: 11px;")
@@ -3733,7 +3722,6 @@ class MainWindow(QMainWindow):
             "ccd_slew": lbl_sl,
             "ccd_goto": btn_goto,
             "ccd_sync": btn_sync,
-            "obs_target": cmb_t,
             "cmb_ccd_filter": cmb_f,
             "ccd_push": btn_push,
             "ccd_start": btn_start,
@@ -3746,14 +3734,10 @@ class MainWindow(QMainWindow):
         btn_sync.clicked.connect(self._ccd_astrometry_goto)
         btn_push.clicked.connect(self._ccd_send_plan)
         btn_start.clicked.connect(self._ccd_start_capture)
-        cmb_t.currentIndexChanged.connect(
-            lambda _i: (self._ccd_apply_state(),
-                        self._ccd_update_coords_label()))
         self._ccd_apply_state()
         # the wheel combo starts on the static fallback list (a real wheel
         # replaces it on connect via _ccd_fill_filters)
         self._ccd_fill_filters()
-        self._refresh_obs_targets()
 
     def _ccd_widgets(self):
         # @return: the CCDciel widget registry of the open Capture step
@@ -3761,33 +3745,6 @@ class MainWindow(QMainWindow):
         #          it is empty until a plan tab has been built — every
         #          consumer guard-checks its keys against that).
         return dict(getattr(self, "_obs_widgets", {}) or {})
-
-    def _obs_target_project(self):
-        # @return: the active project dict chosen in the Capture step's
-        #          target combo, or None (combo absent until the block
-        #          is built)
-        from ..core import project as _p
-        cmb = self._obs_widgets.get("obs_target")
-        if cmb is None:
-            return None
-        pid = cmb.currentData()
-        return _p.get(db, pid) if pid else None
-
-    def _refresh_obs_targets(self):
-        # Refills the Capture step's target combo with the active
-        # projects, keeping the selection (same keep-id pattern as
-        # the campaigns list).
-        cmb = self._obs_widgets.get("obs_target")
-        if cmb is None:
-            return
-        current = cmb.currentData()
-        cmb.blockSignals(True)
-        cmb.clear()
-        for p in project.list_projects(db, "active"):
-            cmb.addItem(f"[{p['kind']}] {p['object_name']}", p["id"])
-        idx = cmb.findData(current)
-        cmb.setCurrentIndex(idx if idx >= 0 else 0)
-        cmb.blockSignals(False)
 
     def _ccd_apply_state(self):
         # Enable/disable the CCDciel widgets after a connection change and
@@ -3996,8 +3953,8 @@ class MainWindow(QMainWindow):
 
     def _ccd_update_coords_label(self):
         # Refreshes the coords/epoch label (ADR-043: it lives in the
-        # Capture step now and follows the selected target project).
-        p = self._obs_target_project() or self._current_project
+        # Capture step now and follows the current project).
+        p = self._current_project
         lbl = self._ccd_widgets().get("ccd_coords")
         if not p or not lbl:
             return
@@ -4013,8 +3970,8 @@ class MainWindow(QMainWindow):
         # @args: slew_fn - c.slew_target or c.astrometry_goto,
         #        ctx - project context dict
         # @return: callable(Client) -> position dict
-        # kind/object may come via ctx (the Observatory-tab target
-        # project); otherwise fall back to the project open in the hub
+        # kind/object may come via ctx (the project page context);
+        # otherwise fall back to the project open in the hub
         p = self._current_project or {}
         kind = ctx.get("kind") or p.get("kind")
         obj_id = (ctx.get("id") or ctx.get("packed")
@@ -4061,17 +4018,7 @@ class MainWindow(QMainWindow):
         project.update_context(db, p["id"], upd)
         p.setdefault("context", {}).update(upd)
         # ADR-043: the coords label lives in the Capture step and follows
-        # its target combo — point the combo at the project this position
-        # belongs to so the step stays coherent
-        cmb = self._obs_widgets.get("obs_target")
-        if cmb is None:
-            self._ccd_update_coords_label()
-            return
-        idx = cmb.findData(p["id"])
-        if idx >= 0 and idx != cmb.currentIndex():
-            cmb.blockSignals(True)
-            cmb.setCurrentIndex(idx)
-            cmb.blockSignals(False)
+        # the current project — the position belongs to it by definition
         self._ccd_update_coords_label()
         if pos.get("fell_back"):
             self.statusBar().showMessage(
@@ -4082,10 +4029,10 @@ class MainWindow(QMainWindow):
         # Point the mount at the current object. Moving kinds get a fresh
         # position resolved inside the worker (network off the GUI thread);
         # the async slew then waits for Telescope_slewing to settle.
-        p = self._obs_target_project()
+        p = self._current_project
         if not p:
             self.statusBar().showMessage(
-                self.tr("Pick a target project in the Capture step"),
+                self.tr("Open a project first (the Capture step needs one)"),
                 6000)
             return
         ctx = dict(p.get("context") or {})
@@ -4125,10 +4072,10 @@ class MainWindow(QMainWindow):
         # first (the plate solve absorbs any residual ephemeris error as
         # long as the prediction lands inside the solve field). The client
         # polls the running flag, so no mount-state polling is needed here.
-        p = self._obs_target_project()
+        p = self._current_project
         if not p:
             self.statusBar().showMessage(
-                self.tr("Pick a target project in the Capture step"),
+                self.tr("Open a project first (the Capture step needs one)"),
                 6000)
             return
         ctx = dict(p.get("context") or {})
@@ -4155,15 +4102,17 @@ class MainWindow(QMainWindow):
 
     def _ccd_send_plan(self):
         # Stage the planned frames/exposure/filter inside CCDciel
-        # (Capture_set*). ADR-043: lives in the Capture step and
-        # reads the TARGET project's SAVED plan — no need to have the
-        # project open in the hub.
-        p = self._obs_target_project() or self._current_project
+        # (Capture_set*). ADR-043: lives in the Capture step and reads
+        # the CURRENT project's SAVED plan (the block is bound to it).
+        p = self._current_project
         if not p:
             self.statusBar().showMessage(
-                self.tr("Pick a target project in the Capture step"),
+                self.tr("Open a project first (the Capture step needs one)"),
                 6000)
             return
+        # the Capture step auto-saves the plan straight to the db, so
+        # re-read it: the in-memory dict is the one from selection time
+        p = project.get(db, p["id"]) or p
         plan = next((s["data"] for s in p.get("steps", [])
                      if s["step"] == "plan"), {})
         n_frames, exp_s = plan.get("n_frames"), plan.get("exp_s")
@@ -4284,8 +4233,8 @@ class MainWindow(QMainWindow):
         elif kind == "hads":
             # ADR-034 (D.3): publication photometry is external — FotoDif
             # (its AUTO mode watches the capture folder live) or AIJ.
-            # NightScribe registers the measurements (Worklog tab) and
-            # points to the AAVSO submission.
+            # NightScribe registers the measurements (Follow-up tab)
+            # and points to the AAVSO submission.
             lbl = QLabel(self.tr(
                 "Reduce the series with FotoDif (its AUTO mode follows the "
                 "capture live) or AIJ. FotoDif writes the AAVSO Extended "
@@ -4312,8 +4261,8 @@ class MainWindow(QMainWindow):
             layout.addWidget(btn_webobs)
             lbl_imp = QLabel(self.tr(
                 "Import the FotoDif measurements («JD mag …» text) with "
-                "«Import file…» in the Worklog tab — the light curve and "
-                "the phase-folded view update themselves."))
+                "«Import file…» in the Follow-up tab — the light curve "
+                "and the phase-folded view update themselves."))
             lbl_imp.setWordWrap(True)
             layout.addWidget(lbl_imp)
         else:

@@ -18,7 +18,8 @@ ADR-043):
   * the CCD block is built per project page inside the Capture step and
     registered in window._obs_widgets (reset when the page is torn down)
   * the disconnected state disables capture + slew, keeps connect alive
-  * the target combo lists the active projects
+  * the block works on the CURRENT project (no target picker): with none
+    open, the capture buttons stay disabled with a "open a project" tip
 
 Offscreen harness, same pattern as test_campaigns_tab.py.
 """
@@ -111,7 +112,7 @@ def test_ccd_block_lives_in_the_plan_page(window):
     # through window._obs_widgets.
     _select_project(window)
     page = window._tab_pages["plan"]
-    for key in ("ccd_connect", "ccd_status", "obs_target", "cmb_ccd_filter"):
+    for key in ("ccd_connect", "ccd_status", "cmb_ccd_filter"):
         w = window._obs_widgets[key]
         assert page.isAncestorOf(w), f"{key} should live in the plan page"
 
@@ -125,7 +126,19 @@ def test_ccd_registry_reset_on_page_teardown(window):
     assert window._obs_widgets == {}
 
 
-# ---------------- state & target list ----------------
+# ---------------- state ----------------
+
+def test_ccd_block_is_bound_to_the_current_project(window):
+    # ADR-043: no target picker. Opening another project rebinds the block
+    # to it automatically; there is no combo to drive.
+    first = _select_project(window, name="SN 2099a")
+    second = _select_project(window, name="SN 2099rt")
+    # the selection re-reads the project from the db, so compare ids, not
+    # dict identity: the block follows whichever project is current
+    assert window._current_project["id"] == second["id"]
+    assert second["id"] != first["id"]
+    assert "obs_target" not in window._obs_widgets
+
 
 def test_disconnected_state_disables_capture(window):
     _select_project(window)
@@ -136,13 +149,3 @@ def test_disconnected_state_disables_capture(window):
     assert window._obs_widgets["ccd_connect"].isEnabled()
 
 
-def test_target_combo_lists_active_projects(window):
-    _select_project(window, name="SN 2099a")
-    from nightscribe.core import project as proj_mod
-    import nightscribe.core.db as dbmod
-    proj_mod.create(dbmod.db, "sn", "SN 2099obs2", {"mag": 15.0})
-    window._refresh_obs_targets()
-    cmb = window._obs_widgets["obs_target"]
-    texts = [cmb.itemText(i) for i in range(cmb.count())]
-    assert any("SN 2099a" in t for t in texts)
-    assert any("SN 2099obs2" in t for t in texts)

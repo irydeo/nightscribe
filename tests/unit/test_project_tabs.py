@@ -24,10 +24,11 @@ action) wipes all of them:
     `window._tab_pages`
   * exactly one page visible at a time (object card included); the
     tab bar buttons mirror the active page
-  * "Mark done" lives once — on the global Next card — and each
-    pending step page carries one discreet "Skip step" footer (done /
-    skipped steps show "Reopen step"); rebuilds never pile controls
-    up
+  * "Mark done" lives once, on the global Next card; the only step
+    control left on a step page is the "Reopen step" link of an
+    already finished step (skipping a step interactively is gone — a
+    "skipped" row can only come from an old database); rebuilds never
+    pile controls up
   * the Follow-up tab is hidden for kinds outside FOLLOWUP_KINDS; a
     deep link to it there is a safe no-op
   * every deep link (Next-card Go, the follow-up entry point, the
@@ -199,10 +200,11 @@ def test_page_is_scroll_wrapped(window, panel):
 
 
 def test_pages_hold_exactly_one_control_set_after_rebuilds(window, panel):
-    # UX-PC (U3) + ADR-041: "Mark done" lives once — on the Next card —
-    # and each pending step page carries one discreet "Skip step"
-    # footer. Rebuilds and lazy builds must never pile controls up:
-    # open every page, rebuild the page twice, open everything again.
+    # UX-PC (U3) + ADR-041: "Mark done" lives once, on the Next card.
+    # The interactive skip went out with the UX (ADR-043): a fresh
+    # project's pending step pages carry NO footer action. Rebuilds and
+    # lazy builds must never pile controls up: open every page, rebuild
+    # the page twice, open everything again.
     p = _mk_project(window)
     window._build_project_page(window._current_project)
     window._build_project_page(window._current_project)
@@ -215,9 +217,11 @@ def test_pages_hold_exactly_one_control_set_after_rebuilds(window, panel):
     # the Next card carries the single "Mark done" command (ADR-043: the
     # card-level Skip is gone; "Mark done" lives once)
     assert not window.projects.btn_next_done.isHidden()
-    # and each pending step page shows exactly one skip link in its
-    # footer (step footers never leak into other pages)
-    assert names.count(window.tr("Skip step")) == 3
+    # and none of the fresh step pages carries skip UI any more: no
+    # "Skip step", no "Reopen step" (the footer only appears on
+    # finished steps, and footers never leak into other pages)
+    assert names.count(window.tr("Skip step")) == 0
+    assert names.count(window.tr("Reopen step")) == 0
 
 
 def test_followup_tab_only_for_followup_kinds(window, panel):
@@ -304,25 +308,46 @@ def test_next_card_done_advances_the_step(window, panel):
     assert window._next_step_key == "process"
 
 
-def test_next_card_skip_marks_the_step(window, panel):
-    # UX-PC (U3): same for "Skip" — the step's own footer "Skip step"
-    # skips the current step and the flow moves on (ADR-043: the card-level
-    # Skip is gone; the per-step footer is the only one).
-    from PySide6.QtWidgets import QPushButton
-    _mk_project(window, name="SN 2099ns")
-    window._show_tab("plan")
-    page = window._tab_pages["plan"]
-    btns = [b for b in page.findChildren(QPushButton)
-            if b.text() == window.tr("Skip step")]
-    assert len(btns) == 1
-    btns[0].click()
+def test_skipped_step_moves_the_flow_forward(window, panel):
+    # The GUI no longer offers skipping (ADR-043), but the step machine
+    # still has to absorb the legacy "skipped" rows of an old database:
+    # the flow lands past them, on the next step.
+    p = _mk_project(window, name="SN 2099ns")
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
+    proj_mod.set_step_status(mw.db, p["id"], "plan", proj_mod.STEP_SKIPPED)
+    p = proj_mod.get(mw.db, p["id"])
+    window._current_project = p
+    window._build_project_page(p)
     steps = {s["step"]: s["status"]
-             for s in proj_mod.get(mw.db, window._current_project["id"])
-             ["steps"]}
+             for s in proj_mod.get(mw.db, p["id"])["steps"]}
     assert steps["plan"] == "skipped"
     assert window._next_step_key == "process"
+
+
+def test_step_footer_reopens_a_legacy_skipped_step(window, panel):
+    # ADR-043: the GUI can no longer produce a "skipped" step, but an old
+    # database may carry one: its footer still offers "Reopen step", and
+    # the click moves the flow back to it (single-current invariant).
+    from PySide6.QtWidgets import QPushButton
+    p = _mk_project(window, name="SN 2099rs")
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    proj_mod.set_step_status(mw.db, p["id"], "process",
+                             proj_mod.STEP_SKIPPED)
+    p = proj_mod.get(mw.db, p["id"])
+    window._current_project = p
+    window._build_project_page(p)
+    window._show_tab("process")  # the skipped step's page builds on first open
+    page = window._tab_pages["process"]
+    btns = [b for b in page.findChildren(QPushButton)
+            if "Reopen" in b.text() or "Reabrir" in b.text()]
+    assert len(btns) == 1
+    btns[0].click()
+    steps = {s["step"]: s["status"]
+             for s in proj_mod.get(mw.db, p["id"])["steps"]}
+    assert steps["process"] == "current"
+    assert steps["plan"] == "pending"
 
 
 def test_step_footer_reopens_a_done_step(window, panel):
@@ -550,8 +575,16 @@ def test_done_chip_carries_the_date(window, panel):
 
 
 def test_skipped_chip(window, panel):
-    _mk_project(window)
-    window._step_skip("process")  # rebuilds: plan stays the target
+    # No skip control in the GUI (ADR-043): a "skipped" step can only
+    # come from an old database, and the chip still has to mirror it.
+    p = _mk_project(window)
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    proj_mod.set_step_status(mw.db, p["id"], "process",
+                             proj_mod.STEP_SKIPPED)
+    p = proj_mod.get(mw.db, p["id"])
+    window._current_project = p
+    window._build_project_page(p)
     window._show_tab("process")
     pages = window._tab_pages
     assert pages["process"]._chip.text() == window.tr("skipped")

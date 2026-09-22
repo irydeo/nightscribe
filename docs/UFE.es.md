@@ -24,9 +24,9 @@ comparación, FITS anotados), que siguen disponibles donde siempre.
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
   coordenadas RA/Dec si la placa trae WCS.
-* **Pestañas**: una por funcionalidad. **Blink** y **Anotar** ya están
-  disponibles (abajo); Comparación llega en la fase F del plan. Solo la
-  pestaña visible responde a los clics sobre la imagen.
+* **Pestañas**: una por funcionalidad. **Blink**, **Comparar** y
+  **Anotar** están disponibles (abajo). Solo la pestaña visible responde
+  a los clics sobre la imagen.
 
 ## Blink
 
@@ -46,6 +46,25 @@ DR1 g (supernovas y transitorios; la placa es la que cargaste con
   SN mapeada por el WCS de tu placa.
 * **GIF… / MP4… / PNG…** exportan el par (lado a lado el PNG), con el
   zoom de recorte sobre la SN que elijas.
+
+## Comparar
+
+La pestaña **Comparar** construye la secuencia fotométrica sobre tu
+placa (necesita WCS; si falta, «Resolver astrometría…» lo consigue):
+
+* **Generar campo** consulta el catálogo (Gaia EDR3 o APASS DR9) y las
+  variables VSX alrededor del centro de la placa: las estrellas más
+  brillantes aparecen rotuladas y las variables conocidas con anillo
+  rojo (nunca sirven de comparación).
+* **Clic** sobre una estrella la añade o quita de la secuencia, como
+  Comparación (cian) o Check (rosa); **Proponer secuencia** elige
+  automáticamente estrellas aisladas y no variables de brillo parecido
+  al objetivo (dile su magnitud aproximada).
+* La **tabla** renombra, cambia el tipo y quita filas; la sonda al pasar
+  el cursor cuenta catálogo, magnitud y color de cada estrella.
+* **Exportar CSV…** escribe la secuencia (columnas fijas + todas las
+  bandas) y **Exportar carta PNG…** guarda exactamente lo que ves:
+  placa, anillos, rótulos y la flecha de norte / barra de escala.
 * **Anotaciones al vuelo**: si la placa ya trae tarjetas ANNOTATE
   (escritas por NightScribe o por AstroImageJ), se dibujan al cargar:
   círculos con su tamaño en píxeles de placa y rótulos legibles a

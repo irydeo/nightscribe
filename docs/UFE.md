@@ -24,9 +24,9 @@ FITS), which stay where they always were.
   the cursor; dragging pans; double-click returns to the fit. Hovering
   shows a tooltip with the pixel, its DN value and the RA/Dec when the
   plate carries a WCS.
-* **Tabs**: one per feature. **Blink** and **Annotate** are already
-  available (below); Compare arrives in the plan's phase F. Only the
-  visible tab answers clicks on the image.
+* **Tabs**: one per feature. **Blink**, **Compare** and **Annotate**
+  are available (below). Only the visible tab answers clicks on the
+  image.
 
 ## Blink
 
@@ -46,6 +46,25 @@ with "Load FITS…"):
   mapped through your plate's WCS.
 * **GIF… / MP4… / PNG…** export the pair (side by side for PNG), with
   the crop zoom on the SN of your choice.
+
+## Compare
+
+The **Compare** tab builds the photometric sequence on your plate (a
+WCS is needed; if it is missing, "Solve astrometry…" gets you one):
+
+* **Generate field** queries the catalog (Gaia EDR3 or APASS DR9) and
+  the VSX variables around the plate centre: the brightest stars come
+  out labelled and the known variables with a red ring (they can never
+  be comparisons).
+* **Click** a star to add or remove it from the sequence, as Comparison
+  (cyan) or Check (pink); **Propose sequence** automatically picks
+  isolated, non-variable stars matched to the target's brightness (give
+  it the approximate magnitude).
+* The **table** renames, retypes and removes rows; hovering tells you
+  each star's catalog, magnitude and colour.
+* **Export CSV…** writes the sequence (fixed columns plus every band)
+  and **Export chart PNG…** saves exactly what you see: plate, rings,
+  labels and the north arrow / scale bar.
 * **Annotations on load**: if the plate already carries ANNOTATE cards
   (written by NightScribe or AstroImageJ), they are drawn on load:
   circles with their plate-pixel sizes and labels readable at any zoom.

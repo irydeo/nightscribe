@@ -1,18 +1,19 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: FASES A-E y D.5 CERRADAS (2026-09-22).** La fase E trajo la
-> pestaña Blink real (`gui/ufe_blink_tab.py` sobre `core/blink` +
-> `BlinkWorker`/`BlinkExportWorker`): la pestaña en escena posee el frame
-> de la vista por `set_frame_override`, el obs se estira con los DN
-> absolutos compartidos de la tira de histograma, la referencia PS1 con
-> sus percentiles propios por la ganancia de balance; gamma e invertir
-> comunes; blink vivo por timer, fundido estático, nudge de la referencia,
-> marcador mapeado por el WCS de la placa (placas espejadas: ambos frames
-> se des-espejan para la vista y el SN se mapea por cielo), exports
-> GIF/MP4/PNG lado a lado idénticos al legacy. Suite 1600 verde, i18n
-> 1173 cadenas.
-> **La próxima sesión empieza en la fase F** (pestaña Comparar sobre
-> `core/compstars` + overlays estilo `FinderChart`).
+> **ESTADO: TODAS LAS FASES CERRADAS (A-F + D.5, 2026-09-22).** La fase F
+> trajo la pestaña Comparar real (`gui/ufe_compare_tab.py` sobre
+> `core/compstars` con el lenguaje visual del `FinderChart` como overlays
+> de la vista compartida): el campo se genera alrededor del centro de la
+> placa con su FOV real (`UfeFieldWorker`, señal `object` para no pasar el
+> dict anidado por QVariantMap), el picker por clic replica Comp/Check con
+> rechazo de variables VSX y motivo, la propuesta automática usa la
+> magnitud del objetivo, la tabla edita nombres/tipos, y los exports son
+> el CSV de siempre y el PNG de la escena visible (overlays + HUD
+> incluidos). Ya no quedan placeholders: las tres pestañas son reales.
+> Suite 1614 verde, i18n 1203 cadenas.
+> **Queda pendiente** solo la fusión a `main` cuando se decida, y el
+> pulido opcional: atajos extra, drag de comp estrella a estrella, y la
+> revisión visual con placas reales del observatorio.
 
 > **Nota de la fase D (resuelta en D.5)**: la flecha de norte y la barra
 > de escala llegaron como overlay COMÚN (HUD de viewport, también en el
@@ -424,10 +425,18 @@ Referencia para la fase A; no rehacer la exploración.
 
 ### F: Pestaña Comparación
 
-- [ ] Sobre `core/compstars` + overlays de `FinderChart`: generar campo
-      (DSS2 o FITS propio), picker de estrellas por clic (Comp/Check),
-      tabla de secuencia, CSV, PNG de la carta.
-- [ ] `SeqChartDialog` legacy sigue vivo.
+- [x] Sobre `core/compstars` + lenguaje visual de `FinderChart` como
+      overlays de la vista compartida: generar campo (la placa cargada
+      ES el fondo; sin WCS se pide resolver con el botón común), picker
+      de estrellas por clic (Comp/Check, radio de pantalla constante,
+      VSX rechazadas con motivo), propuesta automática por magnitud del
+      objetivo, tabla de secuencia (nombre/tipo/quitar/limpiar), CSV
+      (`export_sequence_csv`) y PNG de la carta (el export común de la
+      escena visible, overlays + HUD dentro). Nota: el fondo DSS2 del
+      flujo legacy queda en el legacy; en el UFE la placa propia es el
+      fondo por diseño (el editor es FITS-céntrico y la astrometría se
+      resuelve in situ desde D.5).
+- [x] `SeqChartDialog` legacy sigue vivo (suite verde sin tocarlo).
 
 ## Riesgos y mitigaciones
 

@@ -13,7 +13,9 @@
 > Suite 1614 verde, i18n 1203 cadenas.
 > **Queda pendiente** solo la fusión a `main` cuando se decida, y el
 > pulido opcional: atajos extra, drag de comp estrella a estrella, y la
-> revisión visual con placas reales del observatorio.
+> revisión visual con placas reales del observatorio. La siguiente
+> funcionalidad sobre este editor (fotometría calibrada, pestaña Medir)
+> tiene su propio plan: `docs/PLANS/ufe-photometry.md`.
 
 > **Nota de la fase D (resuelta en D.5)**: la flecha de norte y la barra
 > de escala llegaron como overlay COMÚN (HUD de viewport, también en el

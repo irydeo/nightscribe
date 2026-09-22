@@ -27,6 +27,18 @@ comparación, FITS anotados), que siguen disponibles donde siempre.
 * **Pestañas**: una por funcionalidad. **Anotar** ya está disponible
   (abajo); Blink y Comparación llegan en las siguientes fases del plan.
   Solo la pestaña visible responde a los clics sobre la imagen.
+* **Anotaciones al vuelo**: si la placa ya trae tarjetas ANNOTATE
+  (escritas por NightScribe o por AstroImageJ), se dibujan al cargar:
+  círculos con su tamaño en píxeles de placa y rótulos legibles a
+  cualquier zoom.
+* **Flecha de norte y barra de escala** (botones «N» y «Escala», con
+  WCS): viven en la esquina superior derecha e inferior izquierda, y
+  también salen en el PNG exportado.
+* **Resolver astrometría…**: si la placa no tiene WCS (o quieres
+  repetirlo), la resuelve a ciegas con Astrometry.net (requiere tu clave
+  de API en Ajustes). La solución se aplica en memoria a la sesión: el
+  archivo en disco nunca se modifica, y la sonda, la flecha de norte, la
+  barra de escala y Anotar la usan al instante.
 
 ## Anotar
 

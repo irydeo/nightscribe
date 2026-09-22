@@ -27,6 +27,17 @@ FITS), which stay where they always were.
 * **Tabs**: one per feature. **Annotate** is already available (below);
   Blink and Compare arrive in the plan's next phases. Only the visible
   tab answers clicks on the image.
+* **Annotations on load**: if the plate already carries ANNOTATE cards
+  (written by NightScribe or AstroImageJ), they are drawn on load:
+  circles with their plate-pixel sizes and labels readable at any zoom.
+* **North arrow and scale bar** (the "N" and "Scale" buttons, with a
+  WCS): top-right and bottom-left corners, and they are stamped into the
+  exported PNG too.
+* **Solve astrometry…**: when the plate has no WCS (or you want a fresh
+  one), blind-solves it with Astrometry.net (your API key from Settings
+  required). The solution applies in memory for the session: the file on
+  disk is never modified, and the probe, the north arrow, the scale bar
+  and Annotate pick it up at once.
 
 ## Annotate
 

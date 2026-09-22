@@ -1,20 +1,23 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: FASES A, B, C y D CERRADAS (2026-09-22).** Esqueleto/
+> **ESTADO: FASES A, B, C, D y D.5 CERRADAS (2026-09-22).** Esqueleto/
 > carga/vista (A), motor de estiramiento + histograma visual (B), comunes
-> pulidas (C) y pestaña Anotar real (D: `gui/ufe_annotate_tab.py` sobre
-> `core/fits_annotate`, marcador por clic con nudge, etiqueta y notas,
-> multiplicación de visitas mapeando el marcador por el WCS de cada
-> placa, guardar copias sin tocar los originales). Suite 1571 verde,
-> i18n 1135 cadenas.
+> pulidas (C), pestaña Anotar real (D) y la puntualización del
+> observador (D.5): las placas anotadas muestran sus tarjetas ANNOTATE al
+> cargar (`core/fits_annotate.read_annotations` + capa de solo lectura en
+> la vista), la flecha de norte y la barra de escala son overlays COMUNES
+> (HUD en coords de viewport, también en el PNG exportado) y la
+> resolución astrométrica es funcionalidad común (botón «Resolver
+> astrometría…» + `UfeSolveWorker` + `state.set_wcs_cards`, en memoria:
+> el archivo en disco jamás se toca). Suite 1586 verde, i18n 1145
+> cadenas.
 > **La próxima sesión empieza en la fase E** (pestaña Blink sobre
 > `core/blink`).
 
-> **Nota de la fase D (pendiente de decisión)**: la flecha de norte y la
-> barra de escala del diálogo legacy son decoración de previsualización
-> (las tarjetas NS_SCALE/NS_NORTH sí se escriben desde el WCS). No se
-> migraron: tienen más sentido como overlay COMÚN del editor que como
-> algo propio de Anotar. Queda como posible pulido de una fase futura.
+> **Nota de la fase D (resuelta en D.5)**: la flecha de norte y la barra
+> de escala llegaron como overlay COMÚN (HUD de viewport, también en el
+> PNG exportado), y la resolución astrométrica como funcionalidad común;
+> ver la fase D.5 más abajo.
 
 > **Revisión de la convención de extensión (fase D)**: las pestañas de
 > funcionalidad reciben `(state, lang, view)` (no solo `(state, lang)`):
@@ -382,6 +385,27 @@ Referencia para la fase A; no rehacer la exploración.
       intacto; test que compara bytes).
 - [x] El `SnAnnotateDialog` legacy sigue vivo y no se toca (sus tests
       siguen verdes).
+
+### D.5: puntualización del observador (previo a la fase E)
+
+- [x] Las placas anotadas presentan sus anotaciones al cargar:
+      `core/fits_annotate.read_annotations` (las tarjetas ANNOTATE
+      repetidas colapsan en el dict de cabecera y la etiqueta vive en el
+      comentario de la tarjeta: el parser recorre las tarjetas crudas) +
+      capa de solo lectura en la vista (círculos en píxeles de placa como
+      AIJ, rótulos a tamaño de pantalla constante; la capa sobrevive a
+      `clear_overlays`). Verificado visualmente con el fixture AIJ real
+      (NGC 7331 y su séquito).
+- [x] Flecha de norte y barra de escala como overlays COMUNES: HUD en
+      coordenadas de viewport (`drawForeground`), con relé en la
+      exportación PNG (`export_png` reestampa el HUD entre la escena y la
+      marca de agua), botones «N»/«Escala» activos solo cuando hay WCS.
+      En Anotar NO se duplican: la funcionalidad es común.
+- [x] Resolución astrométrica común: botón «Resolver astrometría…» en la
+      barra superior, `UfeSolveWorker` (QThread, red fuera del hilo GUI),
+      `state.set_wcs_cards` fusiona la solución en memoria (señal
+      `wcs_changed` nueva); la sonda, el HUD y Anotar la recogen al
+      instante. Sin clave o sin solución: mensaje claro, nada se rompe.
 
 ### E: Pestaña Blink
 

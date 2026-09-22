@@ -86,6 +86,8 @@ nightscribe/
     narrative.py     # prosa divulgativa ES/EN
     post.py          # plantillas -> post_ES / post_EN / tuit
     fits_io.py       # lector FITS mínimo (numpy, sin astropy — ADR-018)
+    fits_annotate.py # FITS anotado AIJ-compatible: escribe copias y LEE
+                     #   tarjetas ANNOTATE (UFE las pinta al cargar, ADR-044)
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
     stretch.py       # motor de estiramiento: percentiles, lineal+gamma, invertir,
                      #   histograma, downscale 2×2 (ADR-044; blink_view re-exporta)

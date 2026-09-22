@@ -78,6 +78,8 @@ class UfeImageView(ChartView):
         self._annotation_items = []  # read-only ANNOTATE layer (survives
                                      # clear_overlays, rebuilt per plate)
         self._annotation_labels = []  # [(label item, ann dict)]
+        self._frame_override = None  # Blink tab: fn() -> uint8 display
+                                     # frame replacing the state's own
         self.show_north = True      # HUD toggles (need a WCS to paint)
         self.show_scale = True
 
@@ -121,9 +123,25 @@ class UfeImageView(ChartView):
         if not self._render_timer.isActive():
             self._render_timer.start(_RENDER_COALESCE_MS)
 
+    def set_frame_override(self, fn):
+        # A feature tab (the Blink one, phase E) may own the displayed
+        # frame: fn() returns a uint8 array in SCREEN orientation that the
+        # normal pipeline (plate-covering transform included) paints
+        # instead of the state's. None hands the plate back.
+        # @args: fn - callable or None
+        self._frame_override = fn
+        self._render()
+
+    def refresh_frame(self):
+        # Re-pulls the frame (the Blink tab's timer swaps phases here).
+        self._render()
+
     def _render(self):
         # Swaps the display pixmap in place; zoom and pan stay put.
-        img8 = self._state.display_uint8()
+        if self._frame_override is not None:
+            img8 = self._frame_override()
+        else:
+            img8 = self._state.display_uint8()
         if img8 is None:
             return
         h, w = img8.shape

@@ -148,17 +148,19 @@ class UfeDialog(QDialog):
         return bar
 
     def _add_placeholder_tabs(self):
-        # One placeholder per legacy feature not yet migrated (phases E/F
-        # swap theirs in); the Annotate tab is real since phase D.
-        for title, phase in ((self.tr("Blink"), "E"),
-                             (self.tr("Compare"), "F")):
-            page = QWidget()
-            v = QVBoxLayout(page)
-            lbl = QLabel(self.tr("Arrives in phase {0}").format(phase))
-            lbl.setAlignment(Qt.AlignCenter)
-            lbl.setWordWrap(True)
-            v.addWidget(lbl)
-            self.tabs.addTab(page, title)
+        # The Blink (phase E) and Annotate (phase D) tabs are real; the
+        # Compare placeholder waits for phase F.
+        from .ufe_blink_tab import UfeBlinkTab
+        self.tab_blink = UfeBlinkTab(self.state, self._lang,
+                                     view=self.view)
+        self.tabs.addTab(self.tab_blink, self.tr("Blink"))
+        page = QWidget()
+        v = QVBoxLayout(page)
+        lbl = QLabel(self.tr("Arrives in phase {0}").format("F"))
+        lbl.setAlignment(Qt.AlignCenter)
+        lbl.setWordWrap(True)
+        v.addWidget(lbl)
+        self.tabs.addTab(page, self.tr("Compare"))
         from .ufe_annotate_tab import UfeAnnotateTab
         self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
                                            view=self.view)
@@ -175,6 +177,11 @@ class UfeDialog(QDialog):
             setter = getattr(w, "set_active", None)
             if callable(setter):
                 setter(i == idx)
+
+    def closeEvent(self, event):
+        # The blink timer must not fire into a closing dialog.
+        self.tab_blink.shutdown()
+        super().closeEvent(event)
 
     # -------------------------------------------------------- extension
 

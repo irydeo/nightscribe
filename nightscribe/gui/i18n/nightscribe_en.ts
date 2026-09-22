@@ -6293,15 +6293,159 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
 </context>
 <context>
+    <name>UfeBlinkTab</name>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="88"/>
+        <source>SN:</source>
+        <translation>SN:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="94"/>
+        <source>Manual coordinates</source>
+        <translation>Manual coordinates</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="100"/>
+        <source>RA deg</source>
+        <translation>RA deg</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="102"/>
+        <source>Dec deg</source>
+        <translation>Dec deg</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="106"/>
+        <source>Prepare pair</source>
+        <translation>Prepare pair</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="114"/>
+        <source>Live blink</source>
+        <translation>Live blink</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="118"/>
+        <source>Interval:</source>
+        <translation>Interval:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="127"/>
+        <source>Blink</source>
+        <translation>Blink</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="129"/>
+        <source>Fade</source>
+        <translation>Fade</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="142"/>
+        <source>Balance:</source>
+        <translation>Balance:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="147"/>
+        <source>Multiplies the reference so its sky background matches the plate&apos;s (a blink that does not pump)</source>
+        <translation>Multiplies the reference so its sky background matches the plate&apos;s (a blink that does not pump)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="151"/>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="157"/>
+        <source>Nudge ref:</source>
+        <translation>Nudge ref:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="162"/>
+        <source>Nudge</source>
+        <translation>Nudge</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="170"/>
+        <source>Marker</source>
+        <translation>Marker</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="174"/>
+        <source>Size:</source>
+        <translation>Size:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="183"/>
+        <source>Export zoom:</source>
+        <translation>Export zoom:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="190"/>
+        <source>GIF…</source>
+        <translation>GIF…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="193"/>
+        <source>MP4…</source>
+        <translation>MP4…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="196"/>
+        <source>PNG…</source>
+        <translation>PNG…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="246"/>
+        <location filename="../ufe_blink_tab.py" line="276"/>
+        <source>Load a FITS plate first.</source>
+        <translation>Load a FITS plate first.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="283"/>
+        <source>Manual coordinates invalid</source>
+        <translation>Manual coordinates invalid</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="288"/>
+        <source>Type the supernova name or tick &apos;Manual coordinates&apos;.</source>
+        <translation>Type the supernova name or tick &apos;Manual coordinates&apos;.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="292"/>
+        <source>Preparing the blink pair…</source>
+        <translation>Preparing the blink pair…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="538"/>
+        <source>Export {0}</source>
+        <translation>Export {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="546"/>
+        <source>Rendering…</source>
+        <translation>Rendering…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="561"/>
+        <source>Written to {0}</source>
+        <translation>Written to {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="564"/>
+        <source>Export failed: {0}</source>
+        <translation>Export failed: {0}</translation>
+    </message>
+</context>
+<context>
     <name>UfeDialog</name>
     <message>
         <location filename="../ufe_dialog.py" line="57"/>
-        <location filename="../ufe_dialog.py" line="203"/>
-        <location filename="../ufe_dialog.py" line="302"/>
-        <location filename="../ufe_dialog.py" line="304"/>
-        <location filename="../ufe_dialog.py" line="324"/>
-        <location filename="../ufe_dialog.py" line="349"/>
-        <location filename="../ufe_dialog.py" line="358"/>
+        <location filename="../ufe_dialog.py" line="210"/>
+        <location filename="../ufe_dialog.py" line="309"/>
+        <location filename="../ufe_dialog.py" line="311"/>
+        <location filename="../ufe_dialog.py" line="331"/>
+        <location filename="../ufe_dialog.py" line="356"/>
+        <location filename="../ufe_dialog.py" line="365"/>
         <source>FITS editor</source>
         <translation>FITS editor</translation>
     </message>
@@ -6357,7 +6501,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="122"/>
-        <location filename="../ufe_dialog.py" line="344"/>
+        <location filename="../ufe_dialog.py" line="351"/>
         <source>Solve astrometry…</source>
         <translation>Solve astrometry…</translation>
     </message>
@@ -6387,22 +6531,22 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="325"/>
+        <location filename="../ufe_dialog.py" line="332"/>
         <source>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</source>
         <translation>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="340"/>
+        <location filename="../ufe_dialog.py" line="347"/>
         <source>Solving: {0}…</source>
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="350"/>
+        <location filename="../ufe_dialog.py" line="357"/>
         <source>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</source>
         <translation>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="359"/>
+        <location filename="../ufe_dialog.py" line="366"/>
         <source>The Astrometry.net solution is not usable (non-TAN WCS).</source>
         <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
@@ -6411,42 +6555,42 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Histogram (phase B)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="153"/>
+        <location filename="../ufe_dialog.py" line="156"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="154"/>
+        <location filename="../ufe_dialog.py" line="163"/>
         <source>Compare</source>
         <translation>Compare</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="165"/>
+        <location filename="../ufe_dialog.py" line="167"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="157"/>
+        <location filename="../ufe_dialog.py" line="159"/>
         <source>Arrives in phase {0}</source>
         <translation>Arrives in phase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="193"/>
+        <location filename="../ufe_dialog.py" line="200"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="194"/>
+        <location filename="../ufe_dialog.py" line="201"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="204"/>
+        <location filename="../ufe_dialog.py" line="211"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="220"/>
+        <location filename="../ufe_dialog.py" line="227"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>
@@ -6454,12 +6598,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeImageView</name>
     <message>
-        <location filename="../widgets/ufe_image_view.py" line="93"/>
+        <location filename="../widgets/ufe_image_view.py" line="95"/>
         <source>FITS image view</source>
         <translation>FITS image view</translation>
     </message>
     <message>
-        <location filename="../widgets/ufe_image_view.py" line="390"/>
+        <location filename="../widgets/ufe_image_view.py" line="408"/>
         <source>Open a FITS image to start</source>
         <translation>Open a FITS image to start</translation>
     </message>

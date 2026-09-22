@@ -42,12 +42,13 @@
      <property name="title"><string>Tools</string></property>
      <addaction name="action_settings"/>
      <addaction name="separator"/>
-       <addaction name="action_skycal"/>
-       <addaction name="action_explore"/>
-       <addaction name="action_blink"/>
-       <addaction name="action_journal"/>
-       <addaction name="action_campaigns"/>
-      </widget>
+        <addaction name="action_skycal"/>
+        <addaction name="action_explore"/>
+        <addaction name="action_blink"/>
+        <addaction name="action_journal"/>
+        <addaction name="action_campaigns"/>
+        <addaction name="action_ufe"/>
+       </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
      <addaction name="action_docs"/>
@@ -77,9 +78,12 @@
    <action name="action_skycal">
     <property name="text"><string>Sky calendar…</string></property>
    </action>
-  <action name="action_campaigns">
-   <property name="text"><string>Campaigns…</string></property>
-  </action>
+   <action name="action_campaigns">
+    <property name="text"><string>Campaigns…</string></property>
+   </action>
+   <action name="action_ufe">
+    <property name="text"><string>FITS editor…</string></property>
+   </action>
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>
   </action>

@@ -677,6 +677,8 @@ class MainWindow(QMainWindow):
         self._menus.action_journal.triggered.connect(
             self._open_journal_dialog)
         self._menus.action_skycal.triggered.connect(self._tools_skycal)
+        # ADR-044: the Unified FITS Editor lives in the Tools menu too
+        self._menus.action_ufe.triggered.connect(self._tools_ufe)
         from PySide6.QtGui import QKeySequence, QShortcut
         for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
                                      TAB_CAMPAIGNS,
@@ -7764,6 +7766,25 @@ class MainWindow(QMainWindow):
         # Menu Tools → Sky calendar… (ADR-040)
         dlg = self._skycal_build()
         self._skycal_fill(dlg)
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    # ---------------- Unified FITS Editor (ADR-044) ----------------
+
+    def _ufe_build(self):
+        # Builds the «FITS editor…» dialog once (lazy) and keeps it alive
+        # on self: the observer's plate and stretch survive a close.
+        # @return: the UfeDialog
+        if getattr(self, "_ufe", None) is not None:
+            return self._ufe
+        from .ufe_dialog import UfeDialog
+        self._ufe = UfeDialog(lang=self._lang(), parent=self)
+        return self._ufe
+
+    def _tools_ufe(self):
+        # Menu Tools → FITS editor… (ADR-044)
+        dlg = self._ufe_build()
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()

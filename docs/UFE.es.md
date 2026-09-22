@@ -24,9 +24,25 @@ comparación, FITS anotados), que siguen disponibles donde siempre.
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
   coordenadas RA/Dec si la placa trae WCS.
-* **Pestañas**: una por funcionalidad. Las fases D, E y F del plan las
-  llenarán con Anotar, Blink y Comparación; añadir una funcionalidad
-  nueva es añadir una pestaña.
+* **Pestañas**: una por funcionalidad. **Anotar** ya está disponible
+  (abajo); Blink y Comparación llegan en las siguientes fases del plan.
+  Solo la pestaña visible responde a los clics sobre la imagen.
+
+## Anotar
+
+La pestaña **Anotar** guarda copias FITS anotadas compatibles con
+AstroImageJ (el archivo original nunca se modifica):
+
+* **Clic** sobre la imagen coloca el marcador; **dx/dy + Ajustar** lo
+  mueven a décimas de píxel; tamaño y color a elegir.
+* **Etiqueta** y **notas** viajan en las tarjetas ANNOTATE y NS_NOTES;
+  RA/Dec, escala y PA de norte se escriben desde el WCS de la placa
+  (NS_RA, NS_DEC, NS_SCALE, NS_NORTH).
+* **Anotar también (visitas)**: una lista de placas extra recibe la
+  misma anotación; el marcador aterriza en cada una a través de su
+  propio WCS.
+* **Guardar copia anotada…** escribe la copia elegida y, junto a cada
+  visita, su `<nombre>_annotated.fits`.
 * **Histograma**: 256 bins en escala logarítmica sobre la imagen de
   pantalla. Las zonas sombreadas son lo que el estiramiento descarta.
 

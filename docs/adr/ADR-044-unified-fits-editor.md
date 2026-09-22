@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-22** (fases A, B y C implementadas: esqueleto/carga/vista, motor de estiramiento `core/stretch.py` + histograma visual, y comunes pulidas con teclado y persistencia del stretch; fases D-F pendientes)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-22** (fases A, B, C y D implementadas; en D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; fases E-F pendientes)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 
@@ -80,11 +80,13 @@ zoom no limitado al Fit.
    píxeles reales, no interpolados (estilo AstroImageJ). Regla QImage:
    siempre `.copy()` sobre buffer contiguo, nunca depender del numpy vivo.
 7. **Extensibilidad**: una funcionalidad nueva es una pestaña cuyo widget
-   recibe `(state, lang)` y se suscribe a las señales del estado;
-   `UfeDialog.add_feature_tab(title, widget)` es todo el API. Los
-   overlays de cada pestaña entran por `view.add_overlay(item)` y salen
-   con `view.clear_overlays()` al desactivarla, sin pisarse entre
-   pestañas.
+   recibe `(state, lang, view)` (revisado en la fase D: la vista es donde
+   viven overlays, clics y zoom) y se suscribe a las señales del estado;
+   `UfeDialog.add_feature_tab(title, widget)` es todo el API de registro,
+   y `set_active(bool)` marca qué pestaña posee los clics y los overlays
+   en cada momento. Los overlays de cada pestaña entran por
+   `view.add_overlay(item)` y salen con `view.clear_overlays()` al
+   desactivarla, sin pisarse entre pestañas.
 8. **Probe**: el hover muestra píxel de placa, valor DN y RA/Dec
    (`core/coords.ra_deg_to_hms` / `dec_deg_to_dms`) cuando hay WCS; el DN
    prepara el ajuste fino del histograma de la fase B.
@@ -173,10 +175,13 @@ PNG export as a standard feature and a zoom not limited to Fit.
    interpolation (AstroImageJ style). QImage rule: always `.copy()` on a
    contiguous buffer, never lean on the live numpy one.
 7. **Extensibility**: a new feature is a tab whose widget receives
-   `(state, lang)` and subscribes to the state's signals;
-   `UfeDialog.add_feature_tab(title, widget)` is the whole API. Each
-   tab's overlays enter through `view.add_overlay(item)` and leave with
-   `view.clear_overlays()` on deactivation, never stomping on each other.
+   `(state, lang, view)` (revised in phase D: the view is where overlays,
+   clicks and zoom live) and subscribes to the state's signals;
+   `UfeDialog.add_feature_tab(title, widget)` is the whole registration
+   API, and `set_active(bool)` marks which tab owns the clicks and
+   overlays at any moment. Each tab's overlays enter through
+   `view.add_overlay(item)` and leave with `view.clear_overlays()` on
+   deactivation, never stomping on each other.
 8. **Probe**: hover shows the plate pixel, the DN value and RA/Dec
    (`core/coords.ra_deg_to_hms` / `dec_deg_to_dms`) when a WCS exists;
    the DN prepares phase B's fine histogram work.

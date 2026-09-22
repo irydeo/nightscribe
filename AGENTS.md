@@ -123,8 +123,8 @@ nightscribe/
                        # (ADR-019/035/036/040) — el **Diario de observación**, el
                        # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
                        # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
-                       # widgets/ufe_image_view.py + widgets/histogram_widget.py,
-                       # ADR-044) viven en
+                       # widgets/ufe_image_view.py + widgets/histogram_widget.py +
+                       # ufe_annotate_tab.py, ADR-044) viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,

@@ -1,14 +1,26 @@
 # Plan de implementación: Unified FITS Editor (UFE) (2026-09-22)
 
-> **ESTADO: FASES A, B y C CERRADAS (2026-09-22).** Esqueleto/carga/vista
-> (A), motor de estiramiento + histograma visual (B) y comunes pulidas
-> (C): teclado completo (F, 1, +, -, flechas, Ctrl+O, Ctrl+E),
-> persistencia del stretch entre cargas (checkbox «Mantener
-> estiramiento al cargar»), etiqueta de zoom %, título con el nombre del
-> fichero, doble clic = Fit, accessibleNames y tooltips, doc de usuario
-> `docs/UFE.es.md`/`UFE.md`. Suite 1560 verde, i18n 1116 cadenas.
-> **La próxima sesión empieza en la fase D** (pestaña Anotar sobre
-> `core/fits_annotate`).
+> **ESTADO: FASES A, B, C y D CERRADAS (2026-09-22).** Esqueleto/
+> carga/vista (A), motor de estiramiento + histograma visual (B), comunes
+> pulidas (C) y pestaña Anotar real (D: `gui/ufe_annotate_tab.py` sobre
+> `core/fits_annotate`, marcador por clic con nudge, etiqueta y notas,
+> multiplicación de visitas mapeando el marcador por el WCS de cada
+> placa, guardar copias sin tocar los originales). Suite 1571 verde,
+> i18n 1135 cadenas.
+> **La próxima sesión empieza en la fase E** (pestaña Blink sobre
+> `core/blink`).
+
+> **Nota de la fase D (pendiente de decisión)**: la flecha de norte y la
+> barra de escala del diálogo legacy son decoración de previsualización
+> (las tarjetas NS_SCALE/NS_NORTH sí se escriben desde el WCS). No se
+> migraron: tienen más sentido como overlay COMÚN del editor que como
+> algo propio de Anotar. Queda como posible pulido de una fase futura.
+
+> **Revisión de la convención de extensión (fase D)**: las pestañas de
+> funcionalidad reciben `(state, lang, view)` (no solo `(state, lang)`):
+> la vista es donde viven los overlays, los clics y el zoom. El API de
+> registro sigue siendo solo `add_feature_tab(title, widget)`; la
+> activación pasa por `set_active(bool)` en la propia pestaña.
 >
 > Documento vivo: se actualiza al cierre de cada fase. Requisitos del
 > observador en `docs/unified-fits-editor.md`.
@@ -361,11 +373,15 @@ Referencia para la fase A; no rehacer la exploración.
 
 ### D: Pestaña Anotar
 
-- [ ] `gui/ufe_annotate_tabs...` sobre
+- [x] `gui/ufe_annotate_tab.py` sobre
       `core/fits_annotate.write_annotated_fits`: multiplicación de
-      imágenes (visitaciones), marcador por clic y ajuste, etiqueta y
-      notas, guardar copia (original intacto).
-- [ ] El `SnAnnotateDialog` legacy sigue vivo y no se toca.
+      imágenes (lista de visitas; el marcador se mapea por el WCS de cada
+      placa), marcador por clic (clics y overlays solo mientras la
+      pestaña es la visible, regla `set_active`) y ajuste fino (nudge
+      dx/dy, tamaño, color), etiqueta y notas, guardar copia (original
+      intacto; test que compara bytes).
+- [x] El `SnAnnotateDialog` legacy sigue vivo y no se toca (sus tests
+      siguen verdes).
 
 ### E: Pestaña Blink
 

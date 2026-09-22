@@ -24,9 +24,24 @@ FITS), which stay where they always were.
   the cursor; dragging pans; double-click returns to the fit. Hovering
   shows a tooltip with the pixel, its DN value and the RA/Dec when the
   plate carries a WCS.
-* **Tabs**: one per feature. Phases D, E and F of the plan fill them
-  with Annotate, Blink and Compare; adding a new feature is adding a
-  tab.
+* **Tabs**: one per feature. **Annotate** is already available (below);
+  Blink and Compare arrive in the plan's next phases. Only the visible
+  tab answers clicks on the image.
+
+## Annotate
+
+The **Annotate** tab saves AstroImageJ-compatible annotated FITS copies
+(the original file is never modified):
+
+* **Click** on the image drops the marker; **dx/dy + Nudge** move it by
+  tenths of a pixel; size and colour are yours.
+* **Label** and **notes** travel in the ANNOTATE and NS_NOTES cards;
+  RA/Dec, plate scale and north PA are written from the plate's WCS
+  (NS_RA, NS_DEC, NS_SCALE, NS_NORTH).
+* **Also annotate (visits)**: a list of extra plates receives the same
+  annotation; the marker lands on each through its own WCS.
+* **Save annotated copy…** writes the chosen copy plus, next to every
+  visit, its `<name>_annotated.fits`.
 * **Histogram**: 256 log-scaled bins computed on the display frame. The
   shaded zones are what the stretch throws away.
 

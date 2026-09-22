@@ -65,6 +65,9 @@ placa (necesita WCS; si falta, «Resolver astrometría…» lo consigue):
 * **Exportar CSV…** escribe la secuencia (columnas fijas + todas las
   bandas) y **Exportar carta PNG…** guarda exactamente lo que ves:
   placa, anillos, rótulos y la flecha de norte / barra de escala.
+
+Para entender cómo se mide después la fotometría con estas secuencias:
+[docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
 * **Anotaciones al vuelo**: si la placa ya trae tarjetas ANNOTATE
   (escritas por NightScribe o por AstroImageJ), se dibujan al cargar:
   círculos con su tamaño en píxeles de placa y rótulos legibles a

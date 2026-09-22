@@ -65,6 +65,9 @@ WCS is needed; if it is missing, "Solve astrometry…" gets you one):
 * **Export CSV…** writes the sequence (fixed columns plus every band)
   and **Export chart PNG…** saves exactly what you see: plate, rings,
   labels and the north arrow / scale bar.
+
+To understand how photometry is then measured with these sequences:
+[docs/PHOTOMETRY.md](PHOTOMETRY.md).
 * **Annotations on load**: if the plate already carries ANNOTATE cards
   (written by NightScribe or AstroImageJ), they are drawn on load:
   circles with their plate-pixel sizes and labels readable at any zoom.

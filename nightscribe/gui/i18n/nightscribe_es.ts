@@ -6882,222 +6882,237 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>UfeMeasureTab</name>
     <message>
-        <location filename="../ufe_measure_tab.py" line="88"/>
+        <location filename="../ufe_measure_tab.py" line="89"/>
         <source>Click a star (or the target) to measure it against the Compare tab&apos;s sequence.</source>
         <translation>Pulsa una estrella (o el objetivo) para medirla contra la secuencia de la pestaña Comparar.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="96"/>
+        <location filename="../ufe_measure_tab.py" line="97"/>
         <source>Open the Compare tab</source>
         <translation>Abrir la pestaña Comparar</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="103"/>
+        <location filename="../ufe_measure_tab.py" line="104"/>
         <source>Band:</source>
         <translation>Banda:</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="109"/>
+        <location filename="../ufe_measure_tab.py" line="110"/>
         <source>Apertures:</source>
         <translation>Aperturas:</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="117"/>
+        <location filename="../ufe_measure_tab.py" line="118"/>
         <source>Aperture radius, sky annulus inner and outer radius (px)</source>
         <translation>Radio de apertura y radios interior y exterior del anillo de cielo (px)</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="125"/>
+        <source>Suggest apertures</source>
+        <translation>Sugerir aperturas</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="127"/>
+        <source>Propose the radii from this target&apos;s growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</source>
+        <translation>Propone los radios desde la curva de crecimiento del objetivo y su entorno (vecinos, gradiente del fondo), con las razones en lenguaje llano</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="136"/>
         <source>Sky:</source>
         <translation>Cielo:</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="127"/>
+        <location filename="../ufe_measure_tab.py" line="138"/>
         <source>Median (flat sky)</source>
         <translation>Mediana (cielo plano)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="128"/>
+        <location filename="../ufe_measure_tab.py" line="139"/>
         <source>Plane (galactic cores)</source>
         <translation>Plano (núcleos galácticos)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="130"/>
+        <location filename="../ufe_measure_tab.py" line="141"/>
         <source>How the annulus estimates the background: a flat median, or a tilted plane when the host galaxy tilts it</source>
         <translation>Cómo estima el anillo el fondo: una mediana plana, o un plano inclinado cuando la galaxia huésped lo inclina</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="135"/>
+        <location filename="../ufe_measure_tab.py" line="146"/>
         <source>Sigma-clip the sky</source>
         <translation>Sigma-clip del cielo</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="138"/>
+        <location filename="../ufe_measure_tab.py" line="149"/>
         <source>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</source>
         <translation>Dos rondas a 2,5σ en el anillo: protección extra contra píxeles calientes y núcleos concurridos</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="141"/>
+        <location filename="../ufe_measure_tab.py" line="152"/>
         <source>Aperture follows the seeing</source>
         <translation>La apertura sigue al seeing</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="144"/>
+        <location filename="../ufe_measure_tab.py" line="155"/>
         <source>Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</source>
         <translation>Mide el FWHM de las comparaciones y dimensiona la apertura como 1,35 veces el seeing (H3)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="149"/>
+        <location filename="../ufe_measure_tab.py" line="160"/>
         <source>Colour term</source>
         <translation>Término de color</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="152"/>
+        <location filename="../ufe_measure_tab.py" line="163"/>
         <source>Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</source>
         <translation>Ajusta el punto cero Y su pendiente frente al B−V de las comps (H1); hacen falta al menos 6 comps con dispersión de color</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="155"/>
+        <location filename="../ufe_measure_tab.py" line="166"/>
         <source>B−V target:</source>
         <translation>B−V objetivo:</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="162"/>
+        <location filename="../ufe_measure_tab.py" line="173"/>
         <source>The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</source>
         <translation>El B−V del objetivo cuando se conoce (variables: VSX). Una supernova cerca del pico es ~0; el panel avisa cuando el término de color se aplica con esta suposición</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="168"/>
+        <location filename="../ufe_measure_tab.py" line="179"/>
         <source>Subtract host galaxy (PS1 reference)</source>
         <translation>Restar la galaxia huésped (referencia PS1)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="170"/>
+        <location filename="../ufe_measure_tab.py" line="181"/>
         <source>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</source>
         <translation>Descarga la referencia PanSTARRS alineada, la escala para que las comparaciones desaparezcan y mide el objetivo en la imagen diferencia (H2b; necesita red una vez por campo)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="182"/>
+        <location filename="../ufe_measure_tab.py" line="193"/>
         <source>CSV…</source>
         <translation>CSV…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="186"/>
+        <location filename="../ufe_measure_tab.py" line="197"/>
         <source>AAVSO EFF…</source>
         <translation>AAVSO EFF…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="245"/>
+        <location filename="../ufe_measure_tab.py" line="256"/>
         <source>The plate has no WCS: the comparison stars cannot be located. Solve it with «Solve astrometry…».</source>
         <translation>La placa no tiene WCS: no se pueden localizar las comparaciones. Resuélvela con «Resolver astrometría…».</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="251"/>
+        <location filename="../ufe_measure_tab.py" line="262"/>
         <source>No comparison sequence yet: build one in the Compare tab (Generate field, then pick or propose).</source>
         <translation>Aún no hay secuencia de comparación: constrúyela en la pestaña Comparar (Generar campo, y luego elige o propón).</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="522"/>
+        <location filename="../ufe_measure_tab.py" line="313"/>
+        <source>Measure the target first (a click on it).</source>
+        <translation>Mide primero el objetivo (un clic sobre él).</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="563"/>
         <source>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</source>
         <translation>Píxel ({0:.1f}, {1:.1f}) · flujo neto {2:,.0f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="524"/>
+        <location filename="../ufe_measure_tab.py" line="565"/>
         <source>Instrumental mag: {0:.3f}</source>
         <translation>Mag instrumental: {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="528"/>
+        <location filename="../ufe_measure_tab.py" line="569"/>
         <source>No comparison star could be used: no calibration.</source>
         <translation>Ninguna comparación pudo usarse: no hay calibración.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="531"/>
+        <location filename="../ufe_measure_tab.py" line="572"/>
         <source>Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} ({3} comps, band {4})</source>
         <translation>Punto cero: {0:.3f} ± {1:.3f}, pendiente de color {2:+.3f} ({3} comps, banda {4})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="536"/>
+        <location filename="../ufe_measure_tab.py" line="577"/>
         <source>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</source>
         <translation>Punto cero: {0:.3f} ± {1:.3f} ({2} comps, banda {3})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="539"/>
+        <location filename="../ufe_measure_tab.py" line="580"/>
         <source>± {0:.3f}</source>
         <translation>± {0:.3f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="541"/>
+        <location filename="../ufe_measure_tab.py" line="582"/>
         <source>Magnitude: {0:.3f} {1} ({2})</source>
         <translation>Magnitud: {0:.3f} {1} ({2})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="547"/>
+        <location filename="../ufe_measure_tab.py" line="588"/>
         <source>seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f} px</source>
         <translation>FWHM de seeing {0:.1f} px → aperturas {1:.1f}/{2:.1f}/{3:.1f} px</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="551"/>
+        <location filename="../ufe_measure_tab.py" line="592"/>
         <source>apertures set by hand (the seeing auto-scale is paused)</source>
         <translation>aperturas ajustadas a mano (el auto-seeing está en pausa)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="565"/>
+        <location filename="../ufe_measure_tab.py" line="608"/>
         <source>Colour term not fitted (too few comps or too little colour spread): plain zero point</source>
         <translation>Término de color no ajustado (pocas comps o poca dispersión de color): punto cero plano</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="569"/>
+        <location filename="../ufe_measure_tab.py" line="612"/>
         <source>Colour term applied with target B−V = {0:.2f}</source>
         <translation>Término de color aplicado con B−V del objetivo = {0:.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="573"/>
+        <location filename="../ufe_measure_tab.py" line="616"/>
         <source>No gain in the header or settings: the photon noise is not in the error</source>
         <translation>Sin ganancia en cabecera ni ajustes: el ruido de fotones no entra en el error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="577"/>
+        <location filename="../ufe_measure_tab.py" line="620"/>
         <source>Scintillation included ({0:.3f} mag)</source>
         <translation>Centelleo incluido ({0:.3f} mag)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="581"/>
+        <location filename="../ufe_measure_tab.py" line="624"/>
         <source>Host galaxy subtracted (PS1 reference scaled by the comps)</source>
         <translation>Galaxia huésped restada (referencia PS1 escalada por las comps)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="585"/>
+        <location filename="../ufe_measure_tab.py" line="628"/>
         <source>Error: {0:.3f} internal · {1:.3f} total</source>
         <translation>Error: {0:.3f} interno · {1:.3f} total</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="591"/>
+        <location filename="../ufe_measure_tab.py" line="634"/>
         <source>Check star {0}: measured {1:.2f} vs catalog {2:.2f} (Δ {3:+.2f}, OK)</source>
         <translation>Estrella check {0}: medida {1:.2f} frente a catálogo {2:.2f} (Δ {3:+.2f}, OK)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="597"/>
+        <location filename="../ufe_measure_tab.py" line="640"/>
         <source>Check star {0} is off by {1:+.2f} mag: this measurement is NOT reliable</source>
         <translation>La estrella check {0} se desvía {1:+.2f} mag: esta medida NO es fiable</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="659"/>
+        <location filename="../ufe_measure_tab.py" line="702"/>
         <source>The plate needs a WCS for the aligned reference.</source>
         <translation>La placa necesita WCS para la referencia alineada.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="667"/>
+        <location filename="../ufe_measure_tab.py" line="710"/>
         <source>Fetching the reference and subtracting…</source>
         <translation>Descargando la referencia y restando…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="687"/>
+        <location filename="../ufe_measure_tab.py" line="730"/>
         <source>The subtraction found no usable comparison star to scale the reference.</source>
         <translation>La sustracción no encontró comparaciones utilizables para escalar la referencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="699"/>
+        <location filename="../ufe_measure_tab.py" line="742"/>
         <source>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</source>
         <translation>Huésped restada. El objetivo se mide ahora en la imagen diferencia; las comps calibran en la placa original.</translation>
     </message>
@@ -7106,17 +7121,17 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Magnitud: {0:.3f} ± {1:.3f} ({2})</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="554"/>
+        <location filename="../ufe_measure_tab.py" line="597"/>
         <source>{0} of {1} sequence stars not usable (off the plate, saturated, or without the band)</source>
         <translation>{0} de {1} estrellas de la secuencia no utilizables (fuera de la placa, saturadas o sin la banda)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="558"/>
+        <location filename="../ufe_measure_tab.py" line="601"/>
         <source>Few comparisons: the scatter dominates the error</source>
         <translation>Pocas comparaciones: la dispersión domina el error</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="561"/>
+        <location filename="../ufe_measure_tab.py" line="604"/>
         <source>Band {0} estimated from Gaia (Riello 2021)</source>
         <translation>Banda {0} estimada desde Gaia (Riello 2021)</translation>
     </message>
@@ -7125,17 +7140,17 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">No gain in the header: the error is the comps&apos; scatter only</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="783"/>
+        <location filename="../ufe_measure_tab.py" line="826"/>
         <source>Export measurement</source>
         <translation>Exportar medida</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="793"/>
+        <location filename="../ufe_measure_tab.py" line="836"/>
         <source>Export measurement (AAVSO EFF)</source>
         <translation>Exportar medida (AAVSO EFF)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="817"/>
+        <location filename="../ufe_measure_tab.py" line="860"/>
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
     </message>

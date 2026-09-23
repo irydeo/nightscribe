@@ -116,7 +116,7 @@ def _sigma_clipped_median(values, level=SIG_LEVEL, iters=SIG_ITERS):
 
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
-                  sky_mode="median"):
+                  sky_mode="median", centroid_mode="refined"):
     # One click on one plate (decision D4): sub-pixel centroid, aperture
     # net flux, sky per pixel, peak, and honest guards. Never raises for
     # a bad star: the reason is the bilingual pair, the panel decides.
@@ -127,7 +127,9 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     #        sat_adu - the detector ceiling in ADU, when known (settings
     #        or header); the plateau check always runs on top of it,
     #        sky_mode - "median" (flat sky) or "plane" (H2: a tilted sky
-    #        plane fitted to the annulus, for galactic cores)
+    #        plane fitted to the annulus, for galactic cores),
+    #        centroid_mode - "refined" (sky-subtracted, thresholded, two
+    #        passes; the default) or "raw" (the legacy one-pass moment)
     # @return: {"x", "y" (centroided where possible), "flux", "sky_pp",
     #          "peak", "n_pix", "saturated", "ok", "reason"}
     if data is None or data.size == 0:
@@ -139,7 +141,11 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     # quick-look candidate culling)
     if min(x, y, w - x, h - y) < r_ann_out:
         return _fail("demasiado cerca del borde", "too close to the edge")
-    cx, cy = series._centroid(data, x, y)
+    if centroid_mode == "raw":
+        cx, cy = series._centroid(data, x, y)      # the legacy one-pass
+    else:
+        cen = refined_centroid(data, x, y)
+        cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
     yy, xx = np.ogrid[:h, :w]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
     ap_pixels = data[r2 <= r_ap ** 2]
@@ -306,14 +312,12 @@ def header_instrument(header):
 
 # ---------------- phase H: quality on a single plate (PRECISION.es) ----
 
-def _sky_plane_at(ann_x, ann_y, ann_v, x0, y0, iters=SIG_ITERS):
-    # A tilted sky plane fitted to the annulus and evaluated at the star:
-    # near a galactic core the background is a ramp, and the flat median
-    # of the ring is biased by it (H2a). Sigma-clip first (a hot pixel or
-    # a neighbour must not tilt the plane).
+def _sky_plane_fit(ann_x, ann_y, ann_v, x0, y0, iters=SIG_ITERS):
+    # A tilted sky plane fitted to the annulus, with sigma-clip first (a
+    # hot pixel or a neighbour must not tilt the plane).
     # @args: ann_x, ann_y, ann_v - annulus pixel coordinates and values,
-    #        x0, y0 - where to evaluate (the centroid), iters - clip rounds
-    # @return: the sky level at (x0, y0), or None when unsolvable
+    #        x0, y0 - the reference point, iters - clip rounds
+    # @return: (level at (x0, y0), slope_x, slope_y), or None
     v = np.asarray(ann_v, dtype=np.float64)
     xs = np.asarray(ann_x, dtype=np.float64) - x0
     ys = np.asarray(ann_y, dtype=np.float64) - y0
@@ -335,7 +339,18 @@ def _sky_plane_at(ann_x, ann_y, ann_v, x0, y0, iters=SIG_ITERS):
         coef, *_ = np.linalg.lstsq(a, v, rcond=None)
     except np.linalg.LinAlgError:
         return None
-    return float(coef[0])          # at (x0, y0) the offsets are zero
+    return float(coef[0]), float(coef[1]), float(coef[2])
+
+
+def _sky_plane_at(ann_x, ann_y, ann_v, x0, y0, iters=SIG_ITERS):
+    # A tilted sky plane fitted to the annulus and evaluated at the star:
+    # near a galactic core the background is a ramp, and the flat median
+    # of the ring is biased by it (H2a).
+    # @args: ann_x, ann_y, ann_v - annulus pixel coordinates and values,
+    #        x0, y0 - where to evaluate (the centroid), iters - clip rounds
+    # @return: the sky level at (x0, y0), or None when unsolvable
+    fit = _sky_plane_fit(ann_x, ann_y, ann_v, x0, y0, iters=iters)
+    return fit[0] if fit is not None else None
 
 
 def estimate_fwhm(data, positions, sat_adu=None):
@@ -530,3 +545,191 @@ def combine_errors(*terms):
     if not vals:
         return None
     return math.hypot(*vals)
+
+
+# ---------------- precision centroid + suggested apertures (phase I) ---
+
+def refined_centroid(data, x, y, sky_pp=None, fwhm=None):
+    # The photometric centroid: local sky subtracted, only significant
+    # pixels weighted, the box scaled to the seeing, two passes with
+    # re-centring. The raw series._centroid (sky included, one fixed
+    # pass) pulls faint sources toward the box centre; this one does not.
+    # The legacy quick-look keeps using series._centroid unchanged.
+    # @args: data - 2D array, x, y - starting pixel, sky_pp - local sky
+    #        level or None (then the cutout's edge median), fwhm - seeing
+    #        in px or None (box ~11 px)
+    # @return: {"x", "y", "ok", "moved", "reason"} - ok=False keeps the
+    #          start position (bilingual reason)
+    if data is None or data.size == 0:
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False,
+                "reason": {"es": "no hay imagen cargada",
+                           "en": "no image loaded"}}
+    h, w = data.shape
+    if not (0 <= x < w and 0 <= y < h):
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False,
+                "reason": {"es": "el punto cae fuera del marco",
+                           "en": "the point is out of frame"}}
+    half = max(5, int(round(1.5 * fwhm))) if fwhm else 5
+    cx, cy = float(x), float(y)
+    for _pass in range(2):
+        y0 = max(0, int(round(cy)) - half)
+        y1 = min(h, int(round(cy)) + half + 1)
+        x0 = max(0, int(round(cx)) - half)
+        x1 = min(w, int(round(cx)) + half + 1)
+        sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
+        if sub.size == 0 or not np.any(np.isfinite(sub)):
+            break
+        if sky_pp is None:
+            # local sky from the cutout's outer ring (the star owns the
+            # middle, not the border)
+            ring = np.concatenate([sub[0, :], sub[-1, :], sub[:, 0],
+                                   sub[:, -1]])
+            ring = ring[np.isfinite(ring)]
+            sky = float(np.median(ring)) if ring.size else 0.0
+        else:
+            sky = float(sky_pp)
+        resid = sub - sky
+        mad = float(np.median(np.abs(resid - np.median(resid))))
+        sigma = 1.4826 * mad
+        keep = resid > max(2.0 * sigma, 0.0)
+        if int(keep.sum()) < 5:
+            return {"x": float(x), "y": float(y), "ok": False,
+                    "moved": False,
+                    "reason": {"es": "señal demasiado débil para "
+                                    "centrarla",
+                               "en": "too faint to centroid"}}
+        total = float(resid[keep].sum())
+        if total <= 0.0:
+            break
+        ys, xs = np.mgrid[y0:y1, x0:x1]
+        nx = float((xs[keep] * resid[keep]).sum() / total)
+        ny = float((ys[keep] * resid[keep]).sum() / total)
+        if abs(nx - cx) > half or abs(ny - cy) > half:
+            return {"x": float(x), "y": float(y), "ok": False,
+                    "moved": False,
+                    "reason": {"es": "el centroide se escapó del píxel "
+                                    "clicado",
+                               "en": "the centroid ran away from the "
+                                    "clicked pixel"}}
+        if abs(nx - cx) < 0.01 and abs(ny - cy) < 0.01:
+            cx, cy = nx, ny
+            break
+        cx, cy = nx, ny
+    moved = math.hypot(cx - x, cy - y) > 0.01
+    return {"x": cx, "y": cy, "ok": True, "moved": moved, "reason": None}
+
+
+def _growth_curve(data, cx, cy, r_max, sky_pp):
+    # Net flux inside growing radii, and the relative SNR per radius
+    # (source + sky shot terms only; the shape is what matters).
+    # @return: list of (r, net_flux, snr)
+    h, w = data.shape
+    yy, xx = np.ogrid[:h, :w]
+    r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+    out = []
+    for r in range(2, r_max + 1):
+        px = data[r2 <= r * r]
+        n = px.size
+        net = float(np.nansum(px)) - sky_pp * n
+        snr = net / math.sqrt(max(net, 1e-9) + n * max(sky_pp, 0.0))
+        out.append((r, net, snr))
+    return out
+
+
+def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
+    # Suggested aperture radii for this target in this environment, with
+    # the plain-language reasons (the observer keeps the last word: the
+    # suggestion is applied by a button, never silently).
+    # @args: data - 2D array, x, y - target pixel, fwhm - seeing in px
+    #        (measured when None), sky_pp - local sky (measured when None)
+    # @return: {"r_ap", "r_ann_in", "r_ann_out", "reasons": [{"es","en"}],
+    #          "diag": {...}}
+    reasons = []
+    cen = refined_centroid(data, x, y, fwhm=fwhm)
+    cx, cy = cen["x"], cen["y"]
+    # seeing from the target itself when nobody measured one
+    if fwhm is None:
+        fwhm = estimate_fwhm(data, [(cx, cy)])
+    if fwhm is None:
+        fwhm = 4.0          # a sane default seeing disc (px)
+    # sky and its noise from the default annulus
+    h, w = data.shape
+    yy, xx = np.ogrid[:h, :w]
+    r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+    ann = data[(r2 >= R_ANN_IN ** 2) & (r2 <= R_ANN_OUT ** 2)]
+    if sky_pp is None:
+        sky_pp = float(np.nanmedian(ann)) if ann.size else 0.0
+    sky_sig = float(np.nanstd(ann)) if ann.size else 0.0
+    # the growth curve
+    r_max = min(20, int(min(cx, cy, w - cx, h - cy)) - 1)
+    curve = _growth_curve(data, cx, cy, max(r_max, 6), sky_pp)
+    plateau = None
+    total = curve[-1][1]
+    for r, net, _snr in curve:
+        if total > 0 and net >= 0.99 * total:
+            plateau = float(r)
+            break
+    snr_peak = max(curve, key=lambda t: t[2])
+    peak_snr = snr_peak[2]
+    # environment: nearest detected neighbour around the target
+    cut = max(32, int(4 * R_ANN_OUT))
+    y0, y1 = max(0, int(cy) - cut), min(h, int(cy) + cut)
+    x0, x1 = max(0, int(cx) - cut), min(w, int(cx) + cut)
+    sub = np.ascontiguousarray(data[y0:y1, x0:x1])
+    sources = series.detect_sources(sub, k=5.0) if sub.size else []
+    nearest = None
+    for sx, sy, _pk in sources:
+        d = math.hypot(sx + x0 - cx, sy + y0 - cy)
+        if d > 1.0 and (nearest is None or d < nearest):
+            nearest = d
+    # background gradient across the annulus (core detection)
+    gradient = 0.0
+    if ann.size:
+        mask = (r2 >= R_ANN_IN ** 2) & (r2 <= R_ANN_OUT ** 2)
+        ann_x = np.broadcast_to(xx, data.shape)[mask]
+        ann_y = np.broadcast_to(yy, data.shape)[mask]
+        fit = _sky_plane_fit(ann_x, ann_y, ann, cx, cy)
+        if fit is not None:
+            gradient = math.hypot(fit[1], fit[2])
+    # ---------------- the rules (environment only, the signed choice)
+    r_ap = snr_peak[0] if peak_snr < 30.0 else (
+        plateau if plateau is not None else snr_peak[0])
+    r_in = r_ap * (R_ANN_IN / R_AP)
+    r_out = r_ap * (R_ANN_OUT / R_AP)
+    if peak_snr < 30.0:
+        reasons.append({
+            "es": "objetivo débil: la apertura maximiza la SNR "
+                  f"(r = {r_ap:.1f} px)",
+            "en": f"faint target: the aperture maximises the SNR "
+                  f"(r = {r_ap:.1f} px)"})
+    elif plateau is not None:
+        reasons.append({
+            "es": f"objetivo brillante: la apertura llega a la meseta "
+                  f"del 99 % del flujo (r = {r_ap:.1f} px)",
+            "en": f"bright target: the aperture reaches the 99 % flux "
+                  f"plateau (r = {r_ap:.1f} px)"})
+    if nearest is not None and nearest < 2.0 * r_out:
+        r_ap = max(2.0, min(r_ap, nearest / 2.5))
+        r_in = max(r_ap + 2.0, min(r_in, nearest * 0.6))
+        r_out = max(r_in + 3.0, min(r_out, nearest * 0.9))
+        reasons.append({
+            "es": f"vecino a {nearest:.0f} px: apertura y anillo se "
+                  "acortan para no tocarlo",
+            "en": f"neighbour at {nearest:.0f} px: aperture and annulus "
+                  "pulled in so they never touch it"})
+    # core mode: the ramp's swing across the annulus exceeds the noise
+    swing = gradient * 2.0 * R_ANN_OUT
+    if sky_sig > 0 and swing > sky_sig:
+        reasons.append({
+            "es": "fondo con gradiente (¿núcleo de galaxia?): apertura "
+                  "corta y cielo por plano recomendado",
+            "en": "the background has a gradient (a galactic core?): "
+                  "short aperture, and the plane sky is recommended"})
+    return {"r_ap": float(r_ap), "r_ann_in": float(r_in),
+            "r_ann_out": float(r_out), "reasons": reasons,
+            "diag": {"fwhm": fwhm, "plateau_r": plateau,
+                     "snr_peak_r": snr_peak[0], "peak_snr": peak_snr,
+                     "nearest": nearest, "gradient": gradient,
+                     "sky_pp": sky_pp}}

@@ -74,6 +74,7 @@ class UfeMeasureTab(QWidget):
         self._diff = None            # difference image (work frame,
                                      # plate orientation) or None
         self._diff_scale = 1.0       # plate px per diff-frame px
+        self._last_suggestions = []  # the Suggest button's reasons
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
         if view is not None:
@@ -120,6 +121,16 @@ class UfeMeasureTab(QWidget):
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
             spn.setToolTip(tip)
             spn.valueChanged.connect(self._on_radii_edited)
+        row2 = QHBoxLayout()
+        self.btn_suggest = QPushButton(self.tr("Suggest apertures"))
+        self.btn_suggest.setToolTip(self.tr(
+            "Propose the radii from this target's growth curve and its "
+            "surroundings (crowding, background gradient), with the "
+            "reasons in plain language"))
+        self.btn_suggest.clicked.connect(self._on_suggest)
+        row2.addWidget(self.btn_suggest)
+        row2.addStretch(1)
+        lay.addLayout(row2)
 
         row = QHBoxLayout()
         row.addWidget(QLabel(self.tr("Sky:")))
@@ -253,6 +264,7 @@ class UfeMeasureTab(QWidget):
             self.btn_go_compare.setVisible(True)
             return
         self.btn_go_compare.setVisible(False)
+        self._last_suggestions = []     # a new target: stale reasons go
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
         self._measure(col, row, entries)
 
@@ -290,6 +302,35 @@ class UfeMeasureTab(QWidget):
         self._radii_manual = True
         if self._last is not None:
             self._remeasure()
+
+    def _on_suggest(self):
+        # The Suggest button: proposes the radii for the current target
+        # from its growth curve and its surroundings, applies them (the
+        # click IS the observer's consent, so a manual setup yields), and
+        # explains the reasons in the panel.
+        if self._last is None or not self._state.has_image:
+            self.lbl_status.setText(self.tr(
+                "Measure the target first (a click on it)."))
+            return
+        data = self._state.data
+        col, row = self._last["col"], self._last["row"]
+        sug = photometry.suggest_apertures(data, col, row)
+        # the suggestion is an explicit choice of radii: the seeing
+        # auto-scale steps aside (the checkbox visibly turns off) and the
+        # manual flag stays clear - this is not a hand edit either
+        self.chk_seeing.setChecked(False)
+        self._radii_manual = False
+        for spn, v in ((self.spn_rap, sug["r_ap"]),
+                       (self.spn_rin, sug["r_ann_in"]),
+                       (self.spn_rout, sug["r_ann_out"])):
+            spn.blockSignals(True)
+            spn.setValue(round(v * 2) / 2)
+            spn.blockSignals(False)
+        self._last_suggestions = [r.get(self._lang, r["en"])
+                                  for r in sug["reasons"]]
+        self._remeasure()
+
+    # --------------------------------------------------------- seeing
 
     def _remeasure(self):
         # Re-runs the current measurement with the current controls (the
@@ -549,6 +590,8 @@ class UfeMeasureTab(QWidget):
         if self._radii_manual:
             notes.append(self.tr(
                 "apertures set by hand (the seeing auto-scale is paused)"))
+        for reason in self._last_suggestions:
+            notes.append(reason)
         if skipped:
             notes.append(self.tr(
                 "{0} of {1} sequence stars not usable (off the plate, "

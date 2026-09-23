@@ -463,3 +463,27 @@ def test_new_plate_rearms_the_seeing(dlg, tmp_path):
     data, _t, _c = _plate(seed=9)
     dlg.state.load(_write_plate(tmp_path / "fresh.fits", data))
     assert not dlg.tab_measure._radii_manual
+
+
+# ---------------- phase I: the Suggest button ----------------
+
+
+def test_suggest_applies_and_explains(dlg):
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab = dlg.tab_measure
+    assert tab.chk_seeing.isChecked()           # seeing was on
+    tab._on_suggest()
+    # the suggestion applied, the seeing stepped aside, no manual flag
+    assert not tab.chk_seeing.isChecked()
+    assert not tab._radii_manual
+    assert tab._last_suggestions                 # reasons in the panel
+    assert tab._last_suggestions[0] in tab.lbl_result.text()
+    r = tab._last["radii"]
+    assert r == (round(r[0] * 2) / 2, round(r[1] * 2) / 2,
+                 round(r[2] * 2) / 2)            # the spins show it
+
+
+def test_suggest_without_a_measurement_guides(dlg):
+    dlg.tab_measure._on_suggest()
+    assert "Measure the target first" in dlg.tab_measure.lbl_status.text()

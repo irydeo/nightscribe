@@ -396,3 +396,93 @@ def test_combine_errors():
     assert phot.combine_errors(0.03, 0.04) == pytest.approx(0.05)
     assert phot.combine_errors(0.03, None, 0.04) == pytest.approx(0.05)
     assert phot.combine_errors(None, None) is None
+
+
+# ---------------- phase I: refined centroid + suggested apertures -----
+
+
+def test_refined_centroid_exact_on_a_clean_gaussian():
+    plate = _plate(200, 200, [(100.4, 99.6, 9000.0)], noise=0.0)
+    out = phot.refined_centroid(plate, 100, 100)
+    assert out["ok"] and out["moved"]
+    assert out["x"] == pytest.approx(100.4, abs=0.05)
+    assert out["y"] == pytest.approx(99.6, abs=0.05)
+
+
+def test_refined_centroid_beats_raw_on_a_faint_star_over_a_gradient():
+    rng = np.random.default_rng(5)
+    yy, xx = np.ogrid[:200, :200]
+    data = 800 + 3.0 * (xx - 100) + rng.normal(0, 8, (200, 200))
+    data = data + 250 * np.exp(-((xx - 103.7) ** 2 + (yy - 96.2) ** 2)
+                               / (2 * 2.2 ** 2))
+    ref = phot.refined_centroid(data, 104, 96)
+    d_ref = math.hypot(ref["x"] - 103.7, ref["y"] - 96.2)
+    raw = phot.measure_point(data, 104, 96, centroid_mode="raw")
+    d_raw = math.hypot(raw["x"] - 103.7, raw["y"] - 96.2)
+    assert d_ref < d_raw                    # the sky pull is gone
+    assert d_ref < 0.1
+
+
+def test_refined_centroid_guards_are_honest():
+    empty = np.full((100, 100), 800.0)     # nothing to centre on
+    out = phot.refined_centroid(empty, 50, 50)
+    assert not out["ok"] and not out["moved"]
+    assert out["x"] == 50.0 and out["y"] == 50.0
+    assert phot.refined_centroid(empty, 500, 50)["ok"] is False
+
+
+def test_measure_point_refined_is_the_default_and_raw_survives():
+    plate = _plate(200, 200, [(100.4, 99.6, 9000.0)], noise=0.5)
+    r = phot.measure_point(plate, 100, 100)
+    assert r["ok"] and abs(r["x"] - 100.4) < 0.1
+    raw = phot.measure_point(plate, 100, 100, centroid_mode="raw")
+    assert raw["ok"]
+
+
+def test_suggest_apertures_bright_isolated():
+    rng = np.random.default_rng(3)
+    plate = np.full((200, 200), 800.0) + rng.normal(0, 2, (200, 200))
+    plate += 30000 * np.exp(-((xx := np.arange(200)[None, :]) - 100) ** 2
+                            / (2 * 3.0 ** 2)
+                            + -((yy := np.arange(200)[:, None]) - 100) ** 2
+                            / (2 * 3.0 ** 2))
+    s = phot.suggest_apertures(plate, 100, 100)
+    assert 7.0 <= s["r_ap"] <= 12.0        # the 99 % plateau of a 3-sigma PSF
+    assert s["r_ann_out"] > s["r_ann_in"] > s["r_ap"]
+    assert any("99 %" in r["en"] for r in s["reasons"])
+    assert all(set(r) == {"es", "en"} for r in s["reasons"])
+
+
+def test_suggest_apertures_faint_picks_the_snr_peak():
+    rng = np.random.default_rng(7)
+    plate = 800 + rng.normal(0, 8, (200, 200))
+    yy, xx = np.ogrid[:200, :200]
+    plate = plate + 220 * np.exp(-((xx - 100.0) ** 2 + (yy - 100.0) ** 2)
+                                 / (2 * 2.2 ** 2))
+    s = phot.suggest_apertures(plate, 100, 100)
+    assert s["r_ap"] <= 6.0                # small SNR-optimal aperture
+    assert any("SNR" in r["en"] for r in s["reasons"])
+
+
+def test_suggest_apertures_neighbour_pulls_in():
+    rng = np.random.default_rng(11)
+    plate = np.full((200, 200), 800.0) + rng.normal(0, 2, (200, 200))
+    yy, xx = np.ogrid[:200, :200]
+    plate += 30000 * np.exp(-((xx - 100.0) ** 2 + (yy - 100.0) ** 2)
+                            / (2 * 3.0 ** 2))
+    plate += 20000 * np.exp(-((xx - 130.0) ** 2 + (yy - 100.0) ** 2)
+                            / (2 * 3.0 ** 2))   # a neighbour 30 px away
+    s = phot.suggest_apertures(plate, 100, 100)
+    assert s["diag"]["nearest"] == pytest.approx(30.0, abs=3.0)
+    assert s["r_ann_out"] < 30.0           # the annulus never touches it
+    assert any("neighbour" in r["en"] for r in s["reasons"])
+
+
+def test_suggest_apertures_flags_the_core_gradient():
+    rng = np.random.default_rng(5)
+    yy, xx = np.ogrid[:200, :200]
+    data = 800 + 3.0 * (xx - 100) + rng.normal(0, 8, (200, 200))
+    data = data + 250 * np.exp(-((xx - 100.0) ** 2 + (yy - 100.0) ** 2)
+                               / (2 * 2.2 ** 2))
+    s = phot.suggest_apertures(data, 100, 100)
+    assert any("core" in r["en"] for r in s["reasons"])

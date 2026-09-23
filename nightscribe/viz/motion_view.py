@@ -32,6 +32,7 @@ import logging
 import numpy as np
 from PIL import Image
 
+from ..core import stretch
 from . import blink_view, evolution_view, style
 from ..core import coords, fits_io, fits_meta
 from ..core import wcs as wcs_mod
@@ -94,8 +95,8 @@ def _align_crop(data, frame_wcs, ref_wcs, ra_deg, dec_deg, zoom):
                         resample=Image.BILINEAR)
     warped = np.asarray(pil, dtype=np.float32)
     xy = ref_wcs.sky_to_pixel(ra_deg, dec_deg)
-    black, white = blink_view.auto_limits(warped)
-    img8 = blink_view.to_uint8(blink_view.apply_stretch(warped, black, white))
+    black, white = stretch.auto_limits(warped)
+    img8 = stretch.to_uint8(stretch.apply_stretch(warped, black, white))
     return blink_view.crop_zoom(img8, xy, zoom)
 
 

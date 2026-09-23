@@ -677,6 +677,8 @@ class MainWindow(QMainWindow):
         self._menus.action_journal.triggered.connect(
             self._open_journal_dialog)
         self._menus.action_skycal.triggered.connect(self._tools_skycal)
+        # ADR-044: the Unified FITS Editor lives in the Tools menu too
+        self._menus.action_ufe.triggered.connect(self._tools_ufe)
         from PySide6.QtGui import QKeySequence, QShortcut
         for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
                                      TAB_CAMPAIGNS,
@@ -761,6 +763,8 @@ class MainWindow(QMainWindow):
         dlg.edt_vigils.setPlainText(
             vigils.vigils_to_text(vigils.vigils_from_config(config)))
         dlg.chk_aavso.setChecked(bool(config.get("aavso_feed", True)))
+        dlg.chk_ufe_default.setChecked(bool(config.get("ufe_default",
+                                                       True)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
                                                      "127.0.0.1")))
         dlg.spn_ccdciel_port.setValue(int(config.get("ccdciel_port", 3277)))
@@ -834,6 +838,8 @@ class MainWindow(QMainWindow):
         config.set("vigil_list",
                    vigils.vigils_from_text(dlg.edt_vigils.toPlainText()))
         config.set("aavso_feed", dlg.chk_aavso.isChecked())
+        # Development tab (ADR-044): which UI the FITS work opens in
+        config.set("ufe_default", dlg.chk_ufe_default.isChecked())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())
@@ -5292,6 +5298,20 @@ class MainWindow(QMainWindow):
         ctx = p.get("context") or {}
         sn_ra = ctx.get("ra_deg")
         sn_dec = ctx.get("dec_deg")
+        if self._use_ufe():
+            # ADR-044: the annotated FITS inside the editor; the whole
+            # object attaches (marker on its sky position), the other
+            # visits queue as extra plates, and written copies register
+            # like the legacy dialog's did
+            obj = self._ufe_object_from_project(p)
+            dlg = self._ufe_open("annotate", hook_pid=pid, obj=obj)
+            if not dlg.open_plate(images[-1]["fits_path"]):
+                return
+            dlg.set_object(obj)          # re-apply on the fresh plate
+            dlg.tab_annotate.prefill(
+                notes=self.tr("SN follow-up"),
+                extra_paths=[im["fits_path"] for im in images[:-1]])
+            return
         # Preview first: the observer chooses the plate, checks the marker,
         # the overlays and the stretch. The dialog resolves the WCS from
         # the chosen frame's header (each visit may carry the SN on a
@@ -5710,7 +5730,31 @@ class MainWindow(QMainWindow):
             text += " · " + seq["catalog_name"]
         return text
 
+    def _fu_sequence_via_ufe(self, pid):
+        # The comparison chart inside the UFE (ADR-044): the project's
+        # newest registered plate when there is one, else the Compare
+        # tab's own survey (DSS2) download; saves register into the
+        # project through the hook (files + sequence context + campaign
+        # protocol, the legacy default).
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("compare", hook_pid=pid, obj=obj)
+        from ..core import followup as fu
+        fits_path = None
+        for s in fu.list_sessions(db, pid):
+            for img in fu.list_images(db, s["id"]):
+                if img["fits_path"]:
+                    fits_path = img["fits_path"]      # the newest visit
+        if fits_path and not dlg.open_plate(fits_path):
+            return
+        dlg.set_object(obj)              # re-apply on the fresh plate
+
     def _fu_sequence_dialog(self, pid):
+        if self._use_ufe():
+            self._fu_sequence_via_ufe(pid)
+            return
         # Options dialog + launch of the comparison chart (ADR-042). The
         # heavy work (VizieR, image, render) runs in a SequenceWorker: the
         # GUI never blocks.
@@ -6338,6 +6382,17 @@ class MainWindow(QMainWindow):
             # use the FITS from the process tab if available
             edt = self._project_widgets.get("edt_fits")
             fits_path = edt.text().strip() if edt else ""
+            if self._use_ufe():
+                # ADR-044: the project's blink inside the editor, with
+                # the whole object attached and the exports registered
+                obj = self._ufe_object_from_project(self._current_project)
+                dlg = self._ufe_open("blink",
+                                     hook_pid=self._current_project["id"],
+                                     obj=obj)
+                if fits_path and not dlg.open_plate(fits_path):
+                    return
+                dlg.set_object(obj)      # re-apply on the fresh plate
+                return
             self._open_blink_dialog(
                 sn_name=self._current_project["object_name"],
                 ra=ctx.get("ra_deg"), dec=ctx.get("dec_deg"),
@@ -6842,6 +6897,11 @@ class MainWindow(QMainWindow):
             self._open_explore_dialog(name.strip())
 
     def _tools_blink(self):
+        # ADR-044: with the UFE as default the ad-hoc blink opens in the
+        # editor; the classic dialog stays one setting away
+        if self._use_ufe():
+            self._ufe_open("blink")
+            return
         self._open_blink_dialog()
 
     def _tools_campaigns(self):
@@ -7767,6 +7827,125 @@ class MainWindow(QMainWindow):
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()
+
+    # ---------------- Unified FITS Editor (ADR-044) ----------------
+
+    def _ufe_build(self):
+        # Builds the «FITS editor…» dialog once (lazy) and keeps it alive
+        # on self: the observer's plate and stretch survive a close.
+        # @return: the UfeDialog
+        if getattr(self, "_ufe", None) is not None:
+            return self._ufe
+        from .ufe_dialog import UfeDialog
+        self._ufe = UfeDialog(lang=self._lang(), parent=self)
+        return self._ufe
+
+    def _tools_ufe(self):
+        # Menu Tools → FITS editor… (ADR-044)
+        dlg = self._ufe_build()
+        dlg.set_save_hook(None)      # ad-hoc: no project registration
+        dlg.set_object(None)         # and no stale project object
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+
+    def _use_ufe(self):
+        # @return: True when FITS work opens in the unified editor
+        #          (Settings → Development; the classic dialogs stay
+        #          reachable for the review period, ADR-044)
+        return bool(config.get("ufe_default", True))
+
+    def _ufe_object_from_project(self, p):
+        # Everything the project knows about the object, for the UFE:
+        # name, sky position, magnitude (planner → VSX max → the last
+        # saved sequence) and B-V when the record carries it.
+        # @args: p - the project dict
+        # @return: {"name", "ra", "dec", "mag", "bv"} (values or None)
+        ctx = p.get("context") or {}
+        var = ctx.get("variable") or {}
+        ra = ctx.get("ra_deg")
+        dec = ctx.get("dec_deg")
+        if ra is None or dec is None:
+            ra = var.get("ra_deg")
+            dec = var.get("dec_deg")
+        mag = ctx.get("mag")
+        if mag is None:
+            mag = var.get("max")          # VSX MaxMag: the bright extreme
+        if mag is None:
+            mag = (ctx.get("sequence") or {}).get("target_mag")
+        return {"name": p.get("object_name"), "ra": ra, "dec": dec,
+                "mag": mag, "bv": var.get("bv") or ctx.get("bv")}
+
+    def _ufe_open(self, tab, hook_pid=None, obj=None):
+        # Shared open path: the persistent dialog, the right tab on
+        # stage, the project save hook set or cleared, and the object
+        # attached (or cleared on an ad-hoc open).
+        # @args: tab - "blink"|"compare"|"annotate", hook_pid - project
+        #        id whose written files get registered, or None,
+        #        obj - the object dict from _ufe_object_from_project
+        # @return: the UfeDialog
+        dlg = self._ufe_build()
+        dlg.set_save_hook(None)
+        dlg.set_object(obj)
+        if hook_pid is not None:
+            dlg.set_save_hook(
+                lambda paths, kind, payload:
+                self._ufe_save_hook(hook_pid, paths, kind, payload))
+        dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
+                      "annotate": dlg.tab_annotate}[tab])
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
+        return dlg
+
+    # (the object attaches via set_object at the end of _ufe_open; a
+    # route that loads a plate re-applies it after the load so the
+    # annotate marker lands through the fresh WCS)
+
+    def _ufe_save_hook(self, pid, paths, kind, payload):
+        # Files the UFE wrote while opened from a project get registered
+        # there, like the legacy dialogs did; a sequence CSV also lands
+        # in the project context and its campaign protocol (the legacy
+        # default had the checkbox on).
+        # @args: pid - project id, paths - written files, kind - "fits" |
+        #        "chart" | "sequence", payload - the tab's extra context
+        p = project.get(db, pid)
+        if not p:
+            return
+        for path in paths:
+            fkind = {"fits": "fits", "chart": "chart"}.get(kind)
+            if kind == "sequence":
+                fkind = "chart" if payload.get("which") == "png" \
+                    else "report"
+            try:
+                project.add_file(db, pid, path, fkind)
+            except Exception as err:
+                logger.warning("UFE save registration failed: %s", err)
+        self._populate_project_files(pid)
+        if kind != "sequence" or payload.get("which") != "csv" \
+                or not payload.get("entries"):
+            return
+        ctx_update = {"sequence": {
+            "catalog": payload.get("catalog"),
+            "catalog_name": payload.get("catalog_name"),
+            "fov_arcmin": payload.get("fov_arcmin"),
+            "target_mag": payload.get("target_mag"),
+            "entries": payload["entries"], "csv": paths[0]}}
+        if payload.get("target_mag") is not None:
+            # the magnitude lives in the project from now on (the next
+            # prefill finds it at the top level)
+            ctx_update["mag"] = payload["target_mag"]
+        project.update_context(db, pid, ctx_update)
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            c = _camp.get(db, p["campaign_id"])
+            if c:
+                entries = payload["entries"]
+                prot = c.get("protocol") or {}
+                prot["comp_stars"] = [
+                    f"{e['name']} {e['star']['band']} "
+                    f"{e['star']['mag']:.2f}" for e in entries]
+                _camp.update(db, c["id"], protocol=prot)
 
     # ---------------- Observing journal (ADR-036) ----------------
 

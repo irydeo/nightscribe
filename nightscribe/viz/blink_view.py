@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 
+from ..core import stretch as _stretch
 from . import style
 
 logger = logging.getLogger(__name__)
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 # Renders of the aligned blink pair (user image + geometry-matched survey
 # cutout, see core/blink.py): stretches, side-by-side PNG, animated GIF.
 # Frames are drawn with matplotlib (ADR-010) and assembled with Pillow.
+
+# ADR-044 (phase B): the stretch engine lives in core/stretch.py now; the
+# names below are thin compatibility re-exports so legacy callers (this
+# module included) keep working byte-identical.
+auto_limits = _stretch.auto_limits
+apply_stretch = _stretch.apply_stretch
+auto_gain = _stretch.auto_gain
+apply_gain = _stretch.apply_gain
+to_uint8 = _stretch.to_uint8
 
 GIF_MAX = 1024          # max GIF/video dimension, keeps files attachable
 BLINK_MS = 500          # default dwell per frame in blink mode
@@ -37,53 +47,6 @@ VIDEO_MIN_S = 6.0       # videos do not loop like GIFs: repeat the cycle
 _CAPTIONS = {"es": {"before": "Antes", "after": "Después"},
              "en": {"before": "Before", "after": "After"}}
 _OBS_FALLBACK = {"es": "observatorio", "en": "observatory"}
-
-
-def auto_limits(data, lo=1.0, hi=99.5):
-    # Robust black/white points from percentiles, NaN-safe.
-    # @args: data - 2D array, lo, hi - percentiles
-    # @return: (black, white) with white > black guaranteed
-    flat = data[np.isfinite(data)]
-    if flat.size == 0:
-        return 0.0, 1.0
-    black, white = np.percentile(flat, [lo, hi])
-    if white <= black:
-        white = black + 1.0
-    return float(black), float(white)
-
-
-def apply_stretch(data, black, white, gamma=1.0):
-    # Linear stretch between black/white points with a gamma curve.
-    # @args: data - 2D array, black, white - limits, gamma - <1 brightens
-    # @return: float array 0..1
-    gamma = max(gamma, 1e-3)
-    span = max(white - black, 1e-12)
-    out = np.clip((data - black) / span, 0.0, 1.0)
-    return np.power(out, gamma)
-
-
-def auto_gain(ref_f, obs_f):
-    # Gain that equalizes the sky background level of the stretched pair
-    # (median-matched), so blinking does not pump brightness.
-    # @args: ref_f, obs_f - stretched float arrays 0..1
-    # @return: gain to multiply the survey by, clamped to [0.25, 4]
-    med_r = float(np.nanmedian(ref_f))
-    med_o = float(np.nanmedian(obs_f))
-    if med_r < 1e-6:
-        return 1.0
-    return float(np.clip(med_o / med_r, 0.25, 4.0))
-
-
-def apply_gain(img_f, gain):
-    # @args: img_f - stretched float array, gain - multiplicative factor
-    # @return: float array 0..1
-    return np.clip(img_f * gain, 0.0, 1.0)
-
-
-def to_uint8(img):
-    # @args: img - float array 0..1
-    # @return: uint8 array 0..255
-    return (np.nan_to_num(img) * 255.0 + 0.5).astype(np.uint8)
 
 
 def crop_zoom(img, sn_xy, zoom):

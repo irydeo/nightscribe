@@ -141,6 +141,33 @@ def test_load_field_orchestrates_both_queries(monkeypatch):
     assert s8["vsx"]["name"] == "V0001 Cyg"
 
 
+def test_load_field_reports_the_query_stages(monkeypatch):
+    # Both cone searches are network round-trips; while they run the GUI
+    # must tell the observer what is happening, in the observer's
+    # language. Regression: the UFE rewrite dropped this wiring on the
+    # Compare tab that the legacy sequence worker kept.
+    bodies = {
+        "gaia": (FIX / "vizier_gaia.tsv").read_bytes(),
+        "vsx": (FIX / "vizier_vsx.tsv").read_bytes(),
+    }
+
+    def fake_http_get(key, source, fetch, force=False):
+        catalog = "vsx" if "B/vsx" in key else "gaia"
+        return bodies[catalog], "text/tab-separated-values"
+
+    monkeypatch.setattr(vizier.db, "http_get", fake_http_get)
+    stages = []
+    compstars.load_field("gaia", CENTER[0], CENTER[1], 18.0,
+                         progress=stages.append)
+    assert len(stages) == 2
+    assert stages[0]["en"].startswith("Querying the Gaia EDR3")
+    assert stages[0]["es"].startswith("Consultando el catálogo Gaia EDR3")
+    assert "VSX" in stages[1]["es"] and "VSX" in stages[1]["en"]
+    # every stage is bilingual and self-consistent
+    for stage in stages:
+        assert set(stage) == {"es", "en"} and stage["es"] and stage["en"]
+
+
 def test_load_field_is_json_serializable(monkeypatch):
     # Regression for the "Generate" segfault: a var<->star reference cycle
     # in the field recursed forever in QVariant conversion when the worker

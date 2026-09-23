@@ -31,6 +31,7 @@ import logging
 import numpy as np
 from PIL import Image
 
+from ..core import stretch
 from . import blink_view, style
 
 logger = logging.getLogger(__name__)
@@ -98,10 +99,10 @@ def align_frame(data, frame_wcs, ref_wcs, sn_xy, crop_size=None):
         # SN pixel in the reference frame
         sn_ra, sn_dec = frame_wcs.pixel_to_sky(*sn_xy)
         sn_xy = ref_wcs.sky_to_pixel(sn_ra, sn_dec)
-    # stretch + crop (reuse blink_view)
-    black, white = blink_view.auto_limits(data)
-    stretched = blink_view.apply_stretch(data, black, white)
-    img8 = blink_view.to_uint8(stretched)
+    # stretch + crop (core engine, ADR-044)
+    black, white = stretch.auto_limits(data)
+    stretched = stretch.apply_stretch(data, black, white)
+    img8 = stretch.to_uint8(stretched)
     img8, sn_crop = blink_view.crop_zoom(img8, sn_xy, 1)
     return img8, sn_crop
 

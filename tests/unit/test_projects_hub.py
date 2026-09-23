@@ -1577,39 +1577,113 @@ def test_cadence_hint_no_active_projects(window, panel):
 
 # ---------------- gap fixes: orphaned B5/B6/B10 + B9 ----------------
 
-def test_fu_quicklook_button_runs_engine(window, panel):
-    # B5 fix: the quick-look button calls series.quicklook on the project's
-    # stacked images and saves the resulting points as source='quicklook'.
-    from nightscribe.core import project, followup as fu, series
+def test_fu_point_hook_saves_measure_point(window, panel):
+    # ADR-044: the "Quick analysis" quick-look button is retired (it did
+    # "nada" in the field, ADR-019). Its job moved to the editor's
+    # measure tab: the hook that tab calls must save the calibrated
+    # point as source='measure' under the visit the button came from,
+    # and it must refuse to save silently (no mag, no date).
+    from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
-    p = _create_and_select(window, "sn", "SN2026ql", {"kind": "sn",
-                                                      "ra_deg": 10.0,
-                                                      "dec_deg": 20.0})
+    p = _create_and_select(window, "sn", "SN2026meas",
+                           {"kind": "sn", "ra_deg": 10.0,
+                            "dec_deg": 20.0})
     sid = fu.create_session(dbmod.db, p["id"], "2026-09-08")
-    # register two stacked FITS (the files need not exist for the mock)
-    for i in range(2):
-        fu.add_image(dbmod.db, sid, "Clear", f"/tmp/fu_fake_{i}.fits",
-                     date_obs="2026-09-08", exptime_s=60.0)
-    # mock the engine: it returns synthetic points without reading FITS
-    orig = series.quicklook
-    series.quicklook = lambda *a, **k: {
-        "points": [
-            {"mjd": 60600.0, "filter": "Clear", "mag": -1.2, "err": 0.02,
-             "source": "quicklook"},
-            {"mjd": 60601.0, "filter": "Clear", "mag": -1.1, "err": 0.02,
-             "source": "quicklook"},
-        ],
-        "summary": {"verdict": "normal", "slope_mag_per_day": 0.1,
-                    "delta_from_peak": 0.1},
-        "ensemble": [(50, 50), (150, 150)],
-    }
-    try:
-        window._fu_run_quicklook(p["id"])
-    finally:
-        series.quicklook = orig
+    # valid payload: the point lands with source 'measure' and the visit
+    window._ufe_point_hook(p["id"], sid,
+                           {"mjd": 60600.0, "filter": "R",
+                            "mag": 13.2, "err": 0.02})
     pts = fu.list_points(dbmod.db, p["id"])
-    qpoints = [pt for pt in pts if pt["source"] == "quicklook"]
-    assert len(qpoints) == 2
+    assert len(pts) == 1
+    assert pts[0]["source"] == "measure"
+    assert pts[0]["session_id"] == sid
+    assert abs(pts[0]["mag"] - 13.2) < 1e-9
+    # guards: a missing magnitude or a missing date is NOT saved
+    window._ufe_point_hook(p["id"], sid,
+                           {"mjd": 60600.0, "filter": "R", "mag": None})
+    window._ufe_point_hook(p["id"], sid,
+                           {"mjd": None, "filter": "R", "mag": 13.2})
+    assert len(fu.list_points(dbmod.db, p["id"])) == 1
+    # the retired method does not linger on the window either
+    assert not hasattr(window, "_fu_run_quicklook")
+
+
+def test_fu_campaign_summary_panel_reports_saved_points(window):
+    # ADR-044: the SN/variable follow-up tab rolls the saved points up
+    # into a campaign summary: an empty state before the first point,
+    # then nights, points, slope, delta from peak, and the verdict.
+    from nightscribe.core import project as proj_mod, followup as fu
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtWidgets import QLabel
+    p = proj_mod.create(mw.db, "sn", "SN2026camp", {"kind": "sn"})
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    lbl = tab.findChild(QLabel, "fu_campaign_text")
+    assert lbl is not None
+    assert "No points saved yet" in lbl.text()
+    # two measured nights: the summary rolls them up (15.0 -> 16.0
+    # over 5 days = +0.20 mag/day, 1.00 mag from the peak)
+    fu.create_session(mw.db, p["id"], "2026-09-08")
+    fu.create_session(mw.db, p["id"], "2026-09-13")
+    fu.add_point(mw.db, p["id"], 60600.0, "R", 15.0, source="measure")
+    fu.add_point(mw.db, p["id"], 60605.0, "R", 16.0, source="measure")
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    lbl = tab.findChild(QLabel, "fu_campaign_text")
+    assert "2 nights" in lbl.text()
+    assert "2 points" in lbl.text()
+    assert "0.20 mag/day" in lbl.text()
+    assert "1.00 mag from peak" in lbl.text()
+    assert "verdict:" in lbl.text()
+
+
+
+
+def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
+    # ADR-044: every visit row drives "Measure in the editor…"; the
+    # retired quick-look is no longer offered. The button is UFE-only,
+    # so this test lifts the file's legacy-route autouse fixture.
+    # @args: window - the hub, monkeypatch - flag + routing overrides
+    from nightscribe.core import project as proj_mod, followup as fu
+    from nightscribe.gui import main_window as mw
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QListWidget, QPushButton
+    monkeypatch.setattr(window, "_use_ufe", lambda: True)
+    p = proj_mod.create(mw.db, "sn", "SN2026visit", {"kind": "sn"})
+    sid = fu.create_session(mw.db, p["id"], "2026-09-08")
+    fu.add_image(mw.db, sid, "R", "/tmp/fu_visit.fits",
+                 date_obs="2026-09-08", exptime_s=60.0)
+    _build_page(window, proj_mod.get(mw.db, p["id"]))
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    lst = None
+    for w in tab.findChildren(QListWidget):
+        if any(w.item(i).data(Qt.UserRole) == sid
+               for i in range(w.count())):
+            lst = w
+            break
+    assert lst is not None, "the Visits list is missing"
+    row = [i for i in range(lst.count())
+           if lst.item(i).data(Qt.UserRole) == sid][0]
+    lst.setCurrentItem(lst.item(row))     # user path: select the visit
+    btns = [b.text() for b in tab.findChildren(QPushButton)]
+    assert "Measure in the editor…" in btns
+    assert "Quick analysis" not in btns
+    # the button routes to the UFE Measure tab, re-applying the object
+    opened = []
+    class _D:
+        def open_plate(self, path):
+            return True
+        def set_object(self, obj):
+            opened.append(obj)
+    def _ufe_open(tab_, hook_pid=None, obj=None, **_kw):
+        opened.append((tab_, hook_pid, obj))
+        return _D()
+    monkeypatch.setattr(window, "_ufe_open", _ufe_open)
+    btn = [b for b in tab.findChildren(QPushButton)
+           if b.text() == "Measure in the editor…"][0]
+    btn.click()
+    assert opened[0][:2] == ("measure", p["id"])
+    assert opened[-1]["name"] == "SN2026visit"
 
 
 def test_fu_animation_button_writes_files(window, panel):
@@ -1825,10 +1899,12 @@ def test_variable_project_gets_followup_with_protocol(window):
     assert any("Do not saturate" in t for t in texts)
 
 
-def test_variable_followup_keeps_quicklook_hides_animation(window):
-    # UX-PC (U4): a variable keeps the quick-look as a primary button;
-    # the SN-only animation/annotated-FITS pair is not created at all
-    # (it lives collapsed in SN projects, absent elsewhere).
+def test_variable_followup_drops_quicklook_hides_animation(window):
+    # ADR-044: the "Quick analysis" button is retired for everyone (the
+    # silent "nada" failure, ADR-019): measuring a visit now goes
+    # through the editor's measure tab plus a per-visit button. A
+    # variable still has no SN-specific animation / annotated-FITS
+    # pair either (that lives collapsed in SN projects only).
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     from PySide6.QtWidgets import QPushButton
@@ -1836,7 +1912,7 @@ def test_variable_followup_keeps_quicklook_hides_animation(window):
     _build_page(window, proj_mod.get(mw.db, p["id"]))
     fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
-    assert "Quick analysis" in btns
+    assert "Quick analysis" not in btns
     assert "Generate animation" not in btns
     assert "Export annotated FITS" not in btns
 

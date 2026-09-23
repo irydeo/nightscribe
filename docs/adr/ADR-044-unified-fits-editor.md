@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto SUPERSDE la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 
@@ -103,6 +103,25 @@ zoom no limitado al Fit.
    Anotar (`core/fits_annotate`), E pestaña Blink (`core/blink`), F
    pestaña Comparar (`core/compstars` + overlays `FinderChart`).
 
+**Conexión con el proyecto (2026-09-23, ADR-019)**: la pestaña Seguimiento
+retira su quick-look «Análisis rápido» (fallo silencioso de 0 puntos, la
+respuesta «Nada» sin explicar; ver ADR-019) y su medida por visita pasa a
+la pestaña Medir. Cuando el editor se abre a partir de un proyecto, la
+pestaña Medir muestra el botón **Save in the project** y la medida
+calibrada se registra en el proyecto con `source="measure"`: se pinta en
+la curva, cuenta para la detección de eventos de la campaña y sale en las
+exportaciones (los puntos históricos `source="quicklook"` siguen pintados
+discontinuos, «indicativa», excluidos de las exportaciones por defecto).
+El API lo da `UfeDialog`: `set_point_hook(fn)` / `point_hook()` /
+`notify_point(payload)` (devuelve True/False y nunca lanza) y
+`open_plate()` (informa si la placa entró). Del lado de Seguimiento, cada
+fila de la lista de visitas ofrece «Medir en el Editor…» (EN: "Measure
+in the editor…"), que abre el editor sobre la placa apilada de esa visita
+con la pestaña Medir activa, y el panel **Resumen de campaña**
+(`series.analyze_campaign`: pendiente diaria, distancia desde la cumbre y
+veredicto contra la plantilla) se recalcula al abrir la pestaña y tras
+cada guardado.
+
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
 lo use; añadir una funcionalidad al editor no modifica `ufe_dialog.py`
@@ -197,6 +216,24 @@ PNG export as a standard feature and a zoom not limited to Fit.
    commons (keyboard, stretch persistence, accessibility), D Annotate tab
    (`core/fits_annotate`), E Blink tab (`core/blink`), F Compare tab
    (`core/compstars` + `FinderChart` overlays).
+
+**Project connection (2026-09-23, ADR-019)**: the follow-up tab retires
+its quick-look "Quick analysis" button (silent 0-point failure, a
+"Nada" with no explanation; see ADR-019), and its per-visit
+measurement moves to the Measure tab. When the editor is opened from a
+project, the Measure tab shows a **Save in the project** button and the
+calibrated point is registered in the project as `source="measure"`: it
+renders on the curve, counts for the campaign's event detection and is
+included in the exports (historic `source="quicklook"` points keep
+rendering dashed, "indicativa", excluded from the exports by default).
+The API is `UfeDialog`: `set_point_hook(fn)` / `point_hook()` /
+`notify_point(payload)` (returns True/False, never raises) and
+`open_plate()` (reports whether the plate loaded). On the follow-up
+side, every visit row offers "Measure in the editor…", which opens the
+editor on that visit's stacked plate with the Measure tab active, and
+the **Campaign summary** panel (`series.analyze_campaign`: daily slope,
+distance from the peak, verdict against the template) is recomputed on
+tab open and after every save.
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

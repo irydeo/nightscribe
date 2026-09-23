@@ -177,6 +177,50 @@ def test_full_measurement_calibrates(dlg):
     assert tab.btn_csv.isEnabled() and tab.btn_eff.isEnabled()
 
 
+def test_save_in_project_button_follows_the_point_hook(dlg):
+    # ADR-044: "Save in the project" shows only when the dialog was
+    # opened from a project (a point hook is set), stays disabled until
+    # there is a calibrated point, and hands the payload to the host.
+    tab = dlg.tab_measure
+    btn = tab.btn_save_project
+    assert not btn.isVisible()          # ad-hoc open: no project attached
+    assert dlg.notify_point({"mag": 1.0}) is False     # no hook, no save
+
+    seen = []
+    dlg.set_point_hook(seen.append)
+    assert btn.isVisible()
+    assert not btn.isEnabled()          # nothing measured yet
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert btn.isEnabled()
+    btn.click()
+    assert len(seen) == 1
+    pay = seen[0]
+    assert pay["mag"] == pytest.approx(tab._last["mag"])
+    assert pay["filter"] == "V"
+    assert pay["mjd"] is not None and pay["mjd"] > 60000
+    assert "saved" in tab.lbl_status.text().lower()
+    # every click sends the point: the host registers it per click
+    btn.click()
+    assert len(seen) == 2
+
+
+def test_save_in_project_requires_an_observation_date(dlg, tmp_path):
+    # ADR-044: without a DATE-OBS there is no MJD to register: the save
+    # is refused and the status says why (never a silent drop).
+    tab = dlg.tab_measure
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "nodate.fits", data, instrument=False)
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    _click(dlg, *target)
+    seen = []
+    dlg.set_point_hook(seen.append)
+    tab.btn_save_project.click()
+    assert seen == []                       # nothing left the tab
+    assert "date" in tab.lbl_status.text().lower()
+
+
 def test_saturated_target_is_refused_with_a_reason(dlg, tmp_path):
     data, target, comps = _plate(target_amp=60000.0, clip_target=30000.0)
     plate = _write_plate(tmp_path / "saturated.fits", data)

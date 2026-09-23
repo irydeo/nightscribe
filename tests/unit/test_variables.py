@@ -133,3 +133,13 @@ def test_detect_event_ignores_survey_points_and_splits_filters():
     pts += _pts([12.0, 12.1, 11.9, 12.0, 12.9], filt="B")
     ev = variables.detect_event(pts)
     assert ev["filter"] == "B"                # the survey run never fires
+
+
+def test_detect_event_counts_measure_points():
+    # ADR-044: a point saved from the editor's measure tab
+    # (source='measure') is the observer's own measurement and must fire
+    # the WeSb 1 protocol exactly like manual/paste/file/quicklook do.
+    ev = variables.detect_event(_pts([12.0, 12.1, 11.9, 12.0, 12.8],
+                                     source="measure"))
+    assert ev is not None
+    assert ev["direction"] == "drop"

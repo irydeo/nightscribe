@@ -5096,17 +5096,16 @@ class MainWindow(QMainWindow):
             # carries the same registry key the old button had
             self._project_widgets["fu_survey"] = act_survey
         tools.setMenu(tools_menu)
-        if kind in ("sn", "variable"):
-            # B5: the quick-look engine measures the stacked per-night
-            # images (SN + variables; HADS runs its intra-night series in
-            # FotoDif, ADR-034 D.3)
-            btn_quicklook = QPushButton(self.tr("Quick analysis"))
-            btn_quicklook.setToolTip(self.tr(
-                "Differential magnitude vs. an automatic comparison "
-                "ensemble (indicative)"))
-            btn_quicklook.clicked.connect(
-                lambda: self._fu_run_quicklook(pid))
-            act_row.addWidget(btn_quicklook)
+        # ADR-019 (rev. 2026-09-23) / ADR-044 (rev. 2026-09-23): the
+        # «Quick analysis» quick-look button is retired. In the field it
+        # did "nada": the engine assumed the SN shared the template's
+        # coordinates and its constancy gate
+        # silently rejected every stacked plate, so it saved zero points
+        # without any error (ADR-019, section "Análisis rápido"). Measuring
+        # now happens per visit in the Image Workbench Measure tab
+        # («Medir en el Editor…» on each visit row), which saves calibrated
+        # points with source "measure"; the campaign summary below is
+        # computed over the saved points with the same series engine.
         act_row.addWidget(tools)
         act_row.addStretch()
         layout.addLayout(act_row)
@@ -5150,6 +5149,49 @@ class MainWindow(QMainWindow):
             chk_tpl.toggled.connect(lchart.set_template_visible)
             layout.addWidget(grp_lc)
 
+            # campaign summary over the saved points (ADR-044): the series
+            # engine (retired from the quick-look button, ADR-019) now
+            # reports how the campaign goes so far, rebuilt on every tab
+            # open and after each saved point
+            grp_camp = QGroupBox(self.tr("Campaign summary"))
+            grp_camp.setObjectName("fu_campaign_summary")
+            g_camp = QVBoxLayout(grp_camp)
+            camp_lbl = QLabel("")
+            camp_lbl.setObjectName("fu_campaign_text")
+            camp_lbl.setWordWrap(True)
+            g_camp.addWidget(camp_lbl)
+            camp_pts = fu.list_points(db, pid)
+            if not camp_pts:
+                camp_lbl.setText(self.tr(
+                    "No points saved yet. Measure a visit's stacked plate "
+                    "in the editor («Measure in the editor…» on the visit "
+                    "row) or add a magnitude by hand: the summary updates "
+                    "after every save."))
+            else:
+                from ..core import series as _series
+                camp = _series.analyze_campaign(
+                    camp_pts,
+                    sn_type=ctx.get("sn_type") or ctx.get("otype"))
+                text = self.tr("{n} nights · {p} points").format(
+                    n=camp.get("nights", 0), p=len(camp_pts))
+                slope = camp.get("slope_mag_per_day")
+                if slope is not None:
+                    text += self.tr(" · {:.2f} mag/day").format(slope)
+                delta = camp.get("delta_from_peak")
+                if delta is not None:
+                    text += self.tr(" · {:.2f} mag from peak").format(delta)
+                verdict_map = {
+                    "normal": self.tr("consistent with the typical curve"),
+                    "faster": self.tr("fading faster than typical"),
+                    "slower": self.tr("fading slower than typical"),
+                    "unknown": self.tr("no template to compare against"),
+                    "no_data": self.tr("no data")}
+                verdict = camp.get("verdict") or "unknown"
+                text += self.tr(" · verdict: {}").format(
+                    verdict_map.get(verdict, verdict))
+                camp_lbl.setText(text)
+            layout.addWidget(grp_camp)
+
         # sessions list
         grp = QGroupBox(self.tr("Visits"))
         grp.setLayout(QVBoxLayout())
@@ -5176,8 +5218,8 @@ class MainWindow(QMainWindow):
         # B6/B10: the SN evolution animation and the annotated FITS export
         # — secondary analysis tools, collapsed by default (UX-PC U4).
         # HADS never had them (intra-night series live in FotoDif,
-        # ADR-034 D.3) and variables keep only the quick-look (V-g), so
-        # this block is SN-only instead of a row of hidden buttons.
+        # ADR-034 D.3); the retired quick-look (V-g, ADR-019) served
+        # variables, so this block is SN-only now.
         if kind == "sn":
             adv = self._advanced_block(
                 layout, self.tr("Animation and annotated FITS"))
@@ -5198,57 +5240,6 @@ class MainWindow(QMainWindow):
             adv.addLayout(ana_row)
         layout.addStretch()
         self._project_widgets["fu_sessions"] = lst
-
-    def _fu_run_quicklook(self, pid):
-        # B5: run the series engine on the registered stacked images and save
-        # the quick-look points + campaign summary to the project.
-        from ..core import followup as fu
-        from ..core import series
-        p = project.get(db, pid)
-        if not p:
-            return
-        # collect the stacked images (one per session)
-        paths = []
-        for s in fu.list_sessions(db, pid):
-            for img in fu.list_images(db, s["id"]):
-                if img["fits_path"]:
-                    paths.append(img["fits_path"])
-        if not paths:
-            self.statusBar().showMessage(
-                self.tr("No stacked images registered"), 5000)
-            return
-        ctx = p.get("context") or {}
-        sn_ra = ctx.get("ra_deg")
-        sn_dec = ctx.get("dec_deg")
-        if sn_ra is None or sn_dec is None:
-            self.statusBar().showMessage(
-                self.tr("Project has no coordinates"), 5000)
-            return
-        sn_type = (ctx.get("sn_type") or ctx.get("otype") or "")
-        try:
-            result = series.quicklook(paths, sn_ra, sn_dec, sn_type=sn_type)
-        except Exception as err:
-            self.statusBar().showMessage(
-                self.tr("Quick-look failed: %1").replace("%1", str(err)), 8000)
-            return
-        # save quicklook points
-        for pt in result.get("points", []):
-            fu.add_point(db, pid, pt["mjd"], pt["filter"], pt["mag"],
-                         err=pt.get("err"), source="quicklook")
-        summary = result.get("summary", {})
-        verdict = summary.get("verdict", "unknown")
-        slope = summary.get("slope_mag_per_day")
-        delta = summary.get("delta_from_peak")
-        # show the campaign summary in the status bar + as a status label
-        msg = self.tr("Quick-look: {} points — verdict: {}").format(
-            len(result.get("points", [])), verdict)
-        if slope is not None:
-            msg += self.tr(" · slope: {:.2f} mag/d").format(slope)
-        if delta is not None:
-            msg += self.tr(" · Δmag from peak: {:.2f}").format(delta)
-        self.statusBar().showMessage(msg, 10000)
-        # refresh the panel so the new quicklook points show on the curve
-        self._project_selected()
 
     def _fu_run_animation(self, pid):
         # B6: generate the evolution GIF/MP4 from the registered stacked images.
@@ -5410,11 +5401,20 @@ class MainWindow(QMainWindow):
         detail = self._fu_detail
         self._wipe_layout(detail.layout())
         dlay = detail.layout()
-        # action row: add stacked image + delete this visit
+        # action row: add stacked image, measure it in the editor, delete
         fu_row = QHBoxLayout()
         btn_img = QPushButton(self.tr("Add stacked image…"))
         btn_img.clicked.connect(lambda: self._fu_add_image(sid, pid))
         fu_row.addWidget(btn_img)
+        if self._use_ufe():
+            btn_meas = QPushButton(self.tr("Measure in the editor…"))
+            btn_meas.setToolTip(self.tr(
+                "Open this visit's stacked plate in the unified editor and "
+                "save the calibrated magnitude into the project "
+                "(ADR-044)"))
+            btn_meas.clicked.connect(
+                lambda: self._fu_open_ufe_measure(sid, pid))
+            fu_row.addWidget(btn_meas)
         btn_del = QPushButton(self.tr("Delete visit…"))
         btn_del.setObjectName("fu_btn_delete")
         btn_del.clicked.connect(lambda: self._fu_delete_session(lst, sid, pid))
@@ -7884,6 +7884,7 @@ class MainWindow(QMainWindow):
         # Menu Tools → FITS editor… (ADR-044)
         dlg = self._ufe_build()
         dlg.set_save_hook(None)      # ad-hoc: no project registration
+        dlg.set_point_hook(None)     # and no project to save points to
         dlg.set_object(None)         # and no stale project object
         dlg.show()
         dlg.raise_()
@@ -7916,13 +7917,16 @@ class MainWindow(QMainWindow):
         return {"name": p.get("object_name"), "ra": ra, "dec": dec,
                 "mag": mag, "bv": var.get("bv") or ctx.get("bv")}
 
-    def _ufe_open(self, tab, hook_pid=None, obj=None):
+    def _ufe_open(self, tab, hook_pid=None, obj=None, session_id=None):
         # Shared open path: the persistent dialog, the right tab on
-        # stage, the project save hook set or cleared, and the object
-        # attached (or cleared on an ad-hoc open).
-        # @args: tab - "blink"|"compare"|"annotate", hook_pid - project
-        #        id whose written files get registered, or None,
-        #        obj - the object dict from _ufe_object_from_project
+        # stage, the project save hook set or cleared, the point hook set
+        # or cleared, and the object attached (or cleared on an ad-hoc
+        # open).
+        # @args: tab - "blink"|"compare"|"annotate"|"measure", hook_pid -
+        #        project id whose written files get registered (and whose
+        #        measured points get saved, tab "measure"), or None,
+        #        obj - the object dict from _ufe_object_from_project,
+        #        session_id - the visit a saved point belongs to, or None
         # @return: the UfeDialog
         dlg = self._ufe_build()
         dlg.set_save_hook(None)
@@ -7931,8 +7935,14 @@ class MainWindow(QMainWindow):
             dlg.set_save_hook(
                 lambda paths, kind, payload:
                 self._ufe_save_hook(hook_pid, paths, kind, payload))
+            dlg.set_point_hook(
+                lambda payload:
+                self._ufe_point_hook(hook_pid, session_id, payload))
+        else:
+            dlg.set_point_hook(None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
-                      "annotate": dlg.tab_annotate}[tab])
+                      "annotate": dlg.tab_annotate,
+                      "measure": dlg.tab_measure}[tab])
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()
@@ -7986,6 +7996,70 @@ class MainWindow(QMainWindow):
                     f"{e['name']} {e['star']['band']} "
                     f"{e['star']['mag']:.2f}" for e in entries]
                 _camp.update(db, c["id"], protocol=prot)
+
+    def _ufe_point_hook(self, pid, session_id, payload):
+        # A calibrated magnitude from the Measure tab lands in the project
+        # as a photometry point with source "measure", under the visit the
+        # button came from (ADR-044; replaces the retired quick-look, see
+        # ADR-019 section "Análisis rápido").
+        # @args: pid - project id, session_id - visit or None,
+        #        payload - {"mjd", "filter", "mag", "err", ...}
+        from ..core import followup as fu
+        if not payload or payload.get("mag") is None:
+            self.statusBar().showMessage(
+                self.tr("Point not saved: no magnitude to record"), 6000)
+            return
+        if payload.get("mjd") is None:
+            self.statusBar().showMessage(
+                self.tr("Point not saved: the plate has no observation date"),
+                8000)
+            return
+        try:
+            fu.add_point(db, pid, float(payload["mjd"]),
+                         payload.get("filter") or "Clear",
+                         float(payload["mag"]), err=payload.get("err"),
+                         source="measure", session_id=session_id)
+        except (TypeError, ValueError) as err:
+            self.statusBar().showMessage(
+                self.tr("Point not saved: %1").replace("%1", str(err)), 8000)
+            return
+        self.statusBar().showMessage(
+            self.tr("Point saved: {} band, {:.3f} mag").format(
+                payload.get("filter") or "Clear", float(payload["mag"])),
+            6000)
+        # refresh the panel: light curve, visits and campaign summary update
+        self._project_selected()
+
+    def _fu_open_ufe_measure(self, sid, pid):
+        # Per-visit entry point to the Measure tab (ADR-044): the visit's
+        # last stacked plate opens in the unified editor with the Measure
+        # tab on stage and the point hook armed for this visit; the
+        # calibrated magnitude the user saves lands in the project.
+        # @args: sid - session id, pid - project id
+        from ..core import followup as fu
+        if not self._use_ufe():
+            self.statusBar().showMessage(
+                self.tr("Enable the unified editor in Settings → Development "
+                        "to measure from the editor"), 8000)
+            return
+        if not fu.get_session(db, sid):
+            return
+        images = [img for img in fu.list_images(db, sid) if img["fits_path"]]
+        if not images:
+            self.statusBar().showMessage(
+                self.tr("This visit has no stacked image to measure"), 6000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                             session_id=sid)
+        if not dlg.open_plate(images[-1]["fits_path"]):
+            return
+        # re-attach the object after the fresh plate load, like the
+        # annotate/compare open paths do
+        dlg.set_object(obj)
 
     # ---------------- Observing journal (ADR-036) ----------------
 

@@ -158,6 +158,25 @@ Close/Reopen/Archive/Delete) y la lista pasa a filas ricas con filtros
 avanzados tras «Filters ▸». El modelo (3 pasos, ciclo de vida, página
 única) sigue sin cambiar.
 
+**Revisión (2026-09-23, ADR-044)**: «Análisis rápido» (quick-look) queda
+**retirado** de la GUI. El motivo que decide la retirada es su fallo
+silencioso: en campo, el motor asumía que la SN compartía las
+coordenadas de la plantilla y su control de constancia rechazaba en
+silencio casi todas las placas apiladas, de modo que el botón devolvía
+«Nada» con cero puntos y sin una sola explicación. La medida por visita
+la da ahora la pestaña **Medir** del editor unificado (ADR-044): cada
+fila de la lista de visitas ofrece «Medir en el Editor…», que abre el
+editor sobre la placa apilada de esa visita con la pestaña Medir activa;
+el punto calibrado se guarda en el proyecto con `source="measure"` (se
+pinta en la curva, cuenta para la detección de eventos y sale en las
+exportaciones). El **resumen de campaña** (`series.analyze_campaign`:
+pendiente diaria, distancia desde la cumbre y veredicto contra la
+plantilla) se recalcula al abrir la pestaña y tras cada guardado.
+`core/series.py::quicklook` queda intacto para código y tests, y los
+puntos históricos `source="quicklook"` siguen pintándose discontinuos
+(«indicativa»): quedan excluidos de las exportaciones por defecto, y solo
+un checkbox explícito los incluye.
+
 ## English
 
 **Context**: after v2 (ADR-017), a product reflection from the user: NightScribe must
@@ -310,3 +329,21 @@ card** (Mark done/Skip beside Go →); sections keep only a discreet footer
 **⋯** menu (tags, folders, Close/Reopen/Archive/Delete) and the list
 becomes rich rows with the advanced filters behind "Filters ▸". The model
 (3 steps, lifecycle, single page) still does not change.
+
+**Review (2026-09-23, ADR-044)**: Quick analysis (quick-look) is
+**retired** from the GUI. The deciding reason is its silent failure: in
+the field the engine assumed the SN shared the template's coordinates
+and its constancy gate silently rejected almost every stacked plate, so
+the button answered "Nada" with zero points and zero explanation.
+Per-visit measurement now lives in the unified editor's **Measure** tab
+(ADR-044): every visit row in the follow-up list offers "Measure in the
+editor…", which opens the editor on that visit's stacked plate with the
+Measure tab active; the calibrated point is saved to the project as
+`source="measure"` (renders on the curve, counts for event detection,
+included in the exports). The **campaign summary**
+(`series.analyze_campaign`: daily slope, distance from the peak, verdict
+against the template) is recomputed on tab open and after every save.
+`core/series.py::quicklook` stays intact for code and tests, and
+historic `source="quicklook"` points keep rendering dashed
+("indicativa"): they are excluded from the exports by default, and only
+an explicit checkbox includes them.

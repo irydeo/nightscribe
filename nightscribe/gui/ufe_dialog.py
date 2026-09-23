@@ -57,6 +57,10 @@ class UfeDialog(QDialog):
         self._save_hook = None      # fn(paths, kind, payload) when the
                                     # editor was opened from a project:
                                     # files written get registered there
+        self._point_hook = None     # fn(payload: dict) when the editor
+                                    # was opened from a project: the
+                                    # Measure tab registers a calibrated
+                                    # point there (no files involved)
         self._object = None         # {"name","ra","dec","mag"} when the
                                     # editor was opened from a project
         self.state = UfeImageState(self)
@@ -258,6 +262,36 @@ class UfeDialog(QDialog):
                                 payload or {})
             except Exception as err:      # the write already happened;
                 logger.warning("save hook failed: %s", err)  # never break it
+
+    def set_point_hook(self, fn):
+        # @args: fn - callable(payload: dict) or None. When the editor was
+        #        opened from a project (Main window) it sends a calibrated
+        #        measurement ({"mjd", "filter", "mag", "err", ...}) to the
+        #        host for registration. Cleared on every open path that
+        #        does not set it, like the file save hook. The Measure
+        #        tab shows its «Save in the project» button only then.
+        self._point_hook = fn
+        tab = getattr(self, "tab_measure", None)
+        if tab is not None:
+            tab.set_project_attached(fn is not None)
+
+    def point_hook(self):
+        # @return: the point hook callable, or None when the editor was
+        #          opened ad-hoc (Measure tab hides its save button)
+        return self._point_hook
+
+    def notify_point(self, payload):
+        # The Measure tab reports a calibrated point here; without a hook
+        # it is a no-op (the button is hidden anyway).
+        # @args: payload - {"mjd", "filter", "mag", "err"} plus context
+        if self._point_hook is None:
+            return False
+        try:
+            self._point_hook(payload or {})
+        except Exception as err:      # the measurement already happened;
+            logger.warning("point hook failed: %s", err)  # never break it
+            return False
+        return True
 
     # --------------------------------------------------- the object
 

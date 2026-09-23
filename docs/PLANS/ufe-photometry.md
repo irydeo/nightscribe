@@ -1,20 +1,36 @@
 # Plan de implementación: fotometría calibrada en el UFE (pestaña Medir, fase G) (2026-09-22)
 
-> **ESTADO: SIN EMPEZAR. Plan listo para ejecutar; ninguna línea de
-> código escrita.** El observador firmó el análisis (complejidad
-> baja-media, precisión 0.02–0.05 mag realista) y pidió este plan para
-> que otra IA lo implemente. **Empezar en la sección «Estado de la
-> sesión», firmar las decisiones pendientes (D1-D6) con el usuario y
-> ejecutar G1.**
+> **ESTADO: G1 CERRADA (2026-09-23), G2/G3 PENDIENTES.** La fase G1 la
+> implementó otra IA en `ed8c9c5` (directamente sobre `feature/ufe`) y
+> pasó revisión en esta sesión: `core/photometry.py` con
+> `measure_point` (centroide sub-píxel, flujo neto, cielo con sigma-clip
+> D3, guardas bilingües de borde/saturación/señal), `ccd_flux_error` +
+> `mag_error` (ecuación CCD anclada a ganancia, D2), 
+> `calibrate_zero_point` (mediana + MAD/√N, D1) y `calibrated_mag`;
+> 12 tests con semilla que verifican la física de verdad (fracción
+> analítica de la gaussiana, ZP a precisión de flotante, degradados);
+> suite 1626 verde; humo sobre placa real correcto (guardas de borde
+> saltan en la franja de artefactos del fixture).
+> **La próxima sesión empieza en G2** (`gui/ufe_measure_tab.py`).
 >
 > Documento vivo: se actualiza al cierre de cada fase. El proceso
 > fotométrico tal como existe HOY está documentado para el usuario en
 > `docs/PHOTOMETRY.es.md` / `docs/PHOTOMETRY.md`; este plan añade lo que
 > falta: la medida CALIBRADA sobre la placa cargada.
 >
-> Rama sugerida: `feature/ufe-photometry` desde `feature/ufe` si aún no
-> se fusionó a `main` (comprobar con `git log main..feature/ufe`); si ya
-> está fusionado, desde `main`.
+> Rama: la otra IA trabajó directamente sobre `feature/ufe` (no se creó
+> `feature/ufe-photometry`); se acepta y se sigue así.
+>
+> **Notas de la revisión de G1** (para la próxima sesión):
+> - `measure_point` reimplementa la suma de apertura y el anillo en vez
+>   de llamar a `series.aperture_flux` (lo justifica el sigma-clip; reusa
+>   centroide y radios). Aceptado; no tocar.
+> - La guarda de saturación por meseta exige ≥25 píxeles en el máximo
+>   exacto del frame: una estrella apenas al techo (marginal) no salta;
+>   el camino estricto es `sat_adu` (tarjeta SATURATE o ajuste), que la
+>   fase H4 ya contempla.
+> - El mensaje de commit decía «D1-D6 firmadas»: D1/D5/D6 son decisiones
+>   de la pestaña (G2), no del core; sin consecuencia en el código.
 
 ## Estado de la sesión (actualizado 2026-09-22, empezar AQUÍ)
 
@@ -37,11 +53,12 @@
   historial de la sesión y destilado en la sección 7 de
   `docs/PHOTOMETRY.es.md`.
 
-**Pendiente (todo)**
+**Pendiente**
 
-1. Firmar con el usuario las decisiones D1-D6 (abajo; van con
-   recomendación).
-2. G1: `core/photometry.py` + tests.
+1. ~~Firmar con el usuario las decisiones D1-D6~~ (según el mensaje de
+   commit de la otra IA; D1/D5/D6 se aplican en G2: si el usuario no las
+   recuerda firmadas, confirmarlas antes de G2).
+2. ~~G1: `core/photometry.py` + tests.~~ (hecho y revisado, `ed8c9c5`)
 3. G2: `gui/ufe_measure_tab.py` + tests.
 4. G3: i18n + docs (PHOTOMETRY gana la sección de medida calibrada;
    UFE.es/en ganan la pestaña; AGENTS.md lista los módulos; ADR-044 rev).

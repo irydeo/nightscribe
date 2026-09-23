@@ -18,6 +18,16 @@
 > tiene su propio plan: `docs/PLANS/ufe-photometry.md` (fases G y H
 > cerradas 2026-09-23).
 >
+> **El objeto completo (2026-09-23, CERRADO)**: al abrir desde un
+> proyecto, el UFE adjunta TODO lo que el proyecto sabe del objeto:
+> `UfeDialog.set_object({name, ra, dec, mag, bv})` con línea-info bajo la
+> barra, título «Workbench · objeto · placa», prefill en las cuatro
+> pestañas (Blink nombre+coords; Comparar objetivo+mag+coords; Anotar
+> etiqueta+marcador+visitas; Medir B−V si la ficha lo trae) y
+> supervivencia al cambiar de placa; el builder
+> `main_window._ufe_object_from_project` resuelve mag por planner → VSX
+> MaxMag → última secuencia guardada; ad-hoc limpia.
+>
 > **Revisión con placas reales (2026-09-23, CERRADA)**: los tres fallos
 > reportados por el observador están corregidos con tests: las aperturas
 > de Medir se aplican en vivo (editar un radio re-mide al instante) y la

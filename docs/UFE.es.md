@@ -14,11 +14,15 @@ carta de comparación, FITS anotado) siguen existiendo para comparar y
 revisar, pero por defecto los flujos abren el UFE: en **Ajustes →
 Desarrollo** puedes volver a los clásicos como predeterminados
 (`ufe_default`). Desde un proyecto, el UFE abre con la placa cargada, la
-pestaña correcta en escena y los datos precargados; y lo que escribe
-(copias anotadas, GIF/PNG del blink, CSV/PNG de la secuencia) se
-registra en el proyecto igual que con los clásicos. Sin placa propia,
-la pestaña Comparar descarga el campo del survey (DSS2/PS1) como FITS
-con WCS y trabaja sobre él directamente.
+pestaña correcta en escena y **todo lo que el proyecto sabe del objeto
+ya puesto**: nombre, coordenadas y magnitud en la línea bajo la barra y
+en el título, y cada pestaña con sus campos precargados (Blink: nombre y
+coordenadas; Comparar: objetivo y mag; Anotar: etiqueta, marcador en la
+posición del objeto y visitas extra; Medir: B−V si la ficha lo trae).
+Lo que escribe (copias anotadas, GIF/PNG del blink, CSV/PNG de la
+secuencia) se registra en el proyecto igual que con los clásicos. Sin
+placa propia, la pestaña Comparar descarga el campo del survey
+(DSS2/PS1) como FITS con WCS y trabaja sobre él directamente.
 
 ## La ventana
 

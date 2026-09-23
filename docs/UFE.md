@@ -13,11 +13,15 @@ comparison chart, annotated FITS) still exist for comparison and review,
 but by default the flows open the UFE: under **Settings → Development**
 you can switch the classic ones back as the default (`ufe_default`).
 Opened from a project, the UFE comes with the plate loaded, the right
-tab on stage and the data pre-filled; and what it writes (annotated
-copies, blink GIF/PNG, sequence CSV/PNG) registers into the project just
-like the classics did. With no plate of your own, the Compare tab
-downloads the survey field (DSS2/PS1) as a FITS with WCS and works on
-it directly.
+tab on stage and **everything the project knows about the object already
+in place**: name, coordinates and magnitude on the line under the top
+bar and in the title, and every tab pre-filled (Blink: name and
+coordinates; Compare: target and mag; Annotate: label, the marker on
+the object's position and the extra visits; Measure: B−V when the
+record carries it). What it writes (annotated copies, blink GIF/PNG,
+sequence CSV/PNG) registers into the project just like the classics did.
+With no plate of your own, the Compare tab downloads the survey field
+(DSS2/PS1) as a FITS with WCS and works on it directly.
 
 ## The window
 

@@ -1,6 +1,20 @@
 # Plan de implementación: fotometría calibrada en el UFE (pestaña Medir, fase G) (2026-09-22)
 
-> **ESTADO: G1 CERRADA (2026-09-23), G2/G3 PENDIENTES.** La fase G1 la
+> **ESTADO: G1, G2 y G3 CERRADAS (2026-09-23).** La fase G1 la
+> implementó otra IA en `ed8c9c5` y pasó revisión (notas abajo). G2 la
+> hizo esta sesión: `gui/ufe_measure_tab.py` (clic → centroide → medida;
+> comps de la pestaña Comparar medidas en la misma placa por su nuevo
+> accesor `entries()`; ZP mediana+MAD; error CCD con GAIN/RDNOISE de
+> cabecera o degradado honesto a dispersión de comps; panel con guardas
+> en lenguaje llano; overlays de apertura/anillo/comps; export CSV una
+> fila y EFF con la secuencia; la placa jamás se toca). G3: i18n 1227
+> cadenas, PHOTOMETRY.es/en con la sección 3.3 (medida calibrada),
+> UFE.es/en con la pestaña, ADR-044 rev, AGENTS.md al día. Suite 1635
+> verde.
+> **La fase G está completa.** Lo siguiente es la fase H de
+> `docs/PRECISION.es.md` (calidad en una toma) cuando se decida.
+>
+> **Nota previa conservada (estado tras G1):** la fase G1 la
 > implementó otra IA en `ed8c9c5` (directamente sobre `feature/ufe`) y
 > pasó revisión en esta sesión: `core/photometry.py` con
 > `measure_point` (centroide sub-píxel, flujo neto, cielo con sigma-clip
@@ -59,9 +73,13 @@
    commit de la otra IA; D1/D5/D6 se aplican en G2: si el usuario no las
    recuerda firmadas, confirmarlas antes de G2).
 2. ~~G1: `core/photometry.py` + tests.~~ (hecho y revisado, `ed8c9c5`)
-3. G2: `gui/ufe_measure_tab.py` + tests.
-4. G3: i18n + docs (PHOTOMETRY gana la sección de medida calibrada;
-   UFE.es/en ganan la pestaña; AGENTS.md lista los módulos; ADR-044 rev).
+3. ~~G2: `gui/ufe_measure_tab.py` + tests.~~ (hecho: 9 tests offscreen
+   con placa sintética WCS + semilla; decisiones aplicadas D1/D5/D6 con
+   sus recomendaciones: banda V por defecto, secuencia leída de Comparar
+   por `entries()`, exports solo a archivos)
+4. ~~G3: i18n + docs (PHOTOMETRY gana la sección de medida calibrada;
+   UFE.es/en ganan la pestaña; AGENTS.md lista los módulos; ADR-044
+   rev).~~
 
 ## Decisiones pendientes de firma (D1-D6)
 

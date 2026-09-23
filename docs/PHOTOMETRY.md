@@ -136,6 +136,31 @@ editor brings stars of known magnitude around the plate centre:
 The chosen sequence (click by click, or the automatic proposal matched
 to the target's brightness) exports to CSV with every band.
 
+### 3.3 The calibrated measurement (the FITS editor's Measure tab)
+
+With the plate loaded and the sequence built, the **Measure** tab turns
+one click into a catalog magnitude:
+
+1. The click measures the target (centroid, aperture, sigma-clipped sky;
+  the section 2.4 guards speak in plain language: "saturated", "too
+  close to the edge", "no measurable signal").
+2. The sequence stars are measured **on the same plate**, with the same
+  aperture: that is what makes comparable comparable.
+3. The **zero point** is the median of `catalog mag − instrumental mag`
+  over the comps, with its error from the median absolute deviation
+  (MAD) divided by √N; stars lacking the chosen band or not measurable
+  are skipped and counted.
+4. The target's magnitude is `instrumental + ZP`, with the combined
+   error: the CCD equation (when the header carries GAIN/RDNOISE;
+   otherwise the comps' scatter only, and the panel says so) plus the
+   zero-point error.
+
+The panel shows everything used and everything refused, and the default
+band is V (direct in APASS, Gaia-estimated via Riello 2021, and the
+panel marks it). The measurement exports to a one-row CSV or an AAVSO
+EFF line with the sequence in CNAME/CMAG/KNAME/KMAG. The FITS file on
+disk is never modified.
+
 **Formula 3: the differential magnitude**
 
 ```
@@ -204,9 +229,12 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 
 **What MAG means here**: for quick-look points it is the differential
 instrumental magnitude (Δmag against the ensemble), not a
-catalog-calibrated magnitude. Imported points (measured with another
-tool) keep the magnitude they arrived with. Always read it with the
-point's filter and origin in view.
+catalog-calibrated magnitude. In the Measure tab's measurement it IS a
+catalog-calibrated magnitude via the zero point (TRANS stays `NA`, in
+all honesty: there is no colour transformation to the standard system).
+Imported points (measured with another tool) keep the magnitude they
+arrived with. Always read it with the point's filter and origin in
+view.
 
 ---
 
@@ -301,9 +329,10 @@ implementation appendix: [docs/PRECISION.md](PRECISION.md).
   logarithm; only comparable within the same image or matched series.
 * **Δmag**: the instrumental-magnitude difference between the target and
   the comparison set.
-* **Zero point (ZP)**: the constant that would turn instrumental into
-  catalog magnitude; the current series flow does not use it, because
-  Δmag already cancels what is common.
+* **Zero point (ZP)**: the constant that turns instrumental into catalog
+  magnitude. The series flow does not use it (Δmag already cancels what
+  is common); the FITS editor's Measure tab does compute it from the
+  comps (median of `cat − inst`).
 * **Ensemble**: the group of constant stars chosen as the reference in a
   series.
 * **Check**: the witness star that watches whether the night and the

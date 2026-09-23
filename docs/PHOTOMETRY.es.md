@@ -135,6 +135,31 @@ la placa:
 La secuencia elegida (clic a clic, o la propuesta automática por brillo
 parecido al objetivo) se exporta a CSV con todas las bandas.
 
+### 3.3 La medida calibrada (pestaña Medir del Editor FITS)
+
+Con la placa cargada y la secuencia construida, la pestaña **Medir**
+convierte un clic en una magnitud de catálogo:
+
+1. El clic mide el objetivo (centroide, apertura, cielo con sigma-clip;
+  las guardas de la sección 2.4 hablan en lenguaje llano: «saturada»,
+  «demasiado cerca del borde», «sin señal medible»).
+2. Las estrellas de la secuencia se miden **en la misma placa**, con la
+  misma apertura: eso es lo que hace comparable a lo comparable.
+3. El **punto cero** es la mediana de `mag_catálogo − mag_instrumental`
+  sobre las comps, con su error desde la desviación absoluta mediana
+  (MAD) dividida por √N; las estrellas sin la banda elegida o no
+  medibles se saltan y se cuentan.
+4. La magnitud del objetivo es `instrumental + ZP`, con el error
+   combinado: la ecuación CCD (si la cabecera trae GAIN/RDNOISE; si no,
+   solo la dispersión de las comps, y el panel lo dice) más el error del
+   punto cero.
+
+El panel muestra todo lo usado y todo lo rechazado, y la banda por
+defecto es V (directa en APASS, estimada por Riello 2021 en Gaia, y el
+panel lo marca). La medida se exporta a CSV de una fila o a línea AAVSO
+EFF con la secuencia en CNAME/CMAG/KNAME/KMAG. El archivo FITS en disco
+nunca se modifica.
+
 **Fórmula 3: la magnitud diferencial**
 
 ```
@@ -204,7 +229,10 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 
 **Qué significa MAG aquí**: en los puntos del quicklook es la magnitud
 diferencial instrumental (Δmag contra el ensemble), no una magnitud
-calibrada de catálogo. Los puntos importados de fuera (medidos con otra
+calibrada de catálogo. En la medida de la pestaña Medir sí es una
+magnitud calibrada al catálogo vía el punto cero (TRANS sigue siendo
+`NA` con honestidad: no hay transformación de color al sistema
+estándar). Los puntos importados de fuera (medidos con otra
 herramienta) conservan la magnitud con la que vinieron. Léelo siempre
 con el filtro y el origen del punto a la vista.
 
@@ -300,9 +328,10 @@ y con apéndice técnico de implementación:
   solo comparable dentro de la misma imagen o serie compensada.
 * **Δmag**: diferencia de magnitud instrumental entre el objetivo y el
   conjunto de comparaciones.
-* **Punto cero (ZP)**: la constante que convertiría instrumental en
-  magnitud de catálogo; en el flujo actual de series no se usa porque
-  Δmag ya cancela lo común.
+* **Punto cero (ZP)**: la constante que convierte la magnitud
+  instrumental en magnitud de catálogo. En el flujo de series no se usa
+  (Δmag ya cancela lo común); la pestaña Medir del Editor FITS sí lo
+  calcula a partir de las comps (mediana de `cat − inst`).
 * **Ensemble**: el grupo de estrellas constantes elegido como referencia
   en una serie.
 * **Check**: la estrella testigo que vigila que la noche y la secuencia

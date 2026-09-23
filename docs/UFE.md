@@ -24,9 +24,9 @@ FITS), which stay where they always were.
   the cursor; dragging pans; double-click returns to the fit. Hovering
   shows a tooltip with the pixel, its DN value and the RA/Dec when the
   plate carries a WCS.
-* **Tabs**: one per feature. **Blink**, **Compare** and **Annotate**
-  are available (below). Only the visible tab answers clicks on the
-  image.
+* **Tabs**: one per feature. **Blink**, **Compare**, **Measure** and
+  **Annotate** are available (below). Only the visible tab answers
+  clicks on the image.
 
 ## Blink
 
@@ -68,6 +68,26 @@ WCS is needed; if it is missing, "Solve astrometry…" gets you one):
 
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).
+
+## Measure
+
+The **Measure** tab turns one click into a catalog-calibrated magnitude
+(single-plate differential aperture photometry):
+
+* It needs the plate with a WCS (if missing, "Solve astrometry…" gets
+  one) and a sequence in the Compare tab (if there is none, the tab
+  guides you and has a button that takes you there).
+* **Click** on the star or the SN: sub-pixel centroid, aperture and sky
+  annulus visible on the image, and the panel tells the full story:
+  instrumental magnitude, the zero point with its error and how many
+  comps were used (and why any was refused), and the **calibrated
+  magnitude ± error**.
+* The default band is V; apertures and the sky sigma-clip are
+  adjustable. When the header lacks the gain, the panel warns that the
+  error is the comps' scatter only.
+* **CSV…** exports the measurement as one row and **AAVSO EFF…** in the
+  AAVSO's format, with the sequence in CNAME/CMAG/KNAME/KMAG. The plate
+  on disk is never modified.
 * **Annotations on load**: if the plate already carries ANNOTATE cards
   (written by NightScribe or AstroImageJ), they are drawn on load:
   circles with their plate-pixel sizes and labels readable at any zoom.

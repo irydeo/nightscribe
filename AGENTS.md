@@ -75,6 +75,9 @@ nightscribe/
     photometry_export.py  # reporte fotométrico: CSV + AAVSO EFF (TTL n/a, local)
     phototrans.py     # transformaciones Gaia->Johnson-Cousins (Riello 2021),
                       #   B-V directo/estimado, clase de color (ADR-042)
+    photometry.py     # fotometría calibrada en una placa (pestaña Medir del
+                      #   UFE): medida con guardas, ZP por mediana+MAD, error
+                      #   CCD con ganancia/RON (plan PLANS/ufe-photometry.md)
     compstars.py      # secuencias fotométricas: campo de catálogo, cruce VSX,
                       #   propuesta automática de comps, CSV (ADR-042)
     field_math.py     # proyección TAN de la carta, ticks de borde, escala,
@@ -126,8 +129,8 @@ nightscribe/
                        # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
                        # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
                        # widgets/ufe_image_view.py + widgets/histogram_widget.py +
-                       # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py,
-                       # ADR-044) viven en
+                       # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py +
+                       # ufe_measure_tab.py, ADR-044) viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,

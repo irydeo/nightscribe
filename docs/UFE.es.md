@@ -24,9 +24,9 @@ comparación, FITS anotados), que siguen disponibles donde siempre.
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
   coordenadas RA/Dec si la placa trae WCS.
-* **Pestañas**: una por funcionalidad. **Blink**, **Comparar** y
-  **Anotar** están disponibles (abajo). Solo la pestaña visible responde
-  a los clics sobre la imagen.
+* **Pestañas**: una por funcionalidad. **Blink**, **Comparar**,
+  **Medir** y **Anotar** están disponibles (abajo). Solo la pestaña
+  visible responde a los clics sobre la imagen.
 
 ## Blink
 
@@ -68,6 +68,26 @@ placa (necesita WCS; si falta, «Resolver astrometría…» lo consigue):
 
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
+
+## Medir
+
+La pestaña **Medir** convierte un clic en una magnitud calibrada de
+catálogo (fotometría de apertura diferencial de una placa):
+
+* Necesita la placa con WCS (si falta, «Resolver astrometría…») y una
+  secuencia en la pestaña Comparar (si no la hay, la pestaña te guía y
+  tiene un botón que te lleva).
+* **Clic** sobre la estrella o la SN: centroide sub-píxel, apertura y
+  anillo de cielo visibles en la imagen, y el panel cuenta el resultado
+  completo: magnitud instrumental, punto cero con su error y cuántas
+  comps se usaron (y por qué se rechazó alguna), y la **magnitud
+  calibrada ± error**.
+* La banda por defecto es V; las aperturas y el sigma-clip del cielo son
+  ajustables. Si la cabecera no trae ganancia, el panel avisa de que el
+  error es solo la dispersión de las comps.
+* **CSV…** exporta la medida en una fila y **AAVSO EFF…** en el formato
+  de la AAVSO, con la secuencia en CNAME/CMAG/KNAME/KMAG. La placa en
+  disco nunca se modifica.
 * **Anotaciones al vuelo**: si la placa ya trae tarjetas ANNOTATE
   (escritas por NightScribe o por AstroImageJ), se dibujan al cargar:
   círculos con su tamaño en píxeles de placa y rótulos legibles a

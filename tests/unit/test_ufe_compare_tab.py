@@ -243,3 +243,26 @@ def test_loading_a_new_plate_invalidates_the_field(dlg):
     dlg.state.load(MONO)
     assert tab._field is None and tab._entries == []
     assert tab.table.rowCount() == 0
+
+
+def test_sequence_overlays_survive_switching_to_measure(dlg):
+    # the sequence is the Measure tab's input: leaving Compare for
+    # Measure keeps rings and labels visible (with clicks disarmed)
+    from PySide6.QtCore import QPointF
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    s = tab._stars[0]
+    dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+    assert len(tab._entries) == 1
+    assert len(tab._items) > 0
+    dlg.tabs.setCurrentWidget(dlg.tab_measure)
+    assert len(tab._items) > 0                  # still drawn
+    assert not tab._active                      # but disarmed
+    # and the star probe still answers while measuring
+    hit, lines = dlg.view._hover_probe(s["_sx"], s["_sy"])
+    assert hit and "Gaia EDR3" in lines[0]
+    # leaving Compare for anywhere else drops them as before
+    dlg.tabs.setCurrentWidget(dlg.tab_compare)
+    assert len(tab._items) > 0
+    dlg.tabs.setCurrentWidget(dlg.tab_annotate)
+    assert tab._items == []

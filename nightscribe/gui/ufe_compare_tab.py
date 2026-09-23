@@ -169,9 +169,12 @@ class UfeCompareTab(QWidget):
 
     # ------------------------------------------------------- activation
 
-    def set_active(self, flag):
+    def set_active(self, flag, keep_overlays=False):
         # Only the visible tab owns the view's clicks, overlays and the
         # hover probe (the state's pixel/DN/RA probe returns on leave).
+        # @args: flag - on stage or not, keep_overlays - leaving for the
+        #        Measure tab: the sequence stays visible and its probe
+        #        keeps talking (the Measure tab measures WITH it)
         self._active = bool(flag)
         if self._view is None:
             return
@@ -179,8 +182,9 @@ class UfeCompareTab(QWidget):
             self._view.set_hover_probe(self._probe)
             self._redraw_overlays()
         else:
-            self._view.set_hover_probe(self._state.probe_text)
-            self._drop_items()
+            if not keep_overlays:
+                self._view.set_hover_probe(self._state.probe_text)
+                self._drop_items()
 
     # ------------------------------------------------------------- state
 

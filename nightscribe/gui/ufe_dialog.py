@@ -177,17 +177,27 @@ class UfeDialog(QDialog):
                                            view=self.view)
         self.tabs.addTab(self.tab_annotate, self.tr("Annotate"))
         # only the current tab owns the view's clicks and overlays
+        self._prev_tab = None
         self.tabs.currentChanged.connect(self._on_feature_tab_changed)
         self._on_feature_tab_changed(self.tabs.currentIndex())
 
     def _on_feature_tab_changed(self, idx):
         # Hands the stage to the freshly selected tab (set_active) and
-        # takes it from the others; placeholders carry no method.
+        # takes it from the others. One exception by design: Compare
+        # leaving for Measure keeps its overlays (the sequence IS the
+        # Measure tab's input) and its star probe keeps answering.
+        incoming = self.tabs.widget(idx)
         for i in range(self.tabs.count()):
             w = self.tabs.widget(i)
             setter = getattr(w, "set_active", None)
-            if callable(setter):
+            if not callable(setter):
+                continue
+            if w is self.tab_compare and self._prev_tab is self.tab_compare \
+                    and incoming is self.tab_measure:
+                setter(False, keep_overlays=True)
+            else:
                 setter(i == idx)
+        self._prev_tab = incoming
 
     def closeEvent(self, event):
         # The blink timer must not fire into a closing dialog.

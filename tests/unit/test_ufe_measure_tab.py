@@ -487,3 +487,53 @@ def test_suggest_applies_and_explains(dlg):
 def test_suggest_without_a_measurement_guides(dlg):
     dlg.tab_measure._on_suggest()
     assert "Measure the target first" in dlg.tab_measure.lbl_status.text()
+
+
+# ---------------- review round 2 (subtract + options re-measure) -----
+
+
+def test_subtraction_measures_on_a_consistent_scale(dlg, monkeypatch):
+    # the pair at half resolution (blink downsamples big plates): the
+    # target on the difference and the comps on the work frame share one
+    # DN scale, so the magnitude matches the plain-plate measurement
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    plain_mag = dlg.tab_measure._last["mag"]
+    data, target, comps = _plate()
+    obs = data[::2, ::2].copy()
+    ref, _t, _c = _plate(target_amp=0.0)
+    ref = ref[::2, ::2].copy()
+    pair = {"obs": obs, "ref": ref,
+            "sn_xy": (target[0] / 2, target[1] / 2), "name": "SN x",
+            "ra": 0.0, "dec": 0.0, "ref_label": "PS1 g",
+            "flipped": False}
+    monkeypatch.setattr("nightscribe.gui.workers.BlinkWorker",
+                        lambda *a, **k: _FakeSubWorker(*a, pair=pair))
+    tab = dlg.tab_measure
+    tab.chk_subtract.setChecked(True)
+    assert tab._diff is not None
+    frame = tab._display_diff()
+    assert frame.min() == 0 and frame.max() == 255   # visible, not black
+    _click(dlg, *target)
+    assert tab._last is not None
+    assert tab._last["mag"] == pytest.approx(plain_mag, abs=0.05)
+    tab.chk_subtract.setChecked(False)
+
+
+def test_options_remeasure_the_live_point(dlg):
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab = dlg.tab_measure
+    assert tab._last["sky_mode"] == "median"
+    # sky mode: flipping to plane re-measures with it
+    tab.cmb_sky.setCurrentIndex(1)
+    assert tab._last["sky_mode"] == "plane"
+    # sigma-clip off re-measures without it
+    tab.chk_sigmaclip.setChecked(False)
+    assert tab._last["sigma_clip"] is False
+    # colour term off re-measures with the plain zero point
+    tab.chk_color.setChecked(False)
+    assert tab._last["zp"]["color_used"] is False
+    # target B-V re-measures with it
+    tab.spn_target_bv.setValue(0.4)
+    assert tab._last is not None

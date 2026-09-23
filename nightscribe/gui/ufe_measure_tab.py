@@ -74,6 +74,9 @@ class UfeMeasureTab(QWidget):
         self._diff = None            # difference image (work frame,
                                      # plate orientation) or None
         self._diff_scale = 1.0       # plate px per diff-frame px
+        self._pair_obs = None        # the work-frame observed frame
+                                     # (comps calibrate on it while
+                                     # subtracting: never mix scales)
         self._last_suggestions = []  # the Suggest button's reasons
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
@@ -142,6 +145,9 @@ class UfeMeasureTab(QWidget):
             "a tilted plane when the host galaxy tilts it"))
         row.addWidget(self.cmb_sky, 1)
         lay.addLayout(row)
+        # every measuring control re-measures the live point at once
+        self.cmb_sky.currentIndexChanged.connect(
+            lambda _i: self._remeasure())
 
         self.chk_sigmaclip = QCheckBox(self.tr("Sigma-clip the sky"))
         self.chk_sigmaclip.setChecked(True)
@@ -149,6 +155,7 @@ class UfeMeasureTab(QWidget):
             "Two 2.5-sigma rounds on the annulus: extra skin against hot "
             "pixels and crowded cores"))
         lay.addWidget(self.chk_sigmaclip)
+        self.chk_sigmaclip.toggled.connect(lambda _c: self._remeasure())
         self.chk_seeing = QCheckBox(self.tr("Aperture follows the seeing"))
         self.chk_seeing.setChecked(True)
         self.chk_seeing.setToolTip(self.tr(
@@ -162,6 +169,7 @@ class UfeMeasureTab(QWidget):
         self.chk_color.setToolTip(self.tr(
             "Fit the zero point AND its slope against the comps' B−V "
             "(H1); needs at least 6 comps with colour spread"))
+        self.chk_color.toggled.connect(lambda _c: self._remeasure())
         row.addWidget(self.chk_color)
         row.addWidget(QLabel(self.tr("B−V target:")))
         self.spn_target_bv = QDoubleSpinBox()
@@ -173,6 +181,9 @@ class UfeMeasureTab(QWidget):
             "The target's B−V when known (variables: VSX). A supernova "
             "near peak is about 0; the panel warns when the colour term "
             "is applied with this assumption"))
+        self.spn_target_bv.setKeyboardTracking(False)
+        self.spn_target_bv.valueChanged.connect(
+            lambda _v: self._remeasure())
         row.addWidget(self.spn_target_bv)
         lay.addLayout(row)
         self.chk_subtract = QCheckBox(self.tr(
@@ -432,8 +443,18 @@ class UfeMeasureTab(QWidget):
             except Exception:
                 skipped += 1
                 continue
-            r = self._measure_star(self._state.data, ccol, crow, radii,
-                                   None)
+            if self._diff is not None:
+                # H2b: never mix flux scales: the comps are measured on
+                # the work frame the difference lives in (the blink
+                # downsamples big plates, and a DN is not a DN across
+                # scales)
+                r = self._measure_star(
+                    self._pair_obs, ccol / self._diff_scale,
+                    crow / self._diff_scale,
+                    tuple(v / self._diff_scale for v in radii), None)
+            else:
+                r = self._measure_star(self._state.data, ccol, crow,
+                                       radii, None)
             value, derived = self._band_of(star, band)
             if not r["ok"] or value is None:
                 skipped += 1
@@ -450,6 +471,7 @@ class UfeMeasureTab(QWidget):
                                                  target_bv=target_bv)
         else:
             zp = photometry.calibrate_zero_point(inst, cat)
+        zp.setdefault("color_used", False)   # the plain path carries none
         inst_header = photometry.header_instrument(self._state.header)
         gain = (inst_header["gain"] if inst_header["gain"] is not None
                 else config.get("ccd_gain"))
@@ -477,7 +499,9 @@ class UfeMeasureTab(QWidget):
                       "band": band, "used": used_entries,
                       "derived": derived_seen, "inst_t": inst_t,
                       "fwhm": fwhm, "radii": radii, "scint": scint,
-                      "check": check, "col": col, "row": row}
+                      "check": check, "col": col, "row": row,
+                      "sky_mode": self.cmb_sky.currentData(),
+                      "sigma_clip": self.chk_sigmaclip.isChecked()}
         self._fill_panel(band, len(entries), len(used_entries), skipped,
                          derived_seen, gain)
         self.btn_csv.setEnabled(mag is not None)
@@ -717,6 +741,9 @@ class UfeMeasureTab(QWidget):
         # @args: pair - the blink pair (obs at work size + aligned ref)
         self.chk_subtract.setEnabled(True)
         self._sub_worker = None
+        # the observer may have toggled off while the reference flew
+        if not self.chk_subtract.isChecked():
+            return
         if errors:
             self.lbl_status.setText("⚠ " + errors.get(self._lang, ""))
             self.chk_subtract.blockSignals(True)
@@ -734,6 +761,10 @@ class UfeMeasureTab(QWidget):
             self.chk_subtract.blockSignals(False)
             return
         self._diff = diff
+        obs = pair["obs"]
+        if pair.get("flipped"):
+            obs = np.ascontiguousarray(obs[:, ::-1])
+        self._pair_obs = obs
         plate_w, _plate_h = self._state.plate_shape
         self._diff_scale = plate_w / pair["obs"].shape[1]
         if self._active and self._view is not None:
@@ -777,12 +808,15 @@ class UfeMeasureTab(QWidget):
         return obs - gain * ref
 
     def _display_diff(self):
-        # The difference image as the view's frame (screen orientation),
-        # stretched with the shared controls like any other display.
+        # The difference image as the view's frame (screen orientation).
+        # Its sky sits at ~0, so the plate's black/white would show a
+        # black screen: the difference gets its own auto percentiles
+        # (gamma and invert stay shared).
         if self._diff is None:
             return None
-        img = stretch.apply_stretch(self._diff, self._state.black,
-                                    self._state.white, self._state.gamma)
+        black, white = stretch.auto_limits(self._diff)
+        img = stretch.apply_stretch(self._diff, black, white,
+                                    self._state.gamma)
         if self._state.inverted:
             img = stretch.invert(img)
         return np.ascontiguousarray(np.flipud(stretch.to_uint8(img)))

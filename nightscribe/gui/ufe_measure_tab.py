@@ -1,7 +1,7 @@
 ############################################################
 # -*- coding: utf-8 -*-
 #
-# NightScribe - Unified FITS Editor: Measure tab (ADR-044, phase G2)
+# NightScribe - Unified FITS Editor: Measure tab (ADR-044, phases G2+H)
 # Python  v3.12
 #
 # Francisco José Calvo Fernández
@@ -11,21 +11,31 @@
 #
 ############################################################
 
-"""The UFE's Measure tab (phase G of docs/PLANS/ufe-photometry.md):
-calibrated single-plate photometry. One click on a star or supernova
-measures it (core/photometry: centroid, aperture, sigma-clipped sky,
-honest guards), measures the Compare tab's sequence on the same plate,
-and calibrates against their catalog magnitudes: ZP by median with a
-MAD-based error, the target's error from the CCD equation when the gain
-is known, and a plain-language panel that says exactly what was used and
-what was refused. One measurement is one click (D4); the exports are
-files (CSV one row, AAVSO EFF), the plate on disk is never touched (D6).
+"""The UFE's Measure tab: calibrated single-plate photometry. One click
+on a star or supernova measures it (core/photometry: centroid, aperture,
+sigma-clipped sky, honest guards), measures the Compare tab's sequence
+on the same plate, and calibrates against their catalog magnitudes: ZP
+by median with a MAD-based error, optionally with a colour term fitted
+on the comps' B-V (H1), the target's error from the CCD equation when
+the gain is known plus scintillation, the colour fit and the flat
+residual in an honest total (H5), and a plain-language panel that says
+exactly what was used and what was refused.
+
+Phase H extras (docs/PRECISION.es.md): sky by median or by a fitted
+plane on cores (H2a), apertures that follow the measured seeing (H3),
+the real saturation ceiling from SATURATE or the ccd_saturate setting
+(H4), the check star as the measurement's own traffic light (H6), and
+optional host-galaxy subtraction through the blink's aligned PS1
+reference, comp-scaled so the stars vanish (H2b). One measurement is one
+click (D4); the exports are files (CSV one row, AAVSO EFF), the plate on
+disk is never touched (D6).
 """
 
 import logging
 import math
 from pathlib import Path
 
+import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
@@ -33,7 +43,8 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QPushButton, QVBoxLayout, QWidget,
                                QGraphicsEllipseItem)
 
-from ..core import fits_meta, photometry, photometry_export
+from ..core import coords, fits_meta, photometry, photometry_export, \
+    stretch
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
@@ -59,6 +70,10 @@ class UfeMeasureTab(QWidget):
         self._active = False
         self._items = []             # aperture + comps overlays
         self._last = None            # the last measurement bundle
+        self._sub_worker = None      # BlinkWorker while subtracting
+        self._diff = None            # difference image (work frame,
+                                     # plate orientation) or None
+        self._diff_scale = 1.0       # plate px per diff-frame px
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
         if view is not None:
@@ -103,12 +118,57 @@ class UfeMeasureTab(QWidget):
                       "radius (px)")
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
             spn.setToolTip(tip)
+
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Sky:")))
+        self.cmb_sky = QComboBox()
+        self.cmb_sky.addItem(self.tr("Median (flat sky)"), "median")
+        self.cmb_sky.addItem(self.tr("Plane (galactic cores)"), "plane")
+        self.cmb_sky.setToolTip(self.tr(
+            "How the annulus estimates the background: a flat median, or "
+            "a tilted plane when the host galaxy tilts it"))
+        row.addWidget(self.cmb_sky, 1)
+        lay.addLayout(row)
+
         self.chk_sigmaclip = QCheckBox(self.tr("Sigma-clip the sky"))
         self.chk_sigmaclip.setChecked(True)
         self.chk_sigmaclip.setToolTip(self.tr(
             "Two 2.5-sigma rounds on the annulus: extra skin against hot "
             "pixels and crowded cores"))
         lay.addWidget(self.chk_sigmaclip)
+        self.chk_seeing = QCheckBox(self.tr("Aperture follows the seeing"))
+        self.chk_seeing.setChecked(True)
+        self.chk_seeing.setToolTip(self.tr(
+            "Measure the FWHM of the comparison stars and size the "
+            "aperture as 1.35 times the seeing (H3)"))
+        lay.addWidget(self.chk_seeing)
+        row = QHBoxLayout()
+        self.chk_color = QCheckBox(self.tr("Colour term"))
+        self.chk_color.setChecked(True)
+        self.chk_color.setToolTip(self.tr(
+            "Fit the zero point AND its slope against the comps' B−V "
+            "(H1); needs at least 6 comps with colour spread"))
+        row.addWidget(self.chk_color)
+        row.addWidget(QLabel(self.tr("B−V target:")))
+        self.spn_target_bv = QDoubleSpinBox()
+        self.spn_target_bv.setRange(-1.0, 3.0)
+        self.spn_target_bv.setDecimals(2)
+        self.spn_target_bv.setSingleStep(0.05)
+        self.spn_target_bv.setValue(0.0)
+        self.spn_target_bv.setToolTip(self.tr(
+            "The target's B−V when known (variables: VSX). A supernova "
+            "near peak is about 0; the panel warns when the colour term "
+            "is applied with this assumption"))
+        row.addWidget(self.spn_target_bv)
+        lay.addLayout(row)
+        self.chk_subtract = QCheckBox(self.tr(
+            "Subtract host galaxy (PS1 reference)"))
+        self.chk_subtract.setToolTip(self.tr(
+            "Download the aligned PanSTARRS reference, scale it so the "
+            "comparison stars vanish, and measure the target on the "
+            "difference image (H2b; needs network once per field)"))
+        self.chk_subtract.toggled.connect(self._on_subtract_toggled)
+        lay.addWidget(self.chk_subtract)
 
         self.lbl_result = QLabel("–")
         self.lbl_result.setWordWrap(True)
@@ -143,16 +203,26 @@ class UfeMeasureTab(QWidget):
         self._active = bool(flag)
         if not self._active:
             self._drop_items()
-        elif self._last is not None:
-            self._draw_measurement()
+            if self._diff is not None and self._view is not None:
+                self._view.set_frame_override(None)
+        else:
+            if self._diff is not None and self._view is not None:
+                self._view.set_frame_override(self._display_diff)
+            if self._last is not None:
+                self._draw_measurement()
+
+    def shutdown(self):
+        # Nothing timer-driven here; the subtraction worker may run.
+        self._sub_worker = None
 
     # ------------------------------------------------------------- state
 
     def _on_image_loaded(self):
-        # A fresh plate invalidates the measurement (and the sequence's
-        # sky mapping): start clean, band list rebuilt on next measure.
+        # A fresh plate invalidates the measurement and any subtraction
+        # (the aligned reference belongs to the old plate).
         self._last = None
         self._drop_items()
+        self._drop_subtraction()
         self.lbl_result.setText("–")
         self.btn_csv.setEnabled(False)
         self.btn_eff.setEnabled(False)
@@ -179,22 +249,7 @@ class UfeMeasureTab(QWidget):
             return
         self.btn_go_compare.setVisible(False)
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
-        sat = self._saturation_ceiling()
-        result = photometry.measure_point(
-            self._state.data, col, row, r_ap=self.spn_rap.value(),
-            r_ann_in=self.spn_rin.value(),
-            r_ann_out=self.spn_rout.value(),
-            sigma_clip=self.chk_sigmaclip.isChecked(), sat_adu=sat)
-        if not result["ok"]:
-            reason = (result.get("reason") or {}).get(self._lang, "?")
-            self.lbl_status.setText(reason)
-            self._last = None
-            self._drop_items()
-            self.btn_csv.setEnabled(False)
-            self.btn_eff.setEnabled(False)
-            return
-        self.lbl_status.setText("")
-        self._finish_measurement(result, entries)
+        self._measure(col, row, entries)
 
     def _sequence(self):
         # @return: the Compare tab's entries, or [] when absent/empty
@@ -205,17 +260,194 @@ class UfeMeasureTab(QWidget):
         except Exception:
             return []
 
-    def _saturation_ceiling(self):
-        # @return: the plate's saturation level in ADU, or None
-        header = self._state.header or {}
-        for key in ("SATURATE", "SATLEVEL"):
+    def _apertures(self, entries):
+        # H3: when the seeing checkbox is on, measure the comps' FWHM on
+        # the plate and scale the radii; the spins follow so the numbers
+        # stay visible and tweakable.
+        if not self.chk_seeing.isChecked():
+            return (self.spn_rap.value(), self.spn_rin.value(),
+                    self.spn_rout.value()), None
+        positions = []
+        for e in entries:
             try:
-                v = header.get(key)
-                if v is not None:
-                    return float(v)
-            except (TypeError, ValueError):
+                col, row = self._state.wcs.sky_to_pixel(e["star"]["ra"],
+                                                        e["star"]["dec"])
+                positions.append((col, row))
+            except Exception:
                 continue
-        return None
+        sat = photometry.saturation_ceiling(self._state.header)
+        fwhm = photometry.estimate_fwhm(self._state.data, positions,
+                                        sat_adu=sat)
+        r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm)
+        if fwhm is not None:
+            for spn, v in ((self.spn_rap, r_ap), (self.spn_rin, r_in),
+                           (self.spn_rout, r_out)):
+                spn.blockSignals(True)
+                spn.setValue(v)
+                spn.blockSignals(False)
+        return (r_ap, r_in, r_out), fwhm
+
+    def _measure_star(self, data, col, row, radii, sat):
+        # One measurement with the current UI's sky settings.
+        # @return: core/photometry.measure_point's dict
+        return photometry.measure_point(
+            data, col, row, r_ap=radii[0], r_ann_in=radii[1],
+            r_ann_out=radii[2], sigma_clip=self.chk_sigmaclip.isChecked(),
+            sat_adu=sat,
+            sky_mode=self.cmb_sky.currentData())
+
+    def _measure(self, col, row, entries):
+        # Full chain: seeing -> target -> comps -> calibration -> panel.
+        from ..config import config
+        sat = photometry.saturation_ceiling(self._state.header, config)
+        radii, fwhm = self._apertures(entries)
+        if self._diff is not None:
+            # H2b: the target is measured on the difference image (work
+            # frame, plate orientation); the comps keep calibrating on
+            # the original plate (they vanish in the difference).
+            wcol = col / self._diff_scale
+            wrow = row / self._diff_scale
+            result = self._measure_star(self._diff, wcol, wrow,
+                                        tuple(r / self._diff_scale
+                                              for r in radii), None)
+        else:
+            result = self._measure_star(self._state.data, col, row,
+                                        radii, sat)
+        if not result["ok"]:
+            reason = (result.get("reason") or {}).get(self._lang, "?")
+            self.lbl_status.setText(reason)
+            self._last = None
+            self._drop_items()
+            self.btn_csv.setEnabled(False)
+            self.btn_eff.setEnabled(False)
+            return
+        self.lbl_status.setText("")
+        self._calibrate_and_fill(result, col, row, entries, radii, fwhm,
+                                 config)
+
+    def _calibrate_and_fill(self, result, col, row, entries, radii, fwhm,
+                            config):
+        # Comps on the same plate, zero point (with the colour term when
+        # there is spread), the error budget, the check semaphore, and
+        # the panel.
+        band = self.cmb_band.currentText() or "V"
+        bands = self._available_bands(entries)
+        if bands and band not in bands:
+            band = bands[0]
+        if bands:
+            self.cmb_band.blockSignals(True)
+            self.cmb_band.clear()
+            self.cmb_band.addItems(bands)
+            self.cmb_band.setCurrentText(band)
+            self.cmb_band.blockSignals(False)
+        inst_t = -2.5 * math.log10(result["flux"])
+        inst, cat, bvs, used_entries = [], [], [], []
+        skipped = 0
+        for e in entries:
+            star = e["star"]
+            try:
+                ccol, crow = self._state.wcs.sky_to_pixel(star["ra"],
+                                                          star["dec"])
+            except Exception:
+                skipped += 1
+                continue
+            r = self._measure_star(self._state.data, ccol, crow, radii,
+                                   None)
+            value, derived = self._band_of(star, band)
+            if not r["ok"] or value is None:
+                skipped += 1
+                continue
+            inst.append(-2.5 * math.log10(r["flux"]))
+            cat.append(value)
+            bvs.append(star.get("bv"))
+            used_entries.append((e, r))
+        derived_seen = any(self._band_of(e["star"], band)[1]
+                           for e, _r in used_entries)
+        target_bv = self.spn_target_bv.value()
+        if self.chk_color.isChecked():
+            zp = photometry.calibrate_with_color(inst, cat, bvs,
+                                                 target_bv=target_bv)
+        else:
+            zp = photometry.calibrate_zero_point(inst, cat)
+        inst_header = photometry.header_instrument(self._state.header)
+        gain = (inst_header["gain"] if inst_header["gain"] is not None
+                else config.get("ccd_gain"))
+        ron = (inst_header["ron"] if inst_header["ron"] is not None
+               else config.get("ccd_read_noise"))
+        flux_err = photometry.ccd_flux_error(
+            result["flux"], result["sky_pp"], result["n_pix"],
+            gain=gain, ron=ron, exptime=inst_header["exptime"])
+        ccd_mag_err = photometry.mag_error(result["flux"], flux_err)
+        scint = self._scintillation(config, col, row,
+                                    inst_header["exptime"])
+        flat_floor = config.get("flat_resid_mag", 0.007) or 0.007
+        color_err = zp.get("target_color_err")
+        err_total = photometry.combine_errors(
+            ccd_mag_err, zp["zp_err"], scint, flat_floor, color_err)
+        zp_for_mag = zp["zp"]
+        if zp.get("color_used") and zp["k"] is not None:
+            # the fit's zero point is at B−V = 0: move the target onto it
+            zp_for_mag = zp["zp"] + zp["k"] * target_bv
+        mag, _e = photometry.calibrated_mag(inst_t, zp_for_mag)
+        check = self._check_verdict(entries, used_entries, band, zp,
+                                    err_total)
+        self._last = {"result": result, "zp": zp, "mag": mag,
+                      "err": err_total, "err_internal": ccd_mag_err,
+                      "band": band, "used": used_entries,
+                      "derived": derived_seen, "inst_t": inst_t,
+                      "fwhm": fwhm, "radii": radii, "scint": scint,
+                      "check": check, "col": col, "row": row}
+        self._fill_panel(band, len(entries), len(used_entries), skipped,
+                         derived_seen, gain)
+        self.btn_csv.setEnabled(mag is not None)
+        self.btn_eff.setEnabled(mag is not None)
+        self._draw_measurement()
+
+    def _scintillation(self, config, col, row, exptime):
+        # H5: Young's formula with the site from Ajustes and the target's
+        # altitude from the plate's WCS + DATE-OBS. None when it cannot
+        # be computed (the combiner skips it).
+        meta = fits_meta.meta_from_header(self._state.header or {})
+        if meta["mjd"] is None:
+            return None
+        try:
+            ra, dec = self._state.wcs.pixel_to_sky(col, row)
+            jd = meta["mjd"] + 2400000.5
+            lst = coords.lst_degrees(jd, float(config.get("lon")))
+            alt, _az = coords.altaz(ra, dec, float(config.get("lat")),
+                                    lst)
+            return photometry.scintillation_mag(
+                alt, exptime,
+                float(config.get("aperture_inches", 10.0)) * 0.0254,
+                float(config.get("height", 0) or 0.0))
+        except Exception:
+            return None
+
+    def _check_verdict(self, entries, used_entries, band, zp, err_total):
+        # H6: measure the check star on this same plate and compare with
+        # its catalog value; beyond 2.5 sigma the night is not trusted.
+        # @args: zp - the calibration dict (with the colour term when
+        #        fitted: the check's OWN B-V moves its zero point)
+        # @return: None or {"delta", "ok", "name", "mag", "catalog"}
+        check = next((e for e in entries if e["kind"] == "check"), None)
+        if check is None or zp.get("zp") is None or err_total is None:
+            return None
+        used = next((r for e, r in used_entries
+                     if e["star"] is check["star"]), None)
+        if used is None:
+            return None
+        catalog, _d = self._band_of(check["star"], band)
+        if catalog is None:
+            return None
+        zp_check = zp["zp"]
+        if zp.get("color_used") and zp.get("k") is not None \
+                and check["star"].get("bv") is not None:
+            zp_check = zp["zp"] + zp["k"] * check["star"]["bv"]
+        measured = -2.5 * math.log10(used["flux"]) + zp_check
+        delta = measured - catalog
+        return {"delta": delta, "ok": abs(delta) <= 2.5 * err_total,
+                "name": check["name"], "mag": measured,
+                "catalog": catalog}
 
     def _band_of(self, star, band):
         # @return: (value, derived) of the star's band entry, or
@@ -238,81 +470,42 @@ class UfeMeasureTab(QWidget):
                     labels.append(lab)
         return sorted(labels, key=lambda l: (l != "V", l))
 
-    def _finish_measurement(self, result, entries):
-        # The target measured fine: measure the comps on the same plate,
-        # calibrate, and fill the panel. Everything degraded is said.
-        band = self.cmb_band.currentText() or "V"
-        bands = self._available_bands(entries)
-        if bands and band not in bands:
-            band = bands[0]
-        if bands:
-            self.cmb_band.blockSignals(True)
-            self.cmb_band.clear()
-            self.cmb_band.addItems(bands)
-            self.cmb_band.setCurrentText(band)
-            self.cmb_band.blockSignals(False)
-        inst_t = -2.5 * math.log10(result["flux"])
-        inst, cat, used_entries, derived_seen = [], [], [], False
-        skipped = 0
-        for e in entries:
-            star = e["star"]
-            try:
-                col, row = self._state.wcs.sky_to_pixel(star["ra"],
-                                                        star["dec"])
-            except Exception:
-                skipped += 1
-                continue
-            r = photometry.measure_point(
-                self._state.data, col, row, r_ap=self.spn_rap.value(),
-                r_ann_in=self.spn_rin.value(),
-                r_ann_out=self.spn_rout.value(),
-                sigma_clip=self.chk_sigmaclip.isChecked(), sat_adu=None)
-            value, derived = self._band_of(star, band)
-            if not r["ok"] or value is None:
-                skipped += 1
-                continue
-            inst.append(-2.5 * math.log10(r["flux"]))
-            cat.append(value)
-            derived_seen = derived_seen or derived
-            used_entries.append((e, r))
-        zp = photometry.calibrate_zero_point(inst, cat)
-        inst = photometry.header_instrument(self._state.header)
-        flux_err = photometry.ccd_flux_error(
-            result["flux"], result["sky_pp"], result["n_pix"],
-            gain=inst["gain"], ron=inst["ron"], exptime=inst["exptime"])
-        target_err = photometry.mag_error(result["flux"], flux_err)
-        mag, err = photometry.calibrated_mag(inst_t, zp["zp"],
-                                             zp["zp_err"], target_err)
-        self._last = {"result": result, "zp": zp, "mag": mag, "err": err,
-                      "band": band, "used": used_entries,
-                      "derived": derived_seen, "inst_t": inst_t}
-        self._fill_panel(result, zp, mag, err, band, len(entries),
-                         len(used_entries), skipped, derived_seen,
-                         gain_known=inst["gain"] is not None)
-        self.btn_csv.setEnabled(mag is not None)
-        self.btn_eff.setEnabled(mag is not None)
-        self._draw_measurement()
+    # ------------------------------------------------------------- panel
 
-    def _fill_panel(self, result, zp, mag, err, band, n_seq, n_used,
-                    skipped, derived, gain_known):
+    def _fill_panel(self, band, n_seq, n_used, skipped, derived, gain):
         # The result block, in plain language and with every caveat that
         # applies (ADR-038: the panel says what was used and what was not).
+        last = self._last
+        result = last["result"]
+        zp = last["zp"]
         lines = []
         lines.append(self.tr("Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}")
-                     .format(result["x"], result["y"], result["flux"]))
+                     .format(last["col"], last["row"], result["flux"]))
         lines.append(self.tr("Instrumental mag: {0:.3f}")
-                     .format(self._last["inst_t"]))
+                     .format(last["inst_t"]))
         if zp["zp"] is None:
             lines.append(self.tr(
                 "No comparison star could be used: no calibration."))
+        elif zp.get("color_used"):
+            lines.append(self.tr(
+                "Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} "
+                "({3} comps, band {4})")
+                .format(zp["zp"], zp["zp_err"], zp["k"], zp["n"], band))
         else:
             lines.append(self.tr(
                 "Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})")
                 .format(zp["zp"], zp["zp_err"], zp["n"], band))
-            if mag is not None:
-                lines.append(self.tr("Magnitude: {0:.3f} ± {1:.3f} ({2})")
-                             .format(mag, err, band))
+        if last["mag"] is not None:
+            err_txt = (self.tr("± {0:.3f}").format(last["err"])
+                       if last["err"] is not None else "")
+            lines.append(self.tr("Magnitude: {0:.3f} {1} ({2})")
+                         .format(last["mag"], err_txt, band))
         notes = []
+        if last["fwhm"] is not None:
+            r = last["radii"]
+            notes.append(self.tr(
+                "seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f}"
+                " px").format(last["fwhm"], r[0], r[1], r[2]))
         if skipped:
             notes.append(self.tr(
                 "{0} of {1} sequence stars not usable (off the plate, "
@@ -323,10 +516,44 @@ class UfeMeasureTab(QWidget):
         if derived:
             notes.append(self.tr(
                 "Band {0} estimated from Gaia (Riello 2021)").format(band))
-        if not gain_known:
+        if self.chk_color.isChecked() and not zp.get("color_used") \
+                and zp["zp"] is not None:
             notes.append(self.tr(
-                "No gain in the header: the error is the comps' scatter "
-                "only"))
+                "Colour term not fitted (too few comps or too little "
+                "colour spread): plain zero point"))
+        if self.chk_color.isChecked() and zp.get("color_used"):
+            notes.append(self.tr(
+                "Colour term applied with target B−V = {0:.2f}")
+                .format(self.spn_target_bv.value()))
+        if gain is None:
+            notes.append(self.tr(
+                "No gain in the header or settings: the photon noise is "
+                "not in the error"))
+        if last["scint"] is not None:
+            notes.append(self.tr(
+                "Scintillation included ({0:.3f} mag)")
+                .format(last["scint"]))
+        if self._diff is not None:
+            notes.append(self.tr(
+                "Host galaxy subtracted (PS1 reference scaled by the "
+                "comps)"))
+        if last["err"] is not None and last["err_internal"] is not None:
+            notes.append(self.tr(
+                "Error: {0:.3f} internal · {1:.3f} total")
+                .format(last["err_internal"], last["err"]))
+        chk = last["check"]
+        if chk is not None:
+            if chk["ok"]:
+                notes.append(self.tr(
+                    "Check star {0}: measured {1:.2f} vs catalog {2:.2f} "
+                    "(Δ {3:+.2f}, OK)").format(chk["name"], chk["mag"],
+                                               chk["catalog"],
+                                               chk["delta"]))
+            else:
+                notes.append(self.tr(
+                    "Check star {0} is off by {1:+.2f} mag: this "
+                    "measurement is NOT reliable").format(
+                        chk["name"], chk["delta"]))
         lines.extend(f"· {n}" for n in notes)
         self.lbl_result.setText("\n".join(lines))
 
@@ -338,12 +565,12 @@ class UfeMeasureTab(QWidget):
         self._drop_items()
         if not self._active or self._view is None or self._last is None:
             return
-        result = self._last["result"]
-        x, y = self._state.data_to_scene(result["x"], result["y"])
+        last = self._last
+        x, y = self._state.data_to_scene(last["col"], last["row"])
         for r, color, width in (
-                (self.spn_rap.value(), _C_AP, 2.0),
-                (self.spn_rin.value(), _C_ANN, 1.2),
-                (self.spn_rout.value(), _C_ANN, 1.2)):
+                (last["radii"][0], _C_AP, 2.0),
+                (last["radii"][1], _C_ANN, 1.2),
+                (last["radii"][2], _C_ANN, 1.2)):
             ring = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
             pen = QPen(QColor(color))
             pen.setWidthF(width)
@@ -351,7 +578,7 @@ class UfeMeasureTab(QWidget):
             ring.setPen(pen)
             ring.setZValue(55)
             self._items.append(self._view.add_overlay(ring))
-        for e, _r in self._last["used"]:
+        for e, _r in last["used"]:
             pos = self._state.data_to_scene(
                 *self._state.wcs.sky_to_pixel(e["star"]["ra"],
                                               e["star"]["dec"]))
@@ -375,6 +602,116 @@ class UfeMeasureTab(QWidget):
                 pass
         self._items = []
 
+    # --------------------------------------------- host subtraction (H2b)
+
+    def _on_subtract_toggled(self, checked):
+        # Builds (or drops) the difference image against the aligned PS1
+        # reference. Network stays off the GUI thread (BlinkWorker); the
+        # reference is fetched once per plate and cached by core/blink.
+        if not checked:
+            self._drop_subtraction()
+            return
+        if not self._state.has_image or self._state.wcs is None:
+            self.lbl_status.setText(self.tr(
+                "The plate needs a WCS for the aligned reference."))
+            self.chk_subtract.blockSignals(True)
+            self.chk_subtract.setChecked(False)
+            self.chk_subtract.blockSignals(False)
+            return
+        from .workers import BlinkWorker
+        ra, dec = self._state.wcs.center()
+        self.lbl_status.setText(self.tr(
+            "Fetching the reference and subtracting…"))
+        self.chk_subtract.setEnabled(False)
+        self._sub_worker = BlinkWorker(self._state.path, ra=ra, dec=dec)
+        self._sub_worker.finished.connect(self._on_pair_for_subtraction)
+        self._sub_worker.start()
+
+    def _on_pair_for_subtraction(self, pair, errors):
+        # @args: pair - the blink pair (obs at work size + aligned ref)
+        self.chk_subtract.setEnabled(True)
+        self._sub_worker = None
+        if errors:
+            self.lbl_status.setText("⚠ " + errors.get(self._lang, ""))
+            self.chk_subtract.blockSignals(True)
+            self.chk_subtract.setChecked(False)
+            self.chk_subtract.blockSignals(False)
+            return
+        entries = self._sequence()
+        diff = self._build_difference(pair, entries)
+        if diff is None:
+            self.lbl_status.setText(self.tr(
+                "The subtraction found no usable comparison star to "
+                "scale the reference."))
+            self.chk_subtract.blockSignals(True)
+            self.chk_subtract.setChecked(False)
+            self.chk_subtract.blockSignals(False)
+            return
+        self._diff = diff
+        plate_w, _plate_h = self._state.plate_shape
+        self._diff_scale = plate_w / pair["obs"].shape[1]
+        if self._active and self._view is not None:
+            self._view.set_frame_override(self._display_diff)
+        self.lbl_status.setText(self.tr(
+            "Host subtracted. The target now reads on the difference "
+            "image; comps calibrate on the original plate."))
+
+    def _build_difference(self, pair, entries):
+        # Scales the reference so the comparison stars vanish (least
+        # squares through the origin on their net fluxes) and subtracts.
+        # Mirrored pairs are un-flipped first (the editor's orientation).
+        # @return: the difference image (work frame), or None
+        obs = pair["obs"]
+        ref = pair["ref"]
+        if pair.get("flipped"):
+            obs = np.ascontiguousarray(obs[:, ::-1])
+            ref = np.ascontiguousarray(ref[:, ::-1])
+        plate_w, plate_h = self._state.plate_shape
+        fx = plate_w / obs.shape[1]
+        fy = plate_h / obs.shape[0]
+        num = den = 0.0
+        used = 0
+        for e in entries:
+            try:
+                col, row = self._state.wcs.sky_to_pixel(e["star"]["ra"],
+                                                        e["star"]["dec"])
+            except Exception:
+                continue
+            wx, wy = col / fx, row / fy
+            ro = photometry.measure_point(obs, wx, wy)
+            rr = photometry.measure_point(ref, wx, wy)
+            if not ro["ok"] or not rr["ok"] or rr["flux"] <= 0:
+                continue
+            num += ro["flux"] * rr["flux"]
+            den += rr["flux"] ** 2
+            used += 1
+        if used < 2 or den <= 0:
+            return None
+        gain = num / den
+        return obs - gain * ref
+
+    def _display_diff(self):
+        # The difference image as the view's frame (screen orientation),
+        # stretched with the shared controls like any other display.
+        if self._diff is None:
+            return None
+        img = stretch.apply_stretch(self._diff, self._state.black,
+                                    self._state.white, self._state.gamma)
+        if self._state.inverted:
+            img = stretch.invert(img)
+        return np.ascontiguousarray(np.flipud(stretch.to_uint8(img)))
+
+    def _drop_subtraction(self):
+        # Back to the plain plate: no difference image, no override.
+        self._diff = None
+        self._sub_worker = None
+        if self._view is not None:
+            self._view.set_frame_override(None)
+        if hasattr(self, "chk_subtract"):
+            self.chk_subtract.blockSignals(True)
+            self.chk_subtract.setChecked(False)
+            self.chk_subtract.blockSignals(False)
+
     # ------------------------------------------------------------- export
 
     def _export(self, kind):
@@ -390,8 +727,8 @@ class UfeMeasureTab(QWidget):
         meta = fits_meta.meta_from_header(self._state.header or {})
         result = self._last["result"]
         try:
-            ra, dec = self._state.wcs.pixel_to_sky(result["x"],
-                                                   result["y"])
+            ra, dec = self._state.wcs.pixel_to_sky(self._last["col"],
+                                                   self._last["row"])
         except Exception:
             ra = dec = None
         point = {"mjd": meta["mjd"], "filter": self._last["band"],

@@ -290,3 +290,109 @@ def test_header_instrument():
                                             "exptime": None}
     assert phot.header_instrument({}) == {"gain": None, "ron": None,
                                           "exptime": None}
+
+
+# ---------------- phase H: quality pieces ----------------
+
+
+def test_sky_plane_beats_the_median_on_a_ramp():
+    # A tilted sky (galactic core): the plane fit is far less biased
+    rng = np.random.default_rng(1)
+    yy, xx = np.ogrid[:100, :100]
+    ramp = 1000 + 25.0 * (xx - 50)         # 500 ADU across the ring
+    data = ramp + rng.normal(0, 3, (100, 100))
+    amp = 20000.0
+    data = data + amp * np.exp(-((xx - 50.0) ** 2 + (yy - 50.0) ** 2)
+                             / (2 * PSF_SIGMA ** 2))
+    truth = amp * 2 * math.pi * PSF_SIGMA ** 2 * (1 - math.exp(-2.0))
+    med = phot.measure_point(data, 50, 50, sky_mode="median")
+    pla = phot.measure_point(data, 50, 50, sky_mode="plane")
+    assert abs(pla["flux"] - truth) < abs(med["flux"] - truth)
+    assert abs(pla["flux"] - truth) / truth < 0.02
+
+
+def test_estimate_fwhm_and_aperture_scaling():
+    plate = _plate(200, 200, [(100, 100, 9000.0), (60, 60, 7000.0)],
+                   noise=0.5)
+    fwhm = phot.estimate_fwhm(plate, [(100, 100), (60, 60)])
+    assert fwhm == pytest.approx(2.3548 * PSF_SIGMA, rel=0.2)
+    r_ap, r_in, r_out = phot.aperture_for_fwhm(fwhm)
+    assert r_ap == pytest.approx(1.35 * fwhm, rel=1e-6)
+    assert r_in > r_ap and r_out > r_in
+    # absurd or missing seeing falls back to the series defaults
+    assert phot.aperture_for_fwhm(None) == (phot.R_AP, phot.R_ANN_IN,
+                                            phot.R_ANN_OUT)
+    assert phot.aperture_for_fwhm(500.0) == (phot.R_AP, phot.R_ANN_IN,
+                                             phot.R_ANN_OUT)
+    # saturated stars are skipped
+    hot = np.minimum(_plate(200, 200, [(100, 100, 60000.0)]), 30000.0)
+    assert phot.estimate_fwhm(hot, [(100, 100)], sat_adu=30000.0) is None
+
+
+def test_calibrate_with_color_recovers_slope():
+    inst = [14.0, 14.1, 13.9, 14.05, 13.95, 14.02, 14.07]
+    bvs = [0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5]
+    k_true, zp_true = -0.08, 22.3
+    cat = [i + zp_true + k_true * b for i, b in zip(inst, bvs)]
+    out = phot.calibrate_with_color(inst, cat, bvs, target_bv=0.8)
+    assert out["color_used"]
+    assert out["zp"] == pytest.approx(zp_true, abs=1e-6)
+    assert out["k"] == pytest.approx(k_true, abs=1e-6)
+    assert out["n"] == 7 and out["used"] == list(range(7))
+    # target far from the comps' mean colour carries colour uncertainty
+    far = phot.calibrate_with_color(inst, cat, bvs, target_bv=2.5)
+    assert far["target_color_err"] is not None
+    near = phot.calibrate_with_color(inst, cat, bvs, target_bv=0.9)
+    assert near["target_color_err"] <= far["target_color_err"]
+
+
+def test_calibrate_with_color_clips_a_corrupt_comp():
+    inst = [14.0, 14.1, 13.9, 14.05, 13.95, 14.02, 14.07]
+    bvs = [0.3, 0.5, 0.7, 0.9, 1.1, 1.3, 1.5]
+    k_true, zp_true = -0.08, 22.3
+    cat = [i + zp_true + k_true * b for i, b in zip(inst, bvs)]
+    cat[3] += 0.5                          # a corrupted comp (0.5 mag off)
+    out = phot.calibrate_with_color(inst, cat, bvs)
+    assert out["color_used"] and out["n"] == 6
+    assert 3 not in out["used"]
+    assert out["zp"] == pytest.approx(zp_true, abs=0.01)
+
+
+def test_calibrate_with_color_falls_back_without_spread():
+    inst = [14.0, 14.1, 13.9, 14.05]
+    cat = [i + 22.3 for i in inst]
+    out = phot.calibrate_with_color(inst, cat, [0.7] * 4)
+    assert not out["color_used"] and out["k"] is None
+    assert out["zp"] == pytest.approx(22.3, abs=1e-9)
+    assert out["used"] == [0, 1, 2, 3]     # caller's indexes, not filtered
+
+
+def test_saturation_ceiling_priority():
+    cfg = type("C", (), {"get": lambda self, k, d=None:
+                         {"ccd_saturate": 50000.0}.get(k, d)})()
+    assert phot.saturation_ceiling({"SATURATE": 54000}, cfg) == 54000.0
+    assert phot.saturation_ceiling({}, cfg) == 50000.0
+    assert phot.saturation_ceiling({}, None) is None
+    assert phot.saturation_ceiling({"SATURATE": "lots"}, None) is None
+
+
+def test_scintillation_formula():
+    # Young (1967): 0.064 * D^-2/3 * X^1.75 * (2t)^-1/2 * exp(-h/8000)
+    s = phot.scintillation_mag(45.0, 60.0, 0.25, 600.0)
+    x = phot.airmass_from_alt(45.0)
+    expected = 1.086 * 0.064 * 0.25 ** (-2 / 3) * x ** 1.75 \
+        * (120.0) ** -0.5 * math.exp(-600.0 / 8000.0)
+    assert s == pytest.approx(expected, rel=1e-9)
+    # shorter exposure -> more noise; higher site -> less
+    assert phot.scintillation_mag(45.0, 10.0, 0.25, 600.0) > s
+    assert phot.scintillation_mag(45.0, 60.0, 0.25, 2200.0) < s
+    assert phot.scintillation_mag(45.0, None, 0.25, 600.0) is None
+    # airmass clamped: horizon nonsense never explodes
+    assert phot.airmass_from_alt(0.0) == pytest.approx(6.0, abs=0.01)
+    assert phot.airmass_from_alt(90.0) == pytest.approx(1.0)
+
+
+def test_combine_errors():
+    assert phot.combine_errors(0.03, 0.04) == pytest.approx(0.05)
+    assert phot.combine_errors(0.03, None, 0.04) == pytest.approx(0.05)
+    assert phot.combine_errors(None, None) is None

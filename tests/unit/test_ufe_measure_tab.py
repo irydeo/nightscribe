@@ -42,7 +42,7 @@ def _card(key, value=None, comment=""):
     return (s + (f" / {comment}" if comment else ""))[:80].ljust(80)
 
 
-def _write_plate(path, data, wcs=True, instrument=True):
+def _write_plate(path, data, wcs=True, instrument=True, extra=()):
     # @return: a minimal float32 FITS with a TAN WCS and a DATE-OBS
     cards = [_card("SIMPLE", "T"), _card("BITPIX", "-32"),
              _card("NAXIS", "2"), _card("NAXIS1", str(data.shape[1])),
@@ -57,6 +57,7 @@ def _write_plate(path, data, wcs=True, instrument=True):
     if instrument:
         cards += [_card("GAIN", "2.0"), _card("RDNOISE", "5.0"),
                   _card("DATE-OBS", "'2026-09-20T23:30:00'")]
+    cards += list(extra)
     header = "".join(cards + [_card("END")]).encode("latin-1")
     header += b" " * ((2880 - len(header) % 2880) % 2880)
     raw = np.ascontiguousarray(data, dtype=">f4").tobytes()
@@ -159,13 +160,18 @@ def test_full_measurement_calibrates(dlg):
     tab = dlg.tab_measure
     assert tab.lbl_status.text() == ""
     panel = tab.lbl_result.text()
-    assert "Zero point: 22.310" in panel
+    assert "Zero point:" in panel and "22." in panel
     assert "Magnitude:" in panel and "(V)" in panel
+    # the aperture cancels in differential photometry (all stars share
+    # the PSF): whatever radius the seeing picked, the catalog magnitude
+    # comes back. Compute the invariant from the default-aperture flux.
     from nightscribe.core import photometry as phot
     r = phot.measure_point(dlg.state.data, *dlg._test_target)
     expected = -2.5 * math.log10(r["flux"]) + ZP_TRUE
-    assert tab._last["mag"] == pytest.approx(expected, abs=0.01)
-    assert tab._last["err"] < 0.05
+    assert tab._last["mag"] == pytest.approx(expected, abs=0.02)
+    # internal error plus total error, total never below internal
+    assert tab._last["err"] is not None
+    assert tab._last["err"] >= (tab._last["err_internal"] or 0.0)
     # aperture + annulus on the target and a ring per comp used
     assert len(tab._items) == 3 + 5
     assert tab.btn_csv.isEnabled() and tab.btn_eff.isEnabled()
@@ -231,7 +237,7 @@ def test_without_gain_the_error_is_comps_scatter_only(dlg, tmp_path):
     _sequence(dlg, comps)
     _click(dlg, *target)
     panel = dlg.tab_measure.lbl_result.text()
-    assert "scatter" in panel
+    assert "photon noise is not in the error" in panel
     assert dlg.tab_measure._last["mag"] is not None
 
 
@@ -244,3 +250,182 @@ def test_new_plate_invalidates_the_measurement(dlg, tmp_path):
     assert dlg.tab_measure._last is None
     assert dlg.tab_measure._items == []
     assert dlg.tab_measure.lbl_result.text() == "–"
+
+
+# ---------------- phase H pieces ----------------
+
+
+def test_seeing_checkbox_scales_the_apertures(dlg):
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab = dlg.tab_measure
+    assert tab._last["fwhm"] is not None
+    assert "seeing FWHM" in tab.lbl_result.text()
+    # the spins follow the measured seeing (and stay tweakable); the
+    # spinbox shows one decimal, the state keeps full precision
+    assert tab.spn_rap.value() == pytest.approx(
+        tab._last["radii"][0], abs=0.06)
+    # off: back to the user's/manual radii
+    tab.chk_seeing.setChecked(False)
+    tab.spn_rap.setValue(6.0)
+    _click(dlg, *dlg._test_target)
+    assert tab._last["fwhm"] is None
+    assert tab._last["radii"][0] == 6.0
+
+
+def test_sky_plane_on_a_strong_gradient(dlg, tmp_path):
+    # a galactic-core ramp under the target: the plane is less biased
+    from nightscribe.core import photometry as phot
+    data, target, comps = _plate()
+    yy, xx = np.ogrid[:H, :W]
+    data = data + 30.0 * (xx - target[0])    # steep local ramp
+    plate = _write_plate(tmp_path / "ramp.fits", data)
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    tab = dlg.tab_measure
+    tab.cmb_sky.setCurrentIndex(0)           # median
+    _click(dlg, *target)
+    med_flux = tab._last["result"]["flux"]
+    tab.cmb_sky.setCurrentIndex(1)           # plane
+    _click(dlg, *target)
+    pla_flux = tab._last["result"]["flux"]
+    truth = phot.measure_point(data, *target, sky_mode="plane",
+                               sigma_clip=True)["flux"]
+    assert abs(pla_flux - truth) <= abs(med_flux - truth)
+
+
+def test_colour_term_fit_uses_target_bv(dlg, tmp_path):
+    # comps with a colour spread and a known slope: k and the target's
+    # B-V land in the calibrated magnitude. The colour fit needs >=6
+    # comps with spread, so this plate plants six.
+    from nightscribe.core import photometry as phot
+    k_true = -0.08
+    data, target, comps = _plate(n_comps=6)
+    dlg.state.load(_write_plate(tmp_path / "six.fits", data))
+    # fixed default apertures everywhere: this test isolates the colour
+    # term (the seeing scaling has its own test)
+    dlg.tab_measure.chk_seeing.setChecked(False)
+    entries = _sequence(dlg, comps)
+    for j, e in enumerate(entries):
+        bv = 0.3 + j * 0.2                   # 0.3 .. 1.3: real spread
+        e["star"]["bv"] = bv
+        r = phot.measure_point(dlg.state.data,
+                               *dlg.state.wcs.sky_to_pixel(
+                                   e["star"]["ra"], e["star"]["dec"]))
+        inst = -2.5 * math.log10(r["flux"])
+        # catalog carries the colour term: cat = inst + ZP + k*bv
+        e["star"]["bands"][0]["value"] = inst + ZP_TRUE + k_true * bv
+    dlg.tab_measure.spn_target_bv.setValue(0.8)
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    assert tab._last["zp"]["color_used"]
+    assert tab._last["zp"]["k"] == pytest.approx(k_true, abs=0.01)
+    assert "colour slope" in tab.lbl_result.text()
+    r = phot.measure_point(dlg.state.data, *target,
+                           r_ap=tab._last["radii"][0],
+                           r_ann_in=tab._last["radii"][1],
+                           r_ann_out=tab._last["radii"][2])
+    expected = -2.5 * math.log10(r["flux"]) + ZP_TRUE + k_true * 0.8
+    assert tab._last["mag"] == pytest.approx(expected, abs=0.02)
+
+
+def test_colour_term_falls_back_without_spread(dlg):
+    _sequence(dlg, dlg._test_comps)          # all bv = 0.6: no spread
+    _click(dlg, *dlg._test_target)
+    assert not dlg.tab_measure._last["zp"]["color_used"]
+    assert "plain zero point" in dlg.tab_measure.lbl_result.text()
+
+
+def test_check_star_semaphore(dlg):
+    entries = _sequence(dlg, dlg._test_comps)
+    # a check star whose catalog value lies by half a magnitude
+    entries[0]["kind"] = "check"
+    entries[0]["star"]["bands"][0]["value"] += 0.5
+    _click(dlg, *dlg._test_target)
+    panel = dlg.tab_measure.lbl_result.text()
+    assert "NOT reliable" in panel and "Comp1" in panel
+    # and an honest check star confirms the night
+    entries[0]["star"]["bands"][0]["value"] -= 0.5
+    _click(dlg, *dlg._test_target)
+    panel = dlg.tab_measure.lbl_result.text()
+    assert "OK" in panel and "NOT reliable" not in panel
+
+
+def test_saturation_ceiling_from_the_header(dlg, tmp_path):
+    # a SATURATE card below the comps' peak: the tab refuses the bright
+    # target with the honest reason (H4, end to end through the tab)
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "ceil.fits", data,
+                         extra=[_card("SATURATE", "9000.0")])
+    dlg.state.load(plate)
+    _sequence(dlg, comps)
+    _click(dlg, *target)
+    assert dlg.tab_measure._last is None
+    assert dlg.tab_measure.lbl_status.text() == "saturada"
+    # raise the ceiling and the same plate measures fine
+    plate2 = _write_plate(tmp_path / "ceil2.fits", data,
+                          extra=[_card("SATURATE", "60000.0")])
+    dlg.state.load(plate2)
+    _sequence(dlg, comps)
+    _click(dlg, *target)
+    assert dlg.tab_measure._last is not None
+
+
+class _FakeSubWorker:
+    # Synchronous BlinkWorker double delivering a prepared pair.
+    def __init__(self, path, sn_name=None, ra=None, dec=None, pair=None):
+        from PySide6.QtCore import QObject, Signal
+
+        class _Sig(QObject):
+            finished = Signal(dict, dict)
+            progress = Signal(dict)
+        self._sig = _Sig()
+        self.finished = self._sig.finished
+        self.progress = self._sig.progress
+        self._pair = pair
+
+    def start(self):
+        self.finished.emit(self._pair, {})
+
+
+def test_host_subtraction_recovers_the_target(dlg, monkeypatch):
+    from nightscribe.core import photometry as phot
+    _sequence(dlg, dlg._test_comps)
+    # the reference: the same field WITHOUT the target (a fresh plate)
+    data, target, comps = _plate()
+    ref, _t, _c = _plate(target_amp=0.0)
+    pair = {"obs": dlg.state.data, "ref": ref, "sn_xy": target,
+            "name": "SN x", "ra": 0.0, "dec": 0.0, "ref_label": "PS1 g",
+            "flipped": False}
+    monkeypatch.setattr("nightscribe.gui.workers.BlinkWorker",
+                        lambda *a, **k: _FakeSubWorker(*a, pair=pair))
+    tab = dlg.tab_measure
+    tab.chk_subtract.setChecked(True)
+    assert tab._diff is not None
+    assert dlg.view._frame_override is not None
+    assert "Host subtracted" in tab.lbl_status.text()
+    _click(dlg, *target)
+    # the target on the difference image: the host is gone, the flux is
+    # the SN's alone; compare at the tab's (seeing-scaled) apertures
+    r = tab._last["radii"]
+    truth = phot.measure_point(dlg.state.data, *target, r_ap=r[0],
+                               r_ann_in=r[1], r_ann_out=r[2])["flux"]
+    assert tab._last["result"]["flux"] == pytest.approx(truth, rel=0.05)
+    assert "Host galaxy subtracted" in tab.lbl_result.text()
+    # toggle off: the plate comes back
+    tab.chk_subtract.setChecked(False)
+    assert tab._diff is None
+    assert dlg.view._frame_override is None
+
+
+def test_subtraction_without_a_sequence_reverts(dlg, monkeypatch):
+    pair = {"obs": dlg.state.data, "ref": dlg.state.data,
+            "sn_xy": None, "name": "", "ra": 0.0, "dec": 0.0,
+            "ref_label": "PS1 g", "flipped": False}
+    monkeypatch.setattr("nightscribe.gui.workers.BlinkWorker",
+                        lambda *a, **k: _FakeSubWorker(*a, pair=pair))
+    tab = dlg.tab_measure
+    tab.chk_subtract.setChecked(True)
+    assert tab._diff is None
+    assert not tab.chk_subtract.isChecked()
+    assert "no usable comparison star" in tab.lbl_status.text()

@@ -86,6 +86,14 @@ DEFAULTS = {
     "aavso_api_token": "",
     # EXOTIC handoff (Track D, subplan 4): camera identity and observer code
     # for the inits.json; height above is reused as "Obs. Elevation (meters)"
+    # UFE photometry (phase H, PRECISION.es H4/D2): camera constants used
+    # when the FITS header does not carry them; None means "unknown" (the
+    # header wins when present). JSON-settable; the settings UI may grow
+    # fields for them later.
+    "ccd_gain": None,           # e-/ADU
+    "ccd_read_noise": None,     # e-
+    "ccd_saturate": None,       # ADU ceiling
+    "flat_resid_mag": 0.007,    # flat-field residual floor in the error
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
     "pixel_binning": "1x1",
     "aavso_code": "",           # AAVSO observer code; blank when none

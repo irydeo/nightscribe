@@ -164,7 +164,7 @@ def cmd_history(args):
 def cmd_blink(args):
     # Supernova blink: user FITS vs PanSTARRS DR1 g (ADR-018).
     import re
-    from .core import blink
+    from .core import blink, stretch
     from .viz import blink_view
     try:
         pair = blink.prepare_pair(args.imagen, sn_name=args.nombre,
@@ -175,13 +175,13 @@ def cmd_blink(args):
         print(f"ES: {err.messages['es']}\nEN: {err.messages['en']}")
         return 1
     # equalize backgrounds so the blink does not pump brightness
-    ref_f = blink_view.apply_stretch(pair["ref"],
-                                     *blink_view.auto_limits(pair["ref"]))
-    obs_f = blink_view.apply_stretch(pair["obs"],
-                                     *blink_view.auto_limits(pair["obs"]))
-    gain = blink_view.auto_gain(ref_f, obs_f)
-    ref8 = blink_view.to_uint8(blink_view.apply_gain(ref_f, gain))
-    obs8 = blink_view.to_uint8(obs_f)
+    ref_f = stretch.apply_stretch(pair["ref"],
+                              *stretch.auto_limits(pair["ref"]))
+    obs_f = stretch.apply_stretch(pair["obs"],
+                              *stretch.auto_limits(pair["obs"]))
+    gain = stretch.auto_gain(ref_f, obs_f)
+    ref8 = stretch.to_uint8(stretch.apply_gain(ref_f, gain))
+    obs8 = stretch.to_uint8(obs_f)
     outdir = Path(args.salida) if args.salida else paths.data_dir() / "posts"
     outdir.mkdir(parents=True, exist_ok=True)
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", pair["name"])
@@ -261,7 +261,7 @@ def _fits_background(path, progress):
     # @args: path - FITS path, progress - callable(str) for stage messages
     # @return: (numpy array 0..1, Wcs) or (None, None) with the reason
     #          printed by the caller-visible BlinkError message
-    from .core import blink
+    from .core import blink, stretch
     from .viz import blink_view
     try:
         img = blink.load_user_image(
@@ -270,7 +270,7 @@ def _fits_background(path, progress):
         logger.warning("no usable FITS background: %s", err.messages["en"])
         return None, None
     data = img["data"]
-    stretched = blink_view.apply_stretch(data, *blink_view.auto_limits(data))
+    stretched = stretch.apply_stretch(data, *stretch.auto_limits(data))
     return stretched, img["wcs"]
 
 

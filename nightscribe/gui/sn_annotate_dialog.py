@@ -49,7 +49,7 @@ from PySide6.QtWidgets import (
     QGridLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox,
     QPushButton, QScrollArea, QSlider, QVBoxLayout, QWidget)
 
-from ..viz import blink_view
+from ..core import stretch
 
 logger = logging.getLogger("nightscribe.gui.sn_annotate")
 
@@ -423,11 +423,11 @@ class SnAnnotateDialog(QDialog):
         if self._data is None:
             self.lbl_image.setPixmap(QPixmap())
             return
-        black, white = blink_view.auto_limits(
+        black, white = stretch.auto_limits(
             self._data, self._black_pct, self._white_pct)
         img8 = np.ascontiguousarray(
-            np.flipud(blink_view.to_uint8(
-                blink_view.apply_stretch(
+            np.flipud(stretch.to_uint8(
+                stretch.apply_stretch(
                     self._data, black, white, self._gamma))).
             astype(np.uint8))
         h, w = img8.shape

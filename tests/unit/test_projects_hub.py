@@ -145,6 +145,14 @@ def window(_point_db_at_tmpdir):
     w.close()
 
 
+@pytest.fixture(autouse=True)
+def _legacy_route(window, monkeypatch):
+    # This file exercises the LEGACY dialogs (blink / chart / annotate);
+    # the UFE-default routing (ADR-044) is covered in
+    # test_ufe_integration.py.
+    monkeypatch.setattr(window, "_use_ufe", lambda: False)
+
+
 @pytest.fixture()
 def panel(window, tmp_path):
     # A ready-made ObjectPanel (fake loader, temp chart dir) slotted into

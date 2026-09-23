@@ -65,6 +65,13 @@ def window(_point_db_at_tmpdir):
     w.close()
 
 
+@pytest.fixture(autouse=True)
+def _legacy_route(window, monkeypatch):
+    # This file exercises the LEGACY comparison-chart flow; the
+    # UFE-default routing (ADR-044) is covered in test_ufe_integration.py.
+    monkeypatch.setattr(window, "_use_ufe", lambda: False)
+
+
 VAR_CTX = {"ra_deg": 291.366, "dec_deg": 42.784, "mag": 13.5}
 
 

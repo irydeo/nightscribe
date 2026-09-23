@@ -75,6 +75,9 @@ nightscribe/
     photometry_export.py  # reporte fotométrico: CSV + AAVSO EFF (TTL n/a, local)
     phototrans.py     # transformaciones Gaia->Johnson-Cousins (Riello 2021),
                       #   B-V directo/estimado, clase de color (ADR-042)
+    photometry.py     # fotometría calibrada en una placa (pestaña Medir del
+                      #   UFE): medida con guardas, ZP por mediana+MAD, error
+                      #   CCD con ganancia/RON (plan PLANS/ufe-photometry.md)
     compstars.py      # secuencias fotométricas: campo de catálogo, cruce VSX,
                       #   propuesta automática de comps, CSV (ADR-042)
     field_math.py     # proyección TAN de la carta, ticks de borde, escala,
@@ -86,7 +89,11 @@ nightscribe/
     narrative.py     # prosa divulgativa ES/EN
     post.py          # plantillas -> post_ES / post_EN / tuit
     fits_io.py       # lector FITS mínimo (numpy, sin astropy — ADR-018)
+    fits_annotate.py # FITS anotado AIJ-compatible: escribe copias y LEE
+                     #   tarjetas ANNOTATE (UFE las pinta al cargar, ADR-044)
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
+    stretch.py       # motor de estiramiento: percentiles, lineal+gamma, invertir,
+                     #   histograma, downscale 2×2 (ADR-044; blink_view re-exporta)
     blink.py         # blink de SN: resuelve nombre->coords, pareja alineada PS1-g
     sources/         # una clase/módulo por fuente externa (ver docs/DATA_SOURCES)
                      # + hads_sheet.py: libro HADS de P. Wils (Google Sheets XLSX,
@@ -118,8 +125,12 @@ nightscribe/
                       #   sobre DSS2 o el FITS del usuario — ADR-042)
     gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
                        # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
-                       # (ADR-019/035/036/040) — el **Diario de observación** y el
-                       # **Calendario del cielo** (skycal_dialog.py, ADR-040) viven en
+                       # (ADR-019/035/036/040) — el **Diario de observación**, el
+                       # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
+                       # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
+                       # widgets/ufe_image_view.py + widgets/histogram_widget.py +
+                       # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py +
+                       # ufe_measure_tab.py, ADR-044) viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
@@ -153,7 +164,7 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-037, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-044, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
 **Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
@@ -187,7 +198,7 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-037, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-044, bilingual). Read the ADR before
 changing a decision; update it if you do.
 
 **Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow

@@ -216,3 +216,45 @@ def test_aij_fixture_round_trip(tmp_path):
     _, off_out = fits_annotate._split_header(out_raw)
     assert out_raw[off_out:] == before[off_in:]
     assert fixture.read_bytes() == before
+
+
+def _fixture(name):
+    from pathlib import Path
+    return Path(__file__).resolve().parent.parent / "fixtures" / name
+
+
+def test_read_annotations_aij_fixture():
+    # The real AIJ output carries 13 ANNOTATE cards (the header dict
+    # collapses repeats; the reader walks the raw cards).
+    anns = fits_annotate.read_annotations(_fixture(
+        "sample_annotated_image_from_aij.fits"))
+    assert len(anns) == 13
+    first = anns[0]
+    assert first["x"] == pytest.approx(876.74)
+    assert first["y"] == pytest.approx(868.43)
+    assert first["size"] == 30.0 and first["color"] == "orange"
+    assert first["label"] == "NGC 7325"
+    manual = anns[-1]
+    assert manual["size"] == 5.0                       # AIJ's own radius
+    assert manual["label"].startswith("Ejemplo")
+
+
+def test_read_annotations_roundtrip(tmp_path):
+    src = tmp_path / "src.fits"
+    _make_fits(src)
+    out = tmp_path / "out.fits"
+    fits_annotate.write_annotated_fits(
+        src, out, sn_xy=(10.5, 12.25), obj_name="SN test", notes="n")
+    anns = fits_annotate.read_annotations(out)
+    assert anns == [{"x": 10.5, "y": 12.25, "size": 30.0,
+                     "color": "orange", "label": "SN test"}]
+
+
+def test_read_annotations_plain_and_broken(tmp_path):
+    src = tmp_path / "plain.fits"
+    _make_fits(src)
+    assert fits_annotate.read_annotations(src) == []   # no ANNOTATE cards
+    bad = tmp_path / "bad.fits"
+    _make_fits(bad, extra=[_card("ANNOTATE", "'not-a-position'")])
+    assert fits_annotate.read_annotations(bad) == []   # junk is skipped
+    assert fits_annotate.read_annotations(tmp_path / "missing.fits") == []

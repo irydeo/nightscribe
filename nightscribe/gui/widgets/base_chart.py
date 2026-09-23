@@ -369,13 +369,29 @@ class ChartView(QGraphicsView):
         self._tooltip.setFont(f)
         self._tooltip.setText(join)
         br = self._tooltip.boundingRect()
-        # the tooltip sits a short offset from the cursor, flipping sides
-        # near the edges of the visible scene (so it never trails off-view).
+        x, y = self._tooltip_anchor_pos(viewport_pos, br)
+        self._tooltip.setPos(x, y)
+        pad = _TT_PAD / scale
+        self._tip_panel.setRect(
+            br.adjusted(-pad, -pad, pad, pad).translated(x, y))
+        if not self._tip_emitted:
+            self._tip_emitted = True
+            self.hover_changed.emit(True)
+
+    def _tooltip_anchor_pos(self, viewport_pos, br):
+        # Where the tooltip's top-left corner goes, in scene coords.
+        # Default: a short offset from the cursor, flipping sides near the
+        # edges of the visible scene (so it never trails off-view). A
+        # subclass may pin it elsewhere (the UFE view anchors it to a
+        # viewport corner while picking, so it never covers the star being
+        # marked).
+        # @args: viewport_pos - cursor position in viewport px,
+        #        br - the tooltip text bounding rect in scene units
+        # @return: (x, y) scene coordinates
+        scale = max(self.transform().m11(), 1e-3)
         cursor = self.mapToScene(viewport_pos.toPoint())
-        view_w = self.viewport().width()
-        view_h = self.viewport().height()
         # approximate the visible scene width to decide the flip
-        edge = self.mapToScene(view_w, 0).x()
+        edge = self.mapToScene(self.viewport().width(), 0).x()
         gap = 14.0 / scale
         if cursor.x() + gap + br.width() > edge:
             x = cursor.x() - br.width() - gap
@@ -385,13 +401,7 @@ class ChartView(QGraphicsView):
         top = self.mapToScene(0, 0).y()
         if y < top:
             y = cursor.y() + gap
-        self._tooltip.setPos(x, y)
-        pad = _TT_PAD / scale
-        self._tip_panel.setRect(
-            br.adjusted(-pad, -pad, pad, pad).translated(x, y))
-        if not self._tip_emitted:
-            self._tip_emitted = True
-            self.hover_changed.emit(True)
+        return x, y
 
     def _hide_tooltip(self):
         # Removes both the text and the panel (they are paired).

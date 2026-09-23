@@ -168,6 +168,82 @@ class BlinkWorker(QThread):
             self.finished.emit({}, {"es": str(err), "en": str(err)})
 
 
+class UfeSolveWorker(QThread):
+    # Blind-solves the UFE's current plate with Astrometry.net in the
+    # background (ADR-044: astrometric solving is a common UFE feature).
+    finished = Signal(dict)         # solved WCS cards, or {} on failure
+    progress = Signal(str)          # stage text for the solve button
+
+    def __init__(self, path):
+        super().__init__()
+        self._path = path
+
+    def run(self):
+        from ..core.sources import astrometry
+        try:
+            cards = astrometry.solve(self._path,
+                                     progress=self.progress.emit)
+        except Exception as err:    # never crash the GUI on solve problems
+            logger.exception("ufe solve worker failed: %s", err)
+            cards = None
+        self.finished.emit(cards or {})
+
+
+class UfeFieldWorker(QThread):
+    # Loads the comparison-star field (VizieR catalog + VSX) around the
+    # UFE plate's centre in the background (ADR-044, phase F). Signal
+    # object on purpose: the field is a nested dict that Signal(dict)
+    # would drag through a QVariantMap copy.
+    finished = Signal(object)       # compstars.load_field result or {}
+    progress = Signal(dict)         # stage {"es", "en"} for the status line
+
+    def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin):
+        super().__init__()
+        self._catalog = catalog
+        self._ra = ra_deg
+        self._dec = dec_deg
+        self._fov = fov_arcmin
+
+    def run(self):
+        from ..core import compstars
+        try:
+            field = compstars.load_field(self._catalog, self._ra,
+                                         self._dec, self._fov,
+                                         progress=self.progress.emit)
+        except Exception as err:    # never crash the GUI on data problems
+            logger.exception("ufe field worker failed: %s", err)
+            field = None
+        self.finished.emit(field or {})
+
+
+class UfeCutoutWorker(QThread):
+    # Downloads a survey FITS field (PS1-g, DSS2-red fallback) for the
+    # UFE's Compare tab in the background, through the db cache
+    # (ADR-044 rev: DSS2 inside the UFE, no plate needed).
+    finished = Signal(object)       # (local FITS path, survey label)
+    progress = Signal(dict)         # stage {"es", "en"} for the status line
+
+    def __init__(self, ra_deg, dec_deg, fov_arcmin=30.0):
+        super().__init__()
+        self._ra = ra_deg
+        self._dec = dec_deg
+        self._fov = fov_arcmin
+
+    def run(self):
+        from ..core.sources import cutouts
+        try:
+            self.progress.emit({"es": "Descargando el campo del survey…",
+                                "en": "Downloading the survey field…"})
+            width = 1024
+            pixscale = self._fov * 60.0 / width
+            out = cutouts.ps1g_matched(self._ra, self._dec, width, width,
+                                       pixscale, 0.0)
+            self.finished.emit(out if out[0] is not None else (None, None))
+        except Exception as err:    # never crash the GUI on fetch problems
+            logger.exception("ufe cutout worker failed: %s", err)
+            self.finished.emit((None, None))
+
+
 class BlinkExportWorker(QThread):
     # Renders the blink GIF/MP4/PNG off the GUI thread (matplotlib is slow).
     finished = Signal(str, str)     # output path, error message

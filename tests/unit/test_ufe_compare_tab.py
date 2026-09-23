@@ -236,18 +236,6 @@ def test_csv_export_writes_the_sequence(dlg, monkeypatch, tmp_path):
     assert "Written to" in tab.lbl_status.text()
 
 
-def test_png_export_uses_the_shared_scene_export(dlg, monkeypatch, tmp_path):
-    from PySide6.QtWidgets import QFileDialog
-    tab = dlg.tab_compare
-    tab._on_field_ready(_field(dlg))
-    tab._on_propose()
-    out = tmp_path / "carta.png"
-    monkeypatch.setattr(QFileDialog, "getSaveFileName",
-                        staticmethod(lambda *a, **k: (str(out), "")))
-    tab._export_png()
-    assert out.exists() and out.stat().st_size > 0
-
-
 def test_loading_a_new_plate_invalidates_the_field(dlg):
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))

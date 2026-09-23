@@ -40,8 +40,8 @@ from pathlib import Path
 import numpy as np
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QHBoxLayout, QLabel,
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
+                               QGridLayout, QHBoxLayout, QLabel,
                                QLineEdit, QPushButton, QRadioButton,
                                QSlider, QSpinBox, QVBoxLayout, QWidget,
                                QGraphicsEllipseItem, QGraphicsLineItem,
@@ -153,17 +153,30 @@ class UfeBlinkTab(QWidget):
         row.addWidget(self.btn_balance_auto)
         lay.addLayout(row)
 
+        # Fine alignment: the cross of half-pixel steps from the legacy
+        # blink dialog (up adds to y, which reads up on screen).
         row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Nudge ref:")))
-        self.spin_dx = self._nudge_spinbox()
-        self.spin_dy = self._nudge_spinbox()
-        row.addWidget(self.spin_dx)
-        row.addWidget(self.spin_dy)
-        self.btn_nudge = QPushButton(self.tr("Nudge"))
-        self.btn_nudge.clicked.connect(self._apply_nudge)
-        row.addWidget(self.btn_nudge)
+        row.addWidget(QLabel(self.tr("Fine alignment:")))
+        grid = QGridLayout()
+        grid.setSpacing(2)
+        self.btn_up = QPushButton(self.tr("↑"))
+        self.btn_up.clicked.connect(lambda: self._nudge_step(0.0, 0.5))
+        grid.addWidget(self.btn_up, 0, 1)
+        self.btn_left = QPushButton(self.tr("←"))
+        self.btn_left.clicked.connect(lambda: self._nudge_step(-0.5, 0.0))
+        grid.addWidget(self.btn_left, 1, 0)
         self.lbl_nudge = QLabel("(0.0, 0.0)")
-        row.addWidget(self.lbl_nudge)
+        self.lbl_nudge.setAlignment(Qt.AlignCenter)
+        grid.addWidget(self.lbl_nudge, 1, 1)
+        self.btn_right = QPushButton(self.tr("→"))
+        self.btn_right.clicked.connect(
+            lambda: self._nudge_step(0.5, 0.0))
+        grid.addWidget(self.btn_right, 1, 2)
+        self.btn_down = QPushButton(self.tr("↓"))
+        self.btn_down.clicked.connect(lambda: self._nudge_step(0.0, -0.5))
+        grid.addWidget(self.btn_down, 2, 1)
+        row.addLayout(grid)
+        row.addStretch(1)
         lay.addLayout(row)
 
         row = QHBoxLayout()
@@ -198,14 +211,6 @@ class UfeBlinkTab(QWidget):
         row.addWidget(self.btn_png)
         lay.addLayout(row)
         lay.addStretch(1)
-
-    def _nudge_spinbox(self):
-        # @return: one nudge field, in work-frame pixels (y positive = up)
-        sb = QDoubleSpinBox()
-        sb.setRange(-100.0, 100.0)
-        sb.setDecimals(1)
-        sb.setSingleStep(0.5)
-        return sb
 
     # ------------------------------------------------------- activation
 
@@ -450,12 +455,13 @@ class UfeBlinkTab(QWidget):
         gain = stretch.auto_gain(ref_f, obs_f)
         self.sld_balance.setValue(round(gain * 100))   # drives the render
 
-    def _apply_nudge(self):
-        # Shifts the reference by the two fields (work-frame px, y up).
+    def _nudge_step(self, dx, dy):
+        # One fine-alignment step toward the pressed arrow.
+        # @args: dx, dy - the half-pixel step in work-frame px (y up)
         if self._pair is None:
             return
-        self._nudge[0] += self.spin_dx.value()
-        self._nudge[1] += self.spin_dy.value()
+        self._nudge[0] += dx
+        self._nudge[1] += dy
         self.lbl_nudge.setText(
             f"({self._nudge[0]:+.1f}, {self._nudge[1]:+.1f})")
         self._render_frames()
@@ -548,7 +554,6 @@ class UfeBlinkTab(QWidget):
         # GIF / MP4 / side-by-side PNG of the pair, off the GUI thread.
         if self._pair is None or self._obs8 is None:
             return
-        stem = Path(self._state.path).stem if self._state.path else "blink"
         name = self._pair["name"]
         defaults = {"gif": (f"{name}_blink.gif", "GIF (*.gif)"),
                     "video": (f"{name}_blink.mp4", "MP4 video (*.mp4)"),

@@ -6384,83 +6384,106 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="157"/>
         <source>Nudge ref:</source>
-        <translation>Nudge ref:</translation>
+        <translation type="vanished">Nudge ref:</translation>
+    </message>
+    <message>
+        <source>Nudge</source>
+        <translation type="vanished">Nudge</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="159"/>
+        <source>Fine alignment:</source>
+        <translation>Fine alignment:</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="162"/>
-        <source>Nudge</source>
-        <translation>Nudge</translation>
+        <source>↑</source>
+        <translation>\1</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="170"/>
+        <location filename="../ufe_blink_tab.py" line="165"/>
+        <source>←</source>
+        <translation>\1</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="171"/>
+        <source>→</source>
+        <translation>\1</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="175"/>
+        <source>↓</source>
+        <translation>\1</translation>
+    </message>
+    <message>
+        <location filename="../ufe_blink_tab.py" line="183"/>
         <source>Marker</source>
         <translation>Marker</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="174"/>
+        <location filename="../ufe_blink_tab.py" line="187"/>
         <source>Size:</source>
         <translation>Size:</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="183"/>
+        <location filename="../ufe_blink_tab.py" line="196"/>
         <source>Export zoom:</source>
         <translation>Export zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="190"/>
+        <location filename="../ufe_blink_tab.py" line="203"/>
         <source>GIF…</source>
         <translation>GIF…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="193"/>
+        <location filename="../ufe_blink_tab.py" line="206"/>
         <source>MP4…</source>
         <translation>MP4…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="196"/>
+        <location filename="../ufe_blink_tab.py" line="209"/>
         <source>PNG…</source>
         <translation>PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="246"/>
-        <location filename="../ufe_blink_tab.py" line="296"/>
+        <location filename="../ufe_blink_tab.py" line="251"/>
+        <location filename="../ufe_blink_tab.py" line="301"/>
         <source>Load a FITS plate first.</source>
         <translation>Load a FITS plate first.</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="303"/>
+        <location filename="../ufe_blink_tab.py" line="308"/>
         <source>Manual coordinates invalid</source>
         <translation>Manual coordinates invalid</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="308"/>
+        <location filename="../ufe_blink_tab.py" line="313"/>
         <source>Type the supernova name or tick &apos;Manual coordinates&apos;.</source>
         <translation>Type the supernova name or tick &apos;Manual coordinates&apos;.</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="312"/>
+        <location filename="../ufe_blink_tab.py" line="317"/>
         <source>Preparing the blink pair…</source>
         <translation>Preparing the blink pair…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="558"/>
+        <location filename="../ufe_blink_tab.py" line="563"/>
         <source>Export {0}</source>
         <translation>Export {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="566"/>
+        <location filename="../ufe_blink_tab.py" line="571"/>
         <source>Rendering…</source>
         <translation>Rendering…</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="581"/>
+        <location filename="../ufe_blink_tab.py" line="586"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_blink_tab.py" line="585"/>
+        <location filename="../ufe_blink_tab.py" line="590"/>
         <source>Export failed: {0}</source>
         <translation>Export failed: {0}</translation>
     </message>
@@ -6468,201 +6491,198 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeCompareTab</name>
     <message>
-        <location filename="../ufe_compare_tab.py" line="89"/>
+        <location filename="../ufe_compare_tab.py" line="90"/>
         <source>Target:</source>
         <translation>Target:</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="94"/>
+        <location filename="../ufe_compare_tab.py" line="95"/>
         <source>Target mag:</source>
         <translation>Target mag:</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="100"/>
+        <location filename="../ufe_compare_tab.py" line="101"/>
         <source>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</source>
         <translation>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="108"/>
+        <location filename="../ufe_compare_tab.py" line="109"/>
         <source>Generate field</source>
         <translation>Generate field</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="110"/>
+        <location filename="../ufe_compare_tab.py" line="111"/>
         <source>Query the catalog (and VSX variables) around the plate centre</source>
         <translation>Query the catalog (and VSX variables) around the plate centre</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="114"/>
+        <location filename="../ufe_compare_tab.py" line="115"/>
         <source>Load a survey field (DSS2)…</source>
         <translation>Load a survey field (DSS2)…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="116"/>
+        <location filename="../ufe_compare_tab.py" line="117"/>
         <source>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</source>
         <translation>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="125"/>
+        <location filename="../ufe_compare_tab.py" line="126"/>
         <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
         <translation>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="130"/>
+        <location filename="../ufe_compare_tab.py" line="131"/>
         <source>On click, add as:</source>
         <translation>On click, add as:</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="131"/>
+        <location filename="../ufe_compare_tab.py" line="132"/>
         <source>Comparison</source>
         <translation>Comparison</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="133"/>
+        <location filename="../ufe_compare_tab.py" line="134"/>
         <source>Check</source>
         <translation>Check</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="141"/>
+        <location filename="../ufe_compare_tab.py" line="142"/>
         <source>Show catalog magnitudes</source>
         <translation>Show catalog magnitudes</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="145"/>
+        <location filename="../ufe_compare_tab.py" line="146"/>
         <source>Propose sequence</source>
         <translation>Propose sequence</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="147"/>
+        <location filename="../ufe_compare_tab.py" line="148"/>
         <source>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</source>
         <translation>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="155"/>
+        <location filename="../ufe_compare_tab.py" line="156"/>
         <source>Name</source>
         <translation>Name</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="155"/>
+        <location filename="../ufe_compare_tab.py" line="156"/>
         <source>Type</source>
         <translation>Type</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="155"/>
+        <location filename="../ufe_compare_tab.py" line="156"/>
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="161"/>
+        <location filename="../ufe_compare_tab.py" line="162"/>
         <source>Remove all</source>
         <translation>Remove all</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="164"/>
+        <location filename="../ufe_compare_tab.py" line="165"/>
         <source>Export CSV…</source>
         <translation>Export CSV…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="167"/>
         <source>Export chart PNG…</source>
-        <translation>Export chart PNG…</translation>
+        <translation type="vanished">Export chart PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="201"/>
-        <location filename="../ufe_compare_tab.py" line="269"/>
+        <location filename="../ufe_compare_tab.py" line="199"/>
+        <location filename="../ufe_compare_tab.py" line="267"/>
         <source>The plate has no WCS: solve it with «Solve astrometry…» to build the comparison field.</source>
         <translation>The plate has no WCS: solve it with «Solve astrometry…» to build the comparison field.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="205"/>
+        <location filename="../ufe_compare_tab.py" line="203"/>
         <source>No plate loaded: load a FITS or fetch the field from the survey.</source>
         <translation>No plate loaded: load a FITS or fetch the field from the survey.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="224"/>
+        <location filename="../ufe_compare_tab.py" line="222"/>
         <source>Survey field</source>
         <translation>Survey field</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="225"/>
+        <location filename="../ufe_compare_tab.py" line="223"/>
         <source>Object or field name (SIMBAD):</source>
         <translation>Object or field name (SIMBAD):</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="240"/>
+        <location filename="../ufe_compare_tab.py" line="238"/>
         <source>Downloading the survey field…</source>
         <translation>Downloading the survey field…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="252"/>
+        <location filename="../ufe_compare_tab.py" line="250"/>
         <source>The survey download failed (offline?). Try again later.</source>
         <translation>The survey download failed (offline?). Try again later.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="260"/>
+        <location filename="../ufe_compare_tab.py" line="258"/>
         <source>Field loaded: {0}</source>
         <translation>Field loaded: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="277"/>
+        <location filename="../ufe_compare_tab.py" line="275"/>
         <source>Querying the catalog…</source>
         <translation>Querying the catalog…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="289"/>
+        <location filename="../ufe_compare_tab.py" line="287"/>
         <source>The catalog query failed (offline?). Try again later.</source>
         <translation>The catalog query failed (offline?). Try again later.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="302"/>
+        <location filename="../ufe_compare_tab.py" line="300"/>
         <source>VSX check failed</source>
         <translation>VSX check failed</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="304"/>
+        <location filename="../ufe_compare_tab.py" line="302"/>
         <source>{0} · field {1}′ · {2} catalog stars on the plate · {3} known variables</source>
         <translation>{0} · field {1}′ · {2} catalog stars on the plate · {3} known variables</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="522"/>
+        <location filename="../ufe_compare_tab.py" line="520"/>
         <source>{0} is a known variable: it can never be a comparison.</source>
         <translation>{0} is a known variable: it can never be a comparison.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="548"/>
+        <location filename="../ufe_compare_tab.py" line="546"/>
         <source>VSX variable</source>
         <translation>VSX variable</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="549"/>
+        <location filename="../ufe_compare_tab.py" line="547"/>
         <source>variables cannot be comparisons</source>
         <translation>variables cannot be comparisons</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="551"/>
+        <location filename="../ufe_compare_tab.py" line="549"/>
         <source>click: add/remove from the sequence</source>
         <translation>click: add/remove from the sequence</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="568"/>
+        <location filename="../ufe_compare_tab.py" line="566"/>
         <source>Proposed {0} comparisons (tweak by clicking stars).</source>
         <translation>Proposed {0} comparisons (tweak by clicking stars).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="661"/>
+        <location filename="../ufe_compare_tab.py" line="659"/>
         <source>Export sequence CSV</source>
         <translation>Export sequence CSV</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="680"/>
-        <location filename="../ufe_compare_tab.py" line="696"/>
+        <location filename="../ufe_compare_tab.py" line="678"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="690"/>
         <source>Export chart PNG</source>
-        <translation>Export chart PNG</translation>
+        <translation type="vanished">Export chart PNG</translation>
     </message>
 </context>
 <context>
@@ -6682,103 +6702,101 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Open a FITS image (Ctrl+O)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="96"/>
         <source>Invert</source>
-        <translation>Invert</translation>
+        <translation type="vanished">Invert</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="99"/>
         <source>Swap black for white: faint objects pop against the sky</source>
-        <translation>Swap black for white: faint objects pop against the sky</translation>
+        <translation type="vanished">Swap black for white: faint objects pop against the sky</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="103"/>
+        <location filename="../ufe_dialog.py" line="96"/>
         <source>Export PNG…</source>
         <translation>Export PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="105"/>
+        <location filename="../ufe_dialog.py" line="98"/>
         <source>Save the visible scene as a PNG (Ctrl+E)</source>
         <translation>Save the visible scene as a PNG (Ctrl+E)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="110"/>
+        <location filename="../ufe_dialog.py" line="103"/>
         <source>N</source>
         <translation>N</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="113"/>
+        <location filename="../ufe_dialog.py" line="106"/>
         <source>North arrow (needs a WCS)</source>
         <translation>North arrow (needs a WCS)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="118"/>
+        <location filename="../ufe_dialog.py" line="111"/>
         <source>Scale</source>
         <translation>Scale</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="121"/>
+        <location filename="../ufe_dialog.py" line="114"/>
         <source>Scale bar (needs a WCS)</source>
         <translation>Scale bar (needs a WCS)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="126"/>
-        <location filename="../ufe_dialog.py" line="400"/>
+        <location filename="../ufe_dialog.py" line="119"/>
+        <location filename="../ufe_dialog.py" line="385"/>
         <source>Solve astrometry…</source>
         <translation>Solve astrometry…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="128"/>
+        <location filename="../ufe_dialog.py" line="121"/>
         <source>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</source>
         <translation>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="134"/>
+        <location filename="../ufe_dialog.py" line="127"/>
         <source>Zoom:</source>
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="137"/>
+        <location filename="../ufe_dialog.py" line="130"/>
         <source>Fit</source>
         <translation>Fit</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="138"/>
+        <location filename="../ufe_dialog.py" line="131"/>
         <source>Fit the plate to the window</source>
         <translation>Fit the plate to the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="140"/>
+        <location filename="../ufe_dialog.py" line="133"/>
         <source>Zoom {0} % (1:1 at 100)</source>
         <translation>Zoom {0} % (1:1 at 100)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="149"/>
+        <location filename="../ufe_dialog.py" line="142"/>
         <source>Current zoom: 100 % is one plate pixel per screen pixel</source>
         <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="170"/>
+        <location filename="../ufe_dialog.py" line="163"/>
         <source>Measure</source>
         <translation>Measure</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="381"/>
+        <location filename="../ufe_dialog.py" line="366"/>
         <source>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</source>
         <translation>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="396"/>
+        <location filename="../ufe_dialog.py" line="381"/>
         <source>Solving: {0}…</source>
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="406"/>
+        <location filename="../ufe_dialog.py" line="391"/>
         <source>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</source>
         <translation>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="415"/>
+        <location filename="../ufe_dialog.py" line="400"/>
         <source>The Astrometry.net solution is not usable (non-TAN WCS).</source>
         <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
@@ -6787,17 +6805,17 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Histogram (phase B)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="159"/>
+        <location filename="../ufe_dialog.py" line="152"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="163"/>
+        <location filename="../ufe_dialog.py" line="156"/>
         <source>Compare</source>
         <translation>Compare</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="174"/>
+        <location filename="../ufe_dialog.py" line="167"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
@@ -6806,35 +6824,35 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Arrives in phase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="249"/>
+        <location filename="../ufe_dialog.py" line="242"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="250"/>
+        <location filename="../ufe_dialog.py" line="243"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="215"/>
-        <location filename="../ufe_dialog.py" line="260"/>
+        <location filename="../ufe_dialog.py" line="208"/>
+        <location filename="../ufe_dialog.py" line="253"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="61"/>
-        <location filename="../ufe_dialog.py" line="214"/>
-        <location filename="../ufe_dialog.py" line="259"/>
-        <location filename="../ufe_dialog.py" line="358"/>
-        <location filename="../ufe_dialog.py" line="360"/>
-        <location filename="../ufe_dialog.py" line="380"/>
-        <location filename="../ufe_dialog.py" line="405"/>
-        <location filename="../ufe_dialog.py" line="414"/>
+        <location filename="../ufe_dialog.py" line="62"/>
+        <location filename="../ufe_dialog.py" line="207"/>
+        <location filename="../ufe_dialog.py" line="252"/>
+        <location filename="../ufe_dialog.py" line="343"/>
+        <location filename="../ufe_dialog.py" line="345"/>
+        <location filename="../ufe_dialog.py" line="365"/>
+        <location filename="../ufe_dialog.py" line="390"/>
+        <location filename="../ufe_dialog.py" line="399"/>
         <source>NightScribe Image Workbench</source>
         <translation>NightScribe Image Workbench</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="276"/>
+        <location filename="../ufe_dialog.py" line="263"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>

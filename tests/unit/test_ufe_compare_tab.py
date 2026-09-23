@@ -38,6 +38,15 @@ def qapp():
     return app
 
 
+def _spin_events(ms=20):
+    # A plain processEvents() does NOT deliver a deleteLater, but a real
+    # event loop does: let it run long enough for the deferred deletion.
+    from PySide6.QtCore import QEventLoop, QTimer
+    loop = QEventLoop()
+    QTimer.singleShot(ms, loop.quit)
+    loop.exec()
+
+
 @pytest.fixture
 def dlg(qapp):
     from nightscribe.gui.ufe_dialog import UfeDialog
@@ -87,10 +96,27 @@ class _FakeFieldWorker:
 
         class _Sig(QObject):
             finished = Signal(object)
+            progress = Signal(dict)
         self._sig = _Sig()
         self.finished = self._sig.finished
+        self.progress = self._sig.progress
 
     def start(self):
+        # like the real worker: a stage lands before the field arrives
+        self.progress.emit({"es": "Consultando el catálogo Gaia EDR3…",
+                            "en": "Querying the Gaia EDR3 catalog…"})
+        self.finished.emit(self._field or {})
+
+
+class _HoldingFieldWorker(_FakeFieldWorker):
+    # same double, but it hands the field over when told instead of in
+    # start(): lets the test observe the mid-flight state (the busy
+    # dialog, the stage label) before the result lands
+    def start(self):
+        self.progress.emit({"es": "Consultando el catálogo Gaia EDR3…",
+                            "en": "Querying the Gaia EDR3 catalog…"})
+
+    def land(self):
         self.finished.emit(self._field or {})
 
 
@@ -136,6 +162,62 @@ def test_generate_failure_is_honest(dlg, monkeypatch):
     assert "failed" in dlg.tab_compare.lbl_status.text()
 
 
+def test_generate_reports_the_pipeline_stages(dlg, monkeypatch):
+    # The catalog queries take a while; their stages must reach the
+    # status line in the observer's language. Regression: the UFE
+    # rewrite dropped the .progress wiring that the legacy sequence
+    # dialog kept (Blink and Measure still report theirs).
+    created = {}
+
+    def fake(catalog, ra, dec, fov):
+        w = _FakeFieldWorker(catalog, ra, dec, fov, field=_field(dlg))
+        created["worker"] = w
+        return w
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker", fake)
+    tab = dlg.tab_compare
+    tab._on_generate()
+    assert len(tab._stars) == 60
+    # the finished handler overwrote the first stage: emit the second
+    # one to prove the progress connection is live, not just declared
+    created["worker"].progress.emit(
+        {"es": "Comprobando variables conocidas (VSX)…",
+         "en": "Checking known variables (VSX)…"})
+    text = tab.lbl_status.text()
+    assert "Comprobando variables conocidas" in text     # Spanish by default
+    assert "Checking known variables" not in text
+
+
+def test_generate_runs_behind_the_busy_dialog(dlg, monkeypatch):
+    # The catalog queries take seconds: the legacy sequence flow covered
+    # them with a modal, cancel-less busy dialog (a status line alone
+    # reads as "nothing is happening"), and the UFE rewrite dropped it.
+    # It must follow the stages and be reaped when the field lands.
+    created = {}
+
+    def fake(catalog, ra, dec, fov):
+        w = _HoldingFieldWorker(catalog, ra, dec, fov, field=_field(dlg))
+        created["worker"] = w
+        return w
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker", fake)
+    tab = dlg.tab_compare
+
+    from PySide6.QtWidgets import QProgressDialog, QPushButton
+    tab._on_generate()
+    waits = tab.findChildren(QProgressDialog)
+    assert len(waits) == 1
+    wait = waits[0]
+    assert wait.windowTitle() == "Comparison field"
+    assert not wait.findChildren(QPushButton)  # no cancel button: nothing to abort
+    assert wait.maximum() == 0               # indeterminate
+    assert "Consultando el catálogo Gaia EDR3" in wait.labelText()
+    assert "Consultando el catálogo Gaia EDR3" in tab.lbl_status.text()
+    # the field lands: the dialog is reaped before the result is taken
+    created["worker"].land()
+    _spin_events()                              # let the deleteLater run
+    assert not tab.findChildren(QProgressDialog)
+    assert len(tab._stars) == 60             # the result still landed
+
+
 def test_click_toggles_comp_and_check(dlg):
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
@@ -175,6 +257,15 @@ def test_propose_fills_comps_and_check(dlg):
     assert tab.table.rowCount() == len(tab._entries)
     # the proposed stars carry the entry rings as overlays
     assert len(tab._entry_items) == 2 * len(tab._entries)
+
+
+def test_propose_without_a_field_points_the_way(dlg):
+    # No field yet: the button used to do nothing and stay silent, which
+    # the observer read as "it is thinking". It must now say what to do.
+    tab = dlg.tab_compare
+    assert tab._field is None
+    tab._on_propose()
+    assert "Generate the field first" in tab.lbl_status.text()
 
 
 def test_table_edits_flow_to_the_sequence(dlg):

@@ -270,23 +270,35 @@ def _jname(ra, dec):
             f"{'-' if dec < 0 else '+'}{d:02d}{dm:02d}{ds:04.1f}")
 
 
+def _stage(progress, es, en):
+    # Reports a pipeline stage to the caller (GUI status line / CLI).
+    if progress:
+        progress({"es": es, "en": en})
+
+
 def load_field(catalog, ra_deg, dec_deg, fov_arcmin, max_rows=12000,
-               force=False):
+               force=False, progress=None):
     # Full field around a target: catalog stars + VSX variables matched.
     # The query radius covers the field corners plus a small margin
     # (SecFot's fov*sqrt(1/2) + 0.8').
     # @args: catalog - "gaia"|"apass", ra_deg/dec_deg - target J2000,
     #        fov_arcmin - square field side, max_rows - row cap,
-    #        force - bypass the cache read
+    #        force - bypass the cache read,
+    #        progress - optional stage callback ({"es", "en"} per stage)
     # @return: {"stars", "variables", "catalog", "center", "fov_arcmin",
     #          "vsx_warning"} or None when the catalog query failed
     center = (float(ra_deg), float(dec_deg))
     radius = fov_arcmin * math.sqrt(0.5) + 0.8
+    name = vizier.CATALOGS[catalog]["name"]
+    _stage(progress, f"Consultando el catálogo {name}…",
+           f"Querying the {name} catalog…")
     res = vizier.cone_search(catalog, center[0], center[1], radius,
                              max_rows=max_rows, force=force)
     if res is None:
         return None
     stars = build_stars(res[1], center, fov_arcmin / 60.0, catalog)
+    _stage(progress, "Comprobando variables conocidas (VSX)…",
+           "Checking known variables (VSX)…")
     vsx_res = vizier.cone_search("vsx", center[0], center[1], radius,
                                  max_rows=4000, force=force)
     variables = []

@@ -39,6 +39,15 @@ def qapp():
     return app
 
 
+def _spin_events(ms=20):
+    # A plain processEvents() does NOT deliver a deleteLater, but a real
+    # event loop does: let it run long enough for the deferred deletion.
+    from PySide6.QtCore import QEventLoop, QTimer
+    loop = QEventLoop()
+    QTimer.singleShot(ms, loop.quit)
+    loop.exec()
+
+
 @pytest.fixture
 def dlg(qapp):
     from PySide6.QtWidgets import QMessageBox
@@ -267,18 +276,75 @@ def test_survey_field_flow(dlg, monkeypatch):
 
             class _Sig(QObject):
                 finished = Signal(object)
-                progress = Signal(str)
+                progress = Signal(dict)
             self._sig = _Sig()
             self.finished = self._sig.finished
             self.progress = self._sig.progress
 
         def start(self):
+            self.progress.emit({"es": "Descargando el campo del survey…",
+                                "en": "Downloading the survey field…"})
             self.finished.emit((str(MONO), "DSS2-red"))
 
     monkeypatch.setattr("nightscribe.gui.workers.UfeCutoutWorker",
                         _CutWorker)
     tab._on_load_survey()
     assert tab._prefill_sky == (10.0, 20.0)
+    assert dlg.state.has_image                  # the cutout became the plate
+    assert "DSS2-red" in tab.lbl_status.text()
+
+
+def test_survey_download_runs_behind_the_busy_dialog(dlg, monkeypatch):
+    # The survey download also takes seconds: it runs behind the same
+    # modal, cancel-less busy dialog as the catalog query (the UFE
+    # rewrite dropped it), reaped the moment the cutout arrives.
+    from nightscribe.core import blink as core_blink
+    monkeypatch.setattr(
+        core_blink, "resolve_sn",
+        lambda name, **k: {"ra": 10.0, "dec": 20.0, "name": "M 31"})
+
+    class _Ask:
+        @staticmethod
+        def getText(*a, **k):
+            return "M31", True
+    monkeypatch.setattr("PySide6.QtWidgets.QInputDialog.getText",
+                        _Ask.getText)
+
+    created = {}
+
+    class _Holding:
+        def __init__(self, ra, dec, fov_arcmin=30.0):
+            from PySide6.QtCore import QObject, Signal
+
+            class _Sig(QObject):
+                finished = Signal(object)
+                progress = Signal(dict)
+            self._sig = _Sig()
+            self.finished = self._sig.finished
+            self.progress = self._sig.progress
+            created["worker"] = self
+
+        def start(self):
+            self.progress.emit({"es": "Descargando el campo del survey…",
+                                "en": "Downloading the survey field…"})
+
+        def land(self):
+            self.finished.emit((str(MONO), "DSS2-red"))
+    monkeypatch.setattr("nightscribe.gui.workers.UfeCutoutWorker", _Holding)
+
+    from PySide6.QtWidgets import QProgressDialog, QPushButton
+    tab = dlg.tab_compare
+    tab._on_load_survey()
+    waits = tab.findChildren(QProgressDialog)
+    assert len(waits) == 1
+    assert not waits[0].findChildren(QPushButton)  # no cancel button: nothing to abort
+    assert waits[0].maximum() == 0              # indeterminate
+    assert "Descargando el campo del survey" in waits[0].labelText()
+    assert "Descargando el campo del survey" in tab.lbl_status.text()
+    # the cutout lands: the dialog is reaped before the plate loads
+    created["worker"].land()
+    _spin_events()                            # let the deleteLater run
+    assert not tab.findChildren(QProgressDialog)
     assert dlg.state.has_image                  # the cutout became the plate
     assert "DSS2-red" in tab.lbl_status.text()
 

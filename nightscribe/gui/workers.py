@@ -195,6 +195,7 @@ class UfeFieldWorker(QThread):
     # object on purpose: the field is a nested dict that Signal(dict)
     # would drag through a QVariantMap copy.
     finished = Signal(object)       # compstars.load_field result or {}
+    progress = Signal(dict)         # stage {"es", "en"} for the status line
 
     def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin):
         super().__init__()
@@ -207,7 +208,8 @@ class UfeFieldWorker(QThread):
         from ..core import compstars
         try:
             field = compstars.load_field(self._catalog, self._ra,
-                                         self._dec, self._fov)
+                                         self._dec, self._fov,
+                                         progress=self.progress.emit)
         except Exception as err:    # never crash the GUI on data problems
             logger.exception("ufe field worker failed: %s", err)
             field = None
@@ -219,7 +221,7 @@ class UfeCutoutWorker(QThread):
     # UFE's Compare tab in the background, through the db cache
     # (ADR-044 rev: DSS2 inside the UFE, no plate needed).
     finished = Signal(object)       # (local FITS path, survey label)
-    progress = Signal(str)          # stage text for the status line
+    progress = Signal(dict)         # stage {"es", "en"} for the status line
 
     def __init__(self, ra_deg, dec_deg, fov_arcmin=30.0):
         super().__init__()
@@ -230,7 +232,8 @@ class UfeCutoutWorker(QThread):
     def run(self):
         from ..core.sources import cutouts
         try:
-            self.progress.emit("survey cutout")
+            self.progress.emit({"es": "Descargando el campo del survey…",
+                                "en": "Downloading the survey field…"})
             width = 1024
             pixscale = self._fov * 60.0 / width
             out = cutouts.ps1g_matched(self._ra, self._dec, width, width,

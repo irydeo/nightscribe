@@ -34,7 +34,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
 from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QFileDialog, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QRadioButton,
+                               QLineEdit, QProgressDialog,
+                               QPushButton, QRadioButton,
                                QTableWidget, QTableWidgetItem,
                                QVBoxLayout, QWidget,
                                QGraphicsEllipseItem, QGraphicsLineItem,
@@ -54,6 +55,28 @@ C_RING = "#58d68d"      # catalog label ring
 
 _PICK_PX = 11.0         # click/hover radius in SCREEN px at any zoom
 _MAX_LABELS = 34        # catalog magnitude labels, brightest first
+
+
+def _busy_wait(host, label, title):
+    # A modal busy dialog without Cancel for the seconds of network work:
+    # the legacy comparison-chart flow leaned on it (a status line alone
+    # reads as "nothing is happening"), and the UFE rewrite dropped it:
+    # restoring it here.
+    # @args: host - parent widget, label - first busy message,
+    #        title - the window title
+    # @return: the ready dialog (zero minimumDuration: it appears at once)
+    wait = QProgressDialog(label, "", 0, 0, host)
+    wait.setWindowTitle(title)
+    wait.setWindowModality(Qt.WindowModal)
+    wait.setCancelButton(None)
+    wait.setMinimumDuration(0)
+    return wait
+
+
+def _reap_wait(wait):
+    # @args: wait - the busy dialog to close once the worker finished
+    wait.close()
+    wait.deleteLater()
 
 
 class UfeCompareTab(QWidget):
@@ -242,8 +265,18 @@ class UfeCompareTab(QWidget):
         from .workers import UfeCutoutWorker
         self.btn_dss.setEnabled(False)
         self.lbl_status.setText(self.tr("Downloading the survey field…"))
+        wait = _busy_wait(self, self.tr("Downloading the survey field…"),
+                          self.tr("Comparison field"))
         self._cutout_worker = UfeCutoutWorker(ra, dec)
-        self._cutout_worker.finished.connect(self._on_survey_landed)
+        self._cutout_worker.progress.connect(
+            lambda msg: wait.setLabelText(msg.get(self._lang, "")))
+        self._cutout_worker.progress.connect(
+            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+
+        def survey_landed(result):
+            _reap_wait(wait)
+            self._on_survey_landed(result)
+        self._cutout_worker.finished.connect(survey_landed)
         self._cutout_worker.start()
 
     def _on_survey_landed(self, result):
@@ -279,9 +312,23 @@ class UfeCompareTab(QWidget):
         fov_arcmin = max(w, h) * self._state.wcs.pixel_scale() / 60.0
         self.btn_field.setEnabled(False)
         self.lbl_status.setText(self.tr("Querying the catalog…"))
+        # The queries take seconds: cover them with the busy dialog the
+        # legacy flow had (a status line alone reads as "nothing happens")
+        wait = _busy_wait(self, self.tr("Querying the catalog…"),
+                          self.tr("Comparison field"))
         self._worker = UfeFieldWorker(self.cmb_catalog.currentData(),
                                       ra, dec, fov_arcmin)
-        self._worker.finished.connect(self._on_field_ready)
+        # Pipeline stages (catalog query, VSX crossmatch) reach the
+        # dialog label as well as the status line
+        self._worker.progress.connect(
+            lambda msg: wait.setLabelText(msg.get(self._lang, "")))
+        self._worker.progress.connect(
+            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+
+        def field_landed(field):
+            _reap_wait(wait)
+            self._on_field_ready(field)
+        self._worker.finished.connect(field_landed)
         self._worker.start()
 
     def _on_field_ready(self, field):
@@ -561,6 +608,10 @@ class UfeCompareTab(QWidget):
         # The automatic sequence: isolated, non-variable stars matched to
         # the target's brightness (compstars' criteria).
         if self._field is None:
+            # no silent no-op: say what to do first, in both languages
+            self.lbl_status.setText(self.tr(
+                "Generate the field first: I need the plate's catalog "
+                "stars to propose the sequence."))
             return
         self._flush_table()
         seq = compstars.propose_comps(self._stars, self.spn_mag.value())

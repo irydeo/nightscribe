@@ -737,6 +737,10 @@ class UfeMeasureTab(QWidget):
             "Fetching the reference and subtracting…"))
         self.chk_subtract.setEnabled(False)
         self._sub_worker = BlinkWorker(self._state.path, ra=ra, dec=dec)
+        # the pipeline stages (survey reference download) reach the status
+        # line, as the Blink tab's prepare does (ADR-018 progress)
+        self._sub_worker.progress.connect(
+            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
         self._sub_worker.finished.connect(self._on_pair_for_subtraction)
         self._sub_worker.start()
 

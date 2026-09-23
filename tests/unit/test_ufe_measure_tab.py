@@ -385,6 +385,9 @@ class _FakeSubWorker:
         self._pair = pair
 
     def start(self):
+        # like the real worker and the Blink tab's double: a stage, done
+        self.progress.emit({"es": "Descargando la referencia del survey…",
+                            "en": "Downloading the survey reference…"})
         self.finished.emit(self._pair, {})
 
 
@@ -429,6 +432,35 @@ def test_subtraction_without_a_sequence_reverts(dlg, monkeypatch):
     assert tab._diff is None
     assert not tab.chk_subtract.isChecked()
     assert "no usable comparison star" in tab.lbl_status.text()
+
+
+def test_subtraction_reports_the_pipeline_stages(dlg, monkeypatch):
+    # the PS1 reference download takes a while: its stages must reach the
+    # status line. Regression: the UFE review dropped the .progress wiring
+    # that the legacy dialog and the Blink tab's prepare both keep.
+    _sequence(dlg, dlg._test_comps)
+    ref, _t, _c = _plate(target_amp=0.0)
+    target = dlg._test_target
+    pair = {"obs": dlg.state.data, "ref": ref, "sn_xy": target,
+            "name": "SN x", "ra": 0.0, "dec": 0.0, "ref_label": "PS1 g",
+            "flipped": False}
+    created = {}
+
+    def _factory(*a, **k):
+        created["w"] = _FakeSubWorker(*a, pair=pair)
+        return created["w"]
+
+    monkeypatch.setattr("nightscribe.gui.workers.BlinkWorker", _factory)
+    tab = dlg.tab_measure
+    tab.chk_subtract.setChecked(True)
+    assert tab._diff is not None
+    # the finished handler overwrites the stage; re-emit it after the fact
+    # to prove the progress connection is still alive
+    w = created["w"]
+    w.progress.emit({"es": "Descargando la referencia del survey (PS1 g)…",
+                     "en": "Downloading the survey reference (PS1 g)…"})
+    # the tab defaults to lang="es": the Spanish half must show
+    assert "Descargando la referencia del survey" in tab.lbl_status.text()
 
 
 # ---------------- review fixes (apertures) ----------------

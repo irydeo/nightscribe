@@ -6491,97 +6491,97 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>UfeCompareTab</name>
     <message>
-        <location filename="../ufe_compare_tab.py" line="90"/>
+        <location filename="../ufe_compare_tab.py" line="113"/>
         <source>Target:</source>
         <translation>Objetivo:</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="95"/>
+        <location filename="../ufe_compare_tab.py" line="118"/>
         <source>Target mag:</source>
         <translation>Mag del objetivo:</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="101"/>
+        <location filename="../ufe_compare_tab.py" line="124"/>
         <source>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</source>
         <translation>Magnitud aproximada del objetivo: la propuesta elige comparaciones de brillo parecido o mayor</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="109"/>
+        <location filename="../ufe_compare_tab.py" line="132"/>
         <source>Generate field</source>
         <translation>Generar campo</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="111"/>
+        <location filename="../ufe_compare_tab.py" line="134"/>
         <source>Query the catalog (and VSX variables) around the plate centre</source>
         <translation>Consulta el catálogo (y las variables VSX) alrededor del centro de la placa</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="115"/>
+        <location filename="../ufe_compare_tab.py" line="138"/>
         <source>Load a survey field (DSS2)…</source>
         <translation>Cargar campo del survey (DSS2)…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="117"/>
+        <location filename="../ufe_compare_tab.py" line="140"/>
         <source>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</source>
         <translation>¿No tienes placa propia? Descarga el campo del survey (PS1-g, DSS2-rojo como reserva) como FITS con WCS y trabaja directamente sobre él</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="126"/>
+        <location filename="../ufe_compare_tab.py" line="149"/>
         <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
         <translation>Pulsa una estrella para añadirla o quitarla. Las variables conocidas (anillos rojos) nunca sirven de comparación.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="131"/>
+        <location filename="../ufe_compare_tab.py" line="154"/>
         <source>On click, add as:</source>
         <translation>Al pulsar, añadir como:</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="132"/>
+        <location filename="../ufe_compare_tab.py" line="155"/>
         <source>Comparison</source>
         <translation>Comparación</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="134"/>
+        <location filename="../ufe_compare_tab.py" line="157"/>
         <source>Check</source>
         <translation>Check</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="142"/>
+        <location filename="../ufe_compare_tab.py" line="165"/>
         <source>Show catalog magnitudes</source>
         <translation>Ver las magnitudes del catálogo</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="146"/>
+        <location filename="../ufe_compare_tab.py" line="169"/>
         <source>Propose sequence</source>
         <translation>Proponer secuencia</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="148"/>
+        <location filename="../ufe_compare_tab.py" line="171"/>
         <source>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</source>
         <translation>Propuesta automática: estrellas aisladas, no variables, de brillo parecido al objetivo</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="156"/>
+        <location filename="../ufe_compare_tab.py" line="179"/>
         <source>Name</source>
         <translation>Nombre</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="156"/>
+        <location filename="../ufe_compare_tab.py" line="179"/>
         <source>Type</source>
         <translation>Tipo</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="156"/>
+        <location filename="../ufe_compare_tab.py" line="179"/>
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="162"/>
+        <location filename="../ufe_compare_tab.py" line="185"/>
         <source>Remove all</source>
         <translation>Quitar todas</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="165"/>
+        <location filename="../ufe_compare_tab.py" line="188"/>
         <source>Export CSV…</source>
         <translation>Exportar CSV…</translation>
     </message>
@@ -6590,93 +6590,106 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Exportar carta PNG…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="199"/>
-        <location filename="../ufe_compare_tab.py" line="267"/>
+        <location filename="../ufe_compare_tab.py" line="222"/>
+        <location filename="../ufe_compare_tab.py" line="300"/>
         <source>The plate has no WCS: solve it with «Solve astrometry…» to build the comparison field.</source>
         <translation>La placa no tiene WCS: resuélvela con «Resolver astrometría…» para construir el campo de comparación.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="203"/>
+        <location filename="../ufe_compare_tab.py" line="226"/>
         <source>No plate loaded: load a FITS or fetch the field from the survey.</source>
         <translation>No hay placa cargada: carga un FITS o trae el campo del survey.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="222"/>
+        <location filename="../ufe_compare_tab.py" line="245"/>
         <source>Survey field</source>
         <translation>Campo del survey</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="223"/>
+        <location filename="../ufe_compare_tab.py" line="246"/>
         <source>Object or field name (SIMBAD):</source>
         <translation>Nombre del objeto o campo (SIMBAD):</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="238"/>
+        <location filename="../ufe_compare_tab.py" line="261"/>
+        <location filename="../ufe_compare_tab.py" line="262"/>
         <source>Downloading the survey field…</source>
         <translation>Descargando el campo del survey…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="250"/>
+        <location filename="../ufe_compare_tab.py" line="263"/>
+        <location filename="../ufe_compare_tab.py" line="312"/>
+        <source>Comparison field</source>
+        <translation>Campo de comparación</translation>
+    </message>
+    <message>
+        <location filename="../ufe_compare_tab.py" line="283"/>
         <source>The survey download failed (offline?). Try again later.</source>
         <translation>La descarga del survey falló (¿sin conexión?). Inténtalo más tarde.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="258"/>
+        <location filename="../ufe_compare_tab.py" line="291"/>
         <source>Field loaded: {0}</source>
         <translation>Campo cargado: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="275"/>
+        <location filename="../ufe_compare_tab.py" line="308"/>
+        <location filename="../ufe_compare_tab.py" line="311"/>
         <source>Querying the catalog…</source>
         <translation>Consultando el catálogo…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="287"/>
+        <location filename="../ufe_compare_tab.py" line="334"/>
         <source>The catalog query failed (offline?). Try again later.</source>
         <translation>La consulta al catálogo falló (¿sin conexión?). Inténtalo más tarde.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="300"/>
+        <location filename="../ufe_compare_tab.py" line="347"/>
         <source>VSX check failed</source>
         <translation>la comprobación VSX falló</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="302"/>
+        <location filename="../ufe_compare_tab.py" line="349"/>
         <source>{0} · field {1}′ · {2} catalog stars on the plate · {3} known variables</source>
         <translation>{0} · campo de {1}′ · {2} estrellas de catálogo en la placa · {3} variables conocidas</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="520"/>
+        <location filename="../ufe_compare_tab.py" line="567"/>
         <source>{0} is a known variable: it can never be a comparison.</source>
         <translation>{0} es una variable conocida: nunca puede ser comparación.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="546"/>
+        <location filename="../ufe_compare_tab.py" line="593"/>
         <source>VSX variable</source>
         <translation>Variable VSX</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="547"/>
+        <location filename="../ufe_compare_tab.py" line="594"/>
         <source>variables cannot be comparisons</source>
         <translation>las variables no sirven de comparación</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="549"/>
+        <location filename="../ufe_compare_tab.py" line="596"/>
         <source>click: add/remove from the sequence</source>
         <translation>clic: añadir/quitar de la secuencia</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="566"/>
+        <location filename="../ufe_compare_tab.py" line="607"/>
+        <source>Generate the field first: I need the plate&apos;s catalog stars to propose the sequence.</source>
+        <translation>Genera el campo primero: necesito las estrellas del catálogo de la placa para proponer la secuencia.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_compare_tab.py" line="617"/>
         <source>Proposed {0} comparisons (tweak by clicking stars).</source>
         <translation>Propuestas {0} comparaciones (ajusta pulsando estrellas).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="659"/>
+        <location filename="../ufe_compare_tab.py" line="710"/>
         <source>Export sequence CSV</source>
         <translation>Exportar la secuencia CSV</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="678"/>
+        <location filename="../ufe_compare_tab.py" line="729"/>
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
     </message>
@@ -7107,12 +7120,12 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Descargando la referencia y restando…</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="730"/>
+        <location filename="../ufe_measure_tab.py" line="734"/>
         <source>The subtraction found no usable comparison star to scale the reference.</source>
         <translation>La sustracción no encontró comparaciones utilizables para escalar la referencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="742"/>
+        <location filename="../ufe_measure_tab.py" line="746"/>
         <source>Host subtracted. The target now reads on the difference image; comps calibrate on the original plate.</source>
         <translation>Huésped restada. El objetivo se mide ahora en la imagen diferencia; las comps calibran en la placa original.</translation>
     </message>
@@ -7140,17 +7153,17 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">No gain in the header: the error is the comps&apos; scatter only</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="826"/>
+        <location filename="../ufe_measure_tab.py" line="830"/>
         <source>Export measurement</source>
         <translation>Exportar medida</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="836"/>
+        <location filename="../ufe_measure_tab.py" line="840"/>
         <source>Export measurement (AAVSO EFF)</source>
         <translation>Exportar medida (AAVSO EFF)</translation>
     </message>
     <message>
-        <location filename="../ufe_measure_tab.py" line="860"/>
+        <location filename="../ufe_measure_tab.py" line="864"/>
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
     </message>

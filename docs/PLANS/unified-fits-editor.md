@@ -18,6 +18,16 @@
 > tiene su propio plan: `docs/PLANS/ufe-photometry.md` (fases G y H
 > cerradas 2026-09-23).
 >
+> **Revisión del observador, ronda 2 (2026-09-23, CERRADA)**: la
+> secuencia de Comparar ya no desaparece al pasar a Medir (overlays
+> visibles y sonda viva, clics desarmados: `set_active(keep_overlays=)`);
+> la sustracción de huésped ya no deja la vista negra (la diferencia se
+> auto-estira, no hereda el negro de la placa) ni mezcla escalas de
+> flujo (las comps calibran en el frame de trabajo de la diferencia:
+> `pair["obs"]`), y el par que aterriza con la casilla desmarcada se
+> ignora; toda opción de Medir (cielo, sigma-clip, color, B−V)
+> recalcula la medida viva al instante.
+>
 > **Centroide de precisión y aperturas sugeridas (fase I, 2026-09-23,
 > CERRADA)**: `refined_centroid` (cielo restado, umbral, dos pasadas;
 > el legacy `series._centroid` intacto) es el centroide por defecto de

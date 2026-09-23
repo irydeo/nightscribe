@@ -99,7 +99,10 @@ The **Measure** tab turns one click into a catalog-calibrated magnitude
   annulus visible on the image, and the panel tells the full story:
   instrumental magnitude, the zero point with its error and how many
   comps were used (and why any was refused), and the **calibrated
-  magnitude ± error**.
+  magnitude ± error**. Coming from Compare, the sequence stays visible
+  (rings and labels): you measure WITH it in sight; and changing any
+  option (sky, sigma-clip, colour term, target B−V, radii) re-measures
+  at once.
 * The default band is V; apertures and the sky sigma-clip are
   adjustable. When the header lacks the gain, the panel warns that the
   error is the comps' scatter only.

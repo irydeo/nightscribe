@@ -100,7 +100,10 @@ catálogo (fotometría de apertura diferencial de una placa):
   anillo de cielo visibles en la imagen, y el panel cuenta el resultado
   completo: magnitud instrumental, punto cero con su error y cuántas
   comps se usaron (y por qué se rechazó alguna), y la **magnitud
-  calibrada ± error**.
+  calibrada ± error**. Al entrar desde Comparar, la secuencia queda
+  visible (anillos y etiquetas): mides CON ella a la vista; y cambiar
+  cualquier opción (cielo, sigma-clip, término de color, B−V, radios)
+  recalcula la medida al instante.
 * La banda por defecto es V; las aperturas y el sigma-clip del cielo son
   ajustables. Si la cabecera no trae ganancia, el panel avisa de que el
   error es solo la dispersión de las comps.

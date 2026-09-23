@@ -271,13 +271,13 @@ class UfeImageState(QObject):
         col, row = self.scene_to_data(scene_x, scene_y)
         icol, irow = int(col), int(row)
         dn = self.data[irow, icol]
-        lines = [f"({icol}, {irow})  DN {dn:.1f}"]
+        lines = [f"({icol}, {irow})  {self.tr('DN')} {dn:.1f}"]
         if self.wcs is not None:
             try:
                 ra, dec = self.wcs.pixel_to_sky(col, row)
                 lines.append(
-                    f"RA {coords.ra_deg_to_hms(ra)}  "
-                    f"Dec {coords.dec_deg_to_dms(dec)}")
+                    f"{self.tr('RA')} {coords.ra_deg_to_hms(ra)}  "
+                    f"{self.tr('Dec')} {coords.dec_deg_to_dms(dec)}")
             except Exception:
                 pass                          # off-frame TAN: pixels only
         return True, lines

@@ -161,6 +161,36 @@ panel marks it). The measurement exports to a one-row CSV or an AAVSO
 EFF line with the sequence in CNAME/CMAG/KNAME/KMAG. The FITS file on
 disk is never modified.
 
+**Quality controls** (phase H, 2026-09-23):
+
+* **Sky**: flat median by default; on galactic cores the "Plane" mode
+  fits a ramp to the annulus and evaluates the sky at the star's
+  position (the flat median is biased there).
+* **Aperture follows the seeing**: the comps' FWHM is measured on the
+  plate and the aperture is sized at 1.35 × FWHM (the fields stay
+  visible and hand-adjustable).
+* **Colour term**: with at least 6 comps carrying B−V spread, the fit
+  is `ZP + k·(B−V)` applied with the target's B−V (variables: the VSX
+  one; a SN near peak is ~0, and the panel warns about the assumption).
+  Without enough spread, a plain zero point, and it says so. Comp
+  outliers are MAD-rejected before fitting.
+* **Real saturation**: the ceiling comes from the header's SATURATE
+  card or the `ccd_saturate` setting; when nobody knows, the plateau
+  heuristic keeps running.
+* **Honest total error**: the panel distinguishes "internal" (photons,
+  when the gain is known) from "total" (plus ZP scatter, Young
+  scintillation with your aperture and site height from Settings, the
+  colour term and a 0.007 mag flat floor configurable as
+  `flat_resid_mag`).
+* **The check star as a traffic light**: when the sequence has one, it
+  is measured and compared with its catalog value; beyond 2.5σ_total
+  the measurement is flagged NOT reliable before you trust it.
+* **Subtract host galaxy**: downloads the aligned PS1 reference (the
+  blink's one), scales it so the stars vanish, and measures the target
+  on the difference image; the comps calibrate on the original plate.
+  For SNe on cores this is the difference between "not measurable" and
+  "0.03–0.05 mag".
+
 **Formula 3: the differential magnitude**
 
 ```
@@ -289,7 +319,7 @@ In the usual order of impact:
    different B−V colours (a blue SN against solar-type stars), a drift
    of hundredths of a magnitude appears. Rule of thumb: pick comparisons
    of similar colour to the target (B−V is right there in the Compare
-   tab).
+   tab), or let the Measure tab fit it with the comps (phase H).
 3. **The catalog transformation**: Gaia-derived V adds a ~0.01–0.03 mag
    systematic; APASS's direct V avoids it.
 4. **Sky with a gradient**: near a galactic core the background is not

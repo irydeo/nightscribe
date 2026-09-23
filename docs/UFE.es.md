@@ -85,6 +85,14 @@ catálogo (fotometría de apertura diferencial de una placa):
 * La banda por defecto es V; las aperturas y el sigma-clip del cielo son
   ajustables. Si la cabecera no trae ganancia, el panel avisa de que el
   error es solo la dispersión de las comps.
+* Controles de calidad (fase H): cielo por mediana o por **plano** en
+  núcleos galácticos, **apertura que sigue al seeing** (FWHM medido en
+  la placa), **término de color** ajustado con el B−V de las comps y el
+  del objetivo, techo de **saturación real** (SATURATE o `ccd_saturate`),
+  **error interno vs. total** (fotones + dispersión + centelleo + color
+  + flats), la **estrella check como semáforo** de la medida, y la
+  **sustracción de la galaxia huésped** con la referencia PS1 del blink
+  para SNe en núcleos.
 * **CSV…** exporta la medida en una fila y **AAVSO EFF…** en el formato
   de la AAVSO, con la secuencia en CNAME/CMAG/KNAME/KMAG. La placa en
   disco nunca se modifica.

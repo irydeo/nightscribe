@@ -1,16 +1,18 @@
-# Precision photometry in NightScribe: what it takes
+# Precision photometry in NightScribe: how it is achieved
 
 *[Versión en español](PRECISION.es.md)*
 
 This document answers one question: **what separates a 0.05 mag
 measurement from a 0.005 mag one**. It serves two readers: the observer,
-who wants the concepts and to decide how far to go (part one, no
-mathematics); and an AI or developer who may one day implement the
-missing pieces (technical appendix at the end).
+who wants the concepts and to get the most out of their equipment (part
+one, no mathematics); and an AI or developer extending the
+implementation (technical appendix at the end). Almost everything
+described here already exists in NightScribe (phases G and H,
+2026-09-23); only the exoplanet-transit regime is pending a decision
+(ADR-015).
 
-Documentation of what already exists and how it works:
-[PHOTOMETRY.md](PHOTOMETRY.md). This document starts there and looks
-forward.
+Documentation of the base photometric process:
+[PHOTOMETRY.md](PHOTOMETRY.md). This document is its quality sequel.
 
 ---
 
@@ -38,32 +40,35 @@ systematics.
 
 ### 2. The quality ladder
 
-From the free to the heroic; each rung "buys" a typical improvement:
+From the free to the heroic; each rung "buys" a typical improvement, and
+almost all of them already live in the FITS editor (Measure tab, phase
+H):
 
-| Rung | Effort | What it buys |
+| Rung | Where it lives | What it buys |
 |---|---|---|
-| Well-reduced plate (bias, darks, **flats**) | observing | a flat field: without it, 1–5 % error depending on position |
-| Comparisons of similar colour to the target | one well-chosen click | removes most of the colour term |
-| Aperture that follows the night's seeing | little code | optimal SNR and night-to-night consistency |
-| Well-estimated sky (robust median or plane) | little code | the SN stops being measured "galaxy included" |
-| Your camera's real saturation level | one config line | no clipped star sneaks in as a good one |
-| Colour term fitted with the comps | mathematics | your equipment's response stops biasing the zero |
-| Host-galaxy subtraction (SNe) | moderate code | on galactic cores: from 0.05–0.15 to 0.03–0.05 mag |
-| Per-frame normalization + detrending (series) | moderate code | the transits' requirement: 0.001–0.005 mag relative |
+| Well-reduced plate (bias, darks, **flats**) | you, when stacking | a flat field: without it, 1–5 % error depending on position |
+| Comparisons of similar colour to the target | you, Compare tab | removes most of the colour term |
+| Aperture that follows the night's seeing | Measure tab (H3) | optimal SNR and night-to-night consistency |
+| Well-estimated sky (robust median or plane) | Measure tab (H2a) | the SN stops being measured "galaxy included" |
+| Your camera's real saturation level | Measure tab (H4: SATURATE card or `ccd_saturate` setting) | no clipped star sneaks in as a good one |
+| Colour term fitted with the comps | Measure tab (H1) | your equipment's response stops biasing the zero |
+| Host-galaxy subtraction (SNe) | Measure tab (H2b) | on galactic cores: from 0.05–0.15 to 0.03–0.05 mag |
+| Per-frame normalization + detrending (series) | pending (ADR-015) | the transits' requirement: 0.001–0.005 mag relative |
 
 ### 3. Three scenarios, honest figures
 
-* **Variable star on a good night, reduced plate**: today the series
-  flow gives Δmag with 0.02–0.05 mag total precision; with the adaptive
-  aperture, the colour term and the check star watching, **0.01–0.02
-  mag** is realistic. Beyond that the colour calibration rules, and
+* **Variable star on a good night, reduced plate**: the series flow
+  gives Δmag with 0.02–0.05 mag total precision; the Measure tab
+  (adaptive aperture, colour term and the check star watching) brings it
+  to **0.01–0.02 mag**. Beyond that the colour calibration rules, and
   going further means measuring your own camera's transformation
   coefficients on standard fields (another league, noted as v2).
 * **Supernova against a galactic core**: the enemy is not noise, it is
-  the galaxy. A plane-fitted sky annulus helps somewhat; with **host
-  subtraction** (the PS1 reference already aligned by the blink is
-  subtracted, scaled so the stars vanish and only the SN remains) you go
-  from 0.05–0.15 to **0.03–0.05 mag**.
+  the galaxy. The Measure tab does both things: the plane-fitted sky
+  already improves the measurement, and with **host subtraction** (the
+  PS1 reference aligned by the blink is subtracted, scaled so the stars
+  vanish and only the SN remains) you go from 0.05–0.15 to **0.03–0.05
+  mag**.
 * **Exoplanet transit (hot Jupiter)**: the signal is a 0.01–0.02 mag
   dip lasting hours. Absolute accuracy is not needed; **extreme relative
   stability** is: every frame is normalized with its own comparison
@@ -74,21 +79,22 @@ From the free to the heroic; each rung "buys" a typical improvement:
   amateur reaches 0.001–0.005 mag per binned point: enough for
   publishable transit curves. Today EXOTIC does that reduction (signed
   decision, ADR-015); doing it in-house is possible but is the major
-  work item on this list.
+  work item left.
 
 ### 4. When to trust a number
 
-* **The check star is the traffic light**: it is measured as if it were
-  the target and compared with its catalog value. If it moves, the
-  variable is not to blame: the night, the plate or the sequence is not
-  trustworthy. If only the target moves, that is astrophysics.
+* **The check star is the traffic light**: the Measure tab measures it
+  as if it were the target and compares it with its catalog value. If it
+  moves, the variable is not to blame: the night, the plate or the
+  sequence is not trustworthy. If only the target moves, that is
+  astrophysics.
 * **Saturation with a real level**: "almost saturated" does not exist.
-  The ceiling must come from the SATURATE card or your camera setting,
-  not estimated from the frame itself.
-* **The reported error vs. the total**: the program must tell you
-  whether its error includes only noise or also the comps' scatter and
-  the colour fit. Trusting the first number as if it were the second is
-  the most common mistake.
+  The ceiling comes from the SATURATE card or the `ccd_saturate`
+  setting, not estimated from the frame itself.
+* **The reported error vs. the total**: the panel distinguishes
+  "internal" (photons) from "total" (plus comps' scatter, scintillation,
+  colour and flats). Trusting the first number as if it were the second
+  is the most common mistake.
 
 ### 5. What is what today
 
@@ -98,23 +104,30 @@ From the free to the heroic; each rung "buys" a typical improvement:
 | Comparison sequences with catalog magnitudes (Gaia/APASS, VSX veto) | Exists (the FITS editor's Compare tab) |
 | Δmag series with automatic ensemble + SN quick-look | Exists (`core/series.py`, Follow-up flow) |
 | CSV / AAVSO EFF export | Exists (`core/photometry_export.py`) |
-| Calibrated measurement on one plate (zero point from comps) | Signed plan: `PLANS/ufe-photometry.md` (phase G) |
-| Colour term, gradient sky, FWHM aperture, real saturation, total error, check semaphore | Missing: pieces A–G of the appendix |
-| Host-galaxy subtraction | Missing: piece H2 (the blink already aligns the reference) |
+| Calibrated measurement on one plate (zero point from comps) | Exists (the FITS editor's Measure tab, phase G) |
+| Colour term, gradient sky, FWHM aperture, real saturation, total error, check semaphore | Exists (phase H, 2026-09-23: `core/photometry.py` + Measure tab) |
+| Host-galaxy subtraction | Exists (phase H: the blink's aligned PS1 reference, comp-scaled) |
 | Per-frame normalized series + detrending for transits | Missing: pieces T1–T8; ADR-015 decision to revisit or scope |
 
 ---
 
-## Appendix: for the implementing AI (or developer)
+## Appendix: the implementation's technical reference
+
+**Status**: pieces H1–H7 are implemented (2026-09-23) in
+`core/photometry.py` and `gui/ufe_measure_tab.py`, with tests in
+`tests/unit/test_photometry.py` and `test_ufe_measure_tab.py`; phase G
+(calibrated single-plate measurement) lives in
+`docs/PLANS/ufe-photometry.md`. Pieces T1–T8 (transits) remain pending
+the ADR-015 decision. This appendix stays as the reference specification
+for future extensions.
 
 House rules: the project header on every `.py`; code in English with
 `# @args:`/`# @return:` comments; every visible string through
 `self.tr()`; network only from `core/sources/` via `core/db.py`;
-offscreen tests with a fixed `np.random.default_rng(<seed>)` (the
-`test_series.py` flake does not happen twice); the legacy dialogs are
-never touched; docs without the em dash. Starting point:
-`docs/PLANS/ufe-photometry.md` (phase G: calibrated single-plate
-measurement; this appendix is its quality extension).
+offscreen tests with a fixed `np.random.default_rng(<seed>)`; the legacy
+dialogs are never touched; docs in natural language (the usual style
+rule: colons, commas and semicolons; the en dash only for numeric
+ranges).
 
 ### A. Single-shot improvements (variables, SNe): pieces H1–H7
 

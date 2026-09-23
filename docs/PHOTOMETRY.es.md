@@ -160,6 +160,35 @@ panel lo marca). La medida se exporta a CSV de una fila o a línea AAVSO
 EFF con la secuencia en CNAME/CMAG/KNAME/KMAG. El archivo FITS en disco
 nunca se modifica.
 
+**Controles de calidad** (fase H, 2026-09-23):
+
+* **Cielo**: mediana plana por defecto; en núcleos galácticos, el modo
+  «Plano» ajusta una rampa al anillo y evalúa el cielo en la posición de
+  la estrella (la mediana plana ahí está sesgada).
+* **La apertura sigue al seeing**: se mide el FWHM de las comps en la
+  placa y la apertura se dimensiona a 1,35 × FWHM (los campos quedan
+  visibles y ajustables a mano).
+* **Término de color**: con al menos 6 comps con dispersión de B−V se
+  ajusta `ZP + k·(B−V)` y se aplica con el B−V del objetivo (variables:
+  el del VSX; una SN cerca del pico es ~0, y el panel avisa de la
+  suposición). Sin dispersión suficiente, punto cero plano y se dice.
+  Los outliers de las comps se rechazan por MAD antes de ajustar.
+* **Saturación real**: el techo sale de la tarjeta SATURATE de la
+  cabecera o del ajuste `ccd_saturate`; si nadie lo sabe, sigue la
+  heurística de la meseta.
+* **Error total honesto**: el panel distingue «interno» (fotones, si hay
+  ganancia) de «total» (más dispersión del ZP, centelleo de Young con tu
+  apertura y altura de Ajustes, término de color y un suelo de flat de
+  0,007 mag configurable como `flat_resid_mag`).
+* **La estrella check como semáforo**: si la secuencia tiene una, se
+  mide y se compara con su catálogo; si se desvía más de 2,5σ_total, la
+  medida se marca como NO fiable antes de que te fíes de ella.
+* **Restar la galaxia huésped**: descarga la referencia PS1 alineada
+  (la del blink), la escala para que las estrellas desaparezcan y mide
+  el objetivo en la imagen diferencia; las comps calibran en la placa
+  original. Para SNe en núcleos es la diferencia entre «no medible» y
+  «0,03–0,05 mag».
+
 **Fórmula 3: la magnitud diferencial**
 
 ```
@@ -289,7 +318,8 @@ Por orden de impacto habitual:
    B−V muy distintos (una SN azul frente a estrellas solares), aparece
    una deriva de centésimas de magnitud. Regla práctica: elige
    comparaciones de color parecido al objetivo (el B−V está en la
-   pestaña Comparar).
+   pestaña Comparar), o deja que la pestaña Medir lo ajuste con las
+   comps (fase H).
 3. **La transformación de catálogo**: la V derivada de Gaia añade
    ~0,01–0,03 mag de sistemático; la V directa de APASS lo evita.
 4. **El cielo con gradiente**: cerca de un núcleo galáctico el fondo no

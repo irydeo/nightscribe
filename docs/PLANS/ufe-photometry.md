@@ -1,6 +1,6 @@
-# Plan de implementación: fotometría calibrada en el UFE (pestaña Medir, fase G) (2026-09-22)
+# Plan de implementación: fotometría calibrada en el UFE (pestaña Medir, fases G y H) (2026-09-22)
 
-> **ESTADO: G1, G2 y G3 CERRADAS (2026-09-23).** La fase G1 la
+> **ESTADO: G Y H CERRADAS (2026-09-23).** La fase G1 la
 > implementó otra IA en `ed8c9c5` y pasó revisión (notas abajo). G2 la
 > hizo esta sesión: `gui/ufe_measure_tab.py` (clic → centroide → medida;
 > comps de la pestaña Comparar medidas en la misma placa por su nuevo
@@ -11,8 +11,19 @@
 > cadenas, PHOTOMETRY.es/en con la sección 3.3 (medida calibrada),
 > UFE.es/en con la pestaña, ADR-044 rev, AGENTS.md al día. Suite 1635
 > verde.
-> **La fase G está completa.** Lo siguiente es la fase H de
-> `docs/PRECISION.es.md` (calidad en una toma) cuando se decida.
+> **La fase G está completa.** La fase H (2026-09-23, misma sesión) la
+> cerró con las piezas H1–H7 de `docs/PRECISION.es.md`: cielo por plano
+> (H2a), apertura por FWHM (H3), término de color con rechazo MAD de
+> outliers (H1+H7), saturación real por SATURATE/`ccd_saturate` (H4),
+> error total con centelleo de Young + suelo de flat (H5) y semáforo
+> check (H6); sustracción de la galaxia huésped sobre la referencia
+> alineada del blink (H2b). Suite 1651 verde, i18n 1253 cadenas. Hallazgo
+> propio: el clip por MAD colapsa cuando la mayoría ajusta exacto; el
+> umbral queda con suelo de 0.06 mag y desviaciones medidas desde la
+> mediana de los residuales.
+> **Queda pendiente** solo el régimen de tránsitos (T1–T8), a la espera
+> de la decisión sobre ADR-015, y las piezas de cámara v2 (coeficientes
+> de transformación propios).
 >
 > **Nota previa conservada (estado tras G1):** la fase G1 la
 > implementó otra IA en `ed8c9c5` (directamente sobre `feature/ufe`) y

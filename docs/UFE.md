@@ -85,6 +85,14 @@ The **Measure** tab turns one click into a catalog-calibrated magnitude
 * The default band is V; apertures and the sky sigma-clip are
   adjustable. When the header lacks the gain, the panel warns that the
   error is the comps' scatter only.
+* Quality controls (phase H): sky by median or by a fitted **plane** on
+  galactic cores, **seeing-following aperture** (FWHM measured on the
+  plate), the **colour term** fitted with the comps' and the target's
+  B−V, the **real saturation** ceiling (SATURATE or `ccd_saturate`),
+  **internal vs. total error** (photons + scatter + scintillation +
+  colour + flats), the **check star as the measurement's traffic
+  light**, and **host-galaxy subtraction** with the blink's PS1
+  reference for SNe on cores.
 * **CSV…** exports the measurement as one row and **AAVSO EFF…** in the
   AAVSO's format, with the sequence in CNAME/CMAG/KNAME/KMAG. The plate
   on disk is never modified.

@@ -18,6 +18,15 @@
 > tiene su propio plan: `docs/PLANS/ufe-photometry.md` (fases G y H
 > cerradas 2026-09-23).
 >
+> **Revisión con placas reales (2026-09-23, CERRADA)**: los tres fallos
+> reportados por el observador están corregidos con tests: las aperturas
+> de Medir se aplican en vivo (editar un radio re-mide al instante) y la
+> mano gana sobre el auto-seeing hasta la siguiente placa; la magnitud
+> del objetivo en Comparar se busca en el proyecto (planner → VSX max →
+> secuencia guardada) y se persiste en el contexto al exportar; la tira
+> de histograma dejó la altura fija por mínima (las filas ya no se
+> pisan).
+>
 > **Conexión con los flujos (2026-09-23, CERRADA)**: ajuste
 > `ufe_default` (Ajustes → Desarrollo, por defecto UFE); enrutado de
 > blink (menú y proyecto), carta de comparación y FITS anotado; APIs

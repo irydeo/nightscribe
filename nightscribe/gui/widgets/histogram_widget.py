@@ -50,7 +50,7 @@ class _HistogramCanvas(QWidget):
         self._edges = None
         self._counts = None
         self._drag = None               # "black" | "white" while dragging
-        self.setMinimumHeight(96)
+        self.setMinimumHeight(110)
         self.setMouseTracking(False)
         self.setAccessibleName(self.tr("Histogram"))
         self.setToolTip(self.tr(
@@ -183,7 +183,9 @@ class HistogramWidget(QFrame):
         self._state = state
         self._ui_sync = False          # guards spinboxes during mirroring
         self.setFrameShape(QFrame.StyledPanel)
-        self.setFixedHeight(140)
+        # never fixed: the controls column (black/white/gamma/buttons/keep)
+        # must get its natural height in every language and font size
+        self.setMinimumHeight(175)
         lay = QHBoxLayout(self)
         self.canvas = _HistogramCanvas(state)
         lay.addWidget(self.canvas, 1)

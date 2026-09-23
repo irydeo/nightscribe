@@ -159,3 +159,11 @@ def test_dn_x_roundtrip(strip):
     dn = strip._state.d_min + 0.3 * (strip._state.d_max -
                                      strip._state.d_min)
     assert canvas.x_to_dn(canvas.dn_to_x(dn)) == pytest.approx(dn, rel=1e-4)
+
+
+def test_strip_has_room_for_its_rows(strip):
+    # the four control rows (black, white, gamma, buttons + keep) must
+    # never be squeezed: the strip's floor covers their natural height
+    assert strip.minimumHeight() >= 170
+    assert strip.canvas.minimumHeight() >= 100
+    assert strip.sizeHint().height() >= 170

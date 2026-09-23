@@ -275,3 +275,68 @@ def test_survey_field_flow(dlg, monkeypatch):
     assert tab._prefill_sky == (10.0, 20.0)
     assert dlg.state.has_image                  # the cutout became the plate
     assert "DSS2-red" in tab.lbl_status.text()
+
+
+def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
+    # the target magnitude was saved with an earlier sequence: the
+    # prefill finds it there when the context lacks planner/VSX fields
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(mw.project, "get",
+                        lambda db_, pid: {"id": pid,
+                                          "object_name": "V0001 Cyg",
+                                          "context": {"sequence":
+                                                      {"target_mag":
+                                                       11.25}}})
+    from nightscribe.core import followup as fu
+    monkeypatch.setattr(fu, "list_sessions", lambda db_, pid: [])
+    seen = []
+
+    class _Cmp:
+        def prefill(self, **kw):
+            seen.append(kw)
+
+    class _Dlg:
+        # the mapping in _ufe_open touches all three tabs; only the
+        # compare one needs a recording prefill
+        tab_blink = _Cmp()
+        tab_compare = _Cmp()
+        tab_annotate = _Cmp()
+
+        def set_save_hook(self, fn):
+            pass
+
+        def show_tab(self, tab):
+            pass
+
+        def show(self):
+            pass
+
+        def raise_(self):
+            pass
+
+        def activateWindow(self):
+            pass
+    monkeypatch.setattr(window, "_ufe_build", lambda: _Dlg())
+    monkeypatch.setattr(window, "_use_ufe", lambda: True)
+    window._fu_sequence_dialog(3)
+    assert seen and seen[0]["mag"] == 11.25
+
+
+def test_save_hook_persists_the_target_magnitude(window, monkeypatch):
+    import nightscribe.gui.main_window as mw
+    ctx = []
+    monkeypatch.setattr(mw.project, "get",
+                        lambda db_, pid: {"id": pid, "object_name": "V1",
+                                          "context": {}})
+    monkeypatch.setattr(mw.project, "add_file", lambda *a, **k: None)
+    monkeypatch.setattr(mw.project, "update_context",
+                        lambda db_, pid, payload: ctx.append(payload))
+    window._populate_project_files = lambda pid: None
+    entries = [{"name": "Comp1",
+                "star": {"band": "V", "mag": 12.3, "ra": 1, "dec": 2}}]
+    window._ufe_save_hook(1, ["/tmp/s.csv"], "sequence",
+                          {"which": "csv", "entries": entries,
+                           "catalog": "gaia", "catalog_name": "Gaia EDR3",
+                           "fov_arcmin": 30.0, "target_mag": 11.25})
+    assert ctx[0]["mag"] == 11.25          # it lives in the project now
+    assert ctx[0]["sequence"]["target_mag"] == 11.25

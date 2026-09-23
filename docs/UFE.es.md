@@ -98,6 +98,12 @@ catálogo (fotometría de apertura diferencial de una placa):
 * La banda por defecto es V; las aperturas y el sigma-clip del cielo son
   ajustables. Si la cabecera no trae ganancia, el panel avisa de que el
   error es solo la dispersión de las comps.
+* Las aperturas se miden en vivo: tocar un radio re-mide el punto al
+  instante, y tu ajuste manual manda sobre el auto-seeing hasta que
+  cargues otra placa (o rearms la casilla). Si la secuencia no trae la
+  magnitud del objetivo, se busca en el proyecto (planner, VSX, o la
+  última secuencia guardada); y al exportar la secuencia queda escrita
+  en el proyecto para la próxima vez.
 * Controles de calidad (fase H): cielo por mediana o por **plano** en
   núcleos galácticos, **apertura que sigue al seeing** (FWHM medido en
   la placa), **término de color** ajustado con el B−V de las comps y el

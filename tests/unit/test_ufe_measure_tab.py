@@ -429,3 +429,37 @@ def test_subtraction_without_a_sequence_reverts(dlg, monkeypatch):
     assert tab._diff is None
     assert not tab.chk_subtract.isChecked()
     assert "no usable comparison star" in tab.lbl_status.text()
+
+
+# ---------------- review fixes (apertures) ----------------
+
+
+def test_hand_edited_aperture_remeasures_and_wins(dlg):
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab = dlg.tab_measure
+    seeing_r = tab._last["radii"][0]
+    assert seeing_r != 4.0                  # the seeing sized it first
+    tab.spn_rap.setValue(4.0)               # the observer takes over
+    assert tab._radii_manual
+    # the current point was re-measured with the new radius at once
+    assert tab._last["radii"][0] == 4.0
+    assert "set by hand" in tab.lbl_result.text()
+    # and a fresh click does NOT stomp the manual radius
+    _click(dlg, *dlg._test_target)
+    assert tab._last["radii"][0] == 4.0
+    # re-arming the seeing checkbox hands the radii back
+    tab.chk_seeing.setChecked(False)
+    tab.chk_seeing.setChecked(True)
+    assert not tab._radii_manual
+    assert tab._last["radii"][0] != 4.0
+
+
+def test_new_plate_rearms_the_seeing(dlg, tmp_path):
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.tab_measure.spn_rap.setValue(4.0)
+    assert dlg.tab_measure._radii_manual
+    data, _t, _c = _plate(seed=9)
+    dlg.state.load(_write_plate(tmp_path / "fresh.fits", data))
+    assert not dlg.tab_measure._radii_manual

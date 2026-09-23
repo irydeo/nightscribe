@@ -116,8 +116,10 @@ class UfeMeasureTab(QWidget):
         lay.addLayout(row)
         tip = self.tr("Aperture radius, sky annulus inner and outer "
                       "radius (px)")
+        self._radii_manual = False   # True once the observer edits a spin
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
             spn.setToolTip(tip)
+            spn.valueChanged.connect(self._on_radii_edited)
 
         row = QHBoxLayout()
         row.addWidget(QLabel(self.tr("Sky:")))
@@ -142,6 +144,7 @@ class UfeMeasureTab(QWidget):
             "Measure the FWHM of the comparison stars and size the "
             "aperture as 1.35 times the seeing (H3)"))
         lay.addWidget(self.chk_seeing)
+        self.chk_seeing.toggled.connect(self._on_seeing_toggled)
         row = QHBoxLayout()
         self.chk_color = QCheckBox(self.tr("Colour term"))
         self.chk_color.setChecked(True)
@@ -219,7 +222,9 @@ class UfeMeasureTab(QWidget):
 
     def _on_image_loaded(self):
         # A fresh plate invalidates the measurement and any subtraction
-        # (the aligned reference belongs to the old plate).
+        # (the aligned reference belongs to the old plate); the seeing
+        # auto-scale is free to size the apertures for this plate again.
+        self._radii_manual = False
         self._last = None
         self._drop_items()
         self._drop_subtraction()
@@ -260,11 +265,35 @@ class UfeMeasureTab(QWidget):
         except Exception:
             return []
 
+    def _on_seeing_toggled(self, checked):
+        # Re-arming the checkbox hands the radii back to the seeing
+        # measurement; disarming freezes them where they are.
+        if checked:
+            self._radii_manual = False
+            self._remeasure()
+
+    def _on_radii_edited(self, _value):
+        # A hand edit wins over the seeing auto-scale until the next plate
+        # (or until the checkbox is re-armed), and re-measures the current
+        # point on the spot so the overlay and the panel never lag.
+        self._radii_manual = True
+        if self._last is not None:
+            self._remeasure()
+
+    def _remeasure(self):
+        # Re-runs the current measurement with the current controls (the
+        # aperture spins live-edit the result).
+        if self._last is None or not self._state.has_image:
+            return
+        entries = self._sequence()
+        self._measure(self._last["col"], self._last["row"], entries)
+
     def _apertures(self, entries):
         # H3: when the seeing checkbox is on, measure the comps' FWHM on
         # the plate and scale the radii; the spins follow so the numbers
-        # stay visible and tweakable.
-        if not self.chk_seeing.isChecked():
+        # stay visible and tweakable. A hand edit wins until the next
+        # plate (the observer's radii are never stomped).
+        if not self.chk_seeing.isChecked() or self._radii_manual:
             return (self.spn_rap.value(), self.spn_rin.value(),
                     self.spn_rout.value()), None
         positions = []
@@ -506,6 +535,9 @@ class UfeMeasureTab(QWidget):
             notes.append(self.tr(
                 "seeing FWHM {0:.1f} px → apertures {1:.1f}/{2:.1f}/{3:.1f}"
                 " px").format(last["fwhm"], r[0], r[1], r[2]))
+        if self._radii_manual:
+            notes.append(self.tr(
+                "apertures set by hand (the seeing auto-scale is paused)"))
         if skipped:
             notes.append(self.tr(
                 "{0} of {1} sequence stars not usable (off the plate, "

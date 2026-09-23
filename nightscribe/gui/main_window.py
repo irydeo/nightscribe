@@ -5749,6 +5749,10 @@ class MainWindow(QMainWindow):
         mag0 = ctx.get("mag")
         if mag0 is None:
             mag0 = (ctx.get("variable") or {}).get("max")
+        if mag0 is None:
+            # a sequence saved earlier carries the target magnitude we
+            # last worked with (the hook writes it into the context)
+            mag0 = (ctx.get("sequence") or {}).get("target_mag")
         if fits_path and not dlg.open_plate(fits_path):
             return
         dlg.tab_compare.prefill(target=p["object_name"], mag=mag0,
@@ -7900,12 +7904,17 @@ class MainWindow(QMainWindow):
         if kind != "sequence" or payload.get("which") != "csv" \
                 or not payload.get("entries"):
             return
-        project.update_context(db, pid, {"sequence": {
+        ctx_update = {"sequence": {
             "catalog": payload.get("catalog"),
             "catalog_name": payload.get("catalog_name"),
             "fov_arcmin": payload.get("fov_arcmin"),
             "target_mag": payload.get("target_mag"),
-            "entries": payload["entries"], "csv": paths[0]}})
+            "entries": payload["entries"], "csv": paths[0]}}
+        if payload.get("target_mag") is not None:
+            # the magnitude lives in the project from now on (the next
+            # prefill finds it at the top level)
+            ctx_update["mag"] = payload["target_mag"]
+        project.update_context(db, pid, ctx_update)
         if p.get("campaign_id"):
             from ..core import campaign as _camp
             c = _camp.get(db, p["campaign_id"])

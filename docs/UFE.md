@@ -97,6 +97,12 @@ The **Measure** tab turns one click into a catalog-calibrated magnitude
 * The default band is V; apertures and the sky sigma-clip are
   adjustable. When the header lacks the gain, the panel warns that the
   error is the comps' scatter only.
+* The apertures measure live: touching a radius re-measures the point at
+  once, and your hand edit wins over the seeing auto-scale until you
+  load another plate (or re-arm the checkbox). When the sequence lacks
+  the target's magnitude, it is looked up in the project (planner, VSX,
+  or the last saved sequence); exporting the sequence writes it into the
+  project for next time.
 * Quality controls (phase H): sky by median or by a fitted **plane** on
   galactic cores, **seeing-following aperture** (FWHM measured on the
   plate), the **colour term** fitted with the comps' and the target's

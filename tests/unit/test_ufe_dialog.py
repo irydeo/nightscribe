@@ -12,9 +12,9 @@
 ############################################################
 
 """Offscreen checks for gui/ufe_dialog.py: the layout (top bar, dominant
-image, one tab per feature, histogram placeholder), load and error paths
-with file dialogs stubbed, invert sync, zoom presets, PNG export and the
-add_feature_tab extension API. No network.
+image, one tab per feature, histogram strip), load and error paths with
+file dialogs stubbed, the histogram Invert mirroring the state, zoom
+presets, PNG export and the add_feature_tab extension API. No network.
 """
 
 import os
@@ -58,11 +58,11 @@ def test_layout_three_placeholder_tabs(dlg):
 
 
 def test_buttons_disabled_until_a_plate_lands(dlg):
-    assert not dlg.btn_invert.isEnabled()
     assert not dlg.btn_export.isEnabled()
+    assert not dlg.histogram.btn_invert.isEnabled()
     dlg.state.load(MONO)
-    assert dlg.btn_invert.isEnabled()
     assert dlg.btn_export.isEnabled()
+    assert dlg.histogram.btn_invert.isEnabled()
 
 
 def test_load_via_dialog_updates_title_state(dlg):
@@ -71,14 +71,16 @@ def test_load_via_dialog_updates_title_state(dlg):
     assert dlg.view._pix_item is not None
 
 
-def test_invert_button_mirrors_state(dlg):
+def test_invert_mirrors_state_via_the_histogram(dlg):
+    # Invert lives in the histogram strip, with the other stretch
+    # controls; the strip's button mirrors the state
     dlg.state.load(MONO)
-    dlg.btn_invert.setChecked(True)
+    dlg.histogram.btn_invert.setChecked(True)
     assert dlg.state.inverted
     # loading a fresh plate resets the inversion and the button
     dlg.state.load(MONO)
     assert not dlg.state.inverted
-    assert not dlg.btn_invert.isChecked()
+    assert not dlg.histogram.btn_invert.isChecked()
 
 
 def test_zoom_preset_buttons(dlg, qapp):

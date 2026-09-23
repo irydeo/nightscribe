@@ -26,7 +26,7 @@ With no plate of your own, the Compare tab downloads the survey field
 ## The window
 
 ```
-| Load · Invert · Export PNG · Fit 50 100 200 400 · %                |
+| Load · Export PNG · Fit 50 100 200 400 · %                         |
 |────────────────────────────────────────────|──────────────────────|
 |                                            | [Blink][Compare]     |
 |              IMAGE                         | [Annotate]           |
@@ -55,8 +55,9 @@ with "Load FITS…"):
   reference in your plate's geometry and starts the live blink.
 * The **stretch is the common one** (the histogram strip drives the
   blink too); **Balance** multiplies the reference to match the sky
-  background (Auto button); **Nudge ref** shifts the reference by
-  sub-pixel steps when the registration is not perfect.
+  background (Auto button); **Fine alignment** is the cross of arrows
+  that walks the reference in half-pixel steps when the registration
+  is not perfect, just like the legacy blink dialog.
 * **Blink** (alternates at the chosen interval) or **Fade** (static
   blend with the slider); the amber marker sits at the SN position
   mapped through your plate's WCS.
@@ -78,9 +79,10 @@ WCS is needed; if it is missing, "Solve astrometry…" gets you one):
   it the approximate magnitude).
 * The **table** renames, retypes and removes rows; hovering tells you
   each star's catalog, magnitude and colour.
-* **Export CSV…** writes the sequence (fixed columns plus every band)
-  and **Export chart PNG…** saves exactly what you see: plate, rings,
-  labels and the north arrow / scale bar.
+* **Export CSV…** writes the sequence (fixed columns plus every band).
+  The **chart PNG** goes through the shared "Export PNG…" button in the
+  top bar: plate, rings, labels and the north arrow / scale bar,
+  exactly what you see.
 
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).

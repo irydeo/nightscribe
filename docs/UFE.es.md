@@ -27,7 +27,7 @@ placa propia, la pestaña Comparar descarga el campo del survey
 ## La ventana
 
 ```
-| Cargar · Invertir · Exportar PNG · Fit 50 100 200 400 · %           |
+| Cargar · Exportar PNG · Fit 50 100 200 400 · %                      |
 |────────────────────────────────────────────|──────────────────────|
 |                                            | [Blink][Comparar]    |
 |              IMAGEN                        | [Anotar]             |
@@ -56,8 +56,9 @@ DR1 g (supernovas y transitorios; la placa es la que cargaste con
   referencia con la geometría de tu placa y arranca el blink en vivo.
 * El **estiramiento es el común** (la tira de histograma manda también
   sobre el blink); **Balance** multiplica la referencia para igualar el
-  fondo de cielo (botón Auto); **Ajuste ref** desplaza la referencia a
-  sub-píxel si el registro no es perfecto.
+  fondo de cielo (botón Auto); la **Alineación fina** es la cruz de
+  flechas que desplaza la referencia a medio píxel si el registro no es
+  perfecto, igual que en el diálogo legacy de blink.
 * **Blink** (alterna con el intervalo elegido) o **Fundido** (mezcla
   estática con el deslizador); el marcador ámbar marca la posición de la
   SN mapeada por el WCS de tu placa.
@@ -80,8 +81,9 @@ placa (necesita WCS; si falta, «Resolver astrometría…» lo consigue):
 * La **tabla** renombra, cambia el tipo y quita filas; la sonda al pasar
   el cursor cuenta catálogo, magnitud y color de cada estrella.
 * **Exportar CSV…** escribe la secuencia (columnas fijas + todas las
-  bandas) y **Exportar carta PNG…** guarda exactamente lo que ves:
-  placa, anillos, rótulos y la flecha de norte / barra de escala.
+  bandas). La **carta PNG** sale por el botón común "Exportar PNG…" de
+  la barra superior: placa, anillos, rótulos y la flecha de norte /
+  barra de escala, exactamente lo que ves.
 
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).

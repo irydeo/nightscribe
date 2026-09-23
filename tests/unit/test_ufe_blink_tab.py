@@ -12,10 +12,10 @@
 ############################################################
 
 """Offscreen checks for gui/ufe_blink_tab.py: pair preparation through a
-fake BlinkWorker (no network), the live blink / fade frames, nudge and
-balance, the WCS-mapped marker, the stage handoff (the view's frame
-override) and the exports through a fake BlinkExportWorker. The legacy
-blink dialog is untouched.
+fake BlinkWorker (no network), the live blink / fade frames, the fine
+alignment and the balance, the WCS-mapped marker, the stage handoff (the
+view's frame override) and the exports through a fake BlinkExportWorker.
+The legacy blink dialog is untouched.
 """
 
 import os
@@ -188,15 +188,18 @@ def test_fade_blends_and_honours_the_slider(dlg):
     assert np.array_equal(tab._display_frame(), np.flipud(tab._obs8))
 
 
-def test_nudge_shifts_only_the_reference(dlg):
+def test_fine_alignment_walks_reference_only(dlg):
+    # the cross of arrows shifts the reference frame only, by half
+    # pixel per click (the legacy dialog's fine alignment), and the
+    # center label accumulates the total
     tab = dlg.tab_blink
     tab._on_pair_ready(_pair(dlg), {})
     obs_before = tab._obs8.copy()
-    ref_col = tab._ref8[32].copy()
-    tab.spin_dx.setValue(5.0)
-    tab.btn_nudge.click()
+    ref_row = tab._ref8[32].copy()
+    for _ in range(10):                    # ten right steps: +5.0 px
+        tab.btn_right.click()
     assert np.array_equal(tab._obs8, obs_before)
-    assert not np.array_equal(tab._ref8[32], ref_col)
+    assert not np.array_equal(tab._ref8[32], ref_row)
     assert tab.lbl_nudge.text() == "(+5.0, +0.0)"
 
 

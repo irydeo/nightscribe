@@ -15,9 +15,10 @@
 NightScribe shows and works FITS images. The image owns most of the
 window; the right column carries one tab per feature (Blink, Compare,
 Annotate) and the bottom strip is the visual histogram. The top bar
-carries the common actions: load, invert, PNG export of the visible
-scene, the north arrow / scale bar HUD toggles, astrometric solving and
-zoom presets.
+carries the common actions: load, PNG export of the visible scene, the
+north arrow / scale bar HUD toggles, astrometric solving and zoom
+presets. (Inversion lives in the histogram strip, with the other
+stretch controls.)
 
 Extensibility rule: a new feature is a new tab. The tab widget receives
 (state, lang) and subscribes to the state's signals; the dialog only
@@ -66,7 +67,6 @@ class UfeDialog(QDialog):
         self.resize(1280, 860)
         self.setMinimumSize(900, 600)
         self.state.image_loaded.connect(self._on_image_loaded)
-        self.state.stretch_changed.connect(self._sync_invert_button)
         self.state.wcs_changed.connect(self._sync_wcs_buttons)
         self.view.zoom_changed.connect(self._on_zoom_changed)
 
@@ -98,19 +98,12 @@ class UfeDialog(QDialog):
         self._build_feature_tabs()
 
     def _build_topbar(self):
-        # @return: the common-actions row (load / invert / export / zoom)
+        # @return: the common-actions row (load / export / zoom)
         bar = QHBoxLayout()
         self.btn_load = QPushButton(self.tr("Load FITS…"))
         self.btn_load.setToolTip(self.tr("Open a FITS image (Ctrl+O)"))
         self.btn_load.clicked.connect(self._on_load)
         bar.addWidget(self.btn_load)
-        self.btn_invert = QPushButton(self.tr("Invert"))
-        self.btn_invert.setCheckable(True)
-        self.btn_invert.setToolTip(self.tr(
-            "Swap black for white: faint objects pop against the sky"))
-        self.btn_invert.toggled.connect(self._on_invert_toggled)
-        self.btn_invert.setEnabled(False)
-        bar.addWidget(self.btn_invert)
         self.btn_export = QPushButton(self.tr("Export PNG…"))
         self.btn_export.setToolTip(self.tr(
             "Save the visible scene as a PNG (Ctrl+E)"))
@@ -332,12 +325,6 @@ class UfeDialog(QDialog):
             return
         self._last_dir = str(Path(path).parent)
 
-    def _on_invert_toggled(self, checked):
-        # The button mirrors state.inverted (the state is the source of
-        # truth; loading a plate resets both).
-        if self.state.has_image and checked != self.state.inverted:
-            self.state.toggle_invert()
-
     def _on_export_png(self):
         # Export PNG… → saves whatever the view is showing right now.
         if not self.state.has_image:
@@ -417,10 +404,8 @@ class UfeDialog(QDialog):
                       + dy * max(1, self.view.viewport().height() // 4))
 
     def _on_image_loaded(self):
-        # A fresh plate resets the inversion (state already did its half)
-        # and puts its file name in the title bar.
-        self._sync_invert_button()
-        self.btn_invert.setEnabled(self.state.has_image)
+        # A fresh plate re-arms the top-bar actions and puts its file
+        # name in the title bar (the histogram strip re-arms itself).
         self.btn_export.setEnabled(self.state.has_image)
         self.btn_solve.setEnabled(self.state.has_image)
         self._sync_wcs_buttons()
@@ -481,11 +466,3 @@ class UfeDialog(QDialog):
                 self, self.tr("NightScribe Image Workbench"),
                 self.tr("The Astrometry.net solution is not usable "
                         "(non-TAN WCS)."))
-
-    def _sync_invert_button(self):
-        # The top-bar Invert mirrors state.inverted; the histogram strip
-        # carries its own Invert and both follow the state, never each
-        # other (the toggled handler no-ops when already in sync).
-        self.btn_invert.blockSignals(True)
-        self.btn_invert.setChecked(self.state.inverted)
-        self.btn_invert.blockSignals(False)

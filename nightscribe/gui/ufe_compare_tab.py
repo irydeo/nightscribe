@@ -22,8 +22,9 @@ WCS (the common «Solve astrometry…» button fixes that in place). The
 field (catalog stars + known variables) loads around the plate centre
 with the plate's field of view, off the GUI thread. Clicks on the plate
 toggle stars in and out of the sequence (known VSX variables can never
-be comparisons); the table edits names and kinds; CSV and chart PNG
-exports come out next to the plate.
+be comparisons); the table edits names and kinds; the CSV export comes
+out next to the plate (the chart PNG goes through the shared
+"Export PNG…" button in the dialog's top bar).
 """
 
 import logging
@@ -164,9 +165,6 @@ class UfeCompareTab(QWidget):
         self.btn_csv = QPushButton(self.tr("Export CSV…"))
         self.btn_csv.clicked.connect(self._export_csv)
         row.addWidget(self.btn_csv)
-        self.btn_png = QPushButton(self.tr("Export chart PNG…"))
-        self.btn_png.clicked.connect(self._export_png)
-        row.addWidget(self.btn_png)
         lay.addLayout(row)
 
     # ------------------------------------------------------- activation
@@ -677,20 +675,4 @@ class UfeCompareTab(QWidget):
                                    "fov_arcmin": (self._field or {}).get(
                                        "fov_arcmin"),
                                    "target_mag": self.spn_mag.value()})
-        self.lbl_status.setText(self.tr("Written to {0}").format(out))
-
-    def _export_png(self):
-        # The chart PNG is the shared export of the visible scene: the
-        # plate, the overlays and the HUD, exactly as on screen.
-        if self._view is None:
-            return
-        src = Path(self._state.path)
-        default = src.with_name(f"{src.stem}_carta.png")
-        out, _sel = QFileDialog.getSaveFileName(
-            self, self.tr("Export chart PNG"), str(default), "PNG (*.png)")
-        if not out:
-            return
-        self._view.export_png(out)
-        logger.info("chart PNG exported to %s", out)
-        self._notify_saved([out], {"which": "png"})
         self.lbl_status.setText(self.tr("Written to {0}").format(out))

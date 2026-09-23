@@ -1,8 +1,15 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F implementadas; en D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G y H (2026-09-23): la pestaña Medir añade la fotometría calibrada de una placa sobre `core/photometry.py` — ZP con MAD, término de color con rechazo de outliers, cielo por plano, apertura por FWHM, saturación real, error total con centelleo de Young, semáforo check y sustracción de galaxia huésped sobre la referencia alineada del blink — tomando la secuencia de la pestaña Comparar por su accesor `entries()`; los tres diálogos legacy siguen vivos e intactos)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto SUPERSDE la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
+
+> **Nombre / Name (2026-09-23)**: la marca visible es «NightScribe Image
+> Workbench» (menú y título, sin traducir: ya no es solo un editor);
+> **UFE queda como codename interno** e inmutable en código, tests, ADR
+> y planes. / The visible brand is "NightScribe Image Workbench" (menu
+> and title, untranslated); **UFE stays as the immutable internal
+> codename** in code, tests, ADRs and plans.
 
 ## Español
 

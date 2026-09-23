@@ -3,9 +3,22 @@
 *[English version](UFE.md)*
 
 El **Editor FITS unificado** es el punto único de NightScribe para ver y
-trabajar imágenes FITS (ADR-044). Se abre desde el menú **Herramientas →
-Editor FITS…** y convive con los diálogos clásicos (blink, carta de
-comparación, FITS anotados), que siguen disponibles donde siempre.
+trabajar imágenes FITS (ADR-044). En la interfaz se llama **«NightScribe
+Image Workbench»** (sin traducir: es ya el espacio de trabajo de
+procesamiento, no solo un editor) y se abre desde el menú
+**Herramientas → NightScribe Image Workbench…**; «UFE» queda como
+codename interno en código y documentación.
+
+**Convivencia y ajuste por defecto**: los diálogos clásicos (blink,
+carta de comparación, FITS anotado) siguen existiendo para comparar y
+revisar, pero por defecto los flujos abren el UFE: en **Ajustes →
+Desarrollo** puedes volver a los clásicos como predeterminados
+(`ufe_default`). Desde un proyecto, el UFE abre con la placa cargada, la
+pestaña correcta en escena y los datos precargados; y lo que escribe
+(copias anotadas, GIF/PNG del blink, CSV/PNG de la secuencia) se
+registra en el proyecto igual que con los clásicos. Sin placa propia,
+la pestaña Comparar descarga el campo del survey (DSS2/PS1) como FITS
+con WCS y trabaja sobre él directamente.
 
 ## La ventana
 

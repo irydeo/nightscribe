@@ -3,9 +3,21 @@
 *[Versión en español](UFE.es.md)*
 
 The **Unified FITS Editor** is NightScribe's single place to view and
-work FITS images (ADR-044). Open it from **Tools → FITS editor…**; it
-coexists with the classic dialogs (blink, comparison chart, annotated
-FITS), which stay where they always were.
+work FITS images (ADR-044). In the interface it is called the
+**«NightScribe Image Workbench»** (it is the processing workspace by
+now, not just an editor) and opens from **Tools → NightScribe Image
+Workbench…**; "UFE" stays as the internal codename in code and docs.
+
+**Coexistence and the default setting**: the classic dialogs (blink,
+comparison chart, annotated FITS) still exist for comparison and review,
+but by default the flows open the UFE: under **Settings → Development**
+you can switch the classic ones back as the default (`ufe_default`).
+Opened from a project, the UFE comes with the plate loaded, the right
+tab on stage and the data pre-filled; and what it writes (annotated
+copies, blink GIF/PNG, sequence CSV/PNG) registers into the project just
+like the classics did. With no plate of your own, the Compare tab
+downloads the survey field (DSS2/PS1) as a FITS with WCS and works on
+it directly.
 
 ## The window
 

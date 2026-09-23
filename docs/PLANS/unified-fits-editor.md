@@ -15,7 +15,18 @@
 > pulido opcional: atajos extra, drag de comp estrella a estrella, y la
 > revisión visual con placas reales del observatorio. La siguiente
 > funcionalidad sobre este editor (fotometría calibrada, pestaña Medir)
-> tiene su propio plan: `docs/PLANS/ufe-photometry.md`.
+> tiene su propio plan: `docs/PLANS/ufe-photometry.md` (fases G y H
+> cerradas 2026-09-23).
+>
+> **Conexión con los flujos (2026-09-23, CERRADA)**: ajuste
+> `ufe_default` (Ajustes → Desarrollo, por defecto UFE); enrutado de
+> blink (menú y proyecto), carta de comparación y FITS anotado; APIs
+> `open_plate`/`show_tab`/`prefill` por pestaña; registro en el proyecto
+> vía `set_save_hook` (archivos + contexto de secuencia + protocolo de
+> campaña); carga de campo DSS2/PS1 dentro del UFE (botón en Comparar,
+> worker con caché `db`); revisión i18n con la causa raíz de los
+> apóstrofos documentada (relleno quirúrgico que comparaba el XML crudo:
+> `'` vive como `&apos;`). Legacy intacto y alcanzable.
 
 > **Nota de la fase D (resuelta en D.5)**: la flecha de norte y la barra
 > de escala llegaron como overlay COMÚN (HUD de viewport, también en el

@@ -1272,6 +1272,10 @@ def test_followup_add_session(window, panel):
     # ADR-041: the follow-up content is a lazy tab — open it first
     window.projects.btn_tab_followup.click()
     assert fu.days_since_last_session(dbmod.db, p["id"]) is None
+    # the visits journal is a master-detail dialog now: build it (without
+    # exec) so _fu_add_session refreshes the live list in place instead of
+    # opening the modal that would hang a headless test
+    window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     assert len(sessions) == 1
@@ -1286,6 +1290,8 @@ def test_followup_session_notes_persist(window, panel):
     p = _create_and_select(window, "sn", "SN2026notes", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
     window.projects.btn_tab_followup.click()
+    # build the visits dialog (no exec): it owns the session list + detail
+    window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     sid = sessions[0]["id"]
@@ -1310,6 +1316,8 @@ def test_followup_notes_no_dual_identity(window, panel):
     p = _create_and_select(window, "sn", "SN2026note2", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
     window.projects.btn_tab_followup.click()
+    # build the visits dialog (no exec): it owns the session list + detail
+    window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     s1 = sessions[0]["id"]
@@ -1343,6 +1351,9 @@ def test_followup_add_measurement_has_real_mjd(window, panel):
     dbmod.db.execute(
         "UPDATE project_sessions SET obs_date='' WHERE id=?", (sid,))
     dbmod.db.commit()
+    # build the visits dialog (no exec) so the list + detail live in the
+    # registry without a modal loop
+    window._fu_visits_dialog(p["id"])
     lst = window._project_widgets["fu_sessions"]
     # populate + select so the measurement panel (widgets) is built
     window._fu_populate_sessions(lst, p["id"])
@@ -1377,6 +1388,8 @@ def test_followup_delete_session(window, panel):
     fu.add_point(dbmod.db, p["id"], 61000.0, "V", 16.0,
                  source="manual", session_id=sid)
     assert fu.get_session(dbmod.db, sid) is not None
+    # build the visits dialog (no exec): it owns the session list + detail
+    window._fu_visits_dialog(p["id"])
     # stub the confirmation dialog to auto-accept
     orig = QMessageBox.question
     QMessageBox.question = lambda *a, **kw: QMessageBox.Yes
@@ -1482,6 +1495,8 @@ def test_fu_add_measurement_quick(window, panel):
     p = _create_and_select(window, "sn", "SN2026meas", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
     window.projects.btn_tab_followup.click()
+    # build the visits dialog (no exec): it owns the session list + detail
+    window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
     sessions = fu.list_sessions(dbmod.db, p["id"])
     sid = sessions[0]["id"]
@@ -1647,25 +1662,24 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
     from nightscribe.core import project as proj_mod, followup as fu
     from nightscribe.gui import main_window as mw
     from PySide6.QtCore import Qt
-    from PySide6.QtWidgets import QListWidget, QPushButton
+    from PySide6.QtWidgets import QPushButton
     monkeypatch.setattr(window, "_use_ufe", lambda: True)
     p = proj_mod.create(mw.db, "sn", "SN2026visit", {"kind": "sn"})
     sid = fu.create_session(mw.db, p["id"], "2026-09-08")
     fu.add_image(mw.db, sid, "R", "/tmp/fu_visit.fits",
                  date_obs="2026-09-08", exptime_s=60.0)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
-    lst = None
-    for w in tab.findChildren(QListWidget):
-        if any(w.item(i).data(Qt.UserRole) == sid
-               for i in range(w.count())):
-            lst = w
-            break
-    assert lst is not None, "the Visits list is missing"
+    # the sessions list and the visit detail (and its "Measure in the
+    # editor…" action) now live in the visits dialog, opened from the tab:
+    # build it without exec and work on its children instead of the tab's
+    dlg = window._fu_visits_dialog(p["id"])
+    lst = window._project_widgets["fu_sessions"]
+    assert any(lst.item(i).data(Qt.UserRole) == sid
+               for i in range(lst.count())), "the Visits list is missing"
     row = [i for i in range(lst.count())
            if lst.item(i).data(Qt.UserRole) == sid][0]
     lst.setCurrentItem(lst.item(row))     # user path: select the visit
-    btns = [b.text() for b in tab.findChildren(QPushButton)]
+    btns = [b.text() for b in dlg.findChildren(QPushButton)]
     assert "Measure in the editor…" in btns
     assert "Quick analysis" not in btns
     # the button routes to the UFE Measure tab, re-applying the object
@@ -1679,7 +1693,7 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
         opened.append((tab_, hook_pid, obj))
         return _D()
     monkeypatch.setattr(window, "_ufe_open", _ufe_open)
-    btn = [b for b in tab.findChildren(QPushButton)
+    btn = [b for b in dlg.findChildren(QPushButton)
            if b.text() == "Measure in the editor…"][0]
     btn.click()
     assert opened[0][:2] == ("measure", p["id"])

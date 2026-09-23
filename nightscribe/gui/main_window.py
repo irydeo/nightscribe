@@ -5060,6 +5060,12 @@ class MainWindow(QMainWindow):
         btn_add = QPushButton(self.tr("Add visit"))
         btn_add.clicked.connect(lambda: self._fu_add_session(pid))
         act_row.addWidget(btn_add)
+        # the visits journal (sessions, stacked images, measurements,
+        # notes) lives in the master-detail dialog: the tab keeps the
+        # daily work above, the dialog carries the per-visit administration
+        btn_visits = QPushButton(self.tr("Visits"))
+        btn_visits.clicked.connect(lambda: self._fu_open_visits(pid))
+        act_row.addWidget(btn_visits)
         # ADR-042: the photometry prerequisite, «with what do I compare?»,
         # as a primary action (ADR-038 prominence), never buried in the menu
         btn_seq = QPushButton(self.tr("Comparison chart…"))
@@ -5192,29 +5198,11 @@ class MainWindow(QMainWindow):
                 camp_lbl.setText(text)
             layout.addWidget(grp_camp)
 
-        # sessions list
-        grp = QGroupBox(self.tr("Visits"))
-        grp.setLayout(QVBoxLayout())
-        lst = PassiveList()
-        self._fu_populate_sessions(lst, pid)
-        lst.itemSelectionChanged.connect(
-            lambda: self._fu_session_selected(lst, pid))
-        grp.layout().addWidget(lst)
-
-        # session detail area (rebuilt per session: images, measurements,
-        # notes). The notes widget is created in _fu_session_selected — keep
-        # only a placeholder here so the dual-identity bug (two QTextEdit
-        # bound to different sessions) can't happen.
-        self._fu_detail = QFrame()
-        fu_layout = QVBoxLayout(self._fu_detail)
-        fu_layout.addWidget(QLabel(
-            self.tr("Select a visit to see its images.")))
-        fu_detail_area = QScrollArea()
-        fu_detail_area.setWidgetResizable(True)
-        fu_detail_area.setFrameShape(QFrame.Shape.NoFrame)
-        fu_detail_area.setWidget(self._fu_detail)
-        grp.layout().addWidget(fu_detail_area)
-        layout.addWidget(grp)
+        # the visits journal (sessions list + per-visit detail: images,
+        # measurements, notes) moved to the master-detail dialog built by
+        # _fu_visits_dialog and opened by the "Visits" button in the action
+        # row above. _fu_session_selected still owns the detail pane
+        # (self._fu_detail), which now lives inside that dialog.
         # B6/B10: the SN evolution animation and the annotated FITS export
         # — secondary analysis tools, collapsed by default (UX-PC U4).
         # HADS never had them (intra-night series live in FotoDif,
@@ -5239,7 +5227,63 @@ class MainWindow(QMainWindow):
             ana_row.addStretch()
             adv.addLayout(ana_row)
         layout.addStretch()
+
+    def _fu_visits_dialog(self, pid, select_first=False):
+        # The visits journal, master-detail: the sessions list (newest
+        # first) and the Add visit button on the left, the per-visit
+        # detail pane (images, measurements, notes) on the right, rebuilt
+        # by the shared _fu_session_selected on selection. Built without
+        # exec() so tests can drive it without a modal loop.
+        # @args: pid - project id, select_first - preselect the newest visit
+        # @return: the QDialog
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("Visits"))
+        dlg.resize(880, 560)
+        top = QHBoxLayout(dlg)
+        # master: the sessions list and the add button
+        left = QVBoxLayout()
+        lst = PassiveList()
+        self._fu_populate_sessions(lst, pid)
+        lst.itemSelectionChanged.connect(
+            lambda: self._fu_session_selected(lst, pid))
+        left.addWidget(lst, 3)
+        btn_add = QPushButton(self.tr("Add visit"))
+        btn_add.clicked.connect(lambda: self._fu_add_session(pid))
+        left.addWidget(btn_add)
+        top.addLayout(left, 4)
+        # detail: the selected visit's images, measurements and notes.
+        # The notes widget is created in _fu_session_selected — keep only
+        # a placeholder here so the dual-identity bug (two QTextEdit bound
+        # to different sessions) can't happen.
+        self._fu_detail = QFrame()
+        det_layout = QVBoxLayout(self._fu_detail)
+        det_layout.addWidget(QLabel(
+            self.tr("Select a visit to see its images.")))
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setWidget(self._fu_detail)
+        top.addWidget(scroll, 6)
         self._project_widgets["fu_sessions"] = lst
+        if select_first and lst.count():
+            lst.setCurrentRow(0)
+        return dlg
+
+    def _fu_open_visits(self, pid, select_first=False):
+        # Opens the visits dialog modally. On close the dialog owns its
+        # C++ objects (they die with it), so drop the dangling detail
+        # frame and the registry entries, then rebuild the project page
+        # from the database (light curve, cadence, campaign summary).
+        # @args: pid - project id, select_first - preselect the newest visit
+        # @return: None
+        dlg = self._fu_visits_dialog(pid, select_first=select_first)
+        dlg.exec()
+        self._fu_detail = None
+        self._fu_current_session = None
+        for key in ("fu_sessions", "fu_images", "fu_measurements", "fu_notes",
+                    "fu_meas_mag", "fu_meas_err", "fu_meas_filt"):
+            self._project_widgets.pop(key, None)
+        self._project_selected()
 
     def _fu_run_animation(self, pid):
         # B6: generate the evolution GIF/MP4 from the registered stacked images.
@@ -5398,7 +5442,10 @@ class MainWindow(QMainWindow):
         sid = items[0].data(Qt.UserRole)
         self._fu_current_session = sid
         # rebuild the session detail area: images + measurements + notes
+        # (UD.5: the frame is dialog-owned; if it is gone, do nothing)
         detail = self._fu_detail
+        if detail is None:
+            return
         self._wipe_layout(detail.layout())
         dlay = detail.layout()
         # action row: add stacked image, measure it in the editor, delete
@@ -5617,7 +5664,11 @@ class MainWindow(QMainWindow):
             fu.update_session_notes(db, sid, notes.toPlainText())
 
     def _fu_add_session(self, pid):
-        # Create a session for today and refresh the list (B2).
+        # Create a visit for today and land on it (B2). The list owner
+        # decides the path: when the visits dialog is open it owns the
+        # list, so it is refreshed in place; when called from the tab
+        # button (no dialog) the journal is opened with the new visit
+        # selected (newest first, row 0).
         from ..core import followup as fu
         fu.create_session(db, pid)
         lst = self._project_widgets.get("fu_sessions")
@@ -5625,6 +5676,8 @@ class MainWindow(QMainWindow):
             self._fu_populate_sessions(lst, pid)
             # select the new one (top of the list, ordered DESC)
             lst.setCurrentRow(0)
+        else:
+            self._fu_open_visits(pid, select_first=True)
 
     def _fu_delete_session(self, lst, sid, pid):
         # Delete a visit after confirmation. The cascade removes its stacked
@@ -5649,6 +5702,9 @@ class MainWindow(QMainWindow):
         if lst.count():
             lst.setCurrentRow(0)
         else:
+            # the pane is dialog-owned; guard against it being gone (UD.5)
+            if self._fu_detail is None:
+                return
             dlay = self._fu_detail.layout()
             self._wipe_layout(dlay)
             dlay.addWidget(QLabel(

@@ -8,10 +8,13 @@ quiere entender los conceptos y sacar el máximo de su equipo (primera
 parte, sin matemáticas); y a una IA o desarrollador que extienda la
 implementación (apéndice técnico, al final). Casi todo lo descrito ya
 existe en NightScribe (fases G y H, 2026-09-23); la fase I (misma fecha)
-añadió el centroide de precisión (`refined_centroid`) y la sugerencia
-de aperturas por curva de crecimiento y entorno (`suggest_apertures` +
-botón en Medir); solo el régimen de tránsitos de exoplanetas queda
-pendiente de una decisión (ADR-015).
+añadió el centroide de precisión y la sugerencia de aperturas
+(`suggest_apertures` + botón en Medir); la fase I.5 subió el centroide
+al **filtro adaptado gaussiano** (`gaussian_centroid`: plantilla del
+seeing en malla de 0,1 px con refinado parabólico, ~0,01 px con señal
+decente, guardas honestas con débiles) con la **retícula que se pega al
+centroide** al pasar el ratón; solo el régimen de tránsitos de
+exoplanetas queda pendiente de una decisión (ADR-015).
 
 Documentación del proceso fotométrico base:
 [PHOTOMETRY.es.md](PHOTOMETRY.es.md). Este documento es su continuación

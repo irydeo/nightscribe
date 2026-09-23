@@ -32,12 +32,18 @@ defecto del programa.
 
 ### 2.1 Localizar al objetivo con precisión de sub-píxel
 
-La posición del objetivo viene del WCS de la placa (su solución
-astrométrica): RA/Dec se convierten a píxel. Como esa posición cae entre
-píxeles, se refina con un **centroide**: el centro de masas de la luz en
-una caja de 11×11 píxeles alrededor de la posición inicial. El resultado
-tiene precisión de fracción de píxel, que es lo que la fotometría
-necesita para que la apertura caiga siempre centrada.
+La posición del objetivo viene del WCS de la placa o de tu clic. Como
+cae entre píxeles, se refina con un **centroide**: en el editor, un
+filtro adaptado gaussiano (la PSF del seeing medido en la placa) que
+correlaciona el recorte en una malla de 0,1 px con refinado parabólico:
+cae a centésimas de píxel con señal decente y a centésimas con fuentes
+débiles cuando el ruido lo permite; cuando no, conserva tu punto y lo
+dice. El quicklook de series conserva su centroide de momento clásico
+(comparabilidad durante la revisión).
+
+Al marcar con el ratón (Medir, Anotar, Comparar), el cursor se vuelve
+una cruz con retícula que **se pega al centroide gaussiano** de la
+fuente bajo el ratón: el clic nace centrado.
 
 ### 2.2 La apertura y el anillo de cielo
 

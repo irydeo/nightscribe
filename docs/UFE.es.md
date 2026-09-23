@@ -40,7 +40,10 @@ placa propia, la pestaña Comparar descarga el campo del survey
 * **Imagen**: ocupa la mayor parte de la ventana. La rueda hace zoom
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
-  coordenadas RA/Dec si la placa trae WCS.
+  coordenadas RA/Dec si la placa trae WCS. En las pestañas que marcan
+  (Medir, Anotar, Comparar) el cursor se vuelve una cruz con retícula de
+  hueco central que **se pega al centroide de la fuente** bajo el ratón:
+  el clic nace centrado.
 * **Pestañas**: una por funcionalidad. **Blink**, **Comparar**,
   **Medir** y **Anotar** están disponibles (abajo). Solo la pestaña
   visible responde a los clics sobre la imagen.

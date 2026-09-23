@@ -8,11 +8,13 @@ who wants the concepts and to get the most out of their equipment (part
 one, no mathematics); and an AI or developer extending the
 implementation (technical appendix at the end). Almost everything
 described here already exists in NightScribe (phases G and H,
-2026-09-23); phase I (same date) added the precision centroid
-(`refined_centroid`) and the aperture suggestion from the growth curve
-and the measured surroundings (`suggest_apertures` plus the Measure
-tab's button); only the exoplanet-transit regime is pending a decision
-(ADR-015).
+2026-09-23); phase I (same date) added the precision centroid and the
+aperture suggestion (`suggest_apertures` plus the Measure tab's button);
+phase I.5 raised the centroid to the **gaussian matched filter**
+(`gaussian_centroid`: the seeing template on a 0.1 px lattice with
+parabolic refinement, ~0.01 px with decent signal, honest guards on the
+faint) with the **reticle snapping to the centroid** on hover; only the
+exoplanet-transit regime is pending a decision (ADR-015).
 
 Documentation of the base photometric process:
 [PHOTOMETRY.md](PHOTOMETRY.md). This document is its quality sequel.

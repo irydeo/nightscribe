@@ -34,12 +34,18 @@ values.
 
 ### 2.1 Locating the target with sub-pixel precision
 
-The target position comes from the plate's WCS (its astrometric
-solution): RA/Dec converts to a pixel. Because that position falls
-between pixels, it is refined with a **centroid**: the centre of mass of
-the light in an 11×11 pixel box around the initial position. The result
-has a fraction-of-a-pixel precision, which is what photometry needs so
-the aperture always lands centred.
+The target position comes from the plate's WCS or from your click. Since
+it falls between pixels, it is refined with a **centroid**: in the
+editor, a gaussian matched filter (the seeing PSF measured on the plate)
+correlating the cutout on a 0.1 px lattice with parabolic refinement:
+it lands within hundredths of a pixel with decent signal and within a
+few hundredths on faint sources when the noise allows; when it does
+not, it keeps your point and says so. The series quick-look keeps its
+classic moment centroid (comparability during the review).
+
+When marking with the mouse (Measure, Annotate, Compare), the cursor
+becomes a crosshair with a reticle that **snaps to the gaussian
+centroid** of the source under the mouse: the click is born centred.
 
 ### 2.2 The aperture and the sky annulus
 

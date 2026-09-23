@@ -28,6 +28,13 @@
 > ignora; toda opción de Medir (cielo, sigma-clip, color, B−V)
 > recalcula la medida viva al instante.
 >
+> **Centrado perfecto (fase I.5, 2026-09-23, CERRADA)**: centroide por
+> filtro adaptado gaussiano (`gaussian_centroid`, defecto en la ruta UFE;
+> «refined»/«raw» quedan disponibles y el legacy intacto) y la retícula
+> de marcado con hueco central que se pega al centroide de la fuente al
+> pasar el ratón (las pestañas que marcan la encienden vía
+> `pick_clicks`; jamás sale en el PNG exportado).
+>
 > **Centroide de precisión y aperturas sugeridas (fase I, 2026-09-23,
 > CERRADA)**: `refined_centroid` (cielo restado, umbral, dos pasadas;
 > el legacy `series._centroid` intacto) es el centroide por defecto de

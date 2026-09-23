@@ -26,6 +26,10 @@ Differences from the plain ChartView:
   inspect real plate pixels, not an interpolation.
 * Stretch re-renders swap the pixmap in place: the transform (zoom, pan)
   is untouched.
+* While a picking tab is on stage (pick mode) the resting cursor is the
+  crosshair (the hand only shows while a pan drag is held), the reticle
+  forces full-viewport repaints so it never leaves trails, and the probe
+  panel pins itself to the top-left corner instead of chasing the cursor.
 """
 
 import logging
@@ -98,7 +102,8 @@ class UfeImageView(ChartView):
 
         state.image_loaded.connect(self._on_image_loaded)
         state.stretch_changed.connect(self._render_soon)
-        state.wcs_changed.connect(self.update)   # the HUD depends on WCS
+        # the HUD depends on WCS, and it paints on the viewport
+        state.wcs_changed.connect(self.viewport().update)
         self.zoom_changed.connect(lambda _f: self._layout_annotations())
         self.set_hover_probe(state.probe_text)
         self.setAccessibleName(self.tr("FITS image view"))
@@ -303,7 +308,7 @@ class UfeImageView(ChartView):
             self.show_north = bool(north)
         if scale is not None:
             self.show_scale = bool(scale)
-        self.update()
+        self.viewport().update()
 
     def drawForeground(self, painter, rect):
         # Viewport-space HUD (north arrow, scale bar) under the base's
@@ -329,14 +334,51 @@ class UfeImageView(ChartView):
         # renders the scene; the reticle is view foreground only).
         # @args: on - pick mode on or off
         self._pick_mode = bool(on)
-        # with ScrollHandDrag the cursor that counts is the viewport's;
-        # at rest it is the open hand (the pan affordance), not an arrow
-        self.viewport().setCursor(Qt.CrossCursor if self._pick_mode
-                                  else Qt.OpenHandCursor)
-        if not self._pick_mode:
+        self._apply_rest_cursor()
+        if self._pick_mode:
+            # the reticle spans the whole viewport in device coords but
+            # owns no scene rect: with partial (scene-rect) repaints it
+            # gets clipped into segments that stay behind as trails
+            self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        else:
+            self.setViewportUpdateMode(QGraphicsView.MinimalViewportUpdate)
             self._mouse_vp = None
             self._snap_scene = None
-        self.update()
+        self.viewport().update()
+
+    def _apply_rest_cursor(self):
+        # The resting cursor says what a click does here: the crosshair
+        # while a picking tab is on stage (a precise centroid cannot be
+        # marked with the hand), the open hand elsewhere (the pan
+        # affordance). ScrollHandDrag shows the closed hand while a
+        # button is held and restores the OPEN hand on release, so
+        # mouseReleaseEvent / enterEvent re-apply this.
+        self.viewport().setCursor(Qt.CrossCursor if self._pick_mode
+                                  else Qt.OpenHandCursor)
+
+    def mouseReleaseEvent(self, event):
+        # ScrollHandDrag hands the cursor back as an open hand on every
+        # release; in pick mode the resting shape is the crosshair.
+        super().mouseReleaseEvent(event)
+        self._apply_rest_cursor()
+
+    def enterEvent(self, event):
+        # The resting cursor is ours to keep: dialogs and drags may have
+        # stomped it while the pointer was away.
+        self._apply_rest_cursor()
+        super().enterEvent(event)
+
+    def _tooltip_anchor_pos(self, viewport_pos, br):
+        # While picking, the probe panel never chases the cursor (it would
+        # cover the very star being marked): it pins to the viewport's
+        # top-left corner, the one free of HUD pieces (north arrow
+        # top-right, scale bar bottom-left, watermark bottom-right).
+        if self._pick_mode:
+            scale = max(self.current_factor(), 1e-3)
+            margin = 12.0 / scale
+            tl = self.mapToScene(0, 0)
+            return tl.x() + margin, tl.y() + margin
+        return super()._tooltip_anchor_pos(viewport_pos, br)
 
     def mouseMoveEvent(self, event):
         # The probe stays as always; in pick mode the cursor position is
@@ -345,7 +387,7 @@ class UfeImageView(ChartView):
             self._mouse_vp = event.position().toPoint()
             if not self._snap_timer.isActive():
                 self._snap_timer.start(60)      # one search per 60 ms
-            self.update()
+            self.viewport().update()
         super().mouseMoveEvent(event)
 
     def leaveEvent(self, event):
@@ -353,7 +395,7 @@ class UfeImageView(ChartView):
         if self._pick_mode:
             self._mouse_vp = None
             self._snap_scene = None
-            self.update()
+            self.viewport().update()
         super().leaveEvent(event)
 
     def _snap_now(self):
@@ -389,7 +431,7 @@ class UfeImageView(ChartView):
                 if cen["ok"]:
                     self._snap_scene = self._state.data_to_scene(
                         cen["x"], cen["y"])
-        self.update()
+        self.viewport().update()
 
     def _paint_reticle(self, painter):
         # The crosshair: full-viewport lines with a central gap, white on

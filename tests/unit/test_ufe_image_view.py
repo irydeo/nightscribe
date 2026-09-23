@@ -209,6 +209,59 @@ def test_pick_cursor_and_snap(view, qapp):
     assert view._mouse_vp is None
 
 
+def test_pick_mode_uses_full_viewport_updates(view):
+    # the reticle paints viewport-wide in device coords: only a full
+    # repaint policy keeps it from leaving trails behind
+    from PySide6.QtWidgets import QGraphicsView
+    assert view.viewportUpdateMode() == QGraphicsView.MinimalViewportUpdate
+    view.set_pick_cursor(True)
+    assert view.viewportUpdateMode() == QGraphicsView.FullViewportUpdate
+    view.set_pick_cursor(False)
+    assert view.viewportUpdateMode() == QGraphicsView.MinimalViewportUpdate
+
+
+def test_pick_cursor_survives_a_pan_drag(view, qapp):
+    # ScrollHandDrag restores the OPEN hand on every release; in pick
+    # mode the view must claim the crosshair back, and out of pick mode
+    # the pan affordance stays
+    from PySide6.QtCore import QPoint, Qt
+    from PySide6.QtTest import QTest
+    view._state.load(MONO)
+    view.set_pick_cursor(True)
+    QTest.mousePress(view.viewport(), Qt.LeftButton, pos=QPoint(300, 300))
+    QTest.mouseMove(view.viewport(), QPoint(380, 340))
+    QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=QPoint(380, 340))
+    qapp.processEvents()
+    assert view.viewport().cursor().shape() == Qt.CrossCursor
+    view.set_pick_cursor(False)
+    QTest.mousePress(view.viewport(), Qt.LeftButton, pos=QPoint(300, 300))
+    QTest.mouseMove(view.viewport(), QPoint(380, 340))
+    QTest.mouseRelease(view.viewport(), Qt.LeftButton, pos=QPoint(380, 340))
+    qapp.processEvents()
+    assert view.viewport().cursor().shape() == Qt.OpenHandCursor
+
+
+def test_pick_mode_pins_the_probe_panel_to_the_corner(view):
+    # While picking, the probe panel sits at the viewport's top-left
+    # corner (≈12 device px in) instead of hovering next to the cursor;
+    # out of pick mode it keeps following the cursor
+    from PySide6.QtCore import QPointF
+    factor = view.current_factor()
+    view.set_pick_cursor(True)
+    view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
+    pos = view._tooltip.pos()
+    tl = view.mapToScene(0, 0)
+    assert 0 < (pos.x() - tl.x()) * factor < 20
+    assert 0 < (pos.y() - tl.y()) * factor < 20
+    view.set_pick_cursor(False)
+    view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
+    pos = view._tooltip.pos()
+    cursor = view.mapToScene(400, 300)
+    assert (pos.x() - cursor.x()) * factor == pytest.approx(14.0, abs=2.0)
+    assert pos.y() < cursor.y()          # above the cursor, as always
+    view._hide_tooltip()
+
+
 def test_export_never_carries_the_reticle(view, tmp_path):
     import numpy as np
     data = np.full((100, 100), 800.0, dtype=np.float32)

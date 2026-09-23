@@ -53,9 +53,12 @@ class UfeDialog(QDialog):
         self._lang = lang
         self._last_dir = ""
         self._solve_worker = None   # UfeSolveWorker while a solve runs
+        self._save_hook = None      # fn(paths, kind, payload) when the
+                                    # editor was opened from a project:
+                                    # files written get registered there
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
-        self.setWindowTitle(self.tr("FITS editor"))
+        self.setWindowTitle(self.tr("NightScribe Image Workbench"))
         self._build_ui()
         self._build_shortcuts()
         self.resize(1280, 860)
@@ -131,7 +134,7 @@ class UfeDialog(QDialog):
         bar.addWidget(QLabel(self.tr("Zoom:")))
         self.btn_zoom = {}
         for factor, label in _ZOOM_PRESETS:
-            btn = QPushButton(label)
+            btn = QPushButton(self.tr("Fit") if factor is None else label)
             btn.setToolTip(self.tr("Fit the plate to the window")
                            if factor is None else
                            self.tr("Zoom {0} % (1:1 at 100)").format(
@@ -196,6 +199,48 @@ class UfeDialog(QDialog):
         # @return: the index the tab landed on
         return self.tabs.addTab(widget, title)
 
+    # ---------------------------------------------- host-app integration
+
+    def open_plate(self, path):
+        # Loads a FITS by path (the host app's entry point; same error
+        # box as the file picker).
+        # @args: path - FITS file path
+        # @return: True when the plate loaded
+        try:
+            self.state.load(path)
+        except fits_io.FitsError as err:
+            logger.warning("FITS load failed: %s", err)
+            QMessageBox.warning(
+                self, self.tr("NightScribe Image Workbench"),
+                self.tr("Could not read the FITS file:") + f"\n{err}")
+            return False
+        self._last_dir = str(Path(path).parent)
+        return True
+
+    def show_tab(self, tab):
+        # Brings one feature tab to the front (Blink / Compare / Measure /
+        # Annotate) so the host can deep-link a workflow into the editor.
+        self.tabs.setCurrentWidget(tab)
+
+    def set_save_hook(self, fn):
+        # @args: fn - callable(paths: list[str], kind: str, payload: dict)
+        #        or None. The tabs call it after writing files, so a host
+        #        that opened the editor from a project can register the
+        #        outputs there. Cleared on every open path that does not
+        #        set it (the dialog instance is shared and persistent).
+        self._save_hook = fn
+
+    def notify_saved(self, paths, kind, payload=None):
+        # The tabs report written files here; without a hook it is a no-op.
+        # @args: paths - files just written, kind - "fits" | "chart" |
+        #        "sequence", payload - extra context for the host
+        if self._save_hook is not None and paths:
+            try:
+                self._save_hook([str(p) for p in paths], kind,
+                                payload or {})
+            except Exception as err:      # the write already happened;
+                logger.warning("save hook failed: %s", err)  # never break it
+
     # ----------------------------------------------------------- actions
 
     def _on_load(self):
@@ -211,7 +256,7 @@ class UfeDialog(QDialog):
         except fits_io.FitsError as err:
             logger.warning("FITS load failed: %s", err)
             QMessageBox.warning(
-                self, self.tr("FITS editor"),
+                self, self.tr("NightScribe Image Workbench"),
                 self.tr("Could not read the FITS file:") + f"\n{err}")
             return
         self._last_dir = str(Path(path).parent)
@@ -310,9 +355,9 @@ class UfeDialog(QDialog):
         self._sync_wcs_buttons()
         if self.state.has_image:
             self.setWindowTitle(
-                self.tr("FITS editor") + " · " + Path(self.state.path).name)
+                self.tr("NightScribe Image Workbench") + " · " + Path(self.state.path).name)
         else:
-            self.setWindowTitle(self.tr("FITS editor"))
+            self.setWindowTitle(self.tr("NightScribe Image Workbench"))
 
     def _sync_wcs_buttons(self):
         # North arrow / scale bar need a WCS (present at load or after a
@@ -332,7 +377,7 @@ class UfeDialog(QDialog):
         from ..config import config
         if not (config.get("astrometry_key") or "").strip():
             QMessageBox.information(
-                self, self.tr("FITS editor"),
+                self, self.tr("NightScribe Image Workbench"),
                 self.tr("Set your Astrometry.net API key in Settings to "
                         "solve plates automatically, or solve them with "
                         "ASTAP, NINA, Ekos or PixInsight and save them "
@@ -357,7 +402,7 @@ class UfeDialog(QDialog):
         self._solve_worker = None
         if not cards:
             QMessageBox.warning(
-                self, self.tr("FITS editor"),
+                self, self.tr("NightScribe Image Workbench"),
                 self.tr("Astrometry.net could not solve the plate (or is "
                         "offline). Check the key in Settings or solve it "
                         "with ASTAP/NINA/Ekos/PixInsight."))
@@ -366,7 +411,7 @@ class UfeDialog(QDialog):
             logger.info("UFE: astrometry solved for %s", self.state.path)
         else:
             QMessageBox.warning(
-                self, self.tr("FITS editor"),
+                self, self.tr("NightScribe Image Workbench"),
                 self.tr("The Astrometry.net solution is not usable "
                         "(non-TAN WCS)."))
 

@@ -94,6 +94,10 @@ DEFAULTS = {
     "ccd_read_noise": None,     # e-
     "ccd_saturate": None,       # ADU ceiling
     "flat_resid_mag": 0.007,    # flat-field residual floor in the error
+    # UFE (ADR-044): open Blink / comparison chart / annotated FITS in the
+    # unified editor by default; the classic dialogs stay reachable for
+    # the review period (Settings → Development)
+    "ufe_default": True,
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
     "pixel_binning": "1x1",
     "aavso_code": "",           # AAVSO observer code; blank when none

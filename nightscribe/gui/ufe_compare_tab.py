@@ -73,6 +73,8 @@ class UfeCompareTab(QWidget):
         self._catalog_visible = True
         self._catalog_items = []     # subset hidden with the checkbox
         self._worker = None
+        self._cutout_worker = None   # UfeCutoutWorker while DSS2 lands
+        self._prefill_sky = None     # (ra, dec) from the host, for DSS2
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
         if view is not None:
@@ -109,6 +111,13 @@ class UfeCompareTab(QWidget):
             "centre"))
         self.btn_field.clicked.connect(self._on_generate)
         lay.addWidget(self.btn_field)
+        self.btn_dss = QPushButton(self.tr("Load a survey field (DSS2)…"))
+        self.btn_dss.setToolTip(self.tr(
+            "No plate of your own? Download the field from the survey "
+            "(PS1-g, DSS2-red fallback) as a FITS with WCS and work on "
+            "it directly"))
+        self.btn_dss.clicked.connect(self._on_load_survey)
+        lay.addWidget(self.btn_dss)
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
         lay.addWidget(self.lbl_status)
@@ -179,24 +188,76 @@ class UfeCompareTab(QWidget):
 
     def _on_image_loaded(self):
         # A new plate stalemates the field; the target name defaults to
-        # the plate's stem.
+        # the plate's stem. The tab never disables: without a plate the
+        # survey button is the way in (ADR-044 rev).
         self._field = None
         self._entries = []
         self._stars = []
         self._drop_items()
-        has = self._state.has_image
-        self.setEnabled(has)
-        if has:
+        if self._state.has_image:
             self.edt_target.setText(Path(self._state.path).stem)
             self.lbl_status.setText(
                 "" if self._state.wcs is not None else self.tr(
                     "The plate has no WCS: solve it with «Solve "
                     "astrometry…» to build the comparison field."))
         else:
-            self.lbl_status.setText("")
+            self.lbl_status.setText(self.tr(
+                "No plate loaded: load a FITS or fetch the field from "
+                "the survey."))
         self._reload_table()
 
     # ------------------------------------------------------------- field
+
+    def _on_load_survey(self):
+        # Load a survey field (DSS2/PS1): the plate centre when there is
+        # one, the host's coordinates when we were opened from a project,
+        # else an object name resolved by the usual sources. Network off
+        # the GUI thread; the cutout loads as a normal plate.
+        ra = dec = None
+        if self._state.has_image and self._state.wcs is not None:
+            ra, dec = self._state.wcs.center()
+        elif self._prefill_sky is not None:
+            ra, dec = self._prefill_sky
+        else:
+            from PySide6.QtWidgets import QInputDialog
+            name, ok = QInputDialog.getText(
+                self, self.tr("Survey field"),
+                self.tr("Object or field name (SIMBAD):"))
+            if not ok or not name.strip():
+                return
+            from ..core import blink as _blink
+            try:
+                target = _blink.resolve_sn(name.strip())
+            except _blink.BlinkError as err:
+                self.lbl_status.setText(
+                    "⚠ " + err.messages.get(self._lang, ""))
+                return
+            ra, dec = target["ra"], target["dec"]
+            self.edt_target.setText(target["name"])
+            self._prefill_sky = (ra, dec)
+        from .workers import UfeCutoutWorker
+        self.btn_dss.setEnabled(False)
+        self.lbl_status.setText(self.tr("Downloading the survey field…"))
+        self._cutout_worker = UfeCutoutWorker(ra, dec)
+        self._cutout_worker.finished.connect(self._on_survey_landed)
+        self._cutout_worker.start()
+
+    def _on_survey_landed(self, result):
+        # @args: result - (local FITS path, survey label) or (None, None)
+        self.btn_dss.setEnabled(True)
+        self._cutout_worker = None
+        path, label = result
+        if not path:
+            self.lbl_status.setText(self.tr(
+                "The survey download failed (offline?). Try again later."))
+            return
+        try:
+            self._state.load(path)
+        except Exception as err:
+            logger.warning("survey cutout unreadable: %s", err)
+            self.lbl_status.setText(str(err))
+            return
+        self.lbl_status.setText(self.tr("Field loaded: {0}").format(label))
 
     def _on_generate(self):
         # Generate field: VizieR catalog + VSX variables around the plate
@@ -564,6 +625,30 @@ class UfeCompareTab(QWidget):
         # @return: a copy of the current [{"name","kind","star"}] entries
         return list(self._entries)
 
+    # ------------------------------------------------- host integration
+
+    def prefill(self, target=None, mag=None, ra=None, dec=None):
+        # The host app (a project) lands the chart with the target known:
+        # name and magnitude set, and the sky position remembered so the
+        # survey-field button can download DSS2/PS1 when the observer has
+        # no plate of the field.
+        # @args: target - object name, mag - its approx magnitude,
+        #        ra/dec - J2000 degrees or None
+        if target is not None:
+            self.edt_target.setText(target)
+        if mag is not None:
+            self.spn_mag.setValue(float(mag))
+        if ra is not None and dec is not None:
+            self._prefill_sky = (float(ra), float(dec))
+
+    def _notify_saved(self, paths, payload=None):
+        # Files written while a host watches (a project) get registered
+        # there; with no host this is a no-op.
+        dlg = self.window()
+        notify = getattr(dlg, "notify_saved", None)
+        if callable(notify):
+            notify(paths, "sequence", payload or {})
+
     # ------------------------------------------------------------- export
 
     def _export_csv(self):
@@ -583,6 +668,15 @@ class UfeCompareTab(QWidget):
             catalog_label=self._field.get("catalog_name", "")
             if self._field else "")
         logger.info("sequence CSV exported to %s", out)
+        self._notify_saved([out], {"which": "csv",
+                                   "entries": self.entries(),
+                                   "catalog": (self._field or {}).get(
+                                       "catalog"),
+                                   "catalog_name": (self._field or {}).get(
+                                       "catalog_name", ""),
+                                   "fov_arcmin": (self._field or {}).get(
+                                       "fov_arcmin"),
+                                   "target_mag": self.spn_mag.value()})
         self.lbl_status.setText(self.tr("Written to {0}").format(out))
 
     def _export_png(self):
@@ -598,4 +692,5 @@ class UfeCompareTab(QWidget):
             return
         self._view.export_png(out)
         logger.info("chart PNG exported to %s", out)
+        self._notify_saved([out], {"which": "png"})
         self.lbl_status.setText(self.tr("Written to {0}").format(out))

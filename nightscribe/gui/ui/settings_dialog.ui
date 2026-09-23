@@ -461,12 +461,40 @@
          </property>
         </spacer>
        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="tab_dev">
+      <attribute name="title"><string>Development</string></attribute>
+      <layout class="QVBoxLayout" name="vbox_dev">
+       <item>
+        <widget class="QGroupBox" name="grp_ufe">
+         <property name="title"><string>FITS editor</string></property>
+         <layout class="QVBoxLayout" name="vbox_ufe">
+          <item>
+           <layout class="QHBoxLayout" name="row_ufe">
+            <item><widget class="QLabel" name="lbl_ufe"><property name="text"><string>Unified editor (UFE) by default:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_ufe_default"/></item>
+            <item><spacer name="hsp_ufe"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_ufe"><property name="text"><string>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="vspacer_dev">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0">
+          <size><width>20</width><height>40</height></size>
+         </property>
+        </spacer>
+       </item>
       </layout>
      </widget>
-    </widget>
-   </item>
-   <item>
-    <widget class="QDialogButtonBox" name="buttonBox">
+     </widget>
+    </item>
+    <item>
+     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="standardButtons"><set>QDialogButtonBox::Save|QDialogButtonBox::Cancel</set></property>
     </widget>
    </item>

@@ -176,9 +176,10 @@ def test_zoom_label_follows_the_view(dlg):
 
 
 def test_title_carries_the_file_name(dlg):
-    assert dlg.windowTitle() == "FITS editor"
+    assert dlg.windowTitle() == "NightScribe Image Workbench"
     dlg.state.load(MONO)
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
+    assert dlg.windowTitle().startswith("NightScribe Image Workbench")
 
 
 def test_keep_stretch_checkbox_drives_the_state(dlg):

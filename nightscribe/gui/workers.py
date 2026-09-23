@@ -214,6 +214,33 @@ class UfeFieldWorker(QThread):
         self.finished.emit(field or {})
 
 
+class UfeCutoutWorker(QThread):
+    # Downloads a survey FITS field (PS1-g, DSS2-red fallback) for the
+    # UFE's Compare tab in the background, through the db cache
+    # (ADR-044 rev: DSS2 inside the UFE, no plate needed).
+    finished = Signal(object)       # (local FITS path, survey label)
+    progress = Signal(str)          # stage text for the status line
+
+    def __init__(self, ra_deg, dec_deg, fov_arcmin=30.0):
+        super().__init__()
+        self._ra = ra_deg
+        self._dec = dec_deg
+        self._fov = fov_arcmin
+
+    def run(self):
+        from ..core.sources import cutouts
+        try:
+            self.progress.emit("survey cutout")
+            width = 1024
+            pixscale = self._fov * 60.0 / width
+            out = cutouts.ps1g_matched(self._ra, self._dec, width, width,
+                                       pixscale, 0.0)
+            self.finished.emit(out if out[0] is not None else (None, None))
+        except Exception as err:    # never crash the GUI on fetch problems
+            logger.exception("ufe cutout worker failed: %s", err)
+            self.finished.emit((None, None))
+
+
 class BlinkExportWorker(QThread):
     # Renders the blink GIF/MP4/PNG off the GUI thread (matplotlib is slow).
     finished = Signal(str, str)     # output path, error message

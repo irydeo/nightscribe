@@ -156,6 +156,43 @@ class UfeAnnotateTab(QWidget):
         elif self._view is not None:
             self._drop_marker_items()
 
+    # ------------------------------------------------- host integration
+
+    def prefill(self, label=None, notes=None, ra=None, dec=None,
+                extra_paths=()):
+        # The host app (a project) lands the editor halfway done: label,
+        # notes, the marker on the object's sky position when the plate
+        # carries a WCS, and the other visits queued for annotation.
+        # @args: label - annotation label (the object name), notes -
+        #        default notes, ra/dec - J2000 sky or None,
+        #        extra_paths - more plates to annotate with the same marker
+        if label is not None:
+            self.edit_label.setText(label)
+        if notes is not None:
+            self.edit_notes.setText(notes)
+        if ra is not None and dec is not None and self._state.wcs is not None:
+            try:
+                col, row = self._state.wcs.sky_to_pixel(ra, dec)
+                w, h = self._state.plate_shape
+                if 0 <= col < w and 0 <= row < h:
+                    self._marker = [float(col), float(row)]
+                    self._refresh_marker()
+            except Exception:
+                pass
+        for p in extra_paths or ():
+            existing = {self.lst_extra.item(i).text()
+                        for i in range(self.lst_extra.count())}
+            if p and str(p) not in existing:
+                self.lst_extra.addItem(str(p))
+
+    def _notify_saved(self, paths):
+        # Files written while a host watches (a project) get registered
+        # there; with no host this is a no-op.
+        dlg = self.window()
+        notify = getattr(dlg, "notify_saved", None)
+        if callable(notify):
+            notify(paths, "fits")
+
     # ------------------------------------------------------------- state
 
     def _on_image_loaded(self):
@@ -251,8 +288,8 @@ class UfeAnnotateTab(QWidget):
             try:
                 from ..core import coords
                 ra, dec = self._state.wcs.pixel_to_sky(col, row)
-                parts.append(f"RA {coords.ra_deg_to_hms(ra)}")
-                parts.append(f"Dec {coords.dec_deg_to_dms(dec)}")
+                parts.append(f"{self.tr('RA')} {coords.ra_deg_to_hms(ra)}")
+                parts.append(f"{self.tr('Dec')} {coords.dec_deg_to_dms(dec)}")
             except Exception:
                 pass
         self.lbl_position.setText("  ·  ".join(parts))
@@ -377,6 +414,7 @@ class UfeAnnotateTab(QWidget):
                 .format(dest, str(exc)))
             return
         logger.info("annotated FITS written: %s", written)
+        self._notify_saved(written)
         self.lbl_status.setText(
             self.tr("Saved {0} annotated copy(ies). Last: {1}")
             .format(len(written), written[-1]))

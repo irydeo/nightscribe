@@ -256,6 +256,26 @@ class UfeBlinkTab(QWidget):
         self.edt_ra.setEnabled(checked)
         self.edt_dec.setEnabled(checked)
 
+    # ------------------------------------------------- host integration
+
+    def prefill(self, name=None, ra=None, dec=None):
+        # The host app (a project) lands the blink with the target known:
+        # name or manual coordinates filled, ready for one-click Prepare.
+        if name is not None:
+            self.edt_name.setText(name)
+        if ra is not None and dec is not None:
+            self.chk_manual.setChecked(True)
+            self.edt_ra.setText(f"{ra:.5f}")
+            self.edt_dec.setText(f"{dec:+.5f}")
+
+    def _notify_saved(self, paths):
+        # Files written while a host watches (a project) get registered
+        # there; with no host this is a no-op.
+        dlg = self.window()
+        notify = getattr(dlg, "notify_saved", None)
+        if callable(notify):
+            notify(paths, "chart")
+
     def _manual_coords(self):
         # @return: (ra, dec) in degrees, or None when invalid/unchecked
         if not self.chk_manual.isChecked():
@@ -559,6 +579,7 @@ class UfeBlinkTab(QWidget):
         # @args: out - written path ("" on failure), err - error text
         if out:
             self.lbl_status.setText(self.tr("Written to {0}").format(out))
+            self._notify_saved([out])
         else:
             self.lbl_status.setText(
                 self.tr("Export failed: {0}").format(err))

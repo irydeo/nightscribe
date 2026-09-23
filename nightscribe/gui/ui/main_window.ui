@@ -82,7 +82,7 @@
     <property name="text"><string>Campaigns…</string></property>
    </action>
    <action name="action_ufe">
-    <property name="text"><string>FITS editor…</string></property>
+    <property name="text"><string>NightScribe Image Workbench…</string></property>
    </action>
   <action name="action_about">
    <property name="text"><string>About NightScribe</string></property>

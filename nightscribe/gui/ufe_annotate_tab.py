@@ -45,6 +45,8 @@ _MARKER_DEFAULT = "#ffb347"   # the same amber the legacy dialog uses
 
 
 class UfeAnnotateTab(QWidget):
+    pick_clicks = True   # clicks mark things: the dialog hands us
+                           # the pick cursor + snapping reticle on stage
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView the overlays and clicks live on
 
@@ -149,7 +151,8 @@ class UfeAnnotateTab(QWidget):
 
     def set_active(self, flag):
         # The dialog calls this on tab switches: only the visible tab owns
-        # the view's clicks and its overlays (ADR-044 extension rule).
+        # the view's clicks and its overlays (ADR-044 extension rule); on
+        # stage it also gets the pick cursor and the snapping reticle.
         self._active = bool(flag)
         if self._active:
             self._refresh_marker()

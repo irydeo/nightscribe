@@ -486,3 +486,51 @@ def test_suggest_apertures_flags_the_core_gradient():
                                / (2 * 2.2 ** 2))
     s = phot.suggest_apertures(data, 100, 100)
     assert any("core" in r["en"] for r in s["reasons"])
+
+
+# ---------------- phase I.5: the gaussian (matched-filter) centroid ---
+
+
+def _noisy_star(snr, seed=3, sky=800.0, sig=8.0, pos=(103.7, 96.2)):
+    rng = np.random.default_rng(seed)
+    data = sky + rng.normal(0, sig, (200, 200))
+    yy, xx = np.ogrid[:200, :200]
+    amp = snr * sig * math.sqrt(2 * math.pi * 2.2 ** 2)
+    data = data + amp * np.exp(-((xx - pos[0]) ** 2 + (yy - pos[1]) ** 2)
+                               / (2 * 2.2 ** 2))
+    return data
+
+
+def test_gaussian_centroid_accuracy_by_snr():
+    for snr, tol in ((100, 0.01), (10, 0.05)):
+        d = _noisy_star(snr)
+        g = phot.gaussian_centroid(d, 104, 96, fwhm=2.3548 * 2.2,
+                                   sky_pp=800.0)
+        assert g["ok"]
+        assert math.hypot(g["x"] - 103.7, g["y"] - 96.2) < tol
+        assert g["snr"] > 4
+
+
+def test_gaussian_centroid_guards_are_honest():
+    rng = np.random.default_rng(3)
+    empty = 800 + rng.normal(0, 8, (200, 200))
+    out = phot.gaussian_centroid(empty, 100, 100)
+    assert not out["ok"] and not out["moved"]
+    assert out["x"] == 100.0 and out["y"] == 100.0
+    assert set(out["reason"]) == {"es", "en"}
+    assert not phot.gaussian_centroid(empty, 500, 50)["ok"]
+    # a single hot pixel has no gaussian correlation: refused
+    weak = empty.copy()
+    weak[96, 104] += 30.0
+    assert not phot.gaussian_centroid(weak, 104, 96)["ok"]
+
+
+def test_measure_point_gaussian_is_the_default():
+    plate = _plate(200, 200, [(100.4, 99.6, 9000.0)], noise=0.5)
+    r = phot.measure_point(plate, 100, 100)
+    assert r["ok"]
+    assert abs(r["x"] - 100.4) < 0.05
+    # the alternatives stay available for the tests and odd cases
+    assert phot.measure_point(plate, 100, 100,
+                              centroid_mode="refined")["ok"]
+    assert phot.measure_point(plate, 100, 100, centroid_mode="raw")["ok"]

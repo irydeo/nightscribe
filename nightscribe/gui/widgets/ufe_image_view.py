@@ -80,6 +80,15 @@ class UfeImageView(ChartView):
         self._annotation_labels = []  # [(label item, ann dict)]
         self._frame_override = None  # Blink tab: fn() -> uint8 display
                                      # frame replacing the state's own
+        # pick mode (the Measure/Annotate/Compare tabs while on stage):
+        # a crosshair cursor plus a viewport reticle that snaps to the
+        # gaussian centroid of the source under the mouse
+        self._pick_mode = False
+        self._mouse_vp = None        # last viewport cursor pos (or None)
+        self._snap_scene = None      # snapped scene point (or None)
+        self._snap_timer = QTimer(self)
+        self._snap_timer.setSingleShot(True)
+        self._snap_timer.timeout.connect(self._snap_now)
         self.show_north = True      # HUD toggles (need a WCS to paint)
         self.show_scale = True
 
@@ -299,12 +308,109 @@ class UfeImageView(ChartView):
     def drawForeground(self, painter, rect):
         # Viewport-space HUD (north arrow, scale bar) under the base's
         # watermark; device coordinates, so zoom/pan never move them.
+        # The pick reticle goes last: it must sit on top of everything.
         painter.save()
         painter.resetTransform()
         self._paint_hud(painter, self.viewport().width(),
                         self.viewport().height())
         painter.restore()
         super().drawForeground(painter, rect)
+        if self._pick_mode and self._mouse_vp is not None:
+            painter.save()
+            painter.resetTransform()
+            self._paint_reticle(painter)
+            painter.restore()
+
+    # -------------------------------------------------- pick reticle
+
+    def set_pick_cursor(self, on):
+        # Picking mode for the clicking tabs: a crosshair cursor plus the
+        # snapping reticle. The overlay never reaches the PNG export (it
+        # renders the scene; the reticle is view foreground only).
+        # @args: on - pick mode on or off
+        self._pick_mode = bool(on)
+        # with ScrollHandDrag the cursor that counts is the viewport's;
+        # at rest it is the open hand (the pan affordance), not an arrow
+        self.viewport().setCursor(Qt.CrossCursor if self._pick_mode
+                                  else Qt.OpenHandCursor)
+        if not self._pick_mode:
+            self._mouse_vp = None
+            self._snap_scene = None
+        self.update()
+
+    def mouseMoveEvent(self, event):
+        # The probe stays as always; in pick mode the cursor position is
+        # remembered for the reticle and a snap recompute is coalesced.
+        if self._pick_mode:
+            self._mouse_vp = event.position().toPoint()
+            if not self._snap_timer.isActive():
+                self._snap_timer.start(60)      # one search per 60 ms
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        # The cursor left: no reticle hangs around.
+        if self._pick_mode:
+            self._mouse_vp = None
+            self._snap_scene = None
+            self.update()
+        super().leaveEvent(event)
+
+    def _snap_now(self):
+        # If a detected source sits near the cursor, the reticle snaps to
+        # its gaussian centroid (the click is born centred). Slow plates
+        # never stall the mouse: the search runs on a small cutout only.
+        if not self._pick_mode or self._mouse_vp is None \
+                or not self._state.has_image:
+            return
+        from ...core import series
+        from ...core import photometry as _phot
+        scene_pt = self.mapToScene(self._mouse_vp)
+        col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
+        data = self._state.data
+        h, w = data.shape
+        half = 24
+        y0, y1 = max(0, int(row) - half), min(h, int(row) + half)
+        x0, x1 = max(0, int(col) - half), min(w, int(col) + half)
+        sub = data[y0:y1, x0:x1]
+        self._snap_scene = None
+        if sub.size:
+            sources = series.detect_sources(sub, k=5.0, min_sep=6,
+                                            max_sources=5)
+            best, best_d = None, (12.0 / max(self.current_factor(),
+                                             1e-3)) ** 2
+            for sx, sy, _pk in sources:
+                gx, gy = sx + x0, sy + y0
+                d = (gx - col) ** 2 + (gy - row) ** 2
+                if d < best_d:
+                    best, best_d = (gx, gy), d
+            if best is not None:
+                cen = _phot.gaussian_centroid(data, best[0], best[1])
+                if cen["ok"]:
+                    self._snap_scene = self._state.data_to_scene(
+                        cen["x"], cen["y"])
+        self.update()
+
+    def _paint_reticle(self, painter):
+        # The crosshair: full-viewport lines with a central gap, white on
+        # black (legible on sky, stars and cores alike). At the snapped
+        # point when a source was found, else under the cursor.
+        if self._snap_scene is not None:
+            vp = self.mapFromScene(self._snap_scene[0], self._snap_scene[1])
+        else:
+            vp = self._mouse_vp
+        if vp is None:
+            return
+        x, y = vp.x(), vp.y()
+        w, h = self.viewport().width(), self.viewport().height()
+        gap = 8
+        for dx, dy in ((1, 1), (0, 0)):       # black shadow, then white
+            color = QColor(0, 0, 0, 160) if dx else QColor(230, 235, 245)
+            painter.setPen(QPen(color, 1.6 if dx else 1.0))
+            painter.drawLine(x + dx, 0, x + dx, y - gap + dy)
+            painter.drawLine(x + dx, y + gap + dy, x + dx, h)
+            painter.drawLine(0, y + dy, x - gap + dx, y + dy)
+            painter.drawLine(x + gap + dx, y + dy, w, y + dy)
 
     def _paint_hud(self, painter, w, h, k=1.0):
         # @args: painter - device-coords painter, w, h - surface size in

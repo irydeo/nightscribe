@@ -116,7 +116,7 @@ def _sigma_clipped_median(values, level=SIG_LEVEL, iters=SIG_ITERS):
 
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
-                  sky_mode="median", centroid_mode="refined"):
+                  sky_mode="median", centroid_mode="gaussian"):
     # One click on one plate (decision D4): sub-pixel centroid, aperture
     # net flux, sky per pixel, peak, and honest guards. Never raises for
     # a bad star: the reason is the bilingual pair, the panel decides.
@@ -128,8 +128,9 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     #        or header); the plateau check always runs on top of it,
     #        sky_mode - "median" (flat sky) or "plane" (H2: a tilted sky
     #        plane fitted to the annulus, for galactic cores),
-    #        centroid_mode - "refined" (sky-subtracted, thresholded, two
-    #        passes; the default) or "raw" (the legacy one-pass moment)
+    #        centroid_mode - "gaussian" (matched-filter, parabola-fined;
+    #        the default), "refined" (sky-subtracted moment, two passes)
+    #        or "raw" (the legacy one-pass moment)
     # @return: {"x", "y" (centroided where possible), "flux", "sky_pp",
     #          "peak", "n_pix", "saturated", "ok", "reason"}
     if data is None or data.size == 0:
@@ -143,9 +144,12 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         return _fail("demasiado cerca del borde", "too close to the edge")
     if centroid_mode == "raw":
         cx, cy = series._centroid(data, x, y)      # the legacy one-pass
-    else:
+    elif centroid_mode == "refined":
         cen = refined_centroid(data, x, y)
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
+    else:
+        cen = gaussian_centroid(data, x, y)
+        cx, cy = cen["x"], cen["y"]
     yy, xx = np.ogrid[:h, :w]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
     ap_pixels = data[r2 <= r_ap ** 2]
@@ -548,6 +552,110 @@ def combine_errors(*terms):
 
 
 # ---------------- precision centroid + suggested apertures (phase I) ---
+
+def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
+    # The precision centroid: matched-filter correlation of the
+    # sky-subtracted cutout with a gaussian template of the measured
+    # seeing, on a 0.1 px grid, with parabolic refinement of the
+    # correlation surface (~0.01 px). With a fixed sigma this is the
+    # optimal estimator in white noise, and the one that does not wander
+    # on faint sources. The observer's point is kept (with the bilingual
+    # reason) when the fit is too weak to trust: below SNR ~4 there is
+    # no centroid worth the name, and pretending otherwise is worse.
+    # @args: data - 2D array, x, y - starting pixel, fwhm - seeing in px
+    #        (estimated from the cutout when None), sky_pp - local sky
+    #        (cutout edge median when None)
+    # @return: {"x", "y", "ok", "moved", "reason", "snr"} - ok=False
+    #          keeps the start position
+    if data is None or data.size == 0:
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": None,
+                "reason": {"es": "no hay imagen cargada",
+                           "en": "no image loaded"}}
+    h, w = data.shape
+    if not (0 <= x < w and 0 <= y < h):
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": None,
+                "reason": {"es": "el punto cae fuera del marco",
+                           "en": "the point is out of frame"}}
+    if fwhm is None:
+        fwhm = estimate_fwhm(data, [(x, y)]) or 4.0
+    sigma_psf = max(fwhm / 2.3548, 0.7)
+    half = max(5, int(round(2.0 * sigma_psf)) + 1)
+    seed = refined_centroid(data, x, y, sky_pp=sky_pp, fwhm=fwhm)
+    sx, sy = seed["x"], seed["y"]
+    y0 = max(0, int(round(sy)) - half)
+    y1 = min(h, int(round(sy)) + half + 1)
+    x0 = max(0, int(round(sx)) - half)
+    x1 = min(w, int(round(sx)) + half + 1)
+    sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
+    if sub.size == 0 or not np.any(np.isfinite(sub)):
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": None,
+                "reason": {"es": "sin píxeles utilizables",
+                           "en": "no usable pixels"}}
+    if sky_pp is None:
+        ring = np.concatenate([sub[0, :], sub[-1, :], sub[:, 0],
+                               sub[:, -1]])
+        ring = ring[np.isfinite(ring)]
+        sky = float(np.median(ring)) if ring.size else 0.0
+    else:
+        sky = float(sky_pp)
+    resid = np.nan_to_num(sub - sky)
+    mad = float(np.median(np.abs(resid - np.median(resid))))
+    noise = max(1.4826 * mad, 1e-9)
+    ys, xs = np.mgrid[y0:y1, x0:x1]
+    # matched-filter grid: correlate the residual with the seeing
+    # gaussian on a 0.1 px lattice around the moment seed
+    best = (None, -np.inf)
+    for dy in np.arange(-1.0, 1.0001, 0.1):
+        for dx in np.arange(-1.0, 1.0001, 0.1):
+            g = np.exp(-(((xs - (sx + dx)) ** 2
+                          + (ys - (sy + dy)) ** 2) / (2 * sigma_psf ** 2)))
+            gg = float((g * g).sum())
+            if gg <= 0.0:
+                continue
+            amp = float((resid * g).sum()) / gg
+            snr = amp * math.sqrt(gg) / noise
+            if snr > best[1]:
+                best = ((sx + dx, sy + dy, amp, gg), snr)
+    (bx, by, amp, gg), snr = best
+    # parabolic refinement of the correlation peak (sub-lattice)
+    def _peak(c0, c1, c2, base, step):
+        denom = c0 - 2.0 * c1 + c2
+        if abs(denom) < 1e-12:
+            return base
+        return base + 0.5 * step * (c0 - c2) / denom
+
+    def _corr(cx, cy):
+        g = np.exp(-(((xs - cx) ** 2 + (ys - cy) ** 2)
+                     / (2 * sigma_psf ** 2)))
+        gg2 = float((g * g).sum())
+        return float((resid * g).sum()) / max(gg2, 1e-12) \
+            * math.sqrt(max(gg2, 1e-12))
+    step = 0.1
+    fx = _peak(_corr(bx - step, by), _corr(bx, by), _corr(bx + step, by),
+               bx, step)
+    fy = _peak(_corr(bx, by - step), _corr(bx, by), _corr(bx, by + step),
+               by, step)
+    if snr < 4.0:
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": float(snr),
+                "reason": {"es": "demasiado débil para centrarla "
+                                "(medida donde pulsaste)",
+                           "en": "too faint to centroid (measured where "
+                                "you clicked)"}}
+    if abs(fx - x) > half or abs(fy - y) > half:
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": float(snr),
+                "reason": {"es": "el centroide se escapó del píxel "
+                                "clicado",
+                           "en": "the centroid ran away from the "
+                                "clicked pixel"}}
+    return {"x": float(fx), "y": float(fy), "ok": True,
+            "moved": math.hypot(fx - x, fy - y) > 0.01,
+            "snr": float(snr), "reason": None}
+
 
 def refined_centroid(data, x, y, sky_pp=None, fwhm=None):
     # The photometric centroid: local sky subtracted, only significant

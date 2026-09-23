@@ -57,6 +57,8 @@ _MAX_LABELS = 34        # catalog magnitude labels, brightest first
 
 
 class UfeCompareTab(QWidget):
+    pick_clicks = True   # clicks mark things: the dialog hands us
+                           # the pick cursor + snapping reticle on stage
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView the field overlays and picks live on
 

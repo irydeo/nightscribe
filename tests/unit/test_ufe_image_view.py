@@ -176,3 +176,54 @@ def test_export_png_stamps_the_hud(view, tmp_path):
     assert not view.show_north and not view.show_scale
     out2 = view.export_png(tmp_path / "plain.png")
     assert out2.exists()
+
+
+def test_pick_cursor_and_snap(view, qapp):
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QMouseEvent, QPointingDevice
+    import numpy as np
+    # at rest the viewport carries the pan affordance (open hand)
+    assert view.viewport().cursor().shape() == Qt.OpenHandCursor
+    view.set_pick_cursor(True)
+    assert view.viewport().cursor().shape() == Qt.CrossCursor
+    # a plate with one bright star: hovering near it snaps the reticle
+    data = np.full((200, 200), 800.0, dtype=np.float32)
+    yy, xx = np.ogrid[:200, :200]
+    data += 9000 * np.exp(-((xx - 100.4) ** 2 + (yy - 99.6) ** 2)
+                          / (2 * 2.2 ** 2))
+    view._state.data = data
+    view._state.d_min, view._state.d_max = 790.0, 9800.0
+    sx, sy = view._state.data_to_scene(100.4, 99.6)
+    vp = view.mapFromScene(sx, sy)
+    ev = QMouseEvent(QMouseEvent.MouseMove, QPointF(vp), QPointF(vp),
+                     QPointF(vp), Qt.NoButton, Qt.NoButton, Qt.NoModifier,
+                     QPointingDevice.primaryPointingDevice())
+    view.mouseMoveEvent(ev)
+    view._snap_now()
+    assert view._snap_scene is not None
+    assert abs(view._snap_scene[0] - sx) < 1.0
+    assert abs(view._snap_scene[1] - sy) < 1.0
+    view.repaint()                       # the reticle paints cleanly
+    view.set_pick_cursor(False)
+    assert view.viewport().cursor().shape() == Qt.OpenHandCursor
+    assert view._mouse_vp is None
+
+
+def test_export_never_carries_the_reticle(view, tmp_path):
+    import numpy as np
+    data = np.full((100, 100), 800.0, dtype=np.float32)
+    data += 9000 * np.exp(-((np.arange(100)[None, :] - 50.0) ** 2
+                            + (np.arange(100)[:, None] - 50.0) ** 2)
+                          / (2 * 2.2 ** 2))
+    view._state.data = data
+    view._state.d_min, view._state.d_max = 790.0, 9800.0
+    view._state.load  # noqa - just show we do NOT load here; data set raw
+    view._render()
+    a = view.export_png(tmp_path / "a.png").read_bytes()
+    view.set_pick_cursor(True)
+    from PySide6.QtCore import QPoint
+    view._mouse_vp = QPoint(50, 50)
+    view.repaint()
+    b = view.export_png(tmp_path / "b.png").read_bytes()
+    view.set_pick_cursor(False)
+    assert a == b      # the reticle is viewport-only, never in the file

@@ -54,6 +54,8 @@ _C_COMP = "#4dd0e1"    # used comps ring in the compare tab's cyan
 
 
 class UfeMeasureTab(QWidget):
+    pick_clicks = True   # clicks mark things: the dialog hands us
+                           # the pick cursor + snapping reticle on stage
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView, compare_tab - the Compare tab the
     #        sequence is read from (D5), go_compare - callable switching
@@ -224,7 +226,8 @@ class UfeMeasureTab(QWidget):
     # ------------------------------------------------------- activation
 
     def set_active(self, flag):
-        # Only the visible tab owns the view's clicks and its overlays.
+        # Only the visible tab owns the view's clicks and its overlays;
+        # on stage it also gets the pick cursor and the snapping reticle.
         self._active = bool(flag)
         if not self._active:
             self._drop_items()

@@ -186,6 +186,8 @@ class UfeDialog(QDialog):
         # takes it from the others. One exception by design: Compare
         # leaving for Measure keeps its overlays (the sequence IS the
         # Measure tab's input) and its star probe keeps answering.
+        # The pick cursor (crosshair + snapping reticle) follows the
+        # stage from here: tabs declare `pick_clicks = True`.
         incoming = self.tabs.widget(idx)
         for i in range(self.tabs.count()):
             w = self.tabs.widget(i)
@@ -197,6 +199,8 @@ class UfeDialog(QDialog):
                 setter(False, keep_overlays=True)
             else:
                 setter(i == idx)
+        self.view.set_pick_cursor(
+            bool(getattr(incoming, "pick_clicks", False)))
         self._prev_tab = incoming
 
     def closeEvent(self, event):

@@ -558,6 +558,12 @@ class UfeCompareTab(QWidget):
         self._redraw_entries()
         self._reload_table()
 
+    def entries(self):
+        # The sequence, for the Measure tab (phase G2; the only public
+        # accessor other tabs may use).
+        # @return: a copy of the current [{"name","kind","star"}] entries
+        return list(self._entries)
+
     # ------------------------------------------------------------- export
 
     def _export_csv(self):

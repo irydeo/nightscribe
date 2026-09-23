@@ -115,7 +115,7 @@ class _FakeExportWorker:
 
 def test_tab_replaces_the_placeholder(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Annotate"]
+    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
     assert dlg.tabs.indexOf(dlg.tab_blink) == 0
 
 

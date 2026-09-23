@@ -149,7 +149,7 @@ class UfeDialog(QDialog):
         return bar
 
     def _build_feature_tabs(self):
-        # All three feature tabs are real now (phases D, E, F).
+        # The four feature tabs are real now (phases D, E, F, G2).
         from .ufe_blink_tab import UfeBlinkTab
         self.tab_blink = UfeBlinkTab(self.state, self._lang,
                                      view=self.view)
@@ -158,6 +158,13 @@ class UfeDialog(QDialog):
         self.tab_compare = UfeCompareTab(self.state, self._lang,
                                          view=self.view)
         self.tabs.addTab(self.tab_compare, self.tr("Compare"))
+        from .ufe_measure_tab import UfeMeasureTab
+        self.tab_measure = UfeMeasureTab(
+            self.state, self._lang, view=self.view,
+            compare_tab=self.tab_compare,
+            go_compare=lambda: self.tabs.setCurrentWidget(
+                self.tab_compare))
+        self.tabs.addTab(self.tab_measure, self.tr("Measure"))
         from .ufe_annotate_tab import UfeAnnotateTab
         self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
                                            view=self.view)

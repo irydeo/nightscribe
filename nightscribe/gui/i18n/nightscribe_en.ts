@@ -6580,18 +6580,18 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Proposed {0} comparisons (tweak by clicking stars).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="570"/>
+        <location filename="../ufe_compare_tab.py" line="576"/>
         <source>Export sequence CSV</source>
         <translation>Export sequence CSV</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="580"/>
-        <location filename="../ufe_compare_tab.py" line="595"/>
+        <location filename="../ufe_compare_tab.py" line="586"/>
+        <location filename="../ufe_compare_tab.py" line="601"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="590"/>
+        <location filename="../ufe_compare_tab.py" line="596"/>
         <source>Export chart PNG</source>
         <translation>Export chart PNG</translation>
     </message>
@@ -6600,12 +6600,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <name>UfeDialog</name>
     <message>
         <location filename="../ufe_dialog.py" line="58"/>
-        <location filename="../ufe_dialog.py" line="207"/>
-        <location filename="../ufe_dialog.py" line="306"/>
-        <location filename="../ufe_dialog.py" line="308"/>
-        <location filename="../ufe_dialog.py" line="328"/>
-        <location filename="../ufe_dialog.py" line="353"/>
-        <location filename="../ufe_dialog.py" line="362"/>
+        <location filename="../ufe_dialog.py" line="214"/>
+        <location filename="../ufe_dialog.py" line="313"/>
+        <location filename="../ufe_dialog.py" line="315"/>
+        <location filename="../ufe_dialog.py" line="335"/>
+        <location filename="../ufe_dialog.py" line="360"/>
+        <location filename="../ufe_dialog.py" line="369"/>
         <source>FITS editor</source>
         <translation>FITS editor</translation>
     </message>
@@ -6661,7 +6661,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="123"/>
-        <location filename="../ufe_dialog.py" line="348"/>
+        <location filename="../ufe_dialog.py" line="355"/>
         <source>Solve astrometry…</source>
         <translation>Solve astrometry…</translation>
     </message>
@@ -6691,22 +6691,27 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="329"/>
+        <location filename="../ufe_dialog.py" line="167"/>
+        <source>Measure</source>
+        <translation>Measure</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="336"/>
         <source>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</source>
         <translation>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="344"/>
+        <location filename="../ufe_dialog.py" line="351"/>
         <source>Solving: {0}…</source>
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="354"/>
+        <location filename="../ufe_dialog.py" line="361"/>
         <source>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</source>
         <translation>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="363"/>
+        <location filename="../ufe_dialog.py" line="370"/>
         <source>The Astrometry.net solution is not usable (non-TAN WCS).</source>
         <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
@@ -6725,7 +6730,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Compare</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="164"/>
+        <location filename="../ufe_dialog.py" line="171"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
@@ -6734,22 +6739,22 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Arrives in phase {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="197"/>
+        <location filename="../ufe_dialog.py" line="204"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="198"/>
+        <location filename="../ufe_dialog.py" line="205"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="208"/>
+        <location filename="../ufe_dialog.py" line="215"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="224"/>
+        <location filename="../ufe_dialog.py" line="231"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>
@@ -6765,6 +6770,124 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <location filename="../widgets/ufe_image_view.py" line="408"/>
         <source>Open a FITS image to start</source>
         <translation>Open a FITS image to start</translation>
+    </message>
+</context>
+<context>
+    <name>UfeMeasureTab</name>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="73"/>
+        <source>Click a star (or the target) to measure it against the Compare tab&apos;s sequence.</source>
+        <translation>Click a star (or the target) to measure it against the Compare tab&apos;s sequence.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="81"/>
+        <source>Open the Compare tab</source>
+        <translation>Open the Compare tab</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="88"/>
+        <source>Band:</source>
+        <translation>Band:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="94"/>
+        <source>Apertures:</source>
+        <translation>Apertures:</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="102"/>
+        <source>Aperture radius, sky annulus inner and outer radius (px)</source>
+        <translation>Aperture radius, sky annulus inner and outer radius (px)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="106"/>
+        <source>Sigma-clip the sky</source>
+        <translation>Sigma-clip the sky</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="109"/>
+        <source>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</source>
+        <translation>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="119"/>
+        <source>CSV…</source>
+        <translation>CSV…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="123"/>
+        <source>AAVSO EFF…</source>
+        <translation>AAVSO EFF…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="170"/>
+        <source>The plate has no WCS: the comparison stars cannot be located. Solve it with «Solve astrometry…».</source>
+        <translation>The plate has no WCS: the comparison stars cannot be located. Solve it with «Solve astrometry…».</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="176"/>
+        <source>No comparison sequence yet: build one in the Compare tab (Generate field, then pick or propose).</source>
+        <translation>No comparison sequence yet: build one in the Compare tab (Generate field, then pick or propose).</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="301"/>
+        <source>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</source>
+        <translation>Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="303"/>
+        <source>Instrumental mag: {0:.3f}</source>
+        <translation>Instrumental mag: {0:.3f}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="307"/>
+        <source>No comparison star could be used: no calibration.</source>
+        <translation>No comparison star could be used: no calibration.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="310"/>
+        <source>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</source>
+        <translation>Zero point: {0:.3f} ± {1:.3f} ({2} comps, band {3})</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="313"/>
+        <source>Magnitude: {0:.3f} ± {1:.3f} ({2})</source>
+        <translation>Magnitude: {0:.3f} ± {1:.3f} ({2})</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="318"/>
+        <source>{0} of {1} sequence stars not usable (off the plate, saturated, or without the band)</source>
+        <translation>{0} of {1} sequence stars not usable (off the plate, saturated, or without the band)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="322"/>
+        <source>Few comparisons: the scatter dominates the error</source>
+        <translation>Few comparisons: the scatter dominates the error</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="325"/>
+        <source>Band {0} estimated from Gaia (Riello 2021)</source>
+        <translation>Band {0} estimated from Gaia (Riello 2021)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="328"/>
+        <source>No gain in the header: the error is the comps&apos; scatter only</source>
+        <translation>No gain in the header: the error is the comps&apos; scatter only</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="403"/>
+        <source>Export measurement</source>
+        <translation>Export measurement</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="413"/>
+        <source>Export measurement (AAVSO EFF)</source>
+        <translation>Export measurement (AAVSO EFF)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="437"/>
+        <source>Written to {0}</source>
+        <translation>Written to {0}</translation>
     </message>
 </context>
 <context>

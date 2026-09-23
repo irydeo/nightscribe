@@ -6399,22 +6399,22 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <location filename="../ufe_blink_tab.py" line="162"/>
         <source>↑</source>
-        <translation>\1</translation>
+        <translation>↑</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="165"/>
         <source>←</source>
-        <translation>\1</translation>
+        <translation>←</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="171"/>
         <source>→</source>
-        <translation>\1</translation>
+        <translation>→</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="175"/>
         <source>↓</source>
-        <translation>\1</translation>
+        <translation>↓</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="183"/>

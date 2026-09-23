@@ -17,6 +17,7 @@ degraded paths. All plates are synthetic gaussians with a fixed seed
 keep the tight bounds, but with a deterministic seed)."""
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -25,6 +26,9 @@ from nightscribe.core import photometry as phot
 
 # same synthetic PSF as the series test suite
 PSF_SIGMA = 3.0
+
+FIXTURES = Path(__file__).parents[1] / "fixtures"
+AT2026ACKA = FIXTURES / "AT2026acka.fit"
 
 
 def _plate(w, h, stars, sky=100.0, noise=0.0, seed=42):
@@ -584,3 +588,55 @@ def test_measure_point_gaussian_is_the_default():
     assert phot.measure_point(plate, 100, 100,
                               centroid_mode="refined")["ok"]
     assert phot.measure_point(plate, 100, 100, centroid_mode="raw")["ok"]
+
+
+# ---------------- the AT2026acka regression (real plate) ---------------
+#
+# The field report that caught the lying zero point: a 10 s Clear plate
+# (2048x2048, no SATURATE card) whose field is littered with CMOS
+# full-well-compressed cores. Comps picked among the brightest stars
+# measured low, the zero point came out 0.86 mag faint, and three faint
+# stars read ~1 mag too bright. Gaia says these three are 16.39, 17.11
+# and 17.4 (Tycho-Tracker agreed on the same pixels).
+
+# the three reported faint stars: (col, row), Gaia G
+_AT_TARGETS = [(989.1, 1012.7, 16.39),
+               (1058.3, 1040.9, 17.11),
+               (1108.4, 969.9, 17.40)]
+# two cores compressed by the full well (flat tops at 65535)
+_AT_CLIPPED = [(1159.2, 629.8), (1105.8, 1127.2)]
+
+
+@pytest.fixture(scope="module")
+def at2026acka():
+    # @return: the real plate as float32 (loaded once per module)
+    from nightscribe.core import fits_io
+    _header, data = fits_io.read_fits(AT2026ACKA)
+    return np.ascontiguousarray(data, dtype=np.float32)
+
+
+def test_at2026acka_ceiling_is_inferred_from_the_frame(at2026acka):
+    # 838 px pinned at 65535 across the plate: the ceiling, no card needed
+    assert phot.frame_ceiling(at2026acka) == 65535.0
+
+
+def test_at2026acka_compressed_stars_are_refused(at2026acka):
+    for x, y in _AT_CLIPPED:
+        r = phot.measure_point(at2026acka, x, y, r_ap=4.5,
+                               r_ann_in=10.8, r_ann_out=16.1)
+        assert not r["ok"] and r["saturated"], (x, y)
+        assert "clipped" in r["reason"]["en"]
+
+
+def test_at2026acka_faint_stars_imply_one_consistent_zp(at2026acka):
+    # The heart of the case: the three faint stars measure cleanly, and
+    # their implied zero points (Gaia G - instrumental) agree to a few
+    # hundredths. The plate's relative photometry was never the problem.
+    zps = []
+    for x, y, g in _AT_TARGETS:
+        r = phot.measure_point(at2026acka, x, y, r_ap=4.5,
+                               r_ann_in=10.8, r_ann_out=16.1)
+        assert r["ok"], (x, y, r.get("reason"))
+        zps.append(g + 2.5 * math.log10(r["flux"]))
+    assert max(zps) - min(zps) < 0.05, zps
+    assert 27.80 < sum(zps) / len(zps) < 27.90

@@ -8,7 +8,10 @@ who wants the concepts and to get the most out of their equipment (part
 one, no mathematics); and an AI or developer extending the
 implementation (technical appendix at the end). Almost everything
 described here already exists in NightScribe (phases G and H,
-2026-09-23); only the exoplanet-transit regime is pending a decision
+2026-09-23); phase I (same date) added the precision centroid
+(`refined_centroid`) and the aperture suggestion from the growth curve
+and the measured surroundings (`suggest_apertures` plus the Measure
+tab's button); only the exoplanet-transit regime is pending a decision
 (ADR-015).
 
 Documentation of the base photometric process:

@@ -168,6 +168,14 @@ nunca se modifica.
 * **La apertura sigue al seeing**: se mide el FWHM de las comps en la
   placa y la apertura se dimensiona a 1,35 × FWHM (los campos quedan
   visibles y ajustables a mano).
+* **Centroide de precisión** (fase I): la posición se refina con cielo
+  local restado, solo píxeles significativos, caja escalada al seeing y
+  dos pasadas; en fuentes débiles o con gradiente cae a centésimas de
+  píxel de la posición real, en vez de las décimas del momento crudo.
+* **«Sugerir aperturas»**: propone los radios desde la curva de
+  crecimiento del propio objetivo y su entorno medido (vecino más
+  cercano, gradiente del fondo), y explica las razones en lenguaje llano
+  en el panel; tu edición manual nunca se pisa sola.
 * **Término de color**: con al menos 6 comps con dispersión de B−V se
   ajusta `ZP + k·(B−V)` y se aplica con el B−V del objetivo (variables:
   el del VSX; una SN cerca del pico es ~0, y el panel avisa de la

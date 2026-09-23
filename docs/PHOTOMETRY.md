@@ -169,6 +169,15 @@ disk is never modified.
 * **Aperture follows the seeing**: the comps' FWHM is measured on the
   plate and the aperture is sized at 1.35 × FWHM (the fields stay
   visible and hand-adjustable).
+* **Precision centroid** (phase I): the position is refined with the
+  local sky subtracted, only significant pixels weighted, the box scaled
+  to the seeing and two passes; on faint sources or over gradients it
+  lands within hundredths of a pixel of the truth, instead of the raw
+  moment's tenths.
+* **"Suggest apertures"**: proposes the radii from the target's own
+  growth curve and its measured surroundings (nearest neighbour,
+  background gradient), and explains the reasons in plain language in
+  the panel; your hand edit is never stomped on its own.
 * **Colour term**: with at least 6 comps carrying B−V spread, the fit
   is `ZP + k·(B−V)` applied with the target's B−V (variables: the VSX
   one; a SN near peak is ~0, and the panel warns about the assumption).

@@ -18,6 +18,14 @@
 > tiene su propio plan: `docs/PLANS/ufe-photometry.md` (fases G y H
 > cerradas 2026-09-23).
 >
+> **Centroide de precisión y aperturas sugeridas (fase I, 2026-09-23,
+> CERRADA)**: `refined_centroid` (cielo restado, umbral, dos pasadas;
+> el legacy `series._centroid` intacto) es el centroide por defecto de
+> `measure_point`; `suggest_apertures` propone radios por curva de
+> crecimiento y entorno medido (vecino más cercano, gradiente del fondo)
+> con razones bilingües, y el botón «Sugerir aperturas» de Medir las
+> aplica sin pisar jamás una edición manual.
+>
 > **El objeto completo (2026-09-23, CERRADO)**: al abrir desde un
 > proyecto, el UFE adjunta TODO lo que el proyecto sabe del objeto:
 > `UfeDialog.set_object({name, ra, dec, mag, bv})` con línea-info bajo la

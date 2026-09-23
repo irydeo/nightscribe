@@ -187,9 +187,25 @@
                   <property name="flat"><bool>true</bool></property>
                  </widget>
                 </item>
+                <!-- ADR-043: the bar reads left to right (object card ->
+                     Capture -> Process -> Publish -> Follow-up); the
+                     follow-up separator is only shown for the kinds
+                     that have one (main_window._render_tab_bar) -->
+                <item>
+                 <widget class="QLabel" name="lbl_sep_plan">
+                  <property name="text"><string>→</string></property>
+                  <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 13px;</string></property>
+                 </widget>
+                </item>
                 <item>
                  <widget class="QPushButton" name="btn_tab_plan">
                   <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_sep_process">
+                  <property name="text"><string>→</string></property>
+                  <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 13px;</string></property>
                  </widget>
                 </item>
                 <item>
@@ -198,8 +214,21 @@
                  </widget>
                 </item>
                 <item>
+                 <widget class="QLabel" name="lbl_sep_publish">
+                  <property name="text"><string>→</string></property>
+                  <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 13px;</string></property>
+                 </widget>
+                </item>
+                <item>
                  <widget class="QPushButton" name="btn_tab_publish">
                   <property name="flat"><bool>true</bool></property>
+                 </widget>
+                </item>
+                <item>
+                 <widget class="QLabel" name="lbl_sep_followup">
+                  <property name="visible"><bool>false</bool></property>
+                  <property name="text"><string>→</string></property>
+                  <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 13px;</string></property>
                  </widget>
                 </item>
                 <item>
@@ -286,12 +315,6 @@
               <widget class="QPushButton" name="btn_next_done">
                <property name="text"><string>✔ Mark done</string></property>
                <property name="toolTip"><string>Mark the current step as done</string></property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QToolButton" name="btn_next_skip">
-               <property name="text"><string>Skip</string></property>
-               <property name="toolTip"><string>Skip the current step</string></property>
               </widget>
              </item>
             </layout>

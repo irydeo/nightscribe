@@ -880,14 +880,13 @@ def test_gui_boots_offscreen():
     from nightscribe.gui.main_window import MainWindow
     w = MainWindow()
     tabs = w.centralWidget().findChild(QTabWidget, "tabs")
-    # Four top-level tabs (ADR-036: History & Sun & sky left the bar for
-    # the Tools-menu dialogs):
-    # Tonight · Projects · Campaigns · Observatory
-    assert tabs.count() == 4
+    # Three top-level tabs (ADR-036: History & Sun & sky left the bar for
+    # the Tools-menu dialogs; ADR-043 removed the Observatory tab):
+    # Tonight · Projects · Campaigns
+    assert tabs.count() == 3
     assert tabs.tabText(0) == "Tonight"
     assert tabs.tabText(1) == "Projects"
     assert tabs.tabText(2) == "Campaigns"
-    assert tabs.tabText(3) == "Observatory"
     # suggestion grid container exists
     assert w.tonight.scroll_suggestions is not None
     # table starts collapsed (progressive disclosure)

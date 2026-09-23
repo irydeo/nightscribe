@@ -137,7 +137,7 @@ def add_point(db, project_id, mjd, filter_name, mag, err=None, source="manual",
               session_id=None):
     # @args: mjd - Modified Julian Date (float), filter_name - band or
     #        "Clear"/"None", mag - magnitude (float), err - uncertainty or
-    #        None, source - manual|paste|file|quicklook|survey
+    #        None, source - manual|paste|file|quicklook|measure|survey
     # @return: point id
     cur = db.execute(
         "INSERT INTO photometry_points (project_id, session_id, mjd,"

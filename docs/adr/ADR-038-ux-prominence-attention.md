@@ -57,7 +57,9 @@ La app ya *sabía* lo que necesitaba el usuario (`project.next_action`,
 3. **Lenguaje llano (test del astrónomo)**: si hay que leer un ADR para
    entender una etiqueta, está mal. Renombres: `Signals` → «Está pasando
    ahora», `Session products` → «Lo que guardaste de la sesión»,
-   `Quick-look` → «Quick analysis»/«Análisis rápido», `Finish` → `Close`
+   `Quick-look` → «Quick analysis»/«Análisis rápido» (retirado de la GUI
+   el 2026-09-23: la medición por sesión vive en el editor, ADR-044),
+   `Finish` → `Close`
    (misma palabra que proyectos), `New project…` (en Campaigns) → «New
    project in this campaign…». Se quedan los términos reales de la
    comunidad: Campaign, Follow-up, Blink, HADS, PCCP.

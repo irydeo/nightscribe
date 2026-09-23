@@ -109,7 +109,7 @@ def jd_to_hjd(jd, ra_deg, dec_deg):
 
 # Only the observer's OWN points count; survey context (source="survey:*")
 # has a different zero point and would fake events.
-_EVENT_SOURCES = ("manual", "paste", "file", "quicklook")
+_EVENT_SOURCES = ("manual", "paste", "file", "quicklook", "measure")
 
 
 def detect_event(points, threshold=0.5):

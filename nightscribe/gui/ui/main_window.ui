@@ -22,9 +22,6 @@
       <widget class="QWidget" name="tab_campaigns">
        <attribute name="title"><string>Campaigns</string></attribute>
       </widget>
-      <widget class="QWidget" name="tab_observatory">
-       <attribute name="title"><string>Observatory</string></attribute>
-      </widget>
      </widget>
     </item>
    </layout>

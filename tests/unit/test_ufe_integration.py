@@ -368,16 +368,20 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
             seen.append(kw)
 
     class _Dlg:
-        # the mapping in _ufe_open touches all three tabs; the object
+        # the mapping in _ufe_open touches all four tabs; the object
         # lands whole via set_object (the tabs prefill inside it)
         tab_blink = _Cmp()
         tab_compare = _Cmp()
         tab_annotate = _Cmp()
+        tab_measure = _Cmp()
 
         def set_object(self, obj):
             seen.append(obj)
 
         def set_save_hook(self, fn):
+            pass
+
+        def set_point_hook(self, fn):
             pass
 
         def show_tab(self, tab):

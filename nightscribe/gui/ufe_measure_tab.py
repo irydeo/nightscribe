@@ -70,6 +70,7 @@ class UfeMeasureTab(QWidget):
         self._compare = compare_tab
         self._go_compare = go_compare
         self._active = False
+        self._project_attached = False     # point hook set on the dialog
         self._items = []             # aperture + comps overlays
         self._last = None            # the last measurement bundle
         self._sub_worker = None      # BlinkWorker while subtracting
@@ -211,6 +212,17 @@ class UfeMeasureTab(QWidget):
         self.btn_eff.setEnabled(False)
         self.btn_eff.clicked.connect(lambda: self._export("eff"))
         row.addWidget(self.btn_eff)
+        # ADR-044: the editor opened from a project registers the point
+        # there (source “measure”); ad-hoc opens hide this button.
+        self.btn_save_project = QPushButton(self.tr("Save in the project"))
+        self.btn_save_project.setToolTip(self.tr(
+            "Register this calibrated point in the project that opened "
+            "the editor: it lands on the light curve and feeds the "
+            "campaign summary (source “measure”)"))
+        self.btn_save_project.setEnabled(False)
+        self.btn_save_project.setVisible(False)
+        self.btn_save_project.clicked.connect(self._on_save_project)
+        row.addWidget(self.btn_save_project)
         lay.addLayout(row)
         lay.addStretch(1)
 
@@ -239,6 +251,51 @@ class UfeMeasureTab(QWidget):
             if self._last is not None:
                 self._draw_measurement()
 
+    def set_project_attached(self, flag):
+        # The dialog exposes it: the host opened the editor from a project
+        # and will register the calibrated point. The button shows only
+        # then, and its enabled state still follows the measurement.
+        # @args: flag - True when a point hook is set on the dialog
+        self._project_attached = bool(flag)
+        self.btn_save_project.setVisible(self._project_attached)
+        if not self._project_attached:
+            self.btn_save_project.setEnabled(False)
+        elif self._last is not None and self._last.get("mag") is not None:
+            self.btn_save_project.setEnabled(True)
+
+    def _on_save_project(self):
+        # ADR-044: the host (Main window) set a point hook when it opened
+        # us from a project; it saves this point under that project
+        # (source “measure”, the visit attached) and refreshes the curve.
+        # @return: None; the outcome shows in the status line.
+        if self._last is None or self._last.get("mag") is None:
+            self.lbl_status.setText(
+                self.tr("Nothing to save yet: measure a point first."))
+            return
+        meta = fits_meta.meta_from_header(self._state.header or {})
+        mjd = meta.get("mjd")
+        if mjd is None:
+            self.lbl_status.setText(self.tr(
+                "This plate has no observation date in its header: the "
+                "point cannot be dated, so it cannot be saved."))
+            return
+        payload = {
+            "mjd": float(mjd),
+            "filter": (meta.get("filter")
+                       or self._last.get("band") or "V"),
+            "mag": self._last["mag"],
+            "err": self._last.get("err"),
+            "name": meta.get("object"),
+        }
+        dlg = self.window()
+        if not dlg or not dlg.notify_point(payload):
+            self.lbl_status.setText(
+                self.tr("Could not save the point in the project."))
+            return
+        self.lbl_status.setText(self.tr(
+            "Point saved in the project: it is on the light curve and "
+            "counts for the campaign summary."))
+
     def shutdown(self):
         # Nothing timer-driven here; the subtraction worker may run.
         self._sub_worker = None
@@ -256,6 +313,7 @@ class UfeMeasureTab(QWidget):
         self.lbl_result.setText("–")
         self.btn_csv.setEnabled(False)
         self.btn_eff.setEnabled(False)
+        self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
         self.lbl_status.setText("")
         self.btn_go_compare.setVisible(False)
@@ -415,6 +473,7 @@ class UfeMeasureTab(QWidget):
             self._drop_items()
             self.btn_csv.setEnabled(False)
             self.btn_eff.setEnabled(False)
+            self.btn_save_project.setEnabled(False)
             return
         self.lbl_status.setText("")
         self._calibrate_and_fill(result, col, row, entries, radii, fwhm,
@@ -509,6 +568,9 @@ class UfeMeasureTab(QWidget):
                          derived_seen, gain)
         self.btn_csv.setEnabled(mag is not None)
         self.btn_eff.setEnabled(mag is not None)
+        # the project save tracks the result: a point without a magnitude
+        # (only a check ratio) has nothing to register
+        self.btn_save_project.setEnabled(mag is not None)
         self._draw_measurement()
 
     def _scintillation(self, config, col, row, exptime):

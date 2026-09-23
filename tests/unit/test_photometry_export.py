@@ -39,6 +39,18 @@ def test_collect_points_excludes_quicklook_by_default(db):
                                                 include_quicklook=True)) == 4
 
 
+def test_collect_points_includes_measure_by_default(db):
+    # ADR-044: a point saved from the editor's measure tab is the
+    # observer's own calibrated data and belongs in the campaign report;
+    # only "quicklook" stays out by default (it is indicative).
+    pid = _pid_with_points(db)
+    followup.add_point(db, pid, 59665.5, "V", 15.3, source="measure")
+    pts = photometry_export.collect_points(db, pid)
+    assert len(pts) == 4
+    assert any(pt["source"] == "measure" for pt in pts)
+    assert all(pt["source"] != "quicklook" for pt in pts)
+
+
 def test_csv_columns_and_hjd(db, tmp_path):
     pid = _pid_with_points(db)
     pts = photometry_export.collect_points(db, pid)

@@ -56,6 +56,8 @@ class UfeDialog(QDialog):
         self._save_hook = None      # fn(paths, kind, payload) when the
                                     # editor was opened from a project:
                                     # files written get registered there
+        self._object = None         # {"name","ra","dec","mag"} when the
+                                    # editor was opened from a project
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("NightScribe Image Workbench"))
@@ -71,9 +73,18 @@ class UfeDialog(QDialog):
     # ------------------------------------------------------------- layout
 
     def _build_ui(self):
-        # Top bar + splitter (image | feature tabs) + histogram strip.
+        # Top bar + object line + splitter (image | feature tabs) +
+        # histogram strip.
         lay = QVBoxLayout(self)
         lay.addLayout(self._build_topbar())
+        self.lbl_object = QLabel("")
+        self.lbl_object.setVisible(False)
+        self.lbl_object.setToolTip(self.tr(
+            "The object this editor was opened from"))
+        from . import theme
+        self.lbl_object.setStyleSheet(
+            f"color: {theme.C_TEXT_DIM}; padding: 0 4px;")
+        lay.addWidget(self.lbl_object)
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.addWidget(self.view)
         self.tabs = QTabWidget()
@@ -241,6 +252,66 @@ class UfeDialog(QDialog):
             except Exception as err:      # the write already happened;
                 logger.warning("save hook failed: %s", err)  # never break it
 
+    # --------------------------------------------------- the object
+
+    def set_object(self, obj):
+        # The object the editor was opened from (a project): everything
+        # that applies is shown and prefilled. It survives loading another
+        # plate; only an ad-hoc open (the Tools menu) clears it.
+        # @args: obj - {"name", "ra", "dec", "mag"} (all optional), or
+        #        None to drop the object context (tabs keep their fields)
+        self._object = obj or None
+        self._update_object_line()
+        self._update_title()
+        if not self._object:
+            return
+        name = self._object.get("name")
+        ra, dec = self._object.get("ra"), self._object.get("dec")
+        mag = self._object.get("mag")
+        self.tab_blink.prefill(name=name, ra=ra, dec=dec)
+        self.tab_compare.prefill(target=name, mag=mag, ra=ra, dec=dec)
+        self.tab_annotate.prefill(label=name, ra=ra, dec=dec)
+        self.tab_measure.prefill(bv=self._object.get("bv"))
+
+    def object(self):
+        # @return: the current object dict, or None
+        return self._object
+
+    def _update_object_line(self):
+        # The thin line under the top bar: name, RA/Dec, magnitude; only
+        # visible while an object is attached.
+        if not self._object:
+            self.lbl_object.setVisible(False)
+            return
+        parts = []
+        if self._object.get("name"):
+            parts.append(self._object["name"])
+        ra, dec = self._object.get("ra"), self._object.get("dec")
+        if ra is not None and dec is not None:
+            from ..core import coords
+            try:
+                parts.append(f"RA {coords.ra_deg_to_hms(float(ra))} · "
+                             f"Dec {coords.dec_deg_to_dms(float(dec))}")
+            except (TypeError, ValueError):
+                pass
+        if self._object.get("mag") is not None:
+            try:
+                parts.append(self.tr("mag {0:.2f}").format(
+                    float(self._object["mag"])))
+            except (TypeError, ValueError):
+                parts.append(f"mag {self._object['mag']}")
+        self.lbl_object.setText("   ·   ".join(parts))
+        self.lbl_object.setVisible(bool(parts))
+
+    def _update_title(self):
+        # Brand · object (when attached) · plate file name (when loaded).
+        parts = [self.tr("NightScribe Image Workbench")]
+        if self._object and self._object.get("name"):
+            parts.append(self._object["name"])
+        if self.state.has_image:
+            parts.append(Path(self.state.path).name)
+        self.setWindowTitle(" · ".join(parts))
+
     # ----------------------------------------------------------- actions
 
     def _on_load(self):
@@ -353,11 +424,7 @@ class UfeDialog(QDialog):
         self.btn_export.setEnabled(self.state.has_image)
         self.btn_solve.setEnabled(self.state.has_image)
         self._sync_wcs_buttons()
-        if self.state.has_image:
-            self.setWindowTitle(
-                self.tr("NightScribe Image Workbench") + " · " + Path(self.state.path).name)
-        else:
-            self.setWindowTitle(self.tr("NightScribe Image Workbench"))
+        self._update_title()
 
     def _sync_wcs_buttons(self):
         # North arrow / scale bar need a WCS (present at load or after a

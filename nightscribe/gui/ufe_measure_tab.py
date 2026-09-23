@@ -265,6 +265,17 @@ class UfeMeasureTab(QWidget):
         except Exception:
             return []
 
+    def prefill(self, bv=None):
+        # The host object carries data the Measure tab uses: for now the
+        # target's B-V when the record knows it (variables from VSX), so
+        # the colour term applies with the right colour out of the box.
+        # @args: bv - B-V of the target, or None to leave the spin alone
+        if bv is not None:
+            try:
+                self.spn_target_bv.setValue(float(bv))
+            except (TypeError, ValueError):
+                pass
+
     def _on_seeing_toggled(self, checked):
         # Re-arming the checkbox hands the radii back to the seeing
         # measurement; disarming freezes them where they are.

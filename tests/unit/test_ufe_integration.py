@@ -137,28 +137,27 @@ def test_routing_blink_tools_menu(window, monkeypatch):
 
 def test_routing_project_blink(window, monkeypatch):
     window._current_project = {"id": 1, "object_name": "SN 2026zji",
-                               "context": {"ra_deg": 10.0,
-                                           "dec_deg": 20.0}}
+                               "context": {"ra_deg": 10.0, "dec_deg": 20.0,
+                                           "mag": 13.2}}
     window._project_widgets = {}
     seen = []
 
-    class _Blink:
-        def prefill(self, **kw):
-            seen.append(kw)
-
     class _Dlg:
-        tab_blink = _Blink()
+        def set_object(self, obj):
+            seen.append(obj)
 
         def open_plate(self, path):
             return True
     monkeypatch.setattr(window, "_ufe_open",
-                        lambda tab, hook_pid=None: (
-                            seen.append((tab, hook_pid)) or _Dlg()))
+                        lambda tab, hook_pid=None, obj=None: (
+                            seen.append((tab, hook_pid, obj)) or _Dlg()))
     monkeypatch.setattr(window, "_use_ufe", lambda: True)
     window._project_blink()
-    assert seen[0] == ("blink", 1)
-    assert seen[1]["name"] == "SN 2026zji"
-    assert seen[1]["ra"] == 10.0
+    assert seen[0] == ("blink", 1, {"name": "SN 2026zji", "ra": 10.0,
+                                    "dec": 20.0, "mag": 13.2,
+                                    "bv": None})
+    # and the object is re-applied on the fresh plate
+    assert seen[-1] == seen[0][2]
 
 
 def test_routing_sequence_and_annotate(window, monkeypatch):
@@ -194,16 +193,23 @@ def test_routing_sequence_and_annotate(window, monkeypatch):
     class _Dlg:
         tab_annotate = _Ann()
 
+        def set_object(self, obj):
+            seen.append({"object": obj})
+
         def open_plate(self, path):
             seen.append({"plate": path})
             return True
     monkeypatch.setattr(window, "_ufe_open",
-                        lambda tab, hook_pid=None: (
-                            calls.append((tab, hook_pid)) or _Dlg()))
+                        lambda tab, hook_pid=None, obj=None: (
+                            calls.append((tab, hook_pid, obj)) or _Dlg()))
     window._fu_export_annotated(1)
-    assert ("annotate", 1) in calls
+    assert ("annotate", 1, {"name": "SN x", "ra": 10.0, "dec": 20.0,
+                            "mag": None, "bv": None}) in calls
     assert seen[0]["plate"] == str(MONO)
-    assert seen[1]["label"] == "SN x"
+    # the object re-applies on the fresh plate (the marker needs its WCS)
+    assert seen[1]["object"]["name"] == "SN x"
+    # the visits/notes still come through the tab's prefill
+    assert seen[2]["notes"]
 
 
 def test_save_hook_registers_files_and_sequence(window, monkeypatch):
@@ -296,11 +302,14 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
             seen.append(kw)
 
     class _Dlg:
-        # the mapping in _ufe_open touches all three tabs; only the
-        # compare one needs a recording prefill
+        # the mapping in _ufe_open touches all three tabs; the object
+        # lands whole via set_object (the tabs prefill inside it)
         tab_blink = _Cmp()
         tab_compare = _Cmp()
         tab_annotate = _Cmp()
+
+        def set_object(self, obj):
+            seen.append(obj)
 
         def set_save_hook(self, fn):
             pass
@@ -340,3 +349,50 @@ def test_save_hook_persists_the_target_magnitude(window, monkeypatch):
                            "fov_arcmin": 30.0, "target_mag": 11.25})
     assert ctx[0]["mag"] == 11.25          # it lives in the project now
     assert ctx[0]["sequence"]["target_mag"] == 11.25
+
+
+def test_set_object_fills_everything(dlg):
+    obj = {"name": "T CrB", "ra": 238.08392, "dec": 25.92,
+           "mag": 10.5, "bv": 0.62}
+    dlg.set_object(obj)
+    assert dlg.windowTitle() == "NightScribe Image Workbench · T CrB"
+    line = dlg.lbl_object.text()
+    assert "T CrB" in line and "RA" in line and "mag 10.50" in line
+    assert dlg.lbl_object.isVisible()
+    assert dlg.tab_blink.edt_name.text() == "T CrB"
+    assert dlg.tab_blink.chk_manual.isChecked()
+    assert dlg.tab_compare.edt_target.text() == "T CrB"
+    assert dlg.tab_compare.spn_mag.value() == 10.5
+    assert dlg.tab_compare._prefill_sky == (238.08392, 25.92)
+    assert dlg.tab_annotate.edit_label.text() == "T CrB"
+    assert dlg.tab_measure.spn_target_bv.value() == 0.62
+
+
+def test_object_survives_a_plate_load_and_clears_adhoc(dlg):
+    dlg.set_object({"name": "T CrB", "ra": 238.0, "dec": 25.9})
+    dlg.open_plate(str(MONO))
+    assert "T CrB" in dlg.windowTitle()          # the object stays
+    assert "sn2026zji_new_image.fits" in dlg.windowTitle()
+    assert dlg.lbl_object.isVisible()
+    dlg.set_object(None)                          # the ad-hoc open
+    assert dlg.object() is None
+    assert not dlg.lbl_object.isVisible()
+    assert "T CrB" not in dlg.windowTitle()
+    assert "sn2026zji_new_image.fits" in dlg.windowTitle()
+
+
+def test_object_builder_chain(window):
+    # planner mag wins; else VSX MaxMag; else the last saved sequence
+    p = {"object_name": "V1", "context": {"ra_deg": 1.0, "dec_deg": 2.0,
+                                          "mag": 12.3,
+                                          "variable": {"bv": 0.5}}}
+    assert window._ufe_object_from_project(p) == {
+        "name": "V1", "ra": 1.0, "dec": 2.0, "mag": 12.3, "bv": 0.5}
+    p2 = {"object_name": "V2", "context": {"variable": {"max": 9.75,
+                                                        "ra_deg": 3.0,
+                                                        "dec_deg": 4.0}}}
+    o2 = window._ufe_object_from_project(p2)
+    assert o2["mag"] == 9.75 and o2["ra"] == 3.0 and o2["bv"] is None
+    p3 = {"object_name": "V3", "context": {"sequence":
+                                           {"target_mag": 11.25}}}
+    assert window._ufe_object_from_project(p3)["mag"] == 11.25

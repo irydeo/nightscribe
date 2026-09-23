@@ -5299,16 +5299,17 @@ class MainWindow(QMainWindow):
         sn_ra = ctx.get("ra_deg")
         sn_dec = ctx.get("dec_deg")
         if self._use_ufe():
-            # ADR-044: the annotated FITS inside the editor; the marker
-            # lands on the object's sky position, the other visits queue
-            # as extra plates, and written copies register like the
-            # legacy dialog's did
-            dlg = self._ufe_open("annotate", hook_pid=pid)
+            # ADR-044: the annotated FITS inside the editor; the whole
+            # object attaches (marker on its sky position), the other
+            # visits queue as extra plates, and written copies register
+            # like the legacy dialog's did
+            obj = self._ufe_object_from_project(p)
+            dlg = self._ufe_open("annotate", hook_pid=pid, obj=obj)
             if not dlg.open_plate(images[-1]["fits_path"]):
                 return
+            dlg.set_object(obj)          # re-apply on the fresh plate
             dlg.tab_annotate.prefill(
-                label=p["object_name"], notes=self.tr("SN follow-up"),
-                ra=sn_ra, dec=sn_dec,
+                notes=self.tr("SN follow-up"),
                 extra_paths=[im["fits_path"] for im in images[:-1]])
             return
         # Preview first: the observer chooses the plate, checks the marker,
@@ -5738,26 +5739,17 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if not p:
             return
-        ctx = p.get("context") or {}
-        dlg = self._ufe_open("compare", hook_pid=pid)
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("compare", hook_pid=pid, obj=obj)
         from ..core import followup as fu
         fits_path = None
         for s in fu.list_sessions(db, pid):
             for img in fu.list_images(db, s["id"]):
                 if img["fits_path"]:
                     fits_path = img["fits_path"]      # the newest visit
-        mag0 = ctx.get("mag")
-        if mag0 is None:
-            mag0 = (ctx.get("variable") or {}).get("max")
-        if mag0 is None:
-            # a sequence saved earlier carries the target magnitude we
-            # last worked with (the hook writes it into the context)
-            mag0 = (ctx.get("sequence") or {}).get("target_mag")
         if fits_path and not dlg.open_plate(fits_path):
             return
-        dlg.tab_compare.prefill(target=p["object_name"], mag=mag0,
-                                ra=ctx.get("ra_deg"),
-                                dec=ctx.get("dec_deg"))
+        dlg.set_object(obj)              # re-apply on the fresh plate
 
     def _fu_sequence_dialog(self, pid):
         if self._use_ufe():
@@ -6392,14 +6384,14 @@ class MainWindow(QMainWindow):
             fits_path = edt.text().strip() if edt else ""
             if self._use_ufe():
                 # ADR-044: the project's blink inside the editor, with
-                # the target pre-filled and the exports registered
+                # the whole object attached and the exports registered
+                obj = self._ufe_object_from_project(self._current_project)
                 dlg = self._ufe_open("blink",
-                                     hook_pid=self._current_project["id"])
+                                     hook_pid=self._current_project["id"],
+                                     obj=obj)
                 if fits_path and not dlg.open_plate(fits_path):
                     return
-                dlg.tab_blink.prefill(
-                    name=self._current_project["object_name"],
-                    ra=ctx.get("ra_deg"), dec=ctx.get("dec_deg"))
+                dlg.set_object(obj)      # re-apply on the fresh plate
                 return
             self._open_blink_dialog(
                 sn_name=self._current_project["object_name"],
@@ -7852,6 +7844,7 @@ class MainWindow(QMainWindow):
         # Menu Tools → FITS editor… (ADR-044)
         dlg = self._ufe_build()
         dlg.set_save_hook(None)      # ad-hoc: no project registration
+        dlg.set_object(None)         # and no stale project object
         dlg.show()
         dlg.raise_()
         dlg.activateWindow()
@@ -7862,14 +7855,38 @@ class MainWindow(QMainWindow):
         #          reachable for the review period, ADR-044)
         return bool(config.get("ufe_default", True))
 
-    def _ufe_open(self, tab, hook_pid=None):
+    def _ufe_object_from_project(self, p):
+        # Everything the project knows about the object, for the UFE:
+        # name, sky position, magnitude (planner → VSX max → the last
+        # saved sequence) and B-V when the record carries it.
+        # @args: p - the project dict
+        # @return: {"name", "ra", "dec", "mag", "bv"} (values or None)
+        ctx = p.get("context") or {}
+        var = ctx.get("variable") or {}
+        ra = ctx.get("ra_deg")
+        dec = ctx.get("dec_deg")
+        if ra is None or dec is None:
+            ra = var.get("ra_deg")
+            dec = var.get("dec_deg")
+        mag = ctx.get("mag")
+        if mag is None:
+            mag = var.get("max")          # VSX MaxMag: the bright extreme
+        if mag is None:
+            mag = (ctx.get("sequence") or {}).get("target_mag")
+        return {"name": p.get("object_name"), "ra": ra, "dec": dec,
+                "mag": mag, "bv": var.get("bv") or ctx.get("bv")}
+
+    def _ufe_open(self, tab, hook_pid=None, obj=None):
         # Shared open path: the persistent dialog, the right tab on
-        # stage, and the project save hook set or cleared.
+        # stage, the project save hook set or cleared, and the object
+        # attached (or cleared on an ad-hoc open).
         # @args: tab - "blink"|"compare"|"annotate", hook_pid - project
-        #        id whose written files get registered, or None
+        #        id whose written files get registered, or None,
+        #        obj - the object dict from _ufe_object_from_project
         # @return: the UfeDialog
         dlg = self._ufe_build()
         dlg.set_save_hook(None)
+        dlg.set_object(obj)
         if hook_pid is not None:
             dlg.set_save_hook(
                 lambda paths, kind, payload:
@@ -7880,6 +7897,10 @@ class MainWindow(QMainWindow):
         dlg.raise_()
         dlg.activateWindow()
         return dlg
+
+    # (the object attaches via set_object at the end of _ufe_open; a
+    # route that loads a plate re-applies it after the load so the
+    # annotate marker lands through the fresh WCS)
 
     def _ufe_save_hook(self, pid, paths, kind, payload):
         # Files the UFE wrote while opened from a project get registered

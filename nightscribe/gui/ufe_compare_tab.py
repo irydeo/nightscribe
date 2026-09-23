@@ -546,6 +546,20 @@ class UfeCompareTab(QWidget):
                 best, best_d = s, d
         return best
 
+    def nearest_field_star(self, ra, dec, tol_arcsec=8.0):
+        # The Measure tab's cross-match: the loaded field star nearest to
+        # a sky position (the measured centroid), within tolerance.
+        # @args: ra, dec - degrees, tol_arcsec - maximum separation
+        # @return: (star, separation in arcsec), or (None, None)
+        best, best_sep = None, float(tol_arcsec)
+        for s in self._stars:
+            sep = compstars.separation_arcsec({"ra": ra, "dec": dec}, s)
+            if sep < best_sep:
+                best, best_sep = s, sep
+        if best is None:
+            return None, None
+        return best, best_sep
+
     def _next_name(self, kind):
         # Comp1, Comp2… / Check, Check2… (SecFot's convention)
         make = (lambda n: "Check" if n == 1 else f"Check{n}") \

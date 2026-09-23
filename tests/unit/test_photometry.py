@@ -116,6 +116,32 @@ def test_measure_point_guards_are_honest():
     assert not phot.measure_point(None, 50.0, 50.0)["ok"]
 
 
+def test_frame_ceiling_reads_the_clipping_signature():
+    # Dozens of pixels pinned at the frame maximum: the maximum is a
+    # clipping level. One honest star's apex (a pixel or two) is not.
+    clipped = _plate(200, 200, [(100, 100, 60000.0)])
+    clipped = np.minimum(clipped, 30000.0)          # flat top at 30000
+    assert phot.frame_ceiling(clipped) == 30000.0
+    honest = _plate(200, 200, [(100, 100, 8000.0)])
+    assert phot.frame_ceiling(honest) is None
+
+
+def test_measure_point_rejects_soft_clipped_cores_without_a_card():
+    # The 2026-09 field case: a CMOS plate with no SATURATE anywhere and
+    # a soft roll-off (cores reach the ceiling in a pixel or two, never
+    # the 25-px plateau). The frame's own clipping signature condemns
+    # any peak next to it; far below it the same star is a normal read.
+    plate = _plate(200, 200, [(100.0, 100.0, 8500.0)])
+    plate[5:10, 5:35] = 9000.0      # 150 px pinned: the clipping level
+    r = phot.measure_point(plate, 100.0, 100.0)
+    assert not r["ok"] and r["saturated"]
+    assert "clipped" in r["reason"]["en"]
+    assert "9000" in r["reason"]["en"]
+    low = _plate(200, 200, [(100.0, 100.0, 3000.0)])
+    low[5:10, 5:35] = 9000.0
+    assert phot.measure_point(low, 100.0, 100.0)["ok"]
+
+
 # ---------------- sigma-clip on the sky annulus ----------------
 
 def test_sigma_clipped_median_removes_hot_pixels():
@@ -462,6 +488,30 @@ def test_suggest_apertures_faint_picks_the_snr_peak():
     s = phot.suggest_apertures(plate, 100, 100)
     assert s["r_ap"] <= 6.0                # small SNR-optimal aperture
     assert any("SNR" in r["en"] for r in s["reasons"])
+
+
+def test_suggest_apertures_runaway_growth_falls_back_to_seeing():
+    # The review case: a star whose local sky sits in a dip (the annulus
+    # under-reads it) has a growth curve that never flattens, and the
+    # 99 %-plateau rule inflated the aperture to the scan cap. The
+    # suggestion must refuse the runaway and fall back to the seeing
+    # aperture, saying why.
+    rng = np.random.default_rng(9)
+    yy, xx = np.ogrid[:200, :200]
+    rr = np.sqrt((xx - 100.0) ** 2 + (yy - 100.0) ** 2)
+    plate = 800.0 - 60.0 * np.exp(-((rr - 12.5) ** 2) / 8.0) \
+        + rng.normal(0, 1.5, (200, 200))
+    plate += 30000 * np.exp(-(rr ** 2) / (2 * 1.5 ** 2))
+    s = phot.suggest_apertures(plate, 100, 100)
+    fwhm = s["diag"]["fwhm"]
+    assert s["r_ap"] <= phot._PLATEAU_MAX_FWHM * fwhm
+    assert any("never flattens" in r["en"] for r in s["reasons"])
+    assert all(set(r) == {"es", "en"} for r in s["reasons"])
+    # and the healthy bright star keeps the plateau rule
+    plate2 = 800.0 + rng.normal(0, 1.5, (200, 200))
+    plate2 += 30000 * np.exp(-(rr ** 2) / (2 * 1.5 ** 2))
+    s2 = phot.suggest_apertures(plate2, 100, 100)
+    assert any("99 %" in r["en"] for r in s2["reasons"])
 
 
 def test_suggest_apertures_neighbour_pulls_in():

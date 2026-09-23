@@ -76,10 +76,14 @@ nightscribe/
     phototrans.py     # transformaciones Gaia->Johnson-Cousins (Riello 2021),
                       #   B-V directo/estimado, clase de color (ADR-042)
     photometry.py     # fotometría calibrada en una placa (pestaña Medir del
-                      #   UFE): medida con guardas, ZP por mediana+MAD, error
-                      #   CCD con ganancia/RON (plan PLANS/ufe-photometry.md)
+                      #   UFE): medida con guardas (meseta, techo explícito o
+                      #   inferido del recorte de la propia placa), ZP por
+                      #   mediana+MAD, error CCD con ganancia/RON (plan
+                      #   PLANS/ufe-photometry.md)
     compstars.py      # secuencias fotométricas: campo de catálogo, cruce VSX,
-                      #   propuesta automática de comps, CSV (ADR-042)
+                      #   propuesta automática de comps con ventana de brillo
+                      #   junto al objetivo (nunca las más brillantes del
+                      #   campo: saturan), CSV (ADR-042)
     field_math.py     # proyección TAN de la carta, ticks de borde, escala,
                       #   anti-colisión de rótulos (compartido viz/widget, ADR-042)
     solar.py         # estado del Sol agregado

@@ -73,6 +73,10 @@ class UfeMeasureTab(QWidget):
         self._project_attached = False     # point hook set on the dialog
         self._items = []             # aperture + comps overlays
         self._last = None            # the last measurement bundle
+        # where the target B-V came from: "assumed" (the 0.00 default),
+        # "catalog" (the field star under the click), "project" (the host
+        # record), "manual" (a hand edit, which wins until the next click)
+        self._bv_source = "assumed"
         self._sub_worker = None      # BlinkWorker while subtracting
         self._diff = None            # difference image (work frame,
                                      # plate orientation) or None
@@ -185,8 +189,7 @@ class UfeMeasureTab(QWidget):
             "near peak is about 0; the panel warns when the colour term "
             "is applied with this assumption"))
         self.spn_target_bv.setKeyboardTracking(False)
-        self.spn_target_bv.valueChanged.connect(
-            lambda _v: self._remeasure())
+        self.spn_target_bv.valueChanged.connect(self._on_bv_edited)
         row.addWidget(self.spn_target_bv)
         lay.addLayout(row)
         self.chk_subtract = QCheckBox(self.tr(
@@ -338,7 +341,45 @@ class UfeMeasureTab(QWidget):
         self.btn_go_compare.setVisible(False)
         self._last_suggestions = []     # a new target: stale reasons go
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
+        self._prefill_bv_from_field(col, row)
         self._measure(col, row, entries)
+
+    def _field_match(self, col, row):
+        # The cross-match behind the panel's field line and the B-V
+        # pre-fill: the Compare tab's field star nearest the plate point.
+        # @args: col, row - plate pixels
+        # @return: (star, separation in arcsec), or (None, None)
+        if self._compare is None or self._state.wcs is None:
+            return None, None
+        getter = getattr(self._compare, "nearest_field_star", None)
+        if not callable(getter):
+            return None, None
+        try:
+            ra, dec = self._state.wcs.pixel_to_sky(col, row)
+            return getter(ra, dec)
+        except Exception:
+            return None, None
+
+    def _prefill_bv_from_field(self, col, row):
+        # A click that lands on a catalogued field star IS that star:
+        # its B-V pre-fills the colour term (an assumed 0.00 silently
+        # biases red stars when the term matters). No match: the spin
+        # keeps whatever it had (project, hand edit, or the default).
+        star, _sep = self._field_match(col, row)
+        if star is None or star.get("bv") is None:
+            return
+        self.spn_target_bv.blockSignals(True)
+        try:
+            self.spn_target_bv.setValue(float(star["bv"]))
+        except (TypeError, ValueError):
+            pass
+        self.spn_target_bv.blockSignals(False)
+        self._bv_source = "catalog"
+
+    def _on_bv_edited(self, _value):
+        # A hand edit owns the colour until the next catalogued click.
+        self._bv_source = "manual"
+        self._remeasure()
 
     def _sequence(self):
         # @return: the Compare tab's entries, or [] when absent/empty
@@ -355,10 +396,13 @@ class UfeMeasureTab(QWidget):
         # the colour term applies with the right colour out of the box.
         # @args: bv - B-V of the target, or None to leave the spin alone
         if bv is not None:
+            self.spn_target_bv.blockSignals(True)
             try:
                 self.spn_target_bv.setValue(float(bv))
+                self._bv_source = "project"
             except (TypeError, ValueError):
                 pass
+            self.spn_target_bv.blockSignals(False)
 
     def _on_seeing_toggled(self, checked):
         # Re-arming the checkbox hands the radii back to the seeing
@@ -476,11 +520,16 @@ class UfeMeasureTab(QWidget):
             self.btn_save_project.setEnabled(False)
             return
         self.lbl_status.setText("")
-        self._calibrate_and_fill(result, col, row, entries, radii, fwhm,
-                                 config)
+        # the truth lives at the measured centroid, not at the click:
+        # the overlay, the export and the cross-match all sit there
+        mx, my = result["x"], result["y"]
+        if self._diff is not None:
+            mx, my = mx * self._diff_scale, my * self._diff_scale
+        self._calibrate_and_fill(result, col, row, mx, my, entries,
+                                 radii, fwhm, config, sat)
 
-    def _calibrate_and_fill(self, result, col, row, entries, radii, fwhm,
-                            config):
+    def _calibrate_and_fill(self, result, col, row, mx, my, entries,
+                            radii, fwhm, config, sat):
         # Comps on the same plate, zero point (with the colour term when
         # there is spread), the error budget, the check semaphore, and
         # the panel.
@@ -496,14 +545,18 @@ class UfeMeasureTab(QWidget):
             self.cmb_band.blockSignals(False)
         inst_t = -2.5 * math.log10(result["flux"])
         inst, cat, bvs, used_entries = [], [], [], []
-        skipped = 0
+        skipped = {}     # cause -> count: the panel itemises, never lumps
+
+        def _skip(cause):
+            skipped[cause] = skipped.get(cause, 0) + 1
+
         for e in entries:
             star = e["star"]
             try:
                 ccol, crow = self._state.wcs.sky_to_pixel(star["ra"],
                                                           star["dec"])
             except Exception:
-                skipped += 1
+                _skip("off")
                 continue
             if self._diff is not None:
                 # H2b: never mix flux scales: the comps are measured on
@@ -515,11 +568,16 @@ class UfeMeasureTab(QWidget):
                     crow / self._diff_scale,
                     tuple(v / self._diff_scale for v in radii), None)
             else:
+                # the ceiling applies to comps too: a saturated or
+                # roll-off-compressed comp poisons the zero point
                 r = self._measure_star(self._state.data, ccol, crow,
-                                       radii, None)
+                                       radii, sat)
             value, derived = self._band_of(star, band)
-            if not r["ok"] or value is None:
-                skipped += 1
+            if not r["ok"]:
+                _skip("sat" if r.get("saturated") else "other")
+                continue
+            if value is None:
+                _skip("band")
                 continue
             inst.append(-2.5 * math.log10(r["flux"]))
             cat.append(value)
@@ -543,7 +601,7 @@ class UfeMeasureTab(QWidget):
             result["flux"], result["sky_pp"], result["n_pix"],
             gain=gain, ron=ron, exptime=inst_header["exptime"])
         ccd_mag_err = photometry.mag_error(result["flux"], flux_err)
-        scint = self._scintillation(config, col, row,
+        scint = self._scintillation(config, mx, my,
                                     inst_header["exptime"])
         flat_floor = config.get("flat_resid_mag", 0.007) or 0.007
         color_err = zp.get("target_color_err")
@@ -561,7 +619,10 @@ class UfeMeasureTab(QWidget):
                       "band": band, "used": used_entries,
                       "derived": derived_seen, "inst_t": inst_t,
                       "fwhm": fwhm, "radii": radii, "scint": scint,
-                      "check": check, "col": col, "row": row,
+                      "check": check, "col": mx, "row": my,
+                      "click": (col, row), "skipped": skipped,
+                      "bands_avail": bands,
+                      "match": self._field_match(mx, my),
                       "sky_mode": self.cmb_sky.currentData(),
                       "sigma_clip": self.chk_sigmaclip.isChecked()}
         self._fill_panel(band, len(entries), len(used_entries), skipped,
@@ -671,6 +732,37 @@ class UfeMeasureTab(QWidget):
             lines.append(self.tr("Magnitude: {0:.3f} {1} ({2})")
                          .format(last["mag"], err_txt, band))
         notes = []
+        # the cross-match first: which catalogued source this light is
+        # (and how far from it) answers half the "is this right?" by
+        # itself; no match within reach is the supernova case
+        star, sep = last.get("match") or (None, None)
+        if star is not None:
+            cmag, _d = self._band_of(star, band)
+            mband = band
+            if cmag is None:
+                cmag, mband = star["mag"], star["band"]
+            txt = self.tr("Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}") \
+                .format(star["catalog"], star["id"], sep, mband, cmag)
+            if last["mag"] is not None and cmag is not None:
+                txt += self.tr(" · Δ {0:+.2f}").format(last["mag"] - cmag)
+            notes.append(txt)
+        else:
+            notes.append(self.tr(
+                "No catalogued source within 8″ of the target "
+                "(a new object?)"))
+        click = last.get("click")
+        if click is not None:
+            moved = math.hypot(last["col"] - click[0],
+                               last["row"] - click[1])
+            if moved > 1.0:
+                notes.append(self.tr(
+                    "the centroid landed {0:.1f} px from the click")
+                    .format(moved))
+        if "V" not in last.get("bands_avail", []) and band != "V":
+            notes.append(self.tr(
+                "The sequence carries no Johnson V: calibrating in "
+                "catalog {0} (for red stars it can differ from V by more "
+                "than 1 mag)").format(band))
         if last["fwhm"] is not None:
             r = last["radii"]
             notes.append(self.tr(
@@ -681,10 +773,30 @@ class UfeMeasureTab(QWidget):
                 "apertures set by hand (the seeing auto-scale is paused)"))
         for reason in self._last_suggestions:
             notes.append(reason)
-        if skipped:
+        n_skip = sum(skipped.values()) if isinstance(skipped, dict) else 0
+        if n_skip:
+            parts = []
+            if skipped.get("sat"):
+                parts.append(self.tr("{0} saturated/clipped")
+                             .format(skipped["sat"]))
+            if skipped.get("off"):
+                parts.append(self.tr("{0} off the plate")
+                             .format(skipped["off"]))
+            if skipped.get("band"):
+                parts.append(self.tr("{0} without the {1} band")
+                             .format(skipped["band"], band))
+            if skipped.get("other"):
+                parts.append(self.tr("{0} not measurable")
+                             .format(skipped["other"]))
             notes.append(self.tr(
-                "{0} of {1} sequence stars not usable (off the plate, "
-                "saturated, or without the band)").format(skipped, n_seq))
+                "{0} of {1} sequence stars not usable: {2}")
+                .format(n_skip, n_seq, ", ".join(parts)))
+            if skipped.get("sat"):
+                notes.append(self.tr(
+                    "⚠ comps at the plate's clipping level: a zero point "
+                    "built on compressed cores lies LOW (faint targets "
+                    "read too bright). Propose fainter comps or shorten "
+                    "the exposure"))
         if zp["n"] and zp["n"] < 3:
             notes.append(self.tr(
                 "Few comparisons: the scatter dominates the error"))
@@ -697,9 +809,21 @@ class UfeMeasureTab(QWidget):
                 "Colour term not fitted (too few comps or too little "
                 "colour spread): plain zero point"))
         if self.chk_color.isChecked() and zp.get("color_used"):
+            src_txt = {"assumed": self.tr("assumed"),
+                       "catalog": self.tr("from the field star"),
+                       "project": self.tr("from the project"),
+                       "manual": self.tr("by hand")}.get(self._bv_source,
+                                                         "")
             notes.append(self.tr(
-                "Colour term applied with target B−V = {0:.2f}")
-                .format(self.spn_target_bv.value()))
+                "Colour term applied with target B−V = {0:.2f} ({1})")
+                .format(self.spn_target_bv.value(), src_txt))
+            k = zp.get("k")
+            if self._bv_source == "assumed" and k is not None \
+                    and abs(k) >= 0.1:
+                notes.append(self.tr(
+                    "⚠ B−V assumed: with k = {0:+.2f}, a red star "
+                    "(B−V ≈ 1.5) would read ≈{1:.2f} mag too bright; "
+                    "enter its real B−V").format(k, abs(k) * 1.5))
         if gain is None:
             notes.append(self.tr(
                 "No gain in the header or settings: the photon noise is "

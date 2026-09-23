@@ -178,18 +178,39 @@ nunca se modifica.
   local restado, solo píxeles significativos, caja escalada al seeing y
   dos pasadas; en fuentes débiles o con gradiente cae a centésimas de
   píxel de la posición real, en vez de las décimas del momento crudo.
+  El anillo y la línea «Píxel» se dibujan en el centroide medido, no en
+  el clic; si el centroide se movió más de 1 px, el panel lo dice.
 * **«Sugerir aperturas»**: propone los radios desde la curva de
   crecimiento del propio objetivo y su entorno medido (vecino más
   cercano, gradiente del fondo), y explica las razones en lenguaje llano
-  en el panel; tu edición manual nunca se pisa sola.
+  en el panel; tu edición manual nunca se pisa sola. La regla de la
+  meseta del 99 % solo se cree lo compatible con una fuente puntual
+  (4 × FWHM): si la curva no se aplana ahí (mezcla o fondo mal
+  restado), propone la apertura de seeing y dice por qué.
 * **Término de color**: con al menos 6 comps con dispersión de B−V se
-  ajusta `ZP + k·(B−V)` y se aplica con el B−V del objetivo (variables:
-  el del VSX; una SN cerca del pico es ~0, y el panel avisa de la
-  suposición). Sin dispersión suficiente, punto cero plano y se dice.
-  Los outliers de las comps se rechazan por MAD antes de ajustar.
+  ajusta `ZP + k·(B−V)` y se aplica con el B−V del objetivo. Ese B−V ya
+  no se asume en silencio: si el clic cae sobre una estrella del campo
+  cargado en Comparar, se toma el suyo, y el panel siempre dice la
+  procedencia (campo, proyecto, manual o asumido); cuando se asume y la
+  pendiente es grande, el panel cuantifica el riesgo en magnitudes. Sin
+  dispersión suficiente, punto cero plano y se dice. Los outliers de
+  las comps se rechazan por MAD antes de ajustar.
 * **Saturación real**: el techo sale de la tarjeta SATURATE de la
-  cabecera o del ajuste `ccd_saturate`; si nadie lo sabe, sigue la
-  heurística de la meseta.
+  cabecera o del ajuste `ccd_saturate`; si nadie lo sabe, la placa se
+  delata sola: decenas de píxeles clavados en el máximo del marco solo
+  pueden ser un nivel de recorte, y cualquier estrella con el pico junto
+  a él queda rechazada como «comprimida». Importa porque el roll-off
+  del CMOS comprime los núcleos mucho antes de formar meseta: unas
+  comps comprimidas bajan el punto cero de forma coherente y la
+  estrella check, comprimida igual, no puede delatarlo (su semáforo
+  mide dispersión, no sesgo común). El panel desglosa las exclusiones
+  por causa y avisa en claro cuando el recorte se llevó comps por
+  delante.
+* **Cruce con el catálogo**: tras cada medida el panel dice qué fuente
+  del campo cargado en Comparar quedó bajo el centroide, a cuántas
+  arcsec, y su magnitud de catálogo frente a la nuestra (Δ). Para una
+  SN o un candidato nuevo lo esperable es justo lo contrario: «sin
+  fuente a ≤8″».
 * **Error total honesto**: el panel distingue «interno» (fotones, si hay
   ganancia) de «total» (más dispersión del ZP, centelleo de Young con tu
   apertura y altura de Ajustes, término de color y un suelo de flat de
@@ -354,8 +375,12 @@ y con apéndice técnico de implementación:
 
 * [ ] Placas apiladas y reducidas (bias/dark/flat) antes de medir.
 * [ ] Astrometría resuelta (sin WCS no hay localización del objetivo).
-* [ ] Ni el objetivo ni las comparaciones saturadas (la guarda del 85 %
-      ya vigila; el histograma del Editor FITS te lo muestra).
+* [ ] Ni el objetivo ni las comparaciones saturadas ni comprimidas por
+      el full well (la guarda vigila aun sin tarjeta SATURATE: el panel
+      excluye las estrellas junto al recorte y lo dice; con comps
+      brillantes comprimidas el ZP miente a la baja y la check no lo
+      ve). Regla rápida: comps de brillo parecido al objetivo, nunca
+      las más brillantes del campo.
 * [ ] La misma apertura para toda la serie (el programa la fija por ti).
 * [ ] Una estrella **check** en la secuencia: si ella se mueve, la noche
       no es de fiar; si solo se mueve el objetivo, es astrofísica.

@@ -277,6 +277,61 @@ def _migrate(conn):
             conn.execute("ALTER TABLE projects ADD COLUMN campaign_id INTEGER"
                          " REFERENCES campaigns(id) ON DELETE SET NULL")
         conn.execute("PRAGMA user_version = 7")
+    if v < 8:
+        # ADR-045: the guided flow is Ficha -> Captura -> Análisis ->
+        # Publicación; the "process" step is renamed "analysis" (the old
+        # Procesado and the kind-gated Seguimiento merge into the single
+        # Analysis tab built around visits). The UNIQUE(project_id, step)
+        # constraint is safe: no project can hold both names at once.
+        conn.execute("UPDATE project_steps SET step=?, updated=? WHERE step=?",
+                     ("analysis", time.time(), "process"))
+        conn.execute("PRAGMA user_version = 8")
+    if v < 9:
+        # ADR-045: ONE file registry. project_files gains the visit link
+        # (session_id, SET NULL) and a meta JSON (filter/date_obs/exptime_s
+        # for plates); session_images rows move over and the table goes:
+        # the double registration ends.
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(project_files)")}
+        if "session_id" not in cols:
+            conn.execute("ALTER TABLE project_files ADD COLUMN session_id"
+                         " INTEGER REFERENCES project_sessions(id)"
+                         " ON DELETE SET NULL")
+        if "meta" not in cols:
+            conn.execute("ALTER TABLE project_files ADD COLUMN meta"
+                         " TEXT DEFAULT '{}'")
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "session_images" in tables:
+            rows = conn.execute(
+                "SELECT i.session_id, i.filter, i.fits_path, i.date_obs,"
+                " i.exptime_s, s.project_id, s.created"
+                " FROM session_images i JOIN project_sessions s"
+                " ON s.id=i.session_id").fetchall()
+            for sid, filt, path, date_obs, exptime, pid, created in rows:
+                meta = json.dumps({"filter": filt, "date_obs": date_obs,
+                                   "exptime_s": exptime}, ensure_ascii=False)
+                conn.execute(
+                    "INSERT INTO project_files (project_id, path, kind,"
+                    " created, session_id, meta)"
+                    " VALUES (?, ?, ?, ?, ?, ?)",
+                    (pid, path, "fits", created, sid, meta))
+            conn.execute("DROP TABLE session_images")
+        conn.execute("PRAGMA user_version = 9")
+    if v < 10:
+        # ADR-045 (same-day usability review): a visit can be pinned to
+        # the top of the list (the one you're working tonight floats over
+        # the archive) and its date is editable from its window. The
+        # table guard mirrors v9's: a hand-seeded old database may not
+        # have it (the real chain creates it at v5).
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "project_sessions" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(project_sessions)")}
+            if "pinned" not in cols:
+                conn.execute("ALTER TABLE project_sessions ADD COLUMN"
+                             " pinned INTEGER DEFAULT 0")
+        conn.execute("PRAGMA user_version = 10")
     conn.commit()
 
 
@@ -308,6 +363,16 @@ MIGRATION_NOTES = {
     7: QT_TRANSLATE_NOOP("NSMigrations",
         "Observing campaigns: a first-class list your projects can hang "
         "from, with cadence, filters and shared data links."),
+    8: QT_TRANSLATE_NOOP("NSMigrations",
+        "The project flow is now Ficha, Captura, Análisis, Publicación: "
+        "the old Process step was renamed Analysis."),
+    9: QT_TRANSLATE_NOOP("NSMigrations",
+        "One registry for every project file, with its visit linked: "
+        "the per-night images you had already registered moved over "
+        "automatically."),
+    10: QT_TRANSLATE_NOOP("NSMigrations",
+        "Visits can be pinned to the top of the list, and their date is "
+        "editable from the visit's window."),
 }
 
 

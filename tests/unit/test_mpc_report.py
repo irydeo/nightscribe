@@ -119,3 +119,18 @@ def test_designations_collected():
     text = _mpc80_block(_MPC80_GOOD, _MPC80_GOOD)
     r = mpc_report.validate(text, obs_code="Z41")
     assert "J01EQ" in r["designations"]
+
+
+def test_first_obs_date_mpc80():
+    assert mpc_report.first_obs_date(_MPC80_GOOD) == "2021-03-15"
+
+
+def test_first_obs_date_ades():
+    ades = ("objid|provID|mode|stn|obsTime|ra|dec\n"
+            "J01EQ3|2021EQ3|CCD|Z41|2021-03-15T12:00:00|323.23|+12.58")
+    assert mpc_report.first_obs_date(ades) == "2021-03-15"
+
+
+def test_first_obs_date_none_on_garbage():
+    assert mpc_report.first_obs_date("# nothing\n") is None
+    assert mpc_report.first_obs_date("not a report line") is None

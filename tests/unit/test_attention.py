@@ -62,7 +62,7 @@ def test_sn_cadence_due_is_due_urgency(db):
     e = rep[0]
     assert e["urgency"] == "due"
     assert e["reason"] == "due"
-    assert e["section"] == "followup"
+    assert e["section"] == "analysis"
     assert e["overdue_days"] >= 5
 
 
@@ -74,7 +74,7 @@ def test_never_visited_variable_gets_the_first_visit_prompt(db):
     e = rep[0]
     assert e["urgency"] == "due"
     assert e["reason"] == "never_visited"
-    assert e["section"] == "followup"
+    assert e["section"] == "analysis"
 
 
 def test_detector_event_outranks_everything(db):
@@ -89,7 +89,7 @@ def test_detector_event_outranks_everything(db):
     assert rep[0]["urgency"] == "event"
     assert rep[0]["reason"] == "event"
     assert rep[0]["event"]["direction"] == "rise"   # got brighter
-    assert rep[0]["section"] == "followup"
+    assert rep[0]["section"] == "analysis"
     assert rep[1]["project_id"] == p_calm["id"]
     assert rep[1]["urgency"] == "info"
 
@@ -112,7 +112,7 @@ def test_imminent_extremum_makes_a_variable_due(db):
     assert e["urgency"] == "due"
     assert e["reason"] == "extremum"
     assert e["extremum"]["days"] <= 3       # inside the imminence window
-    assert e["section"] == "followup"
+    assert e["section"] == "analysis"
 
 
 def test_campaign_name_and_favorite_ride_along(db):

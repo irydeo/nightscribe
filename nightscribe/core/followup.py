@@ -11,11 +11,12 @@
 #
 ############################################################
 
-"""Multi-night follow-up storage for SN projects.
+"""Multi-night follow-up storage (visits and photometry points).
 
-A follow-up is a tree: project → sessions (one per observing night) →
-images (one stacked FITS per filter) and photometry points (imported
-from AIJ/Tycho-Tracker or produced by the quick-look differential engine).
+A follow-up is a tree: project → sessions (one per observing night, any
+kind since ADR-045) → resources in the single file registry
+(project_files linked by session_id) and photometry points (manual,
+pasted, imported, measured in the UFE, or survey context).
 
 All SQL goes through db.execute (ADR-002). The module mirrors the
 pragmatic style of core/project.py: short functions, no ORM, no magic.
@@ -49,27 +50,31 @@ def create_session(db, project_id, obs_date=None, notes=""):
 
 
 def list_sessions(db, project_id):
-    # @return: list of session dicts ordered by obs_date
+    # @return: list of session dicts: pinned visits first, then newest
+    #          first by observing date (ADR-045)
     rows = db.execute(
-        "SELECT id, project_id, obs_date, notes, created"
-        " FROM project_sessions WHERE project_id=? ORDER BY obs_date DESC",
+        "SELECT id, project_id, obs_date, notes, created, pinned"
+        " FROM project_sessions WHERE project_id=?"
+        " ORDER BY pinned DESC, obs_date DESC",
         (project_id,),
     ).fetchall()
     return [{"id": r[0], "project_id": r[1], "obs_date": r[2],
-             "notes": r[3] or "", "created": r[4]} for r in rows]
+             "notes": r[3] or "", "created": r[4], "pinned": bool(r[5])}
+            for r in rows]
 
 
 def get_session(db, session_id):
     # @return: session dict or None
     row = db.execute(
-        "SELECT id, project_id, obs_date, notes, created"
+        "SELECT id, project_id, obs_date, notes, created, pinned"
         " FROM project_sessions WHERE id=?",
         (session_id,),
     ).fetchone()
     if not row:
         return None
     return {"id": row[0], "project_id": row[1], "obs_date": row[2],
-            "notes": row[3] or "", "created": row[4]}
+            "notes": row[3] or "", "created": row[4],
+            "pinned": bool(row[5])}
 
 
 def update_session_notes(db, session_id, notes):
@@ -82,9 +87,35 @@ def update_session_notes(db, session_id, notes):
     return cur.rowcount > 0
 
 
+def update_session_date(db, session_id, obs_date):
+    # Edits the visit's date (its visible name in the list). Points
+    # already saved to the visit keep their own MJD: they were measured
+    # then, and that truth is not rewritten here.
+    # @args: obs_date - ISO date string
+    # @return: True if the session was found
+    cur = db.execute(
+        "UPDATE project_sessions SET obs_date=? WHERE id=?",
+        (obs_date, session_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
+def set_session_pinned(db, session_id, pinned):
+    # Pins/unpins a visit: pinned ones float to the top of the list.
+    # @return: True if the session was found
+    cur = db.execute(
+        "UPDATE project_sessions SET pinned=? WHERE id=?",
+        (1 if pinned else 0, session_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
 def delete_session(db, session_id):
-    # @return: True if the session was found and deleted (images cascade,
-    #         photometry points keep their mag but lose the link)
+    # @return: True if the session was found and deleted (its files and
+    #         photometry points keep living in the project, unlinked —
+    #         both links are ON DELETE SET NULL)
     cur = db.execute("DELETE FROM project_sessions WHERE id=?", (session_id,))
     db.commit()
     return cur.rowcount > 0
@@ -103,32 +134,49 @@ def days_since_last_session(db, project_id):
 
 
 # ---------------- images ----------------
+#
+# ADR-045: a visit's images live in the single file registry
+# (project_files, kind="fits", linked by session_id, header facts in
+# meta). The session_images table is gone; the functions below keep the
+# established contract on top of it.
 
 def add_image(db, session_id, filter_name, fits_path, date_obs=None,
               exptime_s=None):
     # @args: filter_name - "Clear"/"None" for the no-filter path (B-f),
     #        fits_path - registered, never copied (T4), date_obs - from FITS
     #        header (B1) or None, exptime_s - exposure seconds or None
-    # @return: image id
-    cur = db.execute(
-        "INSERT INTO session_images (session_id, filter, fits_path,"
-        " date_obs, exptime_s) VALUES (?, ?, ?, ?, ?)",
-        (session_id, filter_name, str(fits_path), date_obs, exptime_s),
-    )
-    db.commit()
-    return cur.lastrowid
+    # @return: the file id, or None when the visit does not exist
+    from . import project as _proj
+    sess = get_session(db, session_id)
+    if sess is None:
+        return None
+    meta = {"filter": filter_name, "date_obs": date_obs,
+            "exptime_s": exptime_s}
+    return _proj.add_file(db, sess["project_id"], fits_path, "fits",
+                          session_id=session_id, meta=meta)
 
 
 def list_images(db, session_id):
-    # @return: list of image dicts
-    rows = db.execute(
-        "SELECT id, session_id, filter, fits_path, date_obs, exptime_s"
-        " FROM session_images WHERE session_id=? ORDER BY id",
-        (session_id,),
-    ).fetchall()
-    return [{"id": r[0], "session_id": r[1], "filter": r[2],
-             "fits_path": r[3], "date_obs": r[4], "exptime_s": r[5]}
-            for r in rows]
+    # @return: list of image dicts (the established keys, read from the
+    #          registry's meta)
+    from . import project as _proj
+    out = []
+    for f in _proj.files_for_session(db, session_id):
+        if f["kind"] != "fits":
+            continue
+        out.append({"id": f["id"], "session_id": session_id,
+                    "filter": f["meta"].get("filter"),
+                    "fits_path": f["path"],
+                    "date_obs": f["meta"].get("date_obs"),
+                    "exptime_s": f["meta"].get("exptime_s")})
+    return out
+
+
+def delete_image(db, image_id):
+    # Unlinks a visit's image (the file on disk is never touched).
+    # @return: True if the row was found and deleted
+    from . import project as _proj
+    return _proj.delete_file(db, image_id)
 
 
 # ---------------- photometry points ----------------

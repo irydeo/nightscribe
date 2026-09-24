@@ -68,6 +68,16 @@ mantienen estables); el Skip de la tarjeta «Siguiente» se jubila (cada
 paso conserva su pie «Skip step»); la pestaña Observatory del main window
 desaparece y su control pasa al paso Captura.
 
+**Enmendado por ADR-045 (2026-09-24)**: la barra pasa a cuatro pestañas
+(Ficha → Captura → Análisis → Publicación): la clave `process` se
+renombra `analysis` (migración v8) y la pestaña Seguimiento desaparece
+como tal (su contenido vive en Análisis, construida sobre el gestor de
+visitas, para todos los tipos). Las claves retiradas `process` y
+`followup` quedan como alias permanentes de `analysis` para los deep
+links. La barra sigue siendo una fila de botones planos en
+`projects_tab.ui`, una página visible a la vez, lazy build, y el
+contrato de deep link se mantiene.
+
 ## English
 
 **Context**: the UX track (UD) folded the step tabs into a **single page of
@@ -122,3 +132,12 @@ Publish · Follow-up* were display-only (now *Capture · Track · Follow-up
 "Next" card's Skip retires (each step keeps its "Skip step" footer); the
 main window's Observatory tab is gone and its control moves into the
 Capture step.
+
+**Amended by ADR-045 (2026-09-24)**: the bar drops to four tabs (Object
+card → Capture → Analysis → Publish): the `process` key is renamed
+`analysis` (migration v8) and the Follow-up tab as such is gone (its
+content lives in Analysis, built around the visits manager, for every
+kind). The retired `process` and `followup` keys stay as permanent
+aliases of `analysis` for deep links. The bar remains a row of flat
+buttons in `projects_tab.ui`, one page visible at a time, lazy build,
+and the deep-link contract holds.

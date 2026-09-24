@@ -189,10 +189,10 @@ def test_followup_tab_gated_for_hads(window):
     # ADR-041: hads is a follow-up kind (ADR-034 D3) — the tab is visible
     # on the bar; its page stays lazy until first opened
     _select(window, "T UMa", _hads_ctx())
-    assert not window.projects.btn_tab_followup.isHidden()
-    assert "followup" not in window._tab_pages
-    _section(window, "followup")
-    assert "followup" in window._tab_pages
+    assert not window.projects.btn_tab_analysis.isHidden()
+    assert "analysis" not in window._tab_pages
+    _section(window, "analysis")
+    assert "analysis" in window._tab_pages
 
 
 def test_followup_hides_sn_analysis_buttons_for_hads(window):
@@ -201,12 +201,13 @@ def test_followup_hides_sn_analysis_buttons_for_hads(window):
     # the bulk tools live in the ⋯ Photometry tools menu.
     from PySide6.QtWidgets import QPushButton, QToolButton
     _select(window, "V0392 UMa", _hads_ctx())
-    sec = _section(window, "followup")
+    sec = _section(window, "analysis")
     texts = [b.text() for b in sec.findChildren(QPushButton)]
     assert "Quick analysis" not in texts
     assert "Generate animation" not in texts
     assert "Export annotated FITS" not in texts
-    assert "Add visit" in texts
+    # ADR-045: the visits manager's single primary action
+    assert "New visit" in texts
     tools = [b for b in sec.findChildren(QToolButton)
              if "Photometry" in b.text()]
     assert tools, "the ⋯ Photometry tools menu is missing"
@@ -217,7 +218,7 @@ def test_followup_hides_sn_analysis_buttons_for_hads(window):
 def test_process_block_fotodif_webobs(window):
     from PySide6.QtWidgets import QPushButton
     _select(window, "DY Her", _hads_ctx())
-    buttons = [b.text() for b in _section(window, "process")
+    buttons = [b.text() for b in _section(window, "analysis")
                .findChildren(QPushButton)]
     assert any("WebObs" in t for t in buttons)
 

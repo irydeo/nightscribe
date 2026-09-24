@@ -18,7 +18,7 @@ from nightscribe.core.db import Database
 
 def test_fresh_db_has_campaigns_and_v7(tmp_path):
     db = Database(str(tmp_path / "t.db"))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
     cols = {r[1] for r in db.execute("PRAGMA table_info(campaigns)")}
     assert {"id", "name", "group_name", "coordinator", "goal", "protocol",
             "report_url", "data_url", "status", "created",
@@ -31,7 +31,7 @@ def test_reopen_v7_is_idempotent(tmp_path):
     f = tmp_path / "t.db"
     Database(str(f)).close()
     db = Database(str(f))           # re-open: the guarded block is a no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
 
 
 def test_upgrade_from_v6_restores_campaigns(tmp_path):
@@ -42,7 +42,7 @@ def test_upgrade_from_v6_restores_campaigns(tmp_path):
     db.commit()
     db.close()
     db = Database(str(f))           # migrates 6 -> 7 again
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
     db.execute("INSERT INTO campaigns (name, created) VALUES ('X', 1.0)")
     assert db.execute("SELECT name FROM campaigns").fetchone()[0] == "X"
 

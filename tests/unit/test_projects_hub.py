@@ -629,9 +629,9 @@ def test_dashboard_attention_card_lands_on_followup(window, panel):
     assert window._current_project is not None
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_detail
-    # ADR-041: the deep link ends on the follow-up tab, built + active
-    assert "followup" in window._tab_pages
-    assert not window._tab_pages["followup"].isHidden()
+    # ADR-045: the deep link ends on the analysis tab, built + active
+    assert "analysis" in window._tab_pages
+    assert not window._tab_pages["analysis"].isHidden()
 
 
 def test_rich_rows_carry_the_story(window, panel):
@@ -1275,199 +1275,166 @@ def test_change_project_folder_rehomes_future_exports(window, panel,
     assert project.get(dbmod.db, p["id"])["root_dir"] == str(prev)
 # ---------------- B2: SN follow-up tab ----------------
 
-def test_followup_tab_visible_for_sn(window, panel):
+def test_analysis_tab_visible_for_every_kind(window, panel):
+    # ADR-045: the Analysis tab is kind-agnostic now (the visits manager
+    # is its core for every kind); nothing is gated at the bar any more.
+    # The photometry blocks inside stay kind-gated (tests below).
     _create_and_select(window, "sn", "SN2026fu", {"kind": "sn"})
-    # ADR-041: the follow-up tab button is gated by kind on the tab bar
-    assert not window.projects.btn_tab_followup.isHidden()
+    assert not window.projects.btn_tab_analysis.isHidden()
 
 
-def test_followup_tab_hidden_for_non_sn(window, panel):
+def test_analysis_tab_visible_for_neo_too(window, panel):
+    # same bar for a NEO: the Analysis tab exists (visits + MPC report)
     _create_and_select(window, "neo", "NEO2026nofu", {"kind": "neo"})
-    assert window.projects.btn_tab_followup.isHidden()
+    assert not window.projects.btn_tab_analysis.isHidden()
+
+
+
+def _visits_panel(window):
+    # ADR-045: the visits manager lives in the Analysis tab (lazy: open
+    # it first). @return: the VisitsPanel
+    window.projects.btn_tab_analysis.click()
+    return window._project_widgets["visits_panel"]
 
 
 def test_followup_add_session(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026sess", {"kind": "sn"})
-    # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
     assert fu.days_since_last_session(dbmod.db, p["id"]) is None
-    # the visits journal is a master-detail dialog now: build it (without
-    # exec) so _fu_add_session refreshes the live list in place instead of
-    # opening the modal that would hang a headless test
-    window._fu_visits_dialog(p["id"])
-    window._fu_add_session(p["id"])
+    # ADR-045: the single primary entry point lives in the visits panel
+    vp = _visits_panel(window)
+    vp.btn_new.click()
     sessions = fu.list_sessions(dbmod.db, p["id"])
     assert len(sessions) == 1
-    lst = window._project_widgets.get("fu_sessions")
-    assert lst is not None
-    assert lst.count() == 1
+    assert vp.lst.count() == 1
+    assert vp.current_session_id() == sessions[0]["id"]
 
 
 def test_followup_session_notes_persist(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026notes", {"kind": "sn"})
-    # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
-    # build the visits dialog (no exec): it owns the session list + detail
-    window._fu_visits_dialog(p["id"])
-    window._fu_add_session(p["id"])
-    sessions = fu.list_sessions(dbmod.db, p["id"])
-    sid = sessions[0]["id"]
-    lst = window._project_widgets["fu_sessions"]
-    lst.setCurrentRow(0)
-    window._fu_current_session = sid
-    notes = window._project_widgets.get("fu_notes")
-    if notes:
-        notes.setPlainText("Clear night, good seeing")
-    window._fu_save_notes(p["id"])
+    vp = _visits_panel(window)
+    vp.btn_new.click()
+    sid = fu.list_sessions(dbmod.db, p["id"])[0]["id"]
+    # the notes widget lives in the visit's window and auto-saves on
+    # every keystroke (ADR-045)
+    vp._win._notes.setPlainText("Clear night, good seeing")
     s = fu.get_session(dbmod.db, sid)
     assert s["notes"] == "Clear night, good seeing"
 
 
 def test_followup_notes_no_dual_identity(window, panel):
-    # B2 defect: _build_followup_tab used to also create a top-level notes
-    # widget. Two QTextEdits bound to different sessions meant _fu_save_notes
-    # could write to a dead widget. After the fix there is exactly ONE live
-    # notes widget and it is always the one in _project_widgets["fu_notes"].
+    # B2 defect, ADR-045 shape: the visits panel rebuilds its detail per
+    # selection and owns exactly ONE live notes widget at a time.
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026note2", {"kind": "sn"})
-    # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
-    # build the visits dialog (no exec): it owns the session list + detail
-    window._fu_visits_dialog(p["id"])
-    window._fu_add_session(p["id"])
-    sessions = fu.list_sessions(dbmod.db, p["id"])
-    s1 = sessions[0]["id"]
-    lst = window._project_widgets["fu_sessions"]
-    lst.setCurrentRow(0)
-    # before the fix this raised / hit a stale widget; now it stores one key
-    w_live = window._project_widgets.get("fu_notes")
+    vp = _visits_panel(window)
+    vp.btn_new.click()
+    s1 = fu.list_sessions(dbmod.db, p["id"])[0]["id"]
+    assert vp.current_session_id() == s1
+    w_live = vp._win._notes
     assert w_live is not None
-    # select it and confirm _fu_save_notes targets the LIVE widget, not a
-    # dead one: change the live widget, save, read back from disk.
-    w_live.blockSignals(True)
     w_live.setPlainText("live widget note")
-    w_live.blockSignals(False)
-    window._fu_current_session = s1
-    window._fu_save_notes(p["id"])
     assert fu.get_session(dbmod.db, s1)["notes"] == "live widget note"
 
 
 def test_followup_add_measurement_has_real_mjd(window, panel):
-    # B2 defect: _fu_add_measurement fell back to mjd=0.0 when obs_date was
-    # missing, corrupting light-curve ordering. Now it derives a real MJD.
+    # B2 defect (still watched in the ADR-045 panel): a visit without a
+    # parseable obs_date must still derive a real MJD, never 0.
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026mjd", {"kind": "sn"})
-    # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
-    # craft a session with NO parseable obs_date (empty string) so the old
-    # code would have taken the mjd=0.0 branch
+    vp = _visits_panel(window)
     sid = fu.create_session(dbmod.db, p["id"], obs_date="")
-    # force the stored date to empty to hit the fallback path
     dbmod.db.execute(
         "UPDATE project_sessions SET obs_date='' WHERE id=?", (sid,))
     dbmod.db.commit()
-    # build the visits dialog (no exec) so the list + detail live in the
-    # registry without a modal loop
-    window._fu_visits_dialog(p["id"])
-    lst = window._project_widgets["fu_sessions"]
-    # populate + select so the measurement panel (widgets) is built
-    window._fu_populate_sessions(lst, p["id"])
-    lst.setCurrentRow(0)
-    window._fu_current_session = sid
-    spn_mag = window._project_widgets.get("fu_meas_mag")
-    spn_err = window._project_widgets.get("fu_meas_err")
-    cmb_filt = window._project_widgets.get("fu_meas_filt")
-    spn_mag.setValue(15.5)
-    cmb_filt.setCurrentText("V")
-    window._fu_add_measurement(sid, p["id"], spn_mag, spn_err, cmb_filt)
+    vp.refresh()
+    vp.lst.setCurrentRow(0)
+    assert vp.current_session_id() == sid
+    vp.open_visit(sid)          # the measurement form lives in the window
+    vp._win.spn_mag.setValue(15.5)
+    vp._win.cmb_filt.setCurrentText("V")
+    vp._win._on_add_measurement()
     pts = [pt for pt in fu.list_points(dbmod.db, p["id"])
            if pt["session_id"] == sid]
     assert len(pts) == 1
     assert pts[0]["mjd"] > 0, "MJD must not be 0 (B2 corruption)"
-    # it should be a plausible modern MJD (2000-01-01 == 51544.5)
+    # a plausible modern MJD (2000-01-01 == 51544.5)
     assert pts[0]["mjd"] > 51544
 
 
 def test_followup_delete_session(window, panel):
-    # B2 defect: the GUI had no way to delete a visit. Now _fu_delete_session
-    # exists and removes the session (images cascade, points are kept).
+    # The panel's delete keeps the B2 contract: the visit goes, its
+    # photometry points and files keep living, unlinked (SET NULL).
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     from PySide6.QtWidgets import QMessageBox
     p = _create_and_select(window, "sn", "SN2026del", {"kind": "sn"})
-    # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    vp = _visits_panel(window)
     sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
-    # attach an image + a point so the cascade / keep behaviour is observable
-    fu.add_image(dbmod.db, sid, "V", "/tmp/fake.fits", date_obs="2026-09-01")
+    fu.add_image(dbmod.db, sid, "V", "/tmp/fake.fits",
+                 date_obs="2026-09-01")
     fu.add_point(dbmod.db, p["id"], 61000.0, "V", 16.0,
                  source="manual", session_id=sid)
     assert fu.get_session(dbmod.db, sid) is not None
-    # build the visits dialog (no exec): it owns the session list + detail
-    window._fu_visits_dialog(p["id"])
-    # stub the confirmation dialog to auto-accept
+    vp.refresh()
+    vp.lst.setCurrentRow(0)
+    vp.open_visit(sid)          # the delete action lives in the window
     orig = QMessageBox.question
     QMessageBox.question = lambda *a, **kw: QMessageBox.Yes
     try:
-        lst = window._project_widgets["fu_sessions"]
-        window._fu_delete_session(lst, sid, p["id"])
+        vp._win._on_delete_visit()
     finally:
         QMessageBox.question = orig
     assert fu.get_session(dbmod.db, sid) is None
-    # images cascaded with the session
-    assert fu.list_images(dbmod.db, sid) == []
-    # but the photometry point is retained per the delete_session contract
-    pts = [pt for pt in fu.list_points(dbmod.db, p["id"])
-           if pt["session_id"] is not None]
-    assert pts or all(pt["session_id"] != sid
-                      for pt in fu.list_points(dbmod.db, p["id"]))
+    # the image survives in the registry, unlinked (ADR-045)
+    remaining = [pt for pt in fu.list_points(dbmod.db, p["id"])]
+    assert all(pt["session_id"] != sid for pt in remaining)
 
 
-def test_followup_add_image_dialog_editable(window, panel, monkeypatch, tmp_path):
-    # B2 defect: 'Add stack' read the FITS header verbatim with no chance to
-    # fix a misnamed filter/date/exptime. Now a dialog pre-fills the values
-    # and lets the user edit them before committing.
+def test_followup_add_image_dialog_editable(window, panel, monkeypatch,
+                                            tmp_path):
+    # B2 defect, ADR-045 shape: attaching a FITS to a visit pre-fills
+    # filter/date/exptime from the header and stays editable before
+    # committing (a misnamed filter breaks the light-curve split).
     from nightscribe.core import followup as fu
     from nightscribe.core import fits_meta
     import nightscribe.core.db as dbmod
     from PySide6.QtWidgets import QDialog, QFileDialog, QComboBox, QLineEdit
     p = _create_and_select(window, "sn", "SN2026imgd", {"kind": "sn"})
-    sid = fu.create_session(dbmod.db, p["id"], "2026-09-05")
+    vp = _visits_panel(window)
+    vp.btn_new.click()
+    sid = vp.current_session_id()
     fake_path = str(tmp_path / "stack.fits")
-    # stub the file chooser + header reader
     monkeypatch.setattr(
-        QFileDialog, "getOpenFileName",
-        lambda *a, **kw: (fake_path, ""))
+        QFileDialog, "getOpenFileNames",
+        lambda *a, **kw: ([fake_path], ""))
     monkeypatch.setattr(
         fits_meta, "read_meta", lambda path: {
             "date_obs": "2026-09-05", "mjd": 61292.0,
             "filter": "R", "exptime_s": 300.0, "object": "SN2026imgd"})
-    # intercept the dialog at accept: rewrite the fields, then accept
+
     def fake_exec(self):
-        # this is our image dialog (find its named children to be sure)
-        combo = self.findChild(QComboBox, "fu_img_filter")
-        date_ed = self.findChild(QLineEdit, "fu_img_date")
-        exp_ed = self.findChild(QLineEdit, "fu_img_exptime")
+        combo = self.findChild(QComboBox, "vp_img_filter")
+        date_ed = self.findChild(QLineEdit, "vp_img_date")
+        exp_ed = self.findChild(QLineEdit, "vp_img_exptime")
         if combo is not None and date_ed is not None and exp_ed is not None:
             combo.setCurrentText("Clear")   # user overrides the FITS "R"
             date_ed.setText("2026-09-06")   # user fixes the date
             exp_ed.setText("120")           # user fixes the exposure
         return QDialog.Accepted
     monkeypatch.setattr(QDialog, "exec", fake_exec)
-    window._fu_add_image(sid, p["id"])
+    vp._win._on_attach()
     imgs = fu.list_images(dbmod.db, sid)
     assert len(imgs) == 1
     # the edited values (not the raw header) were committed
     assert imgs[0]["filter"] == "Clear"
     assert imgs[0]["date_obs"] == "2026-09-06"
     assert imgs[0]["exptime_s"] == 120.0
-
 
 def test_followup_cadence_uses_config(window, panel, monkeypatch):
     # B2 defect: the "stale" colour threshold was hardcoded to 3 instead of
@@ -1490,10 +1457,11 @@ def test_followup_cadence_uses_config(window, panel, monkeypatch):
     from PySide6.QtWidgets import QLabel
 
     def last_visit_label():
-        # each build makes a fresh "followup" tab page; scope the search
-        # to the newest one so stale rebuilds can never leak in
-        window._build_followup_tab(p, {})
-        sec = window._tab_pages["followup"]
+        # ADR-045: the cadence line lives in the Analysis tab; the tab is
+        # lazy, so force a fresh build or the config change never renders
+        window._clear_project_page()
+        window._show_tab("analysis")
+        sec = window._tab_pages["analysis"]
         chips = [w for w in sec.findChildren(QLabel)
                  if "Last visit" in w.text()]
         return chips[0] if chips else None
@@ -1510,34 +1478,22 @@ def test_followup_cadence_uses_config(window, panel, monkeypatch):
 
 # ---------------- B3: photometry entry ----------------
 
+
 def test_fu_add_measurement_quick(window, panel):
     from nightscribe.core import followup as fu
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026meas", {"kind": "sn"})
-    # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
-    # build the visits dialog (no exec): it owns the session list + detail
-    window._fu_visits_dialog(p["id"])
-    window._fu_add_session(p["id"])
-    sessions = fu.list_sessions(dbmod.db, p["id"])
-    sid = sessions[0]["id"]
-    # simulate selecting the session
-    lst = window._project_widgets["fu_sessions"]
-    lst.setCurrentRow(0)
-    window._fu_current_session = sid
-    # set mag and add
-    spn_mag = window._project_widgets.get("fu_meas_mag")
-    spn_err = window._project_widgets.get("fu_meas_err")
-    cmb_filt = window._project_widgets.get("fu_meas_filt")
-    if spn_mag and cmb_filt:
-        spn_mag.setValue(16.55)
-        cmb_filt.setCurrentText("Clear")
-        window._fu_add_measurement(sid, p["id"], spn_mag, spn_err, cmb_filt)
+    vp = _visits_panel(window)
+    vp.btn_new.click()
+    sid = vp.current_session_id()
+    vp._win.spn_mag.setValue(16.55)
+    vp._win.cmb_filt.setCurrentText("Clear")
+    vp._win._on_add_measurement()
     pts = fu.list_points(dbmod.db, p["id"])
     assert len(pts) == 1
     assert pts[0]["mag"] == 16.55
     assert pts[0]["source"] == "manual"
-
+    assert pts[0]["session_id"] == sid
 
 def test_fu_paste_dialog_parses(window, panel):
     from nightscribe.core import followup as fu
@@ -1653,7 +1609,7 @@ def test_fu_campaign_summary_panel_reports_saved_points(window):
     from PySide6.QtWidgets import QLabel
     p = proj_mod.create(mw.db, "sn", "SN2026camp", {"kind": "sn"})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     lbl = tab.findChild(QLabel, "fu_campaign_text")
     assert lbl is not None
     assert "No points saved yet" in lbl.text()
@@ -1664,7 +1620,7 @@ def test_fu_campaign_summary_panel_reports_saved_points(window):
     fu.add_point(mw.db, p["id"], 60600.0, "R", 15.0, source="measure")
     fu.add_point(mw.db, p["id"], 60605.0, "R", 16.0, source="measure")
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     lbl = tab.findChild(QLabel, "fu_campaign_text")
     assert "2 nights" in lbl.text()
     assert "2 points" in lbl.text()
@@ -1676,48 +1632,46 @@ def test_fu_campaign_summary_panel_reports_saved_points(window):
 
 
 def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
-    # ADR-044: every visit row drives "Measure in the editor…"; the
-    # retired quick-look is no longer offered. The button is UFE-only,
-    # so this test lifts the file's legacy-route autouse fixture.
+    # ADR-044/045: the visit's plate opens in the editor from the visits
+    # manager, with both hooks armed for THAT visit. The retired
+    # quick-look is no longer offered anywhere.
     # @args: window - the hub, monkeypatch - flag + routing overrides
     from nightscribe.core import project as proj_mod, followup as fu
     from nightscribe.gui import main_window as mw
-    from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QPushButton
     monkeypatch.setattr(window, "_use_ufe", lambda: True)
-    p = proj_mod.create(mw.db, "sn", "SN2026visit", {"kind": "sn"})
+    p = _create_and_select(window, "sn", "SN2026visit", {"kind": "sn"})
     sid = fu.create_session(mw.db, p["id"], "2026-09-08")
     fu.add_image(mw.db, sid, "R", "/tmp/fu_visit.fits",
                  date_obs="2026-09-08", exptime_s=60.0)
-    _build_page(window, proj_mod.get(mw.db, p["id"]))
-    # the sessions list and the visit detail (and its "Measure in the
-    # editor…" action) now live in the visits dialog, opened from the tab:
-    # build it without exec and work on its children instead of the tab's
-    dlg = window._fu_visits_dialog(p["id"])
-    lst = window._project_widgets["fu_sessions"]
-    assert any(lst.item(i).data(Qt.UserRole) == sid
-               for i in range(lst.count())), "the Visits list is missing"
-    row = [i for i in range(lst.count())
-           if lst.item(i).data(Qt.UserRole) == sid][0]
-    lst.setCurrentItem(lst.item(row))     # user path: select the visit
-    btns = [b.text() for b in dlg.findChildren(QPushButton)]
-    assert "Measure in the editor…" in btns
+    # the visits manager in the Analysis tab lists the visit and its
+    # plate; the plate's Open action routes to the UFE Measure tab with
+    # the hooks armed for the visit (ADR-045)
+    vp = _visits_panel(window)
+    assert vp.lst.count() == 1, "the Visits list is missing the visit"
+    vp.lst.setCurrentRow(0)               # user path: select the visit
+    assert vp.current_session_id() == sid
+    vp.open_visit(sid)                    # the resources live in its window
+    btns = [b.text() for b in vp._win.findChildren(QPushButton)]
+    assert "Open" in btns
     assert "Quick analysis" not in btns
-    # the button routes to the UFE Measure tab, re-applying the object
+    vp._win.lst_res.setCurrentRow(0)      # select the plate resource
     opened = []
+
     class _D:
         def open_plate(self, path):
             return True
+
         def set_object(self, obj):
             opened.append(obj)
-    def _ufe_open(tab_, hook_pid=None, obj=None, **_kw):
-        opened.append((tab_, hook_pid, obj))
+
+    def _ufe_open(tab_, hook_pid=None, obj=None, session_id=None, **_kw):
+        opened.append((tab_, hook_pid, obj, session_id))
         return _D()
     monkeypatch.setattr(window, "_ufe_open", _ufe_open)
-    btn = [b for b in dlg.findChildren(QPushButton)
-           if b.text() == "Measure in the editor…"][0]
-    btn.click()
+    vp._win._on_open_resource()
     assert opened[0][:2] == ("measure", p["id"])
+    assert opened[0][3] == sid            # the hooks land on the visit
     assert opened[-1]["name"] == "SN2026visit"
 
 
@@ -1927,7 +1881,7 @@ def test_variable_project_gets_followup_with_protocol(window):
     _build_page(window, proj_mod.get(mw.db, p["id"]))
     # a variable project gets a "follow-up" tab on its page (ADR-041:
     # open the tab, the user path, then inspect it)
-    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     texts = [l.text() for l in fu.findChildren(QLabel)]
     assert any("Campaña T CrB" in t for t in texts)
     assert any("B, V" in t for t in texts)
@@ -1945,7 +1899,7 @@ def test_variable_followup_drops_quicklook_hides_animation(window):
     from PySide6.QtWidgets import QPushButton
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
     assert "Quick analysis" not in btns
     assert "Generate animation" not in btns
@@ -1988,7 +1942,7 @@ def test_followup_event_advisor_label(window):
     for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
         fu.add_point(mw.db, p["id"], 61000.0 + i, "V", m)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     texts = [l.text() for l in page.findChildren(QLabel)]
     assert any("brightness drop" in t or "descenso" in t for t in texts)
 
@@ -2058,7 +2012,7 @@ def test_followup_has_export_report_button(window):
     from PySide6.QtWidgets import QToolButton
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     tools = [b for b in page.findChildren(QToolButton)
              if "Photometry" in b.text()]
     assert tools, "the ⋯ Photometry tools menu is missing"
@@ -2257,7 +2211,9 @@ def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
         lst.visualItemRect(item).center())
     texts = seen["actions"]
     assert any("Open" in t or "Abrir" in t for t in texts)
-    assert any("Follow-up" in t or "Seguimiento" in t for t in texts)
+    # ADR-045: the follow-up action is the Analysis tab now, for
+    # every kind
+    assert any("Analysis" in t or "Análisis" in t for t in texts)
     assert any("Delete" in t or "Eliminar" in t for t in texts)
 
 

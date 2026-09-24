@@ -115,14 +115,14 @@ def _open_followup(window, p):
     # object-panel worker: the page build only needs _current_project).
     window._current_project = p
     window._build_project_page(p)
-    window._show_tab("followup")
+    window._show_tab("analysis")
 
 
 def test_followup_shows_the_primary_button(window):
     p = _variable_project()
     _open_followup(window, p)
     from PySide6.QtWidgets import QPushButton
-    buttons = window._tab_pages["followup"].findChildren(QPushButton)
+    buttons = window._tab_pages["analysis"].findChildren(QPushButton)
     labels = [b.text() for b in buttons]
     assert any("Comparison chart" in b for b in labels)
     # the status line starts empty, in plain words

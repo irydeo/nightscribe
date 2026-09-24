@@ -400,6 +400,21 @@ class VisitWindow(QDialog):
         lay.addWidget(snotes)
         self._notes = snotes
 
+        # the explicit closing gesture (field report: with no button the
+        # observer is left guessing): everything else auto-saves; the
+        # date field flushes here (a dirty invalid value reverts to the
+        # stored one first), then the window closes
+        bottom = QHBoxLayout()
+        bottom.addStretch(1)
+        self.btn_close = QPushButton(self.tr("Save and close"))
+        self.btn_close.setObjectName("vp_btn_close")
+        self.btn_close.setToolTip(self.tr(
+            "Flush the date edit if pending and close the window "
+            "(everything else already saved itself)"))
+        self.btn_close.clicked.connect(self._on_save_and_close)
+        bottom.addWidget(self.btn_close)
+        lay.addLayout(bottom)
+
     # ---------------------------------------------------------- visit
 
     def _stored_date(self):
@@ -452,6 +467,14 @@ class VisitWindow(QDialog):
         from ...core import followup as fu
         fu.set_session_pinned(self._db, self._sid, checked)
         self._emit_change()
+
+    def _on_save_and_close(self):
+        # The closing gesture: a pending date edit flushes (an invalid
+        # one reverts first, per the field's own rule); everything else
+        # already saved itself, so nothing can be lost silently here.
+        if self.btn_save_date.isEnabled():
+            self._save_date()
+        self.close()
 
     def _on_delete_visit(self):
         # Confirmation first; points and files keep living in the project,

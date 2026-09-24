@@ -7568,130 +7568,140 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Night notes (seeing, clouds…)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="461"/>
+        <location filename="../widgets/visits_panel.py" line="409"/>
+        <source>Save and close</source>
+        <translation>Save and close</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="412"/>
+        <source>Flush the date edit if pending and close the window (everything else already saved itself)</source>
+        <translation>Flush the date edit if pending and close the window (everything else already saved itself)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="484"/>
         <source>Delete visit</source>
         <translation>Delete visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="462"/>
+        <location filename="../widgets/visits_panel.py" line="485"/>
         <source>Delete this visit? Its measurements and files are kept, unlinked from it.</source>
         <translation>Delete this visit? Its measurements and files are kept, unlinked from it.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="495"/>
+        <location filename="../widgets/visits_panel.py" line="518"/>
         <source>Attach files to the visit</source>
         <translation>Attach files to the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="496"/>
+        <location filename="../widgets/visits_panel.py" line="519"/>
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="520"/>
+        <location filename="../widgets/visits_panel.py" line="543"/>
         <source>FITS details</source>
         <translation>FITS details</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="524"/>
+        <location filename="../widgets/visits_panel.py" line="547"/>
         <source>File:</source>
         <translation>File:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="531"/>
-        <location filename="../widgets/visits_panel.py" line="610"/>
+        <location filename="../widgets/visits_panel.py" line="554"/>
+        <location filename="../widgets/visits_panel.py" line="633"/>
         <source>Filter:</source>
         <translation>Filter:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="534"/>
+        <location filename="../widgets/visits_panel.py" line="557"/>
         <source>Date:</source>
         <translation>Date:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="538"/>
+        <location filename="../widgets/visits_panel.py" line="561"/>
         <source>Exptime:</source>
         <translation>Exptime:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="594"/>
+        <location filename="../widgets/visits_panel.py" line="617"/>
         <source>Measurements</source>
         <translation>Measurements</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="597"/>
+        <location filename="../widgets/visits_panel.py" line="620"/>
         <source>Mag:</source>
         <translation>Mag:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="603"/>
+        <location filename="../widgets/visits_panel.py" line="626"/>
         <source>Err:</source>
         <translation>Err:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="615"/>
+        <location filename="../widgets/visits_panel.py" line="638"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="619"/>
+        <location filename="../widgets/visits_panel.py" line="642"/>
         <source>Delete point</source>
         <translation>Delete point</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="694"/>
+        <location filename="../widgets/visits_panel.py" line="717"/>
         <source>Astrometry (MPC report)</source>
         <translation>Astrometry (MPC report)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="697"/>
+        <location filename="../widgets/visits_panel.py" line="720"/>
         <source>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</source>
         <translation>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="703"/>
+        <location filename="../widgets/visits_panel.py" line="726"/>
         <source>Paste MPC 80-column or ADES PSV lines here…</source>
         <translation>Paste MPC 80-column or ADES PSV lines here…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="709"/>
+        <location filename="../widgets/visits_panel.py" line="732"/>
         <source>Validate</source>
         <translation>Validate</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="713"/>
+        <location filename="../widgets/visits_panel.py" line="736"/>
         <source>Save report…</source>
         <translation>Save report…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="731"/>
-        <location filename="../widgets/visits_panel.py" line="760"/>
+        <location filename="../widgets/visits_panel.py" line="754"/>
+        <location filename="../widgets/visits_panel.py" line="783"/>
         <source>Paste your measurements first.</source>
         <translation>Paste your measurements first.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="738"/>
+        <location filename="../widgets/visits_panel.py" line="761"/>
         <source>Valid: %1 lines, %2</source>
         <translation>Valid: %1 lines, %2</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="746"/>
-        <location filename="../widgets/visits_panel.py" line="776"/>
+        <location filename="../widgets/visits_panel.py" line="769"/>
+        <location filename="../widgets/visits_panel.py" line="799"/>
         <source>Invalid: </source>
         <translation>Invalid: </translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="767"/>
+        <location filename="../widgets/visits_panel.py" line="790"/>
         <source>Save MPC report</source>
         <translation>Save MPC report</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="786"/>
+        <location filename="../widgets/visits_panel.py" line="809"/>
         <source>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</source>
         <translation>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="789"/>
+        <location filename="../widgets/visits_panel.py" line="812"/>
         <source>Saved: %1 (%2 lines)</source>
         <translation>Saved: %1 (%2 lines)</translation>
     </message>

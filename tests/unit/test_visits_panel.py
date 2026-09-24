@@ -362,3 +362,35 @@ def test_pinned_visit_floats_to_the_top(panel):
     vp.open_visit(sid_old)
     vp._win.btn_pin.setChecked(False)
     assert vp.lst.item(0).data(Qt.UserRole) != sid_old
+
+
+def test_save_and_close_flushes_the_date_and_closes(panel, qapp):
+    # The explicit closing gesture: a dirty valid date saves, the window
+    # closes and the panel forgets it (the destroyed signal).
+    from nightscribe.core import followup as fu
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    sid = vp.current_session_id()
+    w = vp._win
+    w._date_ed.setText("2026-09-19")
+    assert w.btn_save_date.isEnabled()
+    w.btn_close.click()
+    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-19"
+    qapp.processEvents()
+    assert vp._win is None
+
+
+def test_save_and_close_reverts_an_invalid_date(panel, qapp):
+    # a dirty INVALID value reverts to the stored one and the window
+    # still closes: nothing is ever saved silently nor lost silently
+    from nightscribe.core import followup as fu
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    sid = vp.current_session_id()
+    stored = fu.get_session(vp._db, sid)["obs_date"]
+    w = vp._win
+    w._date_ed.setText("no es una fecha")
+    w.btn_close.click()
+    assert fu.get_session(vp._db, sid)["obs_date"] == stored
+    qapp.processEvents()
+    assert vp._win is None

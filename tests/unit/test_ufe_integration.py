@@ -99,8 +99,10 @@ def test_settings_has_the_development_tab(qapp):
 def test_open_plate_and_show_tab(dlg):
     assert dlg.open_plate(str(MONO))
     assert not dlg.open_plate(str(FIXTURES / "missing.fits"))
+    # the legacy measure tab is routed to the Photometry tab, Measure section
     dlg.show_tab(dlg.tab_measure)
-    assert dlg.tabs.currentWidget() is dlg.tab_measure
+    assert dlg.tabs.currentWidget() is dlg.tab_photometry
+    assert dlg.tab_photometry.btn_meas.isChecked()
 
 
 def test_prefills_land(dlg):

@@ -115,7 +115,7 @@ class _FakeExportWorker:
 
 def test_tab_replaces_the_placeholder(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate"]
     assert dlg.tabs.indexOf(dlg.tab_blink) == 0
 
 
@@ -236,7 +236,7 @@ def test_leaving_the_tab_hands_the_plate_back(dlg):
     tab = dlg.tab_blink
     tab._on_pair_ready(_pair(dlg), {})
     assert dlg.view._frame_override is not None
-    dlg.tabs.setCurrentIndex(1)              # the Compare placeholder
+    dlg.tabs.setCurrentIndex(1)              # the Photometry tab
     assert dlg.view._frame_override is None
     assert not tab._timer.isActive()
     assert tab._items == []

@@ -36,15 +36,15 @@ import math
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
+from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
                                QFileDialog, QHBoxLayout, QLabel,
-                               QPushButton, QVBoxLayout, QWidget,
-                               QGraphicsEllipseItem)
+                               QPushButton, QTextEdit, QVBoxLayout,
+                               QWidget, QGraphicsEllipseItem)
 
 from ..core import coords, fits_meta, photometry, photometry_export, \
     stretch
+from .ufe_advanced_dialog import UfeAdvancedDialog
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
@@ -59,7 +59,7 @@ class UfeMeasureTab(QWidget):
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView, compare_tab - the Compare tab the
     #        sequence is read from (D5), go_compare - callable switching
-    #        the dialog to that tab
+    #        the Photometry tab to the Sequence section
 
     def __init__(self, state, lang="es", view=None, compare_tab=None,
                  go_compare=None, parent=None):
@@ -97,14 +97,14 @@ class UfeMeasureTab(QWidget):
         lay = QVBoxLayout(self)
         hint = QLabel(self.tr(
             "Click a star (or the target) to measure it against the "
-            "Compare tab's sequence."))
+            "sequence (Sequence section, the top half of this tab)."))
         hint.setWordWrap(True)
         lay.addWidget(hint)
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
         lay.addWidget(self.lbl_status)
         self.btn_go_compare = QPushButton(self.tr(
-            "Open the Compare tab"))
+            "Go to the sequence"))
         self.btn_go_compare.setVisible(False)
         if self._go_compare is not None:
             self.btn_go_compare.clicked.connect(self._go_compare)
@@ -131,79 +131,49 @@ class UfeMeasureTab(QWidget):
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
             spn.setToolTip(tip)
             spn.valueChanged.connect(self._on_radii_edited)
-        row2 = QHBoxLayout()
-        self.btn_suggest = QPushButton(self.tr("Suggest apertures"))
+
+        # The recipe knobs live one click open (ADR-044 rev): the daily
+        # flow is band, apertures, Suggest; the rest (sky model,
+        # sigma-clip, seeing, colour term, host subtraction) opens in
+        # its own small non-modal window; the tab keeps the public
+        # attributes and wires every signal itself.
+        self._advanced = UfeAdvancedDialog(self)
+        self.btn_suggest = QPushButton(self.tr("Suggest"))
         self.btn_suggest.setToolTip(self.tr(
             "Propose the radii from this target's growth curve and its "
             "surroundings (crowding, background gradient), with the "
             "reasons in plain language"))
         self.btn_suggest.clicked.connect(self._on_suggest)
-        row2.addWidget(self.btn_suggest)
-        row2.addStretch(1)
-        lay.addLayout(row2)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Sky:")))
-        self.cmb_sky = QComboBox()
-        self.cmb_sky.addItem(self.tr("Median (flat sky)"), "median")
-        self.cmb_sky.addItem(self.tr("Plane (galactic cores)"), "plane")
-        self.cmb_sky.setToolTip(self.tr(
-            "How the annulus estimates the background: a flat median, or "
-            "a tilted plane when the host galaxy tilts it"))
-        row.addWidget(self.cmb_sky, 1)
-        lay.addLayout(row)
+        lay.addWidget(self.btn_suggest)
+        self.btn_advanced = QPushButton(self.tr("Advanced…"))
+        self.btn_advanced.setToolTip(self.tr(
+            "The full recipe: sky model, sigma-clip, seeing apertures, "
+            "colour term, host-galaxy subtraction (a small window: keep "
+            "measuring while it is open)"))
+        self.btn_advanced.clicked.connect(self._open_advanced)
+        lay.addWidget(self.btn_advanced)
+        # the public attributes the tests and the measure flow pin
+        self.chk_sigmaclip = self._advanced.chk_sigmaclip
+        self.chk_seeing = self._advanced.chk_seeing
+        self.chk_color = self._advanced.chk_color
+        self.chk_subtract = self._advanced.chk_subtract
+        self.cmb_sky = self._advanced.cmb_sky
+        self.spn_target_bv = self._advanced.spn_target_bv
         # every measuring control re-measures the live point at once
         self.cmb_sky.currentIndexChanged.connect(
             lambda _i: self._remeasure())
-
-        self.chk_sigmaclip = QCheckBox(self.tr("Sigma-clip the sky"))
-        self.chk_sigmaclip.setChecked(True)
-        self.chk_sigmaclip.setToolTip(self.tr(
-            "Two 2.5-sigma rounds on the annulus: extra skin against hot "
-            "pixels and crowded cores"))
-        lay.addWidget(self.chk_sigmaclip)
         self.chk_sigmaclip.toggled.connect(lambda _c: self._remeasure())
-        self.chk_seeing = QCheckBox(self.tr("Aperture follows the seeing"))
-        self.chk_seeing.setChecked(True)
-        self.chk_seeing.setToolTip(self.tr(
-            "Measure the FWHM of the comparison stars and size the "
-            "aperture as 1.35 times the seeing (H3)"))
-        lay.addWidget(self.chk_seeing)
         self.chk_seeing.toggled.connect(self._on_seeing_toggled)
-        row = QHBoxLayout()
-        self.chk_color = QCheckBox(self.tr("Colour term"))
-        self.chk_color.setChecked(True)
-        self.chk_color.setToolTip(self.tr(
-            "Fit the zero point AND its slope against the comps' B−V "
-            "(H1); needs at least 6 comps with colour spread"))
         self.chk_color.toggled.connect(lambda _c: self._remeasure())
-        row.addWidget(self.chk_color)
-        row.addWidget(QLabel(self.tr("B−V target:")))
-        self.spn_target_bv = QDoubleSpinBox()
-        self.spn_target_bv.setRange(-1.0, 3.0)
-        self.spn_target_bv.setDecimals(2)
-        self.spn_target_bv.setSingleStep(0.05)
-        self.spn_target_bv.setValue(0.0)
-        self.spn_target_bv.setToolTip(self.tr(
-            "The target's B−V when known (variables: VSX). A supernova "
-            "near peak is about 0; the panel warns when the colour term "
-            "is applied with this assumption"))
-        self.spn_target_bv.setKeyboardTracking(False)
         self.spn_target_bv.valueChanged.connect(self._on_bv_edited)
-        row.addWidget(self.spn_target_bv)
-        lay.addLayout(row)
-        self.chk_subtract = QCheckBox(self.tr(
-            "Subtract host galaxy (PS1 reference)"))
-        self.chk_subtract.setToolTip(self.tr(
-            "Download the aligned PanSTARRS reference, scale it so the "
-            "comparison stars vanish, and measure the target on the "
-            "difference image (H2b; needs network once per field)"))
         self.chk_subtract.toggled.connect(self._on_subtract_toggled)
-        lay.addWidget(self.chk_subtract)
 
-        self.lbl_result = QLabel("–")
-        self.lbl_result.setWordWrap(True)
-        self.lbl_result.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        # The result log is plain text in a scrollable editor: a long
+        # report (comps, guards, verdict) must never squash the tab.
+        self.lbl_result = QTextEdit()
+        self.lbl_result.setReadOnly(True)
+        self.lbl_result.setPlainText("–")
+        self.lbl_result.setMinimumHeight(120)
         lay.addWidget(self.lbl_result)
 
         row = QHBoxLayout()
@@ -238,13 +208,25 @@ class UfeMeasureTab(QWidget):
         sb.setValue(value)
         return sb
 
+    def _open_advanced(self):
+        # @return: the recipe window rises, non-modal, so measuring
+        # keeps going while it is open
+        self._advanced.show()
+        self._advanced.raise_()
+        self._advanced.activateWindow()
+
     # ------------------------------------------------------- activation
 
-    def set_active(self, flag):
-        # Only the visible tab owns the view's clicks and its overlays;
-        # on stage it also gets the pick cursor and the snapping reticle.
+    def set_active(self, flag, keep_overlays=False):
+        # Only the section that owns the stage takes the clicks, and on
+        # stage it also gets the pick cursor and the snapping reticle.
+        # @args: keep_overlays - the Sequence section is taking over the
+        #        stage: our markers and result stay on the chart (with
+        #        the clicks disarmed), they are dropped on a full leave
         self._active = bool(flag)
         if not self._active:
+            if keep_overlays:
+                return
             self._drop_items()
             if self._diff is not None and self._view is not None:
                 self._view.set_frame_override(None)
@@ -334,8 +316,8 @@ class UfeMeasureTab(QWidget):
         entries = self._sequence()
         if not entries:
             self.lbl_status.setText(self.tr(
-                "No comparison sequence yet: build one in the Compare "
-                "tab (Generate field, then pick or propose)."))
+                "No comparison sequence yet: build one in the Sequence "
+                "section (Generate field, then pick or propose)."))
             self.btn_go_compare.setVisible(True)
             return
         self.btn_go_compare.setVisible(False)

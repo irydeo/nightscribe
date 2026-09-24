@@ -129,7 +129,8 @@ def dlg(qapp, tmp_path):
     d.state.load(plate)
     d._test_target = target
     d._test_comps = comps
-    d.tabs.setCurrentWidget(d.tab_measure)
+    d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
+    d.tab_photometry.set_mode("measure")
     yield d
     d.tab_blink.shutdown()
     d.view._render_timer.stop()
@@ -144,13 +145,13 @@ def _click(dlg, x, y):
 
 def test_tab_present_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate"]
     assert dlg.tab_measure.isEnabled()
 
 
-def test_click_without_sequence_guides_to_compare(dlg):
+def test_click_without_sequence_guides_to_sequence(dlg):
     _click(dlg, *dlg._test_target)
-    assert "Compare" in dlg.tab_measure.lbl_status.text()
+    assert "Sequence" in dlg.tab_measure.lbl_status.text()
     assert dlg.tab_measure.btn_go_compare.isVisible()
 
 
@@ -159,7 +160,7 @@ def test_full_measurement_calibrates(dlg):
     _click(dlg, *dlg._test_target)
     tab = dlg.tab_measure
     assert tab.lbl_status.text() == ""
-    panel = tab.lbl_result.text()
+    panel = tab.lbl_result.toPlainText()
     assert "Zero point:" in panel and "22." in panel
     assert "Magnitude:" in panel and "(V)" in panel
     # the aperture cancels in differential photometry (all stars share
@@ -280,7 +281,7 @@ def test_without_gain_the_error_is_comps_scatter_only(dlg, tmp_path):
     dlg.state.load(plate)
     _sequence(dlg, comps)
     _click(dlg, *target)
-    panel = dlg.tab_measure.lbl_result.text()
+    panel = dlg.tab_measure.lbl_result.toPlainText()
     assert "photon noise is not in the error" in panel
     assert dlg.tab_measure._last["mag"] is not None
 
@@ -293,7 +294,7 @@ def test_new_plate_invalidates_the_measurement(dlg, tmp_path):
     dlg.state.load(_write_plate(tmp_path / "other.fits", data))
     assert dlg.tab_measure._last is None
     assert dlg.tab_measure._items == []
-    assert dlg.tab_measure.lbl_result.text() == "–"
+    assert dlg.tab_measure.lbl_result.toPlainText() == "–"
 
 
 # ---------------- phase H pieces ----------------
@@ -304,7 +305,7 @@ def test_seeing_checkbox_scales_the_apertures(dlg):
     _click(dlg, *dlg._test_target)
     tab = dlg.tab_measure
     assert tab._last["fwhm"] is not None
-    assert "seeing FWHM" in tab.lbl_result.text()
+    assert "seeing FWHM" in tab.lbl_result.toPlainText()
     # the spins follow the measured seeing (and stay tweakable); the
     # spinbox shows one decimal, the state keeps full precision
     assert tab.spn_rap.value() == pytest.approx(
@@ -364,7 +365,7 @@ def test_colour_term_fit_uses_target_bv(dlg, tmp_path):
     tab = dlg.tab_measure
     assert tab._last["zp"]["color_used"]
     assert tab._last["zp"]["k"] == pytest.approx(k_true, abs=0.01)
-    assert "colour slope" in tab.lbl_result.text()
+    assert "colour slope" in tab.lbl_result.toPlainText()
     r = phot.measure_point(dlg.state.data, *target,
                            r_ap=tab._last["radii"][0],
                            r_ann_in=tab._last["radii"][1],
@@ -377,7 +378,7 @@ def test_colour_term_falls_back_without_spread(dlg):
     _sequence(dlg, dlg._test_comps)          # all bv = 0.6: no spread
     _click(dlg, *dlg._test_target)
     assert not dlg.tab_measure._last["zp"]["color_used"]
-    assert "plain zero point" in dlg.tab_measure.lbl_result.text()
+    assert "plain zero point" in dlg.tab_measure.lbl_result.toPlainText()
 
 
 def test_check_star_semaphore(dlg):
@@ -386,12 +387,12 @@ def test_check_star_semaphore(dlg):
     entries[0]["kind"] = "check"
     entries[0]["star"]["bands"][0]["value"] += 0.5
     _click(dlg, *dlg._test_target)
-    panel = dlg.tab_measure.lbl_result.text()
+    panel = dlg.tab_measure.lbl_result.toPlainText()
     assert "NOT reliable" in panel and "Comp1" in panel
     # and an honest check star confirms the night
     entries[0]["star"]["bands"][0]["value"] -= 0.5
     _click(dlg, *dlg._test_target)
-    panel = dlg.tab_measure.lbl_result.text()
+    panel = dlg.tab_measure.lbl_result.toPlainText()
     assert "OK" in panel and "NOT reliable" not in panel
 
 
@@ -458,7 +459,7 @@ def test_host_subtraction_recovers_the_target(dlg, monkeypatch):
     truth = phot.measure_point(dlg.state.data, *target, r_ap=r[0],
                                r_ann_in=r[1], r_ann_out=r[2])["flux"]
     assert tab._last["result"]["flux"] == pytest.approx(truth, rel=0.05)
-    assert "Host galaxy subtracted" in tab.lbl_result.text()
+    assert "Host galaxy subtracted" in tab.lbl_result.toPlainText()
     # toggle off: the plate comes back
     tab.chk_subtract.setChecked(False)
     assert tab._diff is None
@@ -520,7 +521,7 @@ def test_hand_edited_aperture_remeasures_and_wins(dlg):
     assert tab._radii_manual
     # the current point was re-measured with the new radius at once
     assert tab._last["radii"][0] == 4.0
-    assert "set by hand" in tab.lbl_result.text()
+    assert "set by hand" in tab.lbl_result.toPlainText()
     # and a fresh click does NOT stomp the manual radius
     _click(dlg, *dlg._test_target)
     assert tab._last["radii"][0] == 4.0
@@ -554,7 +555,7 @@ def test_suggest_applies_and_explains(dlg):
     assert not tab.chk_seeing.isChecked()
     assert not tab._radii_manual
     assert tab._last_suggestions                 # reasons in the panel
-    assert tab._last_suggestions[0] in tab.lbl_result.text()
+    assert tab._last_suggestions[0] in tab.lbl_result.toPlainText()
     r = tab._last["radii"]
     assert r == (round(r[0] * 2) / 2, round(r[1] * 2) / 2,
                  round(r[2] * 2) / 2)            # the spins show it
@@ -652,7 +653,7 @@ def test_field_crossmatch_line_and_bv_autofill(dlg):
          "bands": [{"label": "V", "value": mag_expected, "err": 0.01,
                     "derived": False}]}]
     _click(dlg, *dlg._test_target)
-    panel = tab.lbl_result.text()
+    panel = tab.lbl_result.toPlainText()
     assert "Field:" in panel and "T1" in panel
     assert "Δ" in panel                     # measured vs catalog, live
     assert tab.spn_target_bv.value() == pytest.approx(1.20)
@@ -662,7 +663,7 @@ def test_field_crossmatch_line_and_bv_autofill(dlg):
 def test_no_field_match_says_new_object(dlg):
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)
-    assert "No catalogued source" in dlg.tab_measure.lbl_result.text()
+    assert "No catalogued source" in dlg.tab_measure.lbl_result.toPlainText()
 
 
 def test_compressed_comps_are_excluded_and_named(dlg, tmp_path):
@@ -677,7 +678,7 @@ def test_compressed_comps_are_excluded_and_named(dlg, tmp_path):
     _sequence_static(dlg, comps)
     _click(dlg, *target)
     tab = dlg.tab_measure
-    panel = tab.lbl_result.text()
+    panel = tab.lbl_result.toPlainText()
     assert "5 of 5" in panel
     assert "saturated/clipped" in panel
     assert "clipping level" in panel
@@ -691,13 +692,13 @@ def test_overlay_and_pixel_line_follow_the_measured_centroid(dlg):
     tab = dlg.tab_measure
     assert tab._last["col"] == pytest.approx(tx, abs=0.6)
     assert tab._last["row"] == pytest.approx(ty, abs=0.6)
-    assert "centroid landed" in tab.lbl_result.text()
+    assert "centroid landed" in tab.lbl_result.toPlainText()
 
 
 def test_calibration_in_gaia_g_says_so(dlg):
     _sequence_static(dlg, dlg._test_comps, band="G")
     _click(dlg, *dlg._test_target)
-    assert "no Johnson V" in dlg.tab_measure.lbl_result.text()
+    assert "no Johnson V" in dlg.tab_measure.lbl_result.toPlainText()
 
 
 def test_assumed_bv_warns_when_the_colour_term_matters(dlg, tmp_path):
@@ -723,7 +724,7 @@ def test_assumed_bv_warns_when_the_colour_term_matters(dlg, tmp_path):
     dlg.tab_compare._entries = entries
     _click(dlg, *target)
     tab = dlg.tab_measure
-    panel = tab.lbl_result.text()
+    panel = tab.lbl_result.toPlainText()
     assert tab._bv_source == "assumed"
     assert "(assumed)" in panel
     assert "+0.40" in panel and "too bright" in panel
@@ -774,7 +775,7 @@ def test_at2026acka_end_to_end_zp_recovers(dlg):
     dlg.tab_compare._entries = _real_plate_entries(dlg)
     _click(dlg, 989.1, 1012.7)
     assert tab._last is not None
-    panel = tab.lbl_result.text()
+    panel = tab.lbl_result.toPlainText()
     assert tab._last["mag"] == pytest.approx(16.39, abs=0.08)
     assert tab._last["zp"]["zp"] == pytest.approx(27.85, abs=0.1)
     assert "2 of 9" in panel and "saturated/clipped" in panel
@@ -798,4 +799,4 @@ def test_at2026acka_sn_centroid_locks_on_the_galaxy(dlg):
     assert last["row"] == pytest.approx(1011.5, abs=1.0)
     # the faint bump's flux, not the bright neighbour's (~122k ADU)
     assert last["result"]["flux"] < 60000
-    assert "no source could be locked" not in tab.lbl_result.text()
+    assert "no source could be locked" not in tab.lbl_result.toPlainText()

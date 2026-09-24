@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría»)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 
@@ -122,6 +122,35 @@ con la pestaña Medir activa, y el panel **Resumen de campaña**
 veredicto contra la plantilla) se recalcula al abrir la pestaña y tras
 cada guardado.
 
+**Pestaña Fotometría (2026-09-24)**: las secciones Comparar y Medir dejan
+de ser dos pestañas y viven juntas en una única pestaña
+«Photometry» / «Fotometría»: el contenedor `UfePhotometryTab` lleva una
+fila de radios exclusiva (Sequence | Measure) y un splitter vertical
+entre ambos paneles, intactos en su interior; el conjunto de pestañas es
+ahora Blink, Photometry, Annotate. En el panel Medir el flujo diario es
+banda, aperturas y el botón Suggest, que queda justo bajo las tres
+aperturas; las cinco opciones de receta (Sky, Sigma-clip, Seeing,
+Colour term + B−V, Subtract host galaxy) viven en `UfeAdvancedDialog`,
+una pequeña ventana no modal que el botón «Advanced…» abre y deja
+seguir midiendo mientras está abierta. El registro de resultados es un
+editor de texto solo lectura con scroll, para que un informe largo
+(comps, guardas, veredicto) nunca aplaste los controles de encima. La
+barra superior del editor gana un conmutador «A» que muestra u oculta
+las anotaciones guardadas en la placa (las tarjetas ANNOTATE); las
+marcas de fotometría y las estrellas de la secuencia no dependen de
+ese conmutador y siguen siempre visibles en su sección. La ventana del
+editor abre a 1440x960 (mínimo 1000x640), para que las dos secciones
+quepan sin scroll. El cambio de modo va por `tab_photometry.set_mode("sequence" |
+"measure")`, nunca con `setCurrentWidget` sobre los paneles internos;
+el panel Medir conserva sus overlays cuando se activa la sección
+Secuencia (`set_active(False, keep_overlays=True)`) y solo los retira al
+abandonar de verdad la pestaña Fotometría; el botón «Go to the sequence»
+/ «Ir a la secuencia» y los enlaces profundos heredados (prefills,
+`show_tab`) siguen funcionando: el diálogo registra `self.tab_photometry`
+y mantiene `self.tab_compare` / `self.tab_measure` como alias de los
+paneles internos, y al recibir un panel interno cambia de modo y activa
+la pestaña.
+
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
 lo use; añadir una funcionalidad al editor no modifica `ufe_dialog.py`
@@ -232,8 +261,35 @@ The API is `UfeDialog`: `set_point_hook(fn)` / `point_hook()` /
 side, every visit row offers "Measure in the editor…", which opens the
 editor on that visit's stacked plate with the Measure tab active, and
 the **Campaign summary** panel (`series.analyze_campaign`: daily slope,
-distance from the peak, verdict against the template) is recomputed on
-tab open and after every save.
+distance from the peak, tab open and after every save.
+
+**Photometry tab (2026-09-24)**: the Compare and Measure sections stop
+being two tabs and live together inside a single "Photometry" tab: the
+`UfePhotometryTab` container carries an exclusive radio row
+(Sequence | Measure) and a vertical splitter between both panels, whose
+interiors are untouched; the tab set is now Blink, Photometry,
+Annotate. On the Measure panel the daily flow is band, apertures, and
+the Suggest button, which sits right under the three apertures; the
+five recipe options (Sky, Sigma-clip, Seeing, Colour term + B−V,
+Subtract host galaxy) live in `UfeAdvancedDialog`, a small non-modal
+window the "Advanced…" button opens and that lets measuring continue
+while it stays open. The result log is a read-only text editor with
+scrolling, so a long report (comps, guards, verdict) can never squash
+the controls above it. The editor's top bar gains an "A" toggle that
+shows or hides the annotations saved on the plate (the ANNOTATE
+cards); the photometry markers and the sequence stars do not depend on
+that toggle and always stay visible in their own section. The editor
+window opens at 1440x960 (minimum 1000x640) so both sections fit
+without scrolling. Mode
+switching goes through `tab_photometry.set_mode("sequence" |
+"measure")`, never `setCurrentWidget` on the inner panels; the Measure
+panel keeps its overlays while the Sequence section is active
+(`set_active(False, keep_overlays=True)`) and only clears them when the
+Photometry tab is actually left; the "Go to the sequence" button and
+the inherited deep links (prefills, `show_tab`) keep working: the
+dialog registers `self.tab_photometry` and keeps `self.tab_compare` /
+`self.tab_measure` as aliases of the inner panels, and receiving an
+inner panel switches the mode and activates the tab.
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

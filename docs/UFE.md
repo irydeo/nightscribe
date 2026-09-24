@@ -16,19 +16,19 @@ Opened from a project, the UFE comes with the plate loaded, the right
 tab on stage and **everything the project knows about the object already
 in place**: name, coordinates and magnitude on the line under the top
 bar and in the title, and every tab pre-filled (Blink: name and
-coordinates; Compare: target and mag; Annotate: label, the marker on
-the object's position and the extra visits; Measure: B−V when the
-record carries it). What it writes (annotated copies, blink GIF/PNG,
+coordinates; Photometry: target, magnitude and B−V when the record
+carries it; Annotate: label, the marker on the object's position and
+the extra visits). What it writes (annotated copies, blink GIF/PNG,
 sequence CSV/PNG) registers into the project just like the classics did.
-With no plate of your own, the Compare tab downloads the survey field
-(DSS2/PS1) as a FITS with WCS and works on it directly.
+With no plate of your own, the Photometry tab (Sequence mode) downloads
+the survey field (DSS2/PS1) as a FITS with WCS and works on it directly.
 
 ## The window
 
 ```
 | Load · Export PNG · Fit 50 100 200 400 · %                         |
 |────────────────────────────────────────────|──────────────────────|
-|                                            | [Blink][Compare]     |
+|                                            | [Blink][Photometry]  |
 |              IMAGE                         | [Annotate]           |
 |                                            | (one tab per         |
 |                                            |  feature)            |
@@ -39,13 +39,13 @@ With no plate of your own, the Compare tab downloads the survey field
 * **Image**: takes up most of the window. The wheel zooms anchored at
   the cursor; dragging pans; double-click returns to the fit. Hovering
   shows a tooltip with the pixel, its DN value and the RA/Dec when the
-  plate carries a WCS. In the marking tabs (Measure, Annotate, Compare)
+  plate carries a WCS. In the marking tabs (Photometry, Annotate)
   the cursor becomes a crosshair with a centre-gap reticle that **snaps
   to the source's centroid** under the mouse: the click is born
   centred. The detection is local and robust (it sees faint sources even
   on a galaxy's glow) and the snap's reach is capped at 9 plate px: the
   reticle never jumps to a bright star far away.
-* **Tabs**: one per feature. **Blink**, **Compare**, **Measure** and
+* **Tabs**: one per feature. **Blink**, **Photometry** and
   **Annotate** are available (below). Only the visible tab answers
   clicks on the image.
 
@@ -69,76 +69,100 @@ with "Load FITS…"):
 * **GIF… / MP4… / PNG…** export the pair (side by side for PNG), with
   the crop zoom on the SN of your choice.
 
-## Compare
+## Photometry
 
-The **Compare** tab builds the photometric sequence on your plate (a
-WCS is needed; if it is missing, "Solve astrometry…" gets you one):
+The **Photometry** tab does both jobs in the same place, in two stacked
+halves (there is a draggable divider between them): the **Sequence**
+radio on top picks which half receives the clicks, and the other stays
+in sight with its rings and labels, so you can switch between building
+and measuring without losing track of what is on the plate (ADR-044,
+layout revision, 2026-09-24).
 
+### Sequence (top half)
+
+Builds the photometric sequence on your plate (a WCS is needed; if it
+is missing, "Solve astrometry..." gets you one):
+
+* **Target** and **Target mag** pre-fill what the project knows; the
+  approximate magnitude guides the proposal.
 * **Generate field** queries the catalog (Gaia EDR3 or APASS DR9) and
   the VSX variables around the plate centre: the brightest stars come
-  out labelled and the known variables with a red ring (they can never
-  be comparisons).
+  out labelled ("show catalog magnitudes" checkbox) and the known
+  variables with a red ring (they can never be comparisons). **DSS2...**
+  on the same row downloads the survey field (PS1-g, fallback
+  DSS2-red) as a FITS with WCS when you have no plate: you work on it
+  directly.
 * **Click** a star to add or remove it from the sequence, as Comparison
-  (cyan) or Check (pink); **Propose sequence** automatically picks
-  isolated, non-variable stars matched to the target's brightness (give
-  it the approximate magnitude).
-* The **table** renames, retypes and removes rows; hovering tells you
-  each star's catalog, magnitude and colour.
-* **Export CSV…** writes the sequence (fixed columns plus every band).
-  The **chart PNG** goes through the shared "Export PNG…" button in the
-  top bar: plate, rings, labels and the north arrow / scale bar,
-  exactly what you see.
+  (cyan) or Check (pink, "on click, add as" radio).
+* **Propose sequence** automatically picks isolated, non-variable stars
+  matched to the target's brightness.
+* **Sequence (N)...** opens the *table* in a small non-modal window (N
+  is the current number of stars, and it updates itself): you can
+  rename, retype and remove rows, and leave it open while you keep
+  picking stars on the plate. Hovering tells you each star's catalog,
+  magnitude and colour, with the window open too.
+* **Remove all** empties the sequence and **Export CSV...** writes it
+  (fixed columns plus every band); the **chart PNG** goes through the
+  shared "Export PNG..." button in the top bar: plate, rings, labels
+  and the north arrow / scale bar, exactly what you see.
 
-To understand how photometry is then measured with these sequences:
-[docs/PHOTOMETRY.md](PHOTOMETRY.md).
+### Measure (bottom half)
 
-## Measure
+Turns one click into a catalog-calibrated magnitude (single-plate
+differential aperture photometry):
 
-The **Measure** tab turns one click into a catalog-calibrated magnitude
-(single-plate differential aperture photometry):
-
-* It needs the plate with a WCS (if missing, "Solve astrometry…" gets
-  one) and a sequence in the Compare tab (if there is none, the tab
-  guides you and has a button that takes you there).
+* It needs the plate with a WCS (if missing, "Solve astrometry...") and
+  a sequence in the top half (if there is none, a "Go to the sequence"
+  button takes you there).
 * **Click** on the star or the SN: sub-pixel centroid, aperture and sky
   annulus visible on the image, and the panel tells the full story:
   instrumental magnitude, the zero point with its error and how many
   comps were used (and why any was refused), and the **calibrated
-  magnitude ± error**. Coming from Compare, the sequence stays visible
-  (rings and labels): you measure WITH it in sight; and changing any
-  option (sky, sigma-clip, colour term, target B−V, radii) re-measures
-  at once.
-* The default band is V; apertures and the sky sigma-clip are
-  adjustable. When the header lacks the gain, the panel warns that the
-  error is the comps' scatter only.
-* The apertures measure live: touching a radius re-measures the point at
-  once, and your hand edit wins over the seeing auto-scale until you
-  load another plate (or re-arm the checkbox). When the sequence lacks
-  the target's magnitude, it is looked up in the project (planner, VSX,
-  or the last saved sequence); exporting the sequence writes it into the
-  project for next time.
-* Quality controls (phase H): sky by median or by a fitted **plane** on
-  galactic cores, **seeing-following aperture** (FWHM measured on the
-  plate), the **colour term** fitted with the comps' and the target's
-  B−V, the **real saturation** ceiling (SATURATE or `ccd_saturate`),
-  **internal vs. total error** (photons + scatter + scintillation +
-  colour + flats), the **check star as the measurement's traffic
-  light**, and **host-galaxy subtraction** with the blink's PS1
-  reference for SNe on cores.
-* **CSV…** exports the measurement as one row and **AAVSO EFF…** in the
-  AAVSO's format, with the sequence in CNAME/CMAG/KNAME/KMAG. The plate
-  on disk is never modified.
-* **Annotations on load**: if the plate already carries ANNOTATE cards
-  (written by NightScribe or AstroImageJ), they are drawn on load:
-  circles with their plate-pixel sizes and labels readable at any zoom.
-* **North arrow and scale bar** (the "N" and "Scale" buttons, with a
-  WCS): top-right and bottom-left corners, and they are stamped into the
-  exported PNG too.
-* **Solve astrometry…**: when the plate has no WCS (or you want a fresh
-  one), blind-solves it with Astrometry.net (your API key from Settings
-  required). The solution applies in memory for the session: the file on
-  disk is never modified, and the probe, the north arrow, the scale bar
-  and Annotate pick it up at once.
+  magnitude +/- error**. The sequence stays in sight (rings and
+  labels): you measure WITH it; and changing any option (band, radii,
+  sky, sigma-clip, colour term, B-V, subtraction) re-measures at once.
+* The daily flow is **Band** (default V) and the three **aperture
+  radii** (aperture, inner and outer annulus): touching a radius
+  re-measures the point at once, and your hand edit wins over the
+  seeing auto-scale until you load another plate (or re-arm the
+  checkbox).
+* **Advanced...** opens the full recipe in another small non-modal
+  window (you can leave it open while measuring): the **sky** model
+  (flat median or a tilted plane for galactic cores), **sigma-clip** of
+  the sky (two 2.5-sigma passes), the **seeing-following aperture**
+  (FWHM of the comps on your plate, aperture at 1.35 times), the
+  **colour term** fitted with the comps' and the target's B-V,
+  **host-galaxy subtraction** with the aligned PS1 reference (for SNe
+  on cores, one download per field), and the **Suggest** button that
+  proposes the radii with the target's growth curve and its
+  neighbourhood, with the reasons in plain words.
+* Quality controls (phase H, in the background): the **real
+  saturation** ceiling (SATURATE or `ccd_saturate`), **internal vs.
+  total error** (photons + scatter + scintillation + colour + flats)
+  and the **check star as the measurement's traffic light**. When the
+  header lacks the gain, the panel warns that the error is the comps'
+  scatter only.
+* **CSV...** exports the measurement as one row, **AAVSO EFF...** in
+  the AAVSO's format (sequence in CNAME/CMAG/KNAME/KMAG) and, when the
+  editor opened from a project, **Save in the project** records it in
+  the light curve (source "measure", visit attached). When the sequence
+  lacks the target's magnitude, it is looked up in the project
+  (planner, VSX, or the last saved sequence); and exporting the
+  sequence writes it into the project for next time. The plate on disk
+  is never modified.
+
+Both halves share: the **annotations on load** (if the plate already
+carries ANNOTATE cards, written by NightScribe or AstroImageJ, they are
+drawn on load with their plate-pixel sizes and labels readable at any
+zoom), the **north arrow and scale bar** (the "N" and "Scale" buttons
+in the top bar, with a WCS) and **Solve astrometry...** (blind-solves
+with Astrometry.net, your API key from Settings required; the solution
+applies in memory for the session and the file on disk is never
+modified).
+
+To understand how photometry is then measured with these sequences:
+[docs/PHOTOMETRY.md](PHOTOMETRY.md).
+
 
 ## Annotate
 

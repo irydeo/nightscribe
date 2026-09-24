@@ -43,7 +43,7 @@ few hundredths on faint sources when the noise allows; when it does
 not, it keeps your point and says so. The series quick-look keeps its
 classic moment centroid (comparability during the review).
 
-When marking with the mouse (Measure, Annotate, Compare), the cursor
+When marking with the mouse (Photometry, Annotate), the cursor
 becomes a crosshair with a reticle that **snaps to the gaussian
 centroid** of the source under the mouse: the click is born centred.
 
@@ -126,10 +126,10 @@ program picks its own comparisons:
 It is the astronomer's criterion turned algorithm: a good comparison is
 the one that does not move.
 
-### 3.2 The catalog sequence (the FITS editor's Compare tab)
+### 3.2 The catalog sequence (the Sequence half of the FITS editor's Photometry tab)
 
-For photometry with catalog magnitudes, the **Compare** tab of the FITS
-editor brings stars of known magnitude around the plate centre:
+For photometry with catalog magnitudes, the **Sequence** half of the
+**Photometry** tab of the FITS editor brings stars of known magnitude around the plate centre:
 
 * **Gaia EDR3**: native G magnitude and B, V, Rc, Ic **estimated** from
   the BP−RP colour with the Riello et al. 2021 transformations (valid
@@ -142,10 +142,10 @@ editor brings stars of known magnitude around the plate centre:
 The chosen sequence (click by click, or the automatic proposal matched
 to the target's brightness) exports to CSV with every band.
 
-### 3.3 The calibrated measurement (the FITS editor's Measure tab)
+### 3.3 The calibrated measurement (the Measure half of the FITS editor's Photometry tab)
 
-With the plate loaded and the sequence built, the **Measure** tab turns
-one click into a catalog magnitude:
+With the plate loaded and the sequence built, the **Measure** half of the
+**Photometry** tab turns one click into a catalog magnitude:
 
 1. The click measures the target (centroid, aperture, sigma-clipped sky;
   the section 2.4 guards speak in plain language: "saturated", "too
@@ -182,10 +182,16 @@ disk is never modified.
   moment's tenths. The ring and the "Pixel" line sit at the measured
   centroid, not at the click; when it moved more than 1 px, the panel
   says so.
-* **"Suggest apertures"**: proposes the radii from the target's own
-  growth curve and its measured surroundings (nearest neighbour,
-  background gradient), and explains the reasons in plain language in
-  the panel; your hand edit is never stomped on its own. The 99 %
+* **"Suggest apertures"**: the button lives in the Measure section,
+  right under the three apertures, in the daily flow (band, apertures,
+  suggest); the rest of the recipe knobs (sky, sigma-clip, seeing,
+  colour term, host subtraction) open in the small non-modal "Advanced…"
+  window, which lets measuring continue while it stays open, and the
+  result log has its own scrolling for long reports. It proposes the
+  radii from the target's own growth curve and its measured
+  surroundings (nearest neighbour, background gradient), and explains
+  the reasons in plain language in the log; your hand edit is never
+  stomped on its own. The 99 %
   plateau rule is only believed within what a point source allows
   (4 × FWHM): when the curve never flattens there (a blend, or a
   mis-subtracted sky), it proposes the seeing aperture and says why.
@@ -356,14 +362,14 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
   measurement to the standard photometric system (that would require
   knowing your equipment's colour and extinction coefficients).
 * `CNAME`/`CMAG` and `KNAME`/`KMAG` are filled from the comparison
-  sequence saved in the project (Compare tab / chart); `na` when there
+  sequence saved in the project (Photometry tab / chart); `na` when there
   is none.
 * `#OBSCODE` comes from your AAVSO code in Settings,
   `#SOFTWARE=NightScribe` and `#OBSTYPE=CCD`.
 
 **What MAG means here**: for quick-look points it is the differential
 instrumental magnitude (Δmag against the ensemble), not a
-catalog-calibrated magnitude. In the Measure tab's measurement it IS a
+catalog-calibrated magnitude. In the Photometry tab's measurement it IS a
 catalog-calibrated magnitude via the zero point (TRANS stays `NA`, in
 all honesty: there is no colour transformation to the standard system).
 Imported points (measured with another tool) keep the magnitude they
@@ -422,8 +428,8 @@ In the usual order of impact:
    standard system. If the target and the comparisons have very
    different B−V colours (a blue SN against solar-type stars), a drift
    of hundredths of a magnitude appears. Rule of thumb: pick comparisons
-   of similar colour to the target (B−V is right there in the Compare
-   tab), or let the Measure tab fit it with the comps (phase H).
+   of similar colour to the target (B−V is right there in the Photometry
+   tab), or let the Measure half fit it with the comps (phase H).
 3. **The catalog transformation**: Gaia-derived V adds a ~0.01–0.03 mag
    systematic; APASS's direct V avoids it.
 4. **Sky with a gradient**: near a galactic core the background is not
@@ -469,7 +475,7 @@ implementation appendix: [docs/PRECISION.md](PRECISION.md).
   the comparison set.
 * **Zero point (ZP)**: the constant that turns instrumental into catalog
   magnitude. The series flow does not use it (Δmag already cancels what
-  is common); the FITS editor's Measure tab does compute it from the
+  is common); the FITS editor's Photometry tab DOES compute it from the
   comps (median of `cat − inst`).
 * **Ensemble**: the group of constant stars chosen as the reference in a
   series.

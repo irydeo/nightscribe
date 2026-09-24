@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
                                QFileDialog, QHBoxLayout, QLabel,
                                QLineEdit, QProgressDialog,
                                QPushButton, QRadioButton,
-                               QTableWidget, QTableWidgetItem,
+                               QTableWidgetItem,
                                QVBoxLayout, QWidget,
                                QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsRectItem, QGraphicsSimpleTextItem)
@@ -44,6 +44,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
 from ..core import compstars
 from ..core.sources import vizier
 from ..viz import palette
+from .ufe_sequence_dialog import UfeSequenceDialog
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -98,6 +99,8 @@ class UfeCompareTab(QWidget):
         self._pick_kind = "comp"
         self._catalog_visible = True
         self._catalog_items = []     # subset hidden with the checkbox
+        self._target_pos = None      # mark scene coords; None = plate centre
+        self._moving_target = False  # armed move: the next click places it
         self._worker = None
         self._cutout_worker = None   # UfeCutoutWorker while DSS2 lands
         self._prefill_sky = None     # (ra, dec) from the host, for DSS2
@@ -131,19 +134,22 @@ class UfeCompareTab(QWidget):
             self.cmb_catalog.addItem(spec["name"], key)
         row.addWidget(self.cmb_catalog)
         lay.addLayout(row)
+        row = QHBoxLayout()
         self.btn_field = QPushButton(self.tr("Generate field"))
         self.btn_field.setToolTip(self.tr(
             "Query the catalog (and VSX variables) around the plate "
             "centre"))
         self.btn_field.clicked.connect(self._on_generate)
-        lay.addWidget(self.btn_field)
-        self.btn_dss = QPushButton(self.tr("Load a survey field (DSS2)…"))
+        row.addWidget(self.btn_field)
+        self.btn_dss = QPushButton(self.tr("DSS2…"))
         self.btn_dss.setToolTip(self.tr(
             "No plate of your own? Download the field from the survey "
             "(PS1-g, DSS2-red fallback) as a FITS with WCS and work on "
             "it directly"))
         self.btn_dss.clicked.connect(self._on_load_survey)
-        lay.addWidget(self.btn_dss)
+        row.addWidget(self.btn_dss)
+        row.addStretch(1)
+        lay.addLayout(row)
         self.lbl_status = QLabel("")
         self.lbl_status.setWordWrap(True)
         lay.addWidget(self.lbl_status)
@@ -168,29 +174,59 @@ class UfeCompareTab(QWidget):
         self.chk_labels.setChecked(True)
         self.chk_labels.toggled.connect(self._on_catalog_visible)
         row.addWidget(self.chk_labels)
+        self.chk_target = QCheckBox(self.tr("Show target marker"))
+        self.chk_target.setChecked(True)
+        self.chk_target.setToolTip(self.tr(
+            "The amber ring that marks the target on the plate"))
+        self.chk_target.toggled.connect(self._on_target_visible)
+        row.addWidget(self.chk_target)
+        lay.addLayout(row)
+        row = QHBoxLayout()
         self.btn_propose = QPushButton(self.tr("Propose sequence"))
         self.btn_propose.setToolTip(self.tr(
             "Automatic proposal: isolated, non-variable stars matched to "
             "the target's brightness"))
         self.btn_propose.clicked.connect(self._on_propose)
         row.addWidget(self.btn_propose)
+        self.btn_move_target = QPushButton(self.tr("Move marker…"))
+        self.btn_move_target.setToolTip(self.tr(
+            "Place the mark where the object really is: press this, then "
+            "click the plate once"))
+        self.btn_move_target.clicked.connect(self._on_move_requested)
+        row.addWidget(self.btn_move_target)
         lay.addLayout(row)
 
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(
-            [self.tr("Name"), self.tr("Type"), self.tr("Mag"), ""])
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        lay.addWidget(self.table, 1)
+        # The table lives in its own small non-modal window (ADR-044 rev):
+        # the tab stays compact, the window stays open for reading.
+        # _reload_table rebuilds it through self.table and refreshes the
+        # count behind the button.
+        self._seqdlg = UfeSequenceDialog(self)
+        self.table = self._seqdlg.table
 
         row = QHBoxLayout()
+        self.btn_seq_open = QPushButton(self.tr("Sequence ({0})…").format(0))
+        self.btn_seq_open.setToolTip(self.tr(
+            "The sequence table: the comparison stars and the check star "
+            "with their catalog magnitudes (a small window: keep working "
+            "while it is open)"))
+        self.btn_seq_open.clicked.connect(self._open_sequence)
+        row.addWidget(self.btn_seq_open)
         self.btn_clear = QPushButton(self.tr("Remove all"))
         self.btn_clear.clicked.connect(self._on_clear)
         row.addWidget(self.btn_clear)
         self.btn_csv = QPushButton(self.tr("Export CSV…"))
         self.btn_csv.clicked.connect(self._export_csv)
         row.addWidget(self.btn_csv)
+        row.addStretch(1)
         lay.addLayout(row)
+        lay.addStretch(1)
+
+    def _open_sequence(self):
+        # @return: the sequence window rises, non-modal, so picking stars
+        # keeps going while it is open
+        self._seqdlg.show()
+        self._seqdlg.raise_()
+        self._seqdlg.activateWindow()
 
     # ------------------------------------------------------- activation
 
@@ -220,6 +256,8 @@ class UfeCompareTab(QWidget):
         self._field = None
         self._entries = []
         self._stars = []
+        self._target_pos = None      # a new plate: the mark centres itself
+        self._moving_target = False  # placement never survives a new plate
         self._drop_items()
         if self._state.has_image:
             self.edt_target.setText(Path(self._state.path).stem)
@@ -463,22 +501,27 @@ class UfeCompareTab(QWidget):
                                         2 * radius, 2 * radius)
             ring.setPen(self._pen(C_VAR, 1.6))
             self._items.append(self._view.add_overlay(ring))
-        # the target (plate centre): amber ring + ticks + name
-        cx, cy = w / 2.0, h / 2.0
-        r = w * 0.022
-        target = QGraphicsEllipseItem(cx - r, cy - r, 2 * r, 2 * r)
-        target.setPen(self._pen(palette.ACCENT, 2.2))
-        self._items.append(self._view.add_overlay(target))
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            ln = QGraphicsLineItem(cx + dx * r * 1.15, cy + dy * r * 1.15,
-                                   cx + dx * r * 1.7, cy + dy * r * 1.7)
-            ln.setPen(self._pen(palette.ACCENT, 2.2))
-            self._items.append(self._view.add_overlay(ln))
-        name = self.edt_target.text().strip()
-        if name:
-            self._items.append(self._view.add_overlay(
-                self._text(name, cx, cy + r * 2.4, palette.ACCENT,
-                           w * 0.018, bold=True, anchor="center")))
+        # the target mark: the plate centre by default, or the spot the
+        # observer placed it at with «Move marker…». A reference point
+        # only: the maths (proposal, survey, measurement) never reads it
+        if self.chk_target.isChecked():
+            cx, cy = (self._target_pos
+                      if self._target_pos is not None
+                      else (w / 2.0, h / 2.0))
+            r = w * 0.022
+            target = QGraphicsEllipseItem(cx - r, cy - r, 2 * r, 2 * r)
+            target.setPen(self._pen(palette.ACCENT, 2.2))
+            self._items.append(self._view.add_overlay(target))
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ln = QGraphicsLineItem(cx + dx * r * 1.15, cy + dy * r * 1.15,
+                                       cx + dx * r * 1.7, cy + dy * r * 1.7)
+                ln.setPen(self._pen(palette.ACCENT, 2.2))
+                self._items.append(self._view.add_overlay(ln))
+            name = self.edt_target.text().strip()
+            if name:
+                self._items.append(self._view.add_overlay(
+                    self._text(name, cx, cy + r * 2.4, palette.ACCENT,
+                               w * 0.018, bold=True, anchor="center")))
         self._redraw_entries()
 
     def _redraw_entries(self):
@@ -530,6 +573,25 @@ class UfeCompareTab(QWidget):
         for it, star_id in self._catalog_items:
             it.setVisible(flag and star_id not in in_seq)
 
+    def _on_target_visible(self, flag):
+        # The mark is drawn or not on the next pass: a full overlay
+        # repaint is the consistent way to (un)draw it.
+        self._redraw_overlays()
+
+    def _on_move_requested(self):
+        # @return: none; arms the placement mode, where the next click
+        # on the plate moves the target mark to that exact spot
+        if self._view is None or self._field is None:
+            self.lbl_status.setText(self.tr(
+                "Load a plate and build the field first: the mark lives "
+                "on the plate."))
+            return
+        self.chk_target.setChecked(True)    # placing means it is visible
+        self._moving_target = True
+        self.lbl_status.setText(self.tr(
+            "Click the plate where the target really is; the mark moves "
+            "there."))
+
     # ------------------------------------------------------------ picking
 
     def _nearest_star(self, sx, sy):
@@ -571,8 +633,13 @@ class UfeCompareTab(QWidget):
 
     def _on_scene_clicked(self, scene_pt):
         # A click toggles the nearest star in/out of the sequence; known
-        # variables refuse with a reason.
+        # variables refuse with a reason. In placement mode (armed with
+        # the «Move marker…» button) the click moves the target mark
+        # instead of touching the stars.
         if not self._active or self._field is None:
+            return
+        if self._moving_target:
+            self._on_place_target(scene_pt)
             return
         star = self._nearest_star(scene_pt.x(), scene_pt.y())
         if star is None:
@@ -595,10 +662,26 @@ class UfeCompareTab(QWidget):
         self._redraw_entries()
         self._reload_table()
 
+    def _on_place_target(self, scene_pt):
+        # The armed placement: the mark goes where the plate was clicked
+        # (clamped inside the plate), then the mode disarms itself.
+        # @args: scene_pt - the click in scene coordinates
+        w, h = self._state.plate_shape
+        x = max(0.0, min(float(scene_pt.x()), float(w)))
+        y = max(0.0, min(float(scene_pt.y()), float(h)))
+        self._moving_target = False
+        self._target_pos = (x, y)
+        self._redraw_overlays()
+        self.lbl_status.setText(self.tr(
+            "Target mark placed at ({0}, {1}).").format(int(x), int(y)))
+
     def _probe(self, sx, sy):
         # Hover probe while on stage: the star under the cursor, else the
-        # state's pixel/DN/RA probe.
+        # state's pixel/DN/RA probe. In placement mode the plate itself
+        # reads as the hint for where the mark will land.
         # @return: (hit, lines)
+        if self._moving_target:
+            return True, [self.tr("Click: move the target mark here")]
         star = self._nearest_star(sx, sy)
         if star is None:
             return self._state.probe_text(sx, sy)
@@ -662,6 +745,9 @@ class UfeCompareTab(QWidget):
             self.table.setCellWidget(i, 3, btn)
         self.table.blockSignals(False)
         self.table.resizeColumnsToContents()
+        # the button wears the live count, so the observer sees growth
+        self.btn_seq_open.setText(
+            self.tr("Sequence ({0})…").format(len(self._entries)))
 
     def _flush_table(self):
         # Names edited in the table land in the entries (and the overlay).

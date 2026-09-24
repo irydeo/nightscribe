@@ -54,7 +54,8 @@ def dlg(qapp):
     d.resize(1280, 860)
     d.show()
     d.state.load(MONO)
-    d.tabs.setCurrentWidget(d.tab_compare)      # take the stage
+    d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
+    d.tab_photometry.set_mode("sequence")
     yield d
     d.tab_blink.shutdown()
     d.view._render_timer.stop()
@@ -122,7 +123,7 @@ class _HoldingFieldWorker(_FakeFieldWorker):
 
 def test_tab_is_real_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate"]
     assert dlg.tab_compare.isEnabled()
     assert dlg.tab_compare.edt_target.text() == "sn2026zji_new_image"
 
@@ -308,7 +309,7 @@ def test_leaving_the_tab_restores_the_pixel_probe(dlg):
     dlg.tabs.setCurrentIndex(0)
     assert dlg.view._hover_probe == dlg.state.probe_text
     assert tab._items == []
-    dlg.tabs.setCurrentWidget(tab)
+    dlg.tabs.setCurrentWidget(dlg.tab_photometry)   # back: sequence resumes
     assert len(tab._items) > 0
 
 
@@ -337,8 +338,9 @@ def test_loading_a_new_plate_invalidates_the_field(dlg):
 
 
 def test_sequence_overlays_survive_switching_to_measure(dlg):
-    # the sequence is the Measure tab's input: leaving Compare for
-    # Measure keeps rings and labels visible (with clicks disarmed)
+    # the sequence is the Measure section's input: switching sections keeps
+    # rings and labels visible (with clicks disarmed); only leaving the
+    # Photometry tab for real drops them
     from PySide6.QtCore import QPointF
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
@@ -346,14 +348,126 @@ def test_sequence_overlays_survive_switching_to_measure(dlg):
     dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
     assert len(tab._entries) == 1
     assert len(tab._items) > 0
-    dlg.tabs.setCurrentWidget(dlg.tab_measure)
+    dlg.tab_photometry.set_mode("measure")
     assert len(tab._items) > 0                  # still drawn
     assert not tab._active                      # but disarmed
     # and the star probe still answers while measuring
     hit, lines = dlg.view._hover_probe(s["_sx"], s["_sy"])
     assert hit and "Gaia EDR3" in lines[0]
-    # leaving Compare for anywhere else drops them as before
-    dlg.tabs.setCurrentWidget(dlg.tab_compare)
+    # coming back to the sequence restores everything
+    dlg.tab_photometry.set_mode("sequence")
     assert len(tab._items) > 0
     dlg.tabs.setCurrentWidget(dlg.tab_annotate)
     assert tab._items == []
+
+
+# ------------------------------------------------- target mark (toggleable)
+
+def _target_mark(tab):
+    # The amber ring that marks the target. The ticks and the name share
+    # the colour, but only the ring is an ellipse at pen width 2.2.
+    # @return: the ring item, or None when the mark is not drawn
+    from PySide6.QtWidgets import QGraphicsEllipseItem
+    from nightscribe.viz import palette
+    for it in tab._items:
+        if isinstance(it, QGraphicsEllipseItem) and it.pen().widthF() == 2.2 \
+                and it.pen().color().name().lower() == palette.ACCENT.lower():
+            return it
+    return None
+
+
+def test_target_mark_is_on_by_default_at_the_plate_centre(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    assert tab.chk_target.isChecked()
+    w, h = dlg.state.plate_shape
+    mark = _target_mark(tab)
+    assert mark is not None
+    assert mark.rect().center().x() == pytest.approx(w / 2.0)
+    assert mark.rect().center().y() == pytest.approx(h / 2.0)
+
+
+def test_target_mark_toggleable(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    assert _target_mark(tab) is not None
+    tab.chk_target.setChecked(False)
+    assert _target_mark(tab) is None
+    tab.chk_target.setChecked(True)
+    assert _target_mark(tab) is not None
+    # the catalogue and the sequence are untouched by the toggle
+    assert any(it.isVisible() for it, _ in tab._catalog_items)
+
+
+def test_move_target_refuses_without_a_field(dlg):
+    tab = dlg.tab_compare
+    assert tab._field is None
+    tab._on_move_requested()
+    assert "Load a plate and build the field first" in tab.lbl_status.text()
+    assert not tab._moving_target
+    assert tab.chk_target.isChecked()            # visibility unchanged
+
+
+def test_move_target_arms_and_places_on_click(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_move_requested()
+    assert tab._moving_target
+    assert "Click the plate where the target really is" in \
+        tab.lbl_status.text()
+    # the armed mode is readable in the hover probe
+    hit, lines = tab._probe(5.0, 5.0)
+    assert hit and lines == ["Click: move the target mark here"]
+    # the click lands the mark there, disarms, and touches no star
+    from PySide6.QtCore import QPointF
+    dlg.view.scene_clicked.emit(QPointF(40.0, 60.0))
+    assert not tab._moving_target
+    assert tab._target_pos == (40.0, 60.0)
+    assert "Target mark placed at (40, 60)" in tab.lbl_status.text()
+    assert tab._entries == []
+    mark = _target_mark(tab)
+    assert mark is not None
+    assert mark.rect().center().x() == pytest.approx(40.0)
+    assert mark.rect().center().y() == pytest.approx(60.0)
+
+
+def test_move_target_clamps_inside_the_plate(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_move_requested()
+    from PySide6.QtCore import QPointF
+    dlg.view.scene_clicked.emit(QPointF(-50.0, 1e6))
+    w, h = dlg.state.plate_shape
+    assert tab._target_pos == (0.0, float(h))
+
+
+def test_placement_disarms_and_normal_clicks_resume(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_move_requested()
+    from PySide6.QtCore import QPointF
+    dlg.view.scene_clicked.emit(QPointF(20.0, 20.0))
+    assert not tab._moving_target
+    s = tab._stars[0]
+    dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+    assert [(e["name"], e["kind"]) for e in tab._entries] == \
+        [("Comp1", "comp")]
+
+
+def test_new_plate_resets_the_target_mark(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_move_requested()
+    assert tab._moving_target
+    from PySide6.QtCore import QPointF
+    dlg.view.scene_clicked.emit(QPointF(123.0, 321.0))
+    assert tab._target_pos == (123.0, 321.0)
+    dlg.state.load(MONO)
+    assert tab._target_pos is None               # back to the plate centre
+    assert not tab._moving_target
+    # an armed placement never survives into the new plate either
+    tab._on_field_ready(_field(dlg))
+    tab._on_move_requested()
+    assert tab._moving_target
+    dlg.state.load(MONO)
+    assert not tab._moving_target

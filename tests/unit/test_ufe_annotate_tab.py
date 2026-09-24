@@ -54,9 +54,9 @@ def dlg(qapp):
 
 def test_tab_replaces_the_placeholder(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate"]
     tab = dlg.tab_annotate
-    assert dlg.tabs.indexOf(tab) == 3
+    assert dlg.tabs.indexOf(tab) == 2
 
 
 def test_marker_starts_centred_and_tab_enabled(dlg):

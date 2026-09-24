@@ -17,19 +17,19 @@ Desarrollo** puedes volver a los clásicos como predeterminados
 pestaña correcta en escena y **todo lo que el proyecto sabe del objeto
 ya puesto**: nombre, coordenadas y magnitud en la línea bajo la barra y
 en el título, y cada pestaña con sus campos precargados (Blink: nombre y
-coordenadas; Comparar: objetivo y mag; Anotar: etiqueta, marcador en la
-posición del objeto y visitas extra; Medir: B−V si la ficha lo trae).
+coordenadas; Fotometría: objetivo, magnitud y B−V si la ficha lo trae;
+Anotar: etiqueta, marcador en la posición del objeto y visitas extra).
 Lo que escribe (copias anotadas, GIF/PNG del blink, CSV/PNG de la
 secuencia) se registra en el proyecto igual que con los clásicos. Sin
-placa propia, la pestaña Comparar descarga el campo del survey
-(DSS2/PS1) como FITS con WCS y trabaja sobre él directamente.
+placa propia, la pestaña Fotometría (modo Secuencia) descarga el campo
+del survey (DSS2/PS1) como FITS con WCS y trabaja sobre él directamente.
 
 ## La ventana
 
 ```
 | Cargar · Exportar PNG · Fit 50 100 200 400 · %                      |
 |────────────────────────────────────────────|──────────────────────|
-|                                            | [Blink][Comparar]    |
+|                                            | [Blink][Fotometría]  |
 |              IMAGEN                        | [Anotar]             |
 |                                            | (una pestaña por     |
 |                                            |  funcionalidad)      |
@@ -41,14 +41,14 @@ placa propia, la pestaña Comparar descarga el campo del survey
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
   Al pasar el cursor, un globo muestra el píxel, su valor DN y las
   coordenadas RA/Dec si la placa trae WCS. En las pestañas que marcan
-  (Medir, Anotar, Comparar) el cursor se vuelve una cruz con retícula de
+  (Fotometría, Anotar) el cursor se vuelve una cruz con retícula de
   hueco central que **se pega al centroide de la fuente** bajo el ratón:
   el clic nace centrado. La detección es local y robusta (ve fuentes
   débiles incluso sobre el brillo de una galaxia) y el alcance del
   «pegado» está acotado a 9 px de placa: la retícula nunca salta a una
   estrella brillante lejana.
-* **Pestañas**: una por funcionalidad. **Blink**, **Comparar**,
-  **Medir** y **Anotar** están disponibles (abajo). Solo la pestaña
+* **Pestañas**: una por funcionalidad. **Blink**, **Fotometría**
+  y **Anotar** están disponibles (abajo). Solo la pestaña
   visible responde a los clics sobre la imagen.
 
 ## Blink
@@ -71,77 +71,100 @@ DR1 g (supernovas y transitorios; la placa es la que cargaste con
 * **GIF… / MP4… / PNG…** exportan el par (lado a lado el PNG), con el
   zoom de recorte sobre la SN que elijas.
 
-## Comparar
+## Fotometría
 
-La pestaña **Comparar** construye la secuencia fotométrica sobre tu
-placa (necesita WCS; si falta, «Resolver astrometría…» lo consigue):
+La pestaña **Fotometría** hace las dos cosas en el mismo sitio, en dos
+mitades apiladas (hay una divisoria que se puede arrastrar): la radio
+**Secuencia** de arriba elige qué mitad recibe los clics, y la otra
+queda a la vista con sus anillos y rótulos, para poder alternar entre
+construir y medir sin perder de vista lo hecho (ADR-044, revisión de
+distribución, 2026-09-24).
 
+### Secuencia (mitad superior)
+
+Construye la secuencia fotométrica sobre tu placa (necesita WCS; si
+falta, «Resolver astrometría…» lo consigue):
+
+* **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
+  sabe; la magnitud aproximada sirve de guía a la propuesta.
 * **Generar campo** consulta el catálogo (Gaia EDR3 o APASS DR9) y las
   variables VSX alrededor del centro de la placa: las estrellas más
-  brillantes aparecen rotuladas y las variables conocidas con anillo
-  rojo (nunca sirven de comparación).
+  brillantes aparecen rotuladas (casilla «mostrar magnitudes de
+  catálogo») y las variables conocidas con anillo rojo (nunca sirven de
+  comparación). **DSS2…**, en la misma fila, descarga el campo del
+  survey (PS1-g, fallback DSS2-red) como FITS con WCS cuando no tienes
+  placa: se trabaja sobre él directamente.
 * **Clic** sobre una estrella la añade o quita de la secuencia, como
-  Comparación (cian) o Check (rosa); **Proponer secuencia** elige
-  automáticamente estrellas aisladas y no variables de brillo parecido
-  al objetivo (dile su magnitud aproximada).
-* La **tabla** renombra, cambia el tipo y quita filas; la sonda al pasar
-  el cursor cuenta catálogo, magnitud y color de cada estrella.
-* **Exportar CSV…** escribe la secuencia (columnas fijas + todas las
-  bandas). La **carta PNG** sale por el botón común "Exportar PNG…" de
-  la barra superior: placa, anillos, rótulos y la flecha de norte /
-  barra de escala, exactamente lo que ves.
+  Comparación (cian) o Check (rosa, radio «al clicar, añadir como»).
+* **Proponer secuencia** elige automáticamente estrellas aisladas y no
+  variables de brillo parecido al objetivo.
+* **Secuencia (N)…** abre la *tabla* en una ventana pequeña y no modal
+  (N son las estrellas que hay ahora mismo, y se actualiza sola):
+  renombra, cambia el tipo y quita filas, y se puede dejar abierta
+  mientras sigues eligiendo estrellas en la placa. La sonda al pasar el
+  cursor cuenta catálogo, magnitud y color de cada estrella, también con
+  la ventana abierta.
+* **Quitar todo** vacía la secuencia y **Exportar CSV…** la escribe
+  (columnas fijas + todas las bandas); la **carta PNG** sale por el
+  botón común «Exportar PNG…» de la barra superior: placa, anillos,
+  rótulos y la flecha de norte / barra de escala, exactamente lo que ves.
 
-Para entender cómo se mide después la fotometría con estas secuencias:
-[docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
+### Medir (mitad inferior)
 
-## Medir
-
-La pestaña **Medir** convierte un clic en una magnitud calibrada de
-catálogo (fotometría de apertura diferencial de una placa):
+Convierte un clic en una magnitud calibrada de catálogo (fotometría de
+apertura diferencial de una placa):
 
 * Necesita la placa con WCS (si falta, «Resolver astrometría…») y una
-  secuencia en la pestaña Comparar (si no la hay, la pestaña te guía y
-  tiene un botón que te lleva).
+  secuencia en la mitad superior (si no la hay, un botón «Ir a la
+  secuencia» te lleva).
 * **Clic** sobre la estrella o la SN: centroide sub-píxel, apertura y
   anillo de cielo visibles en la imagen, y el panel cuenta el resultado
   completo: magnitud instrumental, punto cero con su error y cuántas
   comps se usaron (y por qué se rechazó alguna), y la **magnitud
-  calibrada ± error**. Al entrar desde Comparar, la secuencia queda
-  visible (anillos y etiquetas): mides CON ella a la vista; y cambiar
-  cualquier opción (cielo, sigma-clip, término de color, B−V, radios)
-  recalcula la medida al instante.
-* La banda por defecto es V; las aperturas y el sigma-clip del cielo son
-  ajustables. Si la cabecera no trae ganancia, el panel avisa de que el
-  error es solo la dispersión de las comps.
-* Las aperturas se miden en vivo: tocar un radio re-mide el punto al
-  instante, y tu ajuste manual manda sobre el auto-seeing hasta que
-  cargues otra placa (o rearms la casilla). Si la secuencia no trae la
-  magnitud del objetivo, se busca en el proyecto (planner, VSX, o la
-  última secuencia guardada); y al exportar la secuencia queda escrita
-  en el proyecto para la próxima vez.
-* Controles de calidad (fase H): cielo por mediana o por **plano** en
-  núcleos galácticos, **apertura que sigue al seeing** (FWHM medido en
-  la placa), **término de color** ajustado con el B−V de las comps y el
-  del objetivo, techo de **saturación real** (SATURATE o `ccd_saturate`),
-  **error interno vs. total** (fotones + dispersión + centelleo + color
-  + flats), la **estrella check como semáforo** de la medida, y la
-  **sustracción de la galaxia huésped** con la referencia PS1 del blink
-  para SNe en núcleos.
-* **CSV…** exporta la medida en una fila y **AAVSO EFF…** en el formato
-  de la AAVSO, con la secuencia en CNAME/CMAG/KNAME/KMAG. La placa en
-  disco nunca se modifica.
-* **Anotaciones al vuelo**: si la placa ya trae tarjetas ANNOTATE
-  (escritas por NightScribe o por AstroImageJ), se dibujan al cargar:
-  círculos con su tamaño en píxeles de placa y rótulos legibles a
-  cualquier zoom.
-* **Flecha de norte y barra de escala** (botones «N» y «Escala», con
-  WCS): viven en la esquina superior derecha e inferior izquierda, y
-  también salen en el PNG exportado.
-* **Resolver astrometría…**: si la placa no tiene WCS (o quieres
-  repetirlo), la resuelve a ciegas con Astrometry.net (requiere tu clave
-  de API en Ajustes). La solución se aplica en memoria a la sesión: el
-  archivo en disco nunca se modifica, y la sonda, la flecha de norte, la
-  barra de escala y Anotar la usan al instante.
+  calibrada ± error**. La secuencia queda a la vista (anillos y
+  etiquetas): mides CON ella a la vista; y cambiar cualquier opción
+  (banda, radios, cielo, sigma-clip, término de color, B−V,
+  sustracción) recalcula la medida al instante.
+* El flujo diario es **Banda** (por defecto V) y los tres **radios de
+  apertura** (apertura, anillo interior y exterior): tocar un radio
+  re-mide el punto al instante, y tu ajuste manual manda sobre el
+  auto-seeing hasta que cargues otra placa (o rearms la casilla).
+* **Avanzado…** abre la receta completa en otra ventana pequeña y no
+  modal (se puede dejar abierta mientras se mide): modelo de **cielo**
+  (mediana plana o plano inclinado para núcleos galácticos),
+  **sigma-clip** del cielo (dos pasadas de 2,5 sigma), **apertura que
+  sigue al seeing** (FWHM de las comps en tu placa, apertura a 1,35
+  veces), **término de color** ajustado con el B−V de las comps y el
+  del objetivo, **sustracción de la galaxia huésped** con la referencia
+  PS1 alineada (para SNe en núcleos, una descarga por campo), y el botón
+  **Sugerir** que propone los radios con la curva de crecimiento del
+  objetivo y su entorno, con las razones en lenguaje llano.
+* Controles de calidad (fase H, en segundo plano): techo de
+  **saturación real** (SATURATE o `ccd_saturate`), **error interno vs.
+  total** (fotones + dispersión + centelleo + color + flats) y la
+  **estrella check como semáforo** de la medida. Si la cabecera no trae
+  ganancia, el panel avisa de que el error es solo la dispersión de las
+  comps.
+* **CSV…** exporta la medida en una fila, **AAVSO EFF…** en el formato
+  de la AAVSO (secuencia en CNAME/CMAG/KNAME/KMAG) y, cuando el editor
+  se abrió desde un proyecto, **Guardar en el proyecto** lo registra en
+  su curva de luz (fuente «measure», visita asociada). Si la secuencia
+  no trae la magnitud del objetivo, se busca en el proyecto (planner,
+  VSX, o la última secuencia guardada); y al exportar la secuencia queda
+  escrita en el proyecto para la próxima vez. La placa en disco nunca se
+  modifica.
+
+Ambas mitades comparten: las **anotaciones al vuelo** (si la placa ya
+trae tarjetas ANNOTATE, escritas por NightScribe o AstroImageJ, se
+dibujan al cargar con su tamaño en píxeles de placa y rótulos legibles
+en cualquier zoom), la **flecha de norte y barra de escala** (botones
+«N» y «Escala» de la barra superior, con WCS) y **Resolver
+astrometría…** (la resuelve a ciegas con Astrometry.net, requiere tu
+clave de API en Ajustes; la solución se aplica en memoria a la sesión y
+el archivo en disco nunca se modifica).
+
+Para entender cómo se mide después la fotometría con estas secuencias:
+[docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
 
 ## Anotar
 

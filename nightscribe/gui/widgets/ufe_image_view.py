@@ -82,6 +82,8 @@ class UfeImageView(ChartView):
         self._annotation_items = []  # read-only ANNOTATE layer (survives
                                      # clear_overlays, rebuilt per plate)
         self._annotation_labels = []  # [(label item, ann dict)]
+        self._show_annotations = True   # the top bar can hide the plate's
+                                        # saved marks; the default is on
         self._frame_override = None  # Blink tab: fn() -> uint8 display
                                      # frame replacing the state's own
         # pick mode (the Measure/Annotate/Compare tabs while on stage):
@@ -281,7 +283,16 @@ class UfeImageView(ChartView):
                 label.setZValue(40)
                 self._annotation_items.append(self.add_item(label))
                 self._annotation_labels.append((label, ann))
+        self.set_annotations_visible(self._show_annotations)
         self._layout_annotations()
+
+    def set_annotations_visible(self, on):
+        # @args: on - show or hide the plate's saved ANNOTATE marks (the
+        #        photometry markers and the sequence stars are other
+        #        layers and always follow their own tabs)
+        self._show_annotations = bool(on)
+        for it in self._annotation_items:
+            it.setVisible(self._show_annotations)
 
     def _layout_annotations(self):
         # Re-seats the annotation labels for the current zoom (constant

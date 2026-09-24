@@ -68,8 +68,8 @@ class UfeDialog(QDialog):
         self.setWindowTitle(self.tr("NightScribe Image Workbench"))
         self._build_ui()
         self._build_shortcuts()
-        self.resize(1280, 860)
-        self.setMinimumSize(900, 600)
+        self.resize(1440, 960)
+        self.setMinimumSize(1000, 640)
         self.state.image_loaded.connect(self._on_image_loaded)
         self.state.wcs_changed.connect(self._sync_wcs_buttons)
         self.view.zoom_changed.connect(self._on_zoom_changed)
@@ -131,6 +131,14 @@ class UfeDialog(QDialog):
         self.btn_scale.toggled.connect(
             lambda checked: self.view.set_hud(scale=checked))
         bar.addWidget(self.btn_scale)
+        self.btn_annot = QPushButton(self.tr("A"))
+        self.btn_annot.setCheckable(True)
+        self.btn_annot.setChecked(True)
+        self.btn_annot.setToolTip(self.tr(
+            "Saved annotations (the marks stored on this plate)"))
+        self.btn_annot.toggled.connect(
+            lambda checked: self.view.set_annotations_visible(checked))
+        bar.addWidget(self.btn_annot)
         self.btn_solve = QPushButton(self.tr("Solve astrometry…"))
         self.btn_solve.setToolTip(self.tr(
             "Blind-solve the plate with Astrometry.net (the file on disk "
@@ -160,52 +168,43 @@ class UfeDialog(QDialog):
         return bar
 
     def _build_feature_tabs(self):
-        # The four feature tabs are real now (phases D, E, F, G2).
+        # The feature tabs are real now (phases D, E, F, G2). Compare and
+        # Measure share the Photometry tab (ADR-044 rev, 2026-09-24); the
+        # tab_compare / tab_measure aliases keep the legacy deep links,
+        # prefills and tests working.
         from .ufe_blink_tab import UfeBlinkTab
         self.tab_blink = UfeBlinkTab(self.state, self._lang,
                                      view=self.view)
         self.tabs.addTab(self.tab_blink, self.tr("Blink"))
-        from .ufe_compare_tab import UfeCompareTab
-        self.tab_compare = UfeCompareTab(self.state, self._lang,
-                                         view=self.view)
-        self.tabs.addTab(self.tab_compare, self.tr("Compare"))
-        from .ufe_measure_tab import UfeMeasureTab
-        self.tab_measure = UfeMeasureTab(
-            self.state, self._lang, view=self.view,
-            compare_tab=self.tab_compare,
-            go_compare=lambda: self.tabs.setCurrentWidget(
-                self.tab_compare))
-        self.tabs.addTab(self.tab_measure, self.tr("Measure"))
+        from .ufe_photometry_tab import UfePhotometryTab
+        self.tab_photometry = UfePhotometryTab(
+            self.state, self._lang, view=self.view)
+        self.tabs.addTab(self.tab_photometry, self.tr("Photometry"))
+        self.tab_compare = self.tab_photometry.tab_compare
+        self.tab_measure = self.tab_photometry.tab_measure
         from .ufe_annotate_tab import UfeAnnotateTab
         self.tab_annotate = UfeAnnotateTab(self.state, self._lang,
                                            view=self.view)
         self.tabs.addTab(self.tab_annotate, self.tr("Annotate"))
         # only the current tab owns the view's clicks and overlays
-        self._prev_tab = None
         self.tabs.currentChanged.connect(self._on_feature_tab_changed)
         self._on_feature_tab_changed(self.tabs.currentIndex())
 
     def _on_feature_tab_changed(self, idx):
         # Hands the stage to the freshly selected tab (set_active) and
-        # takes it from the others. One exception by design: Compare
-        # leaving for Measure keeps its overlays (the sequence IS the
-        # Measure tab's input) and its star probe keeps answering.
+        # takes it from the others. The Photometry tab routes the handoff
+        # to its Sequence / Measure section itself (the sequence's
+        # overlays survive a section switch but not a full leave).
         # The pick cursor (crosshair + snapping reticle) follows the
         # stage from here: tabs declare `pick_clicks = True`.
         incoming = self.tabs.widget(idx)
         for i in range(self.tabs.count()):
             w = self.tabs.widget(i)
             setter = getattr(w, "set_active", None)
-            if not callable(setter):
-                continue
-            if w is self.tab_compare and self._prev_tab is self.tab_compare \
-                    and incoming is self.tab_measure:
-                setter(False, keep_overlays=True)
-            else:
+            if callable(setter):
                 setter(i == idx)
         self.view.set_pick_cursor(
             bool(getattr(incoming, "pick_clicks", False)))
-        self._prev_tab = incoming
 
     def closeEvent(self, event):
         # The blink timer must not fire into a closing dialog.
@@ -240,8 +239,20 @@ class UfeDialog(QDialog):
         return True
 
     def show_tab(self, tab):
-        # Brings one feature tab to the front (Blink / Compare / Measure /
-        # Annotate) so the host can deep-link a workflow into the editor.
+        # Brings one feature tab to the front (Blink / Photometry /
+        # Annotate) so the host can deep-link a workflow into the
+        # editor. The Photometry sections still accept the legacy names:
+        # tab_compare / tab_measure by widget or "compare" / "measure"
+        # by name, which also pick the right section on the way in.
+        # @args: tab - a top-level tab widget, an inner Photometry
+        #        section widget, or "compare" / "measure"
+        if tab in (self.tab_compare, self.tab_measure) \
+                or tab in ("compare", "measure"):
+            self.tab_photometry.set_mode(
+                "measure" if tab in (self.tab_measure, "measure")
+                else "sequence")
+            self.tabs.setCurrentWidget(self.tab_photometry)
+            return
         self.tabs.setCurrentWidget(tab)
 
     def set_save_hook(self, fn):

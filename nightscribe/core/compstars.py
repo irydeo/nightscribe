@@ -40,6 +40,9 @@ logger = logging.getLogger(__name__)
 VSX_MATCH_ARCSEC = 5.0     # a catalog star this close to a VSX entry is
                            # considered the same object (SecFot's value)
 DEFAULT_MARGIN = 0.5       # comps should beat the target by this much
+BRIGHT_WINDOW = 2.0        # ...but by not much more than this: a comp
+                           # many magnitudes brighter saturates real
+                           # plates and calibrates nothing
 COLOR_TOL = 0.4            # preferred |B-V difference| against the target
 ISOLATION_ARCSEC = 10.0    # no catalog neighbour closer than this
 
@@ -325,14 +328,22 @@ def _is_isolated(star, stars, tol_arcsec):
     return True
 
 
-def _why(star, target_mag, target_bv, min_margin, color_tol):
+def _why(star, target_mag, target_bv, min_margin, color_tol,
+         bright_window=BRIGHT_WINDOW):
     # The plain-language reason a star is proposed, in the spirit of the
     # "why tonight" phrases: brightness, colour match, non-variability.
     # @return: {"es":..., "en":...} bilingual string pair
     parts_es, parts_en = [], []
-    if star["mag"] <= target_mag - min_margin:
-        parts_es.append("más brillante que el objetivo")
-        parts_en.append("brighter than the target")
+    if star["mag"] <= target_mag - min_margin - bright_window:
+        parts_es.append("mucho más brillante que el objetivo (riesgo "
+                        "de saturación en exposiciones cortas)")
+        parts_en.append("much brighter than the target (saturation "
+                        "risk on short exposures)")
+    elif star["mag"] <= target_mag - min_margin:
+        parts_es.append("más brillante que el objetivo y de brillo "
+                        "cercano")
+        parts_en.append("brighter than the target and close in "
+                        "brightness")
     elif star["mag"] <= target_mag:
         parts_es.append("brillo parecido al del objetivo")
         parts_en.append("similar brightness to the target")
@@ -357,18 +368,23 @@ def _why(star, target_mag, target_bv, min_margin, color_tol):
 
 def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
                   min_margin=DEFAULT_MARGIN, color_tol=COLOR_TOL,
-                  isolation_arcsec=ISOLATION_ARCSEC, spread_arcmin=0.0):
+                  isolation_arcsec=ISOLATION_ARCSEC, spread_arcmin=0.0,
+                  bright_window=BRIGHT_WINDOW):
     # Proposes a photometric sequence automatically. Criteria, in order:
-    # not a known VSX variable, isolated in the catalog, ideally brighter
-    # than the target by min_margin and of similar colour (|ΔB−V| within
-    # color_tol when both are known); when the strict pool runs short the
-    # brightness margin relaxes so the sequence never comes back empty.
+    # not a known VSX variable, isolated in the catalog, brighter than
+    # the target by min_margin but CLOSE to it (a comp much brighter than
+    # the target saturates real plates and calibrates nothing — the
+    # bright_window), and of similar colour (|ΔB−V| within color_tol when
+    # both are known). When the windowed pool runs short the brightness
+    # rules relax in tiers so the sequence never comes back empty.
     # Picked comps keep a spread_arcmin minimum mutual separation so the
     # sequence covers the field.
     # @args: stars - build_stars list, target_mag - target magnitude in
     #        the label band, target_bv - target B−V or None, n - comps,
     #        check - also pick one check star, spread_arcmin - minimum
-    #        separation between comps (0 disables)
+    #        separation between comps (0 disables), bright_window - how
+    #        far brighter than (target - min_margin) a comp may sit and
+    #        still be a first-class choice
     # @return: {"comps": [{"name", "kind", "star", "why"}...],
     #          "check": entry or None}
     pool = [s for s in stars
@@ -385,14 +401,29 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
     def entry(s, name, kind):
         return {"name": name, "kind": kind, "star": s,
                 "why": _why(s, target_mag, target_bv, min_margin,
-                            color_tol)}
+                            color_tol, bright_window)}
 
+    # Brightness tiers around the anchor (the dimmest a comp needs to
+    # be): close-and-brighter first, then close-but-faint, then the
+    # too-bright rest (last: they are the saturation risk). Every tier
+    # sorts by colour match, then by closeness to the anchor.
+    anchor = target_mag - min_margin
+
+    def close(s):
+        # @return: |mag - anchor|, the closeness ordering
+        return abs(s["mag"] - anchor)
+
+    near = sorted((s for s in pool
+                   if anchor - bright_window <= s["mag"] <= anchor),
+                  key=lambda s: (color_rank(s), close(s)))
+    fainter = sorted((s for s in pool if s["mag"] > anchor),
+                     key=lambda s: (color_rank(s), close(s)))
+    brighter = sorted((s for s in pool if s["mag"] < anchor
+                       - bright_window),
+                      key=lambda s: (color_rank(s), close(s)))
+    ordered = near + fainter + brighter
     picked = []
-    strict = [s for s in pool if s["mag"] <= target_mag - min_margin]
-    strict.sort(key=lambda s: (color_rank(s), s["mag"]))
-    relaxed = [s for s in pool if target_mag - min_margin < s["mag"]]
-    relaxed.sort(key=lambda s: (color_rank(s), s["mag"]))
-    for cand in strict + relaxed:
+    for cand in ordered:
         if len(picked) >= n:
             break
         if spread_arcmin > 0.0 and any(
@@ -402,7 +433,7 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
         picked.append(entry(cand, f"Comp{len(picked) + 1}", "comp"))
     check_entry = None
     if check:
-        for cand in strict + relaxed:
+        for cand in ordered:
             if all(p["star"] is not cand for p in picked):
                 check_entry = entry(cand, "Check", "check")
                 break

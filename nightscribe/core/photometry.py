@@ -60,6 +60,13 @@ _SIG_MIN_KEEP = 5   # never clip an annulus down to fewer than this
 # 25 pixels at the exact frame maximum is a clipped core, not a gaussian.
 _CLIP_MIN_PIXELS = 25
 SAT_FRAC = series._SAT_FRAC     # margin below an explicit ceiling (ADU)
+_FRAME_CLIP_MIN = 25        # px pinned at the frame maximum across the
+                            # plate: the signature of a clipping level
+_INFERRED_CEILING_FRAC = 0.94   # flag peaks this close to an INFERRED
+                                # ceiling: the CMOS roll-off compresses
+                                # cores before they sit exactly on it
+_PLATEAU_MAX_FWHM = 4.0     # the 99 %-plateau rule in suggest_apertures
+                            # is only believed within this many FWHM
 
 # One comparison star tells us nothing about the scatter; the quoted
 # uncertainty floors at a generous constant instead of pretending to be zero.
@@ -189,6 +196,20 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         plateau = int(np.count_nonzero(
             (r2 <= r_ann_in ** 2) & (data > frame_max - eps)))
         saturated = plateau >= _CLIP_MIN_PIXELS
+    if not saturated and sat_adu is None:
+        # No ceiling anywhere (no SATURATE card, no setting): infer it
+        # from the plate itself. A soft CMOS roll-off compresses cores
+        # that never form a 25-px plateau, and those "almost saturated"
+        # stars poison a zero point just the same (the plateau test above
+        # stays blind to them).
+        ceiling = frame_ceiling(data, frame_max)
+        if ceiling is not None and peak >= _INFERRED_CEILING_FRAC * ceiling:
+            return _fail(f"comprimida: el pico llega al recorte de la "
+                         f"placa (~{ceiling:.0f} ADU)",
+                         f"clipped: the peak reaches the plate ceiling "
+                         f"(~{ceiling:.0f} ADU)") | {
+                "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
+                "n_pix": n_pix, "saturated": True}
     if saturated:
         return _fail("saturada", "saturated") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
@@ -409,6 +430,25 @@ def aperture_for_fwhm(fwhm, k=_APER_K_DEFAULT):
     return (float(min(max(r_ap, 2.0), 20.0)),
             float(max(r_ap * ratio_in, r_ap + 3.0)),
             float(max(r_ap * ratio_out, r_ap + 6.0)))
+
+
+def frame_ceiling(data, frame_max=None):
+    # The plate's clipping level in ADU, inferred from the data alone when
+    # no SATURATE card and no setting exist: dozens of pixels pinned at
+    # the very frame maximum are a clipping level, not one star's apex
+    # (an honest core owns one or two pixels up there).
+    # @args: data - 2D array, frame_max - precomputed maximum (optional)
+    # @return: the ceiling in ADU, or None when nothing can be said
+    if data is None or data.size == 0:
+        return None
+    if frame_max is None:
+        frame_max = float(np.nanmax(data))
+    if not math.isfinite(frame_max) or frame_max <= 0.0:
+        return None
+    eps = 1e-6 * max(1.0, frame_max)
+    if int(np.count_nonzero(data >= frame_max - eps)) >= _FRAME_CLIP_MIN:
+        return frame_max
+    return None
 
 
 def saturation_ceiling(header, cfg=None):
@@ -802,8 +842,18 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
         if fit is not None:
             gradient = math.hypot(fit[1], fit[2])
     # ---------------- the rules (environment only, the signed choice)
-    r_ap = snr_peak[0] if peak_snr < 30.0 else (
-        plateau if plateau is not None else snr_peak[0])
+    # The 99 % plateau is only trustworthy at a point-source radius: the
+    # growth curve is cumulative, so a sky level off by a couple of ADU
+    # (or a blend) keeps it "growing" forever and the rule would inflate
+    # the aperture to the scan cap. Beyond _PLATEAU_MAX_FWHM x FWHM the
+    # honest answer is the seeing aperture plus saying so.
+    plateau_ok = plateau is not None and plateau <= _PLATEAU_MAX_FWHM * fwhm
+    if peak_snr < 30.0:
+        r_ap = snr_peak[0]
+    elif plateau_ok:
+        r_ap = plateau
+    else:
+        r_ap = max(1.35 * fwhm, snr_peak[0])
     r_in = r_ap * (R_ANN_IN / R_AP)
     r_out = r_ap * (R_ANN_OUT / R_AP)
     if peak_snr < 30.0:
@@ -812,12 +862,22 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
                   f"(r = {r_ap:.1f} px)",
             "en": f"faint target: the aperture maximises the SNR "
                   f"(r = {r_ap:.1f} px)"})
-    elif plateau is not None:
+    elif plateau_ok:
         reasons.append({
             "es": f"objetivo brillante: la apertura llega a la meseta "
                   f"del 99 % del flujo (r = {r_ap:.1f} px)",
             "en": f"bright target: the aperture reaches the 99 % flux "
                   f"plateau (r = {r_ap:.1f} px)"})
+    else:
+        reasons.append({
+            "es": f"la curva de crecimiento no se aplana a "
+                  f"{_PLATEAU_MAX_FWHM:.0f}×FWHM (¿mezcla o fondo mal "
+                  f"restado?): propongo la apertura de seeing "
+                  f"(r = {r_ap:.1f} px)",
+            "en": f"the growth curve never flattens by "
+                  f"{_PLATEAU_MAX_FWHM:.0f}×FWHM (a blend, or a "
+                  f"mis-subtracted sky?): the seeing aperture is the "
+                  f"honest choice (r = {r_ap:.1f} px)"})
     if nearest is not None and nearest < 2.0 * r_out:
         r_ap = max(2.0, min(r_ap, nearest / 2.5))
         r_in = max(r_ap + 2.0, min(r_in, nearest * 0.6))

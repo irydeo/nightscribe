@@ -179,19 +179,39 @@ disk is never modified.
   local sky subtracted, only significant pixels weighted, the box scaled
   to the seeing and two passes; on faint sources or over gradients it
   lands within hundredths of a pixel of the truth, instead of the raw
-  moment's tenths.
+  moment's tenths. The ring and the "Pixel" line sit at the measured
+  centroid, not at the click; when it moved more than 1 px, the panel
+  says so.
 * **"Suggest apertures"**: proposes the radii from the target's own
   growth curve and its measured surroundings (nearest neighbour,
   background gradient), and explains the reasons in plain language in
-  the panel; your hand edit is never stomped on its own.
+  the panel; your hand edit is never stomped on its own. The 99 %
+  plateau rule is only believed within what a point source allows
+  (4 × FWHM): when the curve never flattens there (a blend, or a
+  mis-subtracted sky), it proposes the seeing aperture and says why.
 * **Colour term**: with at least 6 comps carrying B−V spread, the fit
-  is `ZP + k·(B−V)` applied with the target's B−V (variables: the VSX
-  one; a SN near peak is ~0, and the panel warns about the assumption).
-  Without enough spread, a plain zero point, and it says so. Comp
-  outliers are MAD-rejected before fitting.
+  is `ZP + k·(B−V)` applied with the target's B−V. That B−V is no
+  longer assumed in silence: when the click lands on a star of the
+  field loaded in Compare, its own B−V is used, and the panel always
+  states the provenance (field, project, by hand, or assumed); when it
+  is assumed and the fitted slope is large, the panel quantifies the
+  risk in magnitudes. Without enough spread, a plain zero point, and
+  it says so. Comp outliers are MAD-rejected before fitting.
 * **Real saturation**: the ceiling comes from the header's SATURATE
-  card or the `ccd_saturate` setting; when nobody knows, the plateau
-  heuristic keeps running.
+  card or the `ccd_saturate` setting; when nobody knows, the plate
+  gives itself away: dozens of pixels pinned at the frame maximum can
+  only be a clipping level, and any star peaking next to it is refused
+  as "clipped". It matters because the CMOS roll-off compresses cores
+  long before a plateau forms: comps measured on compressed cores pull
+  the zero point LOW coherently, and the check star, compressed alike,
+  cannot rat on it (its traffic light reads scatter, not a shared
+  bias). The panel itemises the exclusions by cause and warns out loud
+  when clipping removed comps.
+* **Catalog cross-match**: after every measurement the panel says which
+  source of the field loaded in Compare sits under the centroid, how
+  many arcsec away, and its catalog magnitude against ours (Δ). For a
+  SN or a new candidate the expected answer is the opposite: "no
+  source within 8″".
 * **Honest total error**: the panel distinguishes "internal" (photons,
   when the gain is known) from "total" (plus ZP scatter, Young
   scintillation with your aperture and site height from Settings, the
@@ -355,8 +375,12 @@ implementation appendix: [docs/PRECISION.md](PRECISION.md).
 
 * [ ] Stacks reduced (bias/dark/flat) before measuring.
 * [ ] Astrometry solved (no WCS, no target localisation).
-* [ ] Neither the target nor the comparisons saturated (the 85 % guard
-      watches; the FITS editor's histogram shows it).
+* [ ] Neither the target nor the comparisons saturated or squeezed by
+      the full well (the guard watches even without a SATURATE card:
+      the panel excludes the stars next to the clipping level and says
+      so; a ZP built on compressed cores lies LOW and the check star
+      cannot see it). Rule of thumb: comps close in brightness to the
+      target, never the brightest stars in the field.
 * [ ] The same aperture for the whole series (the program fixes it for
       you).
 * [ ] A **check** star in the sequence: if it moves, the night is not to

@@ -286,6 +286,38 @@ def test_propose_comps_no_check_when_disabled():
     assert out["check"] is None
 
 
+def test_propose_comps_prefers_brightness_close_to_the_target():
+    # The 2026-09 review case: an 18.6-mag target in a field with 9-11
+    # mag stars must NOT be handed the brightest ones (they saturate a
+    # short exposure and poison the zero point); the comps near the
+    # target's own brightness win, the far-brighter rest is the last
+    # resort and says so in its reason.
+    stars = [_star(291.30, 42.780, 9.5, bv=0.60),
+             _star(291.31, 42.750, 10.5, bv=0.60),
+             _star(291.32, 42.810, 17.8, bv=0.60),
+             _star(291.34, 42.750, 18.0, bv=0.60)]
+    out = compstars.propose_comps(stars, target_mag=18.6, target_bv=0.60,
+                                  n=2)
+    # closest to the margin anchor (18.1) first
+    assert [c["star"]["mag"] for c in out["comps"]] == [18.0, 17.8]
+    # the check comes from the same closeness ordering: the 10.5 leftover,
+    # flagged as a saturation risk
+    assert out["check"]["star"]["mag"] == 10.5
+    assert "much brighter" in out["check"]["why"]["en"]
+    assert "saturación" in out["check"]["why"]["es"]
+
+
+def test_propose_comps_falls_back_to_bright_when_nothing_close():
+    # A field with nothing near the target: the far-brighter stars still
+    # form a sequence (the honest last resort), closest first.
+    stars = [_star(291.30, 42.780, 9.5, bv=0.60),
+             _star(291.31, 42.750, 10.5, bv=0.60),
+             _star(291.32, 42.810, 11.5, bv=0.60)]
+    out = compstars.propose_comps(stars, target_mag=18.6, n=2,
+                                  check=False)
+    assert [c["star"]["mag"] for c in out["comps"]] == [11.5, 10.5]
+
+
 # --------------------------- CSV export ---------------------------
 
 def test_export_sequence_csv(tmp_path):

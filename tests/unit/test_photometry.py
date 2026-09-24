@@ -17,6 +17,7 @@ degraded paths. All plates are synthetic gaussians with a fixed seed
 keep the tight bounds, but with a deterministic seed)."""
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -25,6 +26,9 @@ from nightscribe.core import photometry as phot
 
 # same synthetic PSF as the series test suite
 PSF_SIGMA = 3.0
+
+FIXTURES = Path(__file__).parents[1] / "fixtures"
+AT2026ACKA = FIXTURES / "AT2026acka.fit"
 
 
 def _plate(w, h, stars, sky=100.0, noise=0.0, seed=42):
@@ -114,6 +118,32 @@ def test_measure_point_guards_are_honest():
 
     assert not phot.measure_point(empty, 250.0, 100.0)["ok"]
     assert not phot.measure_point(None, 50.0, 50.0)["ok"]
+
+
+def test_frame_ceiling_reads_the_clipping_signature():
+    # Dozens of pixels pinned at the frame maximum: the maximum is a
+    # clipping level. One honest star's apex (a pixel or two) is not.
+    clipped = _plate(200, 200, [(100, 100, 60000.0)])
+    clipped = np.minimum(clipped, 30000.0)          # flat top at 30000
+    assert phot.frame_ceiling(clipped) == 30000.0
+    honest = _plate(200, 200, [(100, 100, 8000.0)])
+    assert phot.frame_ceiling(honest) is None
+
+
+def test_measure_point_rejects_soft_clipped_cores_without_a_card():
+    # The 2026-09 field case: a CMOS plate with no SATURATE anywhere and
+    # a soft roll-off (cores reach the ceiling in a pixel or two, never
+    # the 25-px plateau). The frame's own clipping signature condemns
+    # any peak next to it; far below it the same star is a normal read.
+    plate = _plate(200, 200, [(100.0, 100.0, 8500.0)])
+    plate[5:10, 5:35] = 9000.0      # 150 px pinned: the clipping level
+    r = phot.measure_point(plate, 100.0, 100.0)
+    assert not r["ok"] and r["saturated"]
+    assert "clipped" in r["reason"]["en"]
+    assert "9000" in r["reason"]["en"]
+    low = _plate(200, 200, [(100.0, 100.0, 3000.0)])
+    low[5:10, 5:35] = 9000.0
+    assert phot.measure_point(low, 100.0, 100.0)["ok"]
 
 
 # ---------------- sigma-clip on the sky annulus ----------------
@@ -464,6 +494,30 @@ def test_suggest_apertures_faint_picks_the_snr_peak():
     assert any("SNR" in r["en"] for r in s["reasons"])
 
 
+def test_suggest_apertures_runaway_growth_falls_back_to_seeing():
+    # The review case: a star whose local sky sits in a dip (the annulus
+    # under-reads it) has a growth curve that never flattens, and the
+    # 99 %-plateau rule inflated the aperture to the scan cap. The
+    # suggestion must refuse the runaway and fall back to the seeing
+    # aperture, saying why.
+    rng = np.random.default_rng(9)
+    yy, xx = np.ogrid[:200, :200]
+    rr = np.sqrt((xx - 100.0) ** 2 + (yy - 100.0) ** 2)
+    plate = 800.0 - 60.0 * np.exp(-((rr - 12.5) ** 2) / 8.0) \
+        + rng.normal(0, 1.5, (200, 200))
+    plate += 30000 * np.exp(-(rr ** 2) / (2 * 1.5 ** 2))
+    s = phot.suggest_apertures(plate, 100, 100)
+    fwhm = s["diag"]["fwhm"]
+    assert s["r_ap"] <= phot._PLATEAU_MAX_FWHM * fwhm
+    assert any("never flattens" in r["en"] for r in s["reasons"])
+    assert all(set(r) == {"es", "en"} for r in s["reasons"])
+    # and the healthy bright star keeps the plateau rule
+    plate2 = 800.0 + rng.normal(0, 1.5, (200, 200))
+    plate2 += 30000 * np.exp(-(rr ** 2) / (2 * 1.5 ** 2))
+    s2 = phot.suggest_apertures(plate2, 100, 100)
+    assert any("99 %" in r["en"] for r in s2["reasons"])
+
+
 def test_suggest_apertures_neighbour_pulls_in():
     rng = np.random.default_rng(11)
     plate = np.full((200, 200), 800.0) + rng.normal(0, 2, (200, 200))
@@ -534,3 +588,55 @@ def test_measure_point_gaussian_is_the_default():
     assert phot.measure_point(plate, 100, 100,
                               centroid_mode="refined")["ok"]
     assert phot.measure_point(plate, 100, 100, centroid_mode="raw")["ok"]
+
+
+# ---------------- the AT2026acka regression (real plate) ---------------
+#
+# The field report that caught the lying zero point: a 10 s Clear plate
+# (2048x2048, no SATURATE card) whose field is littered with CMOS
+# full-well-compressed cores. Comps picked among the brightest stars
+# measured low, the zero point came out 0.86 mag faint, and three faint
+# stars read ~1 mag too bright. Gaia says these three are 16.39, 17.11
+# and 17.4 (Tycho-Tracker agreed on the same pixels).
+
+# the three reported faint stars: (col, row), Gaia G
+_AT_TARGETS = [(989.1, 1012.7, 16.39),
+               (1058.3, 1040.9, 17.11),
+               (1108.4, 969.9, 17.40)]
+# two cores compressed by the full well (flat tops at 65535)
+_AT_CLIPPED = [(1159.2, 629.8), (1105.8, 1127.2)]
+
+
+@pytest.fixture(scope="module")
+def at2026acka():
+    # @return: the real plate as float32 (loaded once per module)
+    from nightscribe.core import fits_io
+    _header, data = fits_io.read_fits(AT2026ACKA)
+    return np.ascontiguousarray(data, dtype=np.float32)
+
+
+def test_at2026acka_ceiling_is_inferred_from_the_frame(at2026acka):
+    # 838 px pinned at 65535 across the plate: the ceiling, no card needed
+    assert phot.frame_ceiling(at2026acka) == 65535.0
+
+
+def test_at2026acka_compressed_stars_are_refused(at2026acka):
+    for x, y in _AT_CLIPPED:
+        r = phot.measure_point(at2026acka, x, y, r_ap=4.5,
+                               r_ann_in=10.8, r_ann_out=16.1)
+        assert not r["ok"] and r["saturated"], (x, y)
+        assert "clipped" in r["reason"]["en"]
+
+
+def test_at2026acka_faint_stars_imply_one_consistent_zp(at2026acka):
+    # The heart of the case: the three faint stars measure cleanly, and
+    # their implied zero points (Gaia G - instrumental) agree to a few
+    # hundredths. The plate's relative photometry was never the problem.
+    zps = []
+    for x, y, g in _AT_TARGETS:
+        r = phot.measure_point(at2026acka, x, y, r_ap=4.5,
+                               r_ann_in=10.8, r_ann_out=16.1)
+        assert r["ok"], (x, y, r.get("reason"))
+        zps.append(g + 2.5 * math.log10(r["flux"]))
+    assert max(zps) - min(zps) < 0.05, zps
+    assert 27.80 < sum(zps) / len(zps) < 27.90

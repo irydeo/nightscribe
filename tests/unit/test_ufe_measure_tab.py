@@ -613,3 +613,164 @@ def test_options_remeasure_the_live_point(dlg):
     # target B-V re-measures with it
     tab.spn_target_bv.setValue(0.4)
     assert tab._last is not None
+
+
+# ---------------- the 2026-09 review: clipping, identity, colour -------
+
+def _sequence_static(dlg, comps, band="V", mag=12.0, bvs=None):
+    # Sequence entries without measuring the plate (for plates whose
+    # comps cannot be measured, e.g. clipped): catalog values arbitrary.
+    entries = []
+    for j, (cx, cy) in enumerate(comps):
+        ra, dec = dlg.state.wcs.pixel_to_sky(cx, cy)
+        bv = bvs[j] if bvs else 0.6
+        entries.append({"name": f"Comp{j + 1}", "kind": "comp",
+                        "star": {"ra": ra, "dec": dec, "mag": mag,
+                                 "band": band, "catalog": "synthetic",
+                                 "bands": [{"label": band, "value": mag,
+                                            "err": 0.01,
+                                            "derived": False}],
+                                 "bv": bv}})
+    dlg.tab_compare._entries = entries
+    return entries
+
+
+def test_field_crossmatch_line_and_bv_autofill(dlg):
+    # The Compare tab's loaded field carries a star exactly where the
+    # target sits: the panel must identify it (catalog magnitude and Δ
+    # against our measurement) and its colour pre-fills the B-V spin.
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    tab.chk_seeing.setChecked(False)     # default radii: reproducible
+    _sequence(dlg, dlg._test_comps)
+    r = phot.measure_point(dlg.state.data, *dlg._test_target)
+    mag_expected = -2.5 * math.log10(r["flux"]) + ZP_TRUE
+    ra, dec = dlg.state.wcs.pixel_to_sky(*dlg._test_target)
+    dlg.tab_compare._stars = [
+        {"ra": ra, "dec": dec, "mag": mag_expected, "band": "V",
+         "catalog": "synthetic", "id": "T1", "bv": 1.20,
+         "bands": [{"label": "V", "value": mag_expected, "err": 0.01,
+                    "derived": False}]}]
+    _click(dlg, *dlg._test_target)
+    panel = tab.lbl_result.text()
+    assert "Field:" in panel and "T1" in panel
+    assert "Δ" in panel                     # measured vs catalog, live
+    assert tab.spn_target_bv.value() == pytest.approx(1.20)
+    assert tab._bv_source == "catalog"
+
+
+def test_no_field_match_says_new_object(dlg):
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert "No catalogued source" in dlg.tab_measure.lbl_result.text()
+
+
+def test_compressed_comps_are_excluded_and_named(dlg, tmp_path):
+    # The review case: a plate that clips at 10500 ADU. Every comp core
+    # is flat there; the hot corner lets the guard infer the ceiling.
+    # The zero point must refuse them out loud instead of lying low.
+    data, target, comps = _plate()
+    data = np.minimum(data, 10500.0)
+    data[5:8, 5:40] = 10500.0
+    plate = _write_plate(tmp_path / "clipped.fits", data)
+    dlg.state.load(plate)
+    _sequence_static(dlg, comps)
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    panel = tab.lbl_result.text()
+    assert "5 of 5" in panel
+    assert "saturated/clipped" in panel
+    assert "clipping level" in panel
+    assert not tab.btn_csv.isEnabled()
+
+
+def test_overlay_and_pixel_line_follow_the_measured_centroid(dlg):
+    _sequence(dlg, dlg._test_comps)
+    tx, ty = dlg._test_target
+    _click(dlg, tx + 2.5, ty + 1.5)      # deliberately off-centre
+    tab = dlg.tab_measure
+    assert tab._last["col"] == pytest.approx(tx, abs=0.6)
+    assert tab._last["row"] == pytest.approx(ty, abs=0.6)
+    assert "centroid landed" in tab.lbl_result.text()
+
+
+def test_calibration_in_gaia_g_says_so(dlg):
+    _sequence_static(dlg, dlg._test_comps, band="G")
+    _click(dlg, *dlg._test_target)
+    assert "no Johnson V" in dlg.tab_measure.lbl_result.text()
+
+
+def test_assumed_bv_warns_when_the_colour_term_matters(dlg, tmp_path):
+    # Six comps with a colour trend (cat = inst + ZP + 0.4 * BV): the
+    # fit finds k = 0.4 and the target's B-V is still the assumed 0.00,
+    # so the panel must quantify the risk, not just note the value.
+    from nightscribe.core import photometry as phot
+    data, target, comps = _plate(n_comps=6, seed=7)
+    plate = _write_plate(tmp_path / "six.fits", data)
+    dlg.state.load(plate)
+    entries = []
+    for (cx, cy), bv in zip(comps, (0.2, 0.4, 0.6, 0.8, 1.0, 1.2)):
+        r = phot.measure_point(dlg.state.data, cx, cy)
+        cat = -2.5 * math.log10(r["flux"]) + ZP_TRUE + 0.4 * bv
+        ra, dec = dlg.state.wcs.pixel_to_sky(cx, cy)
+        entries.append({"name": f"C{len(entries)}", "kind": "comp",
+                        "star": {"ra": ra, "dec": dec, "mag": cat,
+                                 "band": "V", "catalog": "synthetic",
+                                 "bands": [{"label": "V", "value": cat,
+                                            "err": 0.01,
+                                            "derived": False}],
+                                 "bv": bv}})
+    dlg.tab_compare._entries = entries
+    _click(dlg, *target)
+    tab = dlg.tab_measure
+    panel = tab.lbl_result.text()
+    assert tab._bv_source == "assumed"
+    assert "(assumed)" in panel
+    assert "+0.40" in panel and "too bright" in panel
+
+
+def test_at2026acka_end_to_end_zp_recovers(dlg):
+    # The field report replayed whole: the real AT2026acka plate (10 s,
+    # Clear, no SATURATE card), a sequence mixing six healthy
+    # mid-brightness comps with two stars that sit at the full well, and
+    # the reported target. The clipped comps must be excluded and named,
+    # the zero point must recover (~27.85), and the target must land on
+    # its Gaia value (16.39). Catalog values are bootstrapped from the
+    # plate's own truth scale, the one the three reported Gaia matches
+    # implied to a hundredth.
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    tab.chk_seeing.setChecked(False)     # default radii: reproducible
+    plate = FIXTURES / "AT2026acka.fit"
+    dlg.state.load(plate)
+    zp_true = 27.85
+    healthy = [(539.9, 300.8), (924.2, 438.1), (1732.8, 1741.9),
+               (492.9, 1737.0), (657.1, 1311.0), (1185.8, 1038.2)]
+    clipped = [(1159.2, 629.8), (1105.8, 1127.2)]
+    check_xy = (1050.0, 1591.7)
+
+    def _entry(cx, cy, kind, mag=None):
+        r = phot.measure_point(dlg.state.data, cx, cy)
+        cat = (-2.5 * math.log10(r["flux"]) + zp_true) if mag is None \
+            else mag
+        ra, dec = dlg.state.wcs.pixel_to_sky(cx, cy)
+        return {"name": kind, "kind": kind,
+                "star": {"ra": ra, "dec": dec, "mag": cat, "band": "V",
+                         "catalog": "bootstrapped",
+                         "bands": [{"label": "V", "value": cat,
+                                    "err": 0.01, "derived": False}],
+                         "bv": 0.6}}
+
+    entries = [_entry(x, y, "comp") for x, y in healthy]
+    entries += [_entry(x, y, "comp", mag=12.0) for x, y in clipped]
+    entries.append(_entry(*check_xy, "check"))
+    dlg.tab_compare._entries = entries
+    _click(dlg, 989.1, 1012.7)
+    assert tab._last is not None
+    panel = tab.lbl_result.text()
+    assert tab._last["mag"] == pytest.approx(16.39, abs=0.08)
+    assert tab._last["zp"]["zp"] == pytest.approx(zp_true, abs=0.1)
+    assert "2 of 9" in panel and "saturated/clipped" in panel
+    assert "clipping level" in panel      # the plain-language warning
+    assert "Check star" in panel and "OK" in panel
+    assert tab.btn_csv.isEnabled()

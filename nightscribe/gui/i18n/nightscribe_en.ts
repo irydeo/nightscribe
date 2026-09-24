@@ -3938,49 +3938,54 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>NSMigrations</name>
     <message>
-        <location filename="../../core/db.py" line="330"/>
+        <location filename="../../core/db.py" line="345"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
         <translation>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="333"/>
+        <location filename="../../core/db.py" line="348"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
         <translation>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="336"/>
+        <location filename="../../core/db.py" line="351"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
         <translation>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="339"/>
+        <location filename="../../core/db.py" line="354"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
         <translation>Projects gained their final state: close date, outcome, tags and favourites.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="342"/>
+        <location filename="../../core/db.py" line="357"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
         <translation>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="345"/>
+        <location filename="../../core/db.py" line="360"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
         <translation>Every project keeps its own container folder, in the place it already was.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="348"/>
+        <location filename="../../core/db.py" line="363"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
         <translation>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="351"/>
+        <location filename="../../core/db.py" line="366"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
         <translation>Comparison chart…</translation>
     </message>
     <message>
-        <location filename="../../core/db.py" line="354"/>
+        <location filename="../../core/db.py" line="369"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
         <translation>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</translation>
+    </message>
+    <message>
+        <location filename="../../core/db.py" line="373"/>
+        <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
+        <translation>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</translation>
     </message>
 </context>
 <context>
@@ -7493,180 +7498,200 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>VisitWindow</name>
     <message>
-        <location filename="../widgets/visits_panel.py" line="282"/>
+        <location filename="../widgets/visits_panel.py" line="297"/>
         <source>Visit</source>
         <translation>Visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="299"/>
+        <location filename="../widgets/visits_panel.py" line="318"/>
+        <source>The visit&apos;s date (its name in the list). Points already saved to it keep their own MJD</source>
+        <translation>The visit&apos;s date (its name in the list). Points already saved to it keep their own MJD</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="328"/>
+        <source>Save date</source>
+        <translation>Save date</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="331"/>
+        <source>Save the visit&apos;s date (the date is its name in the list)</source>
+        <translation>Save the visit&apos;s date (the date is its name in the list)</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="341"/>
+        <source>Pin the visit: it floats to the top of the list</source>
+        <translation>Pin the visit: it floats to the top of the list</translation>
+    </message>
+    <message>
+        <location filename="../widgets/visits_panel.py" line="344"/>
         <source>Delete visit…</source>
         <translation>Delete visit…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="306"/>
+        <location filename="../widgets/visits_panel.py" line="351"/>
         <source>Resources</source>
         <translation>Resources</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="309"/>
+        <location filename="../widgets/visits_panel.py" line="354"/>
         <source>Attach files…</source>
         <translation>Attach files…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="312"/>
+        <location filename="../widgets/visits_panel.py" line="357"/>
         <source>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</source>
         <translation>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="317"/>
+        <location filename="../widgets/visits_panel.py" line="362"/>
         <source>Open</source>
         <translation>Open</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="320"/>
+        <location filename="../widgets/visits_panel.py" line="365"/>
         <source>Plates open in the FITS editor; everything else opens with the system</source>
         <translation>Plates open in the FITS editor; everything else opens with the system</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="324"/>
+        <location filename="../widgets/visits_panel.py" line="369"/>
         <source>Remove from visit</source>
         <translation>Remove from visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="327"/>
+        <location filename="../widgets/visits_panel.py" line="372"/>
         <source>Unlink the selected resource (the file on disk is never touched)</source>
         <translation>Unlink the selected resource (the file on disk is never touched)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="352"/>
+        <location filename="../widgets/visits_panel.py" line="397"/>
         <source>Night notes (seeing, clouds…)</source>
         <translation>Night notes (seeing, clouds…)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="365"/>
+        <location filename="../widgets/visits_panel.py" line="461"/>
         <source>Delete visit</source>
         <translation>Delete visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="366"/>
+        <location filename="../widgets/visits_panel.py" line="462"/>
         <source>Delete this visit? Its measurements and files are kept, unlinked from it.</source>
         <translation>Delete this visit? Its measurements and files are kept, unlinked from it.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="399"/>
+        <location filename="../widgets/visits_panel.py" line="495"/>
         <source>Attach files to the visit</source>
         <translation>Attach files to the visit</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="400"/>
+        <location filename="../widgets/visits_panel.py" line="496"/>
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="424"/>
+        <location filename="../widgets/visits_panel.py" line="520"/>
         <source>FITS details</source>
         <translation>FITS details</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="428"/>
+        <location filename="../widgets/visits_panel.py" line="524"/>
         <source>File:</source>
         <translation>File:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="435"/>
-        <location filename="../widgets/visits_panel.py" line="514"/>
+        <location filename="../widgets/visits_panel.py" line="531"/>
+        <location filename="../widgets/visits_panel.py" line="610"/>
         <source>Filter:</source>
         <translation>Filter:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="438"/>
+        <location filename="../widgets/visits_panel.py" line="534"/>
         <source>Date:</source>
         <translation>Date:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="442"/>
+        <location filename="../widgets/visits_panel.py" line="538"/>
         <source>Exptime:</source>
         <translation>Exptime:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="498"/>
+        <location filename="../widgets/visits_panel.py" line="594"/>
         <source>Measurements</source>
         <translation>Measurements</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="501"/>
+        <location filename="../widgets/visits_panel.py" line="597"/>
         <source>Mag:</source>
         <translation>Mag:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="507"/>
+        <location filename="../widgets/visits_panel.py" line="603"/>
         <source>Err:</source>
         <translation>Err:</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="519"/>
+        <location filename="../widgets/visits_panel.py" line="615"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="523"/>
+        <location filename="../widgets/visits_panel.py" line="619"/>
         <source>Delete point</source>
         <translation>Delete point</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="598"/>
+        <location filename="../widgets/visits_panel.py" line="694"/>
         <source>Astrometry (MPC report)</source>
         <translation>Astrometry (MPC report)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="601"/>
+        <location filename="../widgets/visits_panel.py" line="697"/>
         <source>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</source>
         <translation>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="607"/>
+        <location filename="../widgets/visits_panel.py" line="703"/>
         <source>Paste MPC 80-column or ADES PSV lines here…</source>
         <translation>Paste MPC 80-column or ADES PSV lines here…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="613"/>
+        <location filename="../widgets/visits_panel.py" line="709"/>
         <source>Validate</source>
         <translation>Validate</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="617"/>
+        <location filename="../widgets/visits_panel.py" line="713"/>
         <source>Save report…</source>
         <translation>Save report…</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="635"/>
-        <location filename="../widgets/visits_panel.py" line="664"/>
+        <location filename="../widgets/visits_panel.py" line="731"/>
+        <location filename="../widgets/visits_panel.py" line="760"/>
         <source>Paste your measurements first.</source>
         <translation>Paste your measurements first.</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="642"/>
+        <location filename="../widgets/visits_panel.py" line="738"/>
         <source>Valid: %1 lines, %2</source>
         <translation>Valid: %1 lines, %2</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="650"/>
-        <location filename="../widgets/visits_panel.py" line="680"/>
+        <location filename="../widgets/visits_panel.py" line="746"/>
+        <location filename="../widgets/visits_panel.py" line="776"/>
         <source>Invalid: </source>
         <translation>Invalid: </translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="671"/>
+        <location filename="../widgets/visits_panel.py" line="767"/>
         <source>Save MPC report</source>
         <translation>Save MPC report</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="690"/>
+        <location filename="../widgets/visits_panel.py" line="786"/>
         <source>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</source>
         <translation>⚠ the report&apos;s first measurement is from %1, not this visit&apos;s date</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="693"/>
+        <location filename="../widgets/visits_panel.py" line="789"/>
         <source>Saved: %1 (%2 lines)</source>
         <translation>Saved: %1 (%2 lines)</translation>
     </message>
@@ -7718,7 +7743,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>{0} mag</translation>
     </message>
     <message>
-        <location filename="../widgets/visits_panel.py" line="185"/>
+        <location filename="../widgets/visits_panel.py" line="186"/>
         <source>{0} visits</source>
         <translation>{0} visits</translation>
     </message>

@@ -55,7 +55,7 @@ def test_migration_v3_to_current_preserves_projects(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
     # project survived
     row = db.execute(
         "SELECT kind, object_name FROM projects WHERE id=1").fetchone()
@@ -111,7 +111,7 @@ def test_migration_v9_moves_session_images_into_the_registry(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
     row = db.execute(
         "SELECT path, kind, session_id, meta FROM project_files"
         " WHERE project_id=1").fetchone()
@@ -146,7 +146,7 @@ def test_migration_v5_is_idempotent(tmp_path):
 
     Database(str(file))  # 3 -> current
     db = Database(str(file))  # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
 
 
 # ---------------- sessions CRUD ----------------
@@ -262,3 +262,48 @@ def test_points_cascade_with_project(tmp_db):
     followup.add_point(tmp_db, p["id"], 60602.5, "Clear", 16.5)
     project.delete(tmp_db, p["id"])
     assert len(followup.list_points(tmp_db, p["id"])) == 0
+
+
+def test_migration_v10_adds_the_pin_column(tmp_path):
+    # ADR-045 review: a pre-pin database gains project_sessions.pinned
+    # with default 0, and existing visits survive unpinned.
+    import sqlite3
+    import time
+    from nightscribe.core import db as dbmod
+    from nightscribe.core.db import Database
+
+    file = tmp_path / "v9.db"
+    conn = sqlite3.connect(str(file))
+    conn.executescript(dbmod._SCHEMA)
+    conn.executescript(dbmod._V1)
+    conn.execute("ALTER TABLE observations ADD COLUMN project_id INTEGER")
+    conn.execute("ALTER TABLE project_files ADD COLUMN session_id INTEGER")
+    conn.execute("ALTER TABLE project_files ADD COLUMN meta TEXT DEFAULT '{}'")
+    now = time.time()
+    conn.execute(
+        "INSERT INTO projects (kind, object_name, status, created, updated,"
+        " context) VALUES ('sn', 'SN2026p', 'active', ?, ?, '{}')",
+        (now, now))
+    conn.executescript("""
+    CREATE TABLE project_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL,
+        obs_date TEXT, notes TEXT DEFAULT '', created REAL NOT NULL);
+    CREATE TABLE photometry_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL,
+        session_id INTEGER, mjd REAL, filter TEXT, mag REAL, err REAL,
+        source TEXT);
+    """)
+    conn.execute("INSERT INTO project_sessions (project_id, obs_date,"
+                 " created) VALUES (1, '2026-09-20', ?)", (now,))
+    conn.execute("PRAGMA user_version = 9")
+    conn.commit()
+    conn.close()
+
+    db = Database(str(file))
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    cols = {r[1] for r in db.execute(
+        "PRAGMA table_info(project_sessions)").fetchall()}
+    assert "pinned" in cols
+    from nightscribe.core import followup as fu
+    s = fu.list_sessions(db, 1)
+    assert len(s) == 1 and s[0]["pinned"] is False

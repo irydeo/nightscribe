@@ -7,7 +7,9 @@ se mueve a su propia ventana no modal — VisitsPanel queda como resumen
 ligero en la pestaña — y la astrometría MPC vive dentro de esa ventana:
 forma A, sin visita no hay ni área de pegado; el reporte se registra en
 la visita anfitriona y avisa si la fecha de la primera medida no cuadra
-con la de la visita)
+con la de la visita; y una visita puede fijarse 📌 arriba de la lista o
+editar su fecha — su nombre — desde la cabecera de su ventana,
+migración v10)
 
 **Ver / See**: ADR-019 (la UX v3 centrada en proyectos; revisado aquí) ·
 ADR-041 (la barra de pestañas del proyecto; enmendado aquí) · ADR-043 (la
@@ -167,7 +169,10 @@ confirmed in the field:
    report registers to the hosting visit; when the report's first
    measurement's date disagrees with the visit's
    (`mpc_report.first_obs_date`), the window warns without blocking (a
-   report hung on the wrong night is a silent database sin).
+   report hung on the wrong night is a silent database sin). A visit can
+   also be **pinned** (📌, it floats to the top of the list — migration
+   v10) and its **date edited** in the window's header (the date is the
+   visit's name; points already saved keep their own MJD).
 
 **Consequences.** Migrations v8 and v9 with translatable notes; the
 migration tests seed old databases and verify both. The manager has its

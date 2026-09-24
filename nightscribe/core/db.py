@@ -317,6 +317,21 @@ def _migrate(conn):
                     (pid, path, "fits", created, sid, meta))
             conn.execute("DROP TABLE session_images")
         conn.execute("PRAGMA user_version = 9")
+    if v < 10:
+        # ADR-045 (same-day usability review): a visit can be pinned to
+        # the top of the list (the one you're working tonight floats over
+        # the archive) and its date is editable from its window. The
+        # table guard mirrors v9's: a hand-seeded old database may not
+        # have it (the real chain creates it at v5).
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "project_sessions" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(project_sessions)")}
+            if "pinned" not in cols:
+                conn.execute("ALTER TABLE project_sessions ADD COLUMN"
+                             " pinned INTEGER DEFAULT 0")
+        conn.execute("PRAGMA user_version = 10")
     conn.commit()
 
 
@@ -355,6 +370,9 @@ MIGRATION_NOTES = {
         "One registry for every project file, with its visit linked: "
         "the per-night images you had already registered moved over "
         "automatically."),
+    10: QT_TRANSLATE_NOOP("NSMigrations",
+        "Visits can be pinned to the top of the list, and their date is "
+        "editable from the visit's window."),
 }
 
 

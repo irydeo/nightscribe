@@ -50,27 +50,31 @@ def create_session(db, project_id, obs_date=None, notes=""):
 
 
 def list_sessions(db, project_id):
-    # @return: list of session dicts ordered by obs_date
+    # @return: list of session dicts: pinned visits first, then newest
+    #          first by observing date (ADR-045)
     rows = db.execute(
-        "SELECT id, project_id, obs_date, notes, created"
-        " FROM project_sessions WHERE project_id=? ORDER BY obs_date DESC",
+        "SELECT id, project_id, obs_date, notes, created, pinned"
+        " FROM project_sessions WHERE project_id=?"
+        " ORDER BY pinned DESC, obs_date DESC",
         (project_id,),
     ).fetchall()
     return [{"id": r[0], "project_id": r[1], "obs_date": r[2],
-             "notes": r[3] or "", "created": r[4]} for r in rows]
+             "notes": r[3] or "", "created": r[4], "pinned": bool(r[5])}
+            for r in rows]
 
 
 def get_session(db, session_id):
     # @return: session dict or None
     row = db.execute(
-        "SELECT id, project_id, obs_date, notes, created"
+        "SELECT id, project_id, obs_date, notes, created, pinned"
         " FROM project_sessions WHERE id=?",
         (session_id,),
     ).fetchone()
     if not row:
         return None
     return {"id": row[0], "project_id": row[1], "obs_date": row[2],
-            "notes": row[3] or "", "created": row[4]}
+            "notes": row[3] or "", "created": row[4],
+            "pinned": bool(row[5])}
 
 
 def update_session_notes(db, session_id, notes):
@@ -78,6 +82,31 @@ def update_session_notes(db, session_id, notes):
     cur = db.execute(
         "UPDATE project_sessions SET notes=? WHERE id=?",
         (notes, session_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
+def update_session_date(db, session_id, obs_date):
+    # Edits the visit's date (its visible name in the list). Points
+    # already saved to the visit keep their own MJD: they were measured
+    # then, and that truth is not rewritten here.
+    # @args: obs_date - ISO date string
+    # @return: True if the session was found
+    cur = db.execute(
+        "UPDATE project_sessions SET obs_date=? WHERE id=?",
+        (obs_date, session_id),
+    )
+    db.commit()
+    return cur.rowcount > 0
+
+
+def set_session_pinned(db, session_id, pinned):
+    # Pins/unpins a visit: pinned ones float to the top of the list.
+    # @return: True if the session was found
+    cur = db.execute(
+        "UPDATE project_sessions SET pinned=? WHERE id=?",
+        (1 if pinned else 0, session_id),
     )
     db.commit()
     return cur.rowcount > 0

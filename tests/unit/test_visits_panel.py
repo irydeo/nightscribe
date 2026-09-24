@@ -27,6 +27,8 @@ import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import Qt  # noqa: E402
+
 
 @pytest.fixture(scope="module")
 def qapp():
@@ -313,3 +315,50 @@ def test_mpc_save_matching_date_warns_nothing(qapp, tmp_path, monkeypatch):
     vp.close_visit_window()
     vp.deleteLater()
     db.close()
+
+
+# ---------------- pin and the editable date (ADR-045 review) -----------
+
+def test_visit_date_editable_from_the_window(panel):
+    from nightscribe.core import followup as fu
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    sid = vp.current_session_id()
+    # the save gesture arms exactly while the field is dirty (the field
+    # report: an invisible save-on-focus-out alone leaves the observer
+    # guessing)
+    btn = vp._win.btn_save_date
+    assert not btn.isEnabled()
+    vp._win._date_ed.setText("2026-09-20")
+    assert btn.isEnabled()
+    btn.click()
+    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-20"
+    assert not btn.isEnabled()          # clean again after the save
+    assert vp.lst.item(0).text().startswith("2026-09-20")
+    # Enter/focus-out shares the same path
+    vp._win._date_ed.setText("2026-09-21")
+    vp._win._on_date_edited()
+    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-21"
+    # an invalid date reverts to the stored one, text selected, no crash
+    vp._win._date_ed.setText("ayer por la noche")
+    vp._win._on_date_edited()
+    assert vp._win._date_ed.text() == "2026-09-21"
+    assert not btn.isEnabled()
+    assert fu.get_session(vp._db, sid)["obs_date"] == "2026-09-21"
+
+
+def test_pinned_visit_floats_to_the_top(panel):
+    from nightscribe.core import followup as fu
+    vp, pid, _o = panel
+    fu.create_session(vp._db, pid, "2026-09-22")
+    sid_old = fu.create_session(vp._db, pid, "2026-09-20")
+    vp.refresh()
+    assert vp.lst.item(0).data(Qt.UserRole) != sid_old   # newest first
+    vp.open_visit(sid_old)
+    vp._win.btn_pin.setChecked(True)
+    # the pinned visit leads the list, marked
+    assert vp.lst.item(0).data(Qt.UserRole) == sid_old
+    assert vp.lst.item(0).text().startswith("📌")
+    vp.open_visit(sid_old)
+    vp._win.btn_pin.setChecked(False)
+    assert vp.lst.item(0).data(Qt.UserRole) != sid_old

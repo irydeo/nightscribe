@@ -178,7 +178,8 @@ class VisitsPanel(QWidget):
                 chips.append(self.tr("{0} mag").format(n_pts))
             tag = ("  ·  " + " · ".join(chips)) if chips else ""
             notes = f"  ·  {s['notes'][:24]}…" if s["notes"] else ""
-            item = QListWidgetItem(f"{s['obs_date']}{tag}{notes}")
+            pin = "📌 " if s.get("pinned") else ""
+            item = QListWidgetItem(f"{pin}{s['obs_date']}{tag}{notes}")
             item.setData(Qt.UserRole, s["id"])
             self.lst.addItem(item)
         n = len(sessions)
@@ -308,8 +309,38 @@ class VisitWindow(QDialog):
             return
         lay = QVBoxLayout(self)
         head = QHBoxLayout()
-        title = QLabel(f"<b>{s['obs_date'] or '?'}</b>")
-        head.addWidget(title, 1)
+        # the visit's date is its name in the list — editable in place
+        # (ADR-045 review: «pin or edit a visit's name»)
+        self._date_ed = QLineEdit(s["obs_date"] or "")
+        self._date_ed.setObjectName("vp_visit_date")
+        self._date_ed.setPlaceholderText("YYYY-MM-DD")
+        self._date_ed.setToolTip(self.tr(
+            "The visit's date (its name in the list). Points already "
+            "saved to it keep their own MJD"))
+        self._date_ed.setMaximumWidth(150)
+        f = self._date_ed.font()
+        f.setBold(True)
+        self._date_ed.setFont(f)
+        self._date_ed.editingFinished.connect(self._on_date_edited)
+        head.addWidget(self._date_ed, 1)
+        # an explicit save gesture: an invisible save-on-focus-out alone
+        # leaves the observer guessing whether the edit took
+        self.btn_save_date = QPushButton(self.tr("Save date"))
+        self.btn_save_date.setObjectName("vp_btn_save_date")
+        self.btn_save_date.setToolTip(self.tr(
+            "Save the visit's date (the date is its name in the list)"))
+        self.btn_save_date.setEnabled(False)   # arms on a dirty field
+        self.btn_save_date.clicked.connect(self._on_save_date_clicked)
+        self._date_ed.textChanged.connect(self._on_date_dirty)
+        head.addWidget(self.btn_save_date)
+        self.btn_pin = QPushButton("📌")
+        self.btn_pin.setObjectName("vp_btn_pin")
+        self.btn_pin.setCheckable(True)
+        self.btn_pin.setChecked(bool(s.get("pinned")))
+        self.btn_pin.setToolTip(self.tr(
+            "Pin the visit: it floats to the top of the list"))
+        self.btn_pin.toggled.connect(self._on_pin_toggled)
+        head.addWidget(self.btn_pin)
         btn_del = QPushButton(self.tr("Delete visit…"))
         btn_del.setObjectName("vp_btn_delete")
         btn_del.clicked.connect(self._on_delete_visit)
@@ -370,6 +401,57 @@ class VisitWindow(QDialog):
         self._notes = snotes
 
     # ---------------------------------------------------------- visit
+
+    def _stored_date(self):
+        # @return: the visit's date as persisted (or "")
+        from ...core import followup as fu
+        s = fu.get_session(self._db, self._sid)
+        return (s or {}).get("obs_date") or ""
+
+    def _on_date_dirty(self, _text):
+        # The save gesture arms exactly while the field differs from the
+        # stored date.
+        self.btn_save_date.setEnabled(
+            self._date_ed.text().strip() != self._stored_date())
+
+    def _on_save_date_clicked(self):
+        # The explicit save gesture shares the validation path.
+        self._save_date()
+
+    def _on_date_edited(self):
+        # Enter/focus-out saves too — the visible button is the same path.
+        self._save_date()
+
+    def _save_date(self):
+        # The visit's date is its name in the list: validate, save, and
+        # let the panel re-sort. An invalid date reverts to the stored
+        # one with the text selected for a retry (never a modal).
+        from ...core import followup as fu
+        txt = self._date_ed.text().strip()
+        ok = False
+        for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y/%m/%d"):
+            try:
+                datetime.datetime.strptime(txt, fmt)
+                ok = True
+                break
+            except ValueError:
+                pass
+        if not ok or not txt:
+            self._date_ed.blockSignals(True)
+            self._date_ed.setText(self._stored_date())
+            self._date_ed.selectAll()
+            self._date_ed.blockSignals(False)
+            self.btn_save_date.setEnabled(False)
+            return
+        fu.update_session_date(self._db, self._sid, txt)
+        self.btn_save_date.setEnabled(False)   # clean again
+        self._emit_change()
+
+    def _on_pin_toggled(self, checked):
+        # Pin/unpin: the visit floats to the top of the panel's list.
+        from ...core import followup as fu
+        fu.set_session_pinned(self._db, self._sid, checked)
+        self._emit_change()
 
     def _on_delete_visit(self):
         # Confirmation first; points and files keep living in the project,

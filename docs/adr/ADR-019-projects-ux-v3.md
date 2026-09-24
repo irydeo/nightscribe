@@ -177,6 +177,21 @@ puntos históricos `source="quicklook"` siguen pintándose discontinuos
 («indicativa»): quedan excluidos de las exportaciones por defecto, y solo
 un checkbox explícito los incluye.
 
+**Revisión (2026-09-24)**: los ficheros del proyecto se reubican. La
+sección plegable «Ficheros del proyecto» al pie de **Detalles** queda
+retirada: la cabecera del proyecto gana el botón **«Files (n)»** siempre
+visible (desactivado con cero ficheros) que abre una **ventana propia** con
+la tabla (tipo, nombre, fecha, tamaño) y un menú por fila. Un doble clic en
+una placa (tipo `fits`/`image`) abre el **editor FITS unificado** (ADR-044)
+sobre esa placa con el objeto del proyecto adjunto y el gancho de
+guardado activo: lo que se guarde ahí se registra en `project_files`; los
+demás ficheros se abren con el sistema, y el menú por fila conserva
+«Open with the system», carpeta y copiar ruta. La ventana es persistente
+(una sola instancia que sobrevive al cambio de proyecto y a la
+reconstrucción de la página) y se rellena con la lista fresca en cada
+apertura. El modelo de datos no cambia: `project_files` sigue siendo la
+tabla única de ficheros del proyecto.
+
 ## English
 
 **Context**: after v2 (ADR-017), a product reflection from the user: NightScribe must
@@ -347,3 +362,17 @@ against the template) is recomputed on tab open and after every save.
 historic `source="quicklook"` points keep rendering dashed
 ("indicativa"): they are excluded from the exports by default, and only
 an explicit checkbox includes them.
+
+**Review (2026-09-24)**: the project's files get a new home. The
+collapsed "Project files" section at the bottom of **Details** is
+retired: the project masthead gains an always-visible **"Files (n)"**
+button (disabled at zero files) that opens a **dedicated window** with
+the table (kind, name, date, size) and a per-row menu. A double-click on
+a plate (kind `fits`/`image`) opens the **unified FITS editor** (ADR-044)
+on that plate with the project's object attached and the save hook
+active: whatever is saved there gets registered in `project_files`; the
+rest of the files open with the OS, and the per-row menu keeps "Open
+with the system", folder and copy path. The window is persistent (a
+single instance that survives project switches and page rebuilds) and is
+refilled with a fresh list on every show. The data model is unchanged:
+`project_files` remains the project's single file table.

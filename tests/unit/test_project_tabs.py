@@ -31,9 +31,12 @@ action) wipes all of them:
     pile controls up
   * the Follow-up tab is hidden for kinds outside FOLLOWUP_KINDS; a
     deep link to it there is a safe no-op
-  * every deep link (Next-card Go, the follow-up entry point, the
-    nested "Project files" list) lands on the right page and enforces
-    the one-visible-page rule
+  * every deep link (Next-card Go, the follow-up entry point) lands
+    on the right page and enforces the one-visible-page rule
+  * the masthead "Files (n)" button (disabled at zero) opens the
+    project files window: one persistent dialog, re-keyed to the
+    current project on every show (the old nested "Project files"
+    section inside the Object card is retired)
   * the chip on each step page header mirrors the step state (done
     <date> / skipped / pending); the object card and the follow-up
     page carry no chip
@@ -485,57 +488,72 @@ def test_exactly_one_page_visible(window, panel):
     assert shown == ["followup"]
 
 
-def test_files_section_lives_in_the_object_card(window, panel):
-    # The nested "Project files" section lives inside the Object card's
-    # tab page: it starts folded and a header click expands it without
-    # moving the active tab.
+# ---------------- A4: the masthead "Files (n)" button and its window --
+
+
+def test_files_button_off_for_an_empty_project(window, panel):
+    # The button mirrors the file count: a fresh project has none, so
+    # it is disabled and reads "Files (0)"; the old in-card section
+    # attributes are gone for good.
     _mk_project(window)
-    window.projects.btn_tab_details.click()
-    sec = window._proj_files_section
-    assert sec is not None and sec.isCollapsed()
-    sec._btn.click()
-    assert sec.isExpanded()
-    assert window._active_tab == "details"
-    assert not window._tab_pages["details"].isHidden()
-    assert window._tab_pages["plan"].isHidden()
+    btn = window.projects.btn_files
+    assert not btn.isEnabled()
+    assert btn.text() == window.tr("Files (0)")
+    assert not hasattr(window, "_proj_files_section")
+    assert not hasattr(window, "_proj_files_list")
 
 
-def test_switching_tabs_keeps_inner_fold_state(window, panel):
-    # ADR-041: each tab page is its own world — the fold state of the
-    # files list inside the Object card survives a round trip through
-    # another tab; only one page is visible at any moment.
-    _mk_project(window)
-    window.projects.btn_tab_details.click()
-    sec = window._proj_files_section
-    sec._btn.click()  # expand the files list inside the card
-    assert sec.isExpanded()
-    window.projects.btn_tab_process.click()
-    assert window._active_tab == "process"
-    assert not window._tab_pages["process"].isHidden()
-    assert window._tab_pages["details"].isHidden()
-    assert sec.isExpanded()  # the card's fold state is kept, not reset
-    window.projects.btn_tab_details.click()
-    assert not window._tab_pages["details"].isHidden()
-    assert sec.isExpanded()
+def test_files_button_opens_the_files_window(window, panel):
+    # With files registered the button is on and shows its live count;
+    # clicking it opens the files window for the current project with
+    # the files in registration order.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p = _mk_project(window)
+    project.add_file(dbmod.db, p["id"], "/tmp/tab_seq.targets", "sequence")
+    project.add_file(dbmod.db, p["id"], "/tmp/tab_blink.gif", "chart")
+    window._populate_project_files(p["id"])
+    btn = window.projects.btn_files
+    assert btn.isEnabled()
+    assert btn.text() == window.tr("Files (2)")
+    btn.click()
+    dlg = window._proj_files_dlg
+    assert dlg is not None
+    assert dlg.isVisible()
+    assert dlg.project_id == p["id"]
+    assert dlg.tbl.rowCount() == 2
+    kinds = {dlg.tbl.item(i, 0).text() for i in range(dlg.tbl.rowCount())}
+    assert kinds == {"sequence", "chart"}
 
 
-def test_files_toggled_signal_fires_only_on_user_click(window, panel):
-    # setCollapsed() stays silent (programmatic); a real header click
-    # emits the new state (the section's recursion guard rests on this).
-    _mk_project(window)
-    sec = window._proj_files_section
-    fires = []
-    sec.sectionToggled.connect(fires.append)
-    try:
-        sec.setCollapsed(True)
-        sec.setCollapsed(False)
-        assert fires == []
-        sec._btn.click()
-        assert fires == [False]
-        sec._btn.click()
-        assert fires == [False, True]
-    finally:
-        sec.sectionToggled.disconnect(fires.append)
+def test_files_window_survives_project_switch_and_rekeys(window, panel):
+    # The dialog is one persistent instance: a project switch leaves it
+    # open and still attached to the first project, and a re-show
+    # re-keys it onto the project open at that moment (not whichever
+    # one first opened it).
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    p1 = _mk_project(window)
+    project.add_file(dbmod.db, p1["id"], "/tmp/a1.targets", "sequence")
+    window._populate_project_files(p1["id"])
+    window.projects.btn_files.click()
+    dlg = window._proj_files_dlg
+    assert dlg.isVisible()
+    assert dlg.project_id == p1["id"]
+    assert dlg.tbl.rowCount() == 1
+    # switch to a second project while the window is open...
+    p2 = _mk_project(window, name="SN 2100qh")
+    project.add_file(dbmod.db, p2["id"], "/tmp/b1.gif", "chart")
+    window._populate_project_files(p2["id"])
+    # ...the window stays, still attached to the first project...
+    assert dlg.isVisible()
+    assert dlg.project_id == p1["id"]
+    # ...until it is shown again, when it re-keys onto the current one.
+    window.projects.btn_files.click()
+    assert window._proj_files_dlg is dlg     # one dialog, never rebuilt
+    assert dlg.project_id == p2["id"]
+    assert dlg.tbl.rowCount() == 1
+    assert dlg.tbl.item(0, 0).text() == "chart"
 
 
 # ---------------- chips: the step state on the tab page headers --------

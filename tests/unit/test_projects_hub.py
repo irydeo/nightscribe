@@ -241,7 +241,11 @@ def test_select_project_drives_panel(window, panel):
     # carries the nested "Project files" block, and the Next card took
     # over the old wizard buttons
     assert set(window._tab_pages) == {"details", "plan"}  # rest lazy
-    assert window._proj_files_section.isCollapsed()
+    # the masthead "Files (0)" button is the single entry to the
+    # project files (the old in-card section is retired); a fresh
+    # project has none registered, so it reads zero and stays off
+    assert not window.projects.btn_files.isEnabled()
+    assert window.projects.btn_files.text() == window.tr("Files (0)")
     # a fresh project opens on its next-action tab (a fresh project is
     # at "plan"); the object card stays hidden until the user opens it
     assert not window._tab_pages["plan"].isHidden()
@@ -1203,29 +1207,46 @@ def test_hub_favorites_first(window, panel):
     _reset_filters(window)
 
 
-# ---------------- A4: project files visible ----------------
+# ---------------- A4: the masthead Files (n) button and its window ----
 
-def test_hub_files_list_populated(window, panel):
+def test_hub_files_button_count_and_window(window, panel):
+    # The masthead button carries the live count; clicking it opens
+    # the files window for the current project, rows as registered.
     _reset_filters(window)
-    from PySide6.QtCore import Qt
     from nightscribe.core import project
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026files", {"kind": "sn"})
     project.add_file(dbmod.db, p["id"], "/tmp/test_seq.targets", "sequence")
     project.add_file(dbmod.db, p["id"], "/tmp/test_blink.gif", "chart")
     _reselect(window, p["id"])
-    lst = window._proj_files_list
-    assert lst.count() == 2
-    texts = [lst.item(i).text() for i in range(lst.count())]
-    assert any("sequence" in t for t in texts)
-    assert any("chart" in t for t in texts)
+    btn = window.projects.btn_files
+    assert btn.isEnabled()
+    assert btn.text() == window.tr("Files (2)")
+    btn.click()
+    dlg = window._proj_files_dlg
+    assert dlg.isVisible()
+    assert dlg.project_id == p["id"]
+    assert dlg.tbl.rowCount() == 2
+    kinds = {dlg.tbl.item(i, 0).text() for i in range(dlg.tbl.rowCount())}
+    assert any("sequence" in k for k in kinds)
+    assert any("chart" in k for k in kinds)
 
 
-def test_hub_files_list_empty_for_new_project(window, panel):
+def test_hub_files_window_empty_for_new_project(window, panel):
+    # A fresh project: the button is off and reads zero; the window
+    # (opened through the button slot) shows the empty state label
+    # instead of rows.
     _reset_filters(window)
     _create_and_select(window, "sn", "SN2026nofiles", {"kind": "sn"})
-    lst = window._proj_files_list
-    assert lst.count() == 0
+    btn = window.projects.btn_files
+    assert not btn.isEnabled()
+    assert btn.text() == window.tr("Files (0)")
+    window._show_project_files()     # the wired slot: build or re-key
+    dlg = window._proj_files_dlg
+    assert dlg.isVisible()
+    assert dlg.project_id == window._current_project["id"]
+    assert dlg.tbl.rowCount() == 0
+    assert dlg.lbl_status.isVisible()
 
 
 def test_change_project_folder_rehomes_future_exports(window, panel,
@@ -2327,10 +2348,13 @@ def _flush_deferred_deletions():
         app.sendPostedEvents(None, QEvent.DeferredDelete)
 
 
-def test_reselect_rebuilds_files_list_after_wipe(window):
-    # Select, wipe (reselecting clears the page first), let the queued
-    # deletions run, then select again: the files list must be rebuilt
-    # fresh and repopulated -- the old QListWidget is dead by then.
+def test_files_window_survives_page_wipes(window):
+    # The files window lives on the main window, not on the project
+    # page: wiping the page (reselect -> deleteLater) must not kill it.
+    # Once the queued deletions have run, the old "rebuild the list
+    # inside a wiped page" crash class is gone by design -- the dialog
+    # itself is the persistent home of the file list, and re-showing
+    # just re-keys it onto the current project.
     from PySide6 import Shiboken
     import nightscribe.core.db as dbmod
     from nightscribe.core import project
@@ -2347,23 +2371,27 @@ def test_reselect_rebuilds_files_list_after_wipe(window):
         project.add_file(dbmod.db, p["id"], "/tmp/wipe_seq.targets",
                          "sequence")
         _reselect(window, p["id"])
-        first = window._proj_files_list
-        assert first is not None and first.count() == 1
+        window._show_project_files()
+        dlg = window._proj_files_dlg
+        assert dlg.project_id == p["id"]
+        assert dlg.tbl.rowCount() == 1
 
-        # the wipe schedules the deletion of the list it hosted...
+        # two more wipes: the page dies under the dialog, not it...
         _reselect(window, p["id"])
-        assert window._proj_files_list is not first
         _flush_deferred_deletions()
-        assert not Shiboken.isValid(first)   # ...and by now it is truly gone
+        assert Shiboken.isValid(dlg)          # the window outlives the page
+        _reselect(window, p["id"])
+        _flush_deferred_deletions()
+        assert Shiboken.isValid(dlg)
+        assert window._proj_files_dlg is dlg  # one instance, never rebuilt
 
-        # ...the next select must build a fresh one and fill it -- pre-fix
-        # this is exactly where "already deleted" surfaced (lst.clear()).
-        _reselect(window, p["id"])           # must not raise
-        lst = window._proj_files_list
-        assert lst is not first
-        assert lst.count() == 1
-        texts = [lst.item(i).text() for i in range(lst.count())]
-        assert any("sequence" in t for t in texts)
+        # ...and it still speaks for the project
+        window._show_project_files()
+        assert dlg.project_id == p["id"]
+        assert dlg.tbl.rowCount() == 1
+        kinds = [dlg.tbl.item(i, 0).text()
+                 for i in range(dlg.tbl.rowCount())]
+        assert any("sequence" in k for k in kinds)
     finally:
         if window._proj_panel is not None \
                 and Shiboken.isValid(window._proj_panel):

@@ -466,3 +466,50 @@ def test_object_builder_chain(window):
     p3 = {"object_name": "V3", "context": {"sequence":
                                            {"target_mag": 11.25}}}
     assert window._ufe_object_from_project(p3)["mag"] == 11.25
+
+
+def test_files_window_opens_ufe_for_a_project_plate(window):
+    # End to end: the Projects Files window double-clicks a plate row
+    # and the unified FITS editor opens on that plate with the
+    # project's object attached, ready to annotate. The project
+    # save hook is live too: files saved in the editor register
+    # on the project (ADR-044, the files-window rework).
+    from PySide6.QtWidgets import QMessageBox
+    QMessageBox.warning = staticmethod(lambda *a, **k: None)
+    from nightscribe.core import db as dbmod
+    from nightscribe.core import project as proj
+
+    p = proj.create(dbmod.db, "sn", "SN 2110ff",
+                    {"ra_deg": 275.0, "dec_deg": 10.5, "mag": 17.8})
+    proj.add_file(dbmod.db, p["id"], str(MONO), "fits")
+    try:
+        window._current_project = proj.get(dbmod.db, p["id"])
+        window._populate_project_files(p["id"])
+        assert window.projects.btn_files.isEnabled()
+        assert window.projects.btn_files.text() == "Files (1)"
+        window._show_project_files()
+        fd = window._proj_files_dlg
+        assert fd.project_id == p["id"]
+        assert fd.tbl.rowCount() == 1
+        # Offscreen the QTest synthetic mouse does not reach
+        # QTableWidget, so the double-click is emitted by hand
+        # (tests/unit/test_tonight_table.py does the same).
+        fd.tbl.itemDoubleClicked.emit(fd.tbl.item(0, 0))
+
+        # The editor opened on the plate, Annotate tab, object attached.
+        uf = window._ufe
+        assert uf is not None and uf.isVisible()
+        assert uf.tabs.currentWidget() is uf.tab_annotate
+        assert uf.state.has_image
+        assert uf.state.path == str(MONO)
+        assert uf.object() == {"name": "SN 2110ff", "ra": 275.0,
+                               "dec": 10.5, "mag": 17.8, "bv": None}
+        # The project save hook is live: saving a FITS there writes
+        # it into the project files like the legacy dialogs did.
+        saved = str(FIXTURES / "e2e_annotated.fits")
+        uf.notify_saved([saved], "fits")
+        files = proj.list_files(dbmod.db, p["id"])
+        assert any(f["path"] == saved and f["kind"] == "fits"
+                   for f in files)
+    finally:
+        proj.delete(dbmod.db, p["id"])

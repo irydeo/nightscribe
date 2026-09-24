@@ -640,3 +640,75 @@ def test_at2026acka_faint_stars_imply_one_consistent_zp(at2026acka):
         zps.append(g + 2.5 * math.log10(r["flux"]))
     assert max(zps) - min(zps) < 0.05, zps
     assert 27.80 < sum(zps) / len(zps) < 27.90
+
+
+# ---------------- faint sources on structured backgrounds --------------
+#
+# The 2026-09 field case: a SN faint and inside its galaxy, a bright star
+# 7 px away. The global-std detector was blind to the bump and the moment
+# centroid dragged the fit onto the bright neighbour.
+
+def _structured_plate():
+    # A faint bump on a rising glow with a bright star next to it,
+    # mirroring the AT2026acka SN corner: sky 800, a slope, a bright
+    # gaussian and a ~3.5 px-FWHM bump 7 px from it.
+    rng = np.random.default_rng(21)
+    yy, xx = np.ogrid[:200, :200]
+    plate = 800.0 + 2.0 * (xx + yy) + rng.normal(0, 1.5, (200, 200))
+    plate += 30000 * np.exp(-((xx - 110.0) ** 2 + (yy - 100.0) ** 2)
+                            / (2 * 1.5 ** 2))
+    plate += 550.0 * np.exp(-((xx - 103.0) ** 2 + (yy - 101.0) ** 2)
+                            / (2 * 1.5 ** 2))      # the faint one
+    return plate
+
+
+def test_local_sources_see_the_faint_bump_on_a_gradient():
+    plate = _structured_plate()
+    found = phot.local_sources(plate, k=4.0, min_sep=4)
+    hits = [(x, y) for x, y, _pk in found]
+    # the faint bump is found near its true position...
+    assert any(abs(x - 103.0) < 1.0 and abs(y - 101.0) < 1.0
+               for x, y in hits), found
+    # ...and the bright star too
+    assert any(abs(x - 110.0) < 1.0 and abs(y - 100.0) < 1.0
+               for x, y in hits), found
+    # the global-std detector (the snap's old one) cannot see the bump:
+    # the slope inflates its sigma past the bump's peak
+    from nightscribe.core import series
+    old = series.detect_sources(plate, k=5.0, min_sep=4)
+    assert not any(abs(x - 103.0) < 1.5 and abs(y - 101.0) < 1.5
+                   for x, y, _pk in old)
+
+
+def test_local_sources_empty_or_flat_plates_give_nothing():
+    assert phot.local_sources(None) == []
+    assert phot.local_sources(np.zeros((50, 50))) == []
+    assert phot.local_sources(np.full((50, 50), 800.0)) == []
+
+
+def test_gaussian_centroid_locks_the_bump_not_the_bright_neighbour():
+    # The contract on structured backgrounds: the centroid stays at the
+    # faint bump the observer clicked (within the lattice cell), and
+    # NEVER runs onto the bright neighbour (the old moment-seeded path
+    # measured the bright star 7 px away). Sub-pixel locking on real
+    # structure is pinned by the AT2026acka regression in the tab tests.
+    plate = _structured_plate()
+    for fw in (3.5, None):
+        cen = phot.gaussian_centroid(plate, 103.0, 101.0, fwhm=fw)
+        assert cen["ok"]
+        assert abs(cen["x"] - 103.0) < 1.5 and abs(cen["y"] - 101.0) < 1.5
+        assert math.hypot(cen["x"] - 110.0, cen["y"] - 100.0) > 4.0
+
+
+def test_gaussian_centroid_empty_sky_keeps_the_click():
+    plate = _plate(200, 200, [], noise=1.0)
+    cen = phot.gaussian_centroid(plate, 100.0, 100.0)
+    assert not cen["ok"]
+    assert cen["x"] == 100.0 and cen["y"] == 100.0
+
+
+def test_lock_local_peak_nearest_and_honest():
+    plate = _structured_plate()
+    assert phot.lock_local_peak(plate, 103.4, 100.6) == (103.0, 101.0)
+    # nothing significant within reach: the honest answer is None
+    assert phot.lock_local_peak(plate, 40.0, 40.0, max_dist=3.0) is None

@@ -484,14 +484,16 @@ class UfeMeasureTab(QWidget):
                 spn.blockSignals(False)
         return (r_ap, r_in, r_out), fwhm
 
-    def _measure_star(self, data, col, row, radii, sat):
-        # One measurement with the current UI's sky settings.
+    def _measure_star(self, data, col, row, radii, sat, fwhm=None):
+        # One measurement with the current UI's sky settings; when the
+        # comps gave a seeing, the centroid template is anchored to it
+        # (a local guess on a galaxy glow inflates and unlocks the fit).
         # @return: core/photometry.measure_point's dict
         return photometry.measure_point(
             data, col, row, r_ap=radii[0], r_ann_in=radii[1],
             r_ann_out=radii[2], sigma_clip=self.chk_sigmaclip.isChecked(),
             sat_adu=sat,
-            sky_mode=self.cmb_sky.currentData())
+            sky_mode=self.cmb_sky.currentData(), fwhm=fwhm)
 
     def _measure(self, col, row, entries):
         # Full chain: seeing -> target -> comps -> calibration -> panel.
@@ -506,10 +508,12 @@ class UfeMeasureTab(QWidget):
             wrow = row / self._diff_scale
             result = self._measure_star(self._diff, wcol, wrow,
                                         tuple(r / self._diff_scale
-                                              for r in radii), None)
+                                              for r in radii), None,
+                                        fwhm=(fwhm / self._diff_scale
+                                              if fwhm else None))
         else:
             result = self._measure_star(self._state.data, col, row,
-                                        radii, sat)
+                                        radii, sat, fwhm=fwhm)
         if not result["ok"]:
             reason = (result.get("reason") or {}).get(self._lang, "?")
             self.lbl_status.setText(reason)
@@ -566,12 +570,13 @@ class UfeMeasureTab(QWidget):
                 r = self._measure_star(
                     self._pair_obs, ccol / self._diff_scale,
                     crow / self._diff_scale,
-                    tuple(v / self._diff_scale for v in radii), None)
+                    tuple(v / self._diff_scale for v in radii), None,
+                    fwhm=(fwhm / self._diff_scale if fwhm else None))
             else:
                 # the ceiling applies to comps too: a saturated or
                 # roll-off-compressed comp poisons the zero point
                 r = self._measure_star(self._state.data, ccol, crow,
-                                       radii, sat)
+                                       radii, sat, fwhm=fwhm)
             value, derived = self._band_of(star, band)
             if not r["ok"]:
                 _skip("sat" if r.get("saturated") else "other")
@@ -758,6 +763,9 @@ class UfeMeasureTab(QWidget):
                 notes.append(self.tr(
                     "the centroid landed {0:.1f} px from the click")
                     .format(moved))
+        if last["result"].get("cen_ok") is False:
+            notes.append(self.tr(
+                "no source could be locked: measured where you clicked"))
         if "V" not in last.get("bands_avail", []) and band != "V":
             notes.append(self.tr(
                 "The sequence carries no Johnson V: calibrating in "

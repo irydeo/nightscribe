@@ -234,6 +234,74 @@ Si la SN está 2 mag por debajo de la media del ensemble hoy y 1,5 mag
 mañana, se ha debilitado 0,5 mag: el cero absoluto no importa, la
 **evolución** es la señal.
 
+### 3.4 Medir supernovae débiles sobre su galaxia (lecciones de campo)
+
+Una SN de 16-18 mag sentada sobre el brillo de su huésped es el caso
+más delicado de la fotometría de apertura. Estas son las opciones que
+el Editor FITS te da hoy, y cuándo conviene cada una (lecciones pagadas
+con placas reales de 10 s y filtro Clear):
+
+**La secuencia de comparación**
+
+* ✅ Comps de **brillo parecido** al objetivo: la propuesta automática
+  ya las prefiere (ventana de brillo alrededor del objetivo), y si solo
+  quedan mucho más brillantes, la razón de cada estrella te avisa del
+  riesgo de saturación.
+* ❌ Comps «las más brillantes del campo, que tienen mejor SNR»: en una
+  exposición corta con Clear están comprimidas por el full well, el
+  punto cero miente a la baja (en campo lo vimos dar −0,9 mag) y la
+  estrella check no puede delatarlo porque comparte el sesgo. El panel
+  excluye las comprimidas y lo dice; si se queda corto, baja la
+  exposición o elige comps más débiles.
+
+**El centrado (clicar sobre la SN)**
+
+* ✅ Deja activada «la apertura sigue al seeing»: la seeing medida de
+  las comps es lo que ancla la plantilla del centroide sobre el brillo
+  de la galaxia; sin ella el ajuste local se infla y deriva.
+* ✅ La cruceta detecta fuentes débiles sobre fondo estructurado
+  (detector local robusto) y se fija a la fuente más cercana al cursor
+  con un alcance corto y fijo (9 px de placa): si no se fija a nada,
+  no hay nada detectable ahí, y al clicar la medida se hará exactamente
+  donde pulses, con nota en el panel («sin fuente que centrar»). Para
+  una SN al límite ese es el flujo honesto: el punto es un límite, no
+  una detección.
+* ❌ Confiar en un centroide sin mirar la línea «Píxel»: el anillo se
+  dibuja en el centroide **medido**; si se movió más de 1 px de tu
+  clic, el panel lo dice. En una galaxia, un desliz de píxeles es la
+  diferencia entre la SN y el brillo de su huésped.
+
+**El cielo local**
+
+* ✅ Mediana (por defecto) para cielo plano; **Plane** cuando la galaxia
+  inclina el fondo bajo la SN (en campo: 16,67 → 16,87, la diferencia
+  es real); **sustracción de galaxia huésped** (referencia PS1 escalada
+  por las comps) cuando la SN vive en el núcleo.
+* ❌ Anillos apretados contra la SN ni aperturas infladas «porque la
+  curva de crecimiento sigue subiendo»: si la curva no se aplana a
+  4 × FWHM, lo que sube no es la estrella (el sugeridor ya lo rechaza
+  y propone la de seeing, diciendo por qué).
+
+**La banda y el color**
+
+* ✅ Mira la línea de banda del panel: si la secuencia no puede derivar
+  V de Johnson, se calibra en G de Gaia y se dice; en estrellas rojas G
+  y V difieren en más de 1 mag.
+* ✅ El B−V del objetivo se rellena solo cuando el clic cae sobre una
+  estrella catalogada; si el panel dice «asumido» y la pendiente de
+  color es grande, introduce el B−V real a mano (sin filtro/L/OSC el
+  término de color es de primer orden; con filtro V es un retoque).
+
+**El veredicto**
+
+* ✅ La línea de **cruce con catálogo** es tu primer control: un Δ
+  grande y repetido es ciencia (la SN brillando) o mezcla, y la propia
+  línea te dice cuál fuente quedó bajo el centroide.
+* ✅ La check vigila la **dispersión** de la noche; lo que no ve (y
+  nunca verá) es un sesgo coherente de todas las comps: por eso el
+  panel desglosa por qué cada estrella de la secuencia quedó fuera.
+* ✅ Repite la medida por noche: dos puntos detectan lo que uno esconde.
+
 ---
 
 ## 4. Series temporales: el quicklook de supernovas

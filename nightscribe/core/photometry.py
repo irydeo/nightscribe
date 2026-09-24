@@ -123,7 +123,8 @@ def _sigma_clipped_median(values, level=SIG_LEVEL, iters=SIG_ITERS):
 
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
-                  sky_mode="median", centroid_mode="gaussian"):
+                  sky_mode="median", centroid_mode="gaussian",
+                  fwhm=None):
     # One click on one plate (decision D4): sub-pixel centroid, aperture
     # net flux, sky per pixel, peak, and honest guards. Never raises for
     # a bad star: the reason is the bilingual pair, the panel decides.
@@ -137,7 +138,11 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     #        plane fitted to the annulus, for galactic cores),
     #        centroid_mode - "gaussian" (matched-filter, parabola-fined;
     #        the default), "refined" (sky-subtracted moment, two passes)
-    #        or "raw" (the legacy one-pass moment)
+    #        or "raw" (the legacy one-pass moment),
+    #        fwhm - the plate's seeing in px when the caller knows it
+    #        (the Measure tab's comps-based estimate): the centroid
+    #        template then matches the stars instead of trusting a local
+    #        guess, which a galaxy glow inflates
     # @return: {"x", "y" (centroided where possible), "flux", "sky_pp",
     #          "peak", "n_pix", "saturated", "ok", "reason"}
     if data is None or data.size == 0:
@@ -149,14 +154,17 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     # quick-look candidate culling)
     if min(x, y, w - x, h - y) < r_ann_out:
         return _fail("demasiado cerca del borde", "too close to the edge")
+    cen_ok = None                     # the raw mode carries no verdict
     if centroid_mode == "raw":
         cx, cy = series._centroid(data, x, y)      # the legacy one-pass
     elif centroid_mode == "refined":
         cen = refined_centroid(data, x, y)
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
+        cen_ok = cen["ok"]
     else:
-        cen = gaussian_centroid(data, x, y)
-        cx, cy = cen["x"], cen["y"]
+        cen = gaussian_centroid(data, x, y, fwhm=fwhm)
+        cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
+        cen_ok = cen["ok"]
     yy, xx = np.ogrid[:h, :w]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
     ap_pixels = data[r2 <= r_ap ** 2]
@@ -220,7 +228,7 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
             "n_pix": n_pix}
     return {"x": cx, "y": cy, "flux": flux, "sky_pp": sky_pp,
             "peak": peak, "n_pix": n_pix, "saturated": False,
-            "ok": True, "reason": None}
+            "ok": True, "reason": None, "cen_ok": cen_ok}
 
 
 def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None):
@@ -593,6 +601,80 @@ def combine_errors(*terms):
 
 # ---------------- precision centroid + suggested apertures (phase I) ---
 
+def local_sources(data, k=4.0, min_sep=6, ring=4, max_sources=50):
+    # Source finding for structured backgrounds (galaxy cores, nebulosity):
+    # the noise is the MAD of pixel-to-pixel differences (a smooth gradient
+    # barely moves it, where a global std explodes), and every candidate's
+    # significance is measured against the median of a ring around it, not
+    # the frame's sky. Built for cutouts (the snap's 48 px, the centroid's
+    # seed box), in the same plain style as series.detect_sources, which
+    # keeps serving the full-plate quick-look.
+    # @args: data - 2D array, k - significance in local sigmas,
+    #        min_sep - minimum separation between sources (px),
+    #        ring - radius of the local-sky ring (px), max_sources - cap
+    # @return: list of (x, y, peak) sorted by significance (descending)
+    if data is None or data.size == 0:
+        return []
+    clean = np.nan_to_num(np.asarray(data, dtype=np.float64), nan=0.0)
+    h, w = clean.shape
+    if h < 2 * ring + 3 or w < 2 * ring + 3:
+        return []
+    diffs = np.concatenate([np.diff(clean, axis=1).ravel(),
+                            np.diff(clean, axis=0).ravel()])
+    noise = 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
+        / math.sqrt(2.0)
+    if noise <= 0:
+        # a noiseless plate (synthetic fixtures are flat to the last bit):
+        # fall back to the classic global estimator
+        noise = float(np.nanstd(clean))
+    if noise <= 0:
+        return []
+    out = []
+    for y in range(ring, h - ring):
+        for x in range(ring, w - ring):
+            v = clean[y, x]
+            if v < clean[y - 1:y + 2, x - 1:x + 2].max():
+                continue
+            if v == clean[y, x - 1] or v == clean[y - 1, x]:
+                continue        # plateau tie: the upper-left px speaks
+            loc = np.concatenate([clean[y - ring, x - ring:x + ring + 1],
+                                  clean[y + ring, x - ring:x + ring + 1],
+                                  clean[y - ring + 1:y + ring, x - ring],
+                                  clean[y - ring + 1:y + ring, x + ring]])
+            sig = (v - float(np.median(loc))) / noise
+            if sig < k:
+                continue
+            if any((px - x) ** 2 + (py - y) ** 2 < min_sep ** 2
+                   for px, py, _p, _s in out):
+                continue
+            out.append((float(x), float(y), float(v), float(sig)))
+    out.sort(key=lambda s: s[3], reverse=True)
+    return [(x, y, pk) for x, y, pk, _s in out[:max_sources]]
+
+
+def lock_local_peak(data, x, y, max_dist=4.0, k=4.0):
+    # The significant local peak nearest to the clicked pixel: the right
+    # seed for the centroid. A moment estimator drags toward the brightest
+    # wing inside its window (a neighbour star, a galaxy core); the matched
+    # filter can only refine around its seed, so the seed must be the
+    # source the observer MEANT, not the brightest thing nearby.
+    # @args: data - 2D array, x, y - the clicked pixel,
+    #        max_dist - how far a peak may be to count as "under the click"
+    # @return: (px, py) of the nearest local source, or None
+    if data is None or data.size == 0:
+        return None
+    h, w = data.shape
+    half = int(max_dist) + 7
+    y0, y1 = max(0, int(round(y)) - half), min(h, int(round(y)) + half + 1)
+    x0, x1 = max(0, int(round(x)) - half), min(w, int(round(x)) + half + 1)
+    best, best_d = None, max_dist ** 2
+    for px, py, _pk in local_sources(data[y0:y1, x0:x1], k=k):
+        d = (px + x0 - x) ** 2 + (py + y0 - y) ** 2
+        if d < best_d:
+            best, best_d = (px + x0, py + y0), d
+    return best
+
+
 def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     # The precision centroid: matched-filter correlation of the
     # sky-subtracted cutout with a gaussian template of the measured
@@ -622,8 +704,14 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
         fwhm = estimate_fwhm(data, [(x, y)]) or 4.0
     sigma_psf = max(fwhm / 2.3548, 0.7)
     half = max(5, int(round(2.0 * sigma_psf)) + 1)
-    seed = refined_centroid(data, x, y, sky_pp=sky_pp, fwhm=fwhm)
-    sx, sy = seed["x"], seed["y"]
+    # the seed is the significant peak nearest the click (lock_local_peak):
+    # a moment centroid drags toward the brightest wing in its window and
+    # the lattice below can only refine around the seed, so seeding from
+    # the moment could land the whole fit on a bright neighbour (the
+    # 2026-09 AT2026acka case). No peak nearby: seed at the click itself
+    # and let the SNR gate below judge whatever is there.
+    seed = lock_local_peak(data, x, y)
+    sx, sy = seed if seed is not None else (float(x), float(y))
     y0 = max(0, int(round(sy)) - half)
     y1 = min(h, int(round(sy)) + half + 1)
     x0 = max(0, int(round(sx)) - half)
@@ -660,12 +748,20 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
             if snr > best[1]:
                 best = ((sx + dx, sy + dy, amp, gg), snr)
     (bx, by, amp, gg), snr = best
-    # parabolic refinement of the correlation peak (sub-lattice)
+    # parabolic refinement of the correlation peak (sub-lattice). The
+    # vertex is never extrapolated past the lattice cell: on structured
+    # backgrounds (a galaxy core, a bright neighbour's wing) the surface
+    # can be near-flat or flipped, and a tiny denominator would otherwise
+    # run the centroid several pixels away from the winning lattice point
+    # (the 2026-09 AT2026acka case).
     def _peak(c0, c1, c2, base, step):
         denom = c0 - 2.0 * c1 + c2
         if abs(denom) < 1e-12:
             return base
-        return base + 0.5 * step * (c0 - c2) / denom
+        delta = 0.5 * step * (c0 - c2) / denom
+        if abs(delta) > step:
+            return base
+        return base + delta
 
     def _corr(cx, cy):
         g = np.exp(-(((xs - cx) ** 2 + (ys - cy) ** 2)
@@ -795,7 +891,10 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
     # @return: {"r_ap", "r_ann_in", "r_ann_out", "reasons": [{"es","en"}],
     #          "diag": {...}}
     reasons = []
-    cen = refined_centroid(data, x, y, fwhm=fwhm)
+    # center on the peak the observer meant: gaussian_centroid seeds from
+    # lock_local_peak, so a bright neighbour's wing cannot drag the whole
+    # growth curve onto itself (ok=False keeps the clicked point)
+    cen = gaussian_centroid(data, x, y, fwhm=fwhm)
     cx, cy = cen["x"], cen["y"]
     # seeing from the target itself when nobody measured one
     if fwhm is None:

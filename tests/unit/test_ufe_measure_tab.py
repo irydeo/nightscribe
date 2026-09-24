@@ -729,20 +729,14 @@ def test_assumed_bv_warns_when_the_colour_term_matters(dlg, tmp_path):
     assert "+0.40" in panel and "too bright" in panel
 
 
-def test_at2026acka_end_to_end_zp_recovers(dlg):
-    # The field report replayed whole: the real AT2026acka plate (10 s,
-    # Clear, no SATURATE card), a sequence mixing six healthy
-    # mid-brightness comps with two stars that sit at the full well, and
-    # the reported target. The clipped comps must be excluded and named,
-    # the zero point must recover (~27.85), and the target must land on
-    # its Gaia value (16.39). Catalog values are bootstrapped from the
-    # plate's own truth scale, the one the three reported Gaia matches
-    # implied to a hundredth.
+def _real_plate_entries(dlg):
+    # The sequence for the real AT2026acka plate: six healthy
+    # mid-brightness comps, two comps clipped by the full well and a
+    # healthy check. Catalog values are bootstrapped from the plate's
+    # own truth scale (27.85), the one the three reported Gaia matches
+    # implied to a hundredth; the clipped two carry a dummy value, they
+    # are excluded before contributing.
     from nightscribe.core import photometry as phot
-    tab = dlg.tab_measure
-    tab.chk_seeing.setChecked(False)     # default radii: reproducible
-    plate = FIXTURES / "AT2026acka.fit"
-    dlg.state.load(plate)
     zp_true = 27.85
     healthy = [(539.9, 300.8), (924.2, 438.1), (1732.8, 1741.9),
                (492.9, 1737.0), (657.1, 1311.0), (1185.8, 1038.2)]
@@ -764,13 +758,44 @@ def test_at2026acka_end_to_end_zp_recovers(dlg):
     entries = [_entry(x, y, "comp") for x, y in healthy]
     entries += [_entry(x, y, "comp", mag=12.0) for x, y in clipped]
     entries.append(_entry(*check_xy, "check"))
-    dlg.tab_compare._entries = entries
+    return entries
+
+
+def test_at2026acka_end_to_end_zp_recovers(dlg):
+    # The field report replayed whole: the real AT2026acka plate (10 s,
+    # Clear, no SATURATE card), a sequence mixing six healthy
+    # mid-brightness comps with two stars that sit at the full well, and
+    # the reported target. The clipped comps must be excluded and named,
+    # the zero point must recover (~27.85), and the target must land on
+    # its Gaia value (16.39).
+    tab = dlg.tab_measure
+    tab.chk_seeing.setChecked(False)     # default radii: reproducible
+    dlg.state.load(FIXTURES / "AT2026acka.fit")
+    dlg.tab_compare._entries = _real_plate_entries(dlg)
     _click(dlg, 989.1, 1012.7)
     assert tab._last is not None
     panel = tab.lbl_result.text()
     assert tab._last["mag"] == pytest.approx(16.39, abs=0.08)
-    assert tab._last["zp"]["zp"] == pytest.approx(zp_true, abs=0.1)
+    assert tab._last["zp"]["zp"] == pytest.approx(27.85, abs=0.1)
     assert "2 of 9" in panel and "saturated/clipped" in panel
     assert "clipping level" in panel      # the plain-language warning
     assert "Check star" in panel and "OK" in panel
     assert tab.btn_csv.isEnabled()
+
+
+def test_at2026acka_sn_centroid_locks_on_the_galaxy(dlg):
+    # The SN in its host galaxy at (1039, 1010): faint, on a rising
+    # background, a bright star 7 px away. The centroid must lock the
+    # faint bump (the plate's seeing anchors the template), not wander
+    # to the bright neighbour - the exact 2026-09 field report.
+    tab = dlg.tab_measure
+    dlg.state.load(FIXTURES / "AT2026acka.fit")
+    dlg.tab_compare._entries = _real_plate_entries(dlg)
+    _click(dlg, 1039.0, 1010.0)
+    assert tab._last is not None
+    last = tab._last
+    assert last["col"] == pytest.approx(1039.7, abs=1.0)
+    assert last["row"] == pytest.approx(1011.5, abs=1.0)
+    # the faint bump's flux, not the bright neighbour's (~122k ADU)
+    assert last["result"]["flux"] < 60000
+    assert "no source could be locked" not in tab.lbl_result.text()

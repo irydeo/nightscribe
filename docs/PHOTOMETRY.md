@@ -236,6 +236,75 @@ If the SN sits 2 mag below the ensemble mean today and 1.5 mag tomorrow,
 it has faded by 0.5 mag: the absolute zero does not matter, the
 **evolution** is the signal.
 
+### 3.4 Measuring faint supernovae on their host galaxy (field lessons)
+
+A 16-18 mag SN sitting on its host's glow is the most delicate case of
+aperture photometry. These are the options the FITS editor offers today
+and when each one pays off (lessons paid for with real 10 s,
+Clear-filter plates):
+
+**The comparison sequence**
+
+* ✅ Comps **close in brightness** to the target: the automatic proposal
+  already prefers them (a brightness window around the target), and when
+  only much brighter ones exist, each star's reason flags the saturation
+  risk.
+* ❌ Comps "the brightest in the field, they have the best SNR": on a
+  short Clear exposure they sit compressed by the full well, the zero
+  point lies LOW (in the field we watched it lie by −0.9 mag) and the
+  check star cannot rat on it because it shares the bias. The panel
+  excludes the clipped ones and says so; if the ZP runs short, shorten
+  the exposure or pick fainter comps.
+
+**The centring (clicking on the SN)**
+
+* ✅ Keep "aperture follows the seeing" on: the seeing measured from the
+  comps is what anchors the centroid template over the galaxy's glow;
+  without it the local estimate inflates and wanders.
+* ✅ The crosshair detects faint sources on structured backgrounds (a
+  robust local detector) and snaps to the source nearest the cursor with
+  a short, fixed reach (9 plate px): if it snaps to nothing, there is
+  nothing detectable there, and clicking measures exactly where you
+  clicked, with a panel note ("no source could be locked"). For a SN at
+  the limit that is the honest flow: the point is a limit, not a
+  detection.
+* ❌ Trusting a centroid without reading the "Pixel" line: the ring is
+  drawn at the MEASURED centroid; when it moved more than 1 px from your
+  click, the panel says so. On a galaxy, a few pixels of drift is the
+  difference between the SN and its host's glow.
+
+**The local sky**
+
+* ✅ Median (default) for flat sky; **Plane** when the galaxy tilts the
+  background under the SN (in the field: 16.67 → 16.87, a real
+  difference); **host-galaxy subtraction** (PS1 reference scaled by the
+  comps) when the SN lives on the core.
+* ❌ Annuli squeezed against the SN, or inflated apertures "because the
+  growth curve keeps rising": when the curve never flattens by
+  4 × FWHM, what keeps rising is not the star (the suggester already
+  refuses it and proposes the seeing aperture, saying why).
+
+**The band and the colour**
+
+* ✅ Read the panel's band line: when the sequence cannot derive Johnson
+  V, the calibration runs in catalog G and says so; for red stars G and
+  V can differ by more than 1 mag.
+* ✅ The target's B−V pre-fills itself when the click lands on a
+  catalogued star; if the panel says "assumed" and the fitted colour
+  slope is large, enter the real B−V by hand (unfiltered/L/OSC chains
+  make the colour term a first-order correction; with a V filter it is
+  a touch-up).
+
+**The verdict**
+
+* ✅ The **catalog cross-match** line is your first control: a large,
+  repeatable Δ is either science (the SN shining) or a blend, and the
+  line itself tells you which source sat under the centroid.
+* ✅ The check star watches the night's **scatter**; what it cannot see
+  (and never will) is a coherent bias across every comp: that is why the
+  panel itemises why each sequence star was left out.
+* ✅ Repeat the measurement each night: two points catch what one hides.
+
 ---
 
 ## 4. Time series: the supernova quick-look

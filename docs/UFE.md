@@ -42,7 +42,9 @@ With no plate of your own, the Compare tab downloads the survey field
   plate carries a WCS. In the marking tabs (Measure, Annotate, Compare)
   the cursor becomes a crosshair with a centre-gap reticle that **snaps
   to the source's centroid** under the mouse: the click is born
-  centred.
+  centred. The detection is local and robust (it sees faint sources even
+  on a galaxy's glow) and the snap's reach is capped at 9 plate px: the
+  reticle never jumps to a bright star far away.
 * **Tabs**: one per feature. **Blink**, **Compare**, **Measure** and
   **Annotate** are available (below). Only the visible tab answers
   clicks on the image.

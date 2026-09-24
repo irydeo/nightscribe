@@ -402,10 +402,15 @@ class UfeImageView(ChartView):
         # If a detected source sits near the cursor, the reticle snaps to
         # its gaussian centroid (the click is born centred). Slow plates
         # never stall the mouse: the search runs on a small cutout only.
+        # The detector is photometry.local_sources: the global-std one was
+        # blind to faint sources on structured backgrounds (a SN in its
+        # galaxy) and its 5-brightest cap hid them behind the field's
+        # bright stars. The snap reach is capped in plate px: at fit zoom
+        # 12/scale px was a ~30 px grab and the reticle "jumped to the
+        # bright stars".
         if not self._pick_mode or self._mouse_vp is None \
                 or not self._state.has_image:
             return
-        from ...core import series
         from ...core import photometry as _phot
         scene_pt = self.mapToScene(self._mouse_vp)
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
@@ -417,10 +422,10 @@ class UfeImageView(ChartView):
         sub = data[y0:y1, x0:x1]
         self._snap_scene = None
         if sub.size:
-            sources = series.detect_sources(sub, k=5.0, min_sep=6,
-                                            max_sources=5)
-            best, best_d = None, (12.0 / max(self.current_factor(),
-                                             1e-3)) ** 2
+            sources = _phot.local_sources(sub, k=4.0, min_sep=6,
+                                          max_sources=20)
+            reach = min(12.0 / max(self.current_factor(), 1e-3), 9.0)
+            best, best_d = None, reach ** 2
             for sx, sy, _pk in sources:
                 gx, gy = sx + x0, sy + y0
                 d = (gx - col) ** 2 + (gy - row) ** 2

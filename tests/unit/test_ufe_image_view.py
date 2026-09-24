@@ -280,3 +280,34 @@ def test_export_never_carries_the_reticle(view, tmp_path):
     b = view.export_png(tmp_path / "b.png").read_bytes()
     view.set_pick_cursor(False)
     assert a == b      # the reticle is viewport-only, never in the file
+
+
+def test_snap_locks_faint_sources_on_structure(view, qapp):
+    # The AT2026acka SN corner at fit zoom: the reticle must snap to the
+    # faint bump under the cursor (the robust local detector sees it),
+    # not reach for the bright star 7 px away; and past the plate-px
+    # reach cap it must not snap at all (the old 12/scale reach was a
+    # ~30 px grab at fit zoom: "the crosshair jumps to the bright stars").
+    from PySide6.QtCore import QPointF, Qt
+    from PySide6.QtGui import QMouseEvent, QPointingDevice
+    view._state.load(FIXTURES / "AT2026acka.fit")
+    view.set_pick_cursor(True)
+
+    def hover(data_x, data_y):
+        sx, sy = view._state.data_to_scene(data_x, data_y)
+        vp = view.mapFromScene(sx, sy)
+        ev = QMouseEvent(QMouseEvent.MouseMove, QPointF(vp), QPointF(vp),
+                         QPointF(vp), Qt.NoButton, Qt.NoButton,
+                         Qt.NoModifier,
+                         QPointingDevice.primaryPointingDevice())
+        view.mouseMoveEvent(ev)
+        view._snap_now()
+
+    hover(1039.0, 1010.0)          # the faint SN bump in its galaxy
+    assert view._snap_scene is not None
+    sx, sy = view._state.data_to_scene(1039.0, 1011.0)
+    assert abs(view._snap_scene[0] - sx) < 3.0
+    assert abs(view._snap_scene[1] - sy) < 3.0
+    hover(1020.0, 1000.0)          # >20 px from anything: no grab
+    assert view._snap_scene is None
+    view.set_pick_cursor(False)

@@ -69,7 +69,10 @@ class UfeMeasureTab(QWidget):
         self._view = view
         self._compare = compare_tab
         self._go_compare = go_compare
-        self._active = False
+        self._active = False         # owns the view's clicks right now
+        self._on_stage = False       # the Photometry tab is on stage and
+                                     # this section is visible (armed or
+                                     # not): its overlays may be drawn
         self._project_attached = False     # point hook set on the dialog
         self._items = []             # aperture + comps overlays
         self._last = None            # the last measurement bundle
@@ -220,6 +223,9 @@ class UfeMeasureTab(QWidget):
     def set_active(self, flag, keep_overlays=False):
         # Only the section that owns the stage takes the clicks, and on
         # stage it also gets the pick cursor and the snapping reticle.
+        # The OVERLAYS follow the Photometry tab's stage instead
+        # (self._on_stage): both sections stay visible, so a disarmed
+        # Measure half keeps its rings and a re-measure still paints.
         # @args: keep_overlays - the Sequence section is taking over the
         #        stage: our markers and result stay on the chart (with
         #        the clicks disarmed), they are dropped on a full leave
@@ -227,10 +233,12 @@ class UfeMeasureTab(QWidget):
         if not self._active:
             if keep_overlays:
                 return
+            self._on_stage = False
             self._drop_items()
             if self._diff is not None and self._view is not None:
                 self._view.set_frame_override(None)
         else:
+            self._on_stage = True
             if self._diff is not None and self._view is not None:
                 self._view.set_frame_override(self._display_diff)
             if self._last is not None:
@@ -852,7 +860,7 @@ class UfeMeasureTab(QWidget):
         # Aperture + annulus on the measured point, thin rings on the
         # comps that calibrated it (all in plate px, cosmetic pens).
         self._drop_items()
-        if not self._active or self._view is None or self._last is None:
+        if not self._on_stage or self._view is None or self._last is None:
             return
         last = self._last
         x, y = self._state.data_to_scene(last["col"], last["row"])

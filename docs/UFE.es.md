@@ -166,6 +166,30 @@ el archivo en disco nunca se modifica).
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
 
+## Cajas de metadatos y estilo de marcador (ADR-046)
+
+El botón **«Cajas»** de la barra superior muestra las cajas de metadatos
+en las esquinas, en pantalla y quemadas en el PNG exportado (y en los
+GIF/MP4 del blink y en la carta de secuencia), al estilo de las cartas
+de seguimiento clásicas:
+
+* **Sup-izq**: el nombre del objeto (siempre).
+* **Sup-der**: fecha UT, AR/Dec sexagesimal del objetivo, su brillo
+  (solo cuando hay una medida calibrada en la sesión; una magnitud de
+  catálogo no vale) y la exposición.
+* **Inf-izq**: observador, medidor, estación MPC, telescopio y cámara
+  (lo que tengas en Ajustes → Sitio y equipo, grupo «Anotación de
+  cartas»), más la escala en ″/px y el FOV de lo que se ve cuando la
+  placa está resuelta.
+* Con las cajas activas, la rosa de los vientos baja al centro inferior
+  y gana la pata **E**, y la barra de escala se mueve a la derecha, para
+  dejar libres las esquinas.
+
+En el mismo grupo de Ajustes, **Marcador del objeto** elige la estética
+de la marca del objeto: anillo con ticks (clásica) o cruz a todo el
+campo con caja (se aplica en Fotometría, Anotar, Blink y la carta de
+secuencia).
+
 ## Anotar
 
 La pestaña **Anotar** guarda copias FITS anotadas compatibles con

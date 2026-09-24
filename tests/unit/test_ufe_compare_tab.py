@@ -361,6 +361,55 @@ def test_sequence_overlays_survive_switching_to_measure(dlg):
     assert tab._items == []
 
 
+def test_field_paints_while_the_measure_section_owns_the_stage(dlg):
+    # Regression (ADR-044 rev): opened from a visit, the deep link arms
+    # the Measure section and the Sequence half stays visible but
+    # disarmed. Generating the field there painted NOTHING (the draw
+    # gates read the click ownership instead of the stage).
+    tab = dlg.tab_compare
+    dlg.tab_photometry.set_mode("measure")
+    assert not tab._active                      # disarmed...
+    assert tab._on_stage                        # ...but still on stage
+    tab._on_field_ready(_field(dlg))
+    assert len(tab._items) > 0                  # catalog + target paint
+    assert any(it.isVisible() for it, _ in tab._catalog_items)
+    assert _target_mark(tab) is not None
+    # the proposal paints its rings too, and the table keeps ticking
+    tab.spn_mag.setValue(12.5)
+    tab._on_propose()
+    assert len(tab._entries) > 0
+    assert len(tab._entry_items) == 2 * len(tab._entries)
+    # the clicks stay disarmed while the Measure section owns the stage
+    from PySide6.QtCore import QPointF
+    s = tab._stars[0]
+    n = len(tab._entries)
+    dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+    assert len(tab._entries) == n
+    # and the star probe keeps answering (the Measure section needs it)
+    hit, lines = dlg.view._hover_probe(s["_sx"], s["_sy"])
+    assert hit and "Gaia EDR3" in lines[0]
+
+
+def test_sequence_edits_paint_while_disarmed(dlg):
+    # The sequence window stays open in the Measure mode: renaming,
+    # re-typing and removing rows must repaint the rings on the chart.
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    dlg.tab_photometry.set_mode("measure")
+    assert not tab._active
+    n = len(tab._entries)
+    tab.table.cellWidget(0, 1).setCurrentIndex(1)     # Comp -> Check
+    assert tab._entries[0]["kind"] == "check"
+    assert len(tab._entry_items) == 2 * n
+    tab._remove(0)
+    assert len(tab._entry_items) == 2 * (n - 1)
+    tab._on_clear()
+    assert tab._entry_items == []
+    # the catalog labels of the removed stars come back
+    assert any(it.isVisible() for it, _ in tab._catalog_items)
+
+
 # ------------------------------------------------- target mark (toggleable)
 
 def _target_mark(tab):
@@ -471,3 +520,25 @@ def test_new_plate_resets_the_target_mark(dlg):
     assert tab._moving_target
     dlg.state.load(MONO)
     assert not tab._moving_target
+
+
+def test_target_mark_cross_style(dlg, monkeypatch):
+    # ADR-046: the "cross" look swaps the target's ring for the
+    # full-frame crosshair with a box; the name label stays
+    from nightscribe.config import config
+    from nightscribe.viz import palette
+    from PySide6.QtWidgets import QGraphicsLineItem
+    tab = dlg.tab_compare
+    monkeypatch.setitem(config._data, "marker_style", "cross")
+    tab._on_field_ready(_field(dlg))
+    assert _target_mark(tab) is None               # no amber ring
+    w, _h = dlg.state.plate_shape
+    arms = [it for it in tab._items
+            if isinstance(it, QGraphicsLineItem)
+            and it.pen().color().name().lower() == palette.ACCENT.lower()]
+    assert len(arms) == 4
+    xs = [c for ln in arms for c in (ln.line().x1(), ln.line().x2())]
+    assert min(xs) == 0.0 and max(xs) == float(w)   # full-frame arms
+    monkeypatch.setitem(config._data, "marker_style", "ring")
+    tab._redraw_overlays()
+    assert _target_mark(tab) is not None           # the ring is back

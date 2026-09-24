@@ -39,7 +39,8 @@ from pathlib import Path
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (QBrush, QColor, QFont, QImage, QPainter, QPen,
                            QPixmap, QTransform)
-from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsPixmapItem,
+from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsLineItem,
+                               QGraphicsPixmapItem, QGraphicsRectItem,
                                QGraphicsSimpleTextItem, QGraphicsView)
 
 from ...viz import palette
@@ -61,6 +62,34 @@ def _round_arcsec(target):
             key=lambda v: abs(math.log10(v * 10.0 ** exp)
                               - math.log10(target)))
     return m * 10.0 ** exp
+
+
+def cross_marker_items(x, y, scene_w, scene_h, color, box_half):
+    # The "cross" object marker (ADR-046): a full-frame crosshair with a
+    # central box, in the spirit of the classic tracker charts. The
+    # lines span the plate in scene coordinates and the pens are
+    # cosmetic, so the marker stays thin and crisp at any zoom, and an
+    # export of a visible region still shows the cross crossing it.
+    # @args: x, y - object position in scene (plate px) coordinates,
+    #        scene_w, scene_h - plate size in px, color - marker colour
+    #        (hex string or QColor), box_half - central box half side
+    #        in scene px
+    # @return: [4 QGraphicsLineItem + 1 QGraphicsRectItem]
+    pen = QPen(QColor(color))
+    pen.setWidthF(1.8)
+    pen.setCosmetic(True)
+    gap = box_half * 1.4
+    items = []
+    for x0, y0, x1, y1 in ((0.0, y, x - gap, y), (x + gap, y, scene_w, y),
+                           (x, 0.0, x, y - gap), (x, y + gap, x, scene_h)):
+        ln = QGraphicsLineItem(x0, y0, x1, y1)
+        ln.setPen(pen)
+        items.append(ln)
+    box = QGraphicsRectItem(x - box_half, y - box_half,
+                            2.0 * box_half, 2.0 * box_half)
+    box.setPen(pen)
+    items.append(box)
+    return items
 
 
 class UfeImageView(ChartView):
@@ -97,6 +126,13 @@ class UfeImageView(ChartView):
         self._snap_timer.timeout.connect(self._snap_now)
         self.show_north = True      # HUD toggles (need a WCS to paint)
         self.show_scale = True
+        # metadata corner boxes (ADR-046): the provider is consulted at
+        # paint time, so solving, measuring or attaching an object all
+        # show up without any invalidation wiring
+        self.show_boxes = False
+        self._boxes_provider = None    # fn() -> chart_annotate boxes dict
+        self._boxes_tl_h = 0.0         # painted top-left box height
+                                       # (device px; the probe ducks it)
 
         self._render_timer = QTimer(self)
         self._render_timer.setSingleShot(True)
@@ -312,19 +348,31 @@ class UfeImageView(ChartView):
 
     # ------------------------------------------------------------- HUD
 
-    def set_hud(self, north=None, scale=None):
+    def set_hud(self, north=None, scale=None, boxes=None):
         # @args: north, scale - True/False to toggle each HUD piece
-        #        (they only paint when the plate carries a WCS)
+        #        (they only paint when the plate carries a WCS),
+        #        boxes - the metadata corner boxes (ADR-046; they paint
+        #        with or without a WCS: the name and the site lines do
+        #        not need one)
         if north is not None:
             self.show_north = bool(north)
         if scale is not None:
             self.show_scale = bool(scale)
+        if boxes is not None:
+            self.show_boxes = bool(boxes)
+        self.viewport().update()
+
+    def set_boxes_provider(self, fn):
+        # @args: fn - callable returning a core/chart_annotate boxes dict
+        #        (or {}), consulted at every paint; None drops the layer
+        self._boxes_provider = fn
         self.viewport().update()
 
     def drawForeground(self, painter, rect):
-        # Viewport-space HUD (north arrow, scale bar) under the base's
-        # watermark; device coordinates, so zoom/pan never move them.
-        # The pick reticle goes last: it must sit on top of everything.
+        # Viewport-space HUD (north arrow, scale bar, corner boxes) under
+        # the base's watermark; device coordinates, so zoom/pan never
+        # move them. The pick reticle goes last: it must sit on top of
+        # everything.
         painter.save()
         painter.resetTransform()
         self._paint_hud(painter, self.viewport().width(),
@@ -388,7 +436,9 @@ class UfeImageView(ChartView):
             scale = max(self.current_factor(), 1e-3)
             margin = 12.0 / scale
             tl = self.mapToScene(0, 0)
-            return tl.x() + margin, tl.y() + margin
+            # the metadata top-left box would sit under the panel: duck
+            extra = self._boxes_tl_h / scale if self.show_boxes else 0.0
+            return tl.x() + margin, tl.y() + margin + extra
         return super()._tooltip_anchor_pos(viewport_pos, br)
 
     def mouseMoveEvent(self, event):
@@ -473,46 +523,119 @@ class UfeImageView(ChartView):
     def _paint_hud(self, painter, w, h, k=1.0):
         # @args: painter - device-coords painter, w, h - surface size in
         #        device px, k - export pixel ratio (1.0 on screen)
-        if not self._state.has_image or self._state.wcs is None:
+        # The boxes paint with or without a WCS (the name and the site
+        # lines do not need one); north/scale still do. With the boxes
+        # on, the compass moves to the bottom centre (and gains the east
+        # leg) and the scale bar to the bottom right: the report layout
+        # keeps its corners free.
+        if not self._state.has_image:
+            return
+        boxes_on = self._paint_boxes(painter, w, h, k)
+        if self._state.wcs is None:
             return
         if self.show_north:
-            self._paint_north(painter, w, h, k)
+            self._paint_north(painter, w, h, k, bottom=boxes_on)
         if self.show_scale:
-            self._paint_scale(painter, w, h, k)
+            self._paint_scale(painter, w, h, k, right=boxes_on)
 
-    def _paint_north(self, painter, w, h, k):
-        # North arrow in the top-right corner, rotated by the plate PA
-        # (positive = east of north, clockwise; the legacy convention).
+    def _paint_boxes(self, painter, w, h, k):
+        # The metadata corner boxes (ADR-046): square, dark, monospace,
+        # in the spirit of the classic tracker charts. Content comes
+        # from the provider (core/chart_annotate rules); a provider
+        # hiccup never breaks the paint.
+        # @return: True when something was drawn
+        self._boxes_tl_h = 0.0
+        if not self.show_boxes or self._boxes_provider is None:
+            return False
+        try:
+            boxes = self._boxes_provider() or {}
+        except Exception as err:
+            logger.warning("chart boxes provider failed: %s", err)
+            return False
+        if not boxes:
+            return False
+        font = QFont("monospace")
+        font.setPixelSize(max(8.0, 10.0 * k))
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        pad, margin = 5.0 * k, 10.0 * k
+        line_h = fm.height()
+        for key, right, bottom in (("top_left", False, False),
+                                   ("top_right", True, False),
+                                   ("bottom_left", False, True)):
+            lines = boxes.get(key)
+            if not lines:
+                continue
+            bw = max(fm.horizontalAdvance(t) for t in lines) + 2 * pad
+            bh = line_h * len(lines) + 2 * pad
+            x = w - margin - bw if right else margin
+            y = h - margin - bh if bottom else margin
+            bg = QColor(palette.BG)
+            bg.setAlpha(215)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(bg)
+            painter.drawRect(QRectF(x, y, bw, bh))
+            painter.setBrush(Qt.NoBrush)
+            painter.setPen(QPen(QColor(palette.MUTED), max(1.0, 0.8 * k)))
+            painter.drawRect(QRectF(x, y, bw, bh))
+            painter.setPen(QPen(QColor(palette.FG)))
+            for i, t in enumerate(lines):
+                baseline = y + pad + i * line_h + fm.ascent()
+                if right:
+                    painter.drawText(
+                        QRectF(x, y + pad + i * line_h, bw - pad, line_h),
+                        Qt.AlignRight, t)
+                else:
+                    painter.drawText(QPointF(x + pad, baseline), t)
+            if key == "top_left":
+                self._boxes_tl_h = bh + margin
+        return True
+
+    def _paint_north(self, painter, w, h, k, bottom=False):
+        # North arrow, rotated by the plate PA (positive = east of north,
+        # clockwise; the legacy convention). Legacy spot: top-right, N
+        # only. With the corner boxes on it becomes the bottom-centre
+        # compass: the same arrow plus the east leg (90° anticlockwise
+        # from north on screen, flipped on mirrored plates).
         pa = -self._state.wcs.rotation()
-        cx, cy = w - 44 * k, 48 * k
+        cx, cy = (w / 2.0, h - 44 * k) if bottom else (w - 44 * k, 48 * k)
         length = 30 * k
-        painter.save()
-        painter.translate(cx, cy)
-        painter.rotate(pa)
-        for color, width in ((QColor(0, 0, 0, 160), 3.6 * k),
-                             (QColor(palette.FG), 2.0 * k)):
-            painter.setPen(QPen(color, width))
-            painter.drawLine(QPointF(0, length / 2), QPointF(0, -length / 2))
-            ah = length * 0.3
-            painter.drawLine(QPointF(0, -length / 2),
-                             QPointF(-ah / 2, -length / 2 + ah))
-            painter.drawLine(QPointF(0, -length / 2),
-                             QPointF(ah / 2, -length / 2 + ah))
-        f = QFont()
-        f.setPointSizeF(10 * k)
-        painter.setFont(f)
-        painter.drawText(QRectF(-14 * k, length / 2 + 2 * k,
-                                28 * k, 14 * k), Qt.AlignHCenter, "N")
-        painter.restore()
+        legs = [("N", pa)]
+        if bottom:
+            east = pa + 90.0 if self._state.wcs.is_mirrored() \
+                else pa - 90.0
+            legs.append(("E", east))
+        for label, angle in legs:
+            painter.save()
+            painter.translate(cx, cy)
+            painter.rotate(angle)
+            for color, width in ((QColor(0, 0, 0, 160), 3.6 * k),
+                                 (QColor(palette.FG), 2.0 * k)):
+                painter.setPen(QPen(color, width))
+                painter.drawLine(QPointF(0, length / 2),
+                                 QPointF(0, -length / 2))
+                ah = length * 0.3
+                painter.drawLine(QPointF(0, -length / 2),
+                                 QPointF(-ah / 2, -length / 2 + ah))
+                painter.drawLine(QPointF(0, -length / 2),
+                                 QPointF(ah / 2, -length / 2 + ah))
+            f = QFont()
+            f.setPointSizeF(10 * k)
+            painter.setFont(f)
+            painter.drawText(QRectF(-14 * k, length / 2 + 2 * k,
+                                    28 * k, 14 * k), Qt.AlignHCenter, label)
+            painter.restore()
 
-    def _paint_scale(self, painter, w, h, k):
-        # Scale bar in the bottom-left corner: a round arcsec span that
-        # lands near 90 screen px at the current zoom.
+    def _paint_scale(self, painter, w, h, k, right=False):
+        # Scale bar: a round arcsec span that lands near 90 screen px at
+        # the current zoom. Legacy spot: bottom-left; with the corner
+        # boxes on it moves to the bottom-right (that corner stays free).
         factor = max(self.current_factor(), 1e-6) * k
         per_px = self._state.wcs.pixel_scale() / factor   # arcsec/device px
         arcsec = _round_arcsec(90.0 * k * per_px)
         bar = min(max(arcsec / per_px, 12.0 * k), w * 0.35)
-        x0, y0 = 16 * k, h - 26 * k
+        x0 = (w - 16 * k - bar) if right else 16 * k
+        y0 = h - 26 * k
         for color, width in ((QColor(0, 0, 0, 160), 3.6 * k),
                              (QColor(palette.FG), 2.0 * k)):
             painter.setPen(QPen(color, width))
@@ -524,8 +647,13 @@ class UfeImageView(ChartView):
         f.setPointSizeF(9 * k)
         painter.setFont(f)
         painter.setPen(QPen(QColor(palette.FG)))
-        painter.drawText(QRectF(x0, y0 - 22 * k, bar + 40 * k, 18 * k),
-                         Qt.AlignLeft, f"{arcsec:g}″")
+        if right:
+            painter.drawText(QRectF(x0 - 40 * k, y0 - 22 * k,
+                                    bar + 40 * k, 18 * k),
+                             Qt.AlignRight, f"{arcsec:g}″")
+        else:
+            painter.drawText(QRectF(x0, y0 - 22 * k, bar + 40 * k, 18 * k),
+                             Qt.AlignLeft, f"{arcsec:g}″")
 
     # ----------------------------------------------------------- export
 

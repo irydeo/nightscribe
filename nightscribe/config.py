@@ -101,6 +101,15 @@ DEFAULTS = {
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
     "pixel_binning": "1x1",
     "aavso_code": "",           # AAVSO observer code; blank when none
+    # Chart annotations (ADR-046): the identity stamped in the corner
+    # boxes of the exported charts, and the two independent style
+    # switches (the object marker's shape and the boxes layer)
+    "observer_name": "",
+    "measurer_name": "",      # empty -> falls back to observer_name
+    "telescope_desc": "",     # free text, e.g. "0.43-m f/4.9 reflector"
+    "camera_model": "",
+    "marker_style": "ring",   # ring | cross (the object marker)
+    "chart_boxes": False,     # metadata corner boxes on the charts
 }
 
 

@@ -1,6 +1,6 @@
 # ADR-042: Secuencias fotométricas y cartas de comparación (fuentes VizieR, transformaciones Gaia/APASS, propuesta automática)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-21 · **rev. 2026-09-21** (tras la ejecución: las cuatro fases están implantadas; ver el mapa en `docs/WORKFLOWS.es.md`, track SF)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-21 · **rev. 2026-09-21** (tras la ejecución: las cuatro fases están implantadas; ver el mapa en `docs/WORKFLOWS.es.md`, track SF) · **rev. 2026-09-24** (ADR-046: la carta gana las cajas de metadatos de las esquinas, solo sup-der e inf-izq porque el título ya lleva el nombre y la rosa la esquina sup-izq, y el marcador del objetivo admite el estilo `cross`; tanto el widget Qt como el export matplotlib / **rev. 2026-09-24** (ADR-046: the chart gains the metadata corner boxes, top-right and bottom-left only since the title owns the name and the compass the top-left, and the target marker admits the `cross` style; both the Qt widget and the matplotlib export))
 
 **Ver / See**: [docs/DATA_SOURCES.es.md](../DATA_SOURCES.es.md) · [docs/DATA_SOURCES.md](../DATA_SOURCES.md)
 

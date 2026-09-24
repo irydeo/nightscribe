@@ -153,11 +153,66 @@
            </layout>
           </item>
           <item><widget class="QLabel" name="lblH_binning"><property name="text"><string>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
-         </layout>
-        </widget>
-       </item>
-       <item>
-        <spacer name="vspacer_site">
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="grp_chartann">
+          <property name="title"><string>Chart annotations</string></property>
+          <layout class="QVBoxLayout" name="vbox_chartann">
+           <item>
+            <layout class="QHBoxLayout" name="row_observer">
+             <item><widget class="QLabel" name="lbl_observer"><property name="text"><string>Observer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_observer"/></item>
+             <item><spacer name="hsp_observer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_observer"><property name="text"><string>Your name as it should read in the chart boxes (Obs); may stay empty</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_measurer">
+             <item><widget class="QLabel" name="lbl_measurer"><property name="text"><string>Measurer:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_measurer"/></item>
+             <item><spacer name="hsp_measurer"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_measurer"><property name="text"><string>Who measured the plate (Msr); empty means the observer</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_teldesc">
+             <item><widget class="QLabel" name="lbl_teldesc"><property name="text"><string>Telescope:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_telescope"><property name="placeholderText"><string>0.43-m f/4.9 reflector</string></property></widget></item>
+             <item><spacer name="hsp_teldesc"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_teldesc"><property name="text"><string>Free-text telescope line for the chart boxes (Tel)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_cammodel">
+             <item><widget class="QLabel" name="lbl_cammodel"><property name="text"><string>Camera model:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_camera_model"/></item>
+             <item><spacer name="hsp_cammodel"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_cammodel"><property name="text"><string>Free-text camera line for the chart boxes (Cam)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_marker_style">
+             <item><widget class="QLabel" name="lbl_marker_style"><property name="text"><string>Object marker:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QComboBox" name="cmb_marker_style"/></item>
+             <item><spacer name="hsp_marker_style"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_marker_style"><property name="text"><string>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_chart_boxes">
+             <item><widget class="QLabel" name="lbl_chart_boxes"><property name="text"><string>Corner boxes:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_chart_boxes"><property name="text"><string>Stamp the metadata boxes on the charts</string></property></widget></item>
+             <item><spacer name="hsp_chart_boxes"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_chart_boxes"><property name="text"><string>Corner boxes with the object, date, position, brightness, observer, equipment and plate scale; on screen and in the exported PNG/GIF/video</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="vspacer_site">
          <property name="orientation"><enum>Qt::Vertical</enum></property>
          <property name="sizeHint" stdset="0">
           <size><width>20</width><height>40</height></size>

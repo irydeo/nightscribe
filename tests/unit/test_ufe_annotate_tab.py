@@ -212,3 +212,26 @@ def test_save_uses_the_in_memory_solved_wcs(dlg, tmp_path, monkeypatch):
     assert abs(header["NS_SCALE"] - 1.08) < 0.01    # from the solved WCS
     assert "NS_NORTH" in header
     assert "NS_RA" in header and "NS_DEC" in header
+
+
+def test_marker_cross_style_spans_the_plate(dlg, monkeypatch):
+    # ADR-046: the "cross" look (Settings) swaps the ring+ticks for a
+    # full-frame crosshair with a box; the label and the readout stay
+    from nightscribe.config import config
+    from PySide6.QtWidgets import QGraphicsLineItem, QGraphicsRectItem
+    monkeypatch.setitem(config._data, "marker_style", "cross")
+    tab = dlg.tab_annotate
+    tab._refresh_marker()
+    lines = [it for it in tab._items
+             if isinstance(it, QGraphicsLineItem)]
+    boxes = [it for it in tab._items
+             if isinstance(it, QGraphicsRectItem)]
+    w, h = dlg.state.plate_shape
+    assert len(lines) == 4 and len(boxes) == 1
+    xs = [c for ln in lines for c in (ln.line().x1(), ln.line().x2())]
+    ys = [c for ln in lines for c in (ln.line().y1(), ln.line().y2())]
+    assert min(xs) == 0.0 and max(xs) == float(w)  # full-frame arms
+    assert min(ys) == 0.0 and max(ys) == float(h)
+    monkeypatch.setitem(config._data, "marker_style", "ring")
+    tab._refresh_marker()
+    assert len(tab._items) == 5                    # the classic ring back

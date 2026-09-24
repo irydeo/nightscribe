@@ -146,3 +146,27 @@ def test_label_collision_cap():
     for i, a in enumerate(xy):
         for b in xy[i + 1:]:
             assert math.hypot(a[0] - b[0], a[1] - b[1]) >= clear - 1e-6
+
+
+def test_draw_finder_with_boxes_and_cross_marker(tmp_path):
+    # ADR-046: the corner boxes (no top_left here: the title owns the
+    # name) and the full-frame cross target marker
+    import matplotlib.pyplot as plt
+    field = _field()
+    boxes = {"top_left": ["V0001 Cyg"],
+             "top_right": ["RA: 19 25 27.8", "Dec: +42 47 02.4"],
+             "bottom_left": ["Obs: F. Calvo", "Stn: Z41",
+                             "PSc: 1.08″/px", "FOV: 18.0 × 18.0′"]}
+    out = tmp_path / "boxed.png"
+    fig = finder_view.draw_finder(
+        field, target={"name": "V0001 Cyg", "ra": CENTER[0],
+                       "dec": CENTER[1]},
+        entries=_entries(field), out=out, boxes=boxes,
+        marker_style="cross")
+    assert out.exists() and out.stat().st_size > 0
+    texts = [t.get_text() for t in fig.axes[0].texts]
+    assert any("Stn: Z41" in t for t in texts)
+    assert any("RA: 19 25 27.8" in t for t in texts)
+    # the name box is dropped: the only name text is the marker label
+    assert sum("V0001 Cyg" in t for t in texts) == 1
+    plt.close(fig)

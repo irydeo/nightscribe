@@ -96,6 +96,9 @@ nightscribe/
     fits_io.py       # lector FITS mínimo (numpy, sin astropy — ADR-018)
     fits_annotate.py # FITS anotado AIJ-compatible: escribe copias y LEE
                      #   tarjetas ANNOTATE (UFE las pinta al cargar, ADR-044)
+    chart_annotate.py # cajas de metadatos de las cartas (puro; reglas:
+                      #   nombre siempre, posición/escala solo con WCS,
+                      #   brillo solo calibrado — ADR-046)
     wcs.py           # WCS TAN mínimo (pixel<->cielo, escala, rotación)
     stretch.py       # motor de estiramiento: percentiles, lineal+gamma, invertir,
                      #   histograma, downscale 2×2 (ADR-044; blink_view re-exporta)
@@ -181,7 +184,7 @@ python3 -m venv --system-site-packages .venv
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-044, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-046, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
 **Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
@@ -215,7 +218,7 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-044, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-046, bilingual). Read the ADR before
 changing a decision; update it if you do.
 
 **Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow

@@ -385,3 +385,126 @@ def test_ui_language(monkeypatch):
     monkeypatch.setattr(config, "_data", {**config._data,
                                           "language": "system"})
     assert config.ui_language() in ("es", "en")
+
+
+# ---------------- ADR-046: corner boxes, cross marker, compass -----------
+
+def _frame_pixels(fig):
+    from nightscribe.viz import blink_view
+    return np.asarray(blink_view._fig_to_image(fig))
+
+
+def _accentish(arr):
+    # mask of pixels in the ACCENT hue (#ffb347), tolerant of antialiasing
+    r, g, b = arr[..., 0].astype(int), arr[..., 1].astype(int), \
+        arr[..., 2].astype(int)
+    return (r > 170) & (g > 100) & (g < 220) & (b < 160) & (r > b + 40)
+
+
+def _longest_run(mask_row):
+    best = cur = 0
+    for v in mask_row:
+        cur = cur + 1 if v else 0
+        best = max(best, cur)
+    return best
+
+
+def test_compass_angles_north_up_and_mirrored():
+    from nightscribe.core.wcs import Wcs
+    from nightscribe.viz import blink_view
+    s = 1.07 / 3600.0
+    # classic sky CD: Dec grows with the row, RA with the negative column
+    wcs = Wcs(180.0, 20.0, 50.0, 50.0, [[-s, 0.0], [0.0, s]], 100, 100)
+    an, ae = blink_view.compass_angles(wcs)
+    assert an == pytest.approx(0.0, abs=0.5)      # north up
+    assert ae == pytest.approx(-90.0, abs=0.5)    # east left
+    # mirrored plate (det > 0): east flips to the right
+    wcs_m = Wcs(180.0, 20.0, 50.0, 50.0, [[s, 0.0], [0.0, s]], 100, 100)
+    an, ae = blink_view.compass_angles(wcs_m)
+    assert an == pytest.approx(0.0, abs=0.5)
+    assert ae == pytest.approx(90.0, abs=0.5)
+
+
+def test_frame_cross_marker_spans_the_frame():
+    import matplotlib
+    matplotlib.use("Agg")
+    from nightscribe.viz import blink_view
+    _ref, obs = _fake_pair8()
+    h, w = obs.shape
+    fig = blink_view._frame_fig(obs, (80, 60), "", "", "",
+                                marker_style="cross")
+    arr = _frame_pixels(fig)
+    # the horizontal arm crosses the whole frame (the central box only
+    # breaks the run, so count the row's total, not the longest run)
+    accent_rows = _accentish(arr)
+    assert max(int(row.sum()) for row in accent_rows) > w * 0.8
+    fig = blink_view._frame_fig(obs, (80, 60), "", "", "",
+                                marker_style="ring")
+    arr = _frame_pixels(fig)
+    accent_rows = _accentish(arr)
+    assert max(int(row.sum()) for row in accent_rows) < w * 0.3
+
+
+def test_frame_corner_boxes_darken_the_corners():
+    import matplotlib
+    matplotlib.use("Agg")
+    from nightscribe.viz import blink_view
+    _ref, obs = _fake_pair8()
+    boxes = {"top_left": ["AT 2026acka"],
+             "top_right": ["Date: 2026-09-20 21:06 UT", "Mag: 17.10 (G)"],
+             "bottom_left": ["Obs: F. Calvo", "Stn: Z41"]}
+    fig = blink_view._frame_fig(obs, (80, 60), "AT 2026acka", "", "",
+                                boxes=boxes, compass=(0.0, -90.0))
+    arr = _frame_pixels(fig)
+    boxed = [arr[8:22, 8:22], arr[8:22, -22:-8], arr[-22:-8, 8:22]]
+    fig = blink_view._frame_fig(obs, (80, 60), "AT 2026acka", "", "")
+    arr = _frame_pixels(fig)
+    plain = [arr[8:22, 8:22], arr[8:22, -22:-8], arr[-22:-8, 8:22]]
+    # every corner patch is clearly darker with its box than without
+    for pb, pp in zip(boxed, plain):
+        assert pb.mean() < 0.75 * pp.mean()
+
+
+def test_draw_pair_boxes_land_on_the_after_panel(tmp_path):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from nightscribe.viz import blink_view
+    ref, obs = _fake_pair8()
+    boxes = {"top_left": ["AT 2026acka"],
+             "bottom_left": ["Obs: F. Calvo", "Stn: Z41"]}
+    out = tmp_path / "pair.png"
+    fig = blink_view.draw_pair(ref, obs, (80, 60), name="AT 2026acka",
+                               out=out, boxes=boxes, marker_style="cross",
+                               compass=(0.0, -90.0))
+    assert out.exists() and out.stat().st_size > 0
+    texts0 = [t.get_text() for t in fig.axes[0].texts]
+    texts1 = [t.get_text() for t in fig.axes[1].texts]
+    assert not any("Stn: Z41" in t for t in texts0)
+    assert any("Stn: Z41" in t for t in texts1)
+    assert any(t == "N" for t in texts1) and any(t == "E" for t in texts1)
+    plt.close(fig)
+
+
+def test_pair_boxes_and_compass_helpers():
+    import matplotlib
+    matplotlib.use("Agg")
+    from nightscribe.core.wcs import Wcs
+    from nightscribe.viz import blink_view
+    s = 1.07 / 3600.0
+    wcs = Wcs(330.5682, 39.8296, 50.0, 50.0, [[-s, 0.0], [0.0, s]],
+              100, 100)
+    pair = {"name": "AT 2026acka", "ra": 330.5682, "dec": 39.8296,
+            "wcs": wcs, "flipped": False}
+    site = {"observer": "F. Calvo", "measurer": "", "station": "Z41",
+            "telescope": "", "camera": ""}
+    boxes = blink_view.pair_boxes(
+        pair, {"date_obs": "2026-09-20T21:06:28", "exptime_s": 10.0}, site)
+    assert boxes["top_left"] == ["AT 2026acka"]
+    assert "RA: 22 02 16.4" in boxes["top_right"]
+    assert "Mag:" not in " ".join(boxes["top_right"])   # never in blink
+    assert "PSc: 1.07″/px" in boxes["bottom_left"]
+    assert "Obs: F. Calvo" in boxes["bottom_left"]
+    an, ae = blink_view.pair_compass(pair)
+    assert an == pytest.approx(0.0, abs=0.5)
+    assert blink_view.pair_compass({"wcs": None}) is None

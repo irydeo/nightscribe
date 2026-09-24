@@ -163,6 +163,27 @@ modified).
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).
 
+## Metadata boxes and marker style (ADR-046)
+
+The top bar's **"Boxes"** button shows the metadata corner boxes, on
+screen and burned into the exported PNG (and into the blink GIF/MP4 and
+the sequence chart), in the spirit of the classic tracker charts:
+
+* **Top-left**: the object name (always).
+* **Top-right**: UT date, the target's sexagesimal RA/Dec, its
+  brightness (only when a calibrated measurement exists in the session;
+  a catalog magnitude does not count) and the exposure.
+* **Bottom-left**: observer, measurer, MPC station, telescope and camera
+  (whatever you set in Settings → Site & equipment, "Chart annotations"
+  group), plus the plate scale in ″/px and the FOV of what is shown when
+  the plate is solved.
+* With the boxes on, the compass moves to the bottom centre and gains
+  the **E** leg, and the scale bar moves right, keeping the corners
+  free.
+
+In the same Settings group, **Object marker** picks the look of the
+object's mark: ring with ticks (classic) or full-frame cross with a box
+(applied in Photometry, Annotate, Blink and the sequence chart).
 
 ## Annotate
 

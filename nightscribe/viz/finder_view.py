@@ -204,18 +204,32 @@ def _draw_compass(ax, geo):
                    size=12, bold=True, ha="center", mono=False)
 
 
-def _draw_target(ax, geo, target, lang):
-    from matplotlib.patches import Circle
+def _draw_target(ax, geo, target, lang, marker_style="ring"):
+    from matplotlib.patches import Circle, Rectangle
     if target:
         x, y = geo.to_xy(target["ra"], target["dec"])
     else:
         x, y = geo.width / 2.0, geo.height / 2.0
-    r = geo.width * 0.022
-    ax.add_patch(Circle((x, y), r, fill=False, ec=style.ACCENT, lw=2.0))
-    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-        ax.plot([x + dx * r * 1.15, x + dx * r * 1.7],
-                [y + dy * r * 1.15, y + dy * r * 1.7], color=style.ACCENT,
-                lw=2.0)
+    # ADR-046: two looks for the object marker; the cross spans the
+    # frame with a central box, the ring is the classic
+    if marker_style == "cross":
+        half = geo.width * 0.011
+        gap = half * 1.4
+        for xs, ys in (([0, x - gap], [y, y]), ([x + gap, geo.width], [y, y]),
+                       ([x, x], [0, y - gap]),
+                       ([x, x], [y + gap, geo.height])):
+            ax.plot(xs, ys, color=style.ACCENT, lw=1.4,
+                    solid_capstyle="butt")
+        ax.add_patch(Rectangle((x - half, y - half), 2 * half, 2 * half,
+                               fill=False, ec=style.ACCENT, lw=1.8))
+        r = half
+    else:
+        r = geo.width * 0.022
+        ax.add_patch(Circle((x, y), r, fill=False, ec=style.ACCENT, lw=2.0))
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            ax.plot([x + dx * r * 1.15, x + dx * r * 1.7],
+                    [y + dy * r * 1.15, y + dy * r * 1.7], color=style.ACCENT,
+                    lw=2.0)
     if target and target.get("name"):
         _halo_text(ax, x, y - r * 2.2, target["name"], size=12, bold=True,
                    ha="center", mono=False, color=style.ACCENT)
@@ -262,7 +276,8 @@ def _draw_sequence(ax, geo, entries):
 
 def draw_finder(field, target=None, entries=None, image=None, wcs=None,
                 inverted=False, negative=False, out=None, lang="es",
-                watermark="NightScribe", size=None):
+                watermark="NightScribe", size=None, boxes=None,
+                marker_style="ring"):
     # The finder/comparison chart.
     # @args: field - compstars.load_field result, target - optional dict
     #        {name, ra, dec}, entries - sequence entries (comp/check) or
@@ -272,7 +287,10 @@ def draw_finder(field, target=None, entries=None, image=None, wcs=None,
     #        canvas centred on the field), inverted - rotate 180 deg
     #        (canvas mode), negative - black stars on white (grayscale
     #        images), out - PNG path, lang - "es"|"en", watermark - footer,
-    #        size - (w, h) px
+    #        size - (w, h) px, boxes - chart_annotate corner boxes dict
+    #        (ADR-046; only top_right / bottom_left paint: the title owns
+    #        the name and the compass the top-left corner),
+    #        marker_style - "ring" | "cross" for the target marker
     # @return: matplotlib figure
     fig, ax = style.new_fig("instagram", size=size)
     if wcs is not None:
@@ -312,7 +330,13 @@ def draw_finder(field, target=None, entries=None, image=None, wcs=None,
     _draw_ticks(ax, geo)
     _draw_scale(ax, geo, lang)
     _draw_compass(ax, geo)
-    _draw_target(ax, geo, target, lang)
+    _draw_target(ax, geo, target, lang, marker_style)
+    if boxes:
+        # the title owns the name and the compass the top-left corner:
+        # only the other two boxes paint (ADR-046)
+        from . import blink_view as _bv
+        _bv._draw_corner_boxes(
+            ax, {k: v for k, v in boxes.items() if k != "top_left"})
 
     if entries:
         _draw_sequence(ax, geo, entries)

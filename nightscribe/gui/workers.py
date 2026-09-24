@@ -250,7 +250,8 @@ class BlinkExportWorker(QThread):
 
     def __init__(self, kind, ref8, obs8, sn_xy, out, effect="blink",
                  name="", ref_label="", lang="es", observatory="", zoom=1,
-                 marker_scale=1.0, interval_ms=None):
+                 marker_scale=1.0, interval_ms=None,
+                 boxes=None, marker_style="ring", compass=None):
         super().__init__()
         self._kind = kind           # "gif" | "video" | "png"
         self._ref8 = ref8
@@ -265,6 +266,10 @@ class BlinkExportWorker(QThread):
         self._zoom = zoom
         self._marker_scale = marker_scale
         self._interval_ms = interval_ms
+        # ADR-046: corner boxes dict, object marker look, N/E compass
+        self._boxes = boxes
+        self._marker_style = marker_style
+        self._compass = compass
 
     def run(self):
         import matplotlib
@@ -279,7 +284,8 @@ class BlinkExportWorker(QThread):
                     ref_label=self._ref_label, watermark=wm,
                     lang=self._lang, observatory=self._observatory,
                     zoom=self._zoom, marker_scale=self._marker_scale,
-                    interval_ms=self._interval_ms)
+                    interval_ms=self._interval_ms, boxes=self._boxes,
+                    marker_style=self._marker_style, compass=self._compass)
             elif self._kind == "video":
                 blink_view.make_blink_video(
                     self._ref8, self._obs8, self._sn_xy, self._out,
@@ -287,13 +293,16 @@ class BlinkExportWorker(QThread):
                     ref_label=self._ref_label, watermark=wm,
                     lang=self._lang, observatory=self._observatory,
                     zoom=self._zoom, marker_scale=self._marker_scale,
-                    interval_ms=self._interval_ms)
+                    interval_ms=self._interval_ms, boxes=self._boxes,
+                    marker_style=self._marker_style, compass=self._compass)
             else:
                 blink_view.draw_pair(
                     self._ref8, self._obs8, self._sn_xy, name=self._name,
                     ref_label=self._ref_label, out=self._out, watermark=wm,
                     lang=self._lang, observatory=self._observatory,
-                    zoom=self._zoom, marker_scale=self._marker_scale)
+                    zoom=self._zoom, marker_scale=self._marker_scale,
+                    boxes=self._boxes, marker_style=self._marker_style,
+                    compass=self._compass)
             self.finished.emit(str(self._out), "")
         except Exception as err:  # never crash the GUI on render problems
             logger.exception("blink export failed: %s", err)

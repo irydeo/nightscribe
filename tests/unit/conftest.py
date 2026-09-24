@@ -27,6 +27,21 @@ import requests
 
 
 @pytest.fixture(autouse=True)
+def _chart_style_defaults(monkeypatch):
+    # The GUI reads the chart-annotation settings (ADR-046) live from the
+    # config singleton, which loads the DEVELOPER'S real config file: a
+    # saved marker_style/chart_boxes there silently rewrites what the
+    # drawing tests see (the classic-marker tests failed on the author's
+    # machine the day he tried the feature for real). Pin the feature's
+    # keys to their defaults so tests are host-independent; a test that
+    # cares still monkeypatches on top.
+    from nightscribe.config import DEFAULTS, config
+    for key in ("marker_style", "chart_boxes", "observer_name",
+                "measurer_name", "telescope_desc", "camera_model"):
+        monkeypatch.setitem(config._data, key, DEFAULTS[key])
+
+
+@pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
     # @return: None. Any requests call (requests.get/post go through
     # Session.request too) raises ConnectionError at once. It is a

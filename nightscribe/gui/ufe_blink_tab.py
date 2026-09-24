@@ -494,19 +494,29 @@ class UfeBlinkTab(QWidget):
         x, y = pos
         scale = max(self._view.current_factor(), 1e-3)
         r = self.sld_marker.value() / scale
-        pen = QPen(QColor(_MARKER_COLOR))
-        pen.setWidthF(2.0)
-        pen.setCosmetic(True)
-        circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-        circle.setPen(pen)
-        self._items.append(self._view.add_overlay(circle))
-        for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
-                               (x + 0.5 * r, y, x + 1.6 * r, y),
-                               (x, y - 1.6 * r, x, y - 0.5 * r),
-                               (x, y + 0.5 * r, x, y + 1.6 * r)):
-            tick = QGraphicsLineItem(x0, y0, x1, y1)
-            tick.setPen(pen)
-            self._items.append(self._view.add_overlay(tick))
+        # ADR-046: two looks for the object marker (Settings)
+        from ..config import config
+        if config.get("marker_style", "ring") == "cross":
+            from .widgets.ufe_image_view import cross_marker_items
+            w, h = self._state.plate_shape
+            half = max(9.0, self.sld_marker.value() * 0.9) / scale
+            for it in cross_marker_items(x, y, w, h, _MARKER_COLOR, half):
+                self._items.append(self._view.add_overlay(it))
+            r = half                    # the label anchors below the box
+        else:
+            pen = QPen(QColor(_MARKER_COLOR))
+            pen.setWidthF(2.0)
+            pen.setCosmetic(True)
+            circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
+            circle.setPen(pen)
+            self._items.append(self._view.add_overlay(circle))
+            for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
+                                   (x + 0.5 * r, y, x + 1.6 * r, y),
+                                   (x, y - 1.6 * r, x, y - 0.5 * r),
+                                   (x, y + 0.5 * r, x, y + 1.6 * r)):
+                tick = QGraphicsLineItem(x0, y0, x1, y1)
+                tick.setPen(pen)
+                self._items.append(self._view.add_overlay(tick))
         name = self._pair.get("name") or ""
         if name:
             label = QGraphicsSimpleTextItem(name)
@@ -569,13 +579,29 @@ class UfeBlinkTab(QWidget):
         effect = "blink" if self.rdo_blink.isChecked() else "fade"
         from ..config import config
         self.lbl_status.setText(self.tr("Rendering…"))
+        # ADR-046: corner boxes, marker look and the N/E compass follow
+        # the settings; PSc reads the loaded plate's own solution
+        boxes = compass = None
+        if config.get("chart_boxes", False):
+            from ..core import chart_annotate, fits_meta
+            from ..viz import blink_view as _bv
+            meta = fits_meta.meta_from_header(self._state.header or {})
+            scale = (self._state.wcs.pixel_scale()
+                     if self._state.wcs is not None else None)
+            boxes = _bv.pair_boxes(
+                self._pair, meta, chart_annotate.site_from_config(config),
+                scale_arcsec_px=scale)
+            compass = _bv.pair_compass(self._pair)
         w = BlinkExportWorker(
             kind, self._ref8, self._obs8, sn, out, effect=effect,
             name=name, ref_label=self._pair["ref_label"], lang=self._lang,
             observatory=config.get("observatory_name", ""),
             zoom=self.cmb_zoom.currentData(),
             marker_scale=self.sld_marker.value() / 10.0,
-            interval_ms=self.spn_interval.value())
+            interval_ms=self.spn_interval.value(),
+            boxes=boxes,
+            marker_style=config.get("marker_style", "ring"),
+            compass=compass)
         w.finished.connect(self._on_exported)
         self._export_workers.append(w)
         w.start()

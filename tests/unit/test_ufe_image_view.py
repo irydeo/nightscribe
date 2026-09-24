@@ -311,3 +311,84 @@ def test_snap_locks_faint_sources_on_structure(view, qapp):
     hover(1020.0, 1000.0)          # >20 px from anything: no grab
     assert view._snap_scene is None
     view.set_pick_cursor(False)
+
+
+# ------------------------------------------------- chart boxes (ADR-046)
+
+def _boxes_sample():
+    return {"top_left": ["AT 2026acka"],
+            "top_right": ["Date: 2026-09-20 21:06 UT", "RA: 22 02 16.4",
+                          "Dec: +39 49 46.6", "Mag: 17.10 (G)"],
+            "bottom_left": ["Obs: F. Calvo", "Stn: Z41",
+                            "PSc: 1.07″/px", "FOV: 6.8 × 6.8′"]}
+
+
+def test_cross_marker_items_span_the_plate(view):
+    from nightscribe.gui.widgets.ufe_image_view import cross_marker_items
+    items = cross_marker_items(100.0, 60.0, 400.0, 300.0, "#ffb347", 12.0)
+    assert len(items) == 5
+    seg = [(ln.line().x1(), ln.line().y1(), ln.line().x2(), ln.line().y2())
+           for ln in items[:4]]
+    gap = 12.0 * 1.4
+    assert (0.0, 60.0, 100.0 - gap, 60.0) in seg      # west arm
+    assert (100.0 + gap, 60.0, 400.0, 60.0) in seg    # east arm
+    assert (100.0, 0.0, 100.0, 60.0 - gap) in seg     # north arm
+    assert (100.0, 60.0 + gap, 100.0, 300.0) in seg   # south arm
+    rect = items[4].rect()
+    assert rect.center().x() == pytest.approx(100.0)
+    assert rect.center().y() == pytest.approx(60.0)
+    assert rect.width() == pytest.approx(24.0)
+    assert all(it.pen().isCosmetic() for it in items)
+
+
+def test_boxes_follow_the_toggle_on_export(view, tmp_path):
+    view._state.load(MONO)
+    view.set_boxes_provider(_boxes_sample)
+    a = view.export_png(tmp_path / "off.png").read_bytes()    # boxes off
+    view.set_hud(boxes=True)
+    b = view.export_png(tmp_path / "on.png").read_bytes()
+    assert a != b                         # the boxes burn into the file
+    view.set_hud(boxes=False)
+    assert view.export_png(tmp_path / "off2.png").read_bytes() == a
+    view.set_boxes_provider(None)
+    assert view.export_png(tmp_path / "off3.png").read_bytes() == a
+
+
+def test_boxes_paint_needs_no_wcs(view, tmp_path):
+    # the name and the site lines paint even on an unsolved plate
+    from test_fits_annotate import _make_fits
+    view._state.load(_make_fits(tmp_path / "plain.fits"))
+    view.set_boxes_provider(lambda: {"top_left": ["Thing"]})
+    a = view.export_png(tmp_path / "off.png").read_bytes()
+    view.set_hud(boxes=True)
+    b = view.export_png(tmp_path / "on.png").read_bytes()
+    assert a != b
+
+
+def test_boxes_provider_hiccup_never_breaks_the_paint(view, tmp_path):
+    view._state.load(MONO)
+
+    def boom():
+        raise RuntimeError("no boxes today")
+    view.set_boxes_provider(boom)
+    view.set_hud(boxes=True)
+    out = view.export_png(tmp_path / "fine.png")
+    assert out.exists() and out.stat().st_size > 0
+    view.viewport().repaint()                 # the screen paint survives
+
+
+def test_boxes_duck_the_probe_anchor(view, tmp_path):
+    from PySide6.QtCore import QPointF, QRectF
+    view._state.load(MONO)
+    view.set_pick_cursor(True)
+    _x, y_plain = view._tooltip_anchor_pos(QPointF(3, 3),
+                                           QRectF(0, 0, 50, 20))
+    view.set_boxes_provider(_boxes_sample)
+    view.set_hud(boxes=True)
+    # the export runs the HUD paint (offscreen repaints are not a thing)
+    view.export_png(tmp_path / "boxes.png")
+    assert view._boxes_tl_h > 0
+    _x, y_boxed = view._tooltip_anchor_pos(QPointF(3, 3),
+                                           QRectF(0, 0, 50, 20))
+    assert y_boxed > y_plain                  # the probe ducks the box
+    view.set_pick_cursor(False)

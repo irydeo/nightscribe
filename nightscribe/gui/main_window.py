@@ -756,6 +756,20 @@ class MainWindow(QMainWindow):
         dlg.cmb_camera_type.setCurrentText(config.get("camera_type", "CCD"))
         dlg.cmb_binning.addItems(["1x1", "2x2", "3x3"])
         dlg.cmb_binning.setCurrentText(config.get("pixel_binning", "1x1"))
+        # Chart annotations (ADR-046): the identity stamped in the corner
+        # boxes and the two style switches
+        dlg.edt_observer.setText(config.get("observer_name", ""))
+        dlg.edt_measurer.setText(config.get("measurer_name", ""))
+        dlg.edt_telescope.setText(config.get("telescope_desc", ""))
+        dlg.edt_camera_model.setText(config.get("camera_model", ""))
+        dlg.cmb_marker_style.addItem(self.tr("Ring with ticks (classic)"),
+                                     "ring")
+        dlg.cmb_marker_style.addItem(self.tr("Full-frame cross with box"),
+                                     "cross")
+        dlg.cmb_marker_style.setCurrentIndex(
+            1 if config.get("marker_style", "ring") == "cross" else 0)
+        dlg.chk_chart_boxes.setChecked(
+            bool(config.get("chart_boxes", False)))
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
         dlg.spn_horizon_margin.setValue(
             float(config.get("horizon_margin_deg", 0)))
@@ -838,6 +852,14 @@ class MainWindow(QMainWindow):
         config.set("camera_type", dlg.cmb_camera_type.currentText())
         config.set("pixel_binning", dlg.cmb_binning.currentText().strip()
                    or "1x1")
+        # Chart annotations (ADR-046)
+        config.set("observer_name", dlg.edt_observer.text().strip())
+        config.set("measurer_name", dlg.edt_measurer.text().strip())
+        config.set("telescope_desc", dlg.edt_telescope.text().strip())
+        config.set("camera_model", dlg.edt_camera_model.text().strip())
+        config.set("marker_style",
+                   dlg.cmb_marker_style.currentData() or "ring")
+        config.set("chart_boxes", dlg.chk_chart_boxes.isChecked())
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
         config.set("moon_limit_enabled", dlg.chk_moon_enabled.isChecked())
@@ -7110,6 +7132,16 @@ class MainWindow(QMainWindow):
         effect = "blink" if b.rdo_blink.isChecked() else "fade"
         sn = pair["sn_xy"] if b.chk_marker.isChecked() else None
         b.lbl_blink_status.setText(self.tr("Rendering…"))
+        # ADR-046: corner boxes, marker look and the N/E compass follow
+        # the settings (the legacy previews stay as they were)
+        boxes = compass = None
+        if config.get("chart_boxes", False):
+            from ..core import chart_annotate, fits_meta
+            from ..viz import blink_view as _bv
+            boxes = _bv.pair_boxes(
+                pair, fits_meta.read_meta(pair["image_path"]),
+                chart_annotate.site_from_config(config))
+            compass = _bv.pair_compass(pair)
         w = BlinkExportWorker(
             kind, self._blink_ref8, self._blink_obs8, sn, out, effect=effect,
             name=pair["name"], ref_label=pair["ref_label"],
@@ -7117,7 +7149,10 @@ class MainWindow(QMainWindow):
             observatory=config.get("observatory_name", ""),
             zoom=(1, 2, 4)[b.cmb_zoom.currentIndex()],
             marker_scale=b.sld_marker.value() / 10.0,
-            interval_ms=b.spn_interval.value())
+            interval_ms=b.spn_interval.value(),
+            boxes=boxes,
+            marker_style=config.get("marker_style", "ring"),
+            compass=compass)
         w.finished.connect(lambda out, err: b.lbl_blink_status.setText(
             self.tr("Written to %1").replace("%1", out) if out else
             self.tr("Export failed: %1").replace("%1", err)))

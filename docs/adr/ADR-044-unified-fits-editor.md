@@ -149,7 +149,21 @@ abandonar de verdad la pestaña Fotometría; el botón «Go to the sequence»
 `show_tab`) siguen funcionando: el diálogo registra `self.tab_photometry`
 y mantiene `self.tab_compare` / `self.tab_measure` como alias de los
 paneles internos, y al recibir un panel interno cambia de modo y activa
-la pestaña.
+la pestaña. **fix 2026-09-24**: dentro de la pestaña hay dos conceptos
+distintos, los clics (siguen a la sección armada, `self._active`) y los
+overlays (siguen al escenario de la pestaña, `self._on_stage`): al abrir
+desde una visita el enlace profundo arma Medir con la mitad Secuencia
+visible pero desarmada, y las puertas de dibujo que leían `_active`
+dejaban «Generar campo» y «Proponer secuencia» pintando nada; ahora
+`_on_field_ready`, `_redraw_overlays`, `_redraw_entries` y
+`_draw_measurement` se rigen por `_on_stage`. **ADR-046**: la barra
+superior gana el conmutador «Cajas» (las cajas de metadatos de las
+esquinas, en pantalla y en el PNG; con ellas la rosa baja al centro
+inferior y gana la pata E, y la barra de escala se mueve a la derecha),
+el marcador del objeto admite el estilo `cross` (cruz a todo el campo
+con caja; helper compartido `cross_marker_items`, lo usan las pestañas
+Anotar, Secuencia y Blink) y el contenido lo ensambla
+`core/chart_annotate` vía `view.set_boxes_provider`.
 
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
@@ -289,7 +303,21 @@ Photometry tab is actually left; the "Go to the sequence" button and
 the inherited deep links (prefills, `show_tab`) keep working: the
 dialog registers `self.tab_photometry` and keeps `self.tab_compare` /
 `self.tab_measure` as aliases of the inner panels, and receiving an
-inner panel switches the mode and activates the tab.
+inner panel switches the mode and activates the tab. **fix 2026-09-24**:
+inside the tab there are two distinct concepts, the clicks (they follow
+the armed section, `self._active`) and the overlays (they follow the
+tab's stage, `self._on_stage`): opened from a visit, the deep link arms
+Measure with the Sequence half visible but disarmed, and the draw gates
+reading `_active` left "Generate field" and "Propose sequence" painting
+nothing; `_on_field_ready`, `_redraw_overlays`, `_redraw_entries` and
+`_draw_measurement` now follow `_on_stage`. **ADR-046**: the top bar
+gains the "Boxes" toggle (the metadata corner boxes, on screen and in
+the exported PNG; with them on, the compass moves to the bottom centre
+and gains the east leg, and the scale bar moves right), the object
+marker admits the `cross` style (full-frame crosshair with a box; shared
+`cross_marker_items` helper, used by the Annotate, Sequence and Blink
+tabs) and the content is assembled by `core/chart_annotate` through
+`view.set_boxes_provider`.
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

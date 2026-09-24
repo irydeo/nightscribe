@@ -73,6 +73,16 @@ class UfeDialog(QDialog):
         self.state.image_loaded.connect(self._on_image_loaded)
         self.state.wcs_changed.connect(self._sync_wcs_buttons)
         self.view.zoom_changed.connect(self._on_zoom_changed)
+        # ADR-046: the corner boxes always read the live state (solve,
+        # measurement, attached object) through this provider
+        self.view.set_boxes_provider(self._chart_boxes)
+
+    def showEvent(self, event):
+        # The configured default for the corner boxes lands at every
+        # show; the observer's own toggle survives while it stays open.
+        from ..config import config
+        self.btn_boxes.setChecked(bool(config.get("chart_boxes", False)))
+        super().showEvent(event)
 
     # ------------------------------------------------------------- layout
 
@@ -139,6 +149,19 @@ class UfeDialog(QDialog):
         self.btn_annot.toggled.connect(
             lambda checked: self.view.set_annotations_visible(checked))
         bar.addWidget(self.btn_annot)
+        # ADR-046: the metadata corner boxes (object, date, position,
+        # brightness, site, scale); the configured default lands at every
+        # show, the toggle is the session's own choice
+        self.btn_boxes = QPushButton(self.tr("Boxes"))
+        self.btn_boxes.setCheckable(True)
+        self.btn_boxes.setChecked(False)
+        self.btn_boxes.setToolTip(self.tr(
+            "Metadata corner boxes: object, date, position, brightness, "
+            "observer, equipment and plate scale (on screen and in the "
+            "exported PNG)"))
+        self.btn_boxes.toggled.connect(
+            lambda checked: self.view.set_hud(boxes=checked))
+        bar.addWidget(self.btn_boxes)
         self.btn_solve = QPushButton(self.tr("Solve astrometry…"))
         self.btn_solve.setToolTip(self.tr(
             "Blind-solve the plate with Astrometry.net (the file on disk "
@@ -328,6 +351,85 @@ class UfeDialog(QDialog):
     def object(self):
         # @return: the current object dict, or None
         return self._object
+
+    # ------------------------------------------- chart boxes (ADR-046)
+
+    def _chart_target_scene(self):
+        # Where the chart calls the object: the measured centroid first
+        # (the truth sits at the measurement), then the attached
+        # object's coordinates, then the Sequence section's moved mark;
+        # None when nothing says anything (no plate, or no WCS and no
+        # measurement).
+        # @return: (x, y) scene coordinates, or None
+        if not self.state.has_image:
+            return None
+        last = self.tab_measure._last
+        if last is not None:
+            return self.state.data_to_scene(last["col"], last["row"])
+        obj = self._object or {}
+        if self.state.wcs is not None and obj.get("ra") is not None \
+                and obj.get("dec") is not None:
+            try:
+                col, row = self.state.wcs.sky_to_pixel(float(obj["ra"]),
+                                                       float(obj["dec"]))
+                w, h = self.state.plate_shape
+                if 0 <= col < w and 0 <= row < h:
+                    return self.state.data_to_scene(col, row)
+            except Exception:
+                pass
+        pos = self.tab_compare._target_pos
+        if pos is not None:
+            return pos
+        return None
+
+    def _chart_boxes(self):
+        # The view's boxes provider: assembles the corner-box content
+        # from the live state, following core/chart_annotate's rules
+        # (name always; position/scale only solved; brightness only when
+        # measured this session).
+        # @return: the boxes dict ({} when nothing can be said)
+        from ..config import config
+        from ..core import chart_annotate, fits_meta
+        if not self.state.has_image:
+            return {}
+        obj = self._object or {}
+        name = (obj.get("name") or "").strip()
+        if not name:
+            name = self.tab_compare.edt_target.text().strip()
+        if not name and self.state.path:
+            name = Path(self.state.path).stem
+        meta = fits_meta.meta_from_header(self.state.header or {})
+        wcs_info = None
+        if self.state.wcs is not None:
+            scale = self.state.wcs.pixel_scale()
+            # the field of view of what is actually shown, clamped to
+            # the plate (the fit leaves a relaxed margin around it)
+            pw, ph = self.state.plate_shape
+            tl = self.view.mapToScene(0, 0)
+            br = self.view.mapToScene(self.view.viewport().width(),
+                                      self.view.viewport().height())
+            vis_w = min(abs(br.x() - tl.x()), float(pw))
+            vis_h = min(abs(br.y() - tl.y()), float(ph))
+            wcs_info = {"scale_arcsec_px": scale,
+                        "fov_arcmin": (vis_w * scale / 60.0,
+                                       vis_h * scale / 60.0)}
+            pos = self._chart_target_scene()
+            if pos is not None:
+                col, row = self.state.scene_to_data(pos[0], pos[1])
+                try:
+                    ra, dec = self.state.wcs.pixel_to_sky(col, row)
+                    wcs_info["ra_deg"], wcs_info["dec_deg"] = ra, dec
+                except Exception:
+                    pass
+        measured = None
+        last = self.tab_measure._last
+        if last is not None and last.get("mag") is not None:
+            measured = {"mag": last["mag"], "err": last.get("err"),
+                        "band": last.get("band")}
+        return chart_annotate.build_boxes(
+            name=name, meta=meta, wcs_info=wcs_info,
+            site=chart_annotate.site_from_config(config),
+            measured=measured)
 
     def _update_object_line(self):
         # The thin line under the top bar: name, RA/Dec, magnitude; only

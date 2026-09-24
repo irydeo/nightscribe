@@ -251,3 +251,65 @@ def test_solve_failure_warns(dlg, monkeypatch):
     dlg.state.load(MONO)
     dlg._on_solved({})
     assert seen
+
+
+# ------------------------------------------------- chart boxes (ADR-046)
+
+def test_chart_boxes_provider_reads_the_live_state(dlg, monkeypatch):
+    # name: the plate stem when nothing else speaks; the attached object
+    # wins over it. Date/exposure from the header, position/scale/FOV
+    # from the WCS, brightness only after a measurement.
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "observer_name", "F. Calvo")
+    monkeypatch.setitem(config._data, "mpc_code", "Z41")
+    monkeypatch.setitem(config._data, "chart_boxes", True)
+    assert dlg._chart_boxes() == {}                    # no plate, no boxes
+    dlg.state.load(MONO)
+    boxes = dlg._chart_boxes()
+    assert boxes["top_left"] == ["sn2026zji_new_image"]
+    assert "Date: 2026-08-21 20:54 UT" in boxes["top_right"]
+    assert "Exp: 10.0 s" in boxes["top_right"]
+    # solved plate: scale and FOV always; the RA/Dec lines wait for a
+    # known object position (a field centre is not the object)
+    assert not any(ln.startswith("RA: ") for ln in boxes["top_right"])
+    assert any(ln.startswith("PSc: ") for ln in boxes["bottom_left"])
+    assert "Obs: F. Calvo" in boxes["bottom_left"]
+    assert "Stn: Z41" in boxes["bottom_left"]
+    # no measurement yet: no Mag line
+    assert not any(ln.startswith("Mag: ") for ln in boxes["top_right"])
+    # the attached object wins the name and pins the position (an
+    # off-plate object would paint no position lines at all)
+    from nightscribe.core import coords
+    cra, cdec = dlg.state.wcs.center()
+    dlg.set_object({"name": "AT 2026zji", "ra": cra, "dec": cdec,
+                    "mag": 17.1})
+    boxes = dlg._chart_boxes()
+    assert boxes["top_left"] == ["AT 2026zji"]
+    col, row = dlg.state.wcs.sky_to_pixel(cra, cdec)
+    era, edec = dlg.state.wcs.pixel_to_sky(col, row)
+    assert f"RA: {coords.ra_deg_to_hms(era)}" in boxes["top_right"]
+    assert f"Dec: {coords.dec_deg_to_dms(edec)}" in boxes["top_right"]
+    # a catalog magnitude from the project is NOT a calibration: no Mag
+    assert not any(ln.startswith("Mag: ") for ln in boxes["top_right"])
+    # a calibrated measurement this session is
+    dlg.tab_measure._last = {"mag": 16.391, "err": 0.04, "band": "V",
+                             "col": 100.0, "row": 200.0}
+    boxes = dlg._chart_boxes()
+    assert "Mag: 16.39 ± 0.04 (V)" in boxes["top_right"]
+    # ... and the position now speaks from the measured centroid
+    ra, dec = dlg.state.wcs.pixel_to_sky(100.0, 200.0)
+    assert f"RA: {coords.ra_deg_to_hms(ra)}" in boxes["top_right"]
+
+
+def test_chart_boxes_toggle_default_comes_from_config(dlg, monkeypatch):
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "chart_boxes", True)
+    dlg.hide()
+    dlg.show()                          # showEvent re-reads the default
+    assert dlg.btn_boxes.isChecked()
+    assert dlg.view.show_boxes
+    monkeypatch.setitem(config._data, "chart_boxes", False)
+    dlg.hide()
+    dlg.show()
+    assert not dlg.btn_boxes.isChecked()
+    assert not dlg.view.show_boxes

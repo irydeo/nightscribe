@@ -45,6 +45,7 @@ from ..core import compstars
 from ..core.sources import vizier
 from ..viz import palette
 from .ufe_sequence_dialog import UfeSequenceDialog
+from .widgets.ufe_image_view import cross_marker_items
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -91,7 +92,10 @@ class UfeCompareTab(QWidget):
         self._state = state
         self._lang = lang
         self._view = view
-        self._active = False
+        self._active = False         # owns the view's clicks right now
+        self._on_stage = False       # the Photometry tab is on stage and
+                                     # this section is visible (armed or
+                                     # not): its overlays may be drawn
         self._field = None           # compstars.load_field result
         self._entries = []           # the sequence: name/kind/star dicts
         self._stars = []             # catalog stars with _sx/_sy cached
@@ -231,19 +235,25 @@ class UfeCompareTab(QWidget):
     # ------------------------------------------------------- activation
 
     def set_active(self, flag, keep_overlays=False):
-        # Only the visible tab owns the view's clicks, overlays and the
-        # hover probe (the state's pixel/DN/RA probe returns on leave).
-        # @args: flag - on stage or not, keep_overlays - leaving for the
-        #        Measure tab: the sequence stays visible and its probe
-        #        keeps talking (the Measure tab measures WITH it)
+        # Stage handoff, two distinct concepts (ADR-044 rev): the CLICKS
+        # follow the armed section (self._active), the OVERLAYS follow
+        # the Photometry tab's stage (self._on_stage): both sections are
+        # visible at once, so a disarmed section keeps its rings and its
+        # probe, and its buttons (Generate field, Propose) must paint.
+        # @args: flag - owns the clicks or not, keep_overlays - leaving
+        #        the stage for the sister section: the sequence stays
+        #        visible and its probe keeps talking (the Measure
+        #        section measures WITH it); a full leave drops all
         self._active = bool(flag)
         if self._view is None:
             return
         if self._active:
+            self._on_stage = True
             self._view.set_hover_probe(self._probe)
             self._redraw_overlays()
         else:
             if not keep_overlays:
+                self._on_stage = False
                 self._view.set_hover_probe(self._state.probe_text)
                 self._drop_items()
 
@@ -397,7 +407,10 @@ class UfeCompareTab(QWidget):
                         len(self._stars),
                         len(field.get("variables", []))) + wcs_note)
         self._reload_table()
-        if self._active:
+        # paint follows the stage, not the clicks: the field can land
+        # while the Measure section is armed (opened from a visit) and
+        # the Sequence half is still on view
+        if self._on_stage:
             self._redraw_overlays()
 
     def _sky_to_scene(self, ra, dec):
@@ -458,7 +471,7 @@ class UfeCompareTab(QWidget):
         # first, collision-free), known-variable rings, the target and
         # the sequence entries.
         self._drop_items()
-        if not self._active or self._view is None or self._field is None:
+        if not self._on_stage or self._view is None or self._field is None:
             return
         w, h = self._state.plate_shape
         # catalog: only the brightest stars get ring + magnitude label
@@ -503,24 +516,37 @@ class UfeCompareTab(QWidget):
             self._items.append(self._view.add_overlay(ring))
         # the target mark: the plate centre by default, or the spot the
         # observer placed it at with «Move marker…». A reference point
-        # only: the maths (proposal, survey, measurement) never reads it
+        # only: the maths (proposal, survey, measurement) never reads it.
+        # Two looks (ADR-046, Settings): the ring with ticks or the
+        # full-frame cross with a box.
         if self.chk_target.isChecked():
+            from ..config import config
             cx, cy = (self._target_pos
                       if self._target_pos is not None
                       else (w / 2.0, h / 2.0))
-            r = w * 0.022
-            target = QGraphicsEllipseItem(cx - r, cy - r, 2 * r, 2 * r)
-            target.setPen(self._pen(palette.ACCENT, 2.2))
-            self._items.append(self._view.add_overlay(target))
-            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                ln = QGraphicsLineItem(cx + dx * r * 1.15, cy + dy * r * 1.15,
-                                       cx + dx * r * 1.7, cy + dy * r * 1.7)
-                ln.setPen(self._pen(palette.ACCENT, 2.2))
-                self._items.append(self._view.add_overlay(ln))
+            if config.get("marker_style", "ring") == "cross":
+                half = w * 0.011
+                for it in cross_marker_items(cx, cy, w, h,
+                                             palette.ACCENT, half):
+                    self._items.append(self._view.add_overlay(it))
+                label_y = cy + half * 2.6
+            else:
+                r = w * 0.022
+                target = QGraphicsEllipseItem(cx - r, cy - r, 2 * r, 2 * r)
+                target.setPen(self._pen(palette.ACCENT, 2.2))
+                self._items.append(self._view.add_overlay(target))
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    ln = QGraphicsLineItem(cx + dx * r * 1.15,
+                                           cy + dy * r * 1.15,
+                                           cx + dx * r * 1.7,
+                                           cy + dy * r * 1.7)
+                    ln.setPen(self._pen(palette.ACCENT, 2.2))
+                    self._items.append(self._view.add_overlay(ln))
+                label_y = cy + r * 2.4
             name = self.edt_target.text().strip()
             if name:
                 self._items.append(self._view.add_overlay(
-                    self._text(name, cx, cy + r * 2.4, palette.ACCENT,
+                    self._text(name, cx, label_y, palette.ACCENT,
                                w * 0.018, bold=True, anchor="center")))
         self._redraw_entries()
 
@@ -539,7 +565,7 @@ class UfeCompareTab(QWidget):
             except RuntimeError:
                 pass
         self._entry_items = []
-        if not self._active or self._field is None:
+        if not self._on_stage or self._field is None:
             return
         w, _h = self._state.plate_shape
         in_seq = {id(e["star"]) for e in self._entries}

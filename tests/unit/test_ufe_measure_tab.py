@@ -178,6 +178,27 @@ def test_full_measurement_calibrates(dlg):
     assert tab.btn_csv.isEnabled() and tab.btn_eff.isEnabled()
 
 
+def test_remeasure_keeps_painting_while_the_sequence_owns_the_stage(dlg):
+    # Regression (ADR-044 rev): the overlays follow the Photometry tab's
+    # stage, not the click ownership. Re-measuring (any recipe control
+    # ends in _remeasure) while the Sequence section is armed used to
+    # drop the rings and paint nothing back.
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert len(tab._items) == 3 + 5
+    dlg.tab_photometry.set_mode("sequence")     # disarmed, still visible
+    assert not tab._active and tab._on_stage
+    tab._remeasure()
+    assert tab._last is not None and tab._last.get("mag") is not None
+    assert len(tab._items) == 3 + 5
+    # back to Measure: still coherent, and a full leave drops them
+    dlg.tab_photometry.set_mode("measure")
+    assert len(tab._items) == 3 + 5
+    dlg.tabs.setCurrentWidget(dlg.tab_blink)
+    assert tab._items == []
+
+
 def test_save_in_project_button_follows_the_point_hook(dlg):
     # ADR-044: "Save in the project" shows only when the dialog was
     # opened from a project (a point hook is set), stays disabled until

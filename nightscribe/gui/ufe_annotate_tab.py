@@ -239,19 +239,31 @@ class UfeAnnotateTab(QWidget):
         scale = max(self._view.current_factor(), 1e-3)
         r = self.sld_marker.value() / scale      # scene radius, screen px
         x, y = self._state.data_to_scene(*self._marker)
-        pen = QPen(self._marker_color)
-        pen.setWidthF(2.0)
-        pen.setCosmetic(True)
-        circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-        circle.setPen(pen)
-        self._items.append(self._view.add_overlay(circle))
-        for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
-                               (x + 0.5 * r, y, x + 1.6 * r, y),
-                               (x, y - 1.6 * r, x, y - 0.5 * r),
-                               (x, y + 0.5 * r, x, y + 1.6 * r)):
-            tick = QGraphicsLineItem(x0, y0, x1, y1)
-            tick.setPen(pen)
-            self._items.append(self._view.add_overlay(tick))
+        # ADR-046: the marker has two looks (Settings); the cross spans
+        # the plate with a box on the object, the ring is the classic
+        from ..config import config
+        if config.get("marker_style", "ring") == "cross":
+            from .widgets.ufe_image_view import cross_marker_items
+            w, h = self._state.plate_shape
+            half = max(9.0, self.sld_marker.value() * 0.9) / scale
+            for it in cross_marker_items(x, y, w, h, self._marker_color,
+                                         half):
+                self._items.append(self._view.add_overlay(it))
+            r = half                    # the label anchors below the box
+        else:
+            pen = QPen(self._marker_color)
+            pen.setWidthF(2.0)
+            pen.setCosmetic(True)
+            circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
+            circle.setPen(pen)
+            self._items.append(self._view.add_overlay(circle))
+            for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
+                                   (x + 0.5 * r, y, x + 1.6 * r, y),
+                                   (x, y - 1.6 * r, x, y - 0.5 * r),
+                                   (x, y + 0.5 * r, x, y + 1.6 * r)):
+                tick = QGraphicsLineItem(x0, y0, x1, y1)
+                tick.setPen(pen)
+                self._items.append(self._view.add_overlay(tick))
         text = self.edit_label.text().strip()
         if text:
             label = QGraphicsSimpleTextItem(text)

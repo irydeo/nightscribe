@@ -1075,3 +1075,9 @@ class UfeMeasureTab(QWidget):
                 comp=_nc(comp), check=_nc(check))
         logger.info("measurement exported (%s): %s", kind, out)
         self.lbl_status.setText(self.tr("Written to {0}").format(out))
+        # ADR-045: the one-row report registers in the watching project
+        # (the visit it was measured from), like every other UFE file
+        dlg = self.window()
+        notify = getattr(dlg, "notify_saved", None)
+        if callable(notify):
+            notify([out], "report")

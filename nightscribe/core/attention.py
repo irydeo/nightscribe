@@ -75,12 +75,16 @@ def attention_report(db, cfg=None):
             "updated": p.get("updated") or 0,
         }
         # an overdue cadence (or the first-visit prompt) calls for action
-        # tonight; next_action() is the single source for that verdict
-        if act["key"] == "followup":
+        # tonight; next_action() is the single source for that verdict.
+        # ADR-045: the cadence and the step now share the "analysis" key,
+        # so the cadence payload (overdue_days / never_visited) is what
+        # speaks, not the key name.
+        if act["key"] == "analysis" and (
+                act["overdue_days"] is not None or act.get("never_visited")):
             entry.update(
                 urgency="due",
                 reason="never_visited" if act.get("never_visited") else "due",
-                section="followup")
+                section="analysis")
         # an imminent extremum (campaign-style variables) also calls —
         # attached as extra context when the cadence already spoke
         if p["kind"] == "variable":
@@ -92,7 +96,7 @@ def attention_report(db, cfg=None):
                 entry["extremum"] = nxt
                 if entry["urgency"] == "info":
                     entry.update(urgency="due", reason="extremum",
-                                 section="followup")
+                                 section="analysis")
         # a detector event outranks everything (the WeSb protocol: a drop
         # seen today must not wait for the cadence, ADR-035)
         if p["kind"] in ("sn", "variable"):
@@ -101,7 +105,7 @@ def attention_report(db, cfg=None):
                 threshold=event_threshold)
             if ev:
                 entry.update(urgency="event", reason="event", event=ev,
-                             section="followup")
+                             section="analysis")
         out.append(entry)
     out.sort(key=lambda e: (
         URGENCY_RANK.get(e["urgency"], 2),

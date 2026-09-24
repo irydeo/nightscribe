@@ -192,6 +192,14 @@ reconstrucción de la página) y se rellena con la lista fresca en cada
 apertura. El modelo de datos no cambia: `project_files` sigue siendo la
 tabla única de ficheros del proyecto.
 
+**Revisión 2026-09-24 (ADR-045)**: la división Procesado/Seguimiento se
+disuelve: el flujo es Ficha → Captura → Análisis → Publicación y la
+pestaña Análisis se construye alrededor del gestor de visitas para todos
+los tipos (nada se adjunta sin visita). Migraciones v8 (el paso
+`process` pasa a `analysis`) y v9 (los recursos se unifican en
+`project_files` con `session_id` y `meta`; `session_images` muere). Los
+detalles y la motivación completa están en ADR-045.
+
 ## English
 
 **Context**: after v2 (ADR-017), a product reflection from the user: NightScribe must
@@ -376,3 +384,10 @@ with the system", folder and copy path. The window is persistent (a
 single instance that survives project switches and page rebuilds) and is
 refilled with a fresh list on every show. The data model is unchanged:
 `project_files` remains the project's single file table.
+
+**Review 2026-09-24 (ADR-045)**: the Process/Follow-up split dissolves:
+the flow is Object card → Capture → Analysis → Publish and the Analysis
+tab is built around the visits manager for every kind (nothing attaches
+without a visit). Migrations v8 (the `process` step becomes `analysis`)
+and v9 (resources unify into `project_files` with `session_id` and
+`meta`; `session_images` dies). The full motivation lives in ADR-045.

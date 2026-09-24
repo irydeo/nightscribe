@@ -201,9 +201,9 @@
                  </widget>
                 </item>
                 <!-- ADR-043: the bar reads left to right (object card ->
-                     Capture -> Process -> Publish -> Follow-up); the
-                     follow-up separator is only shown for the kinds
-                     that have one (main_window._render_tab_bar) -->
+                     Capture -> Analysis -> Publish); ADR-045 renamed the
+                     Process step to Analysis and retired the kind-gated
+                     Follow-up page (its content lives in Analysis) -->
                 <item>
                  <widget class="QLabel" name="lbl_sep_plan">
                   <property name="text"><string>→</string></property>
@@ -216,13 +216,13 @@
                  </widget>
                 </item>
                 <item>
-                 <widget class="QLabel" name="lbl_sep_process">
+                 <widget class="QLabel" name="lbl_sep_analysis">
                   <property name="text"><string>→</string></property>
                   <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 13px;</string></property>
                  </widget>
                 </item>
                 <item>
-                 <widget class="QPushButton" name="btn_tab_process">
+                 <widget class="QPushButton" name="btn_tab_analysis">
                   <property name="flat"><bool>true</bool></property>
                  </widget>
                 </item>
@@ -234,18 +234,6 @@
                 </item>
                 <item>
                  <widget class="QPushButton" name="btn_tab_publish">
-                  <property name="flat"><bool>true</bool></property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QLabel" name="lbl_sep_followup">
-                  <property name="visible"><bool>false</bool></property>
-                  <property name="text"><string>→</string></property>
-                  <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 13px;</string></property>
-                 </widget>
-                </item>
-                <item>
-                 <widget class="QPushButton" name="btn_tab_followup">
                   <property name="flat"><bool>true</bool></property>
                  </widget>
                 </item>

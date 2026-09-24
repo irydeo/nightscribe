@@ -146,7 +146,10 @@ def test_routing_blink_tools_menu(window, monkeypatch):
     assert calls == [("ufe", "blink"), ("legacy",)]
 
 
-def test_routing_project_blink(window, monkeypatch):
+def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
+    # ADR-045: the retired Process-tab blink button is gone; a visit's
+    # plate opens in the editor from the visits manager, with both hooks
+    # armed for THAT visit.
     window._current_project = {"id": 1, "object_name": "SN 2026zji",
                                "context": {"ra_deg": 10.0, "dec_deg": 20.0,
                                            "mag": 13.2}}
@@ -160,13 +163,19 @@ def test_routing_project_blink(window, monkeypatch):
         def open_plate(self, path):
             return True
     monkeypatch.setattr(window, "_ufe_open",
-                        lambda tab, hook_pid=None, obj=None: (
-                            seen.append((tab, hook_pid, obj)) or _Dlg()))
+                        lambda tab, hook_pid=None, obj=None,
+                        session_id=None: (
+                            seen.append((tab, hook_pid, obj, session_id))
+                            or _Dlg()))
     monkeypatch.setattr(window, "_use_ufe", lambda: True)
-    window._project_blink()
-    assert seen[0] == ("blink", 1, {"name": "SN 2026zji", "ra": 10.0,
-                                    "dec": 20.0, "mag": 13.2,
-                                    "bv": None})
+    import nightscribe.gui.main_window as _mw
+    monkeypatch.setattr(_mw.project, "get",
+                        lambda db_, pid: dict(window._current_project))
+    window._visit_open_in_editor(1, "/tmp/plate.fits", 42)
+    assert seen[0][:2] == ("measure", 1)
+    assert seen[0][2] == {"name": "SN 2026zji", "ra": 10.0, "dec": 20.0,
+                          "mag": 13.2, "bv": None}
+    assert seen[0][3] == 42          # the point/save hooks land on it
     # and the object is re-applied on the fresh plate
     assert seen[-1] == seen[0][2]
 
@@ -231,24 +240,27 @@ def test_save_hook_registers_files_and_sequence(window, monkeypatch):
                         lambda db_, pid: {"id": pid, "object_name": "SN x",
                                           "context": {}})
     monkeypatch.setattr(mw.project, "add_file",
-                        lambda db_, pid, path, kind: saved.append(
-                            (path, kind)))
+                        lambda db_, pid, path, kind, session_id=None:
+                        saved.append((path, kind, session_id)))
     monkeypatch.setattr(mw.project, "update_context",
                         lambda db_, pid, payload: ctx.append(payload))
     window._populate_project_files = lambda pid: None
     window._ufe_save_hook(1, ["/tmp/a.fits"], "fits", {})
-    assert saved == [("/tmp/a.fits", "fits")]
+    assert saved == [("/tmp/a.fits", "fits", None)]
+    # ADR-045: opened from a visit, the files land on it
+    window._ufe_save_hook(1, ["/tmp/b.png"], "chart", {}, session_id=42)
+    assert saved[-1] == ("/tmp/b.png", "chart", 42)
     entries = [{"name": "Comp1",
                 "star": {"band": "V", "mag": 12.3, "ra": 1, "dec": 2}}]
     window._ufe_save_hook(1, ["/tmp/s.csv"], "sequence",
                           {"which": "csv", "entries": entries,
                            "catalog": "gaia", "catalog_name": "Gaia EDR3",
                            "fov_arcmin": 30.0, "target_mag": 12.0})
-    assert saved[-1] == ("/tmp/s.csv", "report")
+    assert saved[-1] == ("/tmp/s.csv", "report", None)
     assert ctx and ctx[0]["sequence"]["entries"] == entries
     window._ufe_save_hook(1, ["/tmp/c.png"], "sequence",
                           {"which": "png"})
-    assert saved[-1] == ("/tmp/c.png", "chart")
+    assert saved[-1] == ("/tmp/c.png", "chart", None)
     assert len(ctx) == 1                     # png does not rewrite it
 
 

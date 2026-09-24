@@ -398,6 +398,9 @@ class UfeDialog(QDialog):
             return
         out = self.view.export_png(path)
         logger.info("UFE PNG export: %s", out)
+        # ADR-045: the scene export registers like every other tab's
+        # files (no-op when no project is watching)
+        self.notify_saved([out], "chart")
 
     def _on_zoom_preset(self, factor):
         # @args: factor - None for Fit, else the absolute scale (0.5..4)

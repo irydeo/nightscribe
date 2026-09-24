@@ -222,13 +222,17 @@ def test_right_click_builds_the_row_menu(dlg, tmp_path, monkeypatch):
 
 def test_show_in_folder_via_desktop_services(dlg, tmp_path, monkeypatch):
     from PySide6.QtGui import QDesktopServices
+    from PySide6.QtCore import QUrl
     seen = []
     monkeypatch.setattr(QDesktopServices, "openUrl",
                         staticmethod(lambda u: seen.append(u.toString())))
     f = tmp_path / "plate.fits"
     f.write_bytes(b"0" * 16)
     dlg.show_in_folder(str(f))
-    assert seen and str(tmp_path) in seen[0]
+    # the URL comparison must go through the same platform conversion:
+    # on Windows str(tmp_path) carries backslashes while the URL never
+    # does (the CI's first Windows run caught this)
+    assert seen and seen[0] == QUrl.fromLocalFile(str(tmp_path)).toString()
 
 
 def test_copy_path_via_clipboard(dlg, monkeypatch):

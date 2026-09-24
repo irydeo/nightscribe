@@ -190,7 +190,7 @@ def test_pages_build_lazily_per_selection(window, panel):
     assert hasattr(window.projects, "scroll_page")
     assert window.projects.scroll_page.widget() is \
         window.projects.page_container
-    for key in ("details", "plan", "process", "publish", "followup"):
+    for key in ("details", "plan", "analysis", "publish", "analysis"):
         assert hasattr(window.projects, f"btn_tab_{key}")
     assert set(window._tab_pages) == {"details", "plan"}
     assert window._active_tab == "plan"
@@ -211,7 +211,7 @@ def test_pages_hold_exactly_one_control_set_after_rebuilds(window, panel):
     p = _mk_project(window)
     window._build_project_page(window._current_project)
     window._build_project_page(window._current_project)
-    for key in ("plan", "process", "publish"):
+    for key in ("plan", "analysis", "publish"):
         window._show_tab(key)
     from PySide6.QtWidgets import QPushButton
     names = [b.text() for b in window.projects.page_container
@@ -227,20 +227,20 @@ def test_pages_hold_exactly_one_control_set_after_rebuilds(window, panel):
     assert names.count(window.tr("Reopen step")) == 0
 
 
-def test_followup_tab_only_for_followup_kinds(window, panel):
-    # ADR-041: the Follow-up tab (and its page) exists only for the
-    # kinds that keep a multi-night journal; for the rest the button
-    # is hidden and a deep link to it is a safe no-op.
+def test_analysis_tab_exists_for_every_kind(window, panel):
+    # ADR-045: the Analysis tab (and its page) exists for EVERY kind —
+    # the visits manager is its core for all; the photometry blocks
+    # inside stay kind-gated. A deep link to it is always honoured.
     _mk_project(window, kind="neo", name="2099 PG1")
-    assert window.projects.btn_tab_followup.isHidden()
-    window._show_tab("followup")  # off-kind: no page, no active switch
-    assert window._active_tab != "followup"
-    assert "followup" not in window._tab_pages
+    assert not window.projects.btn_tab_analysis.isHidden()
+    window._show_tab("analysis")
+    assert window._active_tab == "analysis"
+    assert "analysis" in window._tab_pages
     _mk_project(window, kind="sn", name="SN 2099pg2")
-    assert not window.projects.btn_tab_followup.isHidden()
-    window._show_tab("followup")
-    assert window._active_tab == "followup"
-    assert "followup" in window._tab_pages
+    assert not window.projects.btn_tab_analysis.isHidden()
+    window._show_tab("analysis")
+    assert window._active_tab == "analysis"
+    assert "analysis" in window._tab_pages
 
 
 def test_step_toggle_marks_done(window, panel):
@@ -251,7 +251,7 @@ def test_step_toggle_marks_done(window, panel):
     steps = {s["step"]: s["status"]
              for s in proj_mod.get(mw.db, p["id"])["steps"]}
     assert steps["plan"] == "done"
-    assert steps["process"] == "current"
+    assert steps["analysis"] == "current"
 
 
 def test_step_reopen(window, panel):
@@ -263,7 +263,7 @@ def test_step_reopen(window, panel):
     steps = {s["step"]: s["status"]
              for s in proj_mod.get(mw.db, p["id"])["steps"]}
     assert steps["plan"] == "current"
-    assert steps["process"] == "pending"
+    assert steps["analysis"] == "pending"
 
 
 def test_next_card_lands_on_next_action_tab(window, panel):
@@ -289,8 +289,8 @@ def test_next_card_followup_when_cadence_due(window, panel):
     window._build_project_page(window._current_project)
     assert "Measure" in window.projects.lbl_next.text() or \
         "Mide" in window.projects.lbl_next.text()
-    assert window._active_tab == "followup"
-    assert not window._tab_pages["followup"].isHidden()
+    assert window._active_tab == "analysis"
+    assert not window._tab_pages["analysis"].isHidden()
     # UX-PC (U3): follow-up is not a step — the Next card hides "Mark done"
     # (ADR-043: there is no card-level Skip any more)
     assert window.projects.btn_next_done.isHidden()
@@ -308,7 +308,7 @@ def test_next_card_done_advances_the_step(window, panel):
              for s in proj_mod.get(mw.db, window._current_project["id"])
              ["steps"]}
     assert steps["plan"] == "done"
-    assert window._next_step_key == "process"
+    assert window._next_step_key == "analysis"
 
 
 def test_skipped_step_moves_the_flow_forward(window, panel):
@@ -325,7 +325,7 @@ def test_skipped_step_moves_the_flow_forward(window, panel):
     steps = {s["step"]: s["status"]
              for s in proj_mod.get(mw.db, p["id"])["steps"]}
     assert steps["plan"] == "skipped"
-    assert window._next_step_key == "process"
+    assert window._next_step_key == "analysis"
 
 
 def test_step_footer_reopens_a_legacy_skipped_step(window, panel):
@@ -336,20 +336,20 @@ def test_step_footer_reopens_a_legacy_skipped_step(window, panel):
     p = _mk_project(window, name="SN 2099rs")
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    proj_mod.set_step_status(mw.db, p["id"], "process",
+    proj_mod.set_step_status(mw.db, p["id"], "analysis",
                              proj_mod.STEP_SKIPPED)
     p = proj_mod.get(mw.db, p["id"])
     window._current_project = p
     window._build_project_page(p)
-    window._show_tab("process")  # the skipped step's page builds on first open
-    page = window._tab_pages["process"]
+    window._show_tab("analysis")  # the skipped step's page builds on first open
+    page = window._tab_pages["analysis"]
     btns = [b for b in page.findChildren(QPushButton)
             if "Reopen" in b.text() or "Reabrir" in b.text()]
     assert len(btns) == 1
     btns[0].click()
     steps = {s["step"]: s["status"]
              for s in proj_mod.get(mw.db, p["id"])["steps"]}
-    assert steps["process"] == "current"
+    assert steps["analysis"] == "current"
     assert steps["plan"] == "pending"
 
 
@@ -378,7 +378,7 @@ def test_calibration_and_products_start_collapsed(window, panel):
     from nightscribe.gui.widgets.collapsible_section import \
         CollapsibleSection
     _mk_project(window, kind="neo", name="2099 Coll")
-    window._show_tab("process")  # the Process page builds on first open
+    window._show_tab("analysis")  # the Process page builds on first open
     secs = window.projects.page_container.findChildren(CollapsibleSection)
     titles = {s._btn.text(): s for s in secs}
     cal = next((s for t, s in titles.items() if "alibr" in t.lower()), None)
@@ -409,14 +409,14 @@ def test_activating_a_tab_hides_the_others(window, panel):
     _mk_project(window)
     pages = window._tab_pages
     assert not pages["plan"].isHidden()
-    window.projects.btn_tab_process.click()
-    assert not pages["process"].isHidden()
+    window.projects.btn_tab_analysis.click()
+    assert not pages["analysis"].isHidden()
     for key in ("plan", "details"):
         assert pages[key].isHidden()
     assert "publish" not in pages  # untouched tab: still unbuilt (lazy)
     window.projects.btn_tab_publish.click()
     assert not pages["publish"].isHidden()
-    assert pages["process"].isHidden()
+    assert pages["analysis"].isHidden()
     assert pages["details"].isHidden()
     assert pages["plan"].isHidden()
 
@@ -437,27 +437,27 @@ def test_tab_bar_buttons_mirror_the_active_tab(window, panel):
     # checked, the others are not.
     _mk_project(window)
     btns = {key: getattr(window.projects, f"btn_tab_{key}")
-            for key in ("details", "plan", "process", "publish",
-                        "followup")}
+            for key in ("details", "plan", "analysis", "publish",
+                        "analysis")}
     assert btns["plan"].isChecked()
-    for key in ("details", "process", "publish", "followup"):
+    for key in ("details", "analysis", "publish", "analysis"):
         assert not btns[key].isChecked()
     window.projects.btn_tab_details.click()
     assert btns["details"].isChecked()
     assert not btns["plan"].isChecked()
 
 
-def test_followup_deep_link_lands_on_followup(window, panel):
-    # Cadence chips and the follow-up entry point land on the Follow-up
-    # page; every page built along the way hides behind the bar.
+def test_analysis_deep_link_lands_on_analysis(window, panel):
+    # Cadence chips and the follow-up entry point land on the Analysis
+    # page (ADR-045); every page built along the way hides behind the bar.
     p = _mk_project(window)
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     window.projects.btn_tab_details.click()
     assert window._active_tab == "details"
     window._goto_project_followup(p["id"])
-    assert window._active_tab == "followup"
-    assert not window._tab_pages["followup"].isHidden()
-    for key in ("plan", "process", "details"):
+    assert window._active_tab == "analysis"
+    assert not window._tab_pages["analysis"].isHidden()
+    for key in ("plan", "details"):
         assert window._tab_pages[key].isHidden()
     assert "publish" not in window._tab_pages  # lazy: never opened
 
@@ -466,13 +466,13 @@ def test_go_button_enforces_single_active_page(window, panel):
     # No matter what page you were on, Go lands on the next action's
     # tab and enforces the one-visible-page rule before it.
     _mk_project(window)
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     window.projects.btn_tab_details.click()
     assert window._active_tab == "details"
     window.projects.btn_next_go.click()
     assert window._active_tab == "plan"
     assert not window._tab_pages["plan"].isHidden()
-    for key in ("process", "details"):
+    for key in ("analysis", "details"):
         assert window._tab_pages[key].isHidden()
 
 
@@ -481,11 +481,11 @@ def test_exactly_one_page_visible(window, panel):
     # links — is one and only one visible page in the scroll area.
     p = _mk_project(window)
     window._step_done("plan")
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     window.projects.btn_tab_details.click()
     window._goto_project_followup(p["id"])
     shown = [k for k, pg in window._tab_pages.items() if not pg.isHidden()]
-    assert shown == ["followup"]
+    assert shown == ["analysis"]
 
 
 # ---------------- A4: the masthead "Files (n)" button and its window --
@@ -561,16 +561,15 @@ def test_files_window_survives_project_switch_and_rekeys(window, panel):
 
 def test_chips_fresh_project(window, panel):
     # pending on the three real step pages, nothing on the object card
-    # or the follow-up page.
+    # (ADR-045: Analysis is a step now, so it carries the chip).
     _mk_project(window)
-    for key in ("process", "publish", "followup"):
+    for key in ("analysis", "publish", "analysis"):
         window._show_tab(key)  # the pages build on first open
     pages = window._tab_pages
-    for key in ("plan", "process", "publish"):
+    for key in ("plan", "analysis", "publish"):
         assert not pages[key]._chip.isHidden()
         assert pages[key]._chip.text() == window.tr("pending")
     assert pages["details"]._chip.isHidden()
-    assert pages["followup"]._chip.isHidden()
 
 
 def test_done_chip_carries_the_date(window, panel):
@@ -586,8 +585,8 @@ def test_done_chip_carries_the_date(window, panel):
         "%Y-%m-%d")
     assert pages["plan"]._chip.text() == \
         window.tr("done %1").replace("%1", date)
-    window._show_tab("process")
-    assert pages["process"]._chip.text() == window.tr("pending")
+    window._show_tab("analysis")
+    assert pages["analysis"]._chip.text() == window.tr("pending")
     window._show_tab("publish")
     assert pages["publish"]._chip.text() == window.tr("pending")
 
@@ -598,14 +597,14 @@ def test_skipped_chip(window, panel):
     p = _mk_project(window)
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    proj_mod.set_step_status(mw.db, p["id"], "process",
+    proj_mod.set_step_status(mw.db, p["id"], "analysis",
                              proj_mod.STEP_SKIPPED)
     p = proj_mod.get(mw.db, p["id"])
     window._current_project = p
     window._build_project_page(p)
-    window._show_tab("process")
+    window._show_tab("analysis")
     pages = window._tab_pages
-    assert pages["process"]._chip.text() == window.tr("skipped")
+    assert pages["analysis"]._chip.text() == window.tr("skipped")
     window._show_tab("plan")
     assert pages["plan"]._chip.text() == window.tr("pending")
     window._show_tab("publish")

@@ -244,8 +244,8 @@ def test_exotic_button_in_process_tab(window):
     from PySide6.QtWidgets import QPushButton
     _select(window, "WASP-994 b", _transit_ctx())
     # ADR-041: the process tab is lazy — open it, the user path
-    window.projects.btn_tab_process.click()
-    sec = window._tab_pages["process"]
+    window.projects.btn_tab_analysis.click()
+    sec = window._tab_pages["analysis"]
     texts = [b.text() for b in sec.findChildren(QPushButton)]
     assert any("EXOTIC" in t for t in texts)
 

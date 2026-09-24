@@ -55,15 +55,19 @@ UI_DIR = Path(__file__).parent / "ui"
 # Three guided steps for every project kind. The old "analyse" step (ADR-019,
 # review 2026-08-28) was dropped, and "capture" merged into "plan" (ADR-030,
 # 2026-09-06): planning the session and exporting/running it against CCDciel
-# is one step (it now reads "Captura" under the ADR-043 rename).
-_STEP_KEYS = ("plan", "process", "publish")
+# is one step (it now reads "Captura" under the ADR-043 rename). ADR-045
+# (2026-09-24): "process" is renamed "analysis" — the flow reads Ficha →
+# Captura → Análisis → Publicación and the Analysis tab is built around
+# visits for every kind.
+_STEP_KEYS = ("plan", "analysis", "publish")
 
-# The pages of the project detail (ADR-041): the object card, the
-# three steps and the follow-up view (the latter only for the kinds
-# that keep a multi-night journal). ONE page is visible at a time —
-# the tab bar in the masthead decides which. The step pages are built
-# lazily on first open and cached until the project changes.
-_TAB_KEYS = ("details",) + _STEP_KEYS + ("followup",)
+# The pages of the project detail (ADR-041): the object card and the
+# three steps. ONE page is visible at a time — the tab bar in the
+# masthead decides which. The step pages are built lazily on first open
+# and cached until the project changes. ADR-045: the old kind-gated
+# follow-up tab is gone; its content lives in the Analysis tab and the
+# "process"/"followup" deep-link keys alias to "analysis" forever.
+_TAB_KEYS = ("details",) + _STEP_KEYS
 
 # A2: outcome keys (from project.OUTCOMES) → human labels, by language.
 # The editable combo stores the key (English) and shows the label; «Otro»
@@ -102,11 +106,9 @@ FOLLOWUP_KINDS = project.FOLLOWUP_KINDS
 # Captura, Procesado, Publicar, Seguimiento), so they live here as plain
 # per-language pairs instead of tr() anchors
 _STEP_LABELS_ES = {"details": "Ficha", "plan": "Captura",
-                   "process": "Procesado", "publish": "Publicar",
-                   "followup": "Seguimiento"}
+                   "analysis": "Análisis", "publish": "Publicar"}
 _STEP_LABELS_EN = {"details": "Object card", "plan": "Capture",
-                   "process": "Process", "publish": "Publish",
-                   "followup": "Follow-up"}
+                   "analysis": "Analysis", "publish": "Publish"}
 
 
 def _load_ui(name, parent=None):
@@ -1335,11 +1337,11 @@ class MainWindow(QMainWindow):
 
     def _goto_project_followup(self, pid):
         # Opens the project's Follow-up tab (ADR-043: the multi-night
-        # journal keeps its "followup" key; its label is Seguimiento /
-        # Follow-up). The cadence chips land here (UX-d).
+        # journal keeps its "followup" key). The cadence chips land
+        # here (UX-d). ADR-045: lands on the Analysis tab.
         if not self._goto_project_by_id(pid):
             return
-        self._scroll_to_section("followup")
+        self._scroll_to_section("analysis")
 
     # ---------------- sky-event chips in the Tonight header (SC2) -------
 
@@ -2627,14 +2629,18 @@ class MainWindow(QMainWindow):
         # Next card, the rich rows and the dashboard cards.
         # @args: act - a project.next_action() dict
         # @return: the text
-        texts = {
-            "followup": self.tr("Measure tonight — %1 d since the last "
-                                "visit").replace(
+        if act["never_visited"]:
+            analysis_txt = self.tr("First measurement — it opens the "
+                                   "series")
+        elif act["overdue_days"] is not None:
+            analysis_txt = self.tr("Measure tonight — %1 d since the "
+                                   "last visit").replace(
                 "%1", str(act["overdue_days"]))
-            if not act["never_visited"] else
-            self.tr("First measurement — it opens the series"),
+        else:
+            analysis_txt = self.tr("Analyse your data")
+        texts = {
+            "analysis": analysis_txt,
             "plan": self.tr("Plan the capture"),
-            "process": self.tr("Process your data"),
             "publish": self.tr("Draft the post"),
             "close": self.tr("All steps done — consider closing the "
                              "project"),
@@ -2697,7 +2703,7 @@ class MainWindow(QMainWindow):
         lbl.setWordWrap(True)
         lay.addWidget(lbl, 1)
         btn = QPushButton(
-            self.tr("Measure →") if e.get("section") == "followup"
+            self.tr("Measure →") if e.get("section") == "analysis"
             else self.tr("Go →"))
         btn.setCursor(Qt.PointingHandCursor)
         btn.clicked.connect(lambda _=False, entry=e:
@@ -2825,8 +2831,9 @@ class MainWindow(QMainWindow):
         from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
         act_open = menu.addAction(self.tr("Open"))
-        act_fu = menu.addAction(self._tab_label("followup"))
-        act_fu.setEnabled(p["kind"] in FOLLOWUP_KINDS)
+        # ADR-045: the Analysis tab exists for every kind (the visits
+        # manager is kind-agnostic)
+        act_fu = menu.addAction(self._tab_label("analysis"))
         act_fav = menu.addAction(
             self.tr("Unstar") if p.get("favorite")
             else self.tr("Star as favorite"))
@@ -2843,7 +2850,7 @@ class MainWindow(QMainWindow):
         if chosen is act_open:
             self._project_open_activated(item)
         elif chosen is act_fu:
-            self._scroll_to_section("followup")
+            self._scroll_to_section("analysis")
         elif chosen is act_fav:
             self._project_toggle_favorite()
         elif chosen is act_close:
@@ -3183,9 +3190,8 @@ class MainWindow(QMainWindow):
     def _next_target_key(self, p):
         # @return: the section key the Next card points at
         act = project.next_action(db, p)
-        return {"followup": "followup", "plan": "plan",
-                "process": "process", "publish": "publish",
-                "close": None}.get(act["key"])
+        return {"analysis": "analysis", "plan": "plan",
+                "publish": "publish", "close": None}.get(act["key"])
 
     def _render_tab_bar(self, p):
         # ADR-041: the masthead tab bar — one flat button per page.
@@ -3203,19 +3209,8 @@ class MainWindow(QMainWindow):
         steps = {s["step"]: s["status"] for s in p.get("steps", [])}
         color = theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT)
         active = getattr(self, "_active_tab", None)
-        # ADR-043: the "→" separators make the bar read like the night
-        # runs; the last one goes away with the Follow-up page for the
-        # kinds that have no journal
-        w.lbl_sep_followup.setVisible(p.get("kind") in FOLLOWUP_KINDS)
         for key in _TAB_KEYS:
             btn = getattr(w, f"btn_tab_{key}")
-            if key == "followup":
-                # hidden for the kinds with no multi-night journal —
-                # and re-shown when the kind makes it back (the bar is
-                # re-rendered on every project change)
-                btn.setVisible(p.get("kind") in FOLLOWUP_KINDS)
-            if key == "followup" and p.get("kind") not in FOLLOWUP_KINDS:
-                continue
             if key in _STEP_KEYS:
                 st = steps.get(key, "pending")
                 state = "current" if cur == key else st
@@ -3243,10 +3238,13 @@ class MainWindow(QMainWindow):
         target = self._next_target_key(p)
         self._next_target = target
         self.projects.btn_next_go.setVisible(target is not None)
-        # UX-PC (U3): "Mark done" applies to the current step only
-        # (follow-up and the close suggestion are not steps — nothing to
-        # mark there)
+        # UX-PC (U3): "Mark done" applies to the current step only.
+        # ADR-045: the cadence call shares the "analysis" key with the
+        # step, but it is not step bookkeeping — when the action carries
+        # the cadence payload there is nothing to mark.
         step_key = act["key"] if act["key"] in _STEP_KEYS else None
+        if act.get("overdue_days") is not None or act.get("never_visited"):
+            step_key = None
         self._next_step_key = step_key
         self.projects.btn_next_done.setVisible(step_key is not None)
 
@@ -3264,7 +3262,7 @@ class MainWindow(QMainWindow):
         # caller asked for. With the tab bar (ADR-041) that means
         # activating the tab; "files" is the nested list inside the
         # object card.
-        # @args: key - section key, e.g. "followup"|"plan"|"files"|None
+        # @args: key - section key, e.g. "analysis"|"plan"|"files"|None
         # @return: None
         if not key:
             return
@@ -3273,12 +3271,14 @@ class MainWindow(QMainWindow):
     def _show_tab(self, key):
         # ADR-041: activate one tab page — built on first open (lazy),
         # the other pages of this project get hidden, and the bar is
-        # repainted so the active tab reads "you are here".
-        # @args: key - tab key ("details"|...|"followup")
-        # @return: None (a no-op when the page cannot exist here — the
-        #          follow-up of a kind that has no tab)
+        # repainted so the active tab reads "you are here". ADR-045: the
+        # retired "process"/"followup" keys alias to "analysis" forever,
+        # so every old deep link keeps landing.
+        # @args: key - tab key ("details"|"plan"|"analysis"|"publish")
+        # @return: None (a no-op when the page cannot exist here)
         if key is None or self._current_project is None:
             return
+        key = {"process": "analysis", "followup": "analysis"}.get(key, key)
         self._ensure_tab_built(key)
         if key not in self._tab_pages:
             return
@@ -3303,7 +3303,7 @@ class MainWindow(QMainWindow):
         if key in _STEP_KEYS:
             builders = {
                 "plan": self._build_plan_tab,
-                "process": self._build_process_tab,
+                "analysis": self._build_analysis_tab,
                 "publish": self._build_publish_tab,
             }
             builders[key](p, kind, ctx)
@@ -3312,8 +3312,6 @@ class MainWindow(QMainWindow):
             # content
             self._tab_pages[key].layout().addLayout(
                 self._step_footer(p, key))
-        elif key == "followup" and kind in FOLLOWUP_KINDS:
-            self._build_followup_tab(p, ctx)
 
     def _build_project_page(self, p):
         # The project detail (ADR-041): the object card, the steps and
@@ -4194,8 +4192,17 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("Capture started in CCDciel."), 5000)
 
+    def _build_analysis_tab(self, p, kind, ctx):
+        # ADR-045: the single Analysis tab. While the visits manager
+        # lands (the redesign's F3), this mounts the old Process content
+        # with the old Follow-up blocks below it for the kinds that kept
+        # one — functionally complete, deliberately transitional.
+        self._build_process_tab(p, kind, ctx)
+        if kind in FOLLOWUP_KINDS:
+            self._build_followup_tab(p, ctx)
+
     def _build_process_tab(self, p, kind, ctx):
-        layout = self._step_section("process")
+        layout = self._step_section("analysis")
         if kind in ("neo", "pccp"):
             # MPC report: paste + validate + save
             layout.addWidget(QLabel(
@@ -4232,7 +4239,7 @@ class MainWindow(QMainWindow):
             self._project_widgets["lbl_fits_path"] = lbl_path
             # A4: restore saved FITS path from the process step data
             step = next((s for s in p["steps"]
-                         if s["step"] == "process"), None)
+                         if s["step"] == "analysis"), None)
             saved = step and step["data"].get("fits_path")
             if saved:
                 edt.setText(saved)
@@ -4379,7 +4386,7 @@ class MainWindow(QMainWindow):
         # @args: lst - read-only QListWidget, p - project dict
         # Fills the products summary from the process step data.
         lst.clear()
-        step = next((s for s in p.get("steps", []) if s["step"] == "process"),
+        step = next((s for s in p.get("steps", []) if s["step"] == "analysis"),
                     None)
         data = (step and step.get("data")) or {}
         for e in data.get("session_fits", []):
@@ -4444,7 +4451,7 @@ class MainWindow(QMainWindow):
         p = self._current_project
         if not p:
             return
-        step = next((s for s in p.get("steps", []) if s["step"] == "process"),
+        step = next((s for s in p.get("steps", []) if s["step"] == "analysis"),
                     None)
         fits = ((step and step.get("data")) or {}).get("session_fits", [])
         paths_f = [e["path"] for e in fits]
@@ -4499,13 +4506,13 @@ class MainWindow(QMainWindow):
         # Merges into the process step data (keeping the in-memory copy in
         # sync so consecutive registrations accumulate), then refreshes the
         # products list and the Details files list.
-        step = next((s for s in p.get("steps", []) if s["step"] == "process"),
+        step = next((s for s in p.get("steps", []) if s["step"] == "analysis"),
                     None)
         existing = []
         if step:
             existing = list((step.get("data") or {}).get(key, []))
         existing.extend(entries)
-        project.update_step_data(db, p["id"], "process", {key: existing})
+        project.update_step_data(db, p["id"], "analysis", {key: existing})
         if step is not None:
             step.setdefault("data", {})[key] = existing
         lst = self._project_widgets.get("neo_products")
@@ -5006,17 +5013,21 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
     def _build_followup_tab(self, p, ctx):
-        # B2: SN multi-night follow-up panel. Not a step — like Details, it
-        # holds the session journal (nights, stacked images, notes) and the
-        # cadence reminder ("última visita hace N noches"). All CRUD goes
-        # through core/followup.py; FITS metadata through core/fits_meta.py.
-        # D3 (ADR-034): shared with HADS projects — the tab's journal and the
-        # photometry import are kind-agnostic; only the SN analysis buttons
-        # (quick-look on per-night stacks, evolution animation, annotated
-        # FITS) are hidden for hads.
+        # B2: SN multi-night follow-up panel. ADR-045: it now lives at
+        # the bottom of the Analysis tab (the visits manager replaces it
+        # in F3). It holds the session journal (nights, stacked images,
+        # notes) and the cadence reminder ("última visita hace N
+        # noches"). All CRUD goes through core/followup.py; FITS metadata
+        # through core/fits_meta.py. D3 (ADR-034): shared with HADS
+        # projects — the journal and the photometry import are
+        # kind-agnostic; only the SN analysis buttons (evolution
+        # animation, annotated FITS) are hidden for hads.
         from ..core import followup as fu
         kind = p["kind"]
-        layout = self._step_section("followup")
+        # ADR-045: append to the already-built Analysis page (calling
+        # _step_section again would create a second page and shadow the
+        # first)
+        layout = self._tab_pages["analysis"].layout()
         pid = p["id"]
 
         # campaign lookup (ADR-035): used by the cadence override below and
@@ -6433,7 +6444,7 @@ class MainWindow(QMainWindow):
             # A4: persist the FITS path in the project
             if self._current_project:
                 project.update_step_data(
-                    db, self._current_project["id"], "process",
+                    db, self._current_project["id"], "analysis",
                     {"fits_path": path})
                 project.add_file(db, self._current_project["id"], path, "fits")
                 self._populate_project_files(self._current_project["id"])
@@ -6490,7 +6501,7 @@ class MainWindow(QMainWindow):
         if path:
             project.add_file(db, self._current_project["id"], path, "report")
             project.update_step_data(db, self._current_project["id"],
-                                     "process", {"mpc_report": path})
+                                     "analysis", {"mpc_report": path})
             lbl.setText(self.tr("Saved: %1 (%2 lines)")
                         .replace("%1", path).replace("%2", str(result["n_lines"])))
             self.statusBar().showMessage(

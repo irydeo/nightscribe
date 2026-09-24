@@ -124,7 +124,7 @@ def test_register_fits_records_files_and_step_data(window, monkeypatch):
     from nightscribe.core import project
     p = _select_project(window, "neo", "2016 XYZ")
     # ADR-041: the products summary lives on the lazy Process tab — open it
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     monkeypatch.setattr(
         QFileDialog, "getOpenFileNames",
         staticmethod(lambda *a, **k: (["/tmp/a.fits", "/tmp/b.fit"], "")))
@@ -137,7 +137,7 @@ def test_register_fits_records_files_and_step_data(window, monkeypatch):
     assert [f["path"] for f in files] == ["/tmp/a.fits", "/tmp/b.fit"]
     # and a metadata summary is persisted in the process step data
     fresh = project.get(mw.db, p["id"])
-    step = next(s for s in fresh["steps"] if s["step"] == "process")
+    step = next(s for s in fresh["steps"] if s["step"] == "analysis")
     fits = step["data"]["session_fits"]
     assert len(fits) == 2
     assert fits[0]["filter"] == "R"
@@ -155,7 +155,7 @@ def test_register_images_records_image_kind(window, monkeypatch):
     from nightscribe.core import project
     p = _select_project(window, "neo", "2026 AB1")
     # ADR-041: the products summary lives on the lazy Process tab — open it
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     monkeypatch.setattr(
         QFileDialog, "getOpenFileNames",
         staticmethod(lambda *a, **k: (["/tmp/tycho1.png"], "")))
@@ -164,7 +164,7 @@ def test_register_images_records_image_kind(window, monkeypatch):
              if f["kind"] == "image"]
     assert [f["path"] for f in files] == ["/tmp/tycho1.png"]
     fresh = project.get(mw.db, p["id"])
-    step = next(s for s in fresh["steps"] if s["step"] == "process")
+    step = next(s for s in fresh["steps"] if s["step"] == "analysis")
     assert step["data"]["session_images"] == [{"path": "/tmp/tycho1.png"}]
     lst = window._project_widgets["neo_products"]
     texts = [lst.item(i).text() for i in range(lst.count())]
@@ -179,7 +179,7 @@ def test_products_accumulate_and_survive_rebuild(window, monkeypatch):
     from nightscribe.core import project
     p = _select_project(window, "pccp", "P11ABCD")
     # ADR-041: the products summary lives on the lazy Process tab — open it
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     monkeypatch.setattr(
         "nightscribe.core.fits_meta.read_meta", _fake_fits_meta)
     monkeypatch.setattr(
@@ -198,7 +198,7 @@ def test_products_accumulate_and_survive_rebuild(window, monkeypatch):
     _build(window, fresh)
     # the rebuild wiped the page and the Process tab is lazy again —
     # opening it must restore the full summary from the database
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     lst = window._project_widgets["neo_products"]
     assert lst.count() == 3
 
@@ -216,7 +216,7 @@ def test_comet_gets_products_block_without_mpc(window):
     _select_project(window, "comet", "C/2026 A1")
     # ADR-041: the products block builds with the lazy Process tab —
     # open it, the user path, then probe
-    window.projects.btn_tab_process.click()
+    window.projects.btn_tab_analysis.click()
     assert "neo_products" in window._project_widgets
     assert "txt_mpc" not in window._project_widgets
 

@@ -323,8 +323,8 @@ def test_cadence_chip_navigates_to_followup(window):
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
     # ADR-041: the project hub is a lazy tab bar — "navigate to
     # Follow-up" builds the follow-up tab and activates it.
-    assert "followup" in window._tab_pages, "the Follow-up tab was not built"
-    assert not window._tab_pages["followup"].isHidden(), \
+    assert "analysis" in window._tab_pages, "the Follow-up tab was not built"
+    assert not window._tab_pages["analysis"].isHidden(), \
         "the Follow-up tab should be active"
 
 

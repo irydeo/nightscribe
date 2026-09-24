@@ -629,9 +629,9 @@ def test_dashboard_attention_card_lands_on_followup(window, panel):
     assert window._current_project is not None
     assert window.projects.stack_detail.currentWidget() is \
         window.projects.page_detail
-    # ADR-041: the deep link ends on the follow-up tab, built + active
-    assert "followup" in window._tab_pages
-    assert not window._tab_pages["followup"].isHidden()
+    # ADR-045: the deep link ends on the analysis tab, built + active
+    assert "analysis" in window._tab_pages
+    assert not window._tab_pages["analysis"].isHidden()
 
 
 def test_rich_rows_carry_the_story(window, panel):
@@ -1275,15 +1275,18 @@ def test_change_project_folder_rehomes_future_exports(window, panel,
     assert project.get(dbmod.db, p["id"])["root_dir"] == str(prev)
 # ---------------- B2: SN follow-up tab ----------------
 
-def test_followup_tab_visible_for_sn(window, panel):
+def test_analysis_tab_visible_for_every_kind(window, panel):
+    # ADR-045: the Analysis tab is kind-agnostic now (the visits manager
+    # is its core for every kind); nothing is gated at the bar any more.
+    # The photometry blocks inside stay kind-gated (tests below).
     _create_and_select(window, "sn", "SN2026fu", {"kind": "sn"})
-    # ADR-041: the follow-up tab button is gated by kind on the tab bar
-    assert not window.projects.btn_tab_followup.isHidden()
+    assert not window.projects.btn_tab_analysis.isHidden()
 
 
-def test_followup_tab_hidden_for_non_sn(window, panel):
+def test_analysis_tab_visible_for_neo_too(window, panel):
+    # same bar for a NEO: the Analysis tab exists (visits + MPC report)
     _create_and_select(window, "neo", "NEO2026nofu", {"kind": "neo"})
-    assert window.projects.btn_tab_followup.isHidden()
+    assert not window.projects.btn_tab_analysis.isHidden()
 
 
 def test_followup_add_session(window, panel):
@@ -1291,7 +1294,7 @@ def test_followup_add_session(window, panel):
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026sess", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    window.projects.btn_tab_analysis.click()
     assert fu.days_since_last_session(dbmod.db, p["id"]) is None
     # the visits journal is a master-detail dialog now: build it (without
     # exec) so _fu_add_session refreshes the live list in place instead of
@@ -1310,7 +1313,7 @@ def test_followup_session_notes_persist(window, panel):
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026notes", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    window.projects.btn_tab_analysis.click()
     # build the visits dialog (no exec): it owns the session list + detail
     window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
@@ -1336,7 +1339,7 @@ def test_followup_notes_no_dual_identity(window, panel):
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026note2", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    window.projects.btn_tab_analysis.click()
     # build the visits dialog (no exec): it owns the session list + detail
     window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
@@ -1364,7 +1367,7 @@ def test_followup_add_measurement_has_real_mjd(window, panel):
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026mjd", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    window.projects.btn_tab_analysis.click()
     # craft a session with NO parseable obs_date (empty string) so the old
     # code would have taken the mjd=0.0 branch
     sid = fu.create_session(dbmod.db, p["id"], obs_date="")
@@ -1402,7 +1405,7 @@ def test_followup_delete_session(window, panel):
     from PySide6.QtWidgets import QMessageBox
     p = _create_and_select(window, "sn", "SN2026del", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    window.projects.btn_tab_analysis.click()
     sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
     # attach an image + a point so the cascade / keep behaviour is observable
     fu.add_image(dbmod.db, sid, "V", "/tmp/fake.fits", date_obs="2026-09-01")
@@ -1490,10 +1493,11 @@ def test_followup_cadence_uses_config(window, panel, monkeypatch):
     from PySide6.QtWidgets import QLabel
 
     def last_visit_label():
-        # each build makes a fresh "followup" tab page; scope the search
-        # to the newest one so stale rebuilds can never leak in
-        window._build_followup_tab(p, {})
-        sec = window._tab_pages["followup"]
+        # ADR-045: the cadence line lives in the Analysis tab; the tab is
+        # lazy, so force a fresh build or the config change never renders
+        window._clear_project_page()
+        window._show_tab("analysis")
+        sec = window._tab_pages["analysis"]
         chips = [w for w in sec.findChildren(QLabel)
                  if "Last visit" in w.text()]
         return chips[0] if chips else None
@@ -1515,7 +1519,7 @@ def test_fu_add_measurement_quick(window, panel):
     import nightscribe.core.db as dbmod
     p = _create_and_select(window, "sn", "SN2026meas", {"kind": "sn"})
     # ADR-041: the follow-up content is a lazy tab — open it first
-    window.projects.btn_tab_followup.click()
+    window.projects.btn_tab_analysis.click()
     # build the visits dialog (no exec): it owns the session list + detail
     window._fu_visits_dialog(p["id"])
     window._fu_add_session(p["id"])
@@ -1653,7 +1657,7 @@ def test_fu_campaign_summary_panel_reports_saved_points(window):
     from PySide6.QtWidgets import QLabel
     p = proj_mod.create(mw.db, "sn", "SN2026camp", {"kind": "sn"})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     lbl = tab.findChild(QLabel, "fu_campaign_text")
     assert lbl is not None
     assert "No points saved yet" in lbl.text()
@@ -1664,7 +1668,7 @@ def test_fu_campaign_summary_panel_reports_saved_points(window):
     fu.add_point(mw.db, p["id"], 60600.0, "R", 15.0, source="measure")
     fu.add_point(mw.db, p["id"], 60605.0, "R", 16.0, source="measure")
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    tab = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     lbl = tab.findChild(QLabel, "fu_campaign_text")
     assert "2 nights" in lbl.text()
     assert "2 points" in lbl.text()
@@ -1927,7 +1931,7 @@ def test_variable_project_gets_followup_with_protocol(window):
     _build_page(window, proj_mod.get(mw.db, p["id"]))
     # a variable project gets a "follow-up" tab on its page (ADR-041:
     # open the tab, the user path, then inspect it)
-    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     texts = [l.text() for l in fu.findChildren(QLabel)]
     assert any("Campaña T CrB" in t for t in texts)
     assert any("B, V" in t for t in texts)
@@ -1945,7 +1949,7 @@ def test_variable_followup_drops_quicklook_hides_animation(window):
     from PySide6.QtWidgets import QPushButton
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    fu = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     btns = {b.text(): b for b in fu.findChildren(QPushButton)}
     assert "Quick analysis" not in btns
     assert "Generate animation" not in btns
@@ -1988,7 +1992,7 @@ def test_followup_event_advisor_label(window):
     for i, m in enumerate((12.0, 12.1, 11.9, 12.0, 12.9)):
         fu.add_point(mw.db, p["id"], 61000.0 + i, "V", m)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     texts = [l.text() for l in page.findChildren(QLabel)]
     assert any("brightness drop" in t or "descenso" in t for t in texts)
 
@@ -2058,7 +2062,7 @@ def test_followup_has_export_report_button(window):
     from PySide6.QtWidgets import QToolButton
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
-    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "followup")
+    page = _open_tab(window, proj_mod.get(mw.db, p["id"]), "analysis")
     tools = [b for b in page.findChildren(QToolButton)
              if "Photometry" in b.text()]
     assert tools, "the ⋯ Photometry tools menu is missing"
@@ -2257,7 +2261,9 @@ def test_projects_context_menu_offers_actions(window, panel, monkeypatch):
         lst.visualItemRect(item).center())
     texts = seen["actions"]
     assert any("Open" in t or "Abrir" in t for t in texts)
-    assert any("Follow-up" in t or "Seguimiento" in t for t in texts)
+    # ADR-045: the follow-up action is the Analysis tab now, for
+    # every kind
+    assert any("Analysis" in t or "Análisis" in t for t in texts)
     assert any("Delete" in t or "Eliminar" in t for t in texts)
 
 

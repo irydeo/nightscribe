@@ -28,7 +28,7 @@ def test_create_initialises_three_steps(tmp_db):
     assert p["status"] == "active"
     assert p["object_name"] == "SN 2026ziz"
     assert len(p["steps"]) == 3
-    assert [s["step"] for s in p["steps"]] == ["plan", "process", "publish"]
+    assert [s["step"] for s in p["steps"]] == ["plan", "analysis", "publish"]
     assert p["steps"][0]["status"] == "current"
     for s in p["steps"][1:]:
         assert s["status"] == "pending"
@@ -69,7 +69,7 @@ def test_current_step_helper(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
     assert project.current_step(tmp_db, p["id"]) == "plan"
     project.advance(tmp_db, p["id"])
-    assert project.current_step(tmp_db, p["id"]) == "process"
+    assert project.current_step(tmp_db, p["id"]) == "analysis"
 
 
 def test_list_projects_filters_by_status(tmp_db):
@@ -90,7 +90,7 @@ def test_list_projects_filters_by_status(tmp_db):
 
 def test_set_step_status_skip(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
-    assert project.set_step_status(tmp_db, p["id"], "process", "skipped")
+    assert project.set_step_status(tmp_db, p["id"], "analysis", "skipped")
     p = project.get(tmp_db, p["id"])
     assert p["steps"][1]["status"] == "skipped"
 
@@ -149,7 +149,7 @@ def test_delete_cascades(tmp_db):
 
 def test_migration_user_version_is_current(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 7
+    assert v == 9
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -173,7 +173,7 @@ def test_migration_v1_drops_analyse_step(tmp_path):
     pid = cur.lastrowid
     # the flow was parked on the analyse step
     for step, status in (("plan", "done"), ("capture", "done"),
-                         ("process", "done"), ("analyse", "current"),
+                         ("analysis", "done"), ("analyse", "current"),
                          ("publish", "pending")):
         conn.execute(
             "INSERT INTO project_steps (project_id, step, status, data,"
@@ -184,22 +184,22 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
     # analyse (v2) and capture (v3) are gone; "current" ended on publish
     assert all(s not in (("analyse", "current"), ("capture", "current"))
                for s in steps)
-    assert [s for s, _st in steps] == ["plan", "process", "publish"]
+    assert [s for s, _st in steps] == ["plan", "analysis", "publish"]
     assert dict(steps)["publish"] == "current"
 
 
 def test_migration_v2_merges_capture_into_plan(tmp_path):
     # A pre-v3 database (user_version 2) still has the "capture" step with
     # the calibration counts. Reopen it: the v3 migration moves that data
-    # into "plan", hands "current" to "process" and drops the capture row.
+    # into "plan", hands "current" to "analysis" and drops the capture row.
     import sqlite3
     import json
     import time
@@ -216,7 +216,9 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
         "INSERT INTO projects (kind, object_name, status, created, updated,"
         " context) VALUES ('neo', 'SNx2', 'active', ?, ?, '{}')", (now, now))
     pid = cur.lastrowid
-    # capture holds real data and the flow is parked on it
+    # capture holds real data and the flow is parked on it (the seed
+    # keeps the historical step names: the v3 migration hands "current"
+    # to "process", and v8 renames it "analysis")
     for step, status, data in (("plan", "done",
                                 json.dumps({"n_frames": 30, "exp_s": 60.0})),
                                ("capture", "current",
@@ -232,15 +234,15 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",
         (pid,)).fetchall()
-    assert [s for s, _st, _d in steps] == ["plan", "process", "publish"]
+    assert [s for s, _st, _d in steps] == ["plan", "analysis", "publish"]
     plan = dict((s, st) for s, st, _d in steps)
-    assert plan["process"] == "current"
+    assert plan["analysis"] == "current"
     # the capture data landed inside the plan step (merged, not replaced)
     plan_data = json.loads(dict((s, d) for s, _st, d in steps)["plan"])
     assert plan_data["n_frames"] == 30
@@ -282,7 +284,7 @@ def _build_v3_db(path):
         " context) VALUES ('sn', 'SN2026abc', 'active', ?, ?, '{}')",
         (now, now))
     pid = cur.lastrowid
-    for step, status in (("plan", "done"), ("process", "current"),
+    for step, status in (("plan", "done"), ("analysis", "current"),
                          ("publish", "pending")):
         conn.execute(
             "INSERT INTO project_steps (project_id, step, status, data,"
@@ -312,7 +314,7 @@ def test_migration_v3_to_v4_preserves_projects(tmp_path):
 
     file, pid = _build_v3_db(tmp_path / "v3.db")
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
 
     # the project itself is intact (kind/name/status/context unchanged)
     row = db.execute(
@@ -336,7 +338,7 @@ def test_migration_v3_to_v4_preserves_projects(tmp_path):
     steps = db.execute(
         "SELECT step FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
-    assert [s[0] for s in steps] == ["plan", "process", "publish"]
+    assert [s[0] for s in steps] == ["plan", "analysis", "publish"]
 
 
 def test_migration_v4_is_idempotent(tmp_path):
@@ -347,7 +349,7 @@ def test_migration_v4_is_idempotent(tmp_path):
     file, _pid = _build_v3_db(tmp_path / "v3.db")
     Database(str(file))               # migrates 3 -> 4
     db = Database(str(file))          # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 9
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(projects)").fetchall()}
     assert {"closed_at", "outcome", "tags", "favorite"} <= cols

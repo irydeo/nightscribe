@@ -28,8 +28,11 @@ logger = logging.getLogger(__name__)
 # (the SN blink) now lives in "process", and the explore view is already the
 # Details tab. "capture" merged into "plan" (2026-09-06, ADR-030): planning
 # the session and exporting/running it against CCDciel is one step now.
+# "process" renamed "analysis" (2026-09-24, ADR-045): the guided flow reads
+# Ficha → Captura → Análisis → Publicación and the Analysis tab is built
+# around visits for every kind.
 
-STEPS = ("plan", "process", "publish")
+STEPS = ("plan", "analysis", "publish")
 VALID_KINDS = ("sn", "neo", "comet", "pccp", "transit", "hads", "variable")
 
 # Kinds with multi-night photometry follow-up (moved here from
@@ -98,9 +101,11 @@ def _row_to_step(row):
 
 
 def _row_to_file(row):
-    # @return: file dict from a SELECT row
+    # @return: file dict from a SELECT row (ADR-045: with the visit link
+    #          and the meta JSON parsed, both nullable)
     return {"id": row[0], "project_id": row[1], "path": row[2],
-            "kind": row[3], "created": row[4]}
+            "kind": row[3], "created": row[4], "session_id": row[5],
+            "meta": json.loads(row[6] or "{}")}
 
 
 def create(db, kind, object_name, context=None, campaign_id=None):
@@ -435,14 +440,19 @@ def set_favorite(db, project_id, favorite):
     return cur.rowcount > 0
 
 
-def add_file(db, project_id, path, kind):
-    # Registers a file produced or consumed by a step (sequence, fits, report).
-    # @args: path - file path string, kind - sequence|ephemeris|fits|report|post
+def add_file(db, project_id, path, kind, session_id=None, meta=None):
+    # Registers a file produced or consumed by a step (sequence, fits,
+    # report). In the analysis flow a file hangs from its visit
+    # (session_id); plates carry their header facts in meta.
+    # @args: path - file path string, kind - sequence|ephemeris|fits|report|
+    #        post, session_id - the visit it belongs to or None,
+    #        meta - dict (filter/date_obs/exptime_s for plates) or None
     # @return: file id
     cur = db.execute(
-        "INSERT INTO project_files (project_id, path, kind, created)"
-        " VALUES (?, ?, ?, ?)",
-        (project_id, str(path), kind, _now()),
+        "INSERT INTO project_files (project_id, path, kind, created,"
+        " session_id, meta) VALUES (?, ?, ?, ?, ?, ?)",
+        (project_id, str(path), kind, _now(), session_id,
+         json.dumps(meta or {}, ensure_ascii=False)),
     )
     db.commit()
     return cur.lastrowid
@@ -451,11 +461,30 @@ def add_file(db, project_id, path, kind):
 def list_files(db, project_id):
     # @return: list of file dicts
     rows = db.execute(
-        "SELECT id, project_id, path, kind, created"
+        "SELECT id, project_id, path, kind, created, session_id, meta"
         " FROM project_files WHERE project_id=? ORDER BY created",
         (project_id,),
     ).fetchall()
     return [_row_to_file(r) for r in rows]
+
+
+def files_for_session(db, session_id):
+    # The visit's resources (ADR-045): every registered file linked to it.
+    # @return: list of file dicts, oldest first
+    rows = db.execute(
+        "SELECT id, project_id, path, kind, created, session_id, meta"
+        " FROM project_files WHERE session_id=? ORDER BY created",
+        (session_id,),
+    ).fetchall()
+    return [_row_to_file(r) for r in rows]
+
+
+def delete_file(db, file_id):
+    # Unlinks a file from the project (the file on disk is never touched).
+    # @return: True if the row was found and deleted
+    cur = db.execute("DELETE FROM project_files WHERE id=?", (file_id,))
+    db.commit()
+    return cur.rowcount > 0
 
 
 def delete(db, project_id):
@@ -493,17 +522,17 @@ def next_action(db, proj):
     #      care about step bookkeeping, but "measure tonight" with no plan
     #      is not actionable;
     #   2. plan not passed -> "plan";
-    #   3. plan passed, process not passed -> "process";
-    #   4. process passed, publish not passed -> "publish";
+    #   3. plan passed, analysis not passed -> "analysis";
+    #   4. analysis passed, publish not passed -> "publish";
     #   5. everything passed -> "close".
     # @args: db - Database, proj - project dict from get()
-    # @return: {"key": "followup"|"plan"|"process"|"publish"|"close",
+    # @return: {"key": "analysis"|"plan"|"publish"|"close",
     #          "overdue_days": int|None, "never_visited": bool}
     from . import campaign as _camp
     from . import followup as _fu
     steps = {s["step"]: s["status"] for s in proj.get("steps", [])}
     passed = {k: steps.get(k) in (STEP_DONE, STEP_SKIPPED)
-              for k in ("plan", "process", "publish")}
+              for k in STEPS}
     out = {"key": None, "overdue_days": None, "never_visited": False}
     if proj.get("status") == STATUS_ACTIVE \
             and proj.get("kind") in FOLLOWUP_KINDS \
@@ -520,16 +549,16 @@ def next_action(db, proj):
             # (hads, variable): their project is created *before* the
             # first data is taken. An SN project is born from its
             # detection, so it already holds first light and the step
-            # flow (plan -> process -> publish) leads until it has
+            # flow (plan -> analysis -> publish) leads until it has
             # sessions.
             if proj.get("kind") in ("hads", "variable"):
-                out.update(key="followup", overdue_days=cad,
+                out.update(key="analysis", overdue_days=cad,
                            never_visited=True)
                 return out
         if days is not None and days >= cad:
-            out.update(key="followup", overdue_days=days)
+            out.update(key="analysis", overdue_days=days)
             return out
-    for key in ("plan", "process", "publish"):
+    for key in STEPS:
         if not passed[key]:
             out["key"] = key
             return out

@@ -31,14 +31,14 @@ def test_fresh_project_says_plan(db):
     assert project.next_action(db, _proj(db))["key"] == "plan"
 
 
-def test_plan_done_says_process(db):
+def test_plan_done_says_analysis(db):
     p = _proj(db)
     project.advance(db, p["id"])
     assert project.next_action(db, project.get(db, p["id"]))["key"] == \
-        "process"
+        "analysis"
 
 
-def test_process_done_says_publish(db):
+def test_analysis_done_says_publish(db):
     p = _proj(db)
     project.advance(db, p["id"])
     project.advance(db, p["id"])
@@ -58,10 +58,10 @@ def test_skipped_step_counts_as_passed(db):
     p = _proj(db)
     project.set_step_status(db, p["id"], "plan", project.STEP_SKIPPED)
     assert project.next_action(db, project.get(db, p["id"]))["key"] == \
-        "process"
+        "analysis"
 
 
-def test_cadence_due_beats_process(db):
+def test_cadence_due_beats_analysis(db):
     p = _proj(db)
     project.advance(db, p["id"])                 # plan done
     followup.create_session(db, p["id"])
@@ -69,20 +69,20 @@ def test_cadence_due_beats_process(db):
                (1_700_000_000, p["id"]))         # aged far beyond 3 d
     db.commit()
     act = project.next_action(db, project.get(db, p["id"]))
-    assert act["key"] == "followup" and act["overdue_days"] >= 3
+    assert act["key"] == "analysis" and act["overdue_days"] >= 3
 
 
-def test_no_session_and_no_plan_says_plan_not_followup(db):
+def test_no_session_and_no_plan_says_plan_not_analysis(db):
     # "measure tonight" is not actionable without a plan (rule 1 guard)
     assert project.next_action(db, _proj(db, kind="variable"))["key"] == \
         "plan"
 
 
-def test_never_visited_with_plan_says_followup(db):
+def test_never_visited_with_plan_says_analysis(db):
     p = _proj(db, kind="variable")
     project.advance(db, p["id"])                 # plan done, no visits
     act = project.next_action(db, project.get(db, p["id"]))
-    assert act["key"] == "followup" and act["never_visited"] is True
+    assert act["key"] == "analysis" and act["never_visited"] is True
 
 
 def test_campaign_cadence_overrides_default(db):
@@ -95,7 +95,7 @@ def test_campaign_cadence_overrides_default(db):
                (1_700_000_000, p["id"]))
     db.commit()
     act = project.next_action(db, project.get(db, p["id"]))
-    assert act["key"] == "followup" and act["overdue_days"] >= 10
+    assert act["key"] == "analysis" and act["overdue_days"] >= 10
 
 
 def test_reopen_step_keeps_single_current(db):
@@ -105,4 +105,4 @@ def test_reopen_step_keeps_single_current(db):
     steps = {s["step"]: s["status"]
              for s in project.get(db, p["id"])["steps"]}
     assert steps["plan"] == "current"
-    assert steps["process"] == "pending"
+    assert steps["analysis"] == "pending"

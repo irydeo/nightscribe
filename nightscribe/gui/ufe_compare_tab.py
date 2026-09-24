@@ -251,11 +251,15 @@ class UfeCompareTab(QWidget):
             self._on_stage = True
             self._view.set_hover_probe(self._probe)
             self._redraw_overlays()
+        elif keep_overlays:
+            # disarmed but on stage: the overlays follow the TAB, so the
+            # stage flag must be set even when this section was never
+            # armed (the visit deep link lands straight on Measure)
+            self._on_stage = True
         else:
-            if not keep_overlays:
-                self._on_stage = False
-                self._view.set_hover_probe(self._state.probe_text)
-                self._drop_items()
+            self._on_stage = False
+            self._view.set_hover_probe(self._state.probe_text)
+            self._drop_items()
 
     # ------------------------------------------------------------- state
 

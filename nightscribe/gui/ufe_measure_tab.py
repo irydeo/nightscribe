@@ -232,6 +232,9 @@ class UfeMeasureTab(QWidget):
         self._active = bool(flag)
         if not self._active:
             if keep_overlays:
+                # disarmed but on stage (the visit deep link can land
+                # here without this section ever being armed)
+                self._on_stage = True
                 return
             self._on_stage = False
             self._drop_items()

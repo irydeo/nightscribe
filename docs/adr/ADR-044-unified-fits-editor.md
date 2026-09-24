@@ -156,7 +156,16 @@ desde una visita el enlace profundo arma Medir con la mitad Secuencia
 visible pero desarmada, y las puertas de dibujo que leían `_active`
 dejaban «Generar campo» y «Proponer secuencia» pintando nada; ahora
 `_on_field_ready`, `_redraw_overlays`, `_redraw_entries` y
-`_draw_measurement` se rigen por `_on_stage`. **ADR-046**: la barra
+`_draw_measurement` se rigen por `_on_stage`. **fix 2 (mismo día)**:
+`_on_stage` solo se armaba al armar la sección, así que abriendo desde
+una visita (el deep link aterriza en Medir sin que Secuencia se haya
+armado jamás) el campo seguía sin pintar; ahora
+`set_active(False, keep_overlays=True)` establece `_on_stage` (su
+significado literal: desarmada pero en escena), y el deep link
+«measure» sin secuencia aterriza en la sección Secuencia (la regla de
+la primera apertura del constructor, extendida a `show_tab`): sin
+secuencia no hay con qué medir y el primer acto del observador es marcar
+estrellas. **ADR-046**: la barra
 superior gana el conmutador «Cajas» (las cajas de metadatos de las
 esquinas, en pantalla y en el PNG; con ellas la rosa baja al centro
 inferior y gana la pata E, y la barra de escala se mueve a la derecha),
@@ -310,7 +319,15 @@ tab's stage, `self._on_stage`): opened from a visit, the deep link arms
 Measure with the Sequence half visible but disarmed, and the draw gates
 reading `_active` left "Generate field" and "Propose sequence" painting
 nothing; `_on_field_ready`, `_redraw_overlays`, `_redraw_entries` and
-`_draw_measurement` now follow `_on_stage`. **ADR-046**: the top bar
+`_draw_measurement` now follow `_on_stage`. **fix 2 (same day)**:
+`_on_stage` was only set when a section got armed, so opening from a
+visit (the deep link lands on Measure without Sequence ever being
+armed) still painted nothing; now `set_active(False,
+keep_overlays=True)` sets `_on_stage` (its literal meaning: disarmed
+but on stage), and the "measure" deep link with an empty sequence lands
+on the Sequence section (the constructor's first-open rule, extended to
+`show_tab`): without a sequence there is nothing to measure with, and
+the observer's first act is marking stars. **ADR-046**: the top bar
 gains the "Boxes" toggle (the metadata corner boxes, on screen and in
 the exported PNG; with them on, the compass moves to the bottom centre
 and gains the east leg, and the scale bar moves right), the object

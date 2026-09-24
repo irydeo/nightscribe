@@ -271,9 +271,16 @@ class UfeDialog(QDialog):
         #        section widget, or "compare" / "measure"
         if tab in (self.tab_compare, self.tab_measure) \
                 or tab in ("compare", "measure"):
-            self.tab_photometry.set_mode(
-                "measure" if tab in (self.tab_measure, "measure")
-                else "sequence")
+            mode = "measure" if tab in (self.tab_measure, "measure") \
+                else "sequence"
+            # the constructor's own landing rule, applied to deep links
+            # too: without a sequence there is nothing to measure with,
+            # so land where one is built (the visit path opens on
+            # "measure" with an empty sequence and the observer's first
+            # act is marking stars)
+            if mode == "measure" and not self.tab_compare.entries():
+                mode = "sequence"
+            self.tab_photometry.set_mode(mode)
             self.tabs.setCurrentWidget(self.tab_photometry)
             return
         self.tabs.setCurrentWidget(tab)

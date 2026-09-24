@@ -361,6 +361,69 @@ def test_sequence_overlays_survive_switching_to_measure(dlg):
     assert tab._items == []
 
 
+def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
+    # Regression, the exact visit path (2026-09-24): a fresh dialog whose
+    # Photometry tab is armed on Measure WITHOUT the Sequence section
+    # ever being armed first painted nothing on Generate field, because
+    # keep_overlays kept _on_stage's initial False instead of setting
+    # the stage. The mode is set straight (no show_tab): the landing
+    # rule is tested apart, below.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(1280, 860)
+    d.show()
+    d.tab_photometry.set_mode("measure")
+    d.tabs.setCurrentWidget(d.tab_photometry)
+    d.state.load(MONO)
+    try:
+        tab = d.tab_compare
+        assert not tab._active                    # never armed...
+        assert tab._on_stage                      # ...but on stage
+        tab._on_field_ready(_field(d))
+        assert len(tab._items) > 0                # the field paints
+        assert any(it.isVisible() for it, _ in tab._catalog_items)
+        assert _target_mark(tab) is not None
+        tab._on_propose()
+        assert len(tab._entries) > 0
+        assert len(tab._entry_items) == 2 * len(tab._entries)
+        # clicks stay disarmed: marking stars needs the Sequence mode
+        from PySide6.QtCore import QPointF
+        s = tab._stars[0]
+        n = len(tab._entries)
+        d.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+        assert len(tab._entries) == n
+    finally:
+        d.tab_blink.shutdown()
+        d.view._render_timer.stop()
+        d.deleteLater()
+
+
+def test_measure_deep_link_lands_on_sequence_without_a_sequence(qapp):
+    # The constructor's landing rule applied to deep links (2026-09-24):
+    # "measure" with an empty sequence lands where one is built.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(1280, 860)
+    d.show()
+    d.state.load(MONO)
+    try:
+        d.show_tab(d.tab_measure)
+        assert d.tab_photometry._mode == "sequence"
+        assert d.tab_compare._active               # clicks mark stars
+        # the sister section is disarmed but on stage too
+        assert not d.tab_measure._active and d.tab_measure._on_stage
+        # with a sequence waiting, the same link lands on Measure
+        d.tab_compare._entries = [{"name": "Comp1", "kind": "comp",
+                                   "star": {"ra": 1.0, "dec": 1.0}}]
+        d.show_tab(d.tab_measure)
+        assert d.tab_photometry._mode == "measure"
+        assert d.tab_measure._active
+    finally:
+        d.tab_blink.shutdown()
+        d.view._render_timer.stop()
+        d.deleteLater()
+
+
 def test_field_paints_while_the_measure_section_owns_the_stage(dlg):
     # Regression (ADR-044 rev): opened from a visit, the deep link arms
     # the Measure section and the Sequence half stays visible but

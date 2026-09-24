@@ -4198,7 +4198,9 @@ class MainWindow(QMainWindow):
         # resource (plates, reports, imports) hangs from one. The per-kind
         # blocks absorbed from the retired Process tab ride below; the
         # retired SN FITS-import/blink block is gone for good: a visit's
-        # plate opens in the editor, which owns blink/measure/annotate.
+        # plate opens in the editor, which owns blink/measure/annotate;
+        # and the MPC astrometry block lives inside the visit's window
+        # (the report is the visit's product — form A).
         layout = self._step_section("analysis")
         pid = p["id"]
         if kind in FOLLOWUP_KINDS:
@@ -4209,13 +4211,11 @@ class MainWindow(QMainWindow):
             open_in_editor=lambda path, sid:
                 self._visit_open_in_editor(pid, path, sid),
             on_change=lambda: self._visit_data_changed(pid),
-            curve_kind=kind in FOLLOWUP_KINDS)
+            kind=kind)
         panel.set_project(pid)
         layout.addWidget(panel, 1)
         self._project_widgets["visits_panel"] = panel
-        if kind in ("neo", "pccp"):
-            self._analysis_mpc_block(layout)
-        elif kind == "transit":
+        if kind == "transit":
             self._analysis_transit_block(layout)
         elif kind == "hads":
             self._analysis_hads_block(layout)
@@ -4236,29 +4236,6 @@ class MainWindow(QMainWindow):
     # the retired Process tab; the SN FITS-import/blink block is gone for
     # good: a visit's plate opens in the editor, which owns blink,
     # measure and annotate) -------------
-
-    def _analysis_mpc_block(self, layout):
-        # NEO/PCCP: the MPC report — paste, validate, save (the save
-        # registers the file, on the selected visit when there is one).
-        layout.addWidget(QLabel(
-            self.tr("Paste astrometric measurements (MPC 80-col or ADES)")))
-        txt = QTextEdit()
-        txt.setMaximumHeight(140)
-        txt.setAcceptRichText(False)
-        txt.setPlaceholderText(
-            self.tr("Paste MPC 80-column or ADES PSV lines here…"))
-        font = txt.font(); font.setFamily("Monospace"); txt.setFont(font)
-        layout.addWidget(txt)
-        btn_val = QPushButton(self.tr("Validate"))
-        btn_val.clicked.connect(self._project_mpc_validate)
-        layout.addWidget(btn_val)
-        btn_save = QPushButton(self.tr("Save report…"))
-        btn_save.clicked.connect(self._project_mpc_save)
-        layout.addWidget(btn_save)
-        lbl_status = QLabel("—"); lbl_status.setWordWrap(True)
-        layout.addWidget(lbl_status)
-        self._project_widgets["txt_mpc"] = txt
-        self._project_widgets["lbl_mpc_status"] = lbl_status
 
     def _analysis_transit_block(self, layout):
         # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
@@ -6113,71 +6090,6 @@ class MainWindow(QMainWindow):
         except OSError as err:
             self.statusBar().showMessage(
                 self.tr("Export failed: %1").replace("%1", str(err)), 8000)
-
-    def _project_mpc_validate(self):
-        if not self._current_project:
-            return
-        txt = self._project_widgets.get("txt_mpc")
-        if not txt:
-            return
-        text = txt.toPlainText()
-        if not text.strip():
-            self._project_widgets["lbl_mpc_status"].setText(
-                self.tr("Paste your measurements first."))
-            return
-        obs_code = config.get("mpc_code", "")
-        obj = self._current_project["object_name"]
-        result = mpc_report.validate(text, obs_code=obs_code,
-                                     expected_obj=obj)
-        lbl = self._project_widgets.get("lbl_mpc_status")
-        if result["valid"]:
-            status = (self.tr("Valid: %1 lines, %2").replace("%1", str(result["n_lines"]))
-                      .replace("%2", result["format"]))
-            if result["warnings"]:
-                status += " ⚠ " + "; ".join(result["warnings"])
-            lbl.setText(status)
-        else:
-            lbl.setText(self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                        + ("…" if len(result["errors"]) > 4 else ""))
-
-    def _project_mpc_save(self):
-        if not self._current_project:
-            return
-        txt = self._project_widgets.get("txt_mpc")
-        if not txt:
-            return
-        text = txt.toPlainText()
-        if not text.strip():
-            self._project_widgets["lbl_mpc_status"].setText(
-                self.tr("Paste your measurements first."))
-            return
-        obs_code = config.get("mpc_code", "")
-        obj = self._current_project["object_name"]
-        outdir = project.storage_dir(self._current_project)
-        default = outdir / f"{obj}_mpc_report.txt"
-        out, _ = QFileDialog.getSaveFileName(
-            self, self.tr("Save MPC report"), str(default),
-            "Text files (*.txt);;All files (*)")
-        if not out:
-            return
-        path, result = mpc_report.package(text, out, obs_code=obs_code,
-                                          expected_obj=obj)
-        lbl = self._project_widgets.get("lbl_mpc_status")
-        if path:
-            # ADR-045: the report belongs to the visit whose astrometry
-            # it carries, when one is selected in the visits manager
-            project.add_file(db, self._current_project["id"], path,
-                             "report",
-                             session_id=self._selected_visit_id())
-            project.update_step_data(db, self._current_project["id"],
-                                     "analysis", {"mpc_report": path})
-            lbl.setText(self.tr("Saved: %1 (%2 lines)")
-                        .replace("%1", path).replace("%2", str(result["n_lines"])))
-            self.statusBar().showMessage(
-                self.tr("MPC report ready to email"), 8000)
-        else:
-            lbl.setText(self.tr("Invalid: ") + "; ".join(result["errors"][:4])
-                        + ("…" if len(result["errors"]) > 4 else ""))
 
     def _project_post(self):
         if self._current_project:

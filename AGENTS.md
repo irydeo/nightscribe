@@ -147,6 +147,11 @@ nightscribe/
                        #   (widgets/visits_panel.py, para todos los tipos):
                        #   cada día es una visita y sus recursos cuelgan de
                        #   ella en project_files (session_id + meta);
+                       #   el detalle de la visita vive en su propia ventana
+                       #   no modal (VisitWindow, mismo módulo); el bloque de
+                       #   astrometría MPC vive dentro de esa ventana (forma A:
+                       #   sin visita no hay ni área de pegado), con aviso si
+                       #   la fecha del reporte no cuadra con la de la visita;
                        #   la carta de comparación vive en Análisis
                        #   (seqchart_dialog.py + widgets/finder_widget.py,
                        #   picker interactivo de comps — ADR-042)

@@ -1318,8 +1318,9 @@ def test_followup_session_notes_persist(window, panel):
     vp = _visits_panel(window)
     vp.btn_new.click()
     sid = fu.list_sessions(dbmod.db, p["id"])[0]["id"]
-    # the notes widget auto-saves on every keystroke (ADR-045 panel)
-    vp._notes.setPlainText("Clear night, good seeing")
+    # the notes widget lives in the visit's window and auto-saves on
+    # every keystroke (ADR-045)
+    vp._win._notes.setPlainText("Clear night, good seeing")
     s = fu.get_session(dbmod.db, sid)
     assert s["notes"] == "Clear night, good seeing"
 
@@ -1333,9 +1334,8 @@ def test_followup_notes_no_dual_identity(window, panel):
     vp = _visits_panel(window)
     vp.btn_new.click()
     s1 = fu.list_sessions(dbmod.db, p["id"])[0]["id"]
-    vp.lst.setCurrentRow(0)
     assert vp.current_session_id() == s1
-    w_live = vp._notes
+    w_live = vp._win._notes
     assert w_live is not None
     w_live.setPlainText("live widget note")
     assert fu.get_session(dbmod.db, s1)["notes"] == "live widget note"
@@ -1355,9 +1355,10 @@ def test_followup_add_measurement_has_real_mjd(window, panel):
     vp.refresh()
     vp.lst.setCurrentRow(0)
     assert vp.current_session_id() == sid
-    vp.spn_mag.setValue(15.5)
-    vp.cmb_filt.setCurrentText("V")
-    vp._on_add_measurement()
+    vp.open_visit(sid)          # the measurement form lives in the window
+    vp._win.spn_mag.setValue(15.5)
+    vp._win.cmb_filt.setCurrentText("V")
+    vp._win._on_add_measurement()
     pts = [pt for pt in fu.list_points(dbmod.db, p["id"])
            if pt["session_id"] == sid]
     assert len(pts) == 1
@@ -1382,10 +1383,11 @@ def test_followup_delete_session(window, panel):
     assert fu.get_session(dbmod.db, sid) is not None
     vp.refresh()
     vp.lst.setCurrentRow(0)
+    vp.open_visit(sid)          # the delete action lives in the window
     orig = QMessageBox.question
     QMessageBox.question = lambda *a, **kw: QMessageBox.Yes
     try:
-        vp._on_delete_visit()
+        vp._win._on_delete_visit()
     finally:
         QMessageBox.question = orig
     assert fu.get_session(dbmod.db, sid) is None
@@ -1426,7 +1428,7 @@ def test_followup_add_image_dialog_editable(window, panel, monkeypatch,
             exp_ed.setText("120")           # user fixes the exposure
         return QDialog.Accepted
     monkeypatch.setattr(QDialog, "exec", fake_exec)
-    vp._on_attach()
+    vp._win._on_attach()
     imgs = fu.list_images(dbmod.db, sid)
     assert len(imgs) == 1
     # the edited values (not the raw header) were committed
@@ -1484,9 +1486,9 @@ def test_fu_add_measurement_quick(window, panel):
     vp = _visits_panel(window)
     vp.btn_new.click()
     sid = vp.current_session_id()
-    vp.spn_mag.setValue(16.55)
-    vp.cmb_filt.setCurrentText("Clear")
-    vp._on_add_measurement()
+    vp._win.spn_mag.setValue(16.55)
+    vp._win.cmb_filt.setCurrentText("Clear")
+    vp._win._on_add_measurement()
     pts = fu.list_points(dbmod.db, p["id"])
     assert len(pts) == 1
     assert pts[0]["mag"] == 16.55
@@ -1649,10 +1651,11 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
     assert vp.lst.count() == 1, "the Visits list is missing the visit"
     vp.lst.setCurrentRow(0)               # user path: select the visit
     assert vp.current_session_id() == sid
-    btns = [b.text() for b in vp.findChildren(QPushButton)]
+    vp.open_visit(sid)                    # the resources live in its window
+    btns = [b.text() for b in vp._win.findChildren(QPushButton)]
     assert "Open" in btns
     assert "Quick analysis" not in btns
-    vp.lst_res.setCurrentRow(0)           # select the plate resource
+    vp._win.lst_res.setCurrentRow(0)      # select the plate resource
     opened = []
 
     class _D:
@@ -1666,7 +1669,7 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
         opened.append((tab_, hook_pid, obj, session_id))
         return _D()
     monkeypatch.setattr(window, "_ufe_open", _ufe_open)
-    vp._on_open_resource()
+    vp._win._on_open_resource()
     assert opened[0][:2] == ("measure", p["id"])
     assert opened[0][3] == sid            # the hooks land on the visit
     assert opened[-1]["name"] == "SN2026visit"

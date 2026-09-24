@@ -225,3 +225,6 @@ def test_sn_has_no_products_block(window):
     # SN keeps its own FITS import + follow-up section; no products block.
     _select_project(window, "sn", "SN 2026zz")
     assert "neo_products" not in window._project_widgets
+
+
+

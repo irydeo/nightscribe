@@ -2,7 +2,12 @@
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-09-24 ·
 **ejecutado / executed**: 2026-09-24 (suite unitaria green, i18n 0
-unfinished)
+unfinished) · **Enmendado / Amended**: 2026-09-24 (la vista de la visita
+se mueve a su propia ventana no modal — VisitsPanel queda como resumen
+ligero en la pestaña — y la astrometría MPC vive dentro de esa ventana:
+forma A, sin visita no hay ni área de pegado; el reporte se registra en
+la visita anfitriona y avisa si la fecha de la primera medida no cuadra
+con la de la visita)
 
 **Ver / See**: ADR-019 (la UX v3 centrada en proyectos; revisado aquí) ·
 ADR-041 (la barra de pestañas del proyecto; enmendado aquí) · ADR-043 (la
@@ -59,6 +64,18 @@ todas confirmadas en campo:
    (tránsitos) y los punteros FotoDif/WebObs (HADS) quedan; el bloque
    SN de importar FITS + blink desaparece (la placa de la visita abre
    en el editor, que ya lo cubre todo).
+
+   *Revisión de usabilidad (mismo día)*: el detalle de la visita
+   resultó demasiado cargado inline en la pestaña, así que vive en su
+   **propia ventana no modal** (`VisitWindow`): la pestaña conserva la
+   lista-resumen ligera y el botón primario («Nueva visita» crea y abre
+   la ventana al momento; doble clic o «Abrir visita…» la reabren). Y
+   para la astrometría pegada a mano, forma A: **el bloque MPC vive
+   dentro de la ventana de la visita** (NEO/PCCP) — sin visita no hay
+   ni área de pegado, y el reporte se registra en la visita anfitriona;
+   si la fecha de la primera medida del reporte no cuadra con la de la
+   visita (`mpc_report.first_obs_date`), la ventana avisa sin bloquear
+   (un reporte colgado en la noche equivocada es un pecado silencioso).
 3. **Un solo registro de ficheros** (migración v9): `project_files`
    gana `session_id` (SET NULL: borrar la visita desvincula, no borra)
    y `meta` (JSON: filtro/date_obs/exptime_s para placas). Las filas de
@@ -139,6 +156,18 @@ confirmed in the field:
    its per-project counterpart, not a duplicate), the retired
    quick-look stays retired, and no capability is lost (ADR-038): it is
    relocated.
+
+   *Usability review (same day)*: the visit's detail proved too crowded
+   inline in the tab, so it lives in its **own non-modal window**
+   (`VisitWindow`): the tab keeps the light summary list and the primary
+   button ("New visit" creates and opens the window at once; a
+   double-click or "Open visit…" reopens it). And for hand-pasted
+   astrometry, form A: **the MPC block lives inside the visit's window**
+   (NEO/PCCP) — without a visit there is no paste area at all, and the
+   report registers to the hosting visit; when the report's first
+   measurement's date disagrees with the visit's
+   (`mpc_report.first_obs_date`), the window warns without blocking (a
+   report hung on the wrong night is a silent database sin).
 
 **Consequences.** Migrations v8 and v9 with translatable notes; the
 migration tests seed old databases and verify both. The manager has its

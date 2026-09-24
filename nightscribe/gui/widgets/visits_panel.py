@@ -13,15 +13,19 @@
 
 """The visits manager (ADR-045): every day you work the object is a visit,
 and every resource (FITS plates, imported photometry, ephemeris, MPC
-reports, charts) hangs from one. Master-detail inline in the Analysis tab,
-for EVERY project kind; the photometry measurement block shows for the
-kinds that keep light curves.
+reports, charts) hangs from one.
+
+The split that keeps the tab light and the work roomy (2026-09-24 review):
+the Analysis tab carries the OVERVIEW (the rich-rows list, the count, the
+single primary "New visit" button); the visit's own work (resources,
+measurements, notes) lives in the VisitWindow, a non-modal dialog opened
+by the primary action and by double-clicking a row.
 
 Rules of the redesign, honoured here:
 
 * One primary entry point: "New visit". No duplicated buttons.
-* Nothing attaches without a visit: the add-resource action lives inside
-  the selected visit; with no visit the empty state offers to create one.
+* Nothing attaches without a visit: the attach action lives inside the
+  visit's window.
 * The file on disk is never touched: removing a resource only unlinks it.
 
 All CRUD goes through core/followup.py (visits, points) and
@@ -36,18 +40,22 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFileDialog, QFormLayout, QFrame,
-                               QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+                               QFileDialog, QFormLayout, QGroupBox,
+                               QHBoxLayout, QLabel, QLineEdit,
                                QListWidgetItem, QMessageBox, QPushButton,
-                               QScrollArea, QTextEdit, QVBoxLayout, QWidget)
+                               QTextEdit, QVBoxLayout, QWidget)
 
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
 
 logger = logging.getLogger("nightscribe.gui.visits_panel")
 
 # Kinds whose visits keep photometry points (the light-curve kinds);
-# everyone gets resources and notes.
+# everyone gets resources and notes. NEO/PCCP visits carry the night's
+# astrometry: the MPC paste/validate/save block (ADR-045 form A: the
+# measurements are the visit's product, so the block lives in the
+# visit's window and nowhere else).
 CURVE_KINDS = ("sn", "hads", "variable")
+MPC_KINDS = ("neo", "pccp")
 
 _FILTERS = ["Clear", "V", "R", "B", "I", "NIR"]
 
@@ -68,28 +76,30 @@ def _kind_for(path):
 
 
 class VisitsPanel(QWidget):
-    # The visits master-detail manager. One instance per built Analysis
-    # tab; set_project() refills it (the page caches it until the project
-    # changes).
+    # The in-tab visits overview: the list, the count and the two entry
+    # points (New visit / Open visit…). The per-visit work lives in the
+    # VisitWindow (opened, never crammed inline).
     #
     # @args: db - the Database, lang - "es" | "en",
     #        open_in_editor - callable(path, session_id) opening a FITS in
-    #        the UFE (None hides the per-row editor action),
-    #        on_change - callable() after any data change (curve/cadence
-    #        refresh lives outside),
-    #        curve_kind - True keeps the measurement block (light-curve
-    #        kinds); everyone gets resources and notes
+    #        the UFE (None hides the window's editor action),
+    #        on_change - callable() after any data change (the host
+    #        refreshes the curve/cadence/summary),
+    #        curve_kind - True keeps the measurement block in the window
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
-                 curve_kind=True, parent=None):
+                 curve_kind=True, kind=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
         self._open_in_editor = open_in_editor
         self._on_change = on_change
-        self._curve_kind = bool(curve_kind)
+        # the project's kind drives what a visit carries: light-curve
+        # kinds get the measurements block, MPC kinds the astrometry one
+        self._kind = kind if kind is not None else (
+            "sn" if curve_kind else "neo")
         self._pid = None              # current project id
-        self._sid = None              # selected visit id (or None)
+        self._win = None              # the open VisitWindow (or None)
         self._build_ui()
 
     # ------------------------------------------------------------ build
@@ -99,10 +109,16 @@ class VisitsPanel(QWidget):
         top = QHBoxLayout()
         self.btn_new = QPushButton(self.tr("New visit"))
         self.btn_new.setToolTip(self.tr(
-            "Every day you work the object is a visit: images, reports "
-            "and measurements hang from it"))
+            "Every day you work the object is a visit: it opens in its "
+            "own window, ready for its images, reports and measurements"))
         self.btn_new.clicked.connect(self._on_new_visit)
         top.addWidget(self.btn_new)
+        self.btn_open = QPushButton(self.tr("Open visit…"))
+        self.btn_open.setObjectName("vp_btn_open_visit")
+        self.btn_open.setToolTip(self.tr(
+            "Open the selected visit's window (double-click works too)"))
+        self.btn_open.clicked.connect(self._on_open_selected)
+        top.addWidget(self.btn_open)
         self.lbl_count = QLabel("")
         top.addWidget(self.lbl_count)
         top.addStretch(1)
@@ -114,20 +130,12 @@ class VisitsPanel(QWidget):
         self.lbl_empty.setWordWrap(True)
         lay.addWidget(self.lbl_empty)
 
-        self.split = QHBoxLayout()
         self.lst = PassiveList()
-        self.lst.setMaximumWidth(340)
+        self.lst.setToolTip(self.tr(
+            "The project's visits, newest first; double-click opens one"))
+        self.lst.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.lst.itemSelectionChanged.connect(self._on_select)
-        self.split.addWidget(self.lst, 2)
-        self.detail = QFrame()
-        self.detail.setFrameShape(QFrame.Shape.NoFrame)
-        self.detail_layout = QVBoxLayout(self.detail)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(self.detail)
-        self.split.addWidget(scroll, 5)
-        lay.addLayout(self.split, 1)
+        lay.addWidget(self.lst, 1)
         self._show_empty(True)
 
     # ------------------------------------------------------------ state
@@ -135,7 +143,9 @@ class VisitsPanel(QWidget):
     def set_project(self, project_id, keep_selection=True):
         # @args: project_id - the project to manage, keep_selection - try
         #        to keep the selected visit across a refresh
-        prev = self._sid if keep_selection else None
+        prev = self.current_session_id() if keep_selection else None
+        if self._pid != project_id:
+            self.close_visit_window()      # the window belongs to a visit
         self._pid = project_id
         self.refresh()
         if prev is not None:
@@ -147,11 +157,13 @@ class VisitsPanel(QWidget):
     def current_session_id(self):
         # @return: the selected visit id, or None (the host attaches
         #          reports to it when set)
-        return self._sid
+        items = self.lst.selectedItems()
+        return items[0].data(Qt.UserRole) if items else None
 
     def refresh(self):
         # Refills the visits list from the database (newest first).
         from ...core import followup as fu
+        sel = self.current_session_id()
         self.lst.clear()
         sessions = fu.list_sessions(self._db, self._pid) \
             if self._pid is not None else []
@@ -172,83 +184,115 @@ class VisitsPanel(QWidget):
         n = len(sessions)
         self.lbl_count.setText(self.tr("{0} visits").format(n) if n else "")
         self._show_empty(n == 0)
-        if n:
-            if self.lst.currentRow() < 0:
-                self.lst.setCurrentRow(0)
-        else:
-            self._sid = None
+        if n and sel is not None:
+            for row in range(self.lst.count()):
+                if self.lst.item(row).data(Qt.UserRole) == sel:
+                    self.lst.setCurrentRow(row)
+                    break
+        self.btn_open.setEnabled(self.current_session_id() is not None)
 
     def _show_empty(self, flag):
         # @args: flag - no visits exist
         self.lbl_empty.setVisible(flag)
         self.lst.setVisible(not flag)
-        self.detail.setVisible(not flag)
+        self.btn_open.setVisible(not flag)
 
-    # ---------------------------------------------------------- visits
+    def _on_select(self):
+        self.btn_open.setEnabled(self.current_session_id() is not None)
+
+    # ------------------------------------------------- the visit window
 
     def _on_new_visit(self):
-        # The single entry point: create today's visit and land on it.
+        # The single entry point: create today's visit and open its window
+        # right away (the whole point of the visit is what hangs from it).
         from ...core import followup as fu
         if self._pid is None:
             return
-        fu.create_session(self._db, self._pid)
+        sid = fu.create_session(self._db, self._pid)
         self.refresh()
         self.lst.setCurrentRow(0)   # newest first
-        self._emit_change()
+        self.open_visit(sid)
 
-    def _on_select(self):
-        items = self.lst.selectedItems()
-        if not items:
-            return
-        self._sid = items[0].data(Qt.UserRole)
-        self._rebuild_detail()
+    def _on_open_selected(self):
+        sid = self.current_session_id()
+        if sid is not None:
+            self.open_visit(sid)
 
-    def _on_delete_visit(self):
-        # Confirmation first; points and files keep living in the project,
-        # unlinked (the DB's ON DELETE SET NULL), and the panel says so.
-        from ...core import followup as fu
-        if self._sid is None:
-            return
-        ans = QMessageBox.question(
-            self, self.tr("Delete visit"),
-            self.tr("Delete this visit? Its measurements and files are "
-                    "kept, unlinked from it."))
-        if ans != QMessageBox.Yes:
-            return
-        fu.delete_session(self._db, self._sid)
-        self._sid = None
+    def _on_row_double_clicked(self, item):
+        self.open_visit(item.data(Qt.UserRole))
+
+    def open_visit(self, session_id):
+        # The visit's work window: one at a time, non-modal, so the page
+        # never blocks and the headless suite can drive it.
+        # @args: session_id - the visit to open
+        # @return: the VisitWindow
+        self.close_visit_window()
+        self._win = VisitWindow(self._db, self._pid, session_id,
+                                lang=self._lang,
+                                kind=self._kind,
+                                open_in_editor=self._open_in_editor,
+                                data_changed=self._from_window_changed,
+                                parent=self)
+        self._win.show()
+        return self._win
+
+    def close_visit_window(self):
+        # Closes the open visit window, if any (project switch, delete).
+        if self._win is not None:
+            self._win.close()
+            self._win = None
+
+    def _from_window_changed(self):
+        # The window edited its visit: the list's counts and the host's
+        # reactive blocks follow.
         self.refresh()
         self._emit_change()
 
-    # ---------------------------------------------------------- detail
+    def _emit_change(self):
+        # Tells the host the data changed (curve, cadence, summary).
+        if self._on_change is not None:
+            self._on_change()
 
-    def _wipe(self):
-        # Drops every widget in the detail pane (same discipline as the
-        # main window's _wipe_layout).
-        while self.detail_layout.count():
-            item = self.detail_layout.takeAt(0)
-            w = item.widget()
-            if w is not None:
-                w.setParent(None)
-                w.deleteLater()
-            elif item.layout() is not None:
-                sub = item.layout()
-                while sub.count():
-                    sub_item = sub.takeAt(0)
-                    sw = sub_item.widget()
-                    if sw is not None:
-                        sw.setParent(None)
-                        sw.deleteLater()
 
-    def _rebuild_detail(self):
-        # The selected visit's full card: resources, measurements (curve
-        # kinds) and notes.
+class VisitWindow(QDialog):
+    # The visit's own window (non-modal, shown with show()): its
+    # resources, its measurements (light-curve kinds) and its notes.
+    # Nothing here is modal and nothing blocks the main window.
+    #
+    # @args: db - the Database, pid - project id, sid - the visit's id,
+    #        lang - "es" | "en", curve_kind - keep the measurements block,
+    #        open_in_editor - callable(path, session_id) for FITS rows,
+    #        data_changed - callable() after any edit (the panel refreshes
+    #        and notifies the host), parent - the panel
+
+    def __init__(self, db, pid, sid, lang="es", curve_kind=None,
+                 kind=None, open_in_editor=None, data_changed=None,
+                 parent=None):
+        super().__init__(parent)
+        self._db = db
+        self._pid = pid
+        self._sid = sid
+        self._lang = lang
+        self._kind = kind if kind is not None else (
+            "sn" if (curve_kind or curve_kind is None) else "neo")
+        self._curve_kind = self._kind in CURVE_KINDS
+        self._mpc_kind = self._kind in MPC_KINDS
+        self._open_in_editor = open_in_editor
+        self._data_changed = data_changed
+        self.setWindowTitle(self.tr("Visit"))
+        self.resize(640, 520)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self._build_ui()
+
+    # ------------------------------------------------------------ build
+
+    def _build_ui(self):
         from ...core import followup as fu
-        self._wipe()
         s = fu.get_session(self._db, self._sid)
         if s is None:
+            self.close()
             return
-        lay = self.detail_layout
+        lay = QVBoxLayout(self)
         head = QHBoxLayout()
         title = QLabel(f"<b>{s['obs_date'] or '?'}</b>")
         head.addWidget(title, 1)
@@ -291,12 +335,16 @@ class VisitsPanel(QWidget):
         self.lst_res.itemDoubleClicked.connect(
             lambda _it: self._on_open_resource())
         grp_res.layout().addWidget(self.lst_res)
-        lay.addWidget(grp_res)
+        lay.addWidget(grp_res, 1)
         self._populate_resources()
 
         # ---- measurements (light-curve kinds)
         if self._curve_kind:
             self._build_measurements_block(lay, s)
+
+        # ---- the night's astrometry (NEO/PCCP; ADR-045 form A)
+        if self._mpc_kind:
+            self._build_mpc_block(lay)
 
         # ---- notes
         snotes = QTextEdit()
@@ -307,10 +355,26 @@ class VisitsPanel(QWidget):
         lay.addWidget(snotes)
         self._notes = snotes
 
+    # ---------------------------------------------------------- visit
+
+    def _on_delete_visit(self):
+        # Confirmation first; points and files keep living in the project,
+        # unlinked (the DB's ON DELETE SET NULL), and the dialog says so.
+        from ...core import followup as fu
+        ans = QMessageBox.question(
+            self, self.tr("Delete visit"),
+            self.tr("Delete this visit? Its measurements and files are "
+                    "kept, unlinked from it."))
+        if ans != QMessageBox.Yes:
+            return
+        fu.delete_session(self._db, self._sid)
+        self._emit_change()
+        self.close()
+
     # ------------------------------------------------------- resources
 
     def _populate_resources(self):
-        # Refills the selected visit's resource list from the registry.
+        # Refills the visit's resource list from the registry.
         from ...core import project as proj_mod
         self.lst_res.clear()
         for f in proj_mod.files_for_session(self._db, self._sid):
@@ -346,7 +410,6 @@ class VisitsPanel(QWidget):
             proj_mod.add_file(self._db, self._pid, path, kind,
                               session_id=self._sid, meta=meta)
         self._populate_resources()
-        self.refresh()
         self._emit_change()
 
     def _ask_fits_meta(self, path):
@@ -425,7 +488,6 @@ class VisitsPanel(QWidget):
             return
         proj_mod.delete_file(self._db, f["id"])
         self._populate_resources()
-        self.refresh()
         self._emit_change()
 
     # ----------------------------------------------------- measurements
@@ -467,7 +529,7 @@ class VisitsPanel(QWidget):
         self.lst_meas = PassiveList()
         self.lst_meas.setObjectName("vp_measurements")
         grp.layout().addWidget(self.lst_meas)
-        lay.addWidget(grp)
+        lay.addWidget(grp, 1)
         self._populate_measurements()
 
     def _populate_measurements(self):
@@ -503,8 +565,6 @@ class VisitsPanel(QWidget):
 
     def _on_add_measurement(self):
         from ...core import followup as fu
-        if self._sid is None:
-            return
         mag = self.spn_mag.value()
         err = self.spn_err.value() if self.spn_err.value() > 0 else None
         filt = self.cmb_filt.currentText().strip() or "Clear"
@@ -512,7 +572,6 @@ class VisitsPanel(QWidget):
         fu.add_point(self._db, self._pid, self._session_mjd(s), filt,
                      mag, err=err, source="manual", session_id=self._sid)
         self._populate_measurements()
-        self.refresh()
         self._emit_change()
 
     def _on_delete_measurement(self):
@@ -522,20 +581,131 @@ class VisitsPanel(QWidget):
             return
         fu.delete_point(self._db, items[0].data(Qt.UserRole))
         self._populate_measurements()
-        self.refresh()
+        self._emit_change()
+
+    # --------------------------------------------------- MPC astrometry
+
+    def _project(self):
+        # @return: the project dict (or None)
+        from ...core import project as proj_mod
+        return proj_mod.get(self._db, self._pid)
+
+    def _build_mpc_block(self, lay):
+        # The night's astrometry (NEO/PCCP): paste the MPC 80-col or ADES
+        # lines, validate them, save the report. The report registers to
+        # THIS visit — the measurements are the visit's product, so the
+        # block lives here and nowhere else (ADR-045, form A).
+        grp = QGroupBox(self.tr("Astrometry (MPC report)"))
+        grp.setLayout(QVBoxLayout())
+        grp.layout().addWidget(QLabel(self.tr(
+            "Paste the night's astrometric measurements (MPC 80-col or "
+            "ADES PSV)")))
+        self.txt_mpc = QTextEdit()
+        self.txt_mpc.setMaximumHeight(120)
+        self.txt_mpc.setAcceptRichText(False)
+        self.txt_mpc.setPlaceholderText(self.tr(
+            "Paste MPC 80-column or ADES PSV lines here…"))
+        font = self.txt_mpc.font()
+        font.setFamily("Monospace")
+        self.txt_mpc.setFont(font)
+        grp.layout().addWidget(self.txt_mpc)
+        row = QHBoxLayout()
+        btn_val = QPushButton(self.tr("Validate"))
+        btn_val.setObjectName("vp_mpc_validate")
+        btn_val.clicked.connect(self._on_mpc_validate)
+        row.addWidget(btn_val)
+        btn_save = QPushButton(self.tr("Save report…"))
+        btn_save.setObjectName("vp_mpc_save")
+        btn_save.clicked.connect(self._on_mpc_save)
+        row.addWidget(btn_save)
+        row.addStretch(1)
+        grp.layout().addLayout(row)
+        self.lbl_mpc_status = QLabel("—")
+        self.lbl_mpc_status.setObjectName("vp_mpc_status")
+        self.lbl_mpc_status.setWordWrap(True)
+        grp.layout().addWidget(self.lbl_mpc_status)
+        lay.addWidget(grp)
+
+    def _on_mpc_validate(self):
+        from ...core import mpc_report
+        from ...config import config
+        text = self.txt_mpc.toPlainText()
+        if not text.strip():
+            self.lbl_mpc_status.setText(
+                self.tr("Paste your measurements first."))
+            return
+        p = self._project()
+        result = mpc_report.validate(
+            text, obs_code=config.get("mpc_code", ""),
+            expected_obj=(p or {}).get("object_name"))
+        if result["valid"]:
+            status = (self.tr("Valid: %1 lines, %2")
+                      .replace("%1", str(result["n_lines"]))
+                      .replace("%2", result["format"]))
+            if result["warnings"]:
+                status += " ⚠ " + "; ".join(result["warnings"])
+            self.lbl_mpc_status.setText(status)
+        else:
+            self.lbl_mpc_status.setText(
+                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
+                + ("…" if len(result["errors"]) > 4 else ""))
+
+    def _on_mpc_save(self):
+        # Package and register the report to THIS visit; when the
+        # report's own first measurement disagrees with the visit's date,
+        # say so (a report hung on the wrong night is a silent database
+        # sin), without blocking.
+        from ...core import followup as fu, mpc_report
+        from ...core import project as proj_mod
+        from ...config import config
+        text = self.txt_mpc.toPlainText()
+        if not text.strip():
+            self.lbl_mpc_status.setText(
+                self.tr("Paste your measurements first."))
+            return
+        p = self._project()
+        obj = (p or {}).get("object_name", "")
+        outdir = proj_mod.storage_dir(p) if p else Path.home()
+        default = outdir / f"{obj}_mpc_report.txt"
+        out, _ = QFileDialog.getSaveFileName(
+            self, self.tr("Save MPC report"), str(default),
+            "Text files (*.txt);;All files (*)")
+        if not out:
+            return
+        path, result = mpc_report.package(
+            text, out, obs_code=config.get("mpc_code", ""),
+            expected_obj=obj)
+        if not path:
+            self.lbl_mpc_status.setText(
+                self.tr("Invalid: ") + "; ".join(result["errors"][:4])
+                + ("…" if len(result["errors"]) > 4 else ""))
+            return
+        proj_mod.add_file(self._db, self._pid, path, "report",
+                          session_id=self._sid)
+        note = ""
+        rep_date = mpc_report.first_obs_date(text)
+        s = fu.get_session(self._db, self._sid)
+        if rep_date and s and s["obs_date"] and rep_date != s["obs_date"]:
+            note = " " + self.tr(
+                "⚠ the report's first measurement is from %1, not this "
+                "visit's date").replace("%1", rep_date)
+        self.lbl_mpc_status.setText(
+            self.tr("Saved: %1 (%2 lines)")
+            .replace("%1", path).replace("%2", str(result["n_lines"]))
+            + note)
+        self._populate_resources()
         self._emit_change()
 
     # ------------------------------------------------------------ notes
 
     def _on_notes_changed(self):
         from ...core import followup as fu
-        if self._sid is not None:
-            fu.update_session_notes(self._db, self._sid,
-                                    self._notes.toPlainText())
+        fu.update_session_notes(self._db, self._sid,
+                                self._notes.toPlainText())
 
     # ------------------------------------------------------------ misc
 
     def _emit_change(self):
-        # Tells the host the data changed (curve, cadence, summary).
-        if self._on_change is not None:
-            self._on_change()
+        # Tells the panel (and through it the host) that data changed.
+        if self._data_changed is not None:
+            self._data_changed()

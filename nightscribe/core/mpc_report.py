@@ -55,6 +55,36 @@ def detect_format(text):
     return None
 
 
+def first_obs_date(text):
+    # The observing date of the first parseable measurement, ISO
+    # "YYYY-MM-DD": the MPC 80-column packed date (cols 15-32,
+    # "YYYY MM DD.dddddd") or the ADES obsTime field. Used to pre-fill a
+    # visit's date from the report it carries (ADR-045).
+    # @args: text - the pasted block
+    # @return: "YYYY-MM-DD" or None
+    fmt = detect_format(text)
+    for line in text.splitlines():
+        s = line.rstrip()
+        if not s.strip() or s.strip().startswith("#"):
+            continue
+        if fmt == "mpc80":
+            if len(s) < 80:
+                continue
+            raw = s[_DATE[0]:_DATE[1]].strip()
+            m = re.match(r"^(\d{4})\s(\d{2})\s(\d{2})\.", raw)
+            if m:
+                return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        else:
+            parts = [p.strip() for p in s.split("|")]
+            if all(p.isalpha() for p in parts):
+                continue                       # the header row
+            for p in parts:
+                m = re.match(r"^(\d{4})-(\d{2})-(\d{2})[T ]", p)
+                if m:
+                    return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+    return None
+
+
 def validate(text, obs_code=None, expected_obj=None):
     # Validates pasted measurements line by line.
     # @args: text - the pasted block, obs_code - expected observatory code,

@@ -30,8 +30,15 @@ contexto JSON completo y tres pasos guiados. El contexto se captura al crear el
 proyecto desde Esta noche (snapshot del objetivo: coords, mag, rate, ventana…) y se
 enriquece en cada paso (secuencia exportada, FITS importado, medidas, posts).
 
-**Pasos**: Plan & Captura → Procesado → Publicar (revisión 2026-09-06 de ADR-019: el
-paso Captura se fundió en el Plan y gana el control real de CCDciel — ADR-030).
+**Pasos**: Ficha → Captura → Análisis → Publicación (ADR-045, 2026-09-24:
+«Procesado» se renombra «Análisis» con migración v8 y la pestaña
+Seguimiento se disuelve en ella; la pestaña Análisis se construye
+alrededor del **gestor de visitas** para todos los tipos: cada día que se
+trabaja el objeto es una visita y de ella cuelgan sus recursos — placas,
+reportes, importaciones — registrados en `project_files` con
+`session_id`; nada se adjunta sin visita. Revisión 2026-09-06 de ADR-019:
+el paso Captura se fundió en el Plan y gana el control real de CCDciel —
+ADR-030).
 
 ## 4. Flujo — supernova / transitorio
 

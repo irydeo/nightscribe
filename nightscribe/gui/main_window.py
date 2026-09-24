@@ -4193,136 +4193,189 @@ class MainWindow(QMainWindow):
                 self.tr("Capture started in CCDciel."), 5000)
 
     def _build_analysis_tab(self, p, kind, ctx):
-        # ADR-045: the single Analysis tab. While the visits manager
-        # lands (the redesign's F3), this mounts the old Process content
-        # with the old Follow-up blocks below it for the kinds that kept
-        # one — functionally complete, deliberately transitional.
-        self._build_process_tab(p, kind, ctx)
-        if kind in FOLLOWUP_KINDS:
-            self._build_followup_tab(p, ctx)
-
-    def _build_process_tab(self, p, kind, ctx):
+        # ADR-045: the Analysis tab. Its core is the visits manager, for
+        # EVERY kind: each day you work the object is a visit, and every
+        # resource (plates, reports, imports) hangs from one. The per-kind
+        # blocks absorbed from the retired Process tab ride below; the
+        # retired SN FITS-import/blink block is gone for good: a visit's
+        # plate opens in the editor, which owns blink/measure/annotate.
         layout = self._step_section("analysis")
+        pid = p["id"]
+        if kind in FOLLOWUP_KINDS:
+            self._fu_header_blocks(layout, p, pid)
+        from .widgets.visits_panel import VisitsPanel
+        panel = VisitsPanel(
+            db, lang=self._lang(),
+            open_in_editor=lambda path, sid:
+                self._visit_open_in_editor(pid, path, sid),
+            on_change=lambda: self._visit_data_changed(pid),
+            curve_kind=kind in FOLLOWUP_KINDS)
+        panel.set_project(pid)
+        layout.addWidget(panel, 1)
+        self._project_widgets["visits_panel"] = panel
         if kind in ("neo", "pccp"):
-            # MPC report: paste + validate + save
-            layout.addWidget(QLabel(
-                self.tr("Paste astrometric measurements (MPC 80-col or ADES)")))
-            txt = QTextEdit()
-            txt.setMaximumHeight(140)
-            txt.setAcceptRichText(False)
-            txt.setPlaceholderText(
-                self.tr("Paste MPC 80-column or ADES PSV lines here…"))
-            font = txt.font(); font.setFamily("Monospace"); txt.setFont(font)
-            layout.addWidget(txt)
-            btn_val = QPushButton(self.tr("Validate"))
-            btn_val.clicked.connect(self._project_mpc_validate)
-            layout.addWidget(btn_val)
-            btn_save = QPushButton(self.tr("Save report…"))
-            btn_save.clicked.connect(self._project_mpc_save)
-            layout.addWidget(btn_save)
-            lbl_status = QLabel("—"); lbl_status.setWordWrap(True)
-            layout.addWidget(lbl_status)
-            self._project_widgets["txt_mpc"] = txt
-            self._project_widgets["lbl_mpc_status"] = lbl_status
-        elif kind == "sn":
-            # SN: import result FITS
-            layout.addWidget(QLabel(self.tr("Import your processed FITS image")))
-            edt = QLineEdit()
-            edt.setPlaceholderText(self.tr("Path to plate-solved FITS…"))
-            layout.addWidget(edt)
-            btn_browse = QPushButton(self.tr("Browse…"))
-            btn_browse.clicked.connect(self._project_process_browse)
-            layout.addWidget(btn_browse)
-            lbl_path = QLabel("—")
-            layout.addWidget(lbl_path)
-            self._project_widgets["edt_fits"] = edt
-            self._project_widgets["lbl_fits_path"] = lbl_path
-            # A4: restore saved FITS path from the process step data
-            step = next((s for s in p["steps"]
-                         if s["step"] == "analysis"), None)
-            saved = step and step["data"].get("fits_path")
-            if saved:
-                edt.setText(saved)
-                lbl_path.setText(saved)
-            # (ADR-019 review 2026-08-28) the old "Analyse" step lived here;
-            # its only real action — the blink — moved into this step, so the
-            # FITS import and the confirmation are side by side.
-            btn = QPushButton(self.tr("Open blink…"))
-            btn.clicked.connect(self._project_blink)
-            layout.addWidget(btn)
-            layout.addWidget(QLabel(
-                f"<small>{self.tr('Pre-filled with')} {p['object_name']} "
-                f"@ {ctx.get('ra_deg', 0):.4f}, {ctx.get('dec_deg', 0):+.4f}"
-                f"</small>"))
+            self._analysis_mpc_block(layout)
         elif kind == "transit":
-            # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
-            # NASA/JPL); NightScribe hands over a pre-filled inits.json and
-            # then guides the closing of the scientific loop.
-            layout.addWidget(QLabel(self.tr(
-                "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
-                "Python ≤3.10 environment.")))
-            btn_exotic = QPushButton(
-                self.tr("Export to EXOTIC (inits.json)…"))
-            btn_exotic.setToolTip(self.tr(
-                "Pre-filled EXOTIC initialization file: planet, observatory, "
-                "camera and filter — EXOTIC skips its wizard where it can"))
-            btn_exotic.clicked.connect(self._transit_export_exotic)
-            layout.addWidget(btn_exotic)
-            lbl_exotic = QLabel(self.tr(
-                "After the reduction, upload EXOTIC's output file to "
-                "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
-                "Database — and tell the story in the Follow-up step."))
-            lbl_exotic.setWordWrap(True)
-            layout.addWidget(lbl_exotic)
+            self._analysis_transit_block(layout)
         elif kind == "hads":
-            # ADR-034 (D.3): publication photometry is external — FotoDif
-            # (its AUTO mode watches the capture folder live) or AIJ.
-            # NightScribe registers the measurements (Follow-up tab)
-            # and points to the AAVSO submission.
-            lbl = QLabel(self.tr(
-                "Reduce the series with FotoDif (its AUTO mode follows the "
-                "capture live) or AIJ. FotoDif writes the AAVSO Extended "
-                "File Format report directly; the cadence and exposure "
-                "are in the Capture step."))
-            lbl.setWordWrap(True)
-            layout.addWidget(lbl)
-            code = config.get("aavso_code", "")
-            if code:
-                layout.addWidget(QLabel(
-                    self.tr("Your AAVSO observer code: %1").replace(
-                        "%1", code)))
-            else:
-                lbl_code = QLabel(self.tr(
-                    "No AAVSO observer code yet — set it in Settings"))
-                lbl_code.setWordWrap(True)
-                lbl_code.setStyleSheet("color: #e0c060;")
-                layout.addWidget(lbl_code)
-            btn_webobs = QPushButton(self.tr("Open AAVSO WebObs…"))
-            btn_webobs.setToolTip(self.tr(
-                "Submit the FotoDif/AAVSO report to the AAVSO database"))
-            btn_webobs.clicked.connect(
-                lambda: self._open_url("https://www.aavso.org/webobs/"))
-            layout.addWidget(btn_webobs)
-            lbl_imp = QLabel(self.tr(
-                "Import the FotoDif measurements («JD mag …» text) with "
-                "«Import file…» in the Follow-up tab — the light curve "
-                "and the phase-folded view update themselves."))
-            lbl_imp.setWordWrap(True)
-            layout.addWidget(lbl_imp)
-        else:
-            layout.addWidget(QLabel(
-                self.tr("Process your images with your usual software.")))
-        # C0 (track C): NEO/PCCP/comet sessions produce files the observer
-        # actually keeps (FITS, Tycho annotated images, MPC report) — they
-        # are registered here so the project remembers them.
-        # UX-PC (U3): secondary to the measurement flow — collapsed by
-        # default with a plain-language title (no "Session products"
-        # jargon).
+            self._analysis_hads_block(layout)
         if kind in ("neo", "pccp", "comet"):
             adv = self._advanced_block(
                 layout, self.tr("What you kept from the session"))
             self._build_products_block(adv, p)
+        if kind in FOLLOWUP_KINDS:
+            self._fu_science_blocks(layout, p, ctx, pid)
         layout.addStretch()
+
+    def _selected_visit_id(self):
+        # @return: the visits panel's selected visit id, or None
+        panel = self._project_widgets.get("visits_panel")
+        return panel.current_session_id() if panel is not None else None
+
+    # ------------- the per-kind analysis blocks (ADR-045; absorbed from
+    # the retired Process tab; the SN FITS-import/blink block is gone for
+    # good: a visit's plate opens in the editor, which owns blink,
+    # measure and annotate) -------------
+
+    def _analysis_mpc_block(self, layout):
+        # NEO/PCCP: the MPC report — paste, validate, save (the save
+        # registers the file, on the selected visit when there is one).
+        layout.addWidget(QLabel(
+            self.tr("Paste astrometric measurements (MPC 80-col or ADES)")))
+        txt = QTextEdit()
+        txt.setMaximumHeight(140)
+        txt.setAcceptRichText(False)
+        txt.setPlaceholderText(
+            self.tr("Paste MPC 80-column or ADES PSV lines here…"))
+        font = txt.font(); font.setFamily("Monospace"); txt.setFont(font)
+        layout.addWidget(txt)
+        btn_val = QPushButton(self.tr("Validate"))
+        btn_val.clicked.connect(self._project_mpc_validate)
+        layout.addWidget(btn_val)
+        btn_save = QPushButton(self.tr("Save report…"))
+        btn_save.clicked.connect(self._project_mpc_save)
+        layout.addWidget(btn_save)
+        lbl_status = QLabel("—"); lbl_status.setWordWrap(True)
+        layout.addWidget(lbl_status)
+        self._project_widgets["txt_mpc"] = txt
+        self._project_widgets["lbl_mpc_status"] = lbl_status
+
+    def _analysis_transit_block(self, layout):
+        # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
+        # NASA/JPL); NightScribe hands over a pre-filled inits.json and
+        # then guides the closing of the scientific loop.
+        layout.addWidget(QLabel(self.tr(
+            "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
+            "Python ≤3.10 environment.")))
+        btn_exotic = QPushButton(
+            self.tr("Export to EXOTIC (inits.json)…"))
+        btn_exotic.setToolTip(self.tr(
+            "Pre-filled EXOTIC initialization file: planet, observatory, "
+            "camera and filter — EXOTIC skips its wizard where it can"))
+        btn_exotic.clicked.connect(self._transit_export_exotic)
+        layout.addWidget(btn_exotic)
+        lbl_exotic = QLabel(self.tr(
+            "After the reduction, upload EXOTIC's output file to "
+            "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
+            "Database — and tell the story when you publish."))
+        lbl_exotic.setWordWrap(True)
+        layout.addWidget(lbl_exotic)
+
+    def _analysis_hads_block(self, layout):
+        # ADR-034 (D.3): publication photometry is external — FotoDif
+        # (its AUTO mode watches the capture folder live) or AIJ.
+        # NightScribe registers the measurements (the visit's
+        # measurements block above) and points to the AAVSO submission.
+        lbl = QLabel(self.tr(
+            "Reduce the series with FotoDif (its AUTO mode follows the "
+            "capture live) or AIJ. FotoDif writes the AAVSO Extended "
+            "File Format report directly; the cadence and exposure "
+            "are in the Capture step."))
+        lbl.setWordWrap(True)
+        layout.addWidget(lbl)
+        code = config.get("aavso_code", "")
+        if code:
+            layout.addWidget(QLabel(
+                self.tr("Your AAVSO observer code: %1").replace(
+                    "%1", code)))
+        else:
+            lbl_code = QLabel(self.tr(
+                "No AAVSO observer code yet — set it in Settings"))
+            lbl_code.setWordWrap(True)
+            lbl_code.setStyleSheet("color: #e0c060;")
+            layout.addWidget(lbl_code)
+        btn_webobs = QPushButton(self.tr("Open AAVSO WebObs…"))
+        btn_webobs.setToolTip(self.tr(
+            "Submit the FotoDif/AAVSO report to the AAVSO database"))
+        btn_webobs.clicked.connect(
+            lambda: self._open_url("https://www.aavso.org/webobs/"))
+        layout.addWidget(btn_webobs)
+        lbl_imp = QLabel(self.tr(
+            "Import the FotoDif measurements («JD mag …» text) with "
+            "«Import file…» in the photometry tools menu above — the "
+            "light curve and the phase-folded view update themselves."))
+        lbl_imp.setWordWrap(True)
+        layout.addWidget(lbl_imp)
+
+    def _visit_open_in_editor(self, pid, path, sid):
+        # A visit's plate opens in the UFE with everything attached: the
+        # object context, and both hooks land on THIS visit (ADR-045:
+        # nothing attaches without one).
+        # @args: pid - project id, path - the FITS to open, sid - visit id
+        if not self._use_ufe():
+            self.statusBar().showMessage(
+                self.tr("Enable the unified editor in Settings → Development "
+                        "to measure from the editor"), 8000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                             session_id=sid)
+        if not dlg.open_plate(path):
+            return
+        dlg.set_object(obj)
+
+    def _visit_data_changed(self, pid):
+        # A visit or its contents changed (the panel owns the edit): the
+        # reactive blocks refresh in place — the user's place in the
+        # visits list is never lost to a full page rebuild.
+        w = self._project_widgets
+        p = project.get(db, pid)
+        if p is None:
+            return
+        from ..core import followup as fu
+        lbl = w.get("fu_cadence")
+        if lbl is not None:
+            text, colour = self._fu_cadence_state(p, pid)
+            if text is None:
+                lbl.setVisible(False)
+            else:
+                lbl.setText(text)
+                if colour:
+                    lbl.setStyleSheet(f"color: {colour}; font-size: 13px;")
+                lbl.setVisible(True)
+        chart = w.get("fu_curve")
+        if chart is not None:
+            from ..core import lightcurve_data
+            pts = fu.list_points(db, pid)
+            payload = lightcurve_data.build_payload(
+                {"points": pts,
+                 "sn_type": (p["context"].get("sn_type"))},
+                sn_type_fallback=p["context"].get("sn_type")
+                or p["context"].get("otype"),
+                variable=p["context"].get("variable"))
+            chart.set_data(
+                payload["points"], sn_type=payload.get("sn_type"),
+                peak_mjd=payload.get("peak_mjd"),
+                peak_mag=payload.get("peak_mag"),
+                fold_period_d=payload.get("fold_period_d"),
+                epoch_mjd=payload.get("epoch_mjd"),
+                schematic=payload.get("schematic"))
+        camp = w.get("fu_campaign_text")
+        if camp is not None:
+            camp.setText(self._fu_campaign_text(p, pid))
 
     def _build_products_block(self, layout, p):
         # C0: "what you kept" block for the NEO/PCCP/comet Process step
@@ -4332,12 +4385,6 @@ class MainWindow(QMainWindow):
         # report needs no button: it is registered on save.
         # @args: layout - the host layout, p - project dict
         gl = layout
-        hint = QLabel(self.tr(
-            "Register what you keep from the session: the FITS frames and "
-            "the annotated images (e.g. from Tycho). The MPC report is "
-            "registered automatically when you save it."))
-        hint.setWordWrap(True)
-        gl.addWidget(hint)
         hint = QLabel(self.tr(
             "Register what you keep from the session: the FITS frames and "
             "the annotated images (e.g. from Tycho). The MPC report is "
@@ -5012,52 +5059,52 @@ class MainWindow(QMainWindow):
             f"{p['object_name']}</small>"))
         layout.addStretch()
 
-    def _build_followup_tab(self, p, ctx):
-        # B2: SN multi-night follow-up panel. ADR-045: it now lives at
-        # the bottom of the Analysis tab (the visits manager replaces it
-        # in F3). It holds the session journal (nights, stacked images,
-        # notes) and the cadence reminder ("última visita hace N
-        # noches"). All CRUD goes through core/followup.py; FITS metadata
-        # through core/fits_meta.py. D3 (ADR-034): shared with HADS
-        # projects — the journal and the photometry import are
-        # kind-agnostic; only the SN analysis buttons (evolution
-        # animation, annotated FITS) are hidden for hads.
+    def _fu_cadence_state(self, p, pid):
+        # The cadence line for the follow-up kinds (T9): text + colour,
+        # shared by the tab build and the in-place refresh after a visit
+        # changes (ADR-045).
+        # @return: (text, colour) or (None, None) when there are no
+        #          visits yet
         from ..core import followup as fu
-        kind = p["kind"]
-        # ADR-045: append to the already-built Analysis page (calling
-        # _step_section again would create a second page and shadow the
-        # first)
-        layout = self._tab_pages["analysis"].layout()
-        pid = p["id"]
-
-        # campaign lookup (ADR-035): used by the cadence override below and
-        # the protocol block
         camp = None
         if p.get("campaign_id"):
             from ..core import campaign as _camp
             camp = _camp.get(db, p["campaign_id"])
-
-        # cadence reminder (T9): "hace N noches que no la visitas"
         days = fu.days_since_last_session(db, pid)
         threshold = int(config.get("sn_cadence_days", 3))
         if camp is not None:
             threshold = int((camp.get("protocol") or {}).get(
                 "cadence_nights") or threshold)
-        if days is not None:
-            text = self.tr("Last visit: {} days ago").format(days)
-            if kind == "hads" and (ctx.get("hads") or {}).get("multiperiodic"):
-                text += " · " + self.tr(
-                    "multiperiodic stars want consecutive nights")
+        if days is None:
+            return None, None
+        text = self.tr("Last visit: {} days ago").format(days)
+        if p["kind"] == "hads" \
+                and (p["context"].get("hads") or {}).get("multiperiodic"):
+            text += " · " + self.tr(
+                "multiperiodic stars want consecutive nights")
+        colour = "#e0c060" if days >= threshold else "#8a90a6"
+        return text, colour
+
+    def _fu_header_blocks(self, layout, p, pid):
+        # The follow-up kinds' header above the visits manager (ADR-045):
+        # cadence reminder, the campaign protocol when the project hangs
+        # from one, and the event advisor (V-h).
+        from ..core import followup as fu
+        text, colour = self._fu_cadence_state(p, pid)
+        if text is not None:
             lbl_cadence = QLabel(text)
-            colour = "#e0c060" if days >= threshold else "#8a90a6"
-            lbl_cadence.setStyleSheet(
-                f"color: {colour}; font-size: 13px;")
+            lbl_cadence.setStyleSheet(f"color: {colour}; font-size: 13px;")
             layout.addWidget(lbl_cadence)
+            self._project_widgets["fu_cadence"] = lbl_cadence
         else:
             layout.addWidget(QLabel(
                 self.tr("No visits yet. Add one to start the follow-up.")))
 
         # campaign protocol (ADR-035): show the agreed observing protocol
+        camp = None
+        if p.get("campaign_id"):
+            from ..core import campaign as _camp
+            camp = _camp.get(db, p["campaign_id"])
         if camp is not None:
             prot = camp.get("protocol") or {}
             bits = [self.tr("Campaign: %1").replace("%1", camp["name"])]
@@ -5095,19 +5142,49 @@ class MainWindow(QMainWindow):
             lbl_ev.setStyleSheet("color: #e0c060;")
             layout.addWidget(lbl_ev)
 
-        # UX-PC (U4): the primary row is the follow-up's daily work —
-        # add a visit, run the quick analysis; the bulk/file/report/survey
-        # tools live behind one ⋯ menu (nothing lost, nothing shouting)
+    def _fu_campaign_text(self, p, pid):
+        # The campaign summary line over the saved points (ADR-044): the
+        # series engine reports nights, points, slope, delta-from-peak and
+        # the verdict. Shared by the tab build and the in-place refresh.
+        # @return: the text
+        from ..core import followup as fu
+        camp_pts = fu.list_points(db, pid)
+        if not camp_pts:
+            return self.tr(
+                "No points saved yet. Open a visit's plate in the editor "
+                "or add a magnitude by hand: the summary updates after "
+                "every save.")
+        from ..core import series as _series
+        ctx = p["context"]
+        camp = _series.analyze_campaign(
+            camp_pts, sn_type=ctx.get("sn_type") or ctx.get("otype"))
+        text = self.tr("{n} nights · {p} points").format(
+            n=camp.get("nights", 0), p=len(camp_pts))
+        slope = camp.get("slope_mag_per_day")
+        if slope is not None:
+            text += self.tr(" · {:.2f} mag/day").format(slope)
+        delta = camp.get("delta_from_peak")
+        if delta is not None:
+            text += self.tr(" · {:.2f} mag from peak").format(delta)
+        verdict_map = {
+            "normal": self.tr("consistent with the typical curve"),
+            "faster": self.tr("fading faster than typical"),
+            "slower": self.tr("fading slower than typical"),
+            "unknown": self.tr("no template to compare against"),
+            "no_data": self.tr("no data")}
+        verdict = camp.get("verdict") or "unknown"
+        text += self.tr(" · verdict: {}").format(
+            verdict_map.get(verdict, verdict))
+        return text
+
+    def _fu_science_blocks(self, layout, p, ctx, pid):
+        # The photometry science blocks under the visits manager
+        # (ADR-045): the comparison-chart action and the bulk tools menu,
+        # the sequence status line, the light curve, the campaign
+        # summary and the SN-only animation block.
+        from ..core import followup as fu
+        kind = p["kind"]
         act_row = QHBoxLayout()
-        btn_add = QPushButton(self.tr("Add visit"))
-        btn_add.clicked.connect(lambda: self._fu_add_session(pid))
-        act_row.addWidget(btn_add)
-        # the visits journal (sessions, stacked images, measurements,
-        # notes) lives in the master-detail dialog: the tab keeps the
-        # daily work above, the dialog carries the per-visit administration
-        btn_visits = QPushButton(self.tr("Visits"))
-        btn_visits.clicked.connect(lambda: self._fu_open_visits(pid))
-        act_row.addWidget(btn_visits)
         # ADR-042: the photometry prerequisite, «with what do I compare?»,
         # as a primary action (ADR-038 prominence), never buried in the menu
         btn_seq = QPushButton(self.tr("Comparison chart…"))
@@ -5144,16 +5221,6 @@ class MainWindow(QMainWindow):
             # carries the same registry key the old button had
             self._project_widgets["fu_survey"] = act_survey
         tools.setMenu(tools_menu)
-        # ADR-019 (rev. 2026-09-23) / ADR-044 (rev. 2026-09-23): the
-        # «Quick analysis» quick-look button is retired. In the field it
-        # did "nada": the engine assumed the SN shared the template's
-        # coordinates and its constancy gate
-        # silently rejected every stacked plate, so it saved zero points
-        # without any error (ADR-019, section "Análisis rápido"). Measuring
-        # now happens per visit in the Image Workbench Measure tab
-        # («Medir en el Editor…» on each visit row), which saves calibrated
-        # points with source "measure"; the campaign summary below is
-        # computed over the saved points with the same series engine.
         act_row.addWidget(tools)
         act_row.addStretch()
         layout.addLayout(act_row)
@@ -5165,7 +5232,7 @@ class MainWindow(QMainWindow):
         self._project_widgets["fu_sequence"] = lbl_seq
 
         # Inline light curve (2026-09-17): all the project's photometry —
-        # manual, pasted, file, quick-look, survey — with the SN template
+        # manual, pasted, file, measured, survey — with the SN template
         # or the folded sawtooth. Live in the tab, no dialog, no rebuild;
         # the template is toggleable without the axis moving.
         if kind in ("sn", "variable"):
@@ -5196,11 +5263,11 @@ class MainWindow(QMainWindow):
                     schematic=payload.get("schematic"))
             chk_tpl.toggled.connect(lchart.set_template_visible)
             layout.addWidget(grp_lc)
+            self._project_widgets["fu_curve"] = lchart
 
             # campaign summary over the saved points (ADR-044): the series
-            # engine (retired from the quick-look button, ADR-019) now
-            # reports how the campaign goes so far, rebuilt on every tab
-            # open and after each saved point
+            # engine reports how the campaign goes so far, rebuilt on tab
+            # open and refreshed in place after each saved point
             grp_camp = QGroupBox(self.tr("Campaign summary"))
             grp_camp.setObjectName("fu_campaign_summary")
             g_camp = QVBoxLayout(grp_camp)
@@ -5208,43 +5275,10 @@ class MainWindow(QMainWindow):
             camp_lbl.setObjectName("fu_campaign_text")
             camp_lbl.setWordWrap(True)
             g_camp.addWidget(camp_lbl)
-            camp_pts = fu.list_points(db, pid)
-            if not camp_pts:
-                camp_lbl.setText(self.tr(
-                    "No points saved yet. Measure a visit's stacked plate "
-                    "in the editor («Measure in the editor…» on the visit "
-                    "row) or add a magnitude by hand: the summary updates "
-                    "after every save."))
-            else:
-                from ..core import series as _series
-                camp = _series.analyze_campaign(
-                    camp_pts,
-                    sn_type=ctx.get("sn_type") or ctx.get("otype"))
-                text = self.tr("{n} nights · {p} points").format(
-                    n=camp.get("nights", 0), p=len(camp_pts))
-                slope = camp.get("slope_mag_per_day")
-                if slope is not None:
-                    text += self.tr(" · {:.2f} mag/day").format(slope)
-                delta = camp.get("delta_from_peak")
-                if delta is not None:
-                    text += self.tr(" · {:.2f} mag from peak").format(delta)
-                verdict_map = {
-                    "normal": self.tr("consistent with the typical curve"),
-                    "faster": self.tr("fading faster than typical"),
-                    "slower": self.tr("fading slower than typical"),
-                    "unknown": self.tr("no template to compare against"),
-                    "no_data": self.tr("no data")}
-                verdict = camp.get("verdict") or "unknown"
-                text += self.tr(" · verdict: {}").format(
-                    verdict_map.get(verdict, verdict))
-                camp_lbl.setText(text)
+            camp_lbl.setText(self._fu_campaign_text(p, pid))
             layout.addWidget(grp_camp)
+            self._project_widgets["fu_campaign_text"] = camp_lbl
 
-        # the visits journal (sessions list + per-visit detail: images,
-        # measurements, notes) moved to the master-detail dialog built by
-        # _fu_visits_dialog and opened by the "Visits" button in the action
-        # row above. _fu_session_selected still owns the detail pane
-        # (self._fu_detail), which now lives inside that dialog.
         # B6/B10: the SN evolution animation and the annotated FITS export
         # — secondary analysis tools, collapsed by default (UX-PC U4).
         # HADS never had them (intra-night series live in FotoDif,
@@ -5268,64 +5302,6 @@ class MainWindow(QMainWindow):
             ana_row.addWidget(btn_annot)
             ana_row.addStretch()
             adv.addLayout(ana_row)
-        layout.addStretch()
-
-    def _fu_visits_dialog(self, pid, select_first=False):
-        # The visits journal, master-detail: the sessions list (newest
-        # first) and the Add visit button on the left, the per-visit
-        # detail pane (images, measurements, notes) on the right, rebuilt
-        # by the shared _fu_session_selected on selection. Built without
-        # exec() so tests can drive it without a modal loop.
-        # @args: pid - project id, select_first - preselect the newest visit
-        # @return: the QDialog
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Visits"))
-        dlg.resize(880, 560)
-        top = QHBoxLayout(dlg)
-        # master: the sessions list and the add button
-        left = QVBoxLayout()
-        lst = PassiveList()
-        self._fu_populate_sessions(lst, pid)
-        lst.itemSelectionChanged.connect(
-            lambda: self._fu_session_selected(lst, pid))
-        left.addWidget(lst, 3)
-        btn_add = QPushButton(self.tr("Add visit"))
-        btn_add.clicked.connect(lambda: self._fu_add_session(pid))
-        left.addWidget(btn_add)
-        top.addLayout(left, 4)
-        # detail: the selected visit's images, measurements and notes.
-        # The notes widget is created in _fu_session_selected — keep only
-        # a placeholder here so the dual-identity bug (two QTextEdit bound
-        # to different sessions) can't happen.
-        self._fu_detail = QFrame()
-        det_layout = QVBoxLayout(self._fu_detail)
-        det_layout.addWidget(QLabel(
-            self.tr("Select a visit to see its images.")))
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(self._fu_detail)
-        top.addWidget(scroll, 6)
-        self._project_widgets["fu_sessions"] = lst
-        if select_first and lst.count():
-            lst.setCurrentRow(0)
-        return dlg
-
-    def _fu_open_visits(self, pid, select_first=False):
-        # Opens the visits dialog modally. On close the dialog owns its
-        # C++ objects (they die with it), so drop the dangling detail
-        # frame and the registry entries, then rebuild the project page
-        # from the database (light curve, cadence, campaign summary).
-        # @args: pid - project id, select_first - preselect the newest visit
-        # @return: None
-        dlg = self._fu_visits_dialog(pid, select_first=select_first)
-        dlg.exec()
-        self._fu_detail = None
-        self._fu_current_session = None
-        for key in ("fu_sessions", "fu_images", "fu_measurements", "fu_notes",
-                    "fu_meas_mag", "fu_meas_err", "fu_meas_filt"):
-            self._project_widgets.pop(key, None)
-        self._project_selected()
 
     def _fu_run_animation(self, pid):
         # B6: generate the evolution GIF/MP4 from the registered stacked images.
@@ -5459,300 +5435,6 @@ class MainWindow(QMainWindow):
             self.tr("Annotated FITS written to %1")
             .replace("%1", str(path)), 8000)
 
-    def _fu_populate_sessions(self, lst, pid):
-        # @args: lst - QListWidget, pid - project id
-        from ..core import followup as fu
-        lst.clear()
-        sessions = fu.list_sessions(db, pid)
-        for s in sessions:
-            n_img = len(fu.list_images(db, s["id"]))
-            from ..core import followup as fumod
-            pts = fumod.list_points(db, pid)
-            n_pts = sum(1 for p in pts if p.get("session_id") == s["id"])
-            notes_tag = f" · {s['notes'][:20]}" if s["notes"] else ""
-            item = QListWidgetItem(
-                f"{s['obs_date']}  ({n_img} img, {n_pts} mag){notes_tag}")
-            item.setData(Qt.UserRole, s["id"])
-            lst.addItem(item)
-
-    def _fu_session_selected(self, lst, pid):
-        # @args: lst - QListWidget, pid - project id
-        from ..core import followup as fu
-        items = lst.selectedItems()
-        if not items:
-            return
-        sid = items[0].data(Qt.UserRole)
-        self._fu_current_session = sid
-        # rebuild the session detail area: images + measurements + notes
-        # (UD.5: the frame is dialog-owned; if it is gone, do nothing)
-        detail = self._fu_detail
-        if detail is None:
-            return
-        self._wipe_layout(detail.layout())
-        dlay = detail.layout()
-        # action row: add stacked image, measure it in the editor, delete
-        fu_row = QHBoxLayout()
-        btn_img = QPushButton(self.tr("Add stacked image…"))
-        btn_img.clicked.connect(lambda: self._fu_add_image(sid, pid))
-        fu_row.addWidget(btn_img)
-        if self._use_ufe():
-            btn_meas = QPushButton(self.tr("Measure in the editor…"))
-            btn_meas.setToolTip(self.tr(
-                "Open this visit's stacked plate in the unified editor and "
-                "save the calibrated magnitude into the project "
-                "(ADR-044)"))
-            btn_meas.clicked.connect(
-                lambda: self._fu_open_ufe_measure(sid, pid))
-            fu_row.addWidget(btn_meas)
-        btn_del = QPushButton(self.tr("Delete visit…"))
-        btn_del.setObjectName("fu_btn_delete")
-        btn_del.clicked.connect(lambda: self._fu_delete_session(lst, sid, pid))
-        fu_row.addWidget(btn_del)
-        dlay.addLayout(fu_row)
-        # images list for this session
-        img_lst = PassiveList()
-        self._fu_populate_images(img_lst, sid)
-        dlay.addWidget(img_lst)
-        self._project_widgets["fu_images"] = img_lst
-        # B3: quick measurement entry — just type the magnitude
-        grp_meas = QGroupBox(self.tr("Measurements"))
-        grp_meas.setLayout(QVBoxLayout())
-        meas_row = QHBoxLayout()
-        meas_row.addWidget(QLabel(self.tr("Mag:")))
-        spn_mag = PassiveDoubleSpinBox()
-        spn_mag.setRange(-5.0, 30.0)
-        spn_mag.setDecimals(3)
-        spn_mag.setValue(16.0)
-        meas_row.addWidget(spn_mag)
-        meas_row.addWidget(QLabel(self.tr("Err:")))
-        spn_err = PassiveDoubleSpinBox()
-        spn_err.setRange(0.0, 9.0)
-        spn_err.setDecimals(3)
-        spn_err.setValue(0.0)
-        spn_err.setSpecialValueText("—")
-        meas_row.addWidget(spn_err)
-        meas_row.addWidget(QLabel(self.tr("Filter:")))
-        cmb_filt = QComboBox()
-        cmb_filt.setEditable(True)
-        cmb_filt.addItems(["Clear", "V", "R", "B", "I", "NIR"])
-        meas_row.addWidget(cmb_filt)
-        btn_add_meas = QPushButton(self.tr("Add"))
-        btn_add_meas.clicked.connect(
-            lambda: self._fu_add_measurement(sid, pid, spn_mag,
-                                              spn_err, cmb_filt))
-        grp_meas.layout().addLayout(meas_row)
-        # measurements list for this session
-        meas_lst = PassiveList()
-        self._fu_populate_measurements(meas_lst, pid, sid)
-        grp_meas.layout().addWidget(meas_lst)
-        dlay.addWidget(grp_meas)
-        self._project_widgets["fu_meas_mag"] = spn_mag
-        self._project_widgets["fu_meas_err"] = spn_err
-        self._project_widgets["fu_meas_filt"] = cmb_filt
-        self._project_widgets["fu_measurements"] = meas_lst
-        # notes
-        s = fu.get_session(db, sid)
-        notes = QTextEdit()
-        notes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
-        if s:
-            notes.setText(s["notes"])
-        notes.textChanged.connect(lambda: self._fu_save_notes(pid))
-        dlay.addWidget(notes)
-        self._project_widgets["fu_notes"] = notes
-
-    def _fu_populate_measurements(self, lst, pid, sid):
-        # @args: lst - QListWidget, pid - project id, sid - session id
-        from ..core import followup as fu
-        lst.clear()
-        for pt in fu.list_points(db, pid):
-            if pt.get("session_id") == sid:
-                err_str = f" ±{pt['err']}" if pt["err"] is not None else ""
-                item = QListWidgetItem(
-                    f"[{pt['filter']}] mag {pt['mag']}{err_str}"
-                    f"  ({pt['source']})")
-                item.setData(Qt.UserRole, pt["id"])
-                lst.addItem(item)
-
-    def _session_mjd(self, s):
-        # Turn a session row into a sensible MJD. Prefers the observing date;
-        # falls back to the session's creation timestamp. Never returns 0 — a
-        # zero MJD corrupts the light-curve ordering (B2 defect).
-        # @args: s - session dict from followup.get_session (or None)
-        # @return: MJD as float
-        from ..core.coords import jd_from_datetime
-        if s:
-            date_str = (s.get("obs_date") or "").strip()
-            for fmt in ("%Y-%m-%d", "%Y-%m-%d %H:%M", "%Y/%m/%d"):
-                if date_str:
-                    try:
-                        dt = datetime.datetime.strptime(
-                            date_str, fmt).replace(tzinfo=datetime.timezone.utc)
-                        return jd_from_datetime(dt) - 2400000.5
-                    except ValueError:
-                        pass
-            # no parseable date: use the row's creation epoch
-            created = s.get("created")
-            if created:
-                dt = datetime.datetime.fromtimestamp(
-                    created, tz=datetime.timezone.utc)
-                return jd_from_datetime(dt) - 2400000.5
-        # last resort: right now, so the point still plots in order
-        dt = datetime.datetime.now(datetime.timezone.utc)
-        return jd_from_datetime(dt) - 2400000.5
-
-    def _fu_add_measurement(self, sid, pid, spn_mag, spn_err, cmb_filt):
-        # B3 quick entry: one click saves a point (date/filter from the session).
-        from ..core import followup as fu
-        mag = spn_mag.value()
-        err = spn_err.value() if spn_err.value() > 0 else None
-        filt = cmb_filt.currentText().strip() or "Clear"
-        s = fu.get_session(db, sid)
-        mjd = self._session_mjd(s)
-        fu.add_point(db, pid, mjd, filt, mag, err=err,
-                     source="manual", session_id=sid)
-        self._populate_project_files(pid)
-        meas_lst = self._project_widgets.get("fu_measurements")
-        if meas_lst:
-            self._fu_populate_measurements(meas_lst, pid, sid)
-
-    def _fu_populate_images(self, lst, sid):
-        # @args: lst - QListWidget, sid - session id
-        from ..core import followup as fu
-        lst.clear()
-        for img in fu.list_images(db, sid):
-            filt = img["filter"] or "—"
-            label = f"[{filt}] {Path(img['fits_path']).name}"
-            if img["date_obs"]:
-                label += f"  ({img['date_obs']})"
-            item = QListWidgetItem(label)
-            item.setData(Qt.UserRole, img["id"])
-            lst.addItem(item)
-
-    def _fu_add_image(self, sid, pid):
-        # File dialog → fits_meta auto-fill → editable dialog → save.
-        # The user can correct the filter / date / exptime before committing,
-        # because a misnamed filter breaks the light-curve split (B2 defect).
-        # @args: sid - session id, pid - project id
-        from ..core import followup as fu
-        from ..core import fits_meta
-        path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("Choose stacked FITS"), "",
-            "FITS (*.fits *.fit *.fts);;All files (*)")
-        if not path:
-            return
-        # auto-detect the header values we can, tolerate a bad/empty file
-        try:
-            meta = fits_meta.read_meta(path)
-        except Exception:
-            meta = {}
-        filt = (meta.get("filter") or "Clear").strip() or "Clear"
-        date_obs = meta.get("date_obs") or ""
-        exptime_s = meta.get("exptime_s")
-        # editable confirmation dialog pre-filled from the FITS header
-        dlg = QDialog(self)
-        dlg.setWindowTitle(self.tr("Add stacked image"))
-        dlg.setLayout(QFormLayout())
-        lbl_path = QLabel(Path(path).name)
-        lbl_path.setTextInteractionFlags(
-            Qt.TextInteractionFlag.TextSelectableByMouse)
-        dlg.layout().addRow(self.tr("File:"), lbl_path)
-        cmb_f = QComboBox()
-        cmb_f.setObjectName("fu_img_filter")
-        cmb_f.setEditable(True)
-        cmb_f.addItems(["Clear", "V", "R", "B", "I", "NIR"])
-        cmb_f.setCurrentText(filt)
-        dlg.layout().addRow(self.tr("Filter:"), cmb_f)
-        edt_date = QLineEdit(str(date_obs or ""))
-        edt_date.setObjectName("fu_img_date")
-        edt_date.setPlaceholderText(self.tr("e.g. 2026-09-01 (leave blank to skip)"))
-        dlg.layout().addRow(self.tr("Date:"), edt_date)
-        edt_exp = QLineEdit(
-            "" if exptime_s in (None, "") else str(exptime_s))
-        edt_exp.setObjectName("fu_img_exptime")
-        edt_exp.setPlaceholderText(self.tr("exposure seconds (optional)"))
-        dlg.layout().addRow(self.tr("Exptime:"), edt_exp)
-        box = QDialogButtonBox(
-            QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        dlg.layout().addWidget(box)
-        box.accepted.connect(dlg.accept)
-        box.rejected.connect(dlg.reject)
-        if dlg.exec() != QDialog.Accepted:
-            return
-        out_filt = cmb_f.currentText().strip() or "Clear"
-        out_date = edt_date.text().strip() or None
-        exp_text = edt_exp.text().strip()
-        out_exp = None
-        if exp_text:
-            try:
-                out_exp = float(exp_text)
-            except ValueError:
-                out_exp = None
-        fu.add_image(db, sid, out_filt, path,
-                     date_obs=out_date, exptime_s=out_exp)
-        # T4: register the FITS path in the project
-        project.add_file(db, pid, path, "fits")
-        # refresh images list + files list
-        img_lst = self._project_widgets.get("fu_images")
-        if img_lst:
-            self._fu_populate_images(img_lst, sid)
-        self._populate_project_files(pid)
-
-    def _fu_save_notes(self, pid):
-        # Persist notes on the current session (B2: "en ocasiones" se guardan).
-        from ..core import followup as fu
-        sid = getattr(self, "_fu_current_session", None)
-        notes = self._project_widgets.get("fu_notes")
-        if sid and notes:
-            fu.update_session_notes(db, sid, notes.toPlainText())
-
-    def _fu_add_session(self, pid):
-        # Create a visit for today and land on it (B2). The list owner
-        # decides the path: when the visits dialog is open it owns the
-        # list, so it is refreshed in place; when called from the tab
-        # button (no dialog) the journal is opened with the new visit
-        # selected (newest first, row 0).
-        from ..core import followup as fu
-        fu.create_session(db, pid)
-        lst = self._project_widgets.get("fu_sessions")
-        if lst:
-            self._fu_populate_sessions(lst, pid)
-            # select the new one (top of the list, ordered DESC)
-            lst.setCurrentRow(0)
-        else:
-            self._fu_open_visits(pid, select_first=True)
-
-    def _fu_delete_session(self, lst, sid, pid):
-        # Delete a visit after confirmation. The cascade removes its stacked
-        # images; photometry points are kept (B2 defect: the GUI had no way to
-        # drop a bad visit at all).
-        # @args: lst - sessions QListWidget, sid - session id, pid - project id
-        from ..core import followup as fu
-        n_img = len(fu.list_images(db, sid))
-        if QMessageBox.question(
-                self, self.tr("Delete visit"),
-                self.tr("Delete this visit? Its measurements are kept."
-                        "  ({} stacked image{})").format(
-                            n_img, "s" if n_img != 1 else ""),
-                QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
-            return
-        fu.delete_session(db, sid)
-        self._fu_current_session = None
-        self._project_widgets.pop("fu_notes", None)
-        self._fu_populate_sessions(lst, pid)
-        # re-select the first remaining visit to refresh the detail pane, or
-        # clear the pane if this was the last one
-        if lst.count():
-            lst.setCurrentRow(0)
-        else:
-            # the pane is dialog-owned; guard against it being gone (UD.5)
-            if self._fu_detail is None:
-                return
-            dlay = self._fu_detail.layout()
-            self._wipe_layout(dlay)
-            dlay.addWidget(QLabel(
-                self.tr("Select a visit to see its images.")))
-        self._populate_project_files(pid)
-
     def _fu_paste_dialog(self, pid):
         # B3: paste bulk photometry — tolerant parser + preview + save.
         from ..core.photometry_import import parse_photometry
@@ -5814,9 +5496,10 @@ class MainWindow(QMainWindow):
         pts, _ = parse_photometry(
             edit.toPlainText(),
             default_filter=cmb_def.currentText().strip() or "Clear")
+        sid = self._selected_visit_id()
         for p in pts:
             fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
-                         err=p["err"], source="paste")
+                         err=p["err"], source="paste", session_id=sid)
         self._populate_project_files(pid)
 
     def _fu_import_file(self, pid):
@@ -5843,9 +5526,10 @@ class MainWindow(QMainWindow):
                 self, self.tr("Import"), msg,
                 QMessageBox.Yes | QMessageBox.No) != QMessageBox.Yes:
             return
+        sid = self._selected_visit_id()
         for p in pts:
             fu.add_point(db, pid, p["mjd"], p["filter"], p["mag"],
-                          err=p["err"], source="file")
+                          err=p["err"], source="file", session_id=sid)
         self._populate_project_files(pid)
 
     def _fu_sequence_status_text(self, p):
@@ -6430,25 +6114,6 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("Export failed: %1").replace("%1", str(err)), 8000)
 
-    def _project_process_browse(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, self.tr("Choose FITS image"), "",
-            "FITS (*.fits *.fit *.fts);;All files (*)")
-        if path:
-            edt = self._project_widgets.get("edt_fits")
-            lbl = self._project_widgets.get("lbl_fits_path")
-            if edt:
-                edt.setText(path)
-            if lbl:
-                lbl.setText(path)
-            # A4: persist the FITS path in the project
-            if self._current_project:
-                project.update_step_data(
-                    db, self._current_project["id"], "analysis",
-                    {"fits_path": path})
-                project.add_file(db, self._current_project["id"], path, "fits")
-                self._populate_project_files(self._current_project["id"])
-
     def _project_mpc_validate(self):
         if not self._current_project:
             return
@@ -6499,7 +6164,11 @@ class MainWindow(QMainWindow):
                                           expected_obj=obj)
         lbl = self._project_widgets.get("lbl_mpc_status")
         if path:
-            project.add_file(db, self._current_project["id"], path, "report")
+            # ADR-045: the report belongs to the visit whose astrometry
+            # it carries, when one is selected in the visits manager
+            project.add_file(db, self._current_project["id"], path,
+                             "report",
+                             session_id=self._selected_visit_id())
             project.update_step_data(db, self._current_project["id"],
                                      "analysis", {"mpc_report": path})
             lbl.setText(self.tr("Saved: %1 (%2 lines)")
@@ -6513,28 +6182,6 @@ class MainWindow(QMainWindow):
     def _project_post(self):
         if self._current_project:
             self._open_post_dialog(self._current_project["object_name"])
-
-    def _project_blink(self):
-        if self._current_project:
-            ctx = self._current_project["context"]
-            # use the FITS from the process tab if available
-            edt = self._project_widgets.get("edt_fits")
-            fits_path = edt.text().strip() if edt else ""
-            if self._use_ufe():
-                # ADR-044: the project's blink inside the editor, with
-                # the whole object attached and the exports registered
-                obj = self._ufe_object_from_project(self._current_project)
-                dlg = self._ufe_open("blink",
-                                     hook_pid=self._current_project["id"],
-                                     obj=obj)
-                if fits_path and not dlg.open_plate(fits_path):
-                    return
-                dlg.set_object(obj)      # re-apply on the fresh plate
-                return
-            self._open_blink_dialog(
-                sn_name=self._current_project["object_name"],
-                ra=ctx.get("ra_deg"), dec=ctx.get("dec_deg"),
-                fits_path=fits_path or None)
 
     def _project_archive(self):
         if not self._current_project:
@@ -8032,7 +7679,8 @@ class MainWindow(QMainWindow):
         if hook_pid is not None:
             dlg.set_save_hook(
                 lambda paths, kind, payload:
-                self._ufe_save_hook(hook_pid, paths, kind, payload))
+                self._ufe_save_hook(hook_pid, paths, kind, payload,
+                                    session_id=session_id))
             dlg.set_point_hook(
                 lambda payload:
                 self._ufe_point_hook(hook_pid, session_id, payload))
@@ -8050,23 +7698,27 @@ class MainWindow(QMainWindow):
     # route that loads a plate re-applies it after the load so the
     # annotate marker lands through the fresh WCS)
 
-    def _ufe_save_hook(self, pid, paths, kind, payload):
+    def _ufe_save_hook(self, pid, paths, kind, payload, session_id=None):
         # Files the UFE wrote while opened from a project get registered
         # there, like the legacy dialogs did; a sequence CSV also lands
         # in the project context and its campaign protocol (the legacy
-        # default had the checkbox on).
+        # default had the checkbox on). ADR-045: opened from a visit, the
+        # files land on it.
         # @args: pid - project id, paths - written files, kind - "fits" |
-        #        "chart" | "sequence", payload - the tab's extra context
+        #        "chart" | "sequence", payload - the tab's extra context,
+        #        session_id - the visit the files belong to, or None
         p = project.get(db, pid)
         if not p:
             return
         for path in paths:
-            fkind = {"fits": "fits", "chart": "chart"}.get(kind)
+            fkind = {"fits": "fits", "chart": "chart",
+                     "report": "report"}.get(kind)
             if kind == "sequence":
                 fkind = "chart" if payload.get("which") == "png" \
                     else "report"
             try:
-                project.add_file(db, pid, path, fkind)
+                project.add_file(db, pid, path, fkind,
+                                 session_id=session_id)
             except Exception as err:
                 logger.warning("UFE save registration failed: %s", err)
         self._populate_project_files(pid)
@@ -8127,37 +7779,6 @@ class MainWindow(QMainWindow):
             6000)
         # refresh the panel: light curve, visits and campaign summary update
         self._project_selected()
-
-    def _fu_open_ufe_measure(self, sid, pid):
-        # Per-visit entry point to the Measure tab (ADR-044): the visit's
-        # last stacked plate opens in the unified editor with the Measure
-        # tab on stage and the point hook armed for this visit; the
-        # calibrated magnitude the user saves lands in the project.
-        # @args: sid - session id, pid - project id
-        from ..core import followup as fu
-        if not self._use_ufe():
-            self.statusBar().showMessage(
-                self.tr("Enable the unified editor in Settings → Development "
-                        "to measure from the editor"), 8000)
-            return
-        if not fu.get_session(db, sid):
-            return
-        images = [img for img in fu.list_images(db, sid) if img["fits_path"]]
-        if not images:
-            self.statusBar().showMessage(
-                self.tr("This visit has no stacked image to measure"), 6000)
-            return
-        p = project.get(db, pid)
-        if not p:
-            return
-        obj = self._ufe_object_from_project(p)
-        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
-                             session_id=sid)
-        if not dlg.open_plate(images[-1]["fits_path"]):
-            return
-        # re-attach the object after the fresh plate load, like the
-        # annotate/compare open paths do
-        dlg.set_object(obj)
 
     # ---------------- Observing journal (ADR-036) ----------------
 

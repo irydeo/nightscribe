@@ -5,6 +5,9 @@ executed**: 2026-09-21 (suite unitaria 1494 green, i18n 0 unfinished) ·
 **Enmendado / Amended**: 2026-09-22 (los nombres de paso pasan a la lista
 autoritativa del observador; se retira por completo el Skip de la UI; el
 bloque CCD se ata directamente al proyecto actual, sin combo de objetivos)
+· 2026-09-24 (ADR-045: la lista autoritativa de pasos pasa a Ficha →
+Captura → Análisis → Publicación; «Procesado» se renombra «Análisis» y la
+pestaña Seguimiento se disuelve en ella — Captura no cambia en absoluto)
 
 **Ver / See**: ADR-030 (cliente CCDciel JSON-RPC; el control de hardware no
 cambia) · ADR-038 (prominencia a 3 niveles y lenguaje llano) · ADR-041 (la

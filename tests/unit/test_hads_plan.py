@@ -206,7 +206,8 @@ def test_followup_hides_sn_analysis_buttons_for_hads(window):
     assert "Quick analysis" not in texts
     assert "Generate animation" not in texts
     assert "Export annotated FITS" not in texts
-    assert "Add visit" in texts
+    # ADR-045: the visits manager's single primary action
+    assert "New visit" in texts
     tools = [b for b in sec.findChildren(QToolButton)
              if "Photometry" in b.text()]
     assert tools, "the ⋯ Photometry tools menu is missing"

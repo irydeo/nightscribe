@@ -30,8 +30,14 @@ JSON context and three guided steps. Context is captured when the project is cre
 from Tonight (target snapshot: coords, mag, rate, window…) and enriched at each step
 (exported sequence, imported FITS, measurements, posts).
 
-**Steps**: Plan & Capture → Process → Publish (ADR-019's 2026-09-06 review merged the
-Capture step into Plan and added real CCDciel control — ADR-030).
+**Steps**: Object card → Capture → Analysis → Publish (ADR-045,
+2026-09-24: "Process" is renamed "Analysis" with migration v8 and the
+kind-gated Follow-up tab dissolves into it; the Analysis tab is built
+around the **visits manager** for every kind — every day you work the
+object is a visit, and its resources (plates, reports, imports) hang from
+it, registered in `project_files` with `session_id`; nothing attaches
+without a visit. ADR-019's 2026-09-06 review merged the Capture step into
+Plan and added real CCDciel control — ADR-030).
 
 ## 4. Flow — supernova / transient
 

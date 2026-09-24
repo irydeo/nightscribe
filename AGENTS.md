@@ -141,12 +141,19 @@ nightscribe/
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
                        # prominencia a 3 niveles (primario / menú ⋯ / bloque colapsado),
                        # lenguaje llano + ayudas ⓘ, filas ricas
-                       # + la **pestaña Seguimiento** lleva la «Carta de comparación…»
-                       #   (seqchart_dialog.py + widgets/finder_widget.py, picker
-                       #   interactivo de comps — ADR-042)
+                       # ADR-045: el flujo del proyecto es Ficha → Captura →
+                       #   Análisis → Publicación; la pestaña Análisis se
+                       #   construye sobre el gestor de visitas
+                       #   (widgets/visits_panel.py, para todos los tipos):
+                       #   cada día es una visita y sus recursos cuelgan de
+                       #   ella en project_files (session_id + meta);
+                       #   la carta de comparación vive en Análisis
+                       #   (seqchart_dialog.py + widgets/finder_widget.py,
+                       #   picker interactivo de comps — ADR-042)
                        # + widgets/ (QGraphicsView chart widgets — ADR-029, sin matplotlib;
                        #   incl. timeline_widget: línea de tiempo del tránsito, Track D;
-                       #   y las filas ricas project_row / campaign_row + sparkline, U2/U5)
+                       #   las filas ricas project_row / campaign_row + sparkline, U2/U5;
+                       #   y visits_panel: el gestor de visitas — ADR-045)
 tests/
   unit/              # sin red
   functional/        # con red; verifican cada funcionalidad de punta a punta

@@ -233,13 +233,27 @@ class VisitsPanel(QWidget):
                                 open_in_editor=self._open_in_editor,
                                 data_changed=self._from_window_changed,
                                 parent=self)
+        # WA_DeleteOnClose: the C++ object dies when the user closes the
+        # window, so the wrapper must be dropped on the spot — keeping it
+        # makes the next open_visit call close() on a deleted object
+        # (the shiboken RuntimeError trap)
+        self._win.destroyed.connect(self._on_window_gone)
         self._win.show()
         return self._win
 
+    def _on_window_gone(self):
+        # The visit window died (the user closed it): forget it at once.
+        self._win = None
+
     def close_visit_window(self):
         # Closes the open visit window, if any (project switch, delete).
+        # The RuntimeError guard covers the in-between state where the
+        # deletion is queued but not yet delivered.
         if self._win is not None:
-            self._win.close()
+            try:
+                self._win.close()
+            except RuntimeError:
+                pass            # already deleted (WA_DeleteOnClose)
             self._win = None
 
     def _from_window_changed(self):

@@ -87,6 +87,20 @@ def test_window_closes_on_project_switch(panel):
     assert vp._win is None
 
 
+def test_reopen_after_the_user_closed_the_window(panel, qapp):
+    # The field bug (2026-09-24): WA_DeleteOnClose deletes the window's
+    # C++ object when the user closes it; reopening must never call into
+    # the deleted object.
+    vp, _pid, _o = panel
+    vp.btn_new.click()
+    first = vp._win
+    first.close()                       # the user closes the window
+    qapp.processEvents()                # the deletion is delivered
+    assert vp._win is None
+    vp.btn_new.click()                  # must not raise
+    assert vp._win is not None and vp._win is not first
+
+
 def test_attach_fits_with_editable_meta(panel, monkeypatch, tmp_path):
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod

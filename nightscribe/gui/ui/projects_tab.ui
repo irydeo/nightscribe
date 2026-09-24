@@ -174,6 +174,19 @@
                   <property name="openExternalLinks"><bool>false</bool></property>
                  </widget>
                 </item>
+                <!-- The project's registered files, in their own window:
+                     the old collapsed "Project files" section in the
+                     Details tab is retired, this button is the single
+                     entry. Live count + enablement are painted by
+                     main_window._populate_project_files. -->
+                <item>
+                 <widget class="QPushButton" name="btn_files">
+                  <property name="text"><string>Files (0)</string></property>
+                  <property name="enabled"><bool>false</bool></property>
+                  <property name="flat"><bool>true</bool></property>
+                  <property name="toolTip"><string>Open the project files (FITS plates open in the editor)</string></property>
+                 </widget>
+                </item>
                </layout>
               </item>
               <item>

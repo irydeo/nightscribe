@@ -595,6 +595,12 @@ class MainWindow(QMainWindow):
         # here instead of the browser)
         self.projects.lbl_mast_camp.linkActivated.connect(
             self._campaign_link_clicked)
+        # A4 (rewritten): the project files window (ADR-019, UX v3). The
+        # masthead "Files (n)" button is the single entry; the dialog
+        # owns its row menus and the main window owns the two open
+        # routes (FITS editor / OS) plus the button's live count.
+        self.projects.btn_files.clicked.connect(
+            self._show_project_files)
         # ADR-041: the tab bar — the object card, the three steps and
         # the follow-up view. A click opens that page (lazily built on
         # first open), like any other deep link.
@@ -2859,49 +2865,75 @@ class MainWindow(QMainWindow):
                 (self._current_project or {}).get("id"):
             self._project_selected()
 
-    def _ensure_proj_files_list_section(self, det):
-        # A4: lazily build the project files list inside the Object card
-        # section (UX-i): same content as before, re-targeted at the
-        # section layout instead of the old Details tab.
-        if getattr(self, "_proj_files_list", None) is None:
-            from .widgets.collapsible_section import CollapsibleSection
-            sec = CollapsibleSection(self.tr("Project files"))
-            self._proj_files_list = PassiveList()
-            self._proj_files_list.itemDoubleClicked.connect(
-                self._open_project_file)
-            sec.setContentWidget(self._proj_files_list)
-            # UX-PC (U1): the folder actions ("Show in folder" /
-            # "Change folder…", ADR-032) live in the header's ⋯ manage
-            # menu — one visible home per action; this section is the
-            # plain files list (double-click opens with the OS).
-            sec.setCollapsed(True)
-            det.addWidget(sec)
-            self._proj_files_section = sec
+    def _proj_files_build(self):
+        # A4 (rewritten): the project files window (ADR-019, UX v3) is
+        # built lazily once and kept alive on self, so it survives a
+        # project switch and gets re-populated every time it is shown.
+        # @return: the ProjectFilesDialog
+        if getattr(self, "_proj_files_dlg", None) is not None:
+            return self._proj_files_dlg
+        from .project_files_dialog import ProjectFilesDialog
+        dlg = ProjectFilesDialog(parent=self)
+        dlg.sig_open_ufe.connect(self._proj_file_open_ufe)
+        dlg.sig_open_os.connect(self._open_path_with_os)
+        self._proj_files_dlg = dlg
+        return dlg
+
+    def _show_project_files(self):
+        # A4 (rewritten): the masthead "Files (n)" button opens the
+        # files window for the current project with a fresh file list.
+        # @args: _ - the clicked signal payload
+        # @return: None
+        p = self._current_project
+        if not p:
+            return
+        dlg = self._proj_files_build()
+        dlg.set_project(p)
+        dlg.set_files(project.list_files(db, p["id"]))
+        dlg.show()
+        dlg.raise_()
+        dlg.activateWindow()
 
     def _populate_project_files(self, pid):
-        # A4: refresh the files list in the Details tab from project_files.
-        lst = getattr(self, "_proj_files_list", None)
-        if lst is None:
-            return
-        lst.clear()
-        for f in project.list_files(db, pid):
-            name = Path(f["path"]).name
-            dt = datetime.datetime.fromtimestamp(f["created"])
-            item = QListWidgetItem(
-                f"[{f['kind']}] {name}  ({dt.strftime('%Y-%m-%d')})")
-            item.setData(Qt.UserRole, str(f["path"]))
-            lst.addItem(item)
-        sec = getattr(self, "_proj_files_section", None)
-        if sec is not None and lst.count() > 0:
-            sec.setCollapsed(True)
+        # A4 (rewritten): the masthead "Files (n)" button, with the
+        # live count (disabled at zero), and the files window table
+        # when it is already open and attached to this project.
+        # @args: pid - the project id
+        # @return: None
+        files = project.list_files(db, pid)
+        btn = self.projects.btn_files
+        btn.setEnabled(len(files) > 0)
+        btn.setText(self.tr("Files ({})").format(len(files)))
+        dlg = getattr(self, "_proj_files_dlg", None)
+        if dlg is not None and dlg.project_id == pid and dlg.isVisible():
+            dlg.set_files(files)
 
-    def _open_project_file(self, item):
-        # A4: double-click a file row to open it with the OS default.
+    def _proj_file_open_ufe(self, path):
+        # A4 (rewritten): a double-clicked plate row opens in the FITS
+        # editor with the project's save hook on (files written there
+        # get registered) and the project's object attached; the object
+        # is re-applied after the load so the annotate marker lands
+        # through the fresh WCS (ADR-044).
+        # @args: path - the plate path string
+        # @return: None
+        pid = self._proj_files_dlg.project_id
+        p = project.get(db, pid) if pid is not None else None
+        if p is None:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("annotate", hook_pid=p["id"], obj=obj)
+        if not dlg.open_plate(str(path)):
+            return
+        dlg.set_object(obj)
+
+    def _open_path_with_os(self, path):
+        # A4 (rewritten): "Open with the system" (menu action, or a
+        # double-click on a non-plate row).
+        # @args: path - the file path string
+        # @return: None
         from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
-        path = item.data(Qt.UserRole)
-        if path:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def _open_project_folder(self):
         # "Show in folder" (⋯ manage menu, UX-PC U1): opens the project's
@@ -2991,6 +3023,8 @@ class MainWindow(QMainWindow):
         mast.lbl_mast_name.setText("")
         mast.lbl_mast_kind.setText("")
         mast.lbl_mast_camp.setText("")
+        mast.btn_files.setEnabled(False)
+        mast.btn_files.setText(self.tr("Files (0)"))
         self.projects.lbl_context.setText("—")
         self.projects.lbl_advisor.setVisible(False)
         self._show_dashboard()
@@ -3116,17 +3150,15 @@ class MainWindow(QMainWindow):
         # page, so its registry dies with it: worker slots guard through
         # _ccd_widgets() and a wiped registry is an empty dict
         self._obs_widgets = {}
-        # the wipe below also destroys whatever the page hosted, including
-        # the lazily-cached project-files list (UD.5: nothing from a wiped
-        # page survives): drop those caches so the next build creates fresh
-        # ones — reusing a dangling C++ object crashed with "already
-        # deleted" (RuntimeError) on the second selection of any project.
+        # the wipe below destroys whatever the page hosted (UD.5: nothing
+        # from a wiped page survives): drop the page-level caches so the
+        # next build creates fresh ones, and never touch the project
+        # files window on purpose: it lives with the app, not the page,
+        # so a wipe must not delete it.
         # The reusable ObjectPanel stays put on purpose: it is not killed
         # here (tests may have slotted a fake one in, and a live panel can
         # be re-parented into the new page); _get_proj_panel() checks
         # liveness and rebuilds it only if its C++ object really is gone.
-        self._proj_files_list = None
-        self._proj_files_section = None
         self._next_step_key = None
         self._wipe_layout(self.projects.page_container.layout())
 
@@ -3296,7 +3328,6 @@ class MainWindow(QMainWindow):
         det = self._section_layout("details", self._tab_label("details"))
         panel = self._get_proj_panel()
         det.addWidget(panel)
-        self._ensure_proj_files_list_section(det)
         self._populate_project_files(p["id"])
         # the Next card fills itself AND tells us which page starts
         # active (a finished project — no target — lands on the object

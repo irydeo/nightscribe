@@ -55,4 +55,9 @@ The rest of the CCD panel (connect, filter, push plan, start capture) follows AD
 | **Generic CSV** | `<name>.csv` | Best-effort; times/exposure tables readable by any script. |
 
 Every export is **registered in `project_files`** (ADR-019) so the path can be
-re-opened after the export.
+re-opened after the export. Since the re-homing (ADR-019 review 2026-09-24),
+that list is opened from the project masthead's **"Files (n)"** button, in
+its own window: a double-click on a plate (`fits`/`image`) re-opens it in
+the **unified FITS editor** (ADR-044) with the project's object attached,
+and the rest of the files open with the OS (the per-row menu keeps "Open
+with the system", folder and copy path).

@@ -55,4 +55,10 @@ lógica de ADR-021 §5 y ADR-030: el plan se **entrega en vivo** vía JSON-RPC
 | **CSV genérico** | `<name>.csv` | Best-effort; tablas de tiempos/exposiciones legibles por cualquier script. |
 
 Toda exportación se **registra en `project_files`** (ADR-019) para poder reabrir la
-ruta después del export.
+ruta después del export. A partir del reubicado (revisión 2026-09-24 de
+ADR-019), esa lista se abre desde el botón **«Files (n)»** de la cabecera
+del proyecto, en una ventana propia: un doble clic sobre una placa
+(`fits`/`image`) la reabre en el **editor FITS unificado** (ADR-044) con
+el objeto del proyecto adjunto, y el resto de ficheros se abren con el
+sistema (el menú por fila conserva «Open with the system», carpeta y copiar
+ruta).

@@ -47,8 +47,8 @@ _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
 # ADR-044 rev (2026-09-24): the top-bar button table for the bar style
 # (icons-only vs icon + text). `base` is the asset stem in assets/;
 # toggles flip the _on / _off glyphs with their checked state. `icon_only`
-# means the label can go away in icon mode; Solve and Move keep theirs in
-# both modes because the actions are long and the glyphs only hint at them.
+# means the label can go away in icon mode; Solve keeps its label in both
+# modes because the action is long and the glyph only hints at it.
 _BAR_BUTTONS = {
     "btn_load": {"base": "ufe_load", "icon_only": True},
     "btn_export": {"base": "ufe_export", "icon_only": True},
@@ -56,8 +56,8 @@ _BAR_BUTTONS = {
     "btn_scale": {"base": "ufe_scale", "icon_only": True, "toggle": True},
     "btn_annot": {"base": "ufe_annot", "icon_only": True, "toggle": True},
     "btn_boxes": {"base": "ufe_boxes", "icon_only": True, "toggle": True},
+    "btn_mark": {"base": "ufe_mark", "icon_only": True, "toggle": True},
     "btn_solve": {"base": "ufe_solve", "icon_only": False},
-    "btn_move": {"base": "ufe_move", "icon_only": False},
 }
 _ZOOM_ICONS = {"Fit": "ufe_zoom_fit", "50": "ufe_zoom_50",
                "100": "ufe_zoom_100", "200": "ufe_zoom_200",
@@ -153,19 +153,21 @@ class UfeDialog(QDialog):
         self.btn_boxes = self._ui.btn_boxes
         self.btn_boxes.toggled.connect(
             lambda checked: self.view.set_hud(boxes=checked))
+        # the global object mark: where the attached project's object
+        # sits on the plate (its own layer, visible by default, it never
+        # mixes with the feature tabs' markers)
+        self.btn_mark = self._ui.btn_mark
+        self.btn_mark.toggled.connect(
+            lambda checked: self.view.set_object_mark_visible(checked))
         self.btn_solve = self._ui.btn_solve
         self.btn_solve.clicked.connect(self._on_solve)
-        # ADR-044 rev (2026-09-24): the target mark of the Sequence
-        # section, one click away from whichever tab is open (it lands
-        # the observer on the section and arms the placement)
-        self.btn_move = self._ui.btn_move
-        self.btn_move.clicked.connect(self._on_move_marker)
         # ADR-044 rev (2026-09-24): the toggles' _on/_off glyphs follow
         # the checked state (icons-only mode)
         for name, base in (("btn_north", "ufe_north"),
                            ("btn_scale", "ufe_scale"),
                            ("btn_annot", "ufe_annot"),
-                           ("btn_boxes", "ufe_boxes")):
+                           ("btn_boxes", "ufe_boxes"),
+                           ("btn_mark", "ufe_mark")):
             toggle = getattr(self, name)
             toggle.toggled.connect(
                 lambda _checked, btn=toggle, b=base:
@@ -195,8 +197,8 @@ class UfeDialog(QDialog):
             "btn_scale": self.btn_scale.text(),
             "btn_annot": self.btn_annot.text(),
             "btn_boxes": self.btn_boxes.text(),
+            "btn_mark": self.btn_mark.text(),
             "btn_solve": self.btn_solve.text(),
-            "btn_move": self.btn_move.text(),
         }
         for label, btn in self.btn_zoom.items():
             self._bar_labels["zoom_" + label] = btn.text()
@@ -346,21 +348,12 @@ class UfeDialog(QDialog):
         # Annotate) so the host can deep-link a workflow into the
         # editor. The Photometry sections still accept the legacy names:
         # tab_compare / tab_measure by widget or "compare" / "measure"
-        # by name, which also pick the right section on the way in.
+        # by name; there are no modes anymore, they all land on the same
+        # Photometry tab (ADR-044 rev 2026-09-25).
         # @args: tab - a top-level tab widget, an inner Photometry
         #        section widget, or "compare" / "measure"
         if tab in (self.tab_compare, self.tab_measure) \
                 or tab in ("compare", "measure"):
-            mode = "measure" if tab in (self.tab_measure, "measure") \
-                else "sequence"
-            # the constructor's own landing rule, applied to deep links
-            # too: without a sequence there is nothing to measure with,
-            # so land where one is built (the visit path opens on
-            # "measure" with an empty sequence and the observer's first
-            # act is marking stars)
-            if mode == "measure" and not self.tab_compare.entries():
-                mode = "sequence"
-            self.tab_photometry.set_mode(mode)
             self.tabs.setCurrentWidget(self.tab_photometry)
             return
         self.tabs.setCurrentWidget(tab)
@@ -425,6 +418,13 @@ class UfeDialog(QDialog):
         self._object = obj or None
         self._update_object_line()
         self._update_title()
+        # the global object mark rides on the object's coordinates; the
+        # view (re)places it on every plate load and solve by itself
+        obj_dict = self._object or {}
+        ra, dec = obj_dict.get("ra"), obj_dict.get("dec")
+        self.view.set_object_mark(ra, dec)
+        self.btn_mark.setEnabled(
+            self.view._object_mark_radec is not None)
         if not self._object:
             return
         name = self._object.get("name")
@@ -444,9 +444,8 @@ class UfeDialog(QDialog):
     def _chart_target_scene(self):
         # Where the chart calls the object: the measured centroid first
         # (the truth sits at the measurement), then the attached
-        # object's coordinates, then the Sequence section's moved mark;
-        # None when nothing says anything (no plate, or no WCS and no
-        # measurement).
+        # object's coordinates; None when nothing says anything (no
+        # plate, or no WCS and no measurement).
         # @return: (x, y) scene coordinates, or None
         if not self.state.has_image:
             return None
@@ -464,9 +463,6 @@ class UfeDialog(QDialog):
                     return self.state.data_to_scene(col, row)
             except Exception:
                 pass
-        pos = self.tab_compare._target_pos
-        if pos is not None:
-            return pos
         return None
 
     def _chart_boxes(self):
@@ -605,23 +601,6 @@ class UfeDialog(QDialog):
         # presets, keys, double-click fit); the top bar mirrors it.
         # @args: factor - absolute scale, 1.0 = 100 %
         self.lbl_zoom.setText(f"{factor * 100:.0f} %")
-
-    def _on_move_marker(self):
-        # The bar's Move marker (ADR-044 rev, 2026-09-24): arms the
-        # target-mark placement of the Sequence section, whatever tab is
-        # open. The bar is built before the tabs exist, so everything
-        # resolves at call time. Without a plate or a field there is
-        # nothing to move yet, and we say so instead of arming.
-        comp = self.tab_photometry.tab_compare
-        if comp._view is None or comp._field is None:
-            QMessageBox.information(
-                self, self.tr("NightScribe Image Workbench"),
-                self.tr("Nothing to move yet: load a plate and build the "
-                        "sequence first (Photometry → Sequence)."))
-            return
-        self.tabs.setCurrentWidget(self.tab_photometry)
-        self.tab_photometry.set_mode("sequence")
-        comp.request_target_move()
 
     # --------------------------------------------------------- keyboard
 

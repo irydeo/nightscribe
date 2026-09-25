@@ -64,7 +64,8 @@ def _round_arcsec(target):
     return m * 10.0 ** exp
 
 
-def cross_marker_items(x, y, scene_w, scene_h, color, box_half):
+def cross_marker_items(x, y, scene_w, scene_h, color, box_half,
+                       alpha=None, pen_width=1.8):
     # The "cross" object marker (ADR-046): a full-frame crosshair with a
     # central box, in the spirit of the classic tracker charts. The
     # lines span the plate in scene coordinates and the pens are
@@ -73,10 +74,14 @@ def cross_marker_items(x, y, scene_w, scene_h, color, box_half):
     # @args: x, y - object position in scene (plate px) coordinates,
     #        scene_w, scene_h - plate size in px, color - marker colour
     #        (hex string or QColor), box_half - central box half side
-    #        in scene px
+    #        in scene px, alpha - 0-255 opacity (None keeps the colour
+    #        solid), pen_width - pen width in screen px (cosmetic)
     # @return: [4 QGraphicsLineItem + 1 QGraphicsRectItem]
-    pen = QPen(QColor(color))
-    pen.setWidthF(1.8)
+    pen_color = QColor(color)
+    if alpha is not None:
+        pen_color.setAlpha(int(alpha))
+    pen = QPen(pen_color)
+    pen.setWidthF(pen_width)
     pen.setCosmetic(True)
     gap = box_half * 1.4
     items = []
@@ -144,6 +149,11 @@ class UfeImageView(ChartView):
         self._annotation_labels = []  # [(label item, ann dict)]
         self._show_annotations = True   # the top bar can hide the plate's
                                         # saved marks; the default is on
+        # the global object mark (the attached project's object): its own
+        # layer, like the ANNOTATE one, so feature tabs never touch it
+        self._object_mark_items = []
+        self._object_mark_radec = None   # (ra_deg, dec_deg) or None
+        self._show_object_mark = True    # the top bar toggle; on by default
         self._frame_override = None  # Blink tab: fn() -> uint8 display
                                      # frame replacing the state's own
         # pick mode (the Measure/Annotate/Compare tabs while on stage):
@@ -173,6 +183,8 @@ class UfeImageView(ChartView):
         state.stretch_changed.connect(self._render_soon)
         # the HUD depends on WCS, and it paints on the viewport
         state.wcs_changed.connect(self.viewport().update)
+        # the object mark sits in the scene: a solve (re)places it
+        state.wcs_changed.connect(self._rebuild_object_mark)
         self.zoom_changed.connect(lambda _f: self._layout_annotations())
         self.set_hover_probe(state.probe_text)
         self.setAccessibleName(self.tr("FITS image view"))
@@ -189,6 +201,7 @@ class UfeImageView(ChartView):
         self._hint = None             # clear() removed it from the scene
         self._annotation_items = []   # same fate; rebuilt below
         self._annotation_labels = []
+        self._object_mark_items = []  # rebuilt below, after the plate
         if not self._state.has_image:
             self._show_hint()
             return
@@ -196,6 +209,7 @@ class UfeImageView(ChartView):
         self.set_scene_rect(0, 0, w, h)
         self._render()
         self._rebuild_annotations()
+        self._rebuild_object_mark()
         if self.viewport().width() >= 4 and self.viewport().height() >= 4:
             self.fit_to_scene()
         else:
@@ -314,14 +328,81 @@ class UfeImageView(ChartView):
         return self.add_item(item)
 
     def clear_overlays(self):
-        # Drops every feature-tab overlay; the plate pixmap and the
-        # read-only ANNOTATE layer stay (they belong to the plate, not
-        # to whichever tab is on stage).
-        keep = set([self._pix_item] + self._annotation_items)
+        # Drops every feature-tab overlay; the plate pixmap, the read-only
+        # ANNOTATE layer and the global object mark stay (they belong to
+        # the plate / the attached project, not to whichever tab is on
+        # stage).
+        keep = set([self._pix_item] + self._annotation_items
+                   + self._object_mark_items)
         for it in list(self._items_registered):
             if it not in keep:
                 self.scene().removeItem(it)
                 self._items_registered.remove(it)
+
+    # ------------------------------------------------------ object mark
+
+    def set_object_mark(self, ra_deg, dec_deg):
+        # The attached project's object: a subtle full-frame cross with a
+        # central box (the classic tracker look) where its RA/Dec land on
+        # the plate. Needs a WCS; without one (or off-plate) the layer
+        # stays empty.
+        # @args: ra_deg, dec_deg - object coordinates in degrees, or None
+        #        to drop the mark
+        if ra_deg is None or dec_deg is None:
+            self._object_mark_radec = None
+        else:
+            try:
+                self._object_mark_radec = (float(ra_deg), float(dec_deg))
+            except (TypeError, ValueError):
+                self._object_mark_radec = None
+        self._rebuild_object_mark()
+
+    def set_object_mark_visible(self, on):
+        # @args: on - show or hide the object mark (the top bar toggle;
+        #        a hidden mark does not reach the PNG export either)
+        self._show_object_mark = bool(on)
+        for it in self._object_mark_items:
+            it.setVisible(self._show_object_mark)
+
+    def _rebuild_object_mark(self):
+        # Repositions the object mark for the live plate/WCS. The look is
+        # a thinner, half-transparent red cross, quiet next to the tabs'
+        # own markers.
+        self._drop_object_mark()
+        pos = self._object_mark_scene()
+        if pos is None:
+            return
+        w, h = self._state.plate_shape
+        for it in cross_marker_items(pos[0], pos[1], w, h, "#ff6378",
+                                     w * 0.011, alpha=128, pen_width=1.2):
+            it.setZValue(45)
+            it.setVisible(self._show_object_mark)
+            self._object_mark_items.append(self.add_item(it))
+
+    def _drop_object_mark(self):
+        # Removes the current mark items from the scene and the registry.
+        for it in self._object_mark_items:
+            if it.scene() is not None:
+                self.scene().removeItem(it)
+            if it in self._items_registered:
+                self._items_registered.remove(it)
+        self._object_mark_items = []
+
+    def _object_mark_scene(self):
+        # Where the object sits, in scene (plate px) coordinates.
+        # @return: (x, y) or None (no plate, no WCS, no coords, off-plate)
+        if not self._state.has_image or self._state.wcs is None \
+                or self._object_mark_radec is None:
+            return None
+        ra, dec = self._object_mark_radec
+        try:
+            col, row = self._state.wcs.sky_to_pixel(ra, dec)
+        except Exception:
+            return None
+        w, h = self._state.plate_shape
+        if not (0 <= col < w and 0 <= row < h):
+            return None
+        return self._state.data_to_scene(col, row)
 
     # ------------------------------------------------------ annotations
 

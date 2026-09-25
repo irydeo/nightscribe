@@ -32,6 +32,11 @@ _ASSETS = Path(__file__).resolve().parent.parent / "assets"
 # tick falls back to a black native check on the dark box. "C:/..." works
 # everywhere (identical to str(path) on Linux).
 CHECK_SVG = (_ASSETS / "check.svg").as_posix()
+# Same POSIX-path reasoning as CHECK_SVG: the QSS references these in the
+# spinbox / combo arrows (a styled widget's arrows are NOT painted by the
+# style unless the sheet gives them an image).
+ARROW_UP_SVG = (_ASSETS / "arrow_up.svg").as_posix()
+ARROW_DOWN_SVG = (_ASSETS / "arrow_down.svg").as_posix()
 
 
 def asset(name):
@@ -255,6 +260,10 @@ QPushButton:pressed {{ background: {C_SEL}; }}
 QPushButton:disabled {{ color: {C_TEXT_DIM}; background: {C_DIM_FILL}; }}
 QPushButton:flat {{ background: transparent; }}
 QPushButton:flat:hover {{ background: rgba(255,255,255,0.06); }}
+/* small glyph buttons (28-32 px wide: the ↻ recompute, the × row
+   removals, …): the global 6px/16px padding leaves them no content rect
+   at all and the glyph clips away, so they carry compact="true" */
+QPushButton[compact="true"] {{ padding: 2px 6px; }}
 QToolButton {{
     background: transparent; color: {C_TEXT}; border: none;
     padding: 4px; border-radius: 4px;
@@ -298,6 +307,17 @@ QTextEdit:focus, QPlainTextEdit:focus {{
     border: 1px solid {C_ACCENT};
 }}
 QComboBox::drop-down {{ border: none; width: 22px; }}
+/* a styled combo / spinbox paints its own subcontrols: without an
+   explicit image the arrows are simply never drawn */
+QComboBox::down-arrow {{
+    image: url("{ARROW_DOWN_SVG}"); width: 12px; height: 12px;
+}}
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+    image: url("{ARROW_UP_SVG}"); width: 10px; height: 10px;
+}}
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+    image: url("{ARROW_DOWN_SVG}"); width: 10px; height: 10px;
+}}
 QComboBox QAbstractItemView {{
     background: {C_PANEL}; color: {C_TEXT};
     border: 1px solid {C_EDGE}; selection-background-color: {C_SEL};

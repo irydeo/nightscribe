@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE Comparisons section, manual tweak body (ADR-044 rev 2026-09-25):
+  the hand-driven path, folded by default inside a CollapsibleSection
+  ("Manual tweak") that gui/ufe_compare_tab.py inserts into
+  ufe_compare_tab.ui's ph_manual placeholder. While it is expanded the
+  plate clicks pick stars; folded (the normal state) they measure. The
+  class tag keeps the i18n context of the owning tab.
+-->
+<ui version="4.0">
+ <class>UfeCompareTab</class>
+ <widget class="QWidget" name="manual_body">
+  <layout class="QVBoxLayout" name="vbox_manual"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>0</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>0</number></property>
+   <item><widget class="QLabel" name="lbl_hint"><property name="text"><string>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_pick">
+     <item><widget class="QLabel" name="lbl_pick"><property name="text"><string>On click, add as:</string></property></widget></item>
+     <item><widget class="QRadioButton" name="rdo_comp"><property name="text"><string>Comparison</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QRadioButton" name="rdo_check"><property name="text"><string>Check</string></property></widget></item>
+     <item><spacer name="hsp_pick"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="QCheckBox" name="chk_labels"><property name="text"><string>Show catalog magnitudes</string></property><property name="checked"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_manual_actions">
+     <item><widget class="QPushButton" name="btn_seq_open"><property name="text"><string/></property><property name="toolTip"><string>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_field"><property name="text"><string>Generate field</string></property><property name="toolTip"><string>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_propose"><property name="text"><string>Propose sequence</string></property><property name="toolTip"><string>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target's brightness)</string></property></widget></item>
+     <item><spacer name="hsp_manual_actions"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
+

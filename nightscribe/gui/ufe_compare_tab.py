@@ -11,26 +11,28 @@
 #
 ############################################################
 
-"""The UFE's Compare tab (ADR-044, phase F): the photometric comparison
-sequence picker on top of core/compstars (VizieR Gaia/APASS + VSX
-cross-match), with the FinderChart's visual language reimplemented as
-overlays on the shared plate view (the legacy SeqChartDialog keeps
-living untouched).
+"""The UFE's Comparisons section (ADR-044, phase F; rev 2026-09-25): the
+photometric comparison sequence on top of core/compstars (VizieR
+Gaia/APASS + VSX cross-match), with the FinderChart's visual language
+reimplemented as overlays on the shared plate view (the legacy
+SeqChartDialog keeps living untouched).
 
-The loaded plate IS the field background, so the tab needs it to carry a
-WCS (the common «Solve astrometry…» button fixes that in place). The
-field (catalog stars + known variables) loads around the plate centre
-with the plate's field of view, off the GUI thread. Clicks on the plate
-toggle stars in and out of the sequence (known VSX variables can never
-be comparisons); the table edits names and kinds; the CSV export comes
-out next to the plate (the chart PNG goes through the shared
-"Export PNG…" button in the dialog's top bar).
+The normal path is ONE click: «Build the sequence…» generates the
+catalog field around the plate centre and proposes the comparisons; the
+observer only tweaks by clicking stars (the manual controls live folded
+under «Manual tweak»). The loaded plate IS the field background, so the
+section needs it to carry a WCS (the common «Solve astrometry…» button
+fixes that in place). Known VSX variables can never be comparisons; the
+table edits names and kinds; the CSV export comes out next to the plate
+(the chart PNG goes through the shared "Export PNG…" button in the
+dialog's top bar). The object itself wears the dialog's global red mark
+(the top bar's toggle), not a marker of this section.
 """
 
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QProgressDialog,
                                QPushButton, QTableWidgetItem, QWidget,
@@ -42,7 +44,6 @@ from ..core.sources import vizier
 from ..viz import palette
 from .ufe_sequence_dialog import UfeSequenceDialog
 from .ui_loader import adopt_ui
-from .widgets.ufe_image_view import cross_marker_items, ring_marker_items
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -56,6 +57,28 @@ _PICK_PX = 11.0         # click/hover radius in SCREEN px at any zoom
 _MAX_LABELS = 34        # catalog magnitude labels, brightest first
 
 
+class _CenterOnWindow(QObject):
+    # Keeps the busy dialog centred over the editor window. The stage
+    # labels change its size (long bilingual texts), and the window
+    # manager's placement is not ours to trust: re-centre on every
+    # Show/Resize instead of a single move() that ages with the first
+    # label change.
+    # @args: dialog - the QProgressDialog, host - the widget whose
+    #        top-level window is the reference
+
+    def __init__(self, dialog, host):
+        super().__init__(dialog)
+        self._dialog = dialog
+        self._host = host
+
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.Type.Show, QEvent.Type.Resize):
+            win = self._host.window()
+            self._dialog.move(win.geometry().center()
+                              - self._dialog.rect().center())
+        return False
+
+
 def _busy_wait(host, label, title):
     # A modal busy dialog without Cancel for the seconds of network work:
     # the legacy comparison-chart flow leaned on it (a status line alone
@@ -63,12 +86,21 @@ def _busy_wait(host, label, title):
     # restoring it here.
     # @args: host - parent widget, label - first busy message,
     #        title - the window title
-    # @return: the ready dialog (zero minimumDuration: it appears at once)
+    # @return: the shown dialog, centred over the UFE window (an
+    #          indeterminate QProgressDialog never gets a setValue, which
+    #          is the only call that auto-shows it: without an explicit
+    #          show() it simply never appears)
     wait = QProgressDialog(label, "", 0, 0, host)
     wait.setWindowTitle(title)
     wait.setWindowModality(Qt.WindowModal)
     wait.setCancelButton(None)
     wait.setMinimumDuration(0)
+    # only _reap_wait closes it: no auto-close/reset when the bar hits
+    # its maximum (the caller's last setValue is not the end signal)
+    wait.setAutoClose(False)
+    wait.setAutoReset(False)
+    wait.installEventFilter(_CenterOnWindow(wait, host))
+    wait.show()
     return wait
 
 
@@ -100,8 +132,8 @@ class UfeCompareTab(QWidget):
         self._pick_kind = "comp"
         self._catalog_visible = True
         self._catalog_items = []     # subset hidden with the checkbox
-        self._target_pos = None      # mark scene coords; None = plate centre
-        self._moving_target = False  # armed move: the next click places it
+        self._auto_propose = False   # the field worker landed from the
+                                     # one-click path: propose on arrival
         self._worker = None
         self._cutout_worker = None   # UfeCutoutWorker while DSS2 lands
         self._prefill_sky = None     # (ra, dec) from the host, for DSS2
@@ -116,7 +148,9 @@ class UfeCompareTab(QWidget):
     def _build_ui(self):
         # The structure is the Designer file's (ADR-005); this method
         # aliases the widgets, fills the catalog combo (its items carry
-        # userData, which a .ui cannot hold) and connects the signals.
+        # userData, which a .ui cannot hold), folds the manual picking
+        # controls into their collapsible section and connects the
+        # signals.
         self._ui = adopt_ui(self, "ufe_compare_tab")
                                             # over: no wrapper, no extra
                                             # margins, and layout-walking
@@ -126,23 +160,37 @@ class UfeCompareTab(QWidget):
         self.cmb_catalog = self._ui.cmb_catalog
         for key, spec in vizier.CATALOGS.items():
             self.cmb_catalog.addItem(spec["name"], key)
-        self.btn_field = self._ui.btn_field
-        self.btn_field.clicked.connect(self._on_generate)
+        # the one-click path: field + proposal in a single action
+        self.btn_auto = self._ui.btn_auto
+        self.btn_auto.clicked.connect(self._on_auto)
         self.btn_dss = self._ui.btn_dss
         self.btn_dss.clicked.connect(self._on_load_survey)
         self.lbl_status = self._ui.lbl_status
-        self.rdo_comp = self._ui.rdo_comp
-        self.rdo_check = self._ui.rdo_check
+
+        # the manual tweak: its controls are translatable, so they live
+        # in their own Designer file; here they fold into the collapsed
+        # section that takes the .ui's placeholder. Everything hand-driven
+        # lives inside: picking hints and kind, catalog labels, and the
+        # step-by-step actions (field alone, proposal alone, the table)
+        from .ui_loader import load_ui, drop_in
+        from .widgets.collapsible_section import CollapsibleSection
+        manual = load_ui("ufe_compare_manual", self)
+        self.sec_manual = CollapsibleSection(self.tr("Manual tweak"))
+        self.sec_manual.setContentWidget(manual)
+        self.sec_manual.setCollapsed(True)
+        drop_in(self.layout(), self._ui.ph_manual, self.sec_manual)
+        self.rdo_comp = manual.rdo_comp
+        self.rdo_check = manual.rdo_check
         self.rdo_check.toggled.connect(
             lambda on: setattr(self, "_pick_kind",
                                "check" if on else "comp"))
-        self.chk_labels = self._ui.chk_labels
+        self.chk_labels = manual.chk_labels
         self.chk_labels.toggled.connect(self._on_catalog_visible)
-        self.chk_target = self._ui.chk_target
-        self.chk_target.toggled.connect(self._on_target_visible)
-        self.btn_propose = self._ui.btn_propose
+        self.btn_field = manual.btn_field
+        self.btn_field.clicked.connect(self._on_generate)
+        self.btn_propose = manual.btn_propose
         self.btn_propose.clicked.connect(self._on_propose)
-        self.btn_seq_open = self._ui.btn_seq_open
+        self.btn_seq_open = manual.btn_seq_open
         self.btn_seq_open.clicked.connect(self._open_sequence)
 
         # The table lives in its own small non-modal window (ADR-044 rev):
@@ -202,8 +250,6 @@ class UfeCompareTab(QWidget):
         self._field = None
         self._entries = []
         self._stars = []
-        self._target_pos = None      # a new plate: the mark centres itself
-        self._moving_target = False  # placement never survives a new plate
         self._drop_items()
         if self._state.has_image:
             self.edt_target.setText(Path(self._state.path).stem)
@@ -258,8 +304,15 @@ class UfeCompareTab(QWidget):
             lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
 
         def survey_landed(result):
-            _reap_wait(wait)
-            self._on_survey_landed(result)
+            # same rule as the field chain: the modal dialog is always
+            # reaped, whatever the landing does
+            try:
+                self._on_survey_landed(result)
+            except Exception as err:
+                logger.exception("survey landing failed: %s", err)
+                self.lbl_status.setText(str(err))
+            finally:
+                _reap_wait(wait)
         self._cutout_worker.finished.connect(survey_landed)
         self._cutout_worker.start()
 
@@ -280,12 +333,38 @@ class UfeCompareTab(QWidget):
             return
         self.lbl_status.setText(self.tr("Field loaded: {0}").format(label))
 
+    def _on_auto(self):
+        # The one-click path (ADR-044 rev 2026-09-25): with a field
+        # already loaded it only re-proposes; without one it generates
+        # the field and the proposal runs the moment the field lands.
+        # Both paths sit under the busy dialog: the proposal is local
+        # math, but on a big field it still takes its moment, and a
+        # bare freeze reads as a hang.
+        if self._field is not None:
+            wait = _busy_wait(self, self.tr("Proposing the sequence…"),
+                              self.tr("Comparison field"))
+            wait.setRange(0, 1)
+            wait.setValue(0)
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()   # let the dialog paint before
+                                           # the synchronous proposal
+            try:
+                self._on_propose()
+            finally:
+                wait.setValue(1)
+                _reap_wait(wait)
+            return
+        self._auto_propose = True
+        self._on_generate()
+
     def _on_generate(self):
         # Generate field: VizieR catalog + VSX variables around the plate
         # centre, off the GUI thread.
         if not self._state.has_image:
+            self._auto_propose = False
             return
         if self._state.wcs is None:
+            self._auto_propose = False
             self.lbl_status.setText(self.tr(
                 "The plate has no WCS: solve it with «Solve astrometry…» "
                 "to build the comparison field."))
@@ -297,21 +376,44 @@ class UfeCompareTab(QWidget):
         self.btn_field.setEnabled(False)
         self.lbl_status.setText(self.tr("Querying the catalog…"))
         # The queries take seconds: cover them with the busy dialog the
-        # legacy flow had (a status line alone reads as "nothing happens")
+        # legacy flow had (a status line alone reads as "nothing
+        # happens"). The bar walks the real stages (catalog → VSX →
+        # proposal): an indeterminate bar that never moves reads as
+        # stuck.
         wait = _busy_wait(self, self.tr("Querying the catalog…"),
                           self.tr("Comparison field"))
+        wait.setRange(0, 3)
+        wait.setValue(0)
+        stage = {"n": 0}
         self._worker = UfeFieldWorker(self.cmb_catalog.currentData(),
                                       ra, dec, fov_arcmin)
-        # Pipeline stages (catalog query, VSX crossmatch) reach the
-        # dialog label as well as the status line
-        self._worker.progress.connect(
-            lambda msg: wait.setLabelText(msg.get(self._lang, "")))
-        self._worker.progress.connect(
-            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+
+        def _stage(msg):
+            # @args: msg - the worker's {"es", "en"} stage text
+            wait.setLabelText(msg.get(self._lang, ""))
+            self.lbl_status.setText(msg.get(self._lang, ""))
+            stage["n"] = min(stage["n"] + 1, 1)
+            wait.setValue(stage["n"])
+        self._worker.progress.connect(_stage)
 
         def field_landed(field):
-            _reap_wait(wait)
-            self._on_field_ready(field)
+            # the one-click chain stays covered end to end: the proposal
+            # runs under the dialog, and the dialog is ALWAYS reaped (a
+            # modal dialog surviving an exception reads as a hang)
+            try:
+                if self._auto_propose:
+                    wait.setLabelText(self.tr("Proposing the sequence…"))
+                    wait.setValue(2)
+                self._on_field_ready(field)
+            except Exception as err:
+                logger.exception("field handling failed: %s", err)
+                self._auto_propose = False
+                self.lbl_status.setText(self.tr(
+                    "The field landed but its handling failed: {0}")
+                    .format(err))
+            finally:
+                wait.setValue(3)
+                _reap_wait(wait)
         self._worker.finished.connect(field_landed)
         self._worker.start()
 
@@ -320,6 +422,7 @@ class UfeCompareTab(QWidget):
         self.btn_field.setEnabled(True)
         self._worker = None
         if not field:
+            self._auto_propose = False
             self.lbl_status.setText(self.tr(
                 "The catalog query failed (offline?). Try again later."))
             return
@@ -345,9 +448,15 @@ class UfeCompareTab(QWidget):
         self._reload_table()
         # paint follows the stage, not the clicks: the field can land
         # while the Measure section is armed (opened from a visit) and
-        # the Sequence half is still on view
+        # the Comparisons half is still on view
         if self._on_stage:
             self._redraw_overlays()
+        # the one-click path: the proposal rides the landing (local math,
+        # but it gets its own beat in the status line so the chain reads)
+        if self._auto_propose:
+            self._auto_propose = False
+            self.lbl_status.setText(self.tr("Proposing the sequence…"))
+            self._on_propose()
 
     def _sky_to_scene(self, ra, dec):
         # @return: (x, y) scene coords for a sky position through the
@@ -450,34 +559,6 @@ class UfeCompareTab(QWidget):
                                         2 * radius, 2 * radius)
             ring.setPen(self._pen(C_VAR, 1.6))
             self._items.append(self._view.add_overlay(ring))
-        # the target mark: the plate centre by default, or the spot the
-        # observer placed it at with «Move marker…». A reference point
-        # only: the maths (proposal, survey, measurement) never reads it.
-        # Two looks (ADR-046, Settings): the ring with ticks or the
-        # full-frame cross with a box.
-        if self.chk_target.isChecked():
-            from ..config import config
-            cx, cy = (self._target_pos
-                      if self._target_pos is not None
-                      else (w / 2.0, h / 2.0))
-            if config.get("marker_style", "ring") == "cross":
-                half = w * 0.011
-                for it in cross_marker_items(cx, cy, w, h,
-                                             palette.ACCENT, half):
-                    self._items.append(self._view.add_overlay(it))
-                label_y = cy + half * 2.6
-            else:
-                r = w * 0.022
-                for it in ring_marker_items(cx, cy, palette.ACCENT, r,
-                                            tick_inner=1.15,
-                                            tick_outer=1.7, pen_width=2.2):
-                    self._items.append(self._view.add_overlay(it))
-                label_y = cy + r * 2.4
-            name = self.edt_target.text().strip()
-            if name:
-                self._items.append(self._view.add_overlay(
-                    self._text(name, cx, label_y, palette.ACCENT,
-                               w * 0.018, bold=True, anchor="center")))
         self._redraw_entries()
 
     def _redraw_entries(self):
@@ -529,31 +610,6 @@ class UfeCompareTab(QWidget):
         for it, star_id in self._catalog_items:
             it.setVisible(flag and star_id not in in_seq)
 
-    def _on_target_visible(self, flag):
-        # The mark is drawn or not on the next pass: a full overlay
-        # repaint is the consistent way to (un)draw it.
-        self._redraw_overlays()
-
-    def request_target_move(self):
-        # @return: none; the UFE top bar's "Move marker…" lands here
-        # (ADR-044 rev, 2026-09-25): same arming the tab's own button
-        # used to do, so one place owns the mode
-        self._on_move_requested()
-
-    def _on_move_requested(self):
-        # @return: none; arms the placement mode, where the next click
-        # on the plate moves the target mark to that exact spot
-        if self._view is None or self._field is None:
-            self.lbl_status.setText(self.tr(
-                "Load a plate and build the field first: the mark lives "
-                "on the plate."))
-            return
-        self.chk_target.setChecked(True)    # placing means it is visible
-        self._moving_target = True
-        self.lbl_status.setText(self.tr(
-            "Click the plate where the target really is; the mark moves "
-            "there."))
-
     # ------------------------------------------------------------ picking
 
     def _nearest_star(self, sx, sy):
@@ -595,13 +651,8 @@ class UfeCompareTab(QWidget):
 
     def _on_scene_clicked(self, scene_pt):
         # A click toggles the nearest star in/out of the sequence; known
-        # variables refuse with a reason. In placement mode (armed with
-        # the «Move marker…» button) the click moves the target mark
-        # instead of touching the stars.
+        # variables refuse with a reason.
         if not self._active or self._field is None:
-            return
-        if self._moving_target:
-            self._on_place_target(scene_pt)
             return
         star = self._nearest_star(scene_pt.x(), scene_pt.y())
         if star is None:
@@ -624,26 +675,10 @@ class UfeCompareTab(QWidget):
         self._redraw_entries()
         self._reload_table()
 
-    def _on_place_target(self, scene_pt):
-        # The armed placement: the mark goes where the plate was clicked
-        # (clamped inside the plate), then the mode disarms itself.
-        # @args: scene_pt - the click in scene coordinates
-        w, h = self._state.plate_shape
-        x = max(0.0, min(float(scene_pt.x()), float(w)))
-        y = max(0.0, min(float(scene_pt.y()), float(h)))
-        self._moving_target = False
-        self._target_pos = (x, y)
-        self._redraw_overlays()
-        self.lbl_status.setText(self.tr(
-            "Target mark placed at ({0}, {1}).").format(int(x), int(y)))
-
     def _probe(self, sx, sy):
         # Hover probe while on stage: the star under the cursor, else the
-        # state's pixel/DN/RA probe. In placement mode the plate itself
-        # reads as the hint for where the mark will land.
+        # state's pixel/DN/RA probe.
         # @return: (hit, lines)
-        if self._moving_target:
-            return True, [self.tr("Click: move the target mark here")]
         star = self._nearest_star(sx, sy)
         if star is None:
             return self._state.probe_text(sx, sy)
@@ -703,6 +738,8 @@ class UfeCompareTab(QWidget):
             self.table.setItem(i, 2, mag)
             btn = QPushButton("×")
             btn.setFixedWidth(28)
+            btn.setProperty("compact", True)   # the global padding would
+                                               # clip the glyph away
             btn.clicked.connect(lambda _c=False, row=i: self._remove(row))
             self.table.setCellWidget(i, 3, btn)
         self.table.blockSignals(False)

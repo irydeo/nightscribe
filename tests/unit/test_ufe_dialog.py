@@ -320,13 +320,12 @@ def test_chart_boxes_toggle_default_comes_from_config(dlg, monkeypatch):
 
 def test_topbar_icons_only_is_the_default(dlg):
     # Pinned ufe_bar_icons: True -> a compact glyph bar. The short
-    # actions drop their labels entirely; Solve and Move keep theirs in
-    # both modes, because the actions are long and the glyphs only hint
-    # at them.
+    # actions drop their labels entirely; Solve keeps its own in both
+    # modes, because the action is long and the glyph only hints at it.
     from PySide6.QtGui import QIcon
     from nightscribe.gui import theme
     for name in ("btn_load", "btn_export", "btn_north", "btn_scale",
-                 "btn_annot", "btn_boxes"):
+                 "btn_annot", "btn_boxes", "btn_mark"):
         btn = getattr(dlg, name)
         assert btn.text() == ""
         assert not btn.icon().isNull()
@@ -335,8 +334,6 @@ def test_topbar_icons_only_is_the_default(dlg):
     assert dlg.btn_north.icon().pixmap(16, 16).toImage() == \
         want.toImage()
     assert dlg.btn_solve.text() == "Solve astrometry…"
-    assert dlg.btn_move.text() == "Move marker…"
-    assert not dlg.btn_move.icon().isNull()
     assert dlg.lbl_zoom_hint.isVisible() == False
     for btn in dlg.btn_zoom.values():
         assert btn.text() == ""
@@ -357,8 +354,8 @@ def test_topbar_text_mode_restores_the_labels(dlg, monkeypatch):
     assert dlg.btn_scale.text() == "Scale"
     assert dlg.btn_annot.text() == "A"
     assert dlg.btn_boxes.text() == "Boxes"
+    assert dlg.btn_mark.text() == "Mark"
     assert dlg.btn_solve.text() == "Solve astrometry…"   # unchanged either way
-    assert dlg.btn_move.text() == "Move marker…"         # ...
     assert dlg.lbl_zoom_hint.isVisible()
     assert dlg.btn_zoom["100"].text() == "100"
     assert not dlg.btn_zoom["100"].icon().isNull()
@@ -392,33 +389,26 @@ def test_topbar_missing_asset_keeps_the_text(dlg, monkeypatch):
     assert dlg.btn_north.text() == "N"
 
 
-# The bar's Move marker lands on the Sequence section, whatever tab is
-# open (ADR-044 rev, 2026-09-24: it used to live inside the tab).
+# ADR-044 rev 2026-09-25: the Sequence section's own amber target mark
+# (and the bar's «Move marker…») went away; the dialog's global red
+# object mark (btn_mark) is the one object marker now.
 
 
-def test_move_marker_without_a_plate_is_honest(dlg, monkeypatch):
-    from PySide6.QtWidgets import QMessageBox
-    seen = []
-
-    def _info(parent, title, message, *a, **k):
-        seen.append((title, message))
-
-    monkeypatch.setattr(QMessageBox, "information", staticmethod(_info))
-    dlg._on_move_marker()
-    assert len(seen) == 1
-    assert "load a plate" in seen[0][1]
-    # nothing got armed, the tab did not move either
-    assert dlg.tab_photometry.tab_compare._moving_target is False
-    assert dlg.tabs.currentWidget() is not dlg.tab_photometry
-
-
-def test_move_marker_lands_on_the_sequence_section(dlg):
-    dlg.state.load(MONO)
+def test_move_marker_is_gone_and_the_object_mark_covers_it(dlg):
+    assert not hasattr(dlg, "btn_move")
     comp = dlg.tab_photometry.tab_compare
-    comp._view = dlg.view
-    comp._field = {"stars": []}         # the field exists (synthetic)
-    dlg.tabs.setCurrentWidget(dlg.tab_blink)
-    dlg.btn_move.click()
-    assert dlg.tabs.currentWidget() is dlg.tab_photometry
-    assert dlg.tab_photometry._mode == "sequence"
-    assert comp._moving_target is True
+    assert not hasattr(comp, "chk_target")
+    assert not hasattr(comp, "_target_pos")
+    assert not hasattr(comp, "request_target_move")
+    # the global mark follows set_object and the bar toggle
+    dlg.state.load(MONO)
+    w, h = dlg.state.plate_shape
+    ra, dec = dlg.state.wcs.pixel_to_sky(w / 2.0, h / 2.0)
+    dlg.set_object({"name": "SN test", "ra": ra, "dec": dec})
+    assert dlg.btn_mark.isEnabled()
+    assert len(dlg.view._object_mark_items) == 5
+    dlg.btn_mark.setChecked(False)
+    assert all(not it.isVisible() for it in dlg.view._object_mark_items)
+    dlg.set_object(None)
+    assert not dlg.btn_mark.isEnabled()
+    assert dlg.view._object_mark_items == []

@@ -58,17 +58,15 @@ class UfeMeasureTab(QWidget):
                            # the pick cursor + snapping reticle on stage
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView, compare_tab - the Compare tab the
-    #        sequence is read from (D5), go_compare - callable switching
-    #        the Photometry tab to the Sequence section
+    #        sequence is read from (D5)
 
     def __init__(self, state, lang="es", view=None, compare_tab=None,
-                 go_compare=None, parent=None):
+                 parent=None):
         super().__init__(parent)
         self._state = state
         self._lang = lang
         self._view = view
         self._compare = compare_tab
-        self._go_compare = go_compare
         self._active = False         # owns the view's clicks right now
         self._on_stage = False       # the Photometry tab is on stage and
                                      # this section is visible (armed or
@@ -103,9 +101,6 @@ class UfeMeasureTab(QWidget):
         self._ui = adopt_ui(self, "ufe_measure_tab")
                                             # over: no wrapper margins
         self.lbl_status = self._ui.lbl_status
-        self.btn_go_compare = self._ui.btn_go_compare
-        if self._go_compare is not None:
-            self.btn_go_compare.clicked.connect(self._go_compare)
         self.cmb_band = self._ui.cmb_band
 
         # The recipe knobs live one click open (ADR-044 rev): the daily
@@ -265,7 +260,6 @@ class UfeMeasureTab(QWidget):
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
         self.lbl_status.setText("")
-        self.btn_go_compare.setVisible(False)
 
     # -------------------------------------------------------- measuring
 
@@ -280,11 +274,9 @@ class UfeMeasureTab(QWidget):
         entries = self._sequence()
         if not entries:
             self.lbl_status.setText(self.tr(
-                "No comparison sequence yet: build one in the Sequence "
-                "section (Generate field, then pick or propose)."))
-            self.btn_go_compare.setVisible(True)
+                "No comparison sequence yet: build one above with "
+                "«Build the sequence…»."))
             return
-        self.btn_go_compare.setVisible(False)
         self._last_suggestions = []     # a new target: stale reasons go
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
         self._prefill_bv_from_field(col, row)
@@ -660,6 +652,24 @@ class UfeMeasureTab(QWidget):
         last = self._last
         result = last["result"]
         zp = last["zp"]
+        # the skip breakdown, computed once: with no calibration the
+        # causes ARE the answer, so they ride right under the headline
+        # instead of drowning at the bottom of the notes
+        n_skip = sum(skipped.values()) if isinstance(skipped, dict) else 0
+        parts = []
+        if isinstance(skipped, dict):
+            if skipped.get("sat"):
+                parts.append(self.tr("{0} saturated/clipped")
+                             .format(skipped["sat"]))
+            if skipped.get("off"):
+                parts.append(self.tr("{0} off the plate")
+                             .format(skipped["off"]))
+            if skipped.get("band"):
+                parts.append(self.tr("{0} without the {1} band")
+                             .format(skipped["band"], band))
+            if skipped.get("other"):
+                parts.append(self.tr("{0} not measurable")
+                             .format(skipped["other"]))
         lines = []
         lines.append(self.tr("Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}")
                      .format(last["col"], last["row"], result["flux"]))
@@ -668,6 +678,15 @@ class UfeMeasureTab(QWidget):
         if zp["zp"] is None:
             lines.append(self.tr(
                 "No comparison star could be used: no calibration."))
+            if n_skip:
+                lines.append(self.tr(
+                    "Why: {0} (of {1} sequence stars).")
+                    .format(", ".join(parts), n_seq))
+                if isinstance(skipped, dict) and skipped.get("sat"):
+                    lines.append(self.tr(
+                        "The proposed comps are too bright for this "
+                        "plate: re-propose with a fainter target "
+                        "magnitude, or check the saturation ceiling."))
         elif zp.get("color_used"):
             lines.append(self.tr(
                 "Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} "
@@ -727,21 +746,7 @@ class UfeMeasureTab(QWidget):
                 "apertures set by hand (the seeing auto-scale is paused)"))
         for reason in self._last_suggestions:
             notes.append(reason)
-        n_skip = sum(skipped.values()) if isinstance(skipped, dict) else 0
-        if n_skip:
-            parts = []
-            if skipped.get("sat"):
-                parts.append(self.tr("{0} saturated/clipped")
-                             .format(skipped["sat"]))
-            if skipped.get("off"):
-                parts.append(self.tr("{0} off the plate")
-                             .format(skipped["off"]))
-            if skipped.get("band"):
-                parts.append(self.tr("{0} without the {1} band")
-                             .format(skipped["band"], band))
-            if skipped.get("other"):
-                parts.append(self.tr("{0} not measurable")
-                             .format(skipped["other"]))
+        if n_skip and zp["zp"] is not None:
             notes.append(self.tr(
                 "{0} of {1} sequence stars not usable: {2}")
                 .format(n_skip, n_seq, ", ".join(parts)))

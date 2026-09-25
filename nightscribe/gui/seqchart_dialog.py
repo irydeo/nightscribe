@@ -173,6 +173,7 @@ class SeqChartDialog(QDialog):
             self._table.setItem(i, 2, mag)
             btn = QPushButton("×")
             btn.setFixedWidth(28)
+            btn.setProperty("compact", True)   # see ufe_compare_tab
             btn.clicked.connect(lambda _c=False, row=i: self._remove(row))
             self._table.setCellWidget(i, 3, btn)
         self._table.blockSignals(False)

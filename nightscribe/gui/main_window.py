@@ -5924,6 +5924,7 @@ class MainWindow(QMainWindow):
         row.addWidget(spn_e)
         btn_del = QPushButton("✕")
         btn_del.setFixedWidth(28)
+        btn_del.setProperty("compact", True)   # see ufe_compare_tab
         entry = {"cmb": cmb, "spn_n": spn_n, "spn_e": spn_e,
                     "row": row, "btn_del": btn_del}
         btn_del.clicked.connect(lambda checked, e=entry: self._sn_del_step_row(e))

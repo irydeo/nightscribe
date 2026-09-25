@@ -159,6 +159,8 @@ class OrbitChart(QWidget):
         self._play_btn.setIcon(_play_icon())
         self._play_btn.setToolTip(self.tr("Play"))
         self._play_btn.setFixedHeight(24)
+        self._play_btn.setProperty("compact", True)   # icon-only button:
+                                # the global padding would squeeze the icon
         self._play_btn.clicked.connect(self._toggle_play)
         self._slider = QSlider(Qt.Horizontal)
         self._slider.setRange(0, 1000)

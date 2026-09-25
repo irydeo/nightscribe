@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  UFE Photometry tab, Sequence section (ADR-044 rev): the photometric
-  comparison sequence picker. Loaded by gui/ufe_compare_tab.py through
-  gui/ui_loader.py. The catalog combo's items carry userData and the
-  sequence button's count is dynamic: both are set in code (ADR-005:
-  structure and texts here, data in code).
+  UFE Photometry tab, Comparisons section (ADR-044 rev 2026-09-25): the
+  photometric comparison sequence. Loaded by gui/ufe_compare_tab.py
+  through gui/ui_loader.py. The normal path is ONE click: "Build the
+  sequence…" generates the catalog field and proposes the comparisons.
+  The manual picking controls live folded inside the ph_manual
+  placeholder (a CollapsibleSection inserted in code); the catalog
+  combo's items carry userData and the sequence button's count is
+  dynamic: both are set in code (ADR-005: structure and texts here,
+  data in code).
 -->
 <ui version="4.0">
  <class>UfeCompareTab</class>
@@ -21,34 +25,14 @@
     </layout>
    </item>
    <item>
-    <layout class="QHBoxLayout" name="row_field">
-     <item><widget class="QPushButton" name="btn_field"><property name="text"><string>Generate field</string></property><property name="toolTip"><string>Query the catalog (and VSX variables) around the plate centre</string></property></widget></item>
+    <layout class="QHBoxLayout" name="row_auto">
+     <item><widget class="QPushButton" name="btn_auto"><property name="text"><string>Build the sequence…</string></property><property name="toolTip"><string>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</string></property></widget></item>
      <item><widget class="QPushButton" name="btn_dss"><property name="text"><string>DSS2…</string></property><property name="toolTip"><string>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</string></property></widget></item>
-     <item><spacer name="hsp_field"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><spacer name="hsp_auto"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
     </layout>
    </item>
    <item><widget class="QLabel" name="lbl_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-   <item><widget class="QLabel" name="lbl_hint"><property name="text"><string>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-   <item>
-    <layout class="QHBoxLayout" name="row_pick">
-     <item><widget class="QLabel" name="lbl_pick"><property name="text"><string>On click, add as:</string></property></widget></item>
-     <item><widget class="QRadioButton" name="rdo_comp"><property name="text"><string>Comparison</string></property><property name="checked"><bool>true</bool></property></widget></item>
-     <item><widget class="QRadioButton" name="rdo_check"><property name="text"><string>Check</string></property></widget></item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="row_show">
-     <item><widget class="QCheckBox" name="chk_labels"><property name="text"><string>Show catalog magnitudes</string></property><property name="checked"><bool>true</bool></property></widget></item>
-     <item><widget class="QCheckBox" name="chk_target"><property name="text"><string>Show the target marker</string></property><property name="toolTip"><string>The amber ring that marks the target on the plate</string></property><property name="checked"><bool>true</bool></property></widget></item>
-    </layout>
-   </item>
-   <item>
-    <layout class="QHBoxLayout" name="row_propose">
-     <item><widget class="QPushButton" name="btn_propose"><property name="text"><string>Propose sequence</string></property><property name="toolTip"><string>Automatic proposal: isolated, non-variable stars matched to the target's brightness</string></property></widget></item>
-     <item><widget class="QPushButton" name="btn_seq_open"><property name="text"><string/></property><property name="toolTip"><string>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</string></property></widget></item>
-     <item><spacer name="hsp_propose"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-    </layout>
-   </item>
+   <item><widget class="QWidget" name="ph_manual"/></item>
    <item><spacer name="vsp_compare"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
   </layout>
  </widget>

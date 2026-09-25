@@ -130,7 +130,7 @@ def dlg(qapp, tmp_path):
     d._test_target = target
     d._test_comps = comps
     d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
-    d.tab_photometry.set_mode("measure")
+    # no modes: the folded manual tweak already arms the measuring
     yield d
     d.tab_blink.shutdown()
     d.view._render_timer.stop()
@@ -151,8 +151,20 @@ def test_tab_present_and_enabled(dlg):
 
 def test_click_without_sequence_guides_to_sequence(dlg):
     _click(dlg, *dlg._test_target)
-    assert "Sequence" in dlg.tab_measure.lbl_status.text()
-    assert dlg.tab_measure.btn_go_compare.isVisible()
+    assert "Build the sequence" in dlg.tab_measure.lbl_status.text()
+
+
+def test_no_calibration_explains_why(dlg):
+    # Every comp skipped: the bare headline is not enough; the causes
+    # ride right under it (the breakdown used to drown at the bottom of
+    # the notes, below the fold).
+    entries = _sequence(dlg, dlg._test_comps)
+    for e in entries:
+        e["star"]["bands"] = []                # the catalog lacks the band
+    _click(dlg, *dlg._test_target)
+    panel = dlg.tab_measure.lbl_result.toPlainText()
+    assert "no calibration" in panel
+    assert "Why:" in panel and "without the V band" in panel
 
 
 def test_full_measurement_calibrates(dlg):
@@ -181,19 +193,22 @@ def test_full_measurement_calibrates(dlg):
 def test_remeasure_keeps_painting_while_the_sequence_owns_the_stage(dlg):
     # Regression (ADR-044 rev): the overlays follow the Photometry tab's
     # stage, not the click ownership. Re-measuring (any recipe control
-    # ends in _remeasure) while the Sequence section is armed used to
-    # drop the rings and paint nothing back.
+    # ends in _remeasure) with the manual tweak unfolded (the picking
+    # owns the clicks) used to drop the rings and paint nothing back.
     tab = dlg.tab_measure
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)
     assert len(tab._items) == 3 + 5
-    dlg.tab_photometry.set_mode("sequence")     # disarmed, still visible
+    # unfolded tweak: picking owns the clicks, Measure stays on stage
+    dlg.tab_compare.sec_manual.setCollapsed(False)
+    dlg.tab_photometry._apply()
     assert not tab._active and tab._on_stage
     tab._remeasure()
     assert tab._last is not None and tab._last.get("mag") is not None
     assert len(tab._items) == 3 + 5
-    # back to Measure: still coherent, and a full leave drops them
-    dlg.tab_photometry.set_mode("measure")
+    # folded again: Measure re-arms, still coherent; a full leave drops
+    dlg.tab_compare.sec_manual.setCollapsed(True)
+    dlg.tab_photometry._apply()
     assert len(tab._items) == 3 + 5
     dlg.tabs.setCurrentWidget(dlg.tab_blink)
     assert tab._items == []
@@ -726,7 +741,8 @@ def test_no_field_match_says_new_object(dlg):
 def test_compressed_comps_are_excluded_and_named(dlg, tmp_path):
     # The review case: a plate that clips at 10500 ADU. Every comp core
     # is flat there; the hot corner lets the guard infer the ceiling.
-    # The zero point must refuse them out loud instead of lying low.
+    # The zero point must refuse them out loud instead of lying low:
+    # with no calibration left, the causes ride under the headline.
     data, target, comps = _plate()
     data = np.minimum(data, 10500.0)
     data[5:8, 5:40] = 10500.0
@@ -736,9 +752,9 @@ def test_compressed_comps_are_excluded_and_named(dlg, tmp_path):
     _click(dlg, *target)
     tab = dlg.tab_measure
     panel = tab.lbl_result.toPlainText()
-    assert "5 of 5" in panel
-    assert "saturated/clipped" in panel
-    assert "clipping level" in panel
+    assert "no calibration" in panel
+    assert "Why:" in panel and "5 saturated/clipped" in panel
+    assert "too bright for this plate" in panel
     assert not tab.btn_csv.isEnabled()
 
 

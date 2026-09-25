@@ -392,3 +392,49 @@ def test_boxes_duck_the_probe_anchor(view, tmp_path):
                                            QRectF(0, 0, 50, 20))
     assert y_boxed > y_plain                  # the probe ducks the box
     view.set_pick_cursor(False)
+
+
+# ------------------------------------------------- global object mark
+
+def _plate_centre_sky(view):
+    # @return: (ra, dec) of the loaded plate's centre pixel
+    w, h = view._state.plate_shape
+    return view._state.wcs.pixel_to_sky(w / 2.0, h / 2.0)
+
+
+def test_object_mark_follows_object_and_survives_tabs(view):
+    assert view._object_mark_items == []        # no object, no mark
+    view._state.load(MONO)
+    view.set_object_mark(*_plate_centre_sky(view))
+    assert len(view._object_mark_items) == 5    # 4 arms + the box
+    assert all(it.isVisible() for it in view._object_mark_items)
+    view.set_object_mark_visible(False)         # the bar toggle
+    assert all(not it.isVisible() for it in view._object_mark_items)
+    assert len(view._object_mark_items) == 5    # hidden, never dropped
+    view.clear_overlays()                       # tabs own nothing here
+    assert len(view._object_mark_items) == 5    # the layer survives
+    view.set_object_mark(None, None)
+    assert view._object_mark_items == []
+
+
+def test_object_mark_needs_wcs_and_in_plate_coords(view, tmp_path):
+    from test_fits_annotate import _make_fits
+    view._state.load(_make_fits(tmp_path / "plain.fits"))   # no WCS
+    view.set_object_mark(10.0, 20.0)
+    assert view._object_mark_items == []
+    view._state.load(MONO)
+    view.set_object_mark(10.0, 20.0)            # off-plate sky: no mark
+    assert view._object_mark_items == []
+    view.set_object_mark("not-a-number", None)  # garbage parses to nothing
+    assert view._object_mark_radec is None
+    assert view._object_mark_items == []
+
+
+def test_object_mark_burns_into_the_export_when_visible(view, tmp_path):
+    view._state.load(MONO)
+    a = view.export_png(tmp_path / "off.png").read_bytes()
+    view.set_object_mark(*_plate_centre_sky(view))
+    b = view.export_png(tmp_path / "on.png").read_bytes()
+    assert a != b                               # visible: it burns in
+    view.set_object_mark_visible(False)
+    assert view.export_png(tmp_path / "off2.png").read_bytes() == a

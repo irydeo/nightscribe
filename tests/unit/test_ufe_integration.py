@@ -99,18 +99,19 @@ def test_settings_has_the_development_tab(qapp):
 def test_open_plate_and_show_tab(dlg):
     assert dlg.open_plate(str(MONO))
     assert not dlg.open_plate(str(FIXTURES / "missing.fits"))
-    # the legacy measure tab is routed to the Photometry tab; without a
-    # sequence it lands on the Sequence section (the landing rule: there
-    # is nothing to measure with yet, so the clicks build one)
+    # the legacy section names are routed to the Photometry tab; there
+    # are no modes anymore (ADR-044 rev 2026-09-25): both links land on
+    # the same tab, and the folded manual tweak leaves the clicks
+    # measuring
     dlg.show_tab(dlg.tab_measure)
     assert dlg.tabs.currentWidget() is dlg.tab_photometry
-    assert dlg.tab_photometry.btn_seq.isChecked()
-    # with a sequence waiting, the same link lands on Measure
-    dlg.tab_compare._entries = [{"name": "Comp1", "kind": "comp",
-                                 "star": {"ra": 1.0, "dec": 1.0}}]
-    dlg.show_tab(dlg.tab_measure)
+    assert dlg.tab_measure._active
+    dlg.show_tab("compare")
     assert dlg.tabs.currentWidget() is dlg.tab_photometry
-    assert dlg.tab_photometry.btn_meas.isChecked()
+    # unfolding the manual tweak hands the clicks to the star picking
+    dlg.tab_compare.sec_manual.setCollapsed(False)
+    dlg.tab_photometry._apply()
+    assert dlg.tab_compare._active and not dlg.tab_measure._active
 
 
 def test_prefills_land(dlg):

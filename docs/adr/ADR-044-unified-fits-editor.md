@@ -226,11 +226,62 @@ pestañas, que repetían el mismo anillo en tres bloques propios, dibujan
 ahora con el helper compartido `ring_marker_items` en
 `widgets/ufe_image_view.py` (gemelo de `cross_marker_items`, el mismo
 contrato de ítems: 1 elipse + 4 ticks, pinceles cosméticos, que las
-pruebas pinan por tipo y color), y el ámbar de esta familia de
+ pruebas pinan por tipo y color), y el ámbar de esta familia de
 marcadores tiene una única fuente, `palette.ACCENT` (#ffb347): los
 colores locales duplicados se retiran y el color de apertura de Medir
 se une a la misma familia. Cero cambio visual: las pruebas de
 geometría siguen pasando sin tocar.
+
+**Sección Comparisons: un clic y marca de objeto global (2026-09-25,
+segunda revisión del día)**. La sección Secuencia se presentaba como un
+marcador manual de estrellas, cuando el flujo normal es automático:
+generar el campo y proponer la secuencia. Ahora el camino principal es
+un solo botón, «Build the sequence…» / «Construir la secuencia…»: lanza
+la consulta de catálogo (con el diálogo de progreso modal que ya
+cubre las esperas de red, para que nunca parezca un cuelgue) y la
+propuesta se ejecuta sola en cuanto el campo aterriza; con el campo ya
+cargado, el mismo botón solo re-propone. «Generate field» y «Propose
+sequence» quedan como acciones secundarias por separado. Los controles
+de marcado manual (la pista de clics, los radios Comparison/Check y el
+casillero de etiquetas de catálogo) se pliegan bajo una
+`CollapsibleSection` («Manual tweak» / «Ajuste manual», plegada por
+defecto; su cuerpo vive en `ui/ufe_compare_manual.ui` para que sus
+textos sigan siendo traducibles). La sección se renombra:
+«Comparisons» / «Comparaciones» en el conmutador de la pestaña
+Fotometría (los modos internos `sequence`/`measure` y los deep links no
+cambian). Y la marca ámbar de objetivo de la sección desaparece entera
+(casillero, colocación con clic y el «Move marker…» de la barra): el
+objeto adjunto lo marca ahora la marca global roja tenue de la barra
+superior (cruz a todo el campo con caja, alfa 50 %, capa propia de la
+vista que sobrevive a los cambios de pestaña y sale en el PNG exportado
+solo cuando está visible; necesita WCS, y el botón se deshabilita sin
+objeto con coordenadas).
+
+**Fotometría sin modos (2026-09-25, tercera revisión del día)**. El
+conmutador «Comparisons»/«Measure» desaparece: Fotometría es una sola
+columna con las dos secciones siempre visibles (secuencia arriba, medida
+abajo), y lo que hace un clic en la placa lo decide el plegado de
+«Manual tweak» de la sección de secuencia: plegado (el estado normal)
+el clic mide; desplegado el clic marca estrellas. Todas las acciones
+manuales viven dentro del plegable: la pista de clics, los radios
+Comparison/Check, las etiquetas de catálogo y ahora también «Generate
+field», «Propose sequence» y «Sequence (N)…»; la cara visible de la
+sección es solo el objetivo, «Build the sequence…» y el estado. El
+botón «Go to the comparisons» de Medir sobra y se retira (el mensaje
+sin secuencia apunta a «Build the sequence…»). Los deep links
+«compare»/«measure» siguen aceptados y simplemente seleccionan la
+pestaña. Corrección de paso: el diálogo de progreso del campo nunca
+llegaba a mostrarse (un QProgressDialog indeterminado solo se
+auto-muestra con setValue, que nunca llega): `_busy_wait` lo muestra
+explícitamente y el diálogo cubre la cadena entera campo → propuesta
+(se cierra tras proponer, no al llegar el campo). Tres detalles más de
+la misma revisión: el diálogo se centra sobre la ventana del editor y
+su cierre es incondicional (try/finally: un modal que sobrevive a una
+excepción se lee como un cuelgue); el splitter de Fotometría reparte de
+nuevo al desplegar «Ajuste manual» (la mitad superior crece para que
+quepa todo); y el panel de Medir, cuando no hay calibración, desglosa
+las causas junto al titular («Why: 5 saturated/clipped…») con la guía
+en lenguaje llano, en vez de ahogarlas al final de las notas.
 
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
@@ -450,6 +501,53 @@ of this marker family has a single source, `palette.ACCENT` (#ffb347):
 the duplicated local colours are retired and the Measure tab's aperture
 colour joins the same family. Zero visual change: the geometry pins
 still pass untouched.
+
+**Comparisons section: one click and a global object mark (2026-09-25,
+second revision of the day)**. The Sequence section presented itself as
+a manual star picker, when the normal flow is automatic: generate the
+field and propose the sequence. The main path is now a single button,
+"Build the sequence…": it runs the catalog query (under the modal
+progress dialog that already covers the network waits, so it never
+reads as a hang) and the proposal runs by itself the moment the field
+lands; with a field already loaded, the same button only re-proposes.
+"Generate field" and "Propose sequence" stay as separate secondary
+actions. The manual picking controls (the click hint, the
+Comparison/Check radios and the catalog-labels checkbox) fold under a
+`CollapsibleSection` ("Manual tweak", collapsed by default; its body
+lives in `ui/ufe_compare_manual.ui` so its texts stay translatable).
+The section is renamed: "Comparisons" on the Photometry tab's mode
+toggle (the internal `sequence`/`measure` modes and the deep links are
+unchanged). And the section's own amber target mark is gone entirely
+(checkbox, click placement and the bar's "Move marker…"): the attached
+object is now marked by the top bar's subtle global red mark (a
+full-frame cross with a box, 50 % alpha, its own view layer that
+survives tab switches and lands in the exported PNG only while visible;
+it needs a WCS, and the button disables with no object coordinates).
+
+**Photometry without modes (2026-09-25, third revision of the day)**.
+The "Comparisons"/"Measure" toggle is gone: Photometry is a single
+column with both sections always visible (sequence on top, measuring
+below), and what a plate click does follows the "Manual tweak" fold of
+the sequence section: folded (the normal state) the click measures;
+expanded it picks stars. Every hand-driven action lives inside the
+fold: the click hint, the Comparison/Check radios, the catalog labels
+and now also "Generate field", "Propose sequence" and "Sequence (N)…";
+the section's visible face is just the target, "Build the sequence…"
+and the status line. The Measure section's "Go to the comparisons"
+button is removed (the no-sequence message points at "Build the
+sequence…"). The "compare"/"measure" deep links stay accepted and
+simply select the tab. Fix along the way: the field's progress dialog
+never actually appeared (an indeterminate QProgressDialog only
+auto-shows on setValue, which never comes): `_busy_wait` shows it
+explicitly and the dialog covers the whole field → proposal chain (it
+closes after proposing, not when the field lands). Three more details
+of the same revision: the dialog is centred over the editor window and
+its reaping is unconditional (try/finally: a modal surviving an
+exception reads as a hang); the Photometry splitter re-deals when
+"Manual tweak" unfolds (the top half grows so everything fits); and the
+Measure panel, with no calibration, itemises the causes right under the
+headline ("Why: 5 saturated/clipped…") with plain-language guidance
+instead of drowning them at the bottom of the notes.
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

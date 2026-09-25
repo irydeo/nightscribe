@@ -38,16 +38,14 @@ import logging
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFileDialog,
-                               QGridLayout, QHBoxLayout, QLabel,
-                               QLineEdit, QPushButton, QRadioButton,
-                               QSlider, QSpinBox, QVBoxLayout, QWidget,
+from PySide6.QtWidgets import (QFileDialog, QWidget,
                                QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsSimpleTextItem)
 
 from ..core import stretch
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_blink_tab")
 
@@ -83,134 +81,63 @@ class UfeBlinkTab(QWidget):
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("SN:")))
-        self.edt_name = QLineEdit()
-        self.edt_name.setPlaceholderText("SN 2026xyz")
-        row.addWidget(self.edt_name, 1)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.chk_manual = QCheckBox(self.tr("Manual coordinates"))
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets, fills the zoom combo (its items carry
+        # userData) and connects the signals.
+        self._ui = adopt_ui(self, "ufe_blink_tab")
+                                            # over: no wrapper margins
+        self.edt_name = self._ui.edt_name
+        self.chk_manual = self._ui.chk_manual
         self.chk_manual.toggled.connect(self._on_manual_toggled)
-        row.addWidget(self.chk_manual)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.edt_ra = QLineEdit()
-        self.edt_ra.setPlaceholderText(self.tr("RA deg"))
-        self.edt_dec = QLineEdit()
-        self.edt_dec.setPlaceholderText(self.tr("Dec deg"))
-        row.addWidget(self.edt_ra)
-        row.addWidget(self.edt_dec)
-        lay.addLayout(row)
-        self.btn_prepare = QPushButton(self.tr("Prepare pair"))
+        self.edt_ra = self._ui.edt_ra
+        self.edt_dec = self._ui.edt_dec
+        self.btn_prepare = self._ui.btn_prepare
         self.btn_prepare.clicked.connect(self._on_prepare)
-        lay.addWidget(self.btn_prepare)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setWordWrap(True)
-        lay.addWidget(self.lbl_status)
+        self.lbl_status = self._ui.lbl_status
 
-        row = QHBoxLayout()
-        self.chk_live = QCheckBox(self.tr("Live blink"))
-        self.chk_live.setChecked(True)
+        self.chk_live = self._ui.chk_live
         self.chk_live.toggled.connect(self._on_live_toggled)
-        row.addWidget(self.chk_live)
-        row.addWidget(QLabel(self.tr("Interval:")))
-        self.spn_interval = QSpinBox()
-        self.spn_interval.setRange(100, 5000)
-        self.spn_interval.setValue(500)
-        self.spn_interval.setSuffix(" ms")
+        self.spn_interval = self._ui.spn_interval
         self.spn_interval.valueChanged.connect(self._on_interval_changed)
-        row.addWidget(self.spn_interval)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.rdo_blink = QRadioButton(self.tr("Blink"))
-        self.rdo_blink.setChecked(True)
-        self.rdo_fade = QRadioButton(self.tr("Fade"))
+        self.rdo_blink = self._ui.rdo_blink
+        self.rdo_fade = self._ui.rdo_fade
         self.rdo_blink.toggled.connect(self._on_mode_changed)
-        row.addWidget(self.rdo_blink)
-        row.addWidget(self.rdo_fade)
-        self.sld_fade = QSlider(Qt.Horizontal)
-        self.sld_fade.setRange(0, 100)
-        self.sld_fade.setValue(50)
-        self.sld_fade.setEnabled(False)
+        self.sld_fade = self._ui.sld_fade
         self.sld_fade.valueChanged.connect(self._render_frames)
-        row.addWidget(self.sld_fade)
-        lay.addLayout(row)
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Balance:")))
-        self.sld_balance = QSlider(Qt.Horizontal)
-        self.sld_balance.setRange(25, 400)     # gain 0.25..4.0
-        self.sld_balance.setValue(100)
-        self.sld_balance.setToolTip(self.tr(
-            "Multiplies the reference so its sky background matches the "
-            "plate's (a blink that does not pump)"))
+        self.sld_balance = self._ui.sld_balance   # gain 0.25..4.0
         self.sld_balance.valueChanged.connect(self._on_balance_changed)
-        row.addWidget(self.sld_balance, 1)
-        self.btn_balance_auto = QPushButton(self.tr("Auto"))
+        self.btn_balance_auto = self._ui.btn_balance_auto
         self.btn_balance_auto.clicked.connect(self._on_balance_auto)
-        row.addWidget(self.btn_balance_auto)
-        lay.addLayout(row)
 
         # Fine alignment: the cross of half-pixel steps from the legacy
         # blink dialog (up adds to y, which reads up on screen).
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Fine alignment:")))
-        grid = QGridLayout()
-        grid.setSpacing(2)
-        self.btn_up = QPushButton(self.tr("↑"))
+        self.btn_up = self._ui.btn_up
         self.btn_up.clicked.connect(lambda: self._nudge_step(0.0, 0.5))
-        grid.addWidget(self.btn_up, 0, 1)
-        self.btn_left = QPushButton(self.tr("←"))
+        self.btn_left = self._ui.btn_left
         self.btn_left.clicked.connect(lambda: self._nudge_step(-0.5, 0.0))
-        grid.addWidget(self.btn_left, 1, 0)
-        self.lbl_nudge = QLabel("(0.0, 0.0)")
-        self.lbl_nudge.setAlignment(Qt.AlignCenter)
-        grid.addWidget(self.lbl_nudge, 1, 1)
-        self.btn_right = QPushButton(self.tr("→"))
+        self.lbl_nudge = self._ui.lbl_nudge
+        self.lbl_nudge.setText("(0.0, 0.0)")         # data, not text
+        self.btn_right = self._ui.btn_right
         self.btn_right.clicked.connect(
             lambda: self._nudge_step(0.5, 0.0))
-        grid.addWidget(self.btn_right, 1, 2)
-        self.btn_down = QPushButton(self.tr("↓"))
+        self.btn_down = self._ui.btn_down
         self.btn_down.clicked.connect(lambda: self._nudge_step(0.0, -0.5))
-        grid.addWidget(self.btn_down, 2, 1)
-        row.addLayout(grid)
-        row.addStretch(1)
-        lay.addLayout(row)
 
-        row = QHBoxLayout()
-        self.chk_marker = QCheckBox(self.tr("Marker"))
-        self.chk_marker.setChecked(True)
+        self.chk_marker = self._ui.chk_marker
         self.chk_marker.toggled.connect(self._refresh_marker)
-        row.addWidget(self.chk_marker)
-        row.addWidget(QLabel(self.tr("Size:")))
-        self.sld_marker = QSlider(Qt.Horizontal)
-        self.sld_marker.setRange(2, 30)
-        self.sld_marker.setValue(10)
+        self.sld_marker = self._ui.sld_marker
         self.sld_marker.valueChanged.connect(self._refresh_marker)
-        row.addWidget(self.sld_marker, 1)
-        lay.addLayout(row)
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Export zoom:")))
-        self.cmb_zoom = QComboBox()
+        self.cmb_zoom = self._ui.cmb_zoom
         for label, factor in (("1×", 1), ("2×", 2), ("4×", 4)):
             self.cmb_zoom.addItem(label, factor)
-        row.addWidget(self.cmb_zoom)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.btn_gif = QPushButton(self.tr("GIF…"))
+        self.btn_gif = self._ui.btn_gif
         self.btn_gif.clicked.connect(lambda: self._export("gif"))
-        row.addWidget(self.btn_gif)
-        self.btn_video = QPushButton(self.tr("MP4…"))
+        self.btn_video = self._ui.btn_video
         self.btn_video.clicked.connect(lambda: self._export("video"))
-        row.addWidget(self.btn_video)
-        self.btn_png = QPushButton(self.tr("PNG…"))
+        self.btn_png = self._ui.btn_png
         self.btn_png.clicked.connect(lambda: self._export("png"))
-        row.addWidget(self.btn_png)
-        lay.addLayout(row)
-        lay.addStretch(1)
 
     # ------------------------------------------------------- activation
 

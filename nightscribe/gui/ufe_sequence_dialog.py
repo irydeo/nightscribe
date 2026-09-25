@@ -22,10 +22,15 @@ aliases it as its own public .table so the pinned tests keep working.
 Since 2026-09-25 the "Remove all" and "Export CSV…" actions live
 here, under the table they act on (the tab keeps btn_clear / btn_csv
 aliases pointing at these buttons).
+
+ADR-005 restored (2026-09-25): the structure lives in
+ui/ufe_sequence_dialog.ui; this class loads it, hides the action
+buttons nobody wired, and connects the rest.
 """
 
-from PySide6.QtWidgets import (QDialog, QHBoxLayout, QPushButton,
-                               QTableWidget, QVBoxLayout)
+from PySide6.QtWidgets import QDialog
+
+from .ui_loader import adopt_ui
 
 
 class UfeSequenceDialog(QDialog):
@@ -38,24 +43,18 @@ class UfeSequenceDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Sequence"))
         self.setMinimumSize(420, 240)
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(
-            [self.tr("Name"), self.tr("Type"), self.tr("Mag"), ""])
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        lay = QVBoxLayout(self)
-        lay.addWidget(self.table)
-        # ADR-044 rev (2026-09-25): the actions live with the table,
-        # not on the tab; the Compare tab exposes them as btn_clear
-        # and btn_csv so old code and the pinned tests still find them
-        row = QHBoxLayout()
-        if on_clear is not None:
-            self.btn_clear = QPushButton(self.tr("Remove all"))
-            self.btn_clear.clicked.connect(on_clear)
-            row.addWidget(self.btn_clear)
-        if on_export is not None:
-            self.btn_export = QPushButton(self.tr("Export CSV…"))
-            self.btn_export.clicked.connect(on_export)
-            row.addWidget(self.btn_export)
-        row.addStretch(1)
-        lay.addLayout(row)
+        # the structure is the Designer file's (ADR-005); the code keeps
+        # the window dressing and the callback wiring
+        self._ui = adopt_ui(self, "ufe_sequence_dialog")
+                                            # over: no wrapper, no extra
+                                            # margins, tests see the
+                                            # structure directly
+        self.table = self._ui.table
+        self.btn_clear = self._ui.btn_clear
+        self.btn_export = self._ui.btn_export
+        for btn, cb in ((self.btn_clear, on_clear),
+                        (self.btn_export, on_export)):
+            if cb is None:
+                btn.setVisible(False)
+            else:
+                btn.clicked.connect(cb)

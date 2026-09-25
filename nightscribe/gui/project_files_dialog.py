@@ -26,10 +26,10 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (QAbstractItemView, QApplication,
-                               QDialog, QHeaderView,
-                               QLabel, QMenu, QTableWidget,
-                               QTableWidgetItem, QToolButton, QVBoxLayout)
+from PySide6.QtWidgets import (QApplication, QDialog, QHeaderView,
+                               QMenu, QTableWidgetItem, QToolButton)
+
+from .ui_loader import adopt_ui
 
 # Kinds the editor can load directly: a plate, or an annotated copy of one.
 FITS_KINDS = ("fits", "image")
@@ -56,26 +56,17 @@ class ProjectFilesDialog(QDialog):
 
     def _build_ui(self):
         # One table (kind, name, date, size, per-row menu) + the
-        # empty-state line.
-        lay = QVBoxLayout(self)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setVisible(False)
-        lay.addWidget(self.lbl_status)
-        self.tbl = QTableWidget(0, 5)
-        self.tbl.setHorizontalHeaderLabels(
-            [self.tr("Kind"), self.tr("Name"), self.tr("Date"),
-             self.tr("Size"), ""])
-        self.tbl.verticalHeader().setVisible(False)
-        self.tbl.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tbl.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.tbl.setSelectionMode(QAbstractItemView.SingleSelection)
+        # empty-state line. The structure is the Designer file's
+        # (ADR-005); the per-row menus and the column resize modes
+        # (indexed) stay in code.
+        self._ui = adopt_ui(self, "project_files_dialog")
+        self.lbl_status = self._ui.lbl_status
+        self.tbl = self._ui.tbl
         self.tbl.itemDoubleClicked.connect(self._on_row_activated)
-        self.tbl.setContextMenuPolicy(Qt.CustomContextMenu)
         self.tbl.customContextMenuRequested.connect(self._on_context)
         hh = self.tbl.horizontalHeader()
         hh.setSectionResizeMode(1, QHeaderView.Stretch)
         hh.setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        lay.addWidget(self.tbl, 1)
 
     # ------------------------------------------------------------- data
 

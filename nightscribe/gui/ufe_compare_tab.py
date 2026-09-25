@@ -32,12 +32,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QHBoxLayout, QLabel,
-                               QLineEdit, QProgressDialog,
-                               QPushButton, QRadioButton,
-                               QTableWidgetItem,
-                               QVBoxLayout, QWidget,
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QProgressDialog,
+                               QPushButton, QTableWidgetItem, QWidget,
                                QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsRectItem, QGraphicsSimpleTextItem)
 
@@ -45,6 +41,7 @@ from ..core import compstars
 from ..core.sources import vizier
 from ..viz import palette
 from .ufe_sequence_dialog import UfeSequenceDialog
+from .ui_loader import adopt_ui
 from .widgets.ufe_image_view import cross_marker_items
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
@@ -117,86 +114,36 @@ class UfeCompareTab(QWidget):
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        # ADR-044 rev (2026-09-25): target name and magnitude share one
-        # row; the name field stays narrow so the spin, the catalog and
-        # the row itself keep their breathing room
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Target:")))
-        self.edt_target = QLineEdit()
-        self.edt_target.setFixedWidth(130)
-        row.addWidget(self.edt_target)
-        row.addWidget(QLabel(self.tr("Mag:")))
-        self.spn_mag = QDoubleSpinBox()
-        self.spn_mag.setRange(0.0, 25.0)
-        self.spn_mag.setDecimals(2)
-        self.spn_mag.setValue(12.0)
-        self.spn_mag.setToolTip(self.tr(
-            "Approximate magnitude of the target: the proposal picks "
-            "comparisons brighter than or similar to it"))
-        row.addWidget(self.spn_mag)
-        self.cmb_catalog = QComboBox()
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets, fills the catalog combo (its items carry
+        # userData, which a .ui cannot hold) and connects the signals.
+        self._ui = adopt_ui(self, "ufe_compare_tab")
+                                            # over: no wrapper, no extra
+                                            # margins, and layout-walking
+                                            # code sees the rows directly
+        self.edt_target = self._ui.edt_target
+        self.spn_mag = self._ui.spn_mag
+        self.cmb_catalog = self._ui.cmb_catalog
         for key, spec in vizier.CATALOGS.items():
             self.cmb_catalog.addItem(spec["name"], key)
-        row.addWidget(self.cmb_catalog, 1)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.btn_field = QPushButton(self.tr("Generate field"))
-        self.btn_field.setToolTip(self.tr(
-            "Query the catalog (and VSX variables) around the plate "
-            "centre"))
+        self.btn_field = self._ui.btn_field
         self.btn_field.clicked.connect(self._on_generate)
-        row.addWidget(self.btn_field)
-        self.btn_dss = QPushButton(self.tr("DSS2…"))
-        self.btn_dss.setToolTip(self.tr(
-            "No plate of your own? Download the field from the survey "
-            "(PS1-g, DSS2-red fallback) as a FITS with WCS and work on "
-            "it directly"))
+        self.btn_dss = self._ui.btn_dss
         self.btn_dss.clicked.connect(self._on_load_survey)
-        row.addWidget(self.btn_dss)
-        row.addStretch(1)
-        lay.addLayout(row)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setWordWrap(True)
-        lay.addWidget(self.lbl_status)
-        hint = QLabel(self.tr(
-            "Click a star to add or remove it. Known variables (red "
-            "rings) can never be comparisons."))
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("On click, add as:")))
-        self.rdo_comp = QRadioButton(self.tr("Comparison"))
-        self.rdo_comp.setChecked(True)
-        self.rdo_check = QRadioButton(self.tr("Check"))
+        self.lbl_status = self._ui.lbl_status
+        self.rdo_comp = self._ui.rdo_comp
+        self.rdo_check = self._ui.rdo_check
         self.rdo_check.toggled.connect(
             lambda on: setattr(self, "_pick_kind",
                                "check" if on else "comp"))
-        row.addWidget(self.rdo_comp)
-        row.addWidget(self.rdo_check)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.chk_labels = QCheckBox(self.tr("Show catalog magnitudes"))
-        self.chk_labels.setChecked(True)
+        self.chk_labels = self._ui.chk_labels
         self.chk_labels.toggled.connect(self._on_catalog_visible)
-        row.addWidget(self.chk_labels)
-        self.chk_target = QCheckBox(self.tr("Show target marker"))
-        self.chk_target.setChecked(True)
-        self.chk_target.setToolTip(self.tr(
-            "The amber ring that marks the target on the plate"))
+        self.chk_target = self._ui.chk_target
         self.chk_target.toggled.connect(self._on_target_visible)
-        row.addWidget(self.chk_target)
-        lay.addLayout(row)
-        # ADR-044 rev (2026-09-25): the propose row carries the sequence
-        # button too, and "Move marker…" left for the UFE top bar (the
-        # tab still owns the arming through request_target_move)
-        row = QHBoxLayout()
-        self.btn_propose = QPushButton(self.tr("Propose sequence"))
-        self.btn_propose.setToolTip(self.tr(
-            "Automatic proposal: isolated, non-variable stars matched to "
-            "the target's brightness"))
+        self.btn_propose = self._ui.btn_propose
         self.btn_propose.clicked.connect(self._on_propose)
-        row.addWidget(self.btn_propose)
+        self.btn_seq_open = self._ui.btn_seq_open
+        self.btn_seq_open.clicked.connect(self._open_sequence)
 
         # The table lives in its own small non-modal window (ADR-044 rev):
         # the tab stays compact, the window stays open for reading;
@@ -209,17 +156,6 @@ class UfeCompareTab(QWidget):
         self.table = self._seqdlg.table
         self.btn_clear = self._seqdlg.btn_clear
         self.btn_csv = self._seqdlg.btn_export
-
-        self.btn_seq_open = QPushButton(self.tr("Sequence ({0})…").format(0))
-        self.btn_seq_open.setToolTip(self.tr(
-            "The sequence table: the comparison stars and the check star "
-            "with their catalog magnitudes (a small window: keep working "
-            "while it is open)"))
-        self.btn_seq_open.clicked.connect(self._open_sequence)
-        row.addWidget(self.btn_seq_open)
-        row.addStretch(1)
-        lay.addLayout(row)
-        lay.addStretch(1)
 
     def _open_sequence(self):
         # @return: the sequence window rises, non-modal, so picking stars

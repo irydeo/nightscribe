@@ -47,6 +47,12 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 - **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
   «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
 - **Mantenible por personas**: funciones cortas, dependencias mínimas, sin magia.
+- **La interfaz se define en `gui/ui/*.ui` (ADR-005)**: toda ventana, diálogo o pestaña
+  lleva su estructura, textos y tooltips en Designer (cargado vía
+  `gui/ui_loader.load_ui`, `<class>` = clase propietaria, `objectName` = atributo);
+  el código cablea señales y rellena datos (combos con userData, contadores). Los
+  widgets propios (canvas, histograma, filas ricas) nunca van al `.ui`: placeholder
+  `QWidget` + `replaceWidget`.
 - **Toda cadena visible en la GUI pasa por `self.tr()`** (ver CONTRIBUTING).
 - **Toda consulta de red pasa por `core/db.py` (caché)**: nunca llamar a `requests` desde
   fuera de `core/sources/`.
@@ -131,7 +137,8 @@ nightscribe/
                       #   la "prueba de fuego", Track C)
                       # + finder_view (carta de comparación: secuencia fotométrica
                       #   sobre DSS2 o el FITS del usuario — ADR-042)
-    gui/               # app, main_window, workers (QThread), wizard, ui/ (*.ui Designer);
+    gui/               # app, main_window, workers (QThread), wizard, ui_loader,
+                       #   ui/ (*.ui Designer);
                        # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
                        # (ADR-019/035/036/040) — el **Diario de observación**, el
                        # **Calendario del cielo** (skycal_dialog.py, ADR-040) y el
@@ -211,6 +218,12 @@ drafts + tweet + ready-to-attach PNG charts).
   spirit of the sibling project `saas/`. No robotic docstrings, no over-engineering.
 - **Docs in natural language**: never use the em dash ("—"); we write with ":", ","
   and ";". The en dash ("–") stays reserved for numeric ranges (0–100).
+- **The interface is defined in `gui/ui/*.ui` (ADR-005)**: every window, dialog or tab
+  carries its structure, texts and tooltips in Designer (loaded via
+  `gui/ui_loader.load_ui`, `<class>` = owning class, `objectName` = attribute); code
+  wires signals and fills data (combos with userData, counters). Custom widgets
+  (canvases, histogram, rich rows) never enter a `.ui`: placeholder `QWidget` +
+  `replaceWidget`.
 - **Every GUI-visible string goes through `self.tr()`** (see CONTRIBUTING).
 - **All network access goes through `core/db.py` (cache)**: never call `requests`
   outside `core/sources/`.

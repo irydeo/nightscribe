@@ -37,14 +37,13 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtGui import QColor, QPen
-from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox,
-                               QFileDialog, QHBoxLayout, QLabel,
-                               QPushButton, QTextEdit, QVBoxLayout,
-                               QWidget, QGraphicsEllipseItem)
+from PySide6.QtWidgets import (QFileDialog, QWidget,
+                               QGraphicsEllipseItem)
 
 from ..core import coords, fits_meta, photometry, photometry_export, \
     stretch
 from .ufe_advanced_dialog import UfeAdvancedDialog
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
@@ -97,27 +96,16 @@ class UfeMeasureTab(QWidget):
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        hint = QLabel(self.tr(
-            "Click a star (or the target) to measure it against the "
-            "sequence (Sequence section, the top half of this tab)."))
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setWordWrap(True)
-        lay.addWidget(self.lbl_status)
-        self.btn_go_compare = QPushButton(self.tr(
-            "Go to the sequence"))
-        self.btn_go_compare.setVisible(False)
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets, sizes the aperture spins from
+        # core/photometry's defaults and wires every signal.
+        self._ui = adopt_ui(self, "ufe_measure_tab")
+                                            # over: no wrapper margins
+        self.lbl_status = self._ui.lbl_status
+        self.btn_go_compare = self._ui.btn_go_compare
         if self._go_compare is not None:
             self.btn_go_compare.clicked.connect(self._go_compare)
-        lay.addWidget(self.btn_go_compare)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Band:")))
-        self.cmb_band = QComboBox()
-        row.addWidget(self.cmb_band, 1)
-        lay.addLayout(row)
+        self.cmb_band = self._ui.cmb_band
 
         # The recipe knobs live one click open (ADR-044 rev): the daily
         # flow is band, apertures, Suggest; the rest (sky model,
@@ -125,40 +113,19 @@ class UfeMeasureTab(QWidget):
         # its own small non-modal window; the tab keeps the public
         # attributes and wires every signal itself.
         self._advanced = UfeAdvancedDialog(self)
-        self.btn_suggest = QPushButton(self.tr("Suggest"))
-        self.btn_suggest.setToolTip(self.tr(
-            "Propose the radii from this target's growth curve and its "
-            "surroundings (crowding, background gradient), with the "
-            "reasons in plain language"))
+        self.btn_suggest = self._ui.btn_suggest
         self.btn_suggest.clicked.connect(self._on_suggest)
-
-        # ADR-044 rev (2026-09-25): Suggest shares the Apertures row,
-        # so the daily flow fits on one line; the radius spins stay
-        # narrow
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Apertures:")))
-        self.spn_rap = self._spin(photometry.R_AP, 1.0, 20.0)
-        self.spn_rin = self._spin(photometry.R_ANN_IN, 2.0, 40.0)
-        self.spn_rout = self._spin(photometry.R_ANN_OUT, 3.0, 60.0)
-        for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
-            spn.setFixedWidth(56)
-            row.addWidget(spn)
-        row.addStretch(1)
-        row.addWidget(self.btn_suggest)
-        lay.addLayout(row)
-        tip = self.tr("Aperture radius, sky annulus inner and outer "
-                      "radius (px)")
+        self.spn_rap = self._spin(self._ui.spn_rap, photometry.R_AP,
+                                  1.0, 20.0)
+        self.spn_rin = self._spin(self._ui.spn_rin, photometry.R_ANN_IN,
+                                  2.0, 40.0)
+        self.spn_rout = self._spin(self._ui.spn_rout,
+                                   photometry.R_ANN_OUT, 3.0, 60.0)
         self._radii_manual = False   # True once the observer edits a spin
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
-            spn.setToolTip(tip)
             spn.valueChanged.connect(self._on_radii_edited)
-        self.btn_advanced = QPushButton(self.tr("Advanced…"))
-        self.btn_advanced.setToolTip(self.tr(
-            "The full recipe: sky model, sigma-clip, seeing apertures, "
-            "colour term, host-galaxy subtraction (a small window: keep "
-            "measuring while it is open)"))
+        self.btn_advanced = self._ui.btn_advanced
         self.btn_advanced.clicked.connect(self._open_advanced)
-        lay.addWidget(self.btn_advanced)
         # the public attributes the tests and the measure flow pin
         self.chk_sigmaclip = self._advanced.chk_sigmaclip
         self.chk_seeing = self._advanced.chk_seeing
@@ -177,41 +144,22 @@ class UfeMeasureTab(QWidget):
 
         # The result log is plain text in a scrollable editor: a long
         # report (comps, guards, verdict) must never squash the tab.
-        self.lbl_result = QTextEdit()
-        self.lbl_result.setReadOnly(True)
-        self.lbl_result.setPlainText("–")
-        self.lbl_result.setMinimumHeight(120)
-        lay.addWidget(self.lbl_result)
+        self.lbl_result = self._ui.lbl_result
 
-        row = QHBoxLayout()
-        self.btn_csv = QPushButton(self.tr("CSV…"))
-        self.btn_csv.setEnabled(False)
+        self.btn_csv = self._ui.btn_csv
         self.btn_csv.clicked.connect(lambda: self._export("csv"))
-        row.addWidget(self.btn_csv)
-        self.btn_eff = QPushButton(self.tr("AAVSO EFF…"))
-        self.btn_eff.setEnabled(False)
+        self.btn_eff = self._ui.btn_eff
         self.btn_eff.clicked.connect(lambda: self._export("eff"))
-        row.addWidget(self.btn_eff)
         # ADR-044: the editor opened from a project registers the point
         # there (source “measure”); ad-hoc opens hide this button.
-        self.btn_save_project = QPushButton(self.tr("Save in the project"))
-        self.btn_save_project.setToolTip(self.tr(
-            "Register this calibrated point in the project that opened "
-            "the editor: it lands on the light curve and feeds the "
-            "campaign summary (source “measure”)"))
-        self.btn_save_project.setEnabled(False)
-        self.btn_save_project.setVisible(False)
+        self.btn_save_project = self._ui.btn_save_project
         self.btn_save_project.clicked.connect(self._on_save_project)
-        row.addWidget(self.btn_save_project)
-        lay.addLayout(row)
-        lay.addStretch(1)
 
-    def _spin(self, value, lo, hi):
-        # @return: one aperture spinbox (px, half-pixel steps)
-        sb = QDoubleSpinBox()
+    def _spin(self, sb, value, lo, hi):
+        # Sizes one aperture spin (px, half-pixel steps) from
+        # core/photometry's defaults: the widget itself is the .ui's.
+        # @return: the given spin, configured
         sb.setRange(lo, hi)
-        sb.setDecimals(1)
-        sb.setSingleStep(0.5)
         sb.setValue(value)
         return sb
 

@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE Blink tab (ADR-044, phase E): live blink against the survey
+  reference. Loaded by gui/ufe_blink_tab.py through gui/ui_loader.py.
+  The zoom combo's items carry userData and the nudge readout is data:
+  both are set in code (ADR-005).
+-->
+<ui version="4.0">
+ <class>UfeBlinkTab</class>
+ <widget class="QWidget" name="UfeBlinkTab">
+  <layout class="QVBoxLayout" name="vbox_blink"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_name">
+     <property name="layoutStretch"><string notr="true">0,1</string></property>
+     <item><widget class="QLabel" name="lbl_sn"><property name="text"><string>SN:</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_name"><property name="placeholderText"><string notr="true">SN 2026xyz</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_manual">
+     <item><widget class="QCheckBox" name="chk_manual"><property name="text"><string>Manual coordinates</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_coords">
+     <item><widget class="QLineEdit" name="edt_ra"><property name="placeholderText"><string>RA deg</string></property></widget></item>
+     <item><widget class="QLineEdit" name="edt_dec"><property name="placeholderText"><string>Dec deg</string></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QPushButton" name="btn_prepare"><property name="text"><string>Prepare pair</string></property></widget></item>
+   <item><widget class="QLabel" name="lbl_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_live">
+     <item><widget class="QCheckBox" name="chk_live"><property name="text"><string>Live blink</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QLabel" name="lbl_interval"><property name="text"><string>Interval:</string></property></widget></item>
+     <item><widget class="QSpinBox" name="spn_interval"><property name="minimum"><number>100</number></property><property name="maximum"><number>5000</number></property><property name="value"><number>500</number></property><property name="suffix"><string notr="true"> ms</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_mode">
+     <item><widget class="QRadioButton" name="rdo_blink"><property name="text"><string>Blink</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QRadioButton" name="rdo_fade"><property name="text"><string>Fade</string></property></widget></item>
+     <item><widget class="QSlider" name="sld_fade"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>0</number></property><property name="maximum"><number>100</number></property><property name="value"><number>50</number></property><property name="enabled"><bool>false</bool></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_balance">
+     <property name="layoutStretch"><string notr="true">0,1,0</string></property>
+     <item><widget class="QLabel" name="lbl_balance"><property name="text"><string>Balance:</string></property></widget></item>
+     <item><widget class="QSlider" name="sld_balance"><property name="toolTip"><string>Multiplies the reference so its sky background matches the plate's (a blink that does not pump)</string></property><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>25</number></property><property name="maximum"><number>400</number></property><property name="value"><number>100</number></property></widget></item>
+     <item><widget class="QPushButton" name="btn_balance_auto"><property name="text"><string>Auto</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_nudge">
+     <item><widget class="QLabel" name="lbl_fine"><property name="text"><string>Fine alignment:</string></property></widget></item>
+     <item>
+      <layout class="QGridLayout" name="grid_nudge">
+       <property name="spacing"><number>2</number></property>
+       <item row="0" column="1"><widget class="QPushButton" name="btn_up"><property name="text"><string>↑</string></property></widget></item>
+       <item row="1" column="0"><widget class="QPushButton" name="btn_left"><property name="text"><string>←</string></property></widget></item>
+       <item row="1" column="1"><widget class="QLabel" name="lbl_nudge"><property name="text"><string/></property><property name="alignment"><set>Qt::AlignCenter</set></property></widget></item>
+       <item row="1" column="2"><widget class="QPushButton" name="btn_right"><property name="text"><string>→</string></property></widget></item>
+       <item row="2" column="1"><widget class="QPushButton" name="btn_down"><property name="text"><string>↓</string></property></widget></item>
+      </layout>
+     </item>
+     <item><spacer name="hsp_nudge"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_marker">
+     <property name="layoutStretch"><string notr="true">0,0,1</string></property>
+     <item><widget class="QCheckBox" name="chk_marker"><property name="text"><string>Marker</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QLabel" name="lbl_size"><property name="text"><string>Size:</string></property></widget></item>
+     <item><widget class="QSlider" name="sld_marker"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="minimum"><number>2</number></property><property name="maximum"><number>30</number></property><property name="value"><number>10</number></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_zoom">
+     <item><widget class="QLabel" name="lbl_zoom"><property name="text"><string>Export zoom:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_zoom"/></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_export">
+     <item><widget class="QPushButton" name="btn_gif"><property name="text"><string>GIF…</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_video"><property name="text"><string>MP4…</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_png"><property name="text"><string>PNG…</string></property></widget></item>
+    </layout>
+   </item>
+   <item><spacer name="vsp_blink"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

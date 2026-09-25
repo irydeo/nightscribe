@@ -31,12 +31,11 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
-from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
-                               QMessageBox, QPushButton, QSplitter,
-                               QTabWidget, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from ..core import fits_io
 from .ufe_state import UfeImageState
+from .ui_loader import adopt_ui, drop_in
 from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
 
@@ -109,96 +108,58 @@ class UfeDialog(QDialog):
 
     def _build_ui(self):
         # Top bar + object line + splitter (image | feature tabs) +
-        # histogram strip.
-        lay = QVBoxLayout(self)
-        lay.addLayout(self._build_topbar())
-        self.lbl_object = QLabel("")
-        self.lbl_object.setVisible(False)
-        self.lbl_object.setToolTip(self.tr(
-            "The object this editor was opened from"))
+        # histogram strip. The structure is the Designer file's
+        # (ADR-005); the custom widgets land in its placeholders.
+        self.histogram = HistogramWidget(self.state)
+        self._ui = adopt_ui(self, "ufe_dialog")
+                                            # over: no wrapper margins
+        self.splitter = self._ui.splitter
+        self.splitter.replaceWidget(0, self.view)
+        # (after the adoption the layout answers to self, not the husk;
+        # drop_in also hides the placeholder: QLayout.replaceWidget does
+        # not, and a visible one eats the top bar's clicks)
+        drop_in(self.layout(), self._ui.ph_histogram, self.histogram)
+        self.splitter.setStretchFactor(0, 1)     # the image dominates
+        self.splitter.setStretchFactor(1, 0)
+        self.tabs = self._ui.tabs
+        self.lbl_object = self._ui.lbl_object
         from . import theme
         self.lbl_object.setStyleSheet(
             f"color: {theme.C_TEXT_DIM}; padding: 0 4px;")
-        lay.addWidget(self.lbl_object)
-        self.splitter = QSplitter(Qt.Horizontal)
-        self.splitter.addWidget(self.view)
-        self.tabs = QTabWidget()
-        self.splitter.addWidget(self.tabs)
-        self.splitter.setStretchFactor(0, 1)     # the image dominates
-        self.splitter.setStretchFactor(1, 0)
-        self.tabs.setMinimumWidth(280)
-        lay.addWidget(self.splitter, 1)
-        self.histogram = HistogramWidget(self.state)
-        lay.addWidget(self.histogram)
+        self._wire_topbar()
         self._build_feature_tabs()
 
-    def _build_topbar(self):
-        # @return: the common-actions row (load / export / zoom)
-        bar = QHBoxLayout()
-        self.btn_load = QPushButton(self.tr("Load FITS…"))
-        self.btn_load.setToolTip(self.tr("Open a FITS image (Ctrl+O)"))
+    def _wire_topbar(self):
+        # Aliases and signal wiring for the Designer top bar (ADR-005).
+        # The zoom buttons' texts and tooltips are set here ("Fit"
+        # translates, the factors are data); the glyph skin then reads
+        # them into _bar_labels, as always.
+        self.btn_load = self._ui.btn_load
         self.btn_load.clicked.connect(self._on_load)
-        bar.addWidget(self.btn_load)
-        self.btn_export = QPushButton(self.tr("Export PNG…"))
-        self.btn_export.setToolTip(self.tr(
-            "Save the visible scene as a PNG (Ctrl+E)"))
-        self.btn_export.setEnabled(False)
+        self.btn_export = self._ui.btn_export
         self.btn_export.clicked.connect(self._on_export_png)
-        bar.addWidget(self.btn_export)
-        bar.addSpacing(16)
-        self.btn_north = QPushButton(self.tr("N"))
-        self.btn_north.setCheckable(True)
-        self.btn_north.setChecked(True)
-        self.btn_north.setToolTip(self.tr("North arrow (needs a WCS)"))
-        self.btn_north.setEnabled(False)
+        self.btn_north = self._ui.btn_north
         self.btn_north.toggled.connect(
             lambda checked: self.view.set_hud(north=checked))
-        bar.addWidget(self.btn_north)
-        self.btn_scale = QPushButton(self.tr("Scale"))
-        self.btn_scale.setCheckable(True)
-        self.btn_scale.setChecked(True)
-        self.btn_scale.setToolTip(self.tr("Scale bar (needs a WCS)"))
-        self.btn_scale.setEnabled(False)
+        self.btn_scale = self._ui.btn_scale
         self.btn_scale.toggled.connect(
             lambda checked: self.view.set_hud(scale=checked))
-        bar.addWidget(self.btn_scale)
-        self.btn_annot = QPushButton(self.tr("A"))
-        self.btn_annot.setCheckable(True)
-        self.btn_annot.setChecked(True)
-        self.btn_annot.setToolTip(self.tr(
-            "Saved annotations (the marks stored on this plate)"))
+        self.btn_annot = self._ui.btn_annot
         self.btn_annot.toggled.connect(
             lambda checked: self.view.set_annotations_visible(checked))
-        bar.addWidget(self.btn_annot)
         # ADR-046: the metadata corner boxes (object, date, position,
         # brightness, site, scale); the configured default lands at every
         # show, the toggle is the session's own choice
-        self.btn_boxes = QPushButton(self.tr("Boxes"))
-        self.btn_boxes.setCheckable(True)
-        self.btn_boxes.setChecked(False)
-        self.btn_boxes.setToolTip(self.tr(
-            "Metadata corner boxes: object, date, position, brightness, "
-            "observer, equipment and plate scale (on screen and in the "
-            "exported PNG)"))
+        self.btn_boxes = self._ui.btn_boxes
         self.btn_boxes.toggled.connect(
             lambda checked: self.view.set_hud(boxes=checked))
-        bar.addWidget(self.btn_boxes)
-        self.btn_solve = QPushButton(self.tr("Solve astrometry…"))
-        self.btn_solve.setToolTip(self.tr(
-            "Blind-solve the plate with Astrometry.net (the file on disk "
-            "is never modified)"))
-        self.btn_solve.setEnabled(False)
+        self.btn_solve = self._ui.btn_solve
         self.btn_solve.clicked.connect(self._on_solve)
-        bar.addWidget(self.btn_solve)
         # ADR-044 rev (2026-09-24): the target mark of the Sequence
         # section, one click away from whichever tab is open (it lands
         # the observer on the section and arms the placement)
-        self.btn_move = QPushButton(self.tr("Move marker…"))
-        self.btn_move.setToolTip(self.tr(
-            "Move the target mark to a new position and re-propose the "
-            "sequence (Photometry → Sequence)"))
+        self.btn_move = self._ui.btn_move
         self.btn_move.clicked.connect(self._on_move_marker)
-        bar.addWidget(self.btn_move)
         # ADR-044 rev (2026-09-24): the toggles' _on/_off glyphs follow
         # the checked state (icons-only mode)
         for name, base in (("btn_north", "ufe_north"),
@@ -209,25 +170,21 @@ class UfeDialog(QDialog):
             toggle.toggled.connect(
                 lambda _checked, btn=toggle, b=base:
                 self._bar_reskin_toggle(btn, b))
-        bar.addSpacing(16)
-        self.lbl_zoom_hint = QLabel(self.tr("Zoom:"))
-        bar.addWidget(self.lbl_zoom_hint)
+        self.lbl_zoom_hint = self._ui.lbl_zoom_hint
         self.btn_zoom = {}
         for factor, label in _ZOOM_PRESETS:
-            btn = QPushButton(self.tr("Fit") if factor is None else label)
+            btn = getattr(self._ui, "btn_zoom_"
+                          + ("fit" if factor is None else label))
+            btn.setText(self.tr("Fit") if factor is None else label)
             btn.setToolTip(self.tr("Fit the plate to the window")
                            if factor is None else
                            self.tr("Zoom {0} % (1:1 at 100)").format(
                                int(factor * 100)))
             btn.clicked.connect(
                 lambda _checked=False, f=factor: self._on_zoom_preset(f))
-            bar.addWidget(btn)
             self.btn_zoom[label] = btn
-        self.lbl_zoom = QLabel("–")
-        self.lbl_zoom.setMinimumWidth(44)
-        self.lbl_zoom.setToolTip(self.tr(
-            "Current zoom: 100 % is one plate pixel per screen pixel"))
-        bar.addWidget(self.lbl_zoom)
+        self.lbl_zoom = self._ui.lbl_zoom
+        self.lbl_zoom.setText("–")
         # ADR-044 rev (2026-09-24): the original labels, kept here (not on
         # the buttons): the icons-only mode clears them, and the bar can
         # reskin between shows on the same cached dialog.
@@ -244,8 +201,6 @@ class UfeDialog(QDialog):
         for label, btn in self.btn_zoom.items():
             self._bar_labels["zoom_" + label] = btn.text()
         self._apply_bar_style()
-        bar.addStretch(1)
-        return bar
 
     # -------------------------------------- top-bar style (ADR-044 rev)
 

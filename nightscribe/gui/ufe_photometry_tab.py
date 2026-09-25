@@ -23,11 +23,16 @@ The container plays the tab contract the dialog knows: pick_clicks,
 set_active(flag), and a mode it restores on re-entry. Deep links may
 still name the old tabs by widget (tab_compare / tab_measure) or by
 "compare" / "measure" and the dialog routes them here.
+
+ADR-005 restored (2026-09-25): the structure lives in
+ui/ufe_photometry_tab.ui; this class loads it and inserts the two
+code-built sections into the splitter's placeholders.
 """
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import (QButtonGroup, QHBoxLayout, QRadioButton,
-                               QSplitter, QVBoxLayout, QWidget)
+from PySide6.QtCore import QSize
+from PySide6.QtWidgets import QButtonGroup, QWidget
+
+from .ui_loader import adopt_ui
 
 
 class UfePhotometryTab(QWidget):
@@ -54,14 +59,13 @@ class UfePhotometryTab(QWidget):
             state, lang, view=view, compare_tab=self.tab_compare,
             go_compare=lambda: self.set_mode("sequence"))
 
-        self.btn_seq = QRadioButton(self.tr("Sequence"))
-        self.btn_seq.setToolTip(self.tr(
-            "Build the sequence: click stars on the plate to add the "
-            "comparisons and the check star (top half)"))
-        self.btn_meas = QRadioButton(self.tr("Measure"))
-        self.btn_meas.setToolTip(self.tr(
-            "Measure the target against the sequence you built (bottom "
-            "half)"))
+        # the structure is the Designer file's (ADR-005); the mode
+        # wiring and the section insertion happen here
+        self._ui = adopt_ui(self, "ufe_photometry_tab")
+                                            # over: no wrapper, no extra
+                                            # margins
+        self.btn_seq = self._ui.btn_seq
+        self.btn_meas = self._ui.btn_meas
         grp = QButtonGroup(self)
         grp.addButton(self.btn_seq)
         grp.addButton(self.btn_meas)
@@ -70,9 +74,9 @@ class UfePhotometryTab(QWidget):
         self.btn_meas.toggled.connect(
             lambda _on: self._on_mode_button("measure"))
 
-        self.splitter = QSplitter(Qt.Vertical)
-        self.splitter.addWidget(self.tab_compare)
-        self.splitter.addWidget(self.tab_measure)
+        self.splitter = self._ui.splitter
+        self.splitter.replaceWidget(0, self.tab_compare)
+        self.splitter.replaceWidget(1, self.tab_measure)
         # setMinimumSize (not the 6.3 "hint" variant: this Qt build's
         # bindings lack it) keeps the top half from collapsing; the
         # compare half is compact now (its table lives in its own
@@ -80,15 +84,6 @@ class UfePhotometryTab(QWidget):
         self.tab_compare.setMinimumSize(QSize(0, 200))
         self.tab_measure.setMinimumSize(QSize(0, 260))
         self.splitter.setSizes([320, 540])
-
-        lay = QVBoxLayout(self)
-        # one row up top, plain tooltips instead of a help column
-        row = QHBoxLayout()
-        row.addWidget(self.btn_seq)
-        row.addWidget(self.btn_meas)
-        row.addStretch(1)
-        lay.addLayout(row)
-        lay.addWidget(self.splitter, 1)
 
         # opening section: the Measure one when a sequence already waits,
         # otherwise the Sequence one (where one is built)

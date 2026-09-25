@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The visit's FITS metadata confirmation (ADR-045): pre-filled from the
+  header, editable (a misnamed filter breaks the light-curve split).
+  Loaded by gui/widgets/visits_panel.py (_ask_fits_meta) through
+  gui/ui_loader.py. The class tag is VisitWindow so the i18n context
+  carries over; the file name and the field contents are data, set in
+  code. The window title ("FITS details") is set in code, as today.
+-->
+<ui version="4.0">
+ <class>VisitWindow</class>
+ <widget class="QWidget" name="VisitFileMeta">
+  <layout class="QFormLayout" name="form_meta"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item row="0" column="0"><widget class="QLabel" name="lbl_file"><property name="text"><string>File:</string></property></widget></item>
+   <item row="0" column="1"><widget class="QLabel" name="lbl_file_name"><property name="text"><string/></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property></widget></item>
+   <item row="1" column="0"><widget class="QLabel" name="lbl_filter"><property name="text"><string>Filter:</string></property></widget></item>
+   <item row="1" column="1"><widget class="QComboBox" name="vp_img_filter"><property name="editable"><bool>true</bool></property></widget></item>
+   <item row="2" column="0"><widget class="QLabel" name="lbl_date"><property name="text"><string>Date:</string></property></widget></item>
+   <item row="2" column="1"><widget class="QLineEdit" name="vp_img_date"/></item>
+   <item row="3" column="0"><widget class="QLabel" name="lbl_exptime"><property name="text"><string>Exptime:</string></property></widget></item>
+   <item row="3" column="1"><widget class="QLineEdit" name="vp_img_exptime"/></item>
+   <item row="4" column="0" colspan="2"><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

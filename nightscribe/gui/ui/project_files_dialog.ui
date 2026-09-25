@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Project files window (ADR-019, UX v3): the current project's
+  registered files in one table with a per-row menu. Loaded by
+  gui/project_files_dialog.py through gui/ui_loader.py. The window title
+  (it carries the object name) and the per-row "⋯" menus are data and
+  stay in code; the header resize modes too (they address columns by
+  index).
+-->
+<ui version="4.0">
+ <class>ProjectFilesDialog</class>
+ <widget class="QWidget" name="ProjectFilesDialog">
+  <layout class="QVBoxLayout" name="vbox_files"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <property name="layoutStretch"><string notr="true">0,1</string></property>
+   <item><widget class="QLabel" name="lbl_status"><property name="text"><string/></property><property name="visible"><bool>false</bool></property></widget></item>
+   <item>
+    <widget class="QTableWidget" name="tbl">
+     <property name="columnCount"><number>5</number></property>
+     <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
+     <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
+     <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
+     <property name="contextMenuPolicy"><enum>Qt::CustomContextMenu</enum></property>
+     <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+     <column><property name="text"><string>Kind</string></property></column>
+     <column><property name="text"><string>Name</string></property></column>
+     <column><property name="text"><string>Date</string></property></column>
+     <column><property name="text"><string>Size</string></property></column>
+     <column><property name="text"><string/></property></column>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

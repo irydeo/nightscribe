@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría». **rev. 2026-09-25**: la barra superior gana glifos SVG conmutables (ajuste `ufe_bar_icons`, por defecto solo iconos: carga, export, los conmutadores de HUD y los presets de zoom; «Solve astrometry…» y «Move marker…» conservan siempre su texto), «Move marker…» pasa a la barra como acción global desde cualquier pestaña, «Remove all» y «Export CSV…» se mudan al diálogo de Secuencia que enmarca la tabla, y la fila de objetivo y magnitud cabe en una línea)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría». **rev. 2026-09-25**: la barra superior gana glifos SVG conmutables (ajuste `ufe_bar_icons`, por defecto solo iconos: carga, export, los conmutadores de HUD y los presets de zoom; «Solve astrometry…» y «Move marker…» conservan siempre su texto), «Move marker…» pasa a la barra como acción global desde cualquier pestaña, «Remove all» y «Export CSV…» se mudan al diálogo de Secuencia que enmarca la tabla, y la fila de objetivo y magnitud cabe en una línea; los controles de marca del objeto ganan nombres que dicen qué muestran y tooltips honestos, el anillo dibuja con el helper compartido `ring_marker_items` (gemelo de `cross_marker_items`) y el ámbar de esta familia de marcadores pasa a tener una única fuente, `palette.ACCENT`)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 
@@ -206,6 +206,32 @@ en una línea: el campo de nombre es estrecho (130 px) y la etiqueta es
 solo «Mag». En el panel Medir, «Suggest» comparte la fila de
 aperturas y las tres cajas de numeración se estrechan (56 px).
 
+**Controles de marca del objeto: nombres y tooltips honestos (2026-09-25)**.
+Los cuatro controles de marca (los casilleros de las pestañas Blink,
+Anotar y Secuencia y el botón «Move marker…» de la barra) decían la
+misma genérica palabra sin decir de qué cosa ni con qué efecto, y el
+tooltip de «Move marker…» prometía re-proponer la secuencia, algo que
+nunca hacía. Ahora cada casilla nombra lo que muestra: en Blink,
+«Show the supernova marker» (marca la placa y también el GIF/MP4/PNG
+exportado; desmarcarla es lo único que recorta del export); en Anotar,
+«Show the annotation marker» (solo de pantalla: la anotación se guarda
+en la placa pase lo que pase); en Secuencia, «Show the target marker»
+(solo visual: la propuesta y la matemática de la secuencia jamás lo
+leen). El tooltip del botón deja la promesa muerta y dice solo lo que
+hace: mover la marca del objetivo a una nueva posición de la placa,
+recordando que es una ayuda visual que la matemática jamás lee.
+
+El dibujo queda unificado también: las ramas de anillo de las tres
+pestañas, que repetían el mismo anillo en tres bloques propios, dibujan
+ahora con el helper compartido `ring_marker_items` en
+`widgets/ufe_image_view.py` (gemelo de `cross_marker_items`, el mismo
+contrato de ítems: 1 elipse + 4 ticks, pinceles cosméticos, que las
+pruebas pinan por tipo y color), y el ámbar de esta familia de
+marcadores tiene una única fuente, `palette.ACCENT` (#ffb347): los
+colores locales duplicados se retiran y el color de apertura de Medir
+se une a la misma familia. Cero cambio visual: las pruebas de
+geometría siguen pasando sin tocar.
+
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
 lo use; añadir una funcionalidad al editor no modifica `ufe_dialog.py`
@@ -399,6 +425,31 @@ sequence" with the live count of the table's stars. The target and
 magnitude row fits one line: the name field is narrow (130 px) and
 the label is just "Mag". On the Measure panel, "Suggest" shares the
 apertures row and the three spin boxes go narrow (56 px).
+
+**Object-mark controls: honest names and tooltips (2026-09-25)**.
+The four object-mark controls (the Blink, Annotate and Sequence
+checkboxes and the "Move marker…" bar button) all said the same vague
+word without saying of what, or with what effect, and the "Move
+marker…" tooltip promised a re-propose it never did. Each checkbox now
+names what it shows: on Blink, "Show the supernova marker" (it marks
+the plate and also the exported GIF/MP4/PNG; unchecking it is the only
+change the export sees); on Annotate, "Show the annotation marker"
+(screen only: the annotation itself is always saved to the plate); on
+Sequence, "Show the target marker" (display only: the proposal and the
+sequence math never read it). The button's tooltip drops the dead
+promise and says only what it does: move the target mark to a new
+position on the plate, keeping in mind it is a visual aid the math
+never reads.
+
+The drawing unifies too: the ring branches of the three tabs, which
+repeated the same ring in three bespoke blocks, now draw through the
+shared `ring_marker_items` helper in `widgets/ufe_image_view.py` (twin
+of `cross_marker_items`, same item contract: 1 ellipse + 4 ticks,
+cosmetic pens, which the tests pin by type and colour), and the amber
+of this marker family has a single source, `palette.ACCENT` (#ffb347):
+the duplicated local colours are retired and the Measure tab's aperture
+colour joins the same family. Zero visual change: the geometry pins
+still pass untouched.
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

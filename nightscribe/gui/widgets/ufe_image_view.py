@@ -92,6 +92,37 @@ def cross_marker_items(x, y, scene_w, scene_h, color, box_half):
     return items
 
 
+def ring_marker_items(x, y, color, radius,
+                      tick_inner=0.5, tick_outer=1.6, pen_width=2.0):
+    # The classic "ring" object marker (ADR-046): a circle with four
+    # cardinal ticks, the counterpart of cross_marker_items and shared
+    # by the UFE Blink, Annotate and Compare tabs so the marker reads
+    # identically everywhere. Cosmetic pens keep it thin and crisp at
+    # any zoom.
+    # @args: x, y - object position in scene (plate px) coordinates,
+    #        color - marker colour (hex string or QColor),
+    #        radius - circle radius in scene px,
+    #        tick_inner, tick_outer - tick span as radius multiples
+    #        (Blink/Annotate 0.5–1.6, Compare 1.15–1.7),
+    #        pen_width - pen width in screen px (cosmetic)
+    # @return: [1 QGraphicsEllipseItem + 4 QGraphicsLineItem]
+    pen = QPen(QColor(color))
+    pen.setWidthF(pen_width)
+    pen.setCosmetic(True)
+    ring = QGraphicsEllipseItem(x - radius, y - radius,
+                                2.0 * radius, 2.0 * radius)
+    ring.setPen(pen)
+    items = [ring]
+    for dx, dy in ((1.0, 0.0), (-1.0, 0.0), (0.0, 1.0), (0.0, -1.0)):
+        ln = QGraphicsLineItem(x + dx * radius * tick_inner,
+                               y + dy * radius * tick_inner,
+                               x + dx * radius * tick_outer,
+                               y + dy * radius * tick_outer)
+        ln.setPen(pen)
+        items.append(ln)
+    return items
+
+
 class UfeImageView(ChartView):
     # @args: state - the shared UfeImageState; the view subscribes to its
     #        signals and renders whatever display_uint8() returns

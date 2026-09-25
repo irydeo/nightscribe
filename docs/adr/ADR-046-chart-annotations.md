@@ -1,6 +1,6 @@
 # ADR-046: Anotación de cartas: cajas de metadatos y estilo de marcador / chart annotation: metadata boxes and marker style
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-24
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-24 · **rev. 2026-09-25** (el anillo clásico gana su helper compartido `ring_marker_items`, gemelo de `cross_marker_items`; el ámbar de la familia de marcadores tiene una única fuente, `palette.ACCENT`)
 
 **Ver / See**: ADR-044 (el UFE: su HUD y su exportación PNG; enmendado
 aquí) · ADR-042 (la carta de secuencia fotométrica; enmendada aquí) ·
@@ -54,7 +54,14 @@ y que el marcador actual (anillo con ticks) siga disponible.
    no es el objeto). La cruz del estilo `cross` la dibujan las propias
    pestañas como ítems de escena (helper compartido
    `cross_marker_items` en `ufe_image_view.py`), así el export la
-   recoge por el render de escena sin código duplicado.
+   recoge por el render de escena sin código duplicado. El anillo
+   clásico (estilo `ring`) tiene su gemelo `ring_marker_items` (mismo
+   contrato de ítems: 1 elipse + 4 ticks, pinceles cosméticos), lo
+   llaman Blink, Anotar y Secuencia cada una a su tamaño y escala, y el
+   ámbar de esta familia de marcadores pasa a tener una única fuente,
+   `palette.ACCENT`: los colores locales duplicados se retiran y el
+   color de apertura de Medir se une a la misma familia, sin cambio
+   visual (rev. 2026-09-25).
 5. **Blink**: las cajas llevan nombre, fecha, exposición, posición de la
    SN y la escala de la placa (PSc; el FOV se omite: los recortes de
    zoom lo harían mentira). El mini-compás N/E se calcula numéricamente
@@ -117,7 +124,13 @@ chain: last measurement centroid, attached object coordinates, moved
 Sequence target mark, or no line at all (a field centre is not the
 object). The `cross` marker is drawn by the tabs themselves as scene
 items (shared `cross_marker_items` helper), so the export picks it up
-through the scene render. (5) Blink boxes carry name, date, exposure, SN
+through the scene render. The classic ring (the `ring` style) gets its
+twin `ring_marker_items` (same item contract: 1 ellipse + 4 ticks,
+cosmetic pens), called by the Blink, Annotate and Sequence tabs each
+at their own size and scale, and the amber of this marker family gets
+a single source, `palette.ACCENT`: the duplicated local colours are
+retired and the Measure tab's aperture colour joins the same family,
+with zero visual change (rev. 2026-09-25). (5) Blink boxes carry name, date, exposure, SN
 position and the plate scale (FOV omitted: the zoom crops would make it
 a lie); the N/E mini-compass is computed numerically from the pair's WCS
 (`compass_angles`), which already matches the exported frames, flip

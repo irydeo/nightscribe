@@ -6635,13 +6635,13 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
-        <source>Marker</source>
-        <translation>Marcador</translation>
+        <source>Show the annotation marker</source>
+        <translation>Mostrar el marcador de la anotación</translation>
     </message>
     <message>
         <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
-        <source>Show the annotation marker</source>
-        <translation>Mostrar el marcador de la anotación</translation>
+        <source>Show the annotation marker on the plate (screen only; the annotation is still saved)</source>
+        <translation>Muestra el marcador de la anotación sobre la placa (solo en pantalla; la anotación se guarda igual)</translation>
     </message>
     <message>
         <location filename="../ui/ufe_annotate_tab.ui" line="43"/>
@@ -6798,8 +6798,13 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_blink_tab.ui" line="73"/>
-        <source>Marker</source>
-        <translation>Marcador</translation>
+        <source>Show the supernova marker</source>
+        <translation>Mostrar el marcador de la supernova</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="73"/>
+        <source>Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</source>
+        <translation>Muestra el marcador de la supernova sobre la placa, y también en el GIF/MP4/PNG exportado. Desmárcalo para ocultarlo.</translation>
     </message>
     <message>
         <location filename="../ui/ufe_blink_tab.ui" line="74"/>
@@ -6974,7 +6979,7 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_compare_tab.ui" line="42"/>
-        <source>Show target marker</source>
+        <source>Show the target marker</source>
         <translation>Mostrar la marca del objetivo</translation>
     </message>
     <message>
@@ -7221,8 +7226,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_dialog.ui" line="28"/>
-        <source>Move the target mark to a new position and re-propose the sequence (Photometry → Sequence)</source>
-        <translation>Mueve la marca del objetivo a una nueva posición y vuelve a proponer la secuencia (Fotometría → Secuencia)</translation>
+        <source>Move the target mark to a new position on the plate. The marker is a visual aid; the sequence maths never reads it.</source>
+        <translation>Mueve la marca del objetivo a una nueva posición sobre la placa. El marcador es una ayuda visual; el cálculo de la secuencia nunca lo lee.</translation>
     </message>
     <message>
         <location filename="../ui/ufe_dialog.ui" line="30"/>

@@ -42,12 +42,13 @@ from PySide6.QtWidgets import (QFileDialog, QWidget,
 
 from ..core import coords, fits_meta, photometry, photometry_export, \
     stretch
+from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
 from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
-_C_AP = "#ffb347"      # the amber marker family the UFE already wears
+_C_AP = palette.ACCENT   # the shared amber marker family the UFE wears
 _C_ANN = "#6ec1ff"     # sky annulus rings in the cool accent
 _C_COMP = "#4dd0e1"    # used comps ring in the compare tab's cyan
 

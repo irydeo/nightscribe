@@ -36,7 +36,7 @@
      <item><widget class="QDoubleSpinBox" name="spin_dx"><property name="minimum"><double>-100.0</double></property><property name="maximum"><double>100.0</double></property><property name="decimals"><number>1</number></property><property name="singleStep"><double>0.5</double></property></widget></item>
      <item><widget class="QDoubleSpinBox" name="spin_dy"><property name="minimum"><double>-100.0</double></property><property name="maximum"><double>100.0</double></property><property name="decimals"><number>1</number></property><property name="singleStep"><double>0.5</double></property></widget></item>
      <item><widget class="QPushButton" name="btn_nudge"><property name="text"><string>Nudge</string></property><property name="toolTip"><string>Shift the marker by that many pixels (or click the image)</string></property></widget></item>
-     <item><widget class="QCheckBox" name="chk_marker"><property name="text"><string>Marker</string></property><property name="toolTip"><string>Show the annotation marker</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QCheckBox" name="chk_marker"><property name="text"><string>Show the annotation marker</string></property><property name="toolTip"><string>Show the annotation marker on the plate (screen only; the annotation is still saved)</string></property><property name="checked"><bool>true</bool></property></widget></item>
     </layout>
    </item>
    <item><widget class="QLabel" name="lbl_position"><property name="text"><string notr="true">–</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>

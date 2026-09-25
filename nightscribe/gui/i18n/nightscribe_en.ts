@@ -6635,13 +6635,13 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
-        <source>Marker</source>
-        <translation>Marker</translation>
+        <source>Show the annotation marker</source>
+        <translation>Show the annotation marker</translation>
     </message>
     <message>
         <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
-        <source>Show the annotation marker</source>
-        <translation>Show the annotation marker</translation>
+        <source>Show the annotation marker on the plate (screen only; the annotation is still saved)</source>
+        <translation>Show the annotation marker on the plate (screen only; the annotation is still saved)</translation>
     </message>
     <message>
         <location filename="../ui/ufe_annotate_tab.ui" line="43"/>
@@ -6798,8 +6798,13 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_blink_tab.ui" line="73"/>
-        <source>Marker</source>
-        <translation>Marker</translation>
+        <source>Show the supernova marker</source>
+        <translation>Show the supernova marker</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="73"/>
+        <source>Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</source>
+        <translation>Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</translation>
     </message>
     <message>
         <location filename="../ui/ufe_blink_tab.ui" line="74"/>
@@ -6974,8 +6979,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_compare_tab.ui" line="42"/>
-        <source>Show target marker</source>
-        <translation>Show target marker</translation>
+        <source>Show the target marker</source>
+        <translation>Show the target marker</translation>
     </message>
     <message>
         <location filename="../ui/ufe_compare_tab.ui" line="42"/>
@@ -7221,8 +7226,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_dialog.ui" line="28"/>
-        <source>Move the target mark to a new position and re-propose the sequence (Photometry → Sequence)</source>
-        <translation>Move the target mark to a new position and re-propose the sequence (Photometry → Sequence)</translation>
+        <source>Move the target mark to a new position on the plate. The marker is a visual aid; the sequence maths never reads it.</source>
+        <translation>Move the target mark to a new position on the plate. The marker is a visual aid; the sequence maths never reads it.</translation>
     </message>
     <message>
         <location filename="../ui/ufe_dialog.ui" line="30"/>

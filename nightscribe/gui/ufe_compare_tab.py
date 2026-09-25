@@ -42,7 +42,7 @@ from ..core.sources import vizier
 from ..viz import palette
 from .ufe_sequence_dialog import UfeSequenceDialog
 from .ui_loader import adopt_ui
-from .widgets.ufe_image_view import cross_marker_items
+from .widgets.ufe_image_view import cross_marker_items, ring_marker_items
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -468,16 +468,10 @@ class UfeCompareTab(QWidget):
                 label_y = cy + half * 2.6
             else:
                 r = w * 0.022
-                target = QGraphicsEllipseItem(cx - r, cy - r, 2 * r, 2 * r)
-                target.setPen(self._pen(palette.ACCENT, 2.2))
-                self._items.append(self._view.add_overlay(target))
-                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                    ln = QGraphicsLineItem(cx + dx * r * 1.15,
-                                           cy + dy * r * 1.15,
-                                           cx + dx * r * 1.7,
-                                           cy + dy * r * 1.7)
-                    ln.setPen(self._pen(palette.ACCENT, 2.2))
-                    self._items.append(self._view.add_overlay(ln))
+                for it in ring_marker_items(cx, cy, palette.ACCENT, r,
+                                            tick_inner=1.15,
+                                            tick_outer=1.7, pen_width=2.2):
+                    self._items.append(self._view.add_overlay(it))
                 label_y = cy + r * 2.4
             name = self.edt_target.text().strip()
             if name:

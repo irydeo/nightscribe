@@ -39,7 +39,7 @@
    <item>
     <layout class="QHBoxLayout" name="row_show">
      <item><widget class="QCheckBox" name="chk_labels"><property name="text"><string>Show catalog magnitudes</string></property><property name="checked"><bool>true</bool></property></widget></item>
-     <item><widget class="QCheckBox" name="chk_target"><property name="text"><string>Show target marker</string></property><property name="toolTip"><string>The amber ring that marks the target on the plate</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QCheckBox" name="chk_target"><property name="text"><string>Show the target marker</string></property><property name="toolTip"><string>The amber ring that marks the target on the plate</string></property><property name="checked"><bool>true</bool></property></widget></item>
     </layout>
    </item>
    <item>

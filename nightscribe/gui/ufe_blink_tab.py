@@ -39,17 +39,15 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QFileDialog, QWidget,
-                               QGraphicsEllipseItem, QGraphicsLineItem,
-                               QGraphicsSimpleTextItem)
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (QFileDialog, QGraphicsSimpleTextItem,
+                               QWidget)
 
 from ..core import stretch
+from ..viz import palette
 from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_blink_tab")
-
-_MARKER_COLOR = "#ffb347"   # the amber the legacy blink marker wears
 
 
 class UfeBlinkTab(QWidget):
@@ -421,29 +419,20 @@ class UfeBlinkTab(QWidget):
         x, y = pos
         scale = max(self._view.current_factor(), 1e-3)
         r = self.sld_marker.value() / scale
-        # ADR-046: two looks for the object marker (Settings)
+        # ADR-046: two looks for the object marker (Settings), shared
+        # drawing helpers so the marker reads the same in every tab.
         from ..config import config
+        from .widgets.ufe_image_view import (cross_marker_items,
+                                             ring_marker_items)
         if config.get("marker_style", "ring") == "cross":
-            from .widgets.ufe_image_view import cross_marker_items
             w, h = self._state.plate_shape
             half = max(9.0, self.sld_marker.value() * 0.9) / scale
-            for it in cross_marker_items(x, y, w, h, _MARKER_COLOR, half):
+            for it in cross_marker_items(x, y, w, h, palette.ACCENT, half):
                 self._items.append(self._view.add_overlay(it))
             r = half                    # the label anchors below the box
         else:
-            pen = QPen(QColor(_MARKER_COLOR))
-            pen.setWidthF(2.0)
-            pen.setCosmetic(True)
-            circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-            circle.setPen(pen)
-            self._items.append(self._view.add_overlay(circle))
-            for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
-                                   (x + 0.5 * r, y, x + 1.6 * r, y),
-                                   (x, y - 1.6 * r, x, y - 0.5 * r),
-                                   (x, y + 0.5 * r, x, y + 1.6 * r)):
-                tick = QGraphicsLineItem(x0, y0, x1, y1)
-                tick.setPen(pen)
-                self._items.append(self._view.add_overlay(tick))
+            for it in ring_marker_items(x, y, palette.ACCENT, r):
+                self._items.append(self._view.add_overlay(it))
         name = self._pair.get("name") or ""
         if name:
             label = QGraphicsSimpleTextItem(name)

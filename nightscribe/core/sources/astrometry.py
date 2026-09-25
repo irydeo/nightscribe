@@ -30,7 +30,10 @@ API = "https://nova.astrometry.net/api"
 WCS_URL = "https://nova.astrometry.net/wcs_file"
 
 POLL_S = 3.0          # seconds between job status checks
-TIMEOUT_S = 300.0     # give up on a solve after this
+# A live solve queues on the server and can take a few minutes (measured ~4 min,
+# seen longer under load). Re-solving the same file is a cache hit and instant,
+# so the budget can be generous without any cost (ADR-018).
+TIMEOUT_S = 900.0     # give up on a solve after this
 
 # WCS cards we keep from the solved wcs.fits (NAXIS stays from the user image;
 # SIP polynomial cards A_*/B_* are dropped on purpose: our WCS is plain TAN)

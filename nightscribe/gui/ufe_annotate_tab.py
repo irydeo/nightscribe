@@ -29,17 +29,15 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QFileDialog, QMessageBox, QWidget,
-                               QGraphicsEllipseItem, QGraphicsLineItem,
-                               QGraphicsSimpleTextItem)
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (QFileDialog, QMessageBox,
+                               QGraphicsSimpleTextItem, QWidget)
 
 from ..core import fits_annotate, fits_io, wcs as wcs_mod
+from ..viz import palette
 from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_annotate_tab")
-
-_MARKER_DEFAULT = "#ffb347"   # the same amber the legacy dialog uses
 
 
 class UfeAnnotateTab(QWidget):
@@ -55,7 +53,7 @@ class UfeAnnotateTab(QWidget):
         self._view = view
         self._active = False
         self._marker = None          # (col, row) in data coords, or None
-        self._marker_color = QColor(_MARKER_DEFAULT)
+        self._marker_color = QColor(palette.ACCENT)
         self._items = []             # the marker's scene items
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
@@ -78,7 +76,7 @@ class UfeAnnotateTab(QWidget):
         self.sld_marker = self._ui.sld_marker
         self.sld_marker.valueChanged.connect(self._refresh_marker)
         self.btn_color = self._ui.btn_color
-        self.btn_color.setText(_MARKER_DEFAULT)      # data, not text
+        self.btn_color.setText(palette.ACCENT)      # data, not text
         self.btn_color.setAccessibleName("marker color")
         self.btn_color.clicked.connect(self._pick_color)
         self.spin_dx = self._ui.spin_dx
@@ -190,10 +188,12 @@ class UfeAnnotateTab(QWidget):
         r = self.sld_marker.value() / scale      # scene radius, screen px
         x, y = self._state.data_to_scene(*self._marker)
         # ADR-046: the marker has two looks (Settings); the cross spans
-        # the plate with a box on the object, the ring is the classic
+        # the plate with a box on the object, the ring is the classic.
+        # Both draw through the shared helpers so every tab matches.
         from ..config import config
+        from .widgets.ufe_image_view import (cross_marker_items,
+                                             ring_marker_items)
         if config.get("marker_style", "ring") == "cross":
-            from .widgets.ufe_image_view import cross_marker_items
             w, h = self._state.plate_shape
             half = max(9.0, self.sld_marker.value() * 0.9) / scale
             for it in cross_marker_items(x, y, w, h, self._marker_color,
@@ -201,19 +201,8 @@ class UfeAnnotateTab(QWidget):
                 self._items.append(self._view.add_overlay(it))
             r = half                    # the label anchors below the box
         else:
-            pen = QPen(self._marker_color)
-            pen.setWidthF(2.0)
-            pen.setCosmetic(True)
-            circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-            circle.setPen(pen)
-            self._items.append(self._view.add_overlay(circle))
-            for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
-                                   (x + 0.5 * r, y, x + 1.6 * r, y),
-                                   (x, y - 1.6 * r, x, y - 0.5 * r),
-                                   (x, y + 0.5 * r, x, y + 1.6 * r)):
-                tick = QGraphicsLineItem(x0, y0, x1, y1)
-                tick.setPen(pen)
-                self._items.append(self._view.add_overlay(tick))
+            for it in ring_marker_items(x, y, self._marker_color, r):
+                self._items.append(self._view.add_overlay(it))
         text = self.edit_label.text().strip()
         if text:
             label = QGraphicsSimpleTextItem(text)

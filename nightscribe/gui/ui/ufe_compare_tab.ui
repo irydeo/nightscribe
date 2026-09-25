@@ -9,7 +9,7 @@
 <ui version="4.0">
  <class>UfeCompareTab</class>
  <widget class="QWidget" name="UfeCompareTab">
-  <layout class="QVBoxLayout" name="vbox_compare">
+  <layout class="QVBoxLayout" name="vbox_compare"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
    <item>
     <layout class="QHBoxLayout" name="row_target">
      <property name="layoutStretch"><string notr="true">0,0,0,0,1</string></property>

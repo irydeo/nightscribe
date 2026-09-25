@@ -44,7 +44,7 @@ from PySide6.QtWidgets import (QLabel, QHeaderView, QTableWidgetItem,
 from ..core import exposure, narrative, orbits
 from .. import paths
 from . import theme
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 # Viewer / slot titles, translated at the point of use (tr() at the tab
 # site; QT_TRANSLATE_NOOP marks them here so lupdate can see them).
@@ -203,8 +203,7 @@ class ObjectPanel(QWidget):
         # The structure is the Designer file's (ADR-005): every block
         # starts hidden and the states show them; the skins come from
         # theme.py, and the chips / table rows / chart tabs are data.
-        self._ui = load_ui("object_panel", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "object_panel")
         self._e = None          # last enriched dict (re-render on mode change)
 
         # state line (loading / not found); hidden when ready

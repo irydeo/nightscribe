@@ -32,7 +32,7 @@ code-built sections into the splitter's placeholders.
 from PySide6.QtCore import QSize
 from PySide6.QtWidgets import QButtonGroup, QWidget
 
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 
 class UfePhotometryTab(QWidget):
@@ -61,8 +61,7 @@ class UfePhotometryTab(QWidget):
 
         # the structure is the Designer file's (ADR-005); the mode
         # wiring and the section insertion happen here
-        self._ui = load_ui("ufe_photometry_tab", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_photometry_tab")
                                             # over: no wrapper, no extra
                                             # margins
         self.btn_seq = self._ui.btn_seq

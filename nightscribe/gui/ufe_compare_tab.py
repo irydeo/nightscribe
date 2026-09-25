@@ -41,7 +41,7 @@ from ..core import compstars
 from ..core.sources import vizier
 from ..viz import palette
 from .ufe_sequence_dialog import UfeSequenceDialog
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 from .widgets.ufe_image_view import cross_marker_items
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
@@ -117,8 +117,7 @@ class UfeCompareTab(QWidget):
         # The structure is the Designer file's (ADR-005); this method
         # aliases the widgets, fills the catalog combo (its items carry
         # userData, which a .ui cannot hold) and connects the signals.
-        self._ui = load_ui("ufe_compare_tab", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_compare_tab")
                                             # over: no wrapper, no extra
                                             # margins, and layout-walking
                                             # code sees the rows directly

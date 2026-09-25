@@ -8,7 +8,7 @@
 <ui version="4.0">
  <class>CampaignEditDialog</class>
  <widget class="QWidget" name="CampaignEditDialog">
-  <layout class="QVBoxLayout" name="vbox_camp">
+  <layout class="QVBoxLayout" name="vbox_camp"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
    <item><widget class="QLabel" name="lbl_intro"><property name="text"><string>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</string></property></widget></item>
    <item>
     <layout class="QFormLayout" name="form_camp">

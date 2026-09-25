@@ -8,7 +8,7 @@
 <ui version="4.0">
  <class>JournalDialog</class>
  <widget class="QWidget" name="JournalDialog">
-  <layout class="QVBoxLayout" name="vbox_journal">
+  <layout class="QVBoxLayout" name="vbox_journal"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
    <item>
     <layout class="QHBoxLayout" name="row_filter">
      <item><widget class="QComboBox" name="cmb_kind"/></item>

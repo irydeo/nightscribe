@@ -45,7 +45,7 @@ from PySide6.QtWidgets import (QFileDialog, QWidget,
                                QGraphicsSimpleTextItem)
 
 from ..core import stretch
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_blink_tab")
 
@@ -84,8 +84,7 @@ class UfeBlinkTab(QWidget):
         # The structure is the Designer file's (ADR-005); this method
         # aliases the widgets, fills the zoom combo (its items carry
         # userData) and connects the signals.
-        self._ui = load_ui("ufe_blink_tab", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_blink_tab")
                                             # over: no wrapper margins
         self.edt_name = self._ui.edt_name
         self.chk_manual = self._ui.chk_manual

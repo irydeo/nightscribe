@@ -10,7 +10,7 @@
 <ui version="4.0">
  <class>ProjectFilesDialog</class>
  <widget class="QWidget" name="ProjectFilesDialog">
-  <layout class="QVBoxLayout" name="vbox_files">
+  <layout class="QVBoxLayout" name="vbox_files"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
    <property name="layoutStretch"><string notr="true">0,1</string></property>
    <item><widget class="QLabel" name="lbl_status"><property name="text"><string/></property><property name="visible"><bool>false</bool></property></widget></item>
    <item>

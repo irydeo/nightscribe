@@ -30,7 +30,7 @@ buttons nobody wired, and connects the rest.
 
 from PySide6.QtWidgets import QDialog
 
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 
 class UfeSequenceDialog(QDialog):
@@ -45,8 +45,7 @@ class UfeSequenceDialog(QDialog):
         self.setMinimumSize(420, 240)
         # the structure is the Designer file's (ADR-005); the code keeps
         # the window dressing and the callback wiring
-        self._ui = load_ui("ufe_sequence_dialog", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_sequence_dialog")
                                             # over: no wrapper, no extra
                                             # margins, tests see the
                                             # structure directly

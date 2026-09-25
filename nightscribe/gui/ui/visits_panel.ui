@@ -8,7 +8,7 @@
 <ui version="4.0">
  <class>VisitsPanel</class>
  <widget class="QWidget" name="VisitsPanel">
-  <layout class="QVBoxLayout" name="vbox_visits">
+  <layout class="QVBoxLayout" name="vbox_visits"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
    <property name="layoutStretch"><string notr="true">0,0,1</string></property>
    <item>
     <layout class="QHBoxLayout" name="row_top">

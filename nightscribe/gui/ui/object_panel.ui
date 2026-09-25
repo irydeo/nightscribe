@@ -51,7 +51,7 @@
     <widget class="QGroupBox" name="grp_params">
      <property name="title"><string>Parameters</string></property>
      <property name="visible"><bool>false</bool></property>
-     <layout class="QVBoxLayout" name="vbox_params">
+     <layout class="QVBoxLayout" name="vbox_params"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
       <item>
        <layout class="QHBoxLayout" name="row_deep">
         <item><widget class="QCheckBox" name="chk_deep"><property name="text"><string>In depth</string></property></widget></item>

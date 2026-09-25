@@ -11,7 +11,7 @@
 <ui version="4.0">
  <class>VisitWindow</class>
  <widget class="QWidget" name="VisitWindow">
-  <layout class="QVBoxLayout" name="vbox_visit">
+  <layout class="QVBoxLayout" name="vbox_visit"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
    <property name="layoutStretch"><string notr="true">0,1,0,0</string></property>
    <item>
     <layout class="QHBoxLayout" name="row_head">
@@ -25,7 +25,7 @@
    <item>
     <widget class="QGroupBox" name="grp_res">
      <property name="title"><string>Resources</string></property>
-     <layout class="QVBoxLayout" name="vbox_res">
+     <layout class="QVBoxLayout" name="vbox_res"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
       <item>
        <layout class="QHBoxLayout" name="row_res">
         <item><widget class="QPushButton" name="vp_btn_attach"><property name="text"><string>Attach files…</string></property><property name="toolTip"><string>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</string></property></widget></item>

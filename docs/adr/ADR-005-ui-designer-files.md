@@ -53,6 +53,25 @@ congelados (ADR-044). Reglas operativas, en vigor para todo lo nuevo:
   `notr="true"` para no ensuciar el catálogo.
 - Los diálogos legacy congelados (ADR-044) quedan fuera del saneado.
 
+Dos trampas aprendidas en campo (pagadas con una regresión real: márgenes
+a cero y la barra del UFE sin clicks en «Load FITS…»), ya escritas en el
+cargador para que no se repitan:
+
+- **`adopt_ui(host, name)`** es el idiom de adopción: carga, deja que el
+  layout raíz tome el host y **oculta el husk** (la raíz del `.ui` queda
+  como hija visible de 100×30 en (0, 0) si no se oculta: tapa la primera
+  fila y se come sus clicks).
+- **`drop_in(layout, placeholder, widget)`** para todo placeholder:
+  `QLayout.replaceWidget` NO oculta el widget retirado (a diferencia de
+  `QSplitter.replaceWidget`, que sí), y visible queda flotando sobre la
+  primera fila.
+- **Los márgenes son explícitos en cada `.ui`**: `QUiLoader` entrega 0 y
+  el código viejo obtenía los del estilo (11 px en diálogos top-level,
+  9 px en pestañas/paneles hijos, 9 px en cajas de grupo); los valores
+  medidos del árbol pre-migración viven en los ficheros. Todo esto lo
+  pincha `tests/unit/test_ui_files.py` (márgenes + `childAt`, el
+  hit-test honesto que encontró al culpable).
+
 ## English
 
 **Context**: the author wants interfaces editable with Qt Designer (familiar from
@@ -98,3 +117,22 @@ legacy dialogs (ADR-044). Operative rules, in force for everything new:
   glyphs like "–", samples like "SN 2026xyz") carry `notr="true"` so the
   catalog stays clean.
 - The frozen legacy dialogs (ADR-044) stay out of the restoration.
+
+Two field lessons (paid for with a real regression: zero margins and a
+dead "Load FITS…" button), now written into the loader so they never
+recur:
+
+- **`adopt_ui(host, name)`** is the adoption idiom: load, let the root
+  layout take over the host, and HIDE the husk (the .ui's root widget
+  otherwise stays as a visible 100x30 child at (0, 0): it covers the
+  first row and eats its clicks).
+- **`drop_in(layout, placeholder, widget)`** for every placeholder:
+  `QLayout.replaceWidget` does NOT hide the replaced widget (unlike
+  `QSplitter.replaceWidget`, which does); left visible it floats over
+  the first row.
+- **Margins are explicit in every .ui**: QUiLoader delivers 0 while the
+  old code got the style's (11 px on top-level dialogs, 9 px on child
+  tabs/panels, 9 px on group boxes); the values measured from the
+  pre-migration tree live in the files. All of this is pinned by
+  `tests/unit/test_ui_files.py` (margins + the honest `childAt`
+  hit-test that found the culprit).

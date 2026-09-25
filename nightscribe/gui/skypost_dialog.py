@@ -18,7 +18,7 @@ ui/skypost_dialog.ui (ADR-005, restored 2026-09-25).
 
 from PySide6.QtWidgets import QApplication, QDialog
 
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 
 class SkyPostDialog(QDialog):
@@ -28,8 +28,7 @@ class SkyPostDialog(QDialog):
     def __init__(self, draft, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Sky post draft"))
-        self._ui = load_ui("skypost_dialog", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "skypost_dialog")
         # the drafts' contents and the copy labels are data (the label
         # carries the language tag), filled here
         self.edits = {}

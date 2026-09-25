@@ -20,7 +20,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QDialog, QFileDialog, QLabel,
                                QScroller, QScrollArea)
 
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui, drop_in
 
 # characters that no sane file system keeps in a name (Windows + the
 # control range); the export dialog suggestion is sanitised through this.
@@ -111,8 +111,7 @@ class ChartViewer(QDialog):
         # The structure is the Designer file's (ADR-005); the payload
         # (a scrollable pixmap or a live chart widget) lands in the
         # ph_payload placeholder, and "1:1" is pixmap-mode-only.
-        self._ui = load_ui("chart_viewer", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "chart_viewer")
         self._ui.btn_zoom_out.clicked.connect(self._zoom_out)
         self._ui.btn_zoom_in.clicked.connect(self._zoom_in)
         self._ui.btn_fit.clicked.connect(self._zoom_fit)
@@ -130,7 +129,7 @@ class ChartViewer(QDialog):
             self._scroll = QScrollArea()
             self._scroll.setWidget(self._label)
             self._scroll.setWidgetResizable(False)
-            self.layout().replaceWidget(self._ui.ph_payload, self._scroll)
+            drop_in(self.layout(), self._ui.ph_payload, self._scroll)
             # drag with the mouse to pan (native Qt scroller gesture)
             QScroller.grabGesture(self._scroll.viewport(),
                                   QScroller.LeftMouseButtonGesture)
@@ -142,8 +141,9 @@ class ChartViewer(QDialog):
         else:
             self._label = None
             self._scroll = None
-            # the insert reparents the widget to this dialog
-            self.layout().replaceWidget(self._ui.ph_payload, widget)
+            # the insert reparents the widget to this dialog (and the
+            # placeholder goes away hidden, not floating over the bar)
+            drop_in(self.layout(), self._ui.ph_payload, widget)
             widget.setToolTip(
                 self.tr("Wheel: zoom · drag: pan · hover: inspect"))
             # the widget fits itself to the viewport on resize (ChartView's

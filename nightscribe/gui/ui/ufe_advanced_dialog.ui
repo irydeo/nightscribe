@@ -9,7 +9,7 @@
 <ui version="4.0">
  <class>UfeAdvancedDialog</class>
  <widget class="QWidget" name="UfeAdvancedDialog">
-  <layout class="QVBoxLayout" name="vbox_advanced">
+  <layout class="QVBoxLayout" name="vbox_advanced"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
    <item>
     <layout class="QHBoxLayout" name="row_sky">
      <item><widget class="QLabel" name="lbl_sky"><property name="text"><string>Sky:</string></property></widget></item>

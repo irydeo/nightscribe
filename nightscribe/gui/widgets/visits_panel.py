@@ -42,7 +42,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
                                QMessageBox, QWidget)
 
-from ..ui_loader import load_ui
+from ..ui_loader import adopt_ui, drop_in, load_ui
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
 
 logger = logging.getLogger("nightscribe.gui.visits_panel")
@@ -106,8 +106,7 @@ class VisitsPanel(QWidget):
         # The structure is the Designer file's (ADR-005); the visits
         # list is the wheel-guarded PassiveList, inserted into its
         # placeholder (the wheel guard is behaviour, not structure).
-        self._ui = load_ui("visits_panel", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "visits_panel")
         self.btn_new = self._ui.btn_new
         self.btn_new.clicked.connect(self._on_new_visit)
         self.btn_open = self._ui.vp_btn_open_visit
@@ -119,7 +118,7 @@ class VisitsPanel(QWidget):
             "The project's visits, newest first; double-click opens one"))
         self.lst.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.lst.itemSelectionChanged.connect(self._on_select)
-        self.layout().replaceWidget(self._ui.ph_list, self.lst)
+        drop_in(self.layout(), self._ui.ph_list, self.lst)
         self._show_empty(True)
 
     # ------------------------------------------------------------ state
@@ -294,8 +293,7 @@ class VisitWindow(QDialog):
         # The structure is the Designer file's (ADR-005); the per-kind
         # blocks are fragments loaded on demand (absent means absent),
         # and the Passive widgets land in their placeholders.
-        self._ui = load_ui("visit_window", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "visit_window")
         # the visit's date is its name in the list — editable in place
         # (ADR-045 review: «pin or edit a visit's name»)
         self._date_ed = self._ui.vp_visit_date
@@ -319,8 +317,8 @@ class VisitWindow(QDialog):
         self.lst_res.setObjectName("vp_resources")
         self.lst_res.itemDoubleClicked.connect(
             lambda _it: self._on_open_resource())
-        self._ui.grp_res.layout().replaceWidget(self._ui.ph_resources,
-                                                self.lst_res)
+        drop_in(self._ui.grp_res.layout(), self._ui.ph_resources,
+                self.lst_res)
         self._populate_resources()
 
         # ---- measurements (light-curve kinds)
@@ -470,8 +468,7 @@ class VisitWindow(QDialog):
             meta = {}
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("FITS details"))
-        ui = load_ui("visit_file_meta", dlg)
-        dlg.setLayout(ui.layout())
+        ui = adopt_ui(dlg, "visit_file_meta")
         ui.lbl_file_name.setText(Path(path).name)
         ui.vp_img_filter.addItems(_FILTERS)
         ui.vp_img_filter.setCurrentText((meta.get("filter") or "Clear")
@@ -543,22 +540,20 @@ class VisitWindow(QDialog):
         self.spn_mag.setRange(-5.0, 30.0)
         self.spn_mag.setDecimals(3)
         self.spn_mag.setValue(16.0)
-        ui.layout().itemAt(0).layout().replaceWidget(ui.ph_mag,
-                                                     self.spn_mag)
+        drop_in(ui.layout().itemAt(0).layout(), ui.ph_mag, self.spn_mag)
         self.spn_err = PassiveDoubleSpinBox()
         self.spn_err.setRange(0.0, 9.0)
         self.spn_err.setDecimals(3)
         self.spn_err.setValue(0.0)
         self.spn_err.setSpecialValueText("—")
-        ui.layout().itemAt(0).layout().replaceWidget(ui.ph_err,
-                                                     self.spn_err)
+        drop_in(ui.layout().itemAt(0).layout(), ui.ph_err, self.spn_err)
         self.cmb_filt = ui.cmb_filt
         self.cmb_filt.addItems(_FILTERS)
         ui.vp_btn_add_meas.clicked.connect(self._on_add_measurement)
         ui.vp_btn_del_meas.clicked.connect(self._on_delete_measurement)
         self.lst_meas = PassiveList()
         self.lst_meas.setObjectName("vp_measurements")
-        ui.layout().replaceWidget(ui.ph_meas_list, self.lst_meas)
+        drop_in(ui.layout(), ui.ph_meas_list, self.lst_meas)
         self._populate_measurements()
 
     def _populate_measurements(self):

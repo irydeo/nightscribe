@@ -35,7 +35,7 @@ from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
 
 from ..core import fits_io
 from .ufe_state import UfeImageState
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui, drop_in
 from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
 
@@ -111,13 +111,14 @@ class UfeDialog(QDialog):
         # histogram strip. The structure is the Designer file's
         # (ADR-005); the custom widgets land in its placeholders.
         self.histogram = HistogramWidget(self.state)
-        self._ui = load_ui("ufe_dialog", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_dialog")
                                             # over: no wrapper margins
         self.splitter = self._ui.splitter
         self.splitter.replaceWidget(0, self.view)
-        # (after setLayout the layout answers to self, not to the husk)
-        self.layout().replaceWidget(self._ui.ph_histogram, self.histogram)
+        # (after the adoption the layout answers to self, not the husk;
+        # drop_in also hides the placeholder: QLayout.replaceWidget does
+        # not, and a visible one eats the top bar's clicks)
+        drop_in(self.layout(), self._ui.ph_histogram, self.histogram)
         self.splitter.setStretchFactor(0, 1)     # the image dominates
         self.splitter.setStretchFactor(1, 0)
         self.tabs = self._ui.tabs

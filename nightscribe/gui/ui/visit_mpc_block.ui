@@ -9,7 +9,7 @@
  <class>VisitWindow</class>
  <widget class="QGroupBox" name="grp_mpc">
   <property name="title"><string>Astrometry (MPC report)</string></property>
-  <layout class="QVBoxLayout" name="vbox_mpc">
+  <layout class="QVBoxLayout" name="vbox_mpc"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
    <item><widget class="QLabel" name="lbl_mpc_hint"><property name="text"><string>Paste the night's astrometric measurements (MPC 80-col or ADES PSV)</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item><widget class="QTextEdit" name="txt_mpc"><property name="maximumSize"><size><width>16777215</width><height>120</height></size></property><property name="acceptRichText"><bool>false</bool></property><property name="placeholderText"><string>Paste MPC 80-column or ADES PSV lines here…</string></property><property name="font"><font><family>Monospace</family></font></property></widget></item>
    <item>

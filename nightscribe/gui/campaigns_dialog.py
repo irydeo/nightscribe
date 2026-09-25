@@ -25,7 +25,7 @@ from PySide6.QtWidgets import QDialog
 
 from ..core import campaign
 from ..core.db import db
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +43,7 @@ class CampaignEditDialog(QDialog):
         self._camp = camp
         self.setWindowTitle(self.tr("Edit campaign") if camp
                             else self.tr("New campaign"))
-        self._ui = load_ui("campaign_edit_dialog", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "campaign_edit_dialog")
         self.edt_name = self._ui.edt_name
         self.edt_group = self._ui.edt_group
         self.edt_coord = self._ui.edt_coord
@@ -126,8 +125,7 @@ class NewProjectDialog(QDialog):
         self.setWindowTitle(self.tr("New project"))
         # the form's structure is ui/new_project_dialog.ui (ADR-005);
         # the resolution chain fills its fields in code
-        self._ui = load_ui("new_project_dialog", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "new_project_dialog")
         self.edt_name = self._ui.edt_name
         self.btn_resolve = self._ui.btn_resolve
         self.lbl_resolved = self._ui.lbl_resolved

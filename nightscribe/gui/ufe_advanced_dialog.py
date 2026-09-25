@@ -28,7 +28,7 @@ combo (its items carry userData, which a Designer file cannot hold).
 
 from PySide6.QtWidgets import QDialog
 
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 
 class UfeAdvancedDialog(QDialog):
@@ -38,8 +38,7 @@ class UfeAdvancedDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Advanced"))
         self.setMinimumWidth(420)
-        self._ui = load_ui("ufe_advanced_dialog", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_advanced_dialog")
                                             # over: no wrapper, no extra
                                             # margins
         self.cmb_sky = self._ui.cmb_sky

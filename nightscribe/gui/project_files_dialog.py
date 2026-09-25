@@ -29,7 +29,7 @@ from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (QApplication, QDialog, QHeaderView,
                                QMenu, QTableWidgetItem, QToolButton)
 
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 # Kinds the editor can load directly: a plate, or an annotated copy of one.
 FITS_KINDS = ("fits", "image")
@@ -59,8 +59,7 @@ class ProjectFilesDialog(QDialog):
         # empty-state line. The structure is the Designer file's
         # (ADR-005); the per-row menus and the column resize modes
         # (indexed) stay in code.
-        self._ui = load_ui("project_files_dialog", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "project_files_dialog")
         self.lbl_status = self._ui.lbl_status
         self.tbl = self._ui.tbl
         self.tbl.itemDoubleClicked.connect(self._on_row_activated)

@@ -17,7 +17,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QTreeWidgetItem
 
 from . import markdown
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 # The docs live at the repo root (source) or bundled (PyInstaller); the
 # browser lists every .md file and renders the selected one in a
@@ -62,8 +62,7 @@ class DocViewer(QDialog):
 
         # the structure is the Designer file's (ADR-005); the tree's
         # content and the page styles are data, applied here
-        self._ui = load_ui("doc_viewer", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "doc_viewer")
         self._split = self._ui.split
         self._tree = self._ui.tree
         self._fill_tree()

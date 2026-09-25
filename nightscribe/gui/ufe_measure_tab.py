@@ -43,7 +43,7 @@ from PySide6.QtWidgets import (QFileDialog, QWidget,
 from ..core import coords, fits_meta, photometry, photometry_export, \
     stretch
 from .ufe_advanced_dialog import UfeAdvancedDialog
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
@@ -99,8 +99,7 @@ class UfeMeasureTab(QWidget):
         # The structure is the Designer file's (ADR-005); this method
         # aliases the widgets, sizes the aperture spins from
         # core/photometry's defaults and wires every signal.
-        self._ui = load_ui("ufe_measure_tab", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_measure_tab")
                                             # over: no wrapper margins
         self.lbl_status = self._ui.lbl_status
         self.btn_go_compare = self._ui.btn_go_compare

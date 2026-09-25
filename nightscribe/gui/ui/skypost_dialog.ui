@@ -8,7 +8,7 @@
 <ui version="4.0">
  <class>SkyPostDialog</class>
  <widget class="QWidget" name="SkyPostDialog">
-  <layout class="QVBoxLayout" name="vbox_skypost">
+  <layout class="QVBoxLayout" name="vbox_skypost"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
    <item><widget class="QLabel" name="lbl_es"><property name="text"><string>Spanish draft</string></property></widget></item>
    <item><widget class="QPlainTextEdit" name="txt_es"><property name="readOnly"><bool>true</bool></property></widget></item>
    <item>

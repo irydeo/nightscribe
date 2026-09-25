@@ -22,7 +22,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QListWidgetItem
 
 from ..core import journal
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 _DAYS = 90        # the journal shows the last ~three months
 
@@ -41,8 +41,7 @@ class JournalDialog(QDialog):
         self.setWindowTitle(self.tr("Observing journal"))
         # the structure is the Designer file's (ADR-005); the kind
         # combo's items carry userData and are filled here
-        self._ui = load_ui("journal_dialog", self)
-        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui = adopt_ui(self, "journal_dialog")
         self.cmb_kind = self._ui.cmb_kind
         self.cmb_kind.addItem(self.tr("All kinds"), None)
         for k in (journal.K_PROJECT, journal.K_SESSION, journal.K_FILE,

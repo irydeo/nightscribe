@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (QFileDialog, QMessageBox, QWidget,
                                QGraphicsSimpleTextItem)
 
 from ..core import fits_annotate, fits_io, wcs as wcs_mod
-from .ui_loader import load_ui
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_annotate_tab")
 
@@ -70,8 +70,7 @@ class UfeAnnotateTab(QWidget):
     def _build_ui(self):
         # The structure is the Designer file's (ADR-005); this method
         # aliases the widgets and connects the signals.
-        self._ui = load_ui("ufe_annotate_tab", self)
-        self.setLayout(self._ui.layout())   # the .ui's own layout takes
+        self._ui = adopt_ui(self, "ufe_annotate_tab")
                                             # over: no wrapper margins
         self.edit_label = self._ui.edit_label
         self.edit_label.textChanged.connect(self._refresh_marker)

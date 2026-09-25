@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Visits panel (ADR-045): the Analysis tab's visits overview. Loaded by
+  gui/widgets/visits_panel.py through gui/ui_loader.py; the visits list
+  is a PassiveList (custom wheel guard) inserted into ph_list in code
+  (ADR-005 placeholder rule). The count text is data (set in code).
+-->
+<ui version="4.0">
+ <class>VisitsPanel</class>
+ <widget class="QWidget" name="VisitsPanel">
+  <layout class="QVBoxLayout" name="vbox_visits">
+   <property name="layoutStretch"><string notr="true">0,0,1</string></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_top">
+     <item><widget class="QPushButton" name="btn_new"><property name="text"><string>New visit</string></property><property name="toolTip"><string>Every day you work the object is a visit: it opens in its own window, ready for its images, reports and measurements</string></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_open_visit"><property name="text"><string>Open visit…</string></property><property name="toolTip"><string>Open the selected visit's window (double-click works too)</string></property></widget></item>
+     <item><widget class="QLabel" name="lbl_count"><property name="text"><string/></property></widget></item>
+     <item><spacer name="hsp_top"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_empty"><property name="text"><string>No visits yet. Each night you work the object starts one: plates, reports and measurements attach to it.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QWidget" name="ph_list"/></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

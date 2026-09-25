@@ -14,16 +14,15 @@
 """The observing journal dialog (ADR-036, J2): the derived journal of
 core/journal.py, grouped by observing night, with a kind filter and a
 search box. Read-only; double-clicking an entry jumps to its project (or
-explores the object) through the caller's callback. Code-built like the
-campaign dialogs — no Designer file.
+explores the object) through the caller's callback. The structure is
+ui/journal_dialog.ui (ADR-005, restored 2026-09-25).
 """
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QHBoxLayout, QLineEdit, QListWidget,
-                               QListWidgetItem, QVBoxLayout)
+from PySide6.QtWidgets import QDialog, QListWidgetItem
 
 from ..core import journal
+from .ui_loader import load_ui
 
 _DAYS = 90        # the journal shows the last ~three months
 
@@ -40,28 +39,20 @@ class JournalDialog(QDialog):
         self._lang = lang
         self._on_open = on_open_object
         self.setWindowTitle(self.tr("Observing journal"))
-        lay = QVBoxLayout(self)
-        row = QHBoxLayout()
-        self.cmb_kind = QComboBox()
+        # the structure is the Designer file's (ADR-005); the kind
+        # combo's items carry userData and are filled here
+        self._ui = load_ui("journal_dialog", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self.cmb_kind = self._ui.cmb_kind
         self.cmb_kind.addItem(self.tr("All kinds"), None)
         for k in (journal.K_PROJECT, journal.K_SESSION, journal.K_FILE,
                   journal.K_PHOTOMETRY, journal.K_CAMPAIGN,
                   journal.K_OBSERVATION):
             self.cmb_kind.addItem(journal.kind_label(k, lang), k)
-        row.addWidget(self.cmb_kind)
-        self.edt_search = QLineEdit()
-        self.edt_search.setPlaceholderText(self.tr("Search…"))
-        row.addWidget(self.edt_search)
-        lay.addLayout(row)
-        self.lst = QListWidget()
-        self.lst.setToolTip(self.tr(
-            "Double-click an entry to open its project or explore the "
-            "object"))
+        self.edt_search = self._ui.edt_search
+        self.lst = self._ui.lst
         self.lst.viewport().setCursor(Qt.PointingHandCursor)
-        lay.addWidget(self.lst)
-        btns = QDialogButtonBox(QDialogButtonBox.Close)
-        btns.rejected.connect(self.reject)
-        lay.addWidget(btns)
+        self._ui.buttonBox.rejected.connect(self.reject)
         self.resize(720, 520)
         self.cmb_kind.currentIndexChanged.connect(self._render)
         self.edt_search.textChanged.connect(self._render)

@@ -12,13 +12,13 @@
 ############################################################
 
 """The bilingual "sky today" draft dialog (ADR-036, S3): renders
-core/narrative.sky_draft into two copyable boxes. Code-built like the
-other small dialogs — no Designer file.
+core/narrative.sky_draft into two copyable boxes. The structure is
+ui/skypost_dialog.ui (ADR-005, restored 2026-09-25).
 """
 
-from PySide6.QtWidgets import (QApplication, QDialog, QDialogButtonBox,
-                               QHBoxLayout, QLabel, QPlainTextEdit,
-                               QPushButton, QVBoxLayout)
+from PySide6.QtWidgets import QApplication, QDialog
+
+from .ui_loader import load_ui
 
 
 class SkyPostDialog(QDialog):
@@ -28,25 +28,19 @@ class SkyPostDialog(QDialog):
     def __init__(self, draft, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Sky post draft"))
-        lay = QVBoxLayout(self)
+        self._ui = load_ui("skypost_dialog", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        # the drafts' contents and the copy labels are data (the label
+        # carries the language tag), filled here
         self.edits = {}
-        for lang, title in (("es", self.tr("Spanish draft")),
-                            ("en", self.tr("English draft"))):
-            lay.addWidget(QLabel(title))
-            edt = QPlainTextEdit(draft.get(lang, ""))
-            edt.setReadOnly(True)
-            lay.addWidget(edt)
-            btn = QPushButton(self.tr("Copy %1").replace(
-                "%1", lang.upper()))
+        for lang in ("es", "en"):
+            edt = getattr(self._ui, f"txt_{lang}")
+            edt.setPlainText(draft.get(lang, ""))
+            btn = getattr(self._ui, f"btn_copy_{lang}")
+            btn.setText(self.tr("Copy %1").replace("%1", lang.upper()))
             btn.clicked.connect(lambda _c=False, e=edt:
                                 QApplication.clipboard().setText(
                                     e.toPlainText()))
-            row = QHBoxLayout()
-            row.addStretch(1)
-            row.addWidget(btn)
-            lay.addLayout(row)
             self.edits[lang] = edt
-        btns = QDialogButtonBox(QDialogButtonBox.Close)
-        btns.rejected.connect(self.reject)
-        lay.addWidget(btns)
+        self._ui.buttonBox.rejected.connect(self.reject)
         self.resize(640, 520)

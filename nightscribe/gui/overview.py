@@ -38,14 +38,13 @@ import datetime
 from PySide6.QtCore import (QEvent, QObject, QT_TRANSLATE_NOOP, Qt,
                             Signal)
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QCheckBox, QFrame, QGroupBox,
-                                QHBoxLayout, QLabel, QHeaderView, QPushButton,
-                                QSizePolicy, QTabWidget, QTableWidget,
-                                QTableWidgetItem, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QLabel, QHeaderView, QTableWidgetItem,
+                               QWidget)
 
 from ..core import exposure, narrative, orbits
 from .. import paths
 from . import theme
+from .ui_loader import load_ui
 
 # Viewer / slot titles, translated at the point of use (tr() at the tab
 # site; QT_TRANSLATE_NOOP marks them here so lupdate can see them).
@@ -201,90 +200,55 @@ class ObjectPanel(QWidget):
         self._for_post = for_post
         self._project_lookup = project_lookup
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        # The structure is the Designer file's (ADR-005): every block
+        # starts hidden and the states show them; the skins come from
+        # theme.py, and the chips / table rows / chart tabs are data.
+        self._ui = load_ui("object_panel", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
         self._e = None          # last enriched dict (re-render on mode change)
 
         # state line (loading / not found); hidden when ready
-        self.lbl_state = QLabel()
+        self.lbl_state = self._ui.lbl_state
         self.lbl_state.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
-        self.lbl_state.hide()
-        layout.addWidget(self.lbl_state)
 
-        self.lbl_hook = QLabel()
-        self.lbl_hook.setWordWrap(True)
+        self.lbl_hook = self._ui.lbl_hook
         self.lbl_hook.setStyleSheet("font-size: 15px; font-weight: bold;")
-        self.lbl_hook.hide()
-        layout.addWidget(self.lbl_hook)
 
         # coordinates block (object-card plan, subplan 0): RA/Dec in
         # decimal AND sexagesimal, with a one-click copy button. Hidden
         # for objects without a known position (e.g. ESA alerts).
-        self.row_coords = QFrame()
+        self.row_coords = self._ui.row_coords
         self.row_coords.setStyleSheet(
             f"background: {theme.C_BASE}; border-radius: 8px;"
             f" border: 1px solid {theme.C_LINE};")
-        co_lay = QHBoxLayout(self.row_coords)
-        co_lay.setContentsMargins(10, 6, 10, 6)
-        self.lbl_coords = QLabel()
-        self.lbl_coords.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.lbl_coords = self._ui.lbl_coords
         self.lbl_coords.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
-        co_lay.addWidget(self.lbl_coords, 1)
-        self.btn_copy_coords = QPushButton("⧉  " + self.tr("Copy"))
-        self.btn_copy_coords.setCursor(Qt.PointingHandCursor)
-        self.btn_copy_coords.setToolTip(self.tr(
-            "Copy the coordinates (decimal and sexagesimal)"))
+        self.btn_copy_coords = self._ui.btn_copy_coords
+        self.btn_copy_coords.setText("⧉  " + self.btn_copy_coords.text())
         self.btn_copy_coords.setStyleSheet(
             f"QPushButton {{ color: {theme.C_TEXT_DIM};"
             f" background: transparent; border: 1px solid {theme.C_LINE};"
             f" border-radius: 4px; padding: 2px 10px; }}"
             f"QPushButton:hover {{ color: {theme.C_TEXT}; }}")
         self.btn_copy_coords.clicked.connect(self._copy_coords)
-        co_lay.addWidget(self.btn_copy_coords)
-        self.row_coords.hide()
-        layout.addWidget(self.row_coords)
         self._coords_clip = ""
 
-        self.lbl_facts = QLabel()
-        self.lbl_facts.setWordWrap(True)
+        self.lbl_facts = self._ui.lbl_facts
         self.lbl_facts.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
-        self.lbl_facts.hide()
-        layout.addWidget(self.lbl_facts)
 
-        # capture/window block (D3)
-        self.row_capture = QFrame()
+        # capture/window block (D3): the chips are data, added in code
+        self.row_capture = self._ui.row_capture
         self.row_capture.setStyleSheet(
             f"background: {theme.C_BASE}; border-radius: 8px;"
             f" border: 1px solid {theme.C_LINE};")
-        self._chips = QHBoxLayout(self.row_capture)
-        self._chips.setContentsMargins(10, 6, 10, 6)
-        self._chips.setSpacing(8)
-        self._chips.addStretch(1)
-        self.row_capture.hide()
-        layout.addWidget(self.row_capture)
+        self._chips = self.row_capture.layout()
 
         # parameters table
-        self.grp_params = QGroupBox(self.tr("Parameters"))
-        gl = QVBoxLayout(self.grp_params)
-        top = QHBoxLayout()
-        self.chk_deep = QCheckBox(self.tr("In depth"))
+        self.grp_params = self._ui.grp_params
+        self.chk_deep = self._ui.chk_deep
         self.chk_deep.toggled.connect(lambda: self._refill_params())
-        top.addWidget(self.chk_deep)
-        top.addStretch(1)
-        gl.addLayout(top)
-
-        tbl = QTableWidget(0, 3)
-        self.tbl_params = tbl
-        tbl.setHorizontalHeaderLabels(
-            [self.tr("Parameter"), self.tr("Value"), self.tr("What it means")])
-        tbl.verticalHeader().setVisible(False)
-        tbl.setEditTriggers(QTableWidget.NoEditTriggers)
-        tbl.setSelectionBehavior(QTableWidget.SelectRows)
-        tbl.setSelectionMode(QTableWidget.SingleSelection)
-        # multi-line cells (object-card plan, subplan 1): the explanation
-        # wraps and the row grows — no more vertically clipped text
-        tbl.setWordWrap(True)
-        hdr = tbl.horizontalHeader()
+        self.tbl_params = self._ui.tbl_params
+        hdr = self.tbl_params.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.Interactive)
         hdr.setSectionResizeMode(1, QHeaderView.Interactive)
         hdr.setSectionResizeMode(2, QHeaderView.Stretch)
@@ -294,10 +258,6 @@ class ObjectPanel(QWidget):
         # so watching the section itself is the reliable hook)
         self._rows_busy = False
         hdr.sectionResized.connect(self._param_section_resized)
-        tbl.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        gl.addWidget(tbl)
-        self.grp_params.hide()
-        layout.addWidget(self.grp_params)
 
         # charts tabs (D2): each produced chart gets its own tab labelled
         # with the chart's title; with a single chart the tab bar hides and
@@ -305,32 +265,16 @@ class ObjectPanel(QWidget):
         # field/transit are QLabel+QPixmap. The tabs are (re)filled in
         # _render_charts and emptied by _empty_tabs (state transitions:
         # ready -> blank -> ready).
-        self.grp_charts = QGroupBox(self.tr("Charts"))
-        self._tabs = QTabWidget(self.grp_charts)
-        self._tabs.setTabBarAutoHide(True)
-        self._tabs.setDocumentMode(True)
-        # a sane floor so the auto-fit dialog does not collapse a chart
-        self._tabs.setMinimumSize(480, 340)
-        lay = QVBoxLayout(self.grp_charts)
-        lay.setContentsMargins(6, 4, 6, 6)
-        lay.addWidget(self._tabs)
+        self.grp_charts = self._ui.grp_charts
+        self._tabs = self._ui.tabs_charts
         self._slot_data = {}    # key -> data dict (for rebuild on click)
         self._slot_titles = {}  # key -> translated title (for tabs + viewer)
         self._slot_click = _SlotClick(self)
-        self.grp_charts.hide()
-        layout.addWidget(self.grp_charts)
 
         # single CTA at the very bottom
-        self.btn_project = QPushButton(self.tr("Create project"))
-        self.btn_project.setCursor(Qt.PointingHandCursor)
-        self.btn_project.setMinimumHeight(46)
-        self.btn_project.setSizePolicy(QSizePolicy.Expanding,
-                                       QSizePolicy.Fixed)
+        self.btn_project = self._ui.btn_project
         self._action = "create"
         self.btn_project.clicked.connect(self._cta_clicked)
-        self.btn_project.hide()
-        layout.addSpacing(6)
-        layout.addWidget(self.btn_project)
 
     # ---------------- states ----------------
 

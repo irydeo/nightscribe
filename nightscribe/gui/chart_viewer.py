@@ -17,9 +17,10 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
-                               QPushButton, QScroller, QScrollArea,
-                               QVBoxLayout)
+from PySide6.QtWidgets import (QDialog, QFileDialog, QLabel,
+                               QScroller, QScrollArea)
+
+from .ui_loader import load_ui
 
 # characters that no sane file system keeps in a name (Windows + the
 # control range); the export dialog suggestion is sanitised through this.
@@ -106,25 +107,22 @@ class ChartViewer(QDialog):
         else:
             self.resize(*self._fit_window())
 
-        # ---- toolbar -------------------------------------------------------
-        layout = QVBoxLayout(self)
-        bar = QHBoxLayout()
-        buttons = ((self.tr("Zoom −"), self._zoom_out),
-                   (self.tr("Zoom +"), self._zoom_in),
-                   (self.tr("Fit"), self._zoom_fit))
-        if self._mode == "pixmap":
-            # 1:1 is only meaningful for a bitmap (scene units in widget mode
-            # have no pixel meaning); the widget's "Fit" is its 1:1.
-            buttons += ((self.tr("1:1"), self._zoom_11),)
-        buttons += ((self.tr("Export PNG…"), self._export),)
-        for text, slot in buttons:
-            b = QPushButton(text)
-            b.clicked.connect(slot)
-            bar.addWidget(b)
-        bar.addStretch()
-        layout.addLayout(bar)
+        # ---- toolbar + payload ----------------------------------------
+        # The structure is the Designer file's (ADR-005); the payload
+        # (a scrollable pixmap or a live chart widget) lands in the
+        # ph_payload placeholder, and "1:1" is pixmap-mode-only.
+        self._ui = load_ui("chart_viewer", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self._ui.btn_zoom_out.clicked.connect(self._zoom_out)
+        self._ui.btn_zoom_in.clicked.connect(self._zoom_in)
+        self._ui.btn_fit.clicked.connect(self._zoom_fit)
+        self._ui.btn_11.clicked.connect(self._zoom_11)
+        self._ui.btn_export.clicked.connect(self._export)
+        if self._mode != "pixmap":
+            # 1:1 is only meaningful for a bitmap (scene units in widget
+            # mode have no pixel meaning); the widget's "Fit" is its 1:1.
+            self._ui.btn_11.setVisible(False)
 
-        # ---- payload -------------------------------------------------------
         if self._mode == "pixmap":
             self._label = QLabel()
             self._label.setAlignment(Qt.AlignCenter)
@@ -132,7 +130,7 @@ class ChartViewer(QDialog):
             self._scroll = QScrollArea()
             self._scroll.setWidget(self._label)
             self._scroll.setWidgetResizable(False)
-            layout.addWidget(self._scroll, stretch=1)
+            self.layout().replaceWidget(self._ui.ph_payload, self._scroll)
             # drag with the mouse to pan (native Qt scroller gesture)
             QScroller.grabGesture(self._scroll.viewport(),
                                   QScroller.LeftMouseButtonGesture)
@@ -144,8 +142,8 @@ class ChartViewer(QDialog):
         else:
             self._label = None
             self._scroll = None
-            # adding to the layout reparents the widget to this dialog
-            layout.addWidget(widget, stretch=1)
+            # the insert reparents the widget to this dialog
+            self.layout().replaceWidget(self._ui.ph_payload, widget)
             widget.setToolTip(
                 self.tr("Wheel: zoom · drag: pan · hover: inspect"))
             # the widget fits itself to the viewport on resize (ChartView's

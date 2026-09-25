@@ -21,11 +21,11 @@ core/campaign.py.
 
 import logging
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QLabel, QPushButton, QVBoxLayout)
+from PySide6.QtWidgets import QDialog
 
 from ..core import campaign
 from ..core.db import db
+from .ui_loader import load_ui
 
 logger = logging.getLogger(__name__)
 
@@ -33,52 +33,41 @@ logger = logging.getLogger(__name__)
 class CampaignEditDialog(QDialog):
     # The create/edit form of one campaign. Protocol fields: cadence in
     # nights (default 1, V-l), filters and comparison stars as
-    # comma-separated text (parsed on save).
+    # comma-separated text (parsed on save). The form's structure is
+    # ui/campaign_edit_dialog.ui (ADR-005); the prefill is data.
     # @args: parent - QWidget, camp - campaign dict to edit or None (new),
     #        db_obj - Database
     def __init__(self, parent=None, camp=None, db_obj=None):
         super().__init__(parent)
-        from PySide6.QtWidgets import (QDialogButtonBox, QFormLayout,
-                                       QLineEdit, QPlainTextEdit, QSpinBox)
         self._db = db_obj or db
         self._camp = camp
         self.setWindowTitle(self.tr("Edit campaign") if camp
                             else self.tr("New campaign"))
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(self.tr(
-            "A campaign groups the projects of one shared observation "
-            "effort — several nights, several observatories, one goal. "
-            "Name it after the goal, e.g. “T CrB 2026 eruption” or "
-            "“WeSb 1 light curve”.")))
-        form = QFormLayout()
-        self.edt_name = QLineEdit((camp or {}).get("name", ""))
-        form.addRow(self.tr("Name:"), self.edt_name)
-        self.edt_group = QLineEdit((camp or {}).get("group_name", ""))
-        form.addRow(self.tr("Group:"), self.edt_group)
-        self.edt_coord = QLineEdit((camp or {}).get("coordinator", ""))
-        form.addRow(self.tr("Coordinator:"), self.edt_coord)
-        self.edt_goal = QLineEdit((camp or {}).get("goal", ""))
-        form.addRow(self.tr("Science goal:"), self.edt_goal)
+        self._ui = load_ui("campaign_edit_dialog", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self.edt_name = self._ui.edt_name
+        self.edt_group = self._ui.edt_group
+        self.edt_coord = self._ui.edt_coord
+        self.edt_goal = self._ui.edt_goal
+        self.spn_cadence = self._ui.spn_cadence
+        self.edt_filters = self._ui.edt_filters
+        self.edt_comps = self._ui.edt_comps
+        self.edt_report = self._ui.edt_report
+        self.edt_data = self._ui.edt_data
+        self.edt_notes = self._ui.edt_notes
         prot = (camp or {}).get("protocol") or {}
-        self.spn_cadence = QSpinBox()
-        self.spn_cadence.setRange(1, 30)
+        self.edt_name.setText((camp or {}).get("name", ""))
+        self.edt_group.setText((camp or {}).get("group_name", ""))
+        self.edt_coord.setText((camp or {}).get("coordinator", ""))
+        self.edt_goal.setText((camp or {}).get("goal", ""))
         self.spn_cadence.setValue(int(prot.get("cadence_nights", 1)))
-        form.addRow(self.tr("Cadence (nights):"), self.spn_cadence)
-        self.edt_filters = QLineEdit(", ".join(prot.get("filters", [])))
-        form.addRow(self.tr("Filters:"), self.edt_filters)
-        self.edt_comps = QLineEdit(", ".join(prot.get("comp_stars", [])))
-        form.addRow(self.tr("Comparison stars:"), self.edt_comps)
-        self.edt_report = QLineEdit((camp or {}).get("report_url", ""))
-        form.addRow(self.tr("Report URL:"), self.edt_report)
-        self.edt_data = QLineEdit((camp or {}).get("data_url", ""))
-        form.addRow(self.tr("Data URL:"), self.edt_data)
-        self.edt_notes = QPlainTextEdit(prot.get("notes", ""))
-        form.addRow(self.tr("Protocol notes:"), self.edt_notes)
-        layout.addLayout(form)
-        box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        box.accepted.connect(self._save)
-        box.rejected.connect(self.reject)
-        layout.addWidget(box)
+        self.edt_filters.setText(", ".join(prot.get("filters", [])))
+        self.edt_comps.setText(", ".join(prot.get("comp_stars", [])))
+        self.edt_report.setText((camp or {}).get("report_url", ""))
+        self.edt_data.setText((camp or {}).get("data_url", ""))
+        self.edt_notes.setPlainText(prot.get("notes", ""))
+        self._ui.buttonBox.accepted.connect(self._save)
+        self._ui.buttonBox.rejected.connect(self.reject)
 
     def _csv(self, text):
         # @args: text - comma-separated field text
@@ -130,38 +119,24 @@ class NewProjectDialog(QDialog):
     # @args: parent, campaign_id - int, db_obj - Database
     def __init__(self, parent=None, campaign_id=None, db_obj=None):
         super().__init__(parent)
-        from PySide6.QtWidgets import (QDialogButtonBox, QFormLayout,
-                                       QLineEdit)
         self._db = db_obj or db
         self._campaign_id = campaign_id
         self._resolved = {}
         self._resolve_worker = None
         self.setWindowTitle(self.tr("New project"))
-        layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(self.tr(
-            "Creates a new project for this object and links it to the "
-            "selected campaign. If the project already exists, use "
-            "“Attach project…” in the campaigns tab instead.")))
-        form = QFormLayout()
-        self.edt_name = QLineEdit()
-        form.addRow(self.tr("Object:"), self.edt_name)
-        self.btn_resolve = QPushButton(self.tr("Resolve (VSX/SIMBAD)"))
-        form.addRow("", self.btn_resolve)
-        self.lbl_resolved = QLabel(self.tr("— not resolved yet —"))
-        self.lbl_resolved.setWordWrap(True)
-        form.addRow(self.lbl_resolved)
-        self.edt_ra = QLineEdit()
-        form.addRow(self.tr("RA (deg):"), self.edt_ra)
-        self.edt_dec = QLineEdit()
-        form.addRow(self.tr("Dec (deg):"), self.edt_dec)
-        self.edt_mag = QLineEdit()
-        form.addRow(self.tr("Mag (approx):"), self.edt_mag)
-        layout.addLayout(form)
+        # the form's structure is ui/new_project_dialog.ui (ADR-005);
+        # the resolution chain fills its fields in code
+        self._ui = load_ui("new_project_dialog", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self.edt_name = self._ui.edt_name
+        self.btn_resolve = self._ui.btn_resolve
+        self.lbl_resolved = self._ui.lbl_resolved
+        self.edt_ra = self._ui.edt_ra
+        self.edt_dec = self._ui.edt_dec
+        self.edt_mag = self._ui.edt_mag
         self.btn_resolve.clicked.connect(self._resolve)
-        box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        box.accepted.connect(self._save)
-        box.rejected.connect(self.reject)
-        layout.addWidget(box)
+        self._ui.buttonBox.accepted.connect(self._save)
+        self._ui.buttonBox.rejected.connect(self.reject)
 
     def _resolve(self):
         # Kicks the VSX->SIMBAD chain off the GUI thread (UX-f); the form

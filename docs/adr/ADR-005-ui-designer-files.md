@@ -22,8 +22,15 @@ obligatorio; los `.ui` ya marcan sus textos como traducibles (i18n, ADR-014).
 
 **rev. 2026-09-25 (cumplimiento restaurado).** La era UFE (ADR-044) y las
 piezas nacidas con ella se habían construido en código puro, contra esta
-decisión. Se restaura con estas reglas operativas, que ya valen para todo
-lo nuevo:
+decisión. La restauración cubre **todo** lo construido en código: la
+familia UFE (diálogo, cuatro pestañas y los dos diálogos auxiliares), el
+gestor de visitas (panel, ventana y sus fragmentos por tipo), la ventana
+de ficheros del proyecto, los diálogos de campañas (alta/edición y nuevo
+proyecto), el diario, el borrador de cielo, el visor de documentación, el
+visor de cartas y la ficha de objeto. Quedan en código por diseño: los
+interiores de los widgets propios (`gui/widgets/`), los contenidos
+dinámicos por dato (filas, chips, tablas por tipo) y los diálogos legacy
+congelados (ADR-044). Reglas operativas, en vigor para todo lo nuevo:
 
 - Toda ventana/diálogo/pestaña define su **estructura, textos y
   tooltips** en `gui/ui/<nombre>.ui`, con `<class>` igual a la clase
@@ -63,7 +70,14 @@ step as in saas).
 
 **rev. 2026-09-25 (compliance restored).** The UFE era (ADR-044) and the
 pieces born with it had been built in pure code, against this decision.
-The restoration sets these operative rules, in force for everything new:
+The restoration covers **everything** that was code-built: the UFE family
+(dialog, four tabs and the two auxiliary dialogs), the visits manager
+(panel, window and its per-kind fragments), the project files window, the
+campaign dialogs (edit and new project), the journal, the sky-post draft,
+the documentation viewer, the chart viewer and the object panel. Left in
+code by design: the custom widgets' internals (`gui/widgets/`), the
+data-driven dynamic content (rows, chips, per-kind tables) and the frozen
+legacy dialogs (ADR-044). Operative rules, in force for everything new:
 
 - Every window/dialog/tab defines its **structure, texts and tooltips**
   in `gui/ui/<name>.ui`, with `<class>` equal to the owning Python class

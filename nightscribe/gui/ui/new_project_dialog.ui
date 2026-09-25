@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  New-project dialog of the Campaigns tab (UX-a): one variable project
+  linked to the selected campaign, with the VSX/SIMBAD resolution chain.
+  Loaded by gui/campaigns_dialog.py through gui/ui_loader.py. The
+  resolution status and the resolved fields are data, set in code
+  (ADR-005).
+-->
+<ui version="4.0">
+ <class>NewProjectDialog</class>
+ <widget class="QWidget" name="NewProjectDialog">
+  <layout class="QVBoxLayout" name="vbox_newproj">
+   <item><widget class="QLabel" name="lbl_intro"><property name="text"><string>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</string></property></widget></item>
+   <item>
+    <layout class="QFormLayout" name="form_newproj">
+     <item row="0" column="0"><widget class="QLabel" name="lbl_object"><property name="text"><string>Object:</string></property></widget></item>
+     <item row="0" column="1"><widget class="QLineEdit" name="edt_name"/></item>
+     <item row="1" column="1"><widget class="QPushButton" name="btn_resolve"><property name="text"><string>Resolve (VSX/SIMBAD)</string></property></widget></item>
+     <item row="2" column="0" colspan="2"><widget class="QLabel" name="lbl_resolved"><property name="text"><string>— not resolved yet —</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     <item row="3" column="0"><widget class="QLabel" name="lbl_ra"><property name="text"><string>RA (deg):</string></property></widget></item>
+     <item row="3" column="1"><widget class="QLineEdit" name="edt_ra"/></item>
+     <item row="4" column="0"><widget class="QLabel" name="lbl_dec"><property name="text"><string>Dec (deg):</string></property></widget></item>
+     <item row="4" column="1"><widget class="QLineEdit" name="edt_dec"/></item>
+     <item row="5" column="0"><widget class="QLabel" name="lbl_mag"><property name="text"><string>Mag (approx):</string></property></widget></item>
+     <item row="5" column="1"><widget class="QLineEdit" name="edt_mag"/></item>
+    </layout>
+   </item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

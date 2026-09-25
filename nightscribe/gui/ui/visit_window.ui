@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Visit window (ADR-045, form A): the visit's non-modal work window.
+  Loaded by gui/widgets/visits_panel.py through gui/ui_loader.py.
+  The Measurements and Astrometry blocks are per-kind fragments
+  (ui/visit_measurements.ui, ui/visit_mpc_block.ui) loaded only when the
+  project's kind calls for them: absent means absent, as the pinned
+  tests demand. The PassiveList / PassiveDoubleSpinBox wheel guards are
+  custom widgets inserted into the placeholders in code (ADR-005).
+-->
+<ui version="4.0">
+ <class>VisitWindow</class>
+ <widget class="QWidget" name="VisitWindow">
+  <layout class="QVBoxLayout" name="vbox_visit">
+   <property name="layoutStretch"><string notr="true">0,1,0,0</string></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_head">
+     <property name="layoutStretch"><string notr="true">1,0,0,0</string></property>
+     <item><widget class="QLineEdit" name="vp_visit_date"><property name="placeholderText"><string notr="true">YYYY-MM-DD</string></property><property name="toolTip"><string>The visit's date (its name in the list). Points already saved to it keep their own MJD</string></property><property name="maximumSize"><size><width>150</width><height>16777215</height></size></property><property name="font"><font><bold>true</bold></font></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_save_date"><property name="text"><string>Save date</string></property><property name="toolTip"><string>Save the visit's date (the date is its name in the list)</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_pin"><property name="text"><string notr="true">📌</string></property><property name="toolTip"><string>Pin the visit: it floats to the top of the list</string></property><property name="checkable"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_delete"><property name="text"><string>Delete visit…</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_res">
+     <property name="title"><string>Resources</string></property>
+     <layout class="QVBoxLayout" name="vbox_res">
+      <item>
+       <layout class="QHBoxLayout" name="row_res">
+        <item><widget class="QPushButton" name="vp_btn_attach"><property name="text"><string>Attach files…</string></property><property name="toolTip"><string>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</string></property></widget></item>
+        <item><widget class="QPushButton" name="vp_btn_open"><property name="text"><string>Open</string></property><property name="toolTip"><string>Plates open in the FITS editor; everything else opens with the system</string></property></widget></item>
+        <item><widget class="QPushButton" name="vp_btn_remove"><property name="text"><string>Remove from visit</string></property><property name="toolTip"><string>Unlink the selected resource (the file on disk is never touched)</string></property></widget></item>
+        <item><spacer name="hsp_res"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item><widget class="QWidget" name="ph_resources"/></item>
+     </layout>
+    </widget>
+   </item>
+   <item><widget class="QTextEdit" name="vp_notes"><property name="placeholderText"><string>Night notes (seeing, clouds…)</string></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_bottom">
+     <item><spacer name="hsp_bottom"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="vp_btn_close"><property name="text"><string>Save and close</string></property><property name="toolTip"><string>Flush the date edit if pending and close the window (everything else already saved itself)</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

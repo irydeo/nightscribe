@@ -39,12 +39,10 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDialog, QDialogButtonBox,
-                               QFileDialog, QFormLayout, QGroupBox,
-                               QHBoxLayout, QLabel, QLineEdit,
-                               QListWidgetItem, QMessageBox, QPushButton,
-                               QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QDialog, QFileDialog, QListWidgetItem,
+                               QMessageBox, QWidget)
 
+from ..ui_loader import load_ui
 from .passive_wheel import PassiveDoubleSpinBox, PassiveList
 
 logger = logging.getLogger("nightscribe.gui.visits_panel")
@@ -105,37 +103,23 @@ class VisitsPanel(QWidget):
     # ------------------------------------------------------------ build
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        top = QHBoxLayout()
-        self.btn_new = QPushButton(self.tr("New visit"))
-        self.btn_new.setToolTip(self.tr(
-            "Every day you work the object is a visit: it opens in its "
-            "own window, ready for its images, reports and measurements"))
+        # The structure is the Designer file's (ADR-005); the visits
+        # list is the wheel-guarded PassiveList, inserted into its
+        # placeholder (the wheel guard is behaviour, not structure).
+        self._ui = load_ui("visits_panel", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
+        self.btn_new = self._ui.btn_new
         self.btn_new.clicked.connect(self._on_new_visit)
-        top.addWidget(self.btn_new)
-        self.btn_open = QPushButton(self.tr("Open visit…"))
-        self.btn_open.setObjectName("vp_btn_open_visit")
-        self.btn_open.setToolTip(self.tr(
-            "Open the selected visit's window (double-click works too)"))
+        self.btn_open = self._ui.vp_btn_open_visit
         self.btn_open.clicked.connect(self._on_open_selected)
-        top.addWidget(self.btn_open)
-        self.lbl_count = QLabel("")
-        top.addWidget(self.lbl_count)
-        top.addStretch(1)
-        lay.addLayout(top)
-
-        self.lbl_empty = QLabel(self.tr(
-            "No visits yet. Each night you work the object starts one: "
-            "plates, reports and measurements attach to it."))
-        self.lbl_empty.setWordWrap(True)
-        lay.addWidget(self.lbl_empty)
-
+        self.lbl_count = self._ui.lbl_count
+        self.lbl_empty = self._ui.lbl_empty
         self.lst = PassiveList()
         self.lst.setToolTip(self.tr(
             "The project's visits, newest first; double-click opens one"))
         self.lst.itemDoubleClicked.connect(self._on_row_double_clicked)
         self.lst.itemSelectionChanged.connect(self._on_select)
-        lay.addWidget(self.lst, 1)
+        self.layout().replaceWidget(self._ui.ph_list, self.lst)
         self._show_empty(True)
 
     # ------------------------------------------------------------ state
@@ -307,113 +291,57 @@ class VisitWindow(QDialog):
         if s is None:
             self.close()
             return
-        lay = QVBoxLayout(self)
-        head = QHBoxLayout()
+        # The structure is the Designer file's (ADR-005); the per-kind
+        # blocks are fragments loaded on demand (absent means absent),
+        # and the Passive widgets land in their placeholders.
+        self._ui = load_ui("visit_window", self)
+        self.setLayout(self._ui.layout())   # no wrapper, no extra margins
         # the visit's date is its name in the list — editable in place
         # (ADR-045 review: «pin or edit a visit's name»)
-        self._date_ed = QLineEdit(s["obs_date"] or "")
-        self._date_ed.setObjectName("vp_visit_date")
-        self._date_ed.setPlaceholderText("YYYY-MM-DD")
-        self._date_ed.setToolTip(self.tr(
-            "The visit's date (its name in the list). Points already "
-            "saved to it keep their own MJD"))
-        self._date_ed.setMaximumWidth(150)
-        f = self._date_ed.font()
-        f.setBold(True)
-        self._date_ed.setFont(f)
+        self._date_ed = self._ui.vp_visit_date
+        self._date_ed.setText(s["obs_date"] or "")
         self._date_ed.editingFinished.connect(self._on_date_edited)
-        head.addWidget(self._date_ed, 1)
         # an explicit save gesture: an invisible save-on-focus-out alone
         # leaves the observer guessing whether the edit took
-        self.btn_save_date = QPushButton(self.tr("Save date"))
-        self.btn_save_date.setObjectName("vp_btn_save_date")
-        self.btn_save_date.setToolTip(self.tr(
-            "Save the visit's date (the date is its name in the list)"))
-        self.btn_save_date.setEnabled(False)   # arms on a dirty field
+        self.btn_save_date = self._ui.vp_btn_save_date
         self.btn_save_date.clicked.connect(self._on_save_date_clicked)
         self._date_ed.textChanged.connect(self._on_date_dirty)
-        head.addWidget(self.btn_save_date)
-        self.btn_pin = QPushButton("📌")
-        self.btn_pin.setObjectName("vp_btn_pin")
-        self.btn_pin.setCheckable(True)
+        self.btn_pin = self._ui.vp_btn_pin
         self.btn_pin.setChecked(bool(s.get("pinned")))
-        self.btn_pin.setToolTip(self.tr(
-            "Pin the visit: it floats to the top of the list"))
         self.btn_pin.toggled.connect(self._on_pin_toggled)
-        head.addWidget(self.btn_pin)
-        btn_del = QPushButton(self.tr("Delete visit…"))
-        btn_del.setObjectName("vp_btn_delete")
-        btn_del.clicked.connect(self._on_delete_visit)
-        head.addWidget(btn_del)
-        lay.addLayout(head)
+        self._ui.vp_btn_delete.clicked.connect(self._on_delete_visit)
 
         # ---- resources
-        grp_res = QGroupBox(self.tr("Resources"))
-        grp_res.setLayout(QVBoxLayout())
-        res_row = QHBoxLayout()
-        btn_add = QPushButton(self.tr("Attach files…"))
-        btn_add.setObjectName("vp_btn_attach")
-        btn_add.setToolTip(self.tr(
-            "FITS plates, imported photometry, ephemeris, reports… "
-            "registered to this visit (the file on disk is linked, "
-            "never copied or moved)"))
-        btn_add.clicked.connect(self._on_attach)
-        res_row.addWidget(btn_add)
-        btn_open = QPushButton(self.tr("Open"))
-        btn_open.setObjectName("vp_btn_open")
-        btn_open.setToolTip(self.tr(
-            "Plates open in the FITS editor; everything else opens with "
-            "the system"))
-        btn_open.clicked.connect(self._on_open_resource)
-        res_row.addWidget(btn_open)
-        btn_rm = QPushButton(self.tr("Remove from visit"))
-        btn_rm.setObjectName("vp_btn_remove")
-        btn_rm.setToolTip(self.tr(
-            "Unlink the selected resource (the file on disk is never "
-            "touched)"))
-        btn_rm.clicked.connect(self._on_remove_resource)
-        res_row.addWidget(btn_rm)
-        res_row.addStretch(1)
-        grp_res.layout().addLayout(res_row)
+        self._ui.vp_btn_attach.clicked.connect(self._on_attach)
+        self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
+        self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
         self.lst_res = PassiveList()
         self.lst_res.setObjectName("vp_resources")
         self.lst_res.itemDoubleClicked.connect(
             lambda _it: self._on_open_resource())
-        grp_res.layout().addWidget(self.lst_res)
-        lay.addWidget(grp_res, 1)
+        self._ui.grp_res.layout().replaceWidget(self._ui.ph_resources,
+                                                self.lst_res)
         self._populate_resources()
 
         # ---- measurements (light-curve kinds)
         if self._curve_kind:
-            self._build_measurements_block(lay, s)
+            self._build_measurements_block(s)
 
         # ---- the night's astrometry (NEO/PCCP; ADR-045 form A)
         if self._mpc_kind:
-            self._build_mpc_block(lay)
+            self._build_mpc_block()
 
         # ---- notes
-        snotes = QTextEdit()
-        snotes.setObjectName("vp_notes")
-        snotes.setPlaceholderText(self.tr("Night notes (seeing, clouds…)"))
-        snotes.setText(s["notes"])
-        snotes.textChanged.connect(self._on_notes_changed)
-        lay.addWidget(snotes)
-        self._notes = snotes
+        self._notes = self._ui.vp_notes
+        self._notes.setText(s["notes"])
+        self._notes.textChanged.connect(self._on_notes_changed)
 
         # the explicit closing gesture (field report: with no button the
         # observer is left guessing): everything else auto-saves; the
         # date field flushes here (a dirty invalid value reverts to the
         # stored one first), then the window closes
-        bottom = QHBoxLayout()
-        bottom.addStretch(1)
-        self.btn_close = QPushButton(self.tr("Save and close"))
-        self.btn_close.setObjectName("vp_btn_close")
-        self.btn_close.setToolTip(self.tr(
-            "Flush the date edit if pending and close the window "
-            "(everything else already saved itself)"))
+        self.btn_close = self._ui.vp_btn_close
         self.btn_close.clicked.connect(self._on_save_and_close)
-        bottom.addWidget(self.btn_close)
-        lay.addLayout(bottom)
 
     # ---------------------------------------------------------- visit
 
@@ -534,44 +462,36 @@ class VisitWindow(QDialog):
     def _ask_fits_meta(self, path):
         # The FITS confirmation dialog, pre-filled from the header (a
         # misnamed filter breaks the light-curve split, so it stays
-        # editable). @return: the meta dict, or None when cancelled
+        # editable). The form is ui/visit_file_meta.ui (ADR-005).
+        # @return: the meta dict, or None when cancelled
         try:
             meta = fits_meta.read_meta(path)
         except Exception:
             meta = {}
         dlg = QDialog(self)
         dlg.setWindowTitle(self.tr("FITS details"))
-        dlg.setLayout(QFormLayout())
-        lbl = QLabel(Path(path).name)
-        lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        dlg.layout().addRow(self.tr("File:"), lbl)
-        cmb_f = QComboBox()
-        cmb_f.setObjectName("vp_img_filter")
-        cmb_f.setEditable(True)
-        cmb_f.addItems(_FILTERS)
-        cmb_f.setCurrentText((meta.get("filter") or "Clear").strip()
-                             or "Clear")
-        dlg.layout().addRow(self.tr("Filter:"), cmb_f)
-        edt_date = QLineEdit(str(meta.get("date_obs") or ""))
-        edt_date.setObjectName("vp_img_date")
-        dlg.layout().addRow(self.tr("Date:"), edt_date)
-        edt_exp = QLineEdit("" if meta.get("exptime_s") in (None, "")
-                            else str(meta["exptime_s"]))
-        edt_exp.setObjectName("vp_img_exptime")
-        dlg.layout().addRow(self.tr("Exptime:"), edt_exp)
-        box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        dlg.layout().addWidget(box)
-        box.accepted.connect(dlg.accept)
-        box.rejected.connect(dlg.reject)
+        ui = load_ui("visit_file_meta", dlg)
+        dlg.setLayout(ui.layout())
+        ui.lbl_file_name.setText(Path(path).name)
+        ui.vp_img_filter.addItems(_FILTERS)
+        ui.vp_img_filter.setCurrentText((meta.get("filter") or "Clear")
+                                        .strip() or "Clear")
+        ui.vp_img_date.setText(str(meta.get("date_obs") or ""))
+        ui.vp_img_exptime.setText(
+            "" if meta.get("exptime_s") in (None, "")
+            else str(meta["exptime_s"]))
+        ui.buttonBox.accepted.connect(dlg.accept)
+        ui.buttonBox.rejected.connect(dlg.reject)
         if dlg.exec() != QDialog.Accepted:
             return None
-        exp = edt_exp.text().strip()
+        exp = ui.vp_img_exptime.text().strip()
         try:
             exp = float(exp) if exp else None
         except ValueError:
             exp = None
-        return {"filter": cmb_f.currentText().strip() or "Clear",
-                "date_obs": edt_date.text().strip() or None,
+        return {"filter": ui.vp_img_filter.currentText().strip()
+                or "Clear",
+                "date_obs": ui.vp_img_date.text().strip() or None,
                 "exptime_s": exp}
 
     def _selected_resource(self):
@@ -611,44 +531,34 @@ class VisitWindow(QDialog):
 
     # ----------------------------------------------------- measurements
 
-    def _build_measurements_block(self, lay, s):
+    def _build_measurements_block(self, s):
         # Quick magnitude entry + the visit's points with a remove
-        # action. The point's MJD comes from the visit's date.
-        grp = QGroupBox(self.tr("Measurements"))
-        grp.setLayout(QVBoxLayout())
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Mag:")))
+        # action. The point's MJD comes from the visit's date. The
+        # structure is the fragment ui/visit_measurements.ui, loaded only
+        # for the light-curve kinds: absent means absent (the pinned
+        # tests find no widget at all on the other kinds).
+        ui = load_ui("visit_measurements", self)
+        self.layout().insertWidget(2, ui, 1)   # between resources, notes
         self.spn_mag = PassiveDoubleSpinBox()
         self.spn_mag.setRange(-5.0, 30.0)
         self.spn_mag.setDecimals(3)
         self.spn_mag.setValue(16.0)
-        row.addWidget(self.spn_mag)
-        row.addWidget(QLabel(self.tr("Err:")))
+        ui.layout().itemAt(0).layout().replaceWidget(ui.ph_mag,
+                                                     self.spn_mag)
         self.spn_err = PassiveDoubleSpinBox()
         self.spn_err.setRange(0.0, 9.0)
         self.spn_err.setDecimals(3)
         self.spn_err.setValue(0.0)
         self.spn_err.setSpecialValueText("—")
-        row.addWidget(self.spn_err)
-        row.addWidget(QLabel(self.tr("Filter:")))
-        self.cmb_filt = QComboBox()
-        self.cmb_filt.setEditable(True)
+        ui.layout().itemAt(0).layout().replaceWidget(ui.ph_err,
+                                                     self.spn_err)
+        self.cmb_filt = ui.cmb_filt
         self.cmb_filt.addItems(_FILTERS)
-        row.addWidget(self.cmb_filt)
-        btn_add = QPushButton(self.tr("Add"))
-        btn_add.setObjectName("vp_btn_add_meas")
-        btn_add.clicked.connect(self._on_add_measurement)
-        row.addWidget(btn_add)
-        btn_del = QPushButton(self.tr("Delete point"))
-        btn_del.setObjectName("vp_btn_del_meas")
-        btn_del.clicked.connect(self._on_delete_measurement)
-        row.addWidget(btn_del)
-        row.addStretch(1)
-        grp.layout().addLayout(row)
+        ui.vp_btn_add_meas.clicked.connect(self._on_add_measurement)
+        ui.vp_btn_del_meas.clicked.connect(self._on_delete_measurement)
         self.lst_meas = PassiveList()
         self.lst_meas.setObjectName("vp_measurements")
-        grp.layout().addWidget(self.lst_meas)
-        lay.addWidget(grp, 1)
+        ui.layout().replaceWidget(ui.ph_meas_list, self.lst_meas)
         self._populate_measurements()
 
     def _populate_measurements(self):
@@ -709,41 +619,19 @@ class VisitWindow(QDialog):
         from ...core import project as proj_mod
         return proj_mod.get(self._db, self._pid)
 
-    def _build_mpc_block(self, lay):
+    def _build_mpc_block(self):
         # The night's astrometry (NEO/PCCP): paste the MPC 80-col or ADES
         # lines, validate them, save the report. The report registers to
         # THIS visit — the measurements are the visit's product, so the
-        # block lives here and nowhere else (ADR-045, form A).
-        grp = QGroupBox(self.tr("Astrometry (MPC report)"))
-        grp.setLayout(QVBoxLayout())
-        grp.layout().addWidget(QLabel(self.tr(
-            "Paste the night's astrometric measurements (MPC 80-col or "
-            "ADES PSV)")))
-        self.txt_mpc = QTextEdit()
-        self.txt_mpc.setMaximumHeight(120)
-        self.txt_mpc.setAcceptRichText(False)
-        self.txt_mpc.setPlaceholderText(self.tr(
-            "Paste MPC 80-column or ADES PSV lines here…"))
-        font = self.txt_mpc.font()
-        font.setFamily("Monospace")
-        self.txt_mpc.setFont(font)
-        grp.layout().addWidget(self.txt_mpc)
-        row = QHBoxLayout()
-        btn_val = QPushButton(self.tr("Validate"))
-        btn_val.setObjectName("vp_mpc_validate")
-        btn_val.clicked.connect(self._on_mpc_validate)
-        row.addWidget(btn_val)
-        btn_save = QPushButton(self.tr("Save report…"))
-        btn_save.setObjectName("vp_mpc_save")
-        btn_save.clicked.connect(self._on_mpc_save)
-        row.addWidget(btn_save)
-        row.addStretch(1)
-        grp.layout().addLayout(row)
-        self.lbl_mpc_status = QLabel("—")
-        self.lbl_mpc_status.setObjectName("vp_mpc_status")
-        self.lbl_mpc_status.setWordWrap(True)
-        grp.layout().addWidget(self.lbl_mpc_status)
-        lay.addWidget(grp)
+        # block lives here and nowhere else (ADR-045, form A). The
+        # structure is the fragment ui/visit_mpc_block.ui, loaded only
+        # for the MPC kinds (absent means absent).
+        ui = load_ui("visit_mpc_block", self)
+        self.layout().insertWidget(2, ui)      # between resources, notes
+        self.txt_mpc = ui.txt_mpc
+        ui.vp_mpc_validate.clicked.connect(self._on_mpc_validate)
+        ui.vp_mpc_save.clicked.connect(self._on_mpc_save)
+        self.lbl_mpc_status = ui.vp_mpc_status
 
     def _on_mpc_validate(self):
         from ...core import mpc_report

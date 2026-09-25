@@ -37,7 +37,8 @@ def _chart_style_defaults(monkeypatch):
     # cares still monkeypatches on top.
     from nightscribe.config import DEFAULTS, config
     for key in ("marker_style", "chart_boxes", "observer_name",
-                "measurer_name", "telescope_desc", "camera_model"):
+                "measurer_name", "telescope_desc", "camera_model",
+                "ufe_bar_icons"):
         monkeypatch.setitem(config._data, key, DEFAULTS[key])
 
 

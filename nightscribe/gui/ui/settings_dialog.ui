@@ -529,10 +529,12 @@
            <layout class="QHBoxLayout" name="row_ufe">
             <item><widget class="QLabel" name="lbl_ufe"><property name="text"><string>Unified editor (UFE) by default:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
             <item><widget class="QCheckBox" name="chk_ufe_default"/></item>
+             <item><widget class="QLabel" name="lbl_ufe_icons"><property name="text"><string>Icons-only top bar:</string></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_ufe_bar_icons"/></item>
             <item><spacer name="hsp_ufe"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
            </layout>
           </item>
-          <item><widget class="QLabel" name="lblH_ufe"><property name="text"><string>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item><widget class="QLabel" name="lblH_ufe"><property name="text"><string>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor's action buttons show compact glyphs instead of their labels (Solve and Move marker keep their text); off restores them.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
          </layout>
         </widget>
        </item>

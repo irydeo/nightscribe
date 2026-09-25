@@ -118,13 +118,15 @@ class UfeCompareTab(QWidget):
 
     def _build_ui(self):
         lay = QVBoxLayout(self)
+        # ADR-044 rev (2026-09-25): target name and magnitude share one
+        # row; the name field stays narrow so the spin, the catalog and
+        # the row itself keep their breathing room
         row = QHBoxLayout()
         row.addWidget(QLabel(self.tr("Target:")))
         self.edt_target = QLineEdit()
-        row.addWidget(self.edt_target, 1)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Target mag:")))
+        self.edt_target.setFixedWidth(130)
+        row.addWidget(self.edt_target)
+        row.addWidget(QLabel(self.tr("Mag:")))
         self.spn_mag = QDoubleSpinBox()
         self.spn_mag.setRange(0.0, 25.0)
         self.spn_mag.setDecimals(2)
@@ -136,7 +138,7 @@ class UfeCompareTab(QWidget):
         self.cmb_catalog = QComboBox()
         for key, spec in vizier.CATALOGS.items():
             self.cmb_catalog.addItem(spec["name"], key)
-        row.addWidget(self.cmb_catalog)
+        row.addWidget(self.cmb_catalog, 1)
         lay.addLayout(row)
         row = QHBoxLayout()
         self.btn_field = QPushButton(self.tr("Generate field"))
@@ -185,6 +187,9 @@ class UfeCompareTab(QWidget):
         self.chk_target.toggled.connect(self._on_target_visible)
         row.addWidget(self.chk_target)
         lay.addLayout(row)
+        # ADR-044 rev (2026-09-25): the propose row carries the sequence
+        # button too, and "Move marker…" left for the UFE top bar (the
+        # tab still owns the arming through request_target_move)
         row = QHBoxLayout()
         self.btn_propose = QPushButton(self.tr("Propose sequence"))
         self.btn_propose.setToolTip(self.tr(
@@ -192,22 +197,19 @@ class UfeCompareTab(QWidget):
             "the target's brightness"))
         self.btn_propose.clicked.connect(self._on_propose)
         row.addWidget(self.btn_propose)
-        self.btn_move_target = QPushButton(self.tr("Move marker…"))
-        self.btn_move_target.setToolTip(self.tr(
-            "Place the mark where the object really is: press this, then "
-            "click the plate once"))
-        self.btn_move_target.clicked.connect(self._on_move_requested)
-        row.addWidget(self.btn_move_target)
-        lay.addLayout(row)
 
         # The table lives in its own small non-modal window (ADR-044 rev):
-        # the tab stays compact, the window stays open for reading.
+        # the tab stays compact, the window stays open for reading;
         # _reload_table rebuilds it through self.table and refreshes the
-        # count behind the button.
-        self._seqdlg = UfeSequenceDialog(self)
+        # count behind the button. The window also carries the two
+        # actions that used to sit on the tab ("Remove all", "Export
+        # CSV…"), and we alias them here so old code keeps finding them.
+        self._seqdlg = UfeSequenceDialog(self, on_clear=self._on_clear,
+                                         on_export=self._export_csv)
         self.table = self._seqdlg.table
+        self.btn_clear = self._seqdlg.btn_clear
+        self.btn_csv = self._seqdlg.btn_export
 
-        row = QHBoxLayout()
         self.btn_seq_open = QPushButton(self.tr("Sequence ({0})…").format(0))
         self.btn_seq_open.setToolTip(self.tr(
             "The sequence table: the comparison stars and the check star "
@@ -215,12 +217,6 @@ class UfeCompareTab(QWidget):
             "while it is open)"))
         self.btn_seq_open.clicked.connect(self._open_sequence)
         row.addWidget(self.btn_seq_open)
-        self.btn_clear = QPushButton(self.tr("Remove all"))
-        self.btn_clear.clicked.connect(self._on_clear)
-        row.addWidget(self.btn_clear)
-        self.btn_csv = QPushButton(self.tr("Export CSV…"))
-        self.btn_csv.clicked.connect(self._export_csv)
-        row.addWidget(self.btn_csv)
         row.addStretch(1)
         lay.addLayout(row)
         lay.addStretch(1)
@@ -607,6 +603,12 @@ class UfeCompareTab(QWidget):
         # The mark is drawn or not on the next pass: a full overlay
         # repaint is the consistent way to (un)draw it.
         self._redraw_overlays()
+
+    def request_target_move(self):
+        # @return: none; the UFE top bar's "Move marker…" lands here
+        # (ADR-044 rev, 2026-09-25): same arming the tab's own button
+        # used to do, so one place owns the mode
+        self._on_move_requested()
 
     def _on_move_requested(self):
         # @return: none; arms the placement mode, where the next click

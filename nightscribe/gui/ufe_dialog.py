@@ -29,8 +29,8 @@ sequence-chart dialogs keep living untouched.
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QKeySequence, QShortcut
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QDialog, QFileDialog, QHBoxLayout, QLabel,
                                QMessageBox, QPushButton, QSplitter,
                                QTabWidget, QVBoxLayout, QWidget)
@@ -44,6 +44,25 @@ logger = logging.getLogger("nightscribe.gui.ufe_dialog")
 
 _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
                  (2.0, "200"), (4.0, "400"))
+
+# ADR-044 rev (2026-09-24): the top-bar button table for the bar style
+# (icons-only vs icon + text). `base` is the asset stem in assets/;
+# toggles flip the _on / _off glyphs with their checked state. `icon_only`
+# means the label can go away in icon mode; Solve and Move keep theirs in
+# both modes because the actions are long and the glyphs only hint at them.
+_BAR_BUTTONS = {
+    "btn_load": {"base": "ufe_load", "icon_only": True},
+    "btn_export": {"base": "ufe_export", "icon_only": True},
+    "btn_north": {"base": "ufe_north", "icon_only": True, "toggle": True},
+    "btn_scale": {"base": "ufe_scale", "icon_only": True, "toggle": True},
+    "btn_annot": {"base": "ufe_annot", "icon_only": True, "toggle": True},
+    "btn_boxes": {"base": "ufe_boxes", "icon_only": True, "toggle": True},
+    "btn_solve": {"base": "ufe_solve", "icon_only": False},
+    "btn_move": {"base": "ufe_move", "icon_only": False},
+}
+_ZOOM_ICONS = {"Fit": "ufe_zoom_fit", "50": "ufe_zoom_50",
+               "100": "ufe_zoom_100", "200": "ufe_zoom_200",
+               "400": "ufe_zoom_400"}
 
 
 class UfeDialog(QDialog):
@@ -78,10 +97,12 @@ class UfeDialog(QDialog):
         self.view.set_boxes_provider(self._chart_boxes)
 
     def showEvent(self, event):
-        # The configured default for the corner boxes lands at every
-        # show; the observer's own toggle survives while it stays open.
+        # The configured defaults land at every show: the corner-boxes
+        # state and the bar style (icons-only vs icon + text). The
+        # observer's own toggles survive while the dialog stays open.
         from ..config import config
         self.btn_boxes.setChecked(bool(config.get("chart_boxes", False)))
+        self._apply_bar_style()
         super().showEvent(event)
 
     # ------------------------------------------------------------- layout
@@ -169,8 +190,28 @@ class UfeDialog(QDialog):
         self.btn_solve.setEnabled(False)
         self.btn_solve.clicked.connect(self._on_solve)
         bar.addWidget(self.btn_solve)
+        # ADR-044 rev (2026-09-24): the target mark of the Sequence
+        # section, one click away from whichever tab is open (it lands
+        # the observer on the section and arms the placement)
+        self.btn_move = QPushButton(self.tr("Move marker…"))
+        self.btn_move.setToolTip(self.tr(
+            "Move the target mark to a new position and re-propose the "
+            "sequence (Photometry → Sequence)"))
+        self.btn_move.clicked.connect(self._on_move_marker)
+        bar.addWidget(self.btn_move)
+        # ADR-044 rev (2026-09-24): the toggles' _on/_off glyphs follow
+        # the checked state (icons-only mode)
+        for name, base in (("btn_north", "ufe_north"),
+                           ("btn_scale", "ufe_scale"),
+                           ("btn_annot", "ufe_annot"),
+                           ("btn_boxes", "ufe_boxes")):
+            toggle = getattr(self, name)
+            toggle.toggled.connect(
+                lambda _checked, btn=toggle, b=base:
+                self._bar_reskin_toggle(btn, b))
         bar.addSpacing(16)
-        bar.addWidget(QLabel(self.tr("Zoom:")))
+        self.lbl_zoom_hint = QLabel(self.tr("Zoom:"))
+        bar.addWidget(self.lbl_zoom_hint)
         self.btn_zoom = {}
         for factor, label in _ZOOM_PRESETS:
             btn = QPushButton(self.tr("Fit") if factor is None else label)
@@ -187,8 +228,92 @@ class UfeDialog(QDialog):
         self.lbl_zoom.setToolTip(self.tr(
             "Current zoom: 100 % is one plate pixel per screen pixel"))
         bar.addWidget(self.lbl_zoom)
+        # ADR-044 rev (2026-09-24): the original labels, kept here (not on
+        # the buttons): the icons-only mode clears them, and the bar can
+        # reskin between shows on the same cached dialog.
+        self._bar_labels = {
+            "btn_load": self.btn_load.text(),
+            "btn_export": self.btn_export.text(),
+            "btn_north": self.btn_north.text(),
+            "btn_scale": self.btn_scale.text(),
+            "btn_annot": self.btn_annot.text(),
+            "btn_boxes": self.btn_boxes.text(),
+            "btn_solve": self.btn_solve.text(),
+            "btn_move": self.btn_move.text(),
+        }
+        for label, btn in self.btn_zoom.items():
+            self._bar_labels["zoom_" + label] = btn.text()
+        self._apply_bar_style()
         bar.addStretch(1)
         return bar
+
+    # -------------------------------------- top-bar style (ADR-044 rev)
+
+    def _icon(self, name):
+        # @args: name - the asset stem (e.g. "ufe_load"); the SVG lives in
+        #        the bundled assets/ folder
+        # @return: the QIcon, null when the asset is missing (the caller
+        #          then keeps its text as the fallback)
+        from . import theme
+        path = theme.asset(name + ".svg")
+        if not path.exists():
+            return QIcon()
+        return QIcon(path.as_posix())
+
+    def _bar_icon_mode(self):
+        # @return: True when the icons-only top bar is on (the default)
+        from ..config import config
+        return bool(config.get("ufe_bar_icons", True))
+
+    def _apply_bar_style(self):
+        # ADR-044 rev (2026-09-24): the top bar follows the "icons-only"
+        # setting: compact glyphs instead of labels, with Solve and Move
+        # marker keeping their text in both modes. Runs at build time and
+        # at every show, so a settings change lands on the cached dialog's
+        # next open. A missing asset degrades to the text-only button.
+        icon_mode = self._bar_icon_mode()
+        self.lbl_zoom_hint.setVisible(not icon_mode)
+        for name, spec in _BAR_BUTTONS.items():
+            btn = getattr(self, name)
+            if name == "btn_solve" and self._solve_worker is not None:
+                continue            # the worker owns the "Solving…" text
+            key = spec["base"]
+            if spec.get("toggle"):
+                key += "_on" if btn.isChecked() else "_off"
+            ic = self._icon(key)
+            if ic.isNull():
+                btn.setIcon(QIcon())
+                btn.setText(self._bar_labels[name])
+                continue
+            btn.setIcon(ic)
+            btn.setIconSize(QSize(16, 16))
+            if spec["icon_only"] and icon_mode:
+                btn.setText("")
+            elif not icon_mode:
+                btn.setText(self._bar_labels[name])
+        for label, btn in self.btn_zoom.items():
+            stem = _ZOOM_ICONS.get(label)
+            ic = self._icon(stem) if stem else QIcon()
+            if ic.isNull():
+                btn.setIcon(QIcon())
+                btn.setText(self._bar_labels["zoom_" + label])
+                continue
+            btn.setIcon(ic)
+            btn.setIconSize(QSize(16, 16))
+            btn.setText("" if icon_mode
+                        else self._bar_labels["zoom_" + label])
+
+    def _bar_reskin_toggle(self, btn, base):
+        # @args: btn - a checkable bar toggle, base - its glyph stem
+        #        (e.g. "ufe_north"): flips the _on/_off glyph when the
+        #        state changes. Silently a no-op in text mode or when the
+        #        asset is missing (the label is the fallback).
+        if not self._bar_icon_mode():
+            return
+        ic = self._icon(base + ("_on" if btn.isChecked() else "_off"))
+        if not ic.isNull():
+            btn.setIcon(ic)
+            btn.setIconSize(QSize(16, 16))
 
     def _build_feature_tabs(self):
         # The feature tabs are real now (phases D, E, F, G2). Compare and
@@ -525,6 +650,23 @@ class UfeDialog(QDialog):
         # presets, keys, double-click fit); the top bar mirrors it.
         # @args: factor - absolute scale, 1.0 = 100 %
         self.lbl_zoom.setText(f"{factor * 100:.0f} %")
+
+    def _on_move_marker(self):
+        # The bar's Move marker (ADR-044 rev, 2026-09-24): arms the
+        # target-mark placement of the Sequence section, whatever tab is
+        # open. The bar is built before the tabs exist, so everything
+        # resolves at call time. Without a plate or a field there is
+        # nothing to move yet, and we say so instead of arming.
+        comp = self.tab_photometry.tab_compare
+        if comp._view is None or comp._field is None:
+            QMessageBox.information(
+                self, self.tr("NightScribe Image Workbench"),
+                self.tr("Nothing to move yet: load a plate and build the "
+                        "sequence first (Photometry → Sequence)."))
+            return
+        self.tabs.setCurrentWidget(self.tab_photometry)
+        self.tab_photometry.set_mode("sequence")
+        comp.request_target_move()
 
     # --------------------------------------------------------- keyboard
 

@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría»)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría». **rev. 2026-09-25**: la barra superior gana glifos SVG conmutables (ajuste `ufe_bar_icons`, por defecto solo iconos: carga, export, los conmutadores de HUD y los presets de zoom; «Solve astrometry…» y «Move marker…» conservan siempre su texto), «Move marker…» pasa a la barra como acción global desde cualquier pestaña, «Remove all» y «Export CSV…» se mudan al diálogo de Secuencia que enmarca la tabla, y la fila de objetivo y magnitud cabe en una línea)
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 
@@ -174,6 +174,33 @@ con caja; helper compartido `cross_marker_items`, lo usan las pestañas
 Anotar, Secuencia y Blink) y el contenido lo ensambla
 `core/chart_annotate` vía `view.set_boxes_provider`.
 
+**Barra superior y compactado de Fotometría (2026-09-25)**: la barra
+superior cargaba siete textos y en pantallas pequeñas se desbordaba y
+ocultaba las últimas acciones, y los primeros gestos del flujo diario
+vivían repartidos en tres lugares de la pestaña de Fotometría. La barra
+gana un juego de glifos SVG (16×16, trazo blanco, una variante `_off`
+por conmutador; los ficheros viven en `nightscribe/assets/` y los
+resuelve `theme.asset`): carga, exportar, los conmutadores de HUD
+(norte, escala, anotación, cajas) y los presets de zoom pasan a icono
+puro, con los tooltips y los atajos intactos; «Solve astrometry…» y
+«Move marker…» conservan siempre su texto, porque esas palabras son
+precisamente su identidad. El ajuste `ufe_bar_icons` (Ajustes →
+Desarrollo, activo por defecto) conmuta la barra en el `showEvent`,
+reaplicando textos e iconos: sin reconstruir nada, con efecto
+inmediato; si un glifo falta, el botón vuelve a su texto en silencio.
+«Move marker…» sale del panel Secuencia y pasa a la barra como acción
+global: desde cualquier pestaña arma la colocación de la marca de
+objetivo, conmuta a la sección Secuencia, y si la placa o el campo
+faltan, explica qué falta en vez de armar. En el panel Secuencia,
+«Remove all» y «Export CSV…» dejan de ser botones de la pestaña y
+viven en el diálogo que enmarca la tabla; el panel conserva los alias
+`btn_clear` / `btn_csv` (los pinan los tests de integración) y
+«Sequence (N)…» se sienta junto a «Propose sequence» con el recuento
+vivo de las estrellas de la tabla. La fila de objetivo y magnitud cabe
+en una línea: el campo de nombre es estrecho (130 px) y la etiqueta es
+solo «Mag». En el panel Medir, «Suggest» comparte la fila de
+aperturas y las tres cajas de numeración se estrechan (56 px).
+
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
 lo use; añadir una funcionalidad al editor no modifica `ufe_dialog.py`
@@ -335,6 +362,32 @@ marker admits the `cross` style (full-frame crosshair with a box; shared
 `cross_marker_items` helper, used by the Annotate, Sequence and Blink
 tabs) and the content is assembled by `core/chart_annotate` through
 `view.set_boxes_provider`.
+
+**Top bar and Photometry compaction (2026-09-25)**: the top bar
+carried seven texts and on small screens it overflowed and hid the
+last actions, and the first gestures of the daily flow lived spread
+over three places inside the Photometry tab. The bar gains a set of
+SVG glyphs (16×16, white stroke, one `_off` variant per toggle; the
+files live in `nightscribe/assets/` and `theme.asset` resolves them):
+load, export, the HUD toggles (north, scale, annotations, boxes) and
+the zoom presets become icon-only, with the tooltips and the shortcuts
+intact; "Solve astrometry…" and "Move marker…" always keep their
+text, because those words are precisely their identity. The
+`ufe_bar_icons` setting (Settings → Development, on by default)
+swaps the bar in `showEvent` by re-applying texts and icons: no
+rebuild, immediate effect; if a glyph is missing, the button silently
+falls back to its text. "Move marker…" leaves the Sequence panel and
+moves to the bar as a global action: from any tab it arms the target
+marker placement, switches to the Sequence section, and if the plate
+or the field is missing it explains what is missing instead of
+arming. In the Sequence panel, "Remove all" and "Export CSV…" stop
+being buttons of the tab and live in the dialog that frames the
+table; the panel keeps the `btn_clear` / `btn_csv` aliases (the
+integration tests pin them) and "Sequence (N)…" sits next to "Propose
+sequence" with the live count of the table's stars. The target and
+magnitude row fits one line: the name field is narrow (130 px) and
+the label is just "Mag". On the Measure panel, "Suggest" shares the
+apertures row and the three spin boxes go narrow (56 px).
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

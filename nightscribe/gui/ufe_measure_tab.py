@@ -119,22 +119,6 @@ class UfeMeasureTab(QWidget):
         row.addWidget(self.cmb_band, 1)
         lay.addLayout(row)
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Apertures:")))
-        self.spn_rap = self._spin(photometry.R_AP, 1.0, 20.0)
-        self.spn_rin = self._spin(photometry.R_ANN_IN, 2.0, 40.0)
-        self.spn_rout = self._spin(photometry.R_ANN_OUT, 3.0, 60.0)
-        for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
-            row.addWidget(spn)
-        row.addStretch(1)
-        lay.addLayout(row)
-        tip = self.tr("Aperture radius, sky annulus inner and outer "
-                      "radius (px)")
-        self._radii_manual = False   # True once the observer edits a spin
-        for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
-            spn.setToolTip(tip)
-            spn.valueChanged.connect(self._on_radii_edited)
-
         # The recipe knobs live one click open (ADR-044 rev): the daily
         # flow is band, apertures, Suggest; the rest (sky model,
         # sigma-clip, seeing, colour term, host subtraction) opens in
@@ -147,7 +131,27 @@ class UfeMeasureTab(QWidget):
             "surroundings (crowding, background gradient), with the "
             "reasons in plain language"))
         self.btn_suggest.clicked.connect(self._on_suggest)
-        lay.addWidget(self.btn_suggest)
+
+        # ADR-044 rev (2026-09-25): Suggest shares the Apertures row,
+        # so the daily flow fits on one line; the radius spins stay
+        # narrow
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Apertures:")))
+        self.spn_rap = self._spin(photometry.R_AP, 1.0, 20.0)
+        self.spn_rin = self._spin(photometry.R_ANN_IN, 2.0, 40.0)
+        self.spn_rout = self._spin(photometry.R_ANN_OUT, 3.0, 60.0)
+        for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
+            spn.setFixedWidth(56)
+            row.addWidget(spn)
+        row.addStretch(1)
+        row.addWidget(self.btn_suggest)
+        lay.addLayout(row)
+        tip = self.tr("Aperture radius, sky annulus inner and outer "
+                      "radius (px)")
+        self._radii_manual = False   # True once the observer edits a spin
+        for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
+            spn.setToolTip(tip)
+            spn.valueChanged.connect(self._on_radii_edited)
         self.btn_advanced = QPushButton(self.tr("Advanced…"))
         self.btn_advanced.setToolTip(self.tr(
             "The full recipe: sky model, sigma-clip, seeing apertures, "

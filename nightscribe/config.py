@@ -98,6 +98,10 @@ DEFAULTS = {
     # unified editor by default; the classic dialogs stay reachable for
     # the review period (Settings → Development)
     "ufe_default": True,
+    # UFE top bar (ADR-044 rev, 2026-09-24): compact icons in place of the
+    # text labels by default; off restores the full labels (the tooltips
+    # never change). Solving and the marker-move button keep their text.
+    "ufe_bar_icons": True,
     "camera_type": "CCD",       # CCD | CMOS | DSLR (CMOS -> "CCD" + note)
     "pixel_binning": "1x1",
     "aavso_code": "",           # AAVSO observer code; blank when none

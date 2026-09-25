@@ -284,6 +284,80 @@ def test_table_edits_flow_to_the_sequence(dlg):
     assert tab._entries == [] and tab.table.rowCount() == 0
 
 
+# ADR-044 rev (2026-09-25): "Remove all" and "Export CSV…" live in the
+# Sequence dialog (the table's home), the Target row is one line, and
+# the tab's old Move-marker button moved to the top bar.
+
+def test_sequence_actions_live_in_the_dialog(dlg):
+    tab = dlg.tab_compare
+    assert tab._seqdlg is not None
+    assert tab._seqdlg.btn_clear.text() == "Remove all"
+    assert tab._seqdlg.btn_export.text() == "Export CSV…"
+    # the tab keeps working aliases to the dialog's own buttons
+    assert tab.btn_clear is tab._seqdlg.btn_clear
+    assert tab.btn_csv is tab._seqdlg.btn_export
+    assert tab.table is tab._seqdlg.table
+    # the tab's own Move-marker button is gone: the bar owns it now
+    assert not hasattr(tab, "btn_move_target")
+
+
+def test_clear_via_the_dialog_button_empties_the_sequence(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    assert len(tab._entries) > 0 and tab.table.rowCount() == len(tab._entries)
+    tab.btn_clear.click()                       # the dialog's own button
+    assert tab._entries == [] and tab.table.rowCount() == 0
+    assert tab.entries() == []
+
+
+def _innermost_row_of(tab, target):
+    # the nearest layout that holds `target`, walking the tab's layout
+    # tree (rows are QHBoxLayouts nested under the main QVBoxLayout)
+    if tab.layout() is None:
+        return None
+    stack = [tab.layout()]
+    while stack:
+        lay = stack.pop()
+        for i in range(lay.count()):
+            it = lay.itemAt(i)
+            if it.widget() is target:
+                return lay
+            sub = it.layout()
+            if sub is not None and sub is not lay:
+                stack.append(sub)
+    return None
+
+
+def test_open_sequence_sits_next_to_propose(dlg):
+    # One row: Propose does the work, Sequence (N)… opens the table;
+    # the count grows as entries land (ADR-044 rev, 2026-09-25).
+    tab = dlg.tab_compare
+    row = _innermost_row_of(tab, tab.btn_propose)
+    assert row is not None
+    widgets = [row.itemAt(i).widget() for i in range(row.count())
+               if row.itemAt(i).widget() is not None]
+    assert tab.btn_seq_open in widgets
+    assert tab.btn_seq_open.text() == "Sequence (0)…"
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    n = len(tab._entries)
+    assert tab.btn_seq_open.text() == "Sequence ({0})…".format(n)
+
+
+def test_target_and_magnitude_share_one_row(dlg):
+    from PySide6.QtWidgets import QLabel
+    tab = dlg.tab_compare
+    # a narrow name field, the magnitude straight beside it
+    assert tab.edt_target.minimumWidth() == 130
+    assert tab.edt_target.maximumWidth() == 130   # fixed, not growing
+    labels = [l.text() for l in tab.findChildren(QLabel)]
+    assert "Mag:" in labels
+    assert not any("Target magnitude" in t for t in labels)
+    assert 0.0 <= tab.spn_mag.value() <= 25.0
+    assert tab.spn_mag.decimals() == 2
+
+
 def test_catalog_labels_toggle(dlg):
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))

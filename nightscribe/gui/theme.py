@@ -34,6 +34,13 @@ _ASSETS = Path(__file__).resolve().parent.parent / "assets"
 CHECK_SVG = (_ASSETS / "check.svg").as_posix()
 
 
+def asset(name):
+    # @args: name - a file name inside the bundled assets folder (SVG, PNG)
+    # @return: its Path; the caller wraps it in a QIcon or a QSS url().
+    #          Do not assume it exists: check with path.exists() first.
+    return _ASSETS / name
+
+
 # Per-kind accent colors, shared by cards, icons and table names.
 # Eight well-separated hues on the wheel (0/24/100/140/185/216/268/320°),
 # none in the amber band (40-65°), all saturated, mid-value.

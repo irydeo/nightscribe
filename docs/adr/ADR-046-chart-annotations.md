@@ -40,7 +40,9 @@ y que el marcador actual (anillo con ticks) siga disponible.
    consultada al pintar vía `set_boxes_provider`, así resolver WCS o
    medir se reflejan sin cableado extra) y las estampa en el PNG
    exportado; un conmutador «Cajas» en la barra superior gobierna la
-   visibilidad (su estado inicial sale de `chart_boxes` en cada show).
+   visibilidad (su estado inicial sale de `chart_boxes` en cada show;
+   en el modo de iconos de la barra el botón lleva el glifo `boxes`,
+   ver ADR-044, rev. 2026-09-25).
    Con las cajas activas la rosa de los vientos baja al centro inferior
    y gana la pata E, y la barra de escala se mueve a la derecha: las
    esquinas quedan libres. matplotlib (`blink_view`) dibuja las mismas
@@ -105,7 +107,8 @@ as a device-coordinates HUD layer (`_paint_boxes`, consulted at paint
 time through `set_boxes_provider`, so a solve or a measurement shows up
 with no extra wiring) and stamps them into the exported PNG; a "Boxes"
 top-bar toggle governs visibility (its initial state comes from
-`chart_boxes` at every show). With the boxes on, the compass moves to
+`chart_boxes` at every show; in the bar's icon mode the button
+carries the `boxes` glyph, see ADR-044, rev. 2026-09-25). With the boxes on, the compass moves to
 the bottom centre and gains the east leg, and the scale bar moves right:
 the corners stay free. matplotlib (`blink_view`) draws the same boxes as
 dark-backed corner texts (the existing caption pattern) on GIF, MP4 and

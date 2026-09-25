@@ -791,6 +791,9 @@ class MainWindow(QMainWindow):
         dlg.edt_vigils.setPlainText(
             vigils.vigils_to_text(vigils.vigils_from_config(config)))
         dlg.chk_aavso.setChecked(bool(config.get("aavso_feed", True)))
+        # ADR-044 rev (2026-09-24): icons-only top bar in the UFE
+        dlg.chk_ufe_bar_icons.setChecked(
+            bool(config.get("ufe_bar_icons", True)))
         dlg.chk_ufe_default.setChecked(bool(config.get("ufe_default",
                                                        True)))
         dlg.edt_ccdciel_host.setText(str(config.get("ccdciel_host",
@@ -876,6 +879,7 @@ class MainWindow(QMainWindow):
         config.set("aavso_feed", dlg.chk_aavso.isChecked())
         # Development tab (ADR-044): which UI the FITS work opens in
         config.set("ufe_default", dlg.chk_ufe_default.isChecked())
+        config.set("ufe_bar_icons", dlg.chk_ufe_bar_icons.isChecked())
         config.set("ccdciel_host", dlg.edt_ccdciel_host.text().strip())
         config.set("ccdciel_port", dlg.spn_ccdciel_port.value())
         config.set("ccdciel_auto_connect", dlg.chk_ccdciel_auto.isChecked())

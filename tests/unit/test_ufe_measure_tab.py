@@ -587,6 +587,42 @@ def test_suggest_without_a_measurement_guides(dlg):
     assert "Measure the target first" in dlg.tab_measure.lbl_status.text()
 
 
+def _innermost_row_of(tab, target):
+    # the nearest layout that holds `target`, walking the tab's layout
+    # tree (rows are QHBoxLayouts nested in the main QVBoxLayout)
+    if tab.layout() is None:
+        return None
+    stack = [tab.layout()]
+    while stack:
+        lay = stack.pop()
+        for i in range(lay.count()):
+            it = lay.itemAt(i)
+            if it.widget() is target:
+                return lay
+            sub = it.layout()
+            if sub is not None and sub is not lay:
+                stack.append(sub)
+    return None
+
+
+def test_suggest_shares_the_apertures_row(dlg):
+    # The daily flow is band, apertures and Suggest on one line
+    # (ADR-044 rev, 2026-09-25): fewer hops, no second button row.
+    # The recipe knobs open in the Advanced window, not on this tab.
+    tab = dlg.tab_measure
+    row = _innermost_row_of(tab, tab.btn_suggest)
+    assert row is not None
+    widgets = [row.itemAt(i).widget() for i in range(row.count())
+               if row.itemAt(i).widget() is not None]
+    for spn in (tab.spn_rap, tab.spn_rin, tab.spn_rout):
+        assert spn in widgets                       # all three radii
+    assert any(w.text().startswith("Apertures") for w in widgets)
+    assert tab.btn_advanced not in widgets          # off the daily line
+    # the radius spins stay narrow so the row never overflows
+    for spn in (tab.spn_rap, tab.spn_rin, tab.spn_rout):
+        assert spn.minimumWidth() == 56 == spn.maximumWidth()
+
+
 # ---------------- review round 2 (subtract + options re-measure) -----
 
 

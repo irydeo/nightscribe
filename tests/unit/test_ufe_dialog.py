@@ -313,3 +313,112 @@ def test_chart_boxes_toggle_default_comes_from_config(dlg, monkeypatch):
     dlg.show()
     assert not dlg.btn_boxes.isChecked()
     assert not dlg.view.show_boxes
+
+
+# ------------------------------------- top-bar style (ADR-044 rev, 2026-09-24)
+
+
+def test_topbar_icons_only_is_the_default(dlg):
+    # Pinned ufe_bar_icons: True -> a compact glyph bar. The short
+    # actions drop their labels entirely; Solve and Move keep theirs in
+    # both modes, because the actions are long and the glyphs only hint
+    # at them.
+    from PySide6.QtGui import QIcon
+    from nightscribe.gui import theme
+    for name in ("btn_load", "btn_export", "btn_north", "btn_scale",
+                 "btn_annot", "btn_boxes"):
+        btn = getattr(dlg, name)
+        assert btn.text() == ""
+        assert not btn.icon().isNull()
+    # the checked toggles sit on the _on glyph (they start checked)
+    want = QIcon(str(theme.asset("ufe_north_on.svg"))).pixmap(16, 16)
+    assert dlg.btn_north.icon().pixmap(16, 16).toImage() == \
+        want.toImage()
+    assert dlg.btn_solve.text() == "Solve astrometry…"
+    assert dlg.btn_move.text() == "Move marker…"
+    assert not dlg.btn_move.icon().isNull()
+    assert dlg.lbl_zoom_hint.isVisible() == False
+    for btn in dlg.btn_zoom.values():
+        assert btn.text() == ""
+        assert not btn.icon().isNull()
+
+
+def test_topbar_text_mode_restores_the_labels(dlg, monkeypatch):
+    from PySide6.QtGui import QIcon
+    from nightscribe.config import config
+    from nightscribe.gui import theme
+    # The same cached dialog reskins between shows: text mode brings the
+    # labels back (icon stays as a hint), icon mode puts them away again.
+    monkeypatch.setitem(config._data, "ufe_bar_icons", False)
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_load.text() == "Load FITS…"
+    assert dlg.btn_north.text() == "N"
+    assert dlg.btn_scale.text() == "Scale"
+    assert dlg.btn_annot.text() == "A"
+    assert dlg.btn_boxes.text() == "Boxes"
+    assert dlg.btn_solve.text() == "Solve astrometry…"   # unchanged either way
+    assert dlg.btn_move.text() == "Move marker…"         # ...
+    assert dlg.lbl_zoom_hint.isVisible()
+    assert dlg.btn_zoom["100"].text() == "100"
+    assert not dlg.btn_zoom["100"].icon().isNull()
+    monkeypatch.setitem(config._data, "ufe_bar_icons", True)
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_load.text() == ""
+    assert dlg.btn_north.text() == ""
+    assert dlg.btn_zoom["Fit"].text() == ""
+    # a checked-state flip re-skins the glyph in icon mode
+    dlg.btn_north.setChecked(False)
+    off = QIcon(str(theme.asset("ufe_north_off.svg"))).pixmap(16, 16)
+    assert dlg.btn_north.icon().pixmap(16, 16).toImage() == off.toImage()
+    dlg.btn_north.setChecked(True)
+
+
+def test_topbar_missing_asset_keeps_the_text(dlg, monkeypatch):
+    # The SVG is missing: the button must not go silent.
+    from pathlib import Path
+    from nightscribe.gui import theme
+    monkeypatch.setattr(
+        theme, "asset",
+        staticmethod(lambda name: Path("/nonexistent") / name))
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_load.text() == "Load FITS…"
+    assert dlg.btn_load.icon().isNull()
+    assert dlg.btn_zoom["100"].text() == "100"
+    # and the toggle re-skin silently does nothing with no asset
+    dlg.btn_north.setChecked(False)
+    assert dlg.btn_north.text() == "N"
+
+
+# The bar's Move marker lands on the Sequence section, whatever tab is
+# open (ADR-044 rev, 2026-09-24: it used to live inside the tab).
+
+
+def test_move_marker_without_a_plate_is_honest(dlg, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    seen = []
+
+    def _info(parent, title, message, *a, **k):
+        seen.append((title, message))
+
+    monkeypatch.setattr(QMessageBox, "information", staticmethod(_info))
+    dlg._on_move_marker()
+    assert len(seen) == 1
+    assert "load a plate" in seen[0][1]
+    # nothing got armed, the tab did not move either
+    assert dlg.tab_photometry.tab_compare._moving_target is False
+    assert dlg.tabs.currentWidget() is not dlg.tab_photometry
+
+
+def test_move_marker_lands_on_the_sequence_section(dlg):
+    dlg.state.load(MONO)
+    comp = dlg.tab_photometry.tab_compare
+    comp._view = dlg.view
+    comp._field = {"stars": []}         # the field exists (synthetic)
+    dlg.tabs.setCurrentWidget(dlg.tab_blink)
+    dlg.btn_move.click()
+    assert dlg.tabs.currentWidget() is dlg.tab_photometry
+    assert dlg.tab_photometry._mode == "sequence"
+    assert comp._moving_target is True

@@ -181,9 +181,11 @@ Anotar, Secuencia y Blink) y el contenido lo ensambla
 superior cargaba siete textos y en pantallas pequeñas se desbordaba y
 ocultaba las últimas acciones, y los primeros gestos del flujo diario
 vivían repartidos en tres lugares de la pestaña de Fotometría. La barra
-gana un juego de glifos SVG (16×16, trazo blanco, una variante `_off`
-por conmutador; los ficheros viven en `nightscribe/assets/` y los
-resuelve `theme.asset`): carga, exportar, los conmutadores de HUD
+gana un juego de glifos SVG (16×16, trazo azul acento `#6ab0ff`, una
+variante `_off` por conmutador en azul atenuado `#456c9d` para que el
+estado apagado se lea más quieto; los presets de zoom llevan el aro delgado
+(1.6) y el dígito más grande y más grueso (1.9), claro y separado del borde;
+los ficheros viven en `nightscribe/assets/` y los resuelve `theme.asset`): carga, exportar, los conmutadores de HUD
 (norte, escala, anotación, cajas) y los presets de zoom pasan a icono
 puro, con los tooltips y los atajos intactos; «Solve astrometry…» y
 «Move marker…» conservan siempre su texto, porque esas palabras son
@@ -373,8 +375,11 @@ tabs) and the content is assembled by `core/chart_annotate` through
 carried seven texts and on small screens it overflowed and hid the
 last actions, and the first gestures of the daily flow lived spread
 over three places inside the Photometry tab. The bar gains a set of
-SVG glyphs (16×16, white stroke, one `_off` variant per toggle; the
-files live in `nightscribe/assets/` and `theme.asset` resolves them):
+SVG glyphs (16×16, accent blue `#6ab0ff` stroke, one `_off` variant per
+toggle in a dimmed blue `#456c9d` so the off state reads quieter; the zoom
+presets carry a thin rim (1.6) and a larger, bolder digit (1.9), clearly
+separated from the border; the files live in `nightscribe/assets/` and
+`theme.asset` resolves them):
 load, export, the HUD toggles (north, scale, annotations, boxes) and
 the zoom presets become icon-only, with the tooltips and the shortcuts
 intact; "Solve astrometry…" and "Move marker…" always keep their

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE Photometry tab (ADR-044 rev): the Sequence and Measure sections
+  stacked in one vertical splitter, the exclusive mode toggle up top.
+  Loaded by gui/ufe_photometry_tab.py through gui/ui_loader.py; the two
+  sections are code-built classes inserted into the placeholders (the
+  house's custom-widget rule, ADR-005).
+-->
+<ui version="4.0">
+ <class>UfePhotometryTab</class>
+ <widget class="QWidget" name="UfePhotometryTab">
+  <layout class="QVBoxLayout" name="vbox_photometry">
+   <property name="layoutStretch"><string notr="true">0,1</string></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_mode">
+     <item><widget class="QRadioButton" name="btn_seq"><property name="text"><string>Sequence</string></property><property name="toolTip"><string>Build the sequence: click stars on the plate to add the comparisons and the check star (top half)</string></property></widget></item>
+     <item><widget class="QRadioButton" name="btn_meas"><property name="text"><string>Measure</string></property><property name="toolTip"><string>Measure the target against the sequence you built (bottom half)</string></property></widget></item>
+     <item><spacer name="hsp_mode"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <widget class="QWidget" name="ph_compare"/>
+     <widget class="QWidget" name="ph_measure"/>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

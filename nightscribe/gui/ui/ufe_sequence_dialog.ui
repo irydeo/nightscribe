@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE sequence dialog (ADR-044 rev): the Compare section's sequence
+  table in its own small window. Loaded by gui/ufe_sequence_dialog.py
+  through gui/ui_loader.py; the class tag matches the Python class so
+  the i18n context carries over. Window-level concerns (title, minimum
+  size, hiding the action buttons when no callback is given) stay in
+  code.
+-->
+<ui version="4.0">
+ <class>UfeSequenceDialog</class>
+ <widget class="QWidget" name="UfeSequenceDialog">
+  <layout class="QVBoxLayout" name="vbox_seqdlg">
+   <item>
+    <widget class="QTableWidget" name="table">
+     <property name="columnCount"><number>4</number></property>
+     <attribute name="horizontalHeaderStretchLastSection"><bool>false</bool></attribute>
+     <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
+     <column><property name="text"><string>Name</string></property></column>
+     <column><property name="text"><string>Type</string></property></column>
+     <column><property name="text"><string>Mag</string></property></column>
+     <column><property name="text"><string/></property></column>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_actions">
+     <item><widget class="QPushButton" name="btn_clear"><property name="text"><string>Remove all</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_export"><property name="text"><string>Export CSV…</string></property></widget></item>
+     <item><spacer name="hsp_actions"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

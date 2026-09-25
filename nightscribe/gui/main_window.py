@@ -16,10 +16,9 @@ import logging
 from pathlib import Path
 
 from PySide6 import Shiboken
-from PySide6.QtCore import (QCoreApplication, QFile, QSize, Qt, Signal,
+from PySide6.QtCore import (QCoreApplication, QSize, Qt, Signal,
                             QPropertyAnimation, QEasingCurve, QTimer)
 from PySide6.QtGui import QBrush, QColor
-from PySide6.QtUiTools import QUiLoader
 from PySide6.QtWidgets import (QApplication, QDialog, QFileDialog, QFrame,
                                 QFormLayout, QGroupBox, QHBoxLayout,
                                 QInputDialog, QLabel, QLineEdit,
@@ -50,7 +49,10 @@ from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
 
 logger = logging.getLogger(__name__)
 
-UI_DIR = Path(__file__).parent / "ui"
+# the shared .ui loader (ADR-005): it lives in gui/ui_loader.py; this
+# alias keeps the house's imports and the pinned tests working
+from .ui_loader import load_ui as _load_ui
+from .ui_loader import UI_DIR
 
 # Three guided steps for every project kind. The old "analyse" step (ADR-019,
 # review 2026-08-28) was dropped, and "capture" merged into "plan" (ADR-030,
@@ -109,16 +111,6 @@ _STEP_LABELS_ES = {"details": "Ficha", "plan": "Captura",
                    "analysis": "Análisis", "publish": "Publicar"}
 _STEP_LABELS_EN = {"details": "Object card", "plan": "Capture",
                    "analysis": "Analysis", "publish": "Publish"}
-
-
-def _load_ui(name, parent=None):
-    # @args: name - .ui file name without extension, parent - widget
-    # @return: the loaded widget
-    file = QFile(str(UI_DIR / f"{name}.ui"))
-    file.open(QFile.ReadOnly)
-    widget = QUiLoader().load(file, parent)
-    file.close()
-    return widget
 
 
 def tr(fmt, *sub):

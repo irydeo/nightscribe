@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Unified FITS Editor dialog (ADR-044): the common top bar, the object
+  line, the image/tabs splitter and the histogram strip. Loaded by
+  gui/ufe_dialog.py through gui/ui_loader.py. Placeholders ph_view /
+  ph_histogram host the custom widgets (UfeImageView, HistogramWidget),
+  inserted in code (ADR-005). The zoom buttons carry no text or tooltip
+  here: "Fit" is the only translatable one and the factors are data, so
+  code sets them (the icon-mode skin reads the texts afterwards, as
+  always). The feature tabs enter the empty QTabWidget through
+  add_feature_tab, the extension API.
+-->
+<ui version="4.0">
+ <class>UfeDialog</class>
+ <widget class="QWidget" name="UfeDialog">
+  <layout class="QVBoxLayout" name="vbox_ufe">
+   <property name="layoutStretch"><string notr="true">0,0,1,0</string></property>
+   <item>
+    <layout class="QHBoxLayout" name="topbar">
+     <item><widget class="QPushButton" name="btn_load"><property name="text"><string>Load FITS…</string></property><property name="toolTip"><string>Open a FITS image (Ctrl+O)</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_export"><property name="text"><string>Export PNG…</string></property><property name="toolTip"><string>Save the visible scene as a PNG (Ctrl+E)</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <item><spacer name="hsp_bar1"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>16</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_north"><property name="text"><string>N</string></property><property name="toolTip"><string>North arrow (needs a WCS)</string></property><property name="enabled"><bool>false</bool></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_scale"><property name="text"><string>Scale</string></property><property name="toolTip"><string>Scale bar (needs a WCS)</string></property><property name="enabled"><bool>false</bool></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_annot"><property name="text"><string>A</string></property><property name="toolTip"><string>Saved annotations (the marks stored on this plate)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_boxes"><property name="text"><string>Boxes</string></property><property name="toolTip"><string>Metadata corner boxes: object, date, position, brightness, observer, equipment and plate scale (on screen and in the exported PNG)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_solve"><property name="text"><string>Solve astrometry…</string></property><property name="toolTip"><string>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_move"><property name="text"><string>Move marker…</string></property><property name="toolTip"><string>Move the target mark to a new position and re-propose the sequence (Photometry → Sequence)</string></property></widget></item>
+     <item><spacer name="hsp_bar2"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>16</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QLabel" name="lbl_zoom_hint"><property name="text"><string>Zoom:</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_zoom_fit"><property name="text"><string/></property></widget></item>
+     <item><widget class="QPushButton" name="btn_zoom_50"><property name="text"><string/></property></widget></item>
+     <item><widget class="QPushButton" name="btn_zoom_100"><property name="text"><string/></property></widget></item>
+     <item><widget class="QPushButton" name="btn_zoom_200"><property name="text"><string/></property></widget></item>
+     <item><widget class="QPushButton" name="btn_zoom_400"><property name="text"><string/></property></widget></item>
+     <item><widget class="QLabel" name="lbl_zoom"><property name="text"><string/></property><property name="toolTip"><string>Current zoom: 100 % is one plate pixel per screen pixel</string></property><property name="minimumSize"><size><width>44</width><height>0</height></size></property></widget></item>
+     <item><spacer name="hsp_bar_end"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_object"><property name="text"><string/></property><property name="toolTip"><string>The object this editor was opened from</string></property><property name="visible"><bool>false</bool></property></widget></item>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <widget class="QWidget" name="ph_view"/>
+     <widget class="QTabWidget" name="tabs">
+      <property name="minimumSize"><size><width>280</width><height>0</height></size></property>
+     </widget>
+    </widget>
+   </item>
+   <item><widget class="QWidget" name="ph_histogram"/></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

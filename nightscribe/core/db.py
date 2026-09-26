@@ -332,6 +332,25 @@ def _migrate(conn):
                 conn.execute("ALTER TABLE project_sessions ADD COLUMN"
                              " pinned INTEGER DEFAULT 0")
         conn.execute("PRAGMA user_version = 10")
+    if v < 11:
+        # ADR-047: a photometry point knows which plate (project_files) it
+        # was measured on, so reopening that plate restores its full work
+        # state. Pre-link rows keep NULL: they were taken before the link
+        # existed. The table guard mirrors v9's/v10's: a hand-seeded old
+        # database may not have it (the real chain creates it at v5).
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            if "file_id" not in cols:
+                conn.execute(
+                    "ALTER TABLE photometry_points ADD COLUMN file_id"
+                    " INTEGER REFERENCES project_files(id) ON DELETE SET NULL")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_photo_points_file"
+                " ON photometry_points(file_id)")
+        conn.execute("PRAGMA user_version = 11")
     conn.commit()
 
 
@@ -373,6 +392,10 @@ MIGRATION_NOTES = {
     10: QT_TRANSLATE_NOOP("NSMigrations",
         "Visits can be pinned to the top of the list, and their date is "
         "editable from the visit's window."),
+    11: QT_TRANSLATE_NOOP("NSMigrations",
+        "Measurements remember the plate they were taken on: reopening "
+        "that plate in the unified editor restores its stretch, the "
+        "measurement recipe and the comparison sequence."),
 }
 
 

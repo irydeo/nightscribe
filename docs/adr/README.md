@@ -52,3 +52,4 @@
 | [044](ADR-044-unified-fits-editor.md) | Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa / unified FITS editor (UFE): one window, one tab per feature, scene in plate pixels |
 | [045](ADR-045-project-analysis-visits.md) | El flujo del proyecto se reconstruye sobre visitas (Ficha → Captura → Análisis → Publicación) / the project flow rebuilds around visits (Card → Capture → Analysis → Publication) |
 | [046](ADR-046-chart-annotations.md) | Anotación de cartas: cajas de metadatos en las esquinas y estilo de marcador configurable (anillo/cruz) / chart annotation: metadata corner boxes and configurable marker style (ring/cross) |
+| [047](ADR-047-ufe-plate-persistence.md) | El estado de la placa vive en la placa: mediciones ligadas a su origen y recuperación completa / plate state lives on the plate: points tied to their source plate, full recovery |

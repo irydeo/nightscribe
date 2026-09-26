@@ -33,7 +33,7 @@ def _stub_config(monkeypatch, root=""):
 
 def test_fresh_db_migrates_to_v6(tmp_path):
     db = dbm.Database(tmp_path / "fresh.db")
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
 
 
 def test_migration_v6_backfills_legacy_root(tmp_path):
@@ -50,14 +50,14 @@ def test_migration_v6_backfills_legacy_root(tmp_path):
     conn.commit()
     conn.close()
     db = dbm.Database(str(f))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     row = db.execute("SELECT root_dir FROM projects").fetchone()
     # never moved: the legacy location is pinned as the project's own root
     assert row[0] == str(paths.data_dir() / "projects")
     # re-opening is idempotent (backfill is a no-op)
     db.close()
     db = dbm.Database(str(f))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
 
 
 def test_create_freezes_configured_root(tmp_path, monkeypatch):

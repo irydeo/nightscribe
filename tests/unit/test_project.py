@@ -130,6 +130,50 @@ def test_add_and_list_files(tmp_db):
     assert files[1]["kind"] == "fits"
 
 
+def test_find_file_locates_the_plate_row(tmp_db):
+    # The ADR-047 save hooks resolve the open image to its registry row.
+    p = project.create(tmp_db, "sn", "SN 2026find")
+    q = project.create(tmp_db, "sn", "SN 2026other")
+    fid = project.add_file(tmp_db, p["id"], "/tmp/plate.fits", "fits",
+                           meta={"filter": "Clear"})
+    # exact path matches
+    found = project.find_file(tmp_db, p["id"], "/tmp/plate.fits")
+    assert found is not None and found["id"] == fid
+    # case-insensitive match (POSIX paths)
+    found = project.find_file(tmp_db, p["id"], "/tmp/PLATE.FITS")
+    assert found is not None and found["id"] == fid
+    # unknown path or another project: no match
+    assert project.find_file(tmp_db, p["id"], "/tmp/stranger.fits") is None
+    assert project.find_file(tmp_db, q["id"], "/tmp/plate.fits") is None
+    # a row from another project with the same path must never leak in
+    project.add_file(tmp_db, q["id"], "/tmp/plate.fits", "fits")
+    assert project.find_file(tmp_db, p["id"], "/tmp/plate.fits")["id"] == fid
+
+
+def test_update_file_meta_merges_and_resets(tmp_db):
+    # The plate's UFE working state (ADR-047) is stored under meta["ufe"]
+    # next to the header facts; a None patch value resets the key.
+    p = project.create(tmp_db, "sn", "SN 2026meta")
+    fid = project.add_file(tmp_db, p["id"], "/tmp/plate.fits", "fits",
+                           meta={"filter": "Clear", "date_obs": "2026-09-24"})
+    state = {"stretch": {"black": 400, "white": 13000, "gamma": 1.0,
+                         "invert": False},
+             "measure": {"band": "V", "rap": 14, "rin": 9, "rout": 22},
+             "saved_at": "2026-09-25T11:20:00"}
+    assert project.update_file_meta(tmp_db, fid, {"ufe": state})
+    files = project.list_files(tmp_db, p["id"])
+    assert files[0]["meta"]["filter"] == "Clear"          # kept by the merge
+    assert files[0]["meta"]["date_obs"] == "2026-09-24"
+    assert files[0]["meta"]["ufe"]["measure"]["band"] == "V"
+    # reset: the ufe key goes away, the rest of the meta survives
+    assert project.update_file_meta(tmp_db, fid, {"ufe": None})
+    files = project.list_files(tmp_db, p["id"])
+    assert "ufe" not in files[0]["meta"]
+    assert files[0]["meta"]["filter"] == "Clear"
+    # unknown row: no error, no change
+    assert project.update_file_meta(tmp_db, 999999, {"ufe": state}) is False
+
+
 def test_delete_cascades(tmp_db):
     p = project.create(tmp_db, "sn", "SN 2026ziz")
     project.add_file(tmp_db, p["id"], "/tmp/seq.json", "sequence")
@@ -149,7 +193,7 @@ def test_delete_cascades(tmp_db):
 
 def test_migration_user_version_is_current(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 10
+    assert v == 11
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -184,8 +228,8 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
@@ -234,8 +278,8 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",
@@ -314,7 +358,7 @@ def test_migration_v3_to_v4_preserves_projects(tmp_path):
 
     file, pid = _build_v3_db(tmp_path / "v3.db")
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
 
     # the project itself is intact (kind/name/status/context unchanged)
     row = db.execute(
@@ -349,7 +393,7 @@ def test_migration_v4_is_idempotent(tmp_path):
     file, _pid = _build_v3_db(tmp_path / "v3.db")
     Database(str(file))               # migrates 3 -> 4
     db = Database(str(file))          # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(projects)").fetchall()}
     assert {"closed_at", "outcome", "tags", "favorite"} <= cols

@@ -81,17 +81,22 @@ class VisitsPanel(QWidget):
     # @args: db - the Database, lang - "es" | "en",
     #        open_in_editor - callable(path, session_id) opening a FITS in
     #        the UFE (None hides the window's editor action),
+    #        on_measure_click - callable(point_id) ADR-047: the window's
+    #        measurements list, when wired, opens the point's plate in
+    #        the editor (None keeps the list plain),
     #        on_change - callable() after any data change (the host
     #        refreshes the curve/cadence/summary),
     #        curve_kind - True keeps the measurement block in the window
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
-                 curve_kind=True, kind=None, parent=None):
+                 curve_kind=True, kind=None, on_measure_click=None,
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
         self._open_in_editor = open_in_editor
         self._on_change = on_change
+        self._on_measure_click = on_measure_click
         # the project's kind drives what a visit carries: light-curve
         # kinds get the measurements block, MPC kinds the astrometry one
         self._kind = kind if kind is not None else (
@@ -215,6 +220,7 @@ class VisitsPanel(QWidget):
                                 lang=self._lang,
                                 kind=self._kind,
                                 open_in_editor=self._open_in_editor,
+                                on_measure_click=self._on_measure_click,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -260,12 +266,15 @@ class VisitWindow(QDialog):
     # @args: db - the Database, pid - project id, sid - the visit's id,
     #        lang - "es" | "en", curve_kind - keep the measurements block,
     #        open_in_editor - callable(path, session_id) for FITS rows,
+    #        on_measure_click - callable(point_id) ADR-047: click a
+    #        measured point and its plate opens in the editor (None keeps
+    #        the list plain),
     #        data_changed - callable() after any edit (the panel refreshes
     #        and notifies the host), parent - the panel
 
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
-                 parent=None):
+                 on_measure_click=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -277,6 +286,7 @@ class VisitWindow(QDialog):
         self._mpc_kind = self._kind in MPC_KINDS
         self._open_in_editor = open_in_editor
         self._data_changed = data_changed
+        self._on_measure_click = on_measure_click
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -554,7 +564,21 @@ class VisitWindow(QDialog):
         self.lst_meas = PassiveList()
         self.lst_meas.setObjectName("vp_measurements")
         drop_in(ui.layout(), ui.ph_meas_list, self.lst_meas)
+        # ADR-047: a click on a row is a shortcut to its origin (the UFE
+        # opens on the plate the point was measured on); without the
+        # callback the list stays plain
+        if self._on_measure_click is not None:
+            self.lst_meas.itemClicked.connect(self._on_measure_clicked)
         self._populate_measurements()
+
+    def _on_measure_clicked(self, item):
+        # ADR-047: hand the row's point id to the host (the main window
+        # resolves the plate and opens the editor); the None callback
+        # never installs this handler.
+        # @args: item - the clicked list row
+        if self._on_measure_click is None:
+            return
+        self._on_measure_click(item.data(Qt.UserRole))
 
     def _populate_measurements(self):
         from ...core import followup as fu

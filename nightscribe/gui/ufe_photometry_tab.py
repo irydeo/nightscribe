@@ -119,3 +119,25 @@ class UfePhotometryTab(QWidget):
         else:
             self.tab_compare.set_active(False)
             self.tab_measure.set_active(False)
+
+    # ------------------------------------------------------ state (ADR-047)
+
+    def capture_state(self):
+        # Both halves, as two plain JSON blocks (ADR-047): the measuring
+        # recipe and the sequence a saved point was built from. Read-only.
+        # @return: the {"measure": ..., "sequence": ...} dict the dialog
+        #          stores in the plate's meta
+        return {
+            "measure": self.tab_measure.capture_state(),
+            "sequence": self.tab_compare.capture_state(),
+        }
+
+    def apply_state(self, st):
+        # Restores both blocks (ADR-047). Each half is a no-op when its
+        # piece is missing (no recipe saved, no sequence saved), so a
+        # half-empty state restores whatever it holds.
+        # @args: st - capture_state dict, or None to skip
+        if not st:
+            return
+        self.tab_measure.apply_state(st.get("measure"))
+        self.tab_compare.apply_state(st.get("sequence"))

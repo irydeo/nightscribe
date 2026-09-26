@@ -153,6 +153,24 @@ class UfeImageState(QObject):
             self._downscaled(), 1.0, 99.5)
         self.stretch_changed.emit()
 
+    def stretch_state(self):
+        # ADR-047: the stretch knobs as plain JSON, what the plate's
+        # saved state stores and what a restore or a state reset reads
+        # back.
+        # @return: the {"black", "white", "gamma", "invert"} dict
+        return {"black": float(self.black), "white": float(self.white),
+                "gamma": float(self.gamma), "invert": bool(self.inverted)}
+
+    def reset_stretch(self):
+        # Back to first sight of a plate (ADR-047): the auto limits, no
+        # inversion. No-op without data.
+        # @args: none
+        # @return: None; the view redraws through stretch_changed
+        if self.data is None:
+            return
+        self.inverted = False
+        self.auto()
+
     def set_stretch(self, black=None, white=None, gamma=None):
         # Sets any of the stretch parameters; the white > black invariant
         # is kept by clamping, never by raising, so sliders and spin boxes

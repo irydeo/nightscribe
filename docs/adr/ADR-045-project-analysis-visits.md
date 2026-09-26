@@ -9,13 +9,17 @@ forma A, sin visita no hay ni área de pegado; el reporte se registra en
 la visita anfitriona y avisa si la fecha de la primera medida no cuadra
 con la de la visita; y una visita puede fijarse 📌 arriba de la lista o
 editar su fecha — su nombre — desde la cabecera de su ventana,
-migración v10)
+migración v10) · **Enmendado / Amended**: 2026-09-26 (ADR-047: clic
+bidireccional; la fila de un punto con placa es clicable y reaparece
+esa placa en el UFE con su estado guardado; sin placa, aviso llano)
 
 **Ver / See**: ADR-019 (la UX v3 centrada en proyectos; revisado aquí) ·
 ADR-041 (la barra de pestañas del proyecto; enmendado aquí) · ADR-043 (la
 pestaña Observatory plegada en Captura; enmendado aquí) · ADR-044 (el UFE;
 sus escrituras se registran siempre ahora) · ADR-036 (el diario: vista
-derivada global; el gestor de visitas es su contraparte por proyecto).
+derivada global; el gestor de visitas es su contraparte por proyecto)
+· ADR-047 (el estado de la placa y el clic bidireccional; enmienda la
+forma A de este ADR).
 
 ## Español
 
@@ -78,6 +82,11 @@ todas confirmadas en campo:
    si la fecha de la primera medida del reporte no cuadra con la de la
    visita (`mpc_report.first_obs_date`), la ventana avisa sin bloquear
    (un reporte colgado en la noche equivocada es un pecado silencioso).
+   Enmienda (2026-09-26, ADR-047): el clic pasa a ser bidireccional: la
+   fila de un punto que tiene placa (`file_id`) es clicable y reaparece
+   esa placa en el UFE con su estado guardado (la pestaña Medir, a
+   punto); sin placa (o placa no usable), aviso llano y no se abre
+   nada. «Sin visita no hay medición» se mantiene.
 3. **Un solo registro de ficheros** (migración v9): `project_files`
    gana `session_id` (SET NULL: borrar la visita desvincula, no borra)
    y `meta` (JSON: filtro/date_obs/exptime_s para placas). Las filas de
@@ -173,6 +182,11 @@ confirmed in the field:
    also be **pinned** (📌, it floats to the top of the list — migration
    v10) and its **date edited** in the window's header (the date is the
    visit's name; points already saved keep their own MJD).
+   Amendment (2026-09-26, ADR-047): the click is now bidirectional: the
+   row of a point that has a plate (`file_id`) is clickable and brings
+   that plate back in the UFE with its saved state (the Measure tab,
+   ready); without a plate (or an unusable one), a plain notice and
+   nothing opens. "No visit, no measurement" is upheld.
 
 **Consequences.** Migrations v8 and v9 with translatable notes; the
 migration tests seed old databases and verify both. The manager has its

@@ -487,6 +487,58 @@ def delete_file(db, file_id):
     return cur.rowcount > 0
 
 
+def find_file(db, project_id, path):
+    # Looks up a registered file by its project and path (ADR-047): the
+    # UFE save hooks resolve which plate row the open image belongs to.
+    # Paths are case-insensitive compared on POSIX; on Windows the OS
+    # already folds them.
+    # @return: file dict, or None when not registered
+    rows = db.execute(
+        "SELECT id, project_id, path, kind, created, session_id, meta"
+        " FROM project_files WHERE project_id=? AND path=?",
+        (project_id, str(path))).fetchall()
+    if rows:
+        return _row_to_file(rows[0])
+    rows = db.execute(
+        "SELECT id, project_id, path, kind, created, session_id, meta"
+        " FROM project_files WHERE project_id=? AND LOWER(path)=?",
+        (project_id, str(path).lower())).fetchall()
+    return _row_to_file(rows[0]) if rows else None
+
+
+def get_file(db, file_id):
+    # Loads one registered file by id (ADR-047): the visits window opens
+    # a measurement's plate with the id it carries in the row.
+    # @return: file dict, or None when the id is not registered
+    row = db.execute(
+        "SELECT id, project_id, path, kind, created, session_id, meta"
+        " FROM project_files WHERE id=?",
+        (file_id,)).fetchone()
+    return _row_to_file(row) if row else None
+
+
+def update_file_meta(db, file_id, patch):
+    # Merges a patch into the file's meta JSON and stores it back
+    # (ADR-047: the plate's UFE working state lives in meta["ufe"]).
+    # A patch value of None removes that key (reset).
+    # @args: patch - dict of {"key": value} to merge
+    # @return: True if the file row was found and updated
+    row = db.execute("SELECT meta FROM project_files WHERE id=?",
+                     (file_id,)).fetchone()
+    if not row:
+        return False
+    meta = json.loads(row[0] or "{}")
+    for key, value in (patch or {}).items():
+        if value is None:
+            meta.pop(key, None)
+        else:
+            meta[key] = value
+    db.execute("UPDATE project_files SET meta=? WHERE id=?",
+               (json.dumps(meta, ensure_ascii=False), file_id))
+    db.commit()
+    return True
+
+
 def delete(db, project_id):
     # Deletes a project; steps and files cascade (PRAGMA foreign_keys = ON).
     # @return: True if the project was found and deleted

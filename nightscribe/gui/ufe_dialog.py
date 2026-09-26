@@ -79,6 +79,11 @@ class UfeDialog(QDialog):
                                     # was opened from a project: the
                                     # Measure tab registers a calibrated
                                     # point there (no files involved)
+        self._reset_state_hook = None   # fn() ADR-047: clear the open
+                                        # plate's saved state block
+        self._reset_points_hook = None  # fn() ADR-047: drop the plate's
+                                        # measured points (confirmed in the
+                                        # tab first)
         self._object = None         # {"name","ra","dec","mag"} when the
                                     # editor was opened from a project
         self.state = UfeImageState(self)
@@ -406,6 +411,96 @@ class UfeDialog(QDialog):
             logger.warning("point hook failed: %s", err)  # never break it
             return False
         return True
+
+    # ---------------------------------------------------- plate state
+    # (ADR-047: the working state of the open plate, as plain JSON the
+    # host stores in the plate row's meta["ufe"])
+
+    def capture_full_state(self):
+        # ADR-047: the open plate's working state: the stretch knobs plus
+        # the photometry tab's blocks (the measure recipe and the
+        # sequence; None when no field has been built).
+        # @args: none
+        # @return: the {"stretch", "measure", "sequence"} dict
+        return {
+            "stretch": self.state.stretch_state(),
+            **(self.tab_photometry.capture_state() or {}),
+        }
+
+    def apply_plate_state(self, st):
+        # ADR-047: restore a plate's saved working state on top of the
+        # open plate: the stretch first (the image already looks like it
+        # did), then the recipe and the sequence. Missing blocks are
+        # skipped (a state saved before the sequence existed restores
+        # the recipe only).
+        # @args: st - the meta["ufe"] dict, or None for a no-op
+        # @return: None
+        if not st or not self.state.has_image:
+            return
+        s = dict(st.get("stretch") or {})
+        self.state.set_stretch(black=s.get("black"), white=s.get("white"),
+                               gamma=s.get("gamma"))
+        if bool(s.get("invert", False)) != self.state.inverted:
+            self.state.toggle_invert()
+        self.tab_photometry.apply_state(st)
+
+    def reset_state_local(self):
+        # ADR-047: the in-editor half of the state reset: the recipe back
+        # to the editor's defaults, the stretch back to auto, the
+        # sequence field cleared. The saved-state clear is the host's
+        # job (notify_reset_state).
+        # @args: none
+        # @return: False when there is no plate, True when applied
+        if not self.state.has_image:
+            return False
+        self.tab_measure.apply_state(self.tab_measure.ui_defaults())
+        self.state.reset_stretch()
+        self.tab_photometry.tab_compare.reset_state()
+        return True
+
+    # ---------------------------------------------------- reset hooks
+
+    def set_reset_hooks(self, state_fn=None, points_fn=None):
+        # ADR-047: the host's two plate resets. state_fn clears the open
+        # plate's saved state block; points_fn drops the plate's measured
+        # points. Both optional: opened ad-hoc, both are None and the
+        # Measure tab hides its reset buttons (same rule as the save
+        # button: not attached, not visible).
+        # @args: state_fn - callable() or None, points_fn - callable() or None
+        # @return: None
+        self._reset_state_hook = state_fn if callable(state_fn) else None
+        self._reset_points_hook = points_fn if callable(points_fn) else None
+        if hasattr(self, "tab_measure"):
+            self.tab_measure.set_reset_attached(
+                self._reset_state_hook is not None)
+
+    def notify_reset_state(self):
+        # ADR-047: the Measure tab applied the editor's defaults and now
+        # asks the host to clear the plate's saved state block.
+        # @args: none
+        # @return: True when the hook ran
+        if self._reset_state_hook is None:
+            return False
+        try:
+            self._reset_state_hook()
+            return True
+        except Exception as err:
+            logger.warning("reset-state hook failed: %s", err)
+            return False
+
+    def notify_reset_points(self):
+        # ADR-047: destructive (the light curve loses the points): the
+        # Measure tab already asked the user before this fires.
+        # @args: none
+        # @return: True when the hook ran
+        if self._reset_points_hook is None:
+            return False
+        try:
+            self._reset_points_hook()
+            return True
+        except Exception as err:
+            logger.warning("reset-points hook failed: %s", err)
+            return False
 
     # --------------------------------------------------- the object
 

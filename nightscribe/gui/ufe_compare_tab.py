@@ -247,21 +247,156 @@ class UfeCompareTab(QWidget):
         # A new plate stalemates the field; the target name defaults to
         # the plate's stem. The tab never disables: without a plate the
         # survey button is the way in (ADR-044 rev).
+        self.reset_state()
+        if self._state.has_image:
+            self.edt_target.setText(Path(self._state.path).stem)
+            if self._state.wcs is None:
+                self.lbl_status.setText(self.tr(
+                    "The plate has no WCS: solve it with «Solve "
+                    "astrometry…» to build the comparison field."))
+
+    def reset_state(self):
+        # ADR-047: the sequence field's zero point: no catalog, no
+        # entries, empty table, a neutral status. The state reset in the
+        # Measure tab goes through here (the new-plate stalemate above
+        # reuses it too).
+        # @args: none
+        # @return: None
         self._field = None
         self._entries = []
         self._stars = []
         self._drop_items()
         if self._state.has_image:
-            self.edt_target.setText(Path(self._state.path).stem)
-            self.lbl_status.setText(
-                "" if self._state.wcs is not None else self.tr(
-                    "The plate has no WCS: solve it with «Solve "
-                    "astrometry…» to build the comparison field."))
+            self.lbl_status.setText(self.tr(
+                "The sequence field is empty: build it with «Generate "
+                "field…», or restore the one saved with the plate."))
         else:
             self.lbl_status.setText(self.tr(
                 "No plate loaded: load a FITS or fetch the field from "
                 "the survey."))
         self._reload_table()
+
+    # ----------------------------------------------------- state (ADR-047)
+
+    def capture_state(self):
+        # The field and the sequence, as plain JSON (ADR-047): the
+        # catalog, the sky centre and width that produced it, the
+        # target magnitude and every chosen star with the photometry
+        # the calibration needs (band + bands). Only stars inside
+        # entries are kept: the rest is re-derivable from the catalog.
+        # @return: None when there is no field, else the dict
+        if self._field is None:
+            return None
+        field = self._field
+        return {
+            "catalog": field.get("catalog"),
+            "catalog_name": field.get("catalog_name"),
+            "center": list(field.get("center") or ()),
+            "fov_arcmin": float(field.get("fov_arcmin") or 0.0),
+            "target_mag": float(self.spn_mag.value()),
+            "entries": [
+                {
+                    "name": e["name"],
+                    "kind": e["kind"],
+                    "star": {
+                        "id": e["star"].get("id"),
+                        "ra": e["star"].get("ra"),
+                        "dec": e["star"].get("dec"),
+                        "band": e["star"].get("band"),
+                        "mag": e["star"].get("mag"),
+                        "bv": e["star"].get("bv"),
+                        "color_origin": e["star"].get("color_origin"),
+                        "catalog": e["star"].get("catalog"),
+                        "bands": [
+                            {"label": b.get("label"),
+                             "value": b.get("value"),
+                             "err": b.get("err"),
+                             "derived": bool(b.get("derived", False))}
+                            for b in (e["star"].get("bands") or [])
+                            if isinstance(b, dict)],
+                    },
+                }
+                for e in self._entries
+            ],
+        }
+
+    def apply_state(self, st):
+        # Restores a plate's saved field and sequence (ADR-047): the
+        # saved stars are re-placed by their sky coordinates into THIS
+        # plate (no WCS or out of the plate means the star is dropped,
+        # it stays only in the table via _stars when placed), the
+        # catalog combo points back at the saved key and the target
+        # magnitude returns. No proposal: that is the observer's beat.
+        # @args: st - capture_state dict (None/empty is a no-op)
+        if not st or not st.get("catalog"):
+            return
+        catalog = st["catalog"]
+        self._field = {
+            "catalog": catalog,
+            "catalog_name": (st.get("catalog_name") or catalog),
+            "center": list(st.get("center") or ()),
+            "fov_arcmin": float(st.get("fov_arcmin") or 0.0),
+            "stars": [],
+            "variables": [],
+            # the VSX cross-match is a network artifact: it re-runs
+            # with the next live query, and the restored stars carry
+            # no variable flag rather than a stale one
+            "vsx_warning": None,
+        }
+        placed = []      # stars that landed on this plate
+        pairs = []       # (star, saved entry), for the entries below
+        for raw in (st.get("entries") or []):
+            rs = raw.get("star") or {}
+            star = {
+                "id": rs.get("id"),
+                "name": None,
+                "ra": rs.get("ra"),
+                "dec": rs.get("dec"),
+                "band": rs.get("band"),
+                "mag": rs.get("mag"),
+                "bv": rs.get("bv"),
+                "color_origin": rs.get("color_origin"),
+                "catalog": rs.get("catalog"),
+                "bands": [b for b in (rs.get("bands") or [])
+                          if isinstance(b, dict)],
+                "vsx": None,
+            }
+            if star.get("mag") is None:
+                continue     # the table formats the magnitude
+            pos = self._sky_to_scene(star["ra"], star["dec"])
+            if pos is None:
+                continue
+            star["_sx"], star["_sy"] = pos
+            placed.append(star)
+            pairs.append((star, raw))
+        self._stars = placed
+        self._entries = []
+        for star, raw in pairs:
+            kind = raw.get("kind") or "comp"
+            self._entries.append({
+                "name": str(raw.get("name") or self._next_name(kind)),
+                "kind": kind,
+                "star": star,
+                "why": {"es": "devuelta de la placa",
+                        "en": "restored from the plate"}})
+        # the combo lists the shipped catalogs; a saved one from an
+        # older build gets added so the export keeps its label
+        if self.cmb_catalog.findData(catalog) < 0:
+            self.cmb_catalog.addItem(
+                self._field["catalog_name"], catalog)
+        self.cmb_catalog.setCurrentIndex(
+            self.cmb_catalog.findData(catalog))
+        if st.get("target_mag") is not None:
+            self.spn_mag.setValue(float(st["target_mag"]))
+        self._auto_propose = False   # the restored field must not be
+                                     # re-proposed under the observer's feet
+        self._reload_table()
+        self._redraw_overlays()     # no-ops off stage (it checks itself)
+        self.lbl_status.setText(self.tr(
+            "{0}: sequence restored from the plate ({1} stars, "
+            "{2} in the sequence)").format(
+                self._field["catalog_name"], len(self._stars),
+                len(self._entries)))
 
     # ------------------------------------------------------------- field
 

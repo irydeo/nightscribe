@@ -4228,6 +4228,8 @@ class MainWindow(QMainWindow):
             db, lang=self._lang(),
             open_in_editor=lambda path, sid:
                 self._visit_open_in_editor(pid, path, sid),
+            # ADR-047: a measurement row is a shortcut to its plate
+            on_measure_click=self._visit_open_measure,
             on_change=lambda: self._visit_data_changed(pid),
             kind=kind)
         panel.set_project(pid)
@@ -4331,6 +4333,56 @@ class MainWindow(QMainWindow):
         if not dlg.open_plate(path):
             return
         dlg.set_object(obj)
+        # ADR-047: the plate's saved working state comes back with it:
+        # stretch, the measure recipe, the sequence field, when there
+        # is one (nothing was saved, or the plate predates it, and the
+        # fresh defaults stand)
+        row = project.find_file(db, pid, path)
+        if row is not None and (row.get("meta") or {}).get("ufe"):
+            dlg.apply_plate_state(row["meta"]["ufe"])
+
+    def _visit_open_measure(self, point_id):
+        # ADR-047: a measured point in the visit window is a shortcut
+        # to its origin: the editor opens on the plate the point came
+        # from, with its saved working state, and the measure tab armed.
+        # A point without a plate (hand-entered, pasted, or saved before
+        # ADR-047 gets one) gets a plain note, never a blind open.
+        # @args: point_id - the photometry_points id
+        from ..core import followup as fu
+        pt = fu.point_by_id(db, point_id)
+        if pt is None:
+            self.statusBar().showMessage(
+                self.tr("This measurement no longer exists."), 6000)
+            return
+        if pt.get("file_id") is None:
+            self.statusBar().showMessage(
+                self.tr("This point has no plate: it was hand-entered, "
+                        "pasted, or saved before this feature."), 8000)
+            return
+        row = project.get_file(db, pt["file_id"])
+        if row is None or row.get("kind") != "fits":
+            self.statusBar().showMessage(
+                self.tr("The plate this point came from is not a usable "
+                        "image anymore."), 8000)
+            return
+        pid = row["project_id"]
+        if not self._use_ufe():
+            self.statusBar().showMessage(
+                self.tr("Enable the unified editor in Settings → Development "
+                        "to open this plate"), 8000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                             session_id=pt.get("session_id"))
+        if not dlg.open_plate(row["path"]):
+            return
+        dlg.set_object(obj)
+        # the same restore as "restore in the editor"
+        if (row.get("meta") or {}).get("ufe"):
+            dlg.apply_plate_state(row["meta"]["ufe"])
 
     def _visit_data_changed(self, pid):
         # A visit or its contents changed (the panel owns the edit): the
@@ -7574,6 +7626,7 @@ class MainWindow(QMainWindow):
         dlg = self._ufe_build()
         dlg.set_save_hook(None)      # ad-hoc: no project registration
         dlg.set_point_hook(None)     # and no project to save points to
+        dlg.set_reset_hooks(None, None)   # and nothing to reset (ADR-047)
         dlg.set_object(None)         # and no stale project object
         dlg.show()
         dlg.raise_()
@@ -7628,8 +7681,14 @@ class MainWindow(QMainWindow):
             dlg.set_point_hook(
                 lambda payload:
                 self._ufe_point_hook(hook_pid, session_id, payload))
+            # ADR-047: the plate's two resets land on this project's
+            # plate row (the open image, resolved by path)
+            dlg.set_reset_hooks(
+                lambda: self._ufe_reset_state(dlg, hook_pid),
+                lambda: self._ufe_reset_points(dlg, hook_pid))
         else:
             dlg.set_point_hook(None)
+            dlg.set_reset_hooks(None, None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
@@ -7680,6 +7739,20 @@ class MainWindow(QMainWindow):
             # prefill finds it at the top level)
             ctx_update["mag"] = payload["target_mag"]
         project.update_context(db, pid, ctx_update)
+        # ADR-047: the sequence lands in the OPEN plate's saved state
+        # too, merged over whatever it already carries (stretch and
+        # measure blocks survive); the open image is the state holder,
+        # not the CSV just written. No plate row: nothing to attach to,
+        # and no editor open (hook driven from outside): the CSV and the
+        # context stand on their own.
+        ufe = getattr(self, "_ufe", None)
+        if ufe is not None and getattr(ufe, "state", None) is not None:
+            plate_row = project.find_file(db, pid, ufe.state.path)
+            if plate_row is not None:
+                st = ufe.capture_full_state()
+                st["saved_at"] = datetime.datetime.now(
+                    datetime.timezone.utc).isoformat()
+                project.update_file_meta(db, plate_row["id"], {"ufe": st})
         if p.get("campaign_id"):
             from ..core import campaign as _camp
             c = _camp.get(db, p["campaign_id"])
@@ -7695,9 +7768,12 @@ class MainWindow(QMainWindow):
         # A calibrated magnitude from the Measure tab lands in the project
         # as a photometry point with source "measure", under the visit the
         # button came from (ADR-044; replaces the retired quick-look, see
-        # ADR-019 section "Análisis rápido").
+        # ADR-019 section "Análisis rápido"). ADR-047: the point
+        # remembers the plate it was measured on, and the plate's
+        # working state is saved along with it, so a click on the row
+        # later can restore the whole session.
         # @args: pid - project id, session_id - visit or None,
-        #        payload - {"mjd", "filter", "mag", "err", ...}
+        #        payload - {"mjd", "filter", "mag", "err", "path", ...}
         from ..core import followup as fu
         if not payload or payload.get("mag") is None:
             self.statusBar().showMessage(
@@ -7708,20 +7784,66 @@ class MainWindow(QMainWindow):
                 self.tr("Point not saved: the plate has no observation date"),
                 8000)
             return
+        # ADR-047: the open plate's registry row, when it has one
+        plate = payload.get("path")
+        file_row = project.find_file(db, pid, plate) if plate else None
         try:
             fu.add_point(db, pid, float(payload["mjd"]),
                          payload.get("filter") or "Clear",
                          float(payload["mag"]), err=payload.get("err"),
-                         source="measure", session_id=session_id)
+                         source="measure", session_id=session_id,
+                         file_id=file_row["id"] if file_row else None)
         except (TypeError, ValueError) as err:
             self.statusBar().showMessage(
                 self.tr("Point not saved: %1").replace("%1", str(err)), 8000)
             return
-        self.statusBar().showMessage(
-            self.tr("Point saved: {} band, {:.3f} mag").format(
-                payload.get("filter") or "Clear", float(payload["mag"])),
-            6000)
+        # and the plate's working state rides along, so "restore in
+        # the editor" from the visit window brings it back (ADR-047);
+        # the editor is always present when this hook is armed, but the
+        # guard keeps hooks driven from outside safe
+        ufe = getattr(self, "_ufe", None)
+        if file_row is not None and ufe is not None:
+            st = ufe.capture_full_state()
+            st["saved_at"] = datetime.datetime.now(
+                datetime.timezone.utc).isoformat()
+            project.update_file_meta(db, file_row["id"], {"ufe": st})
+        if file_row is None:
+            self.statusBar().showMessage(
+                self.tr("Point saved without plate state: this plate "
+                        "is not registered in the project."), 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Point saved: {} band, {:.3f} mag").format(
+                    payload.get("filter") or "Clear",
+                    float(payload["mag"])), 6000)
         # refresh the panel: light curve, visits and campaign summary update
+        self._project_selected()
+
+    # ---------------- UFE plate resets (ADR-047) ----------------
+
+    def _ufe_reset_state(self, dlg, pid):
+        # The tab already restored the editor's defaults locally (and
+        # told the user); here the plate's saved state block is cleared
+        # from its project row. No row: nothing was ever saved, and the
+        # local reset stands on its own.
+        # @args: dlg - the UfeDialog, pid - the project id
+        row = project.find_file(db, pid, dlg.state.path)
+        if row is None:
+            return
+        project.update_file_meta(db, row["id"], {"ufe": None})
+        self.statusBar().showMessage(
+            self.tr("The plate's saved state was cleared."), 6000)
+
+    def _ufe_reset_points(self, dlg, pid):
+        # Destructive, confirmed in the tab: the measured points tied
+        # to this plate are dropped (they leave the light curve), and
+        # the project page refreshes so the curve and the visit show it
+        # at once.
+        # @args: dlg - the UfeDialog, pid - the project id
+        from ..core import followup as fu
+        row = project.find_file(db, pid, dlg.state.path)
+        if row is not None:
+            fu.delete_points_for_file(db, row["id"])
         self._project_selected()
 
     # ---------------- Observing journal (ADR-036) ----------------

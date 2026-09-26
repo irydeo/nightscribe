@@ -37,7 +37,7 @@ from pathlib import Path
 
 import numpy as np
 from PySide6.QtGui import QColor, QPen
-from PySide6.QtWidgets import (QFileDialog, QWidget,
+from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
                                QGraphicsEllipseItem)
 
 from ..core import coords, fits_meta, photometry, photometry_export, \
@@ -74,6 +74,10 @@ class UfeMeasureTab(QWidget):
         self._project_attached = False     # point hook set on the dialog
         self._items = []             # aperture + comps overlays
         self._last = None            # the last measurement bundle
+        self._band = None            # the band of the last plate (the
+                                     # combo is refilled per measurement,
+                                     # ADR-047 keeps a stable pick across
+                                     # plate re-opens)
         # where the target B-V came from: "assumed" (the 0.00 default),
         # "catalog" (the field star under the click), "project" (the host
         # record), "manual" (a hand edit, which wins until the next click)
@@ -91,6 +95,10 @@ class UfeMeasureTab(QWidget):
         if view is not None:
             view.scene_clicked.connect(self._on_scene_clicked)
         self._on_image_loaded()
+        # ADR-047: the recipe as the .ui shipped it, captured once the
+        # widgets exist: what the state reset applies back (.ui = the
+        # single source of the defaults, no mirror in Python).
+        self._ui_defaults = self.capture_state()
 
     # ------------------------------------------------------------------ UI
 
@@ -150,6 +158,12 @@ class UfeMeasureTab(QWidget):
         # there (source “measure”); ad-hoc opens hide this button.
         self.btn_save_project = self._ui.btn_save_project
         self.btn_save_project.clicked.connect(self._on_save_project)
+        # ADR-047: the plate's two resets, visible only when the dialog
+        # is opened from a project (same rule as the save button).
+        self.btn_reset_state = self._ui.btn_reset_state
+        self.btn_reset_state.clicked.connect(self._on_reset_state)
+        self.btn_reset_points = self._ui.btn_reset_points
+        self.btn_reset_points.clicked.connect(self._on_reset_points)
 
     def _spin(self, sb, value, lo, hi):
         # Sizes one aperture spin (px, half-pixel steps) from
@@ -207,6 +221,66 @@ class UfeMeasureTab(QWidget):
         elif self._last is not None and self._last.get("mag") is not None:
             self.btn_save_project.setEnabled(True)
 
+    # -------------------------------------------------- resets (ADR-047)
+
+    def set_reset_attached(self, flag):
+        # ADR-047: the dialog carries reset hooks (it was opened from a
+        # project): the two plate resets show. Same rule as the save
+        # button: not attached, not visible.
+        # @args: flag - True when the dialog's state/points hooks are set
+        self.btn_reset_state.setVisible(bool(flag))
+        self.btn_reset_points.setVisible(bool(flag))
+
+    def ui_defaults(self):
+        # ADR-047: the recipe the .ui shipped with, for the state reset
+        # (the dialog applies it back on the tab).
+        # @args: none
+        # @return: a copy of the captured defaults dict
+        return dict(self._ui_defaults)
+
+    def _on_reset_state(self):
+        # ADR-047: the working state back to the editor's defaults: the
+        # recipe, the stretch, the sequence. No confirmation: nothing on
+        # disk is lost, the saved state is just overwritable.
+        dlg = self.window()
+        f = getattr(dlg, "reset_state_local", None)
+        if not callable(f) or not f():
+            self.lbl_status.setText(self.tr(
+                "Load a plate first: there is no state to reset."))
+            return
+        if dlg.notify_reset_state():
+            self.lbl_status.setText(self.tr("Plate state reset."))
+        else:
+            self.lbl_status.setText(self.tr(
+                "Plate state reset locally: this plate is not "
+                "registered in the project, so there was no saved "
+                "state to clear."))
+
+    def _on_reset_points(self):
+        # ADR-047: destructive for the light curve: every measured point
+        # saved on THIS plate is dropped. The plan requires a
+        # confirmation here, and the hook fires only after a yes.
+        dlg = self.window()
+        if not dlg.state.has_image:
+            self.lbl_status.setText(self.tr(
+                "Load a plate first: there are no plate points to reset."))
+            return
+        box = QMessageBox.question(
+            self, self.tr("Reset the points of this plate"),
+            self.tr(
+                "Delete every measurement point saved on this plate?\n"
+                "They leave the light curve; the CSV files on disk are\n"
+                "not touched."),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if box != QMessageBox.Yes:
+            return
+        if dlg.notify_reset_points():
+            self.lbl_status.setText(self.tr(
+                "The plate's measurement points were deleted."))
+        else:
+            self.lbl_status.setText(self.tr(
+                "No measurement points saved on this plate."))
+
     def _on_save_project(self):
         # ADR-044: the host (Main window) set a point hook when it opened
         # us from a project; it saves this point under that project
@@ -230,6 +304,9 @@ class UfeMeasureTab(QWidget):
             "mag": self._last["mag"],
             "err": self._last.get("err"),
             "name": meta.get("object"),
+            # ADR-047: the plate this point belongs to, so the host ties
+            # it to its project_files row and saves the plate's state.
+            "path": self._state.path,
         }
         dlg = self.window()
         if not dlg or not dlg.notify_point(payload):
@@ -341,6 +418,68 @@ class UfeMeasureTab(QWidget):
             except (TypeError, ValueError):
                 pass
             self.spn_target_bv.blockSignals(False)
+
+    # ----------------------------------------------------- state (ADR-047)
+
+    def capture_state(self):
+        # The recipe, as plain JSON (ADR-047): band, the aperture
+        # triple, the manual flag, the advanced switches, the sky
+        # method and the target B-V. Read-only: nothing here moves a
+        # widget.
+        # @return: the dict the dialog stores alongside the plate
+        return {
+            "band": self.cmb_band.currentText() or None,
+            "rap": float(self.spn_rap.value()),
+            "rin": float(self.spn_rin.value()),
+            "rout": float(self.spn_rout.value()),
+            "radii_manual": bool(self._radii_manual),
+            "sigmaclip": bool(self.chk_sigmaclip.isChecked()),
+            "seeing": bool(self.chk_seeing.isChecked()),
+            "color": bool(self.chk_color.isChecked()),
+            "sky": self.cmb_sky.currentData() or "median",
+            "target_bv": float(self.spn_target_bv.value()),
+        }
+
+    def apply_state(self, st):
+        # Restores a saved recipe (ADR-047). Signals are blocked while
+        # the widgets move: re-measures cannot fire there is no
+        # point yet, and the seeing toggle must not reset the manual
+        # radii we restore right after.
+        # @args: st - capture_state dict (empty/None is a no-op)
+        if not st:
+            return
+        band = st.get("band")
+        if band:
+            self.cmb_band.setCurrentText(str(band))
+        for spn, key in ((self.spn_rap, "rap"),
+                         (self.spn_rin, "rin"),
+                         (self.spn_rout, "rout")):
+            if st.get(key) is None:
+                continue
+            spn.blockSignals(True)
+            spn.setValue(float(st[key]))
+            spn.blockSignals(False)
+        self._radii_manual = False
+        for chk, key in ((self.chk_sigmaclip, "sigmaclip"),
+                         (self.chk_seeing, "seeing"),
+                         (self.chk_color, "color")):
+            want = bool(st.get(key, False))
+            if chk.isChecked() != want:
+                chk.setChecked(want)
+        sky = st.get("sky")
+        if sky:
+            row = self.cmb_sky.findData(sky)
+            if row >= 0:
+                self.cmb_sky.setCurrentIndex(row)
+        if st.get("target_bv") is not None:
+            self.spn_target_bv.blockSignals(True)
+            try:
+                self.spn_target_bv.setValue(float(st["target_bv"]))
+            except (TypeError, ValueError):
+                pass
+            self.spn_target_bv.blockSignals(False)
+        self._bv_source = "assumed"
+        self._radii_manual = bool(st.get("radii_manual", False))
 
     def _on_seeing_toggled(self, checked):
         # Re-arming the checkbox hands the radii back to the seeing
@@ -475,10 +614,11 @@ class UfeMeasureTab(QWidget):
         # Comps on the same plate, zero point (with the colour term when
         # there is spread), the error budget, the check semaphore, and
         # the panel.
-        band = self.cmb_band.currentText() or "V"
+        band = self.cmb_band.currentText() or self._band or "V"
         bands = self._available_bands(entries)
         if bands and band not in bands:
             band = bands[0]
+        self._band = band
         if bands:
             self.cmb_band.blockSignals(True)
             self.cmb_band.clear()

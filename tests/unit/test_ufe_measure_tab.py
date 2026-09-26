@@ -215,7 +215,7 @@ def test_remeasure_keeps_painting_while_the_sequence_owns_the_stage(dlg):
 
 
 def test_save_in_project_button_follows_the_point_hook(dlg):
-    # ADR-044: "Save in the project" shows only when the dialog was
+    # ADR-044: "Save…" shows only when the dialog was
     # opened from a project (a point hook is set), stays disabled until
     # there is a calibrated point, and hands the payload to the host.
     tab = dlg.tab_measure

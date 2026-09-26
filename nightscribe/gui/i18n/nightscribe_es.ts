@@ -7613,8 +7613,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="232"/>
-        <source>Save in the project</source>
-        <translation>Guardar en el proyecto</translation>
+        <source>Save…</source>
+        <translation>Guardar…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="242"/>
@@ -7623,8 +7623,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="245"/>
-        <source>Reset plate state</source>
-        <translation>Restablecer el estado de la placa</translation>
+        <source>Reset state…</source>
+        <translation>Restablecer estado…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="255"/>
@@ -7633,8 +7633,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="258"/>
-        <source>Reset plate points</source>
-        <translation>Reiniciar los puntos de la placa</translation>
+        <source>Reset points…</source>
+        <translation>Reiniciar puntos…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="229"/>

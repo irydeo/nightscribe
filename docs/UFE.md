@@ -144,7 +144,7 @@ differential aperture photometry):
   scatter only.
 * **CSV...** exports the measurement as one row, **AAVSO EFF...** in
   the AAVSO's format (sequence in CNAME/CMAG/KNAME/KMAG) and, when the
-  editor opened from a project, **Save in the project** records it in
+  editor opened from a project, **Save…** records it in
   the light curve (source "measure", visit attached). When the sequence
   lacks the target's magnitude, it is looked up in the project
   (planner, VSX, or the last saved sequence); and exporting the

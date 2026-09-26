@@ -107,7 +107,7 @@ zoom no limitado al Fit.
 retira su quick-look «Análisis rápido» (fallo silencioso de 0 puntos, la
 respuesta «Nada» sin explicar; ver ADR-019) y su medida por visita pasa a
 la pestaña Medir. Cuando el editor se abre a partir de un proyecto, la
-pestaña Medir muestra el botón **Save in the project** y la medida
+pestaña Medir muestra el botón **Guardar…** y la medida
 calibrada se registra en el proyecto con `source="measure"`: se pinta en
 la curva, cuenta para la detección de eventos de la campaña y sale en las
 exportaciones (los puntos históricos `source="quicklook"` siguen pintados
@@ -382,7 +382,7 @@ PNG export as a standard feature and a zoom not limited to Fit.
 its quick-look "Quick analysis" button (silent 0-point failure, a
 "Nada" with no explanation; see ADR-019), and its per-visit
 measurement moves to the Measure tab. When the editor is opened from a
-project, the Measure tab shows a **Save in the project** button and the
+project, the Measure tab shows a **Save…** button and the
 calibrated point is registered in the project as `source="measure"`: it
 renders on the curve, counts for the campaign's event detection and is
 included in the exports (historic `source="quicklook"` points keep

@@ -388,7 +388,7 @@ class UfeDialog(QDialog):
         #        measurement ({"mjd", "filter", "mag", "err", ...}) to the
         #        host for registration. Cleared on every open path that
         #        does not set it, like the file save hook. The Measure
-        #        tab shows its «Save in the project» button only then.
+        #        tab shows its «Save…» button only then.
         self._point_hook = fn
         tab = getattr(self, "tab_measure", None)
         if tab is not None:

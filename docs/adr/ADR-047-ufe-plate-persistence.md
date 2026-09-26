@@ -70,13 +70,13 @@ la placa, que es su origen natural.
    `file_id` es la única fuente de verdad del origen: reports (CSV,
    AAVSO EFF), dashboard «Necesita tu atención» y vigilias siguen
    leyendo `photometry_points` (ADR-045 no cambia de superficie).
-6. **Dos resets desde la pestaña Medir del UFE.** «Reset plate state»
+6. **Dos resets desde la pestaña Medir del UFE.** «Restablecer estado…»
    *sin* confirmación (el editor vuelve a sus valores por defecto *y*
    se borra el `meta["ufe"]` de la placa; los puntos de la placa no
-   se tocan) y «Reset plate points» *con* confirmación (borra los
+   se tocan) y «Reiniciar puntos…» *con* confirmación (borra los
    puntos de esa placa; refresco de la página del proyecto: curva de
    luz y visitas). Sin proyecto no hay botones (misma regla que
-   «Save in the project»).
+   «Guardar…»).
 
 **Consecuencias.** Un único punto de contacto del estado entre el
 editor y la app (ganchos `set_reset_hooks` / `notify_reset_*` del
@@ -150,13 +150,12 @@ plate, their natural source.
    single source of truth for origin: reports (CSV, AAVSO EFF), the
    attention dashboard and the vigils keep reading `photometry_points`
    (ADR-045's surface is unchanged).
-6. **Two resets from the UFE's Measure tab.** "Reset plate state"
+6. **Two resets from the UFE's Measure tab.** "Reset state…"
    *without* confirmation (the editor returns to its defaults *and*
    `meta["ufe"]` is dropped from the plate; its points are not
-   touched) and "Reset plate points" *with* confirmation (the plate's
+   touched) and "Reset points…" *with* confirmation (the plate's
    points are deleted, and the project page refreshes: light curve and
-   visits). No project, no buttons: same rule as "Save in the
-   project".
+   visits). No project, no buttons: same rule as "Save…".
 
 **Consequences.** A single contact point for state between the editor
 and the app (the dialog's `set_reset_hooks` / `notify_reset_*` hooks,

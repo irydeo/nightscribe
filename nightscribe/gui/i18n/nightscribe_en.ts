@@ -4014,7 +4014,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../../core/db.py" line="385"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
-        <translation>Comparison chart…</translation>
+        <translation>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</translation>
     </message>
     <message>
         <location filename="../../core/db.py" line="388"/>
@@ -4944,7 +4944,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../ui/projects_tab.ui" line="184"/>
         <source>Files (0)</source>
-        <translation>Your measurements so far</translation>
+        <translation>Files (0)</translation>
     </message>
     <message>
         <location filename="../ui/projects_tab.ui" line="187"/>
@@ -5497,7 +5497,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../ui/settings_dialog.ui" line="328"/>
         <source>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs</source>
-        <translation>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs.</translation>
+        <translation>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs</translation>
     </message>
     <message>
         <location filename="../ui/settings_dialog.ui" line="379"/>
@@ -7613,8 +7613,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="232"/>
-        <source>Save in the project</source>
-        <translation>Save in the project</translation>
+        <source>Save…</source>
+        <translation>Save…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="242"/>
@@ -7623,8 +7623,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="245"/>
-        <source>Reset plate state</source>
-        <translation>Reset plate state</translation>
+        <source>Reset state…</source>
+        <translation>Reset state…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="255"/>
@@ -7633,8 +7633,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="258"/>
-        <source>Reset plate points</source>
-        <translation>Reset plate points</translation>
+        <source>Reset points…</source>
+        <translation>Reset points…</translation>
     </message>
     <message>
         <location filename="../ui/ufe_measure_tab.ui" line="229"/>
@@ -8273,7 +8273,7 @@ not touched.</translation>
     <message>
         <location filename="../ui/visits_panel.ui" line="15"/>
         <source>New visit</source>
-        <translation>Colour term applied with target B−V = {0:.2f}</translation>
+        <translation>New visit</translation>
     </message>
     <message>
         <source>Every day you work the object is a visit: images, reports and measurements hang from it</source>

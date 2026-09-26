@@ -120,176 +120,219 @@
 <context>
     <name>BlinkTab</name>
     <message>
+        <location filename="../ui/blink_tab.ui" line="8"/>
         <source>Supernova:</source>
-        <translation type="vanished">Supernova:</translation>
+        <translation>Supernova:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="9"/>
         <source>2026ziz, SN2023ixf…</source>
-        <translation type="vanished">2026ziz, SN2023ixf…</translation>
+        <translation>2026ziz, SN2023ixf…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="10"/>
         <source>FITS image:</source>
-        <translation type="vanished">FITS image:</translation>
+        <translation>FITS image:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="11"/>
         <source>Plate-solved FITS (with WCS)…</source>
-        <translation type="vanished">Plate-solved FITS (with WCS)…</translation>
+        <translation>Plate-solved FITS (with WCS)…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="12"/>
         <source>Browse…</source>
-        <translation type="vanished">Browse…</translation>
+        <translation>Browse…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="13"/>
         <source>Prepare pair</source>
-        <translation type="vanished">Prepare pair</translation>
+        <translation>Prepare pair</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="18"/>
         <source>Manual coordinates:</source>
-        <translation type="vanished">Manual coordinates:</translation>
+        <translation>Manual coordinates:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="19"/>
         <source>RA (deg):</source>
-        <translation type="vanished">RA (deg):</translation>
+        <translation>RA (deg):</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="20"/>
         <source>301.1436</source>
-        <translation type="vanished">301.1436</translation>
+        <translation>301.1436</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="21"/>
         <source>Dec (deg):</source>
-        <translation type="vanished">Dec (deg):</translation>
+        <translation>Dec (deg):</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="22"/>
         <source>+62.6441</source>
-        <translation type="vanished">+62.6441</translation>
+        <translation>+62.6441</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="33"/>
         <source>Load a plate-solved FITS and press &quot;Prepare pair&quot; — the survey reference (PanSTARRS DR1 g) will be matched automatically.</source>
-        <translation type="vanished">Load a plate-solved FITS and press &quot;Prepare pair&quot; — the survey reference (PanSTARRS DR1 g) will be matched automatically.</translation>
+        <translation>Load a plate-solved FITS and press &quot;Prepare pair&quot; — the survey reference (PanSTARRS DR1 g) will be matched automatically.</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="41"/>
         <source>Stretch</source>
-        <translation type="vanished">Stretch</translation>
+        <translation>Stretch</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="43"/>
         <source>Black point</source>
-        <translation type="vanished">Black point</translation>
+        <translation>Black point</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="45"/>
         <source>White point</source>
-        <translation type="vanished">White point</translation>
+        <translation>White point</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="47"/>
         <source>Gamma</source>
-        <translation type="vanished">Gamma</translation>
+        <translation>Gamma</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="49"/>
         <source>Auto stretch</source>
-        <translation type="vanished">Auto stretch</translation>
+        <translation>Auto stretch</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="50"/>
         <source>Brightness balance (survey)</source>
-        <translation type="vanished">Brightness balance (survey)</translation>
+        <translation>Brightness balance (survey)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="51"/>
         <source>Gain applied to the survey so both backgrounds match (100 = no change)</source>
-        <translation type="vanished">Gain applied to the survey so both backgrounds match (100 = no change)</translation>
+        <translation>Gain applied to the survey so both backgrounds match (100 = no change)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="52"/>
         <source>Auto balance</source>
-        <translation type="vanished">Auto balance</translation>
+        <translation>Auto balance</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="58"/>
         <source>View</source>
-        <translation type="vanished">View</translation>
+        <translation>View</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="60"/>
         <source>Live blink</source>
-        <translation type="vanished">Live blink</translation>
+        <translation>Live blink</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="63"/>
         <source>Blink every (ms):</source>
-        <translation type="vanished">Blink every (ms):</translation>
+        <translation>Blink every (ms):</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="67"/>
         <source>Fade (survey ↔ yours)</source>
-        <translation type="vanished">Fade (survey ↔ yours)</translation>
+        <translation>Fade (survey ↔ yours)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="71"/>
         <source>Zoom on the SN:</source>
-        <translation type="vanished">Zoom on the SN:</translation>
+        <translation>Zoom on the SN:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="73"/>
         <source>×1</source>
-        <translation type="vanished">×1</translation>
+        <translation>×1</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="74"/>
         <source>×2</source>
-        <translation type="vanished">×2</translation>
+        <translation>×2</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="75"/>
         <source>×4</source>
-        <translation type="vanished">×4</translation>
+        <translation>×4</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="79"/>
         <source>Mark the supernova</source>
-        <translation type="vanished">Mark the supernova</translation>
+        <translation>Mark the supernova</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="80"/>
         <source>Marker size</source>
-        <translation type="vanished">Marker size</translation>
+        <translation>Marker size</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="87"/>
         <source>Fine alignment (survey)</source>
-        <translation type="vanished">Fine alignment (survey)</translation>
+        <translation>Fine alignment (survey)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="89"/>
         <source>↑</source>
-        <translation type="vanished">↑</translation>
+        <translation>↑</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="90"/>
         <source>←</source>
-        <translation type="vanished">←</translation>
+        <translation>←</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="91"/>
         <source>(0.0, 0.0)</source>
-        <translation type="vanished">(0.0, 0.0)</translation>
+        <translation>(0.0, 0.0)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="92"/>
         <source>→</source>
-        <translation type="vanished">→</translation>
+        <translation>→</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="93"/>
         <source>↓</source>
-        <translation type="vanished">↓</translation>
+        <translation>↓</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="99"/>
         <source>Export</source>
-        <translation type="vanished">Export</translation>
+        <translation>Export</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="101"/>
         <source>Blink GIF</source>
-        <translation type="vanished">Blink GIF</translation>
+        <translation>Blink GIF</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="102"/>
         <source>Fade GIF</source>
-        <translation type="vanished">Fade GIF</translation>
+        <translation>Fade GIF</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="103"/>
         <source>Export GIF…</source>
-        <translation type="vanished">Export GIF…</translation>
+        <translation>Export GIF…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="104"/>
         <source>Export video (MP4)…</source>
-        <translation type="vanished">Export video (MP4)…</translation>
+        <translation>Export video (MP4)…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="104"/>
         <source>Same animation as the GIF, encoded as H.264 MP4 for sites that reject GIFs</source>
-        <translation type="vanished">Same animation as the GIF, encoded as H.264 MP4 for sites that reject GIFs</translation>
+        <translation>Same animation as the GIF, encoded as H.264 MP4 for sites that reject GIFs</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="105"/>
         <source>Export side-by-side PNG…</source>
-        <translation type="vanished">Export side-by-side PNG…</translation>
+        <translation>Export side-by-side PNG…</translation>
     </message>
 </context>
 <context>
@@ -305,48 +348,59 @@
         <translation>New campaign</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="12"/>
         <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</source>
-        <translation type="vanished">A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</translation>
+        <translation>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="15"/>
         <source>Name:</source>
-        <translation type="vanished">Name:</translation>
+        <translation>Name:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="17"/>
         <source>Group:</source>
-        <translation type="vanished">Group:</translation>
+        <translation>Group:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="19"/>
         <source>Coordinator:</source>
-        <translation type="vanished">Coordinator:</translation>
+        <translation>Coordinator:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="21"/>
         <source>Science goal:</source>
-        <translation type="vanished">Science goal:</translation>
+        <translation>Science goal:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="23"/>
         <source>Cadence (nights):</source>
-        <translation type="vanished">Cadence (nights):</translation>
+        <translation>Cadence (nights):</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="25"/>
         <source>Filters:</source>
-        <translation type="vanished">Filters:</translation>
+        <translation>Filters:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="27"/>
         <source>Comparison stars:</source>
-        <translation type="vanished">Comparison stars:</translation>
+        <translation>Comparison stars:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="29"/>
         <source>Report URL:</source>
-        <translation type="vanished">Report URL:</translation>
+        <translation>Report URL:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="31"/>
         <source>Data URL:</source>
-        <translation type="vanished">Data URL:</translation>
+        <translation>Data URL:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="33"/>
         <source>Protocol notes:</source>
-        <translation type="vanished">Protocol notes:</translation>
+        <translation>Protocol notes:</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="85"/>
@@ -370,28 +424,34 @@
 <context>
     <name>CampaignsTab</name>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="53"/>
         <source>Campaigns</source>
-        <translation type="vanished">Campaigns</translation>
+        <translation>Campaigns</translation>
     </message>
     <message>
         <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</source>
         <translation type="vanished">A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="17"/>
+        <location filename="../ui/campaigns_tab.ui" line="37"/>
         <source>color: #8a90a6; font-style: italic; font-size: 11px;</source>
-        <translation type="vanished">color: #8a90a6; font-style: italic; font-size: 11px;</translation>
+        <translation>color: #8a90a6; font-style: italic; font-size: 11px;</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="58"/>
         <source>Select a campaign to see its detail</source>
-        <translation type="vanished">Select a campaign to see its detail</translation>
+        <translation>Select a campaign to see its detail</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="63"/>
         <source>New campaign…</source>
-        <translation type="vanished">New campaign…</translation>
+        <translation>New campaign…</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="91"/>
         <source>Edit…</source>
-        <translation type="vanished">Edit…</translation>
+        <translation>Edit…</translation>
     </message>
     <message>
         <source>Delete…</source>
@@ -418,64 +478,82 @@
         <translation type="vanished">Detach project…</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="8"/>
         <source>Happening now</source>
-        <translation type="vanished">Happening now</translation>
+        <translation>Happening now</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="15"/>
         <source>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</source>
-        <translation type="vanished">Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</translation>
+        <translation>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="27"/>
+        <location filename="../ui/campaigns_tab.ui" line="66"/>
         <source>ⓘ</source>
-        <translation type="vanished">ⓘ</translation>
+        <translation>ⓘ</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="28"/>
         <source>What do the icons mean?</source>
-        <translation type="vanished">What do the icons mean?</translation>
+        <translation>What do the icons mean?</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="67"/>
         <source>What is a campaign?</source>
-        <translation type="vanished">What is a campaign?</translation>
+        <translation>What is a campaign?</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="78"/>
         <source>Campaign detail</source>
-        <translation type="vanished">Campaign detail</translation>
+        <translation>Campaign detail</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="84"/>
         <source>Select a campaign.</source>
-        <translation type="vanished">Select a campaign.</translation>
+        <translation>Select a campaign.</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="85"/>
         <source>font-size: 15px; font-weight: bold;</source>
-        <translation type="vanished">font-size: 15px; font-weight: bold;</translation>
+        <translation>font-size: 15px; font-weight: bold;</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="96"/>
         <source>Close</source>
-        <translation type="vanished">Close</translation>
+        <translation>Close</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="101"/>
         <source>⋯</source>
-        <translation type="vanished">⋯</translation>
+        <translation>⋯</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="102"/>
         <source>More campaign actions (delete, projects)</source>
-        <translation type="vanished">More campaign actions (delete, projects)</translation>
+        <translation>More campaign actions (delete, projects)</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="108"/>
+        <location filename="../ui/campaigns_tab.ui" line="127"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="123"/>
         <source>Protocol</source>
-        <translation type="vanished">Protocol</translation>
+        <translation>Protocol</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="136"/>
         <source>Projects in this campaign</source>
-        <translation type="vanished">Projects in this campaign</translation>
+        <translation>Projects in this campaign</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="42"/>
+        <location filename="../ui/campaigns_tab.ui" line="140"/>
         <source>Double-click a row to open its project</source>
-        <translation type="vanished">Double-click a row to open its project</translation>
+        <translation>Double-click a row to open its project</translation>
     </message>
     <message>
         <source>Signals</source>
@@ -489,24 +567,28 @@
 <context>
     <name>ChartViewer</name>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="15"/>
         <source>Zoom −</source>
-        <translation type="vanished">Zoom −</translation>
+        <translation>Zoom −</translation>
     </message>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="16"/>
         <source>Zoom +</source>
-        <translation type="vanished">Zoom +</translation>
+        <translation>Zoom +</translation>
     </message>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="17"/>
         <source>Fit</source>
-        <translation type="vanished">Fit</translation>
+        <translation>Fit</translation>
     </message>
     <message>
         <source>1:1</source>
         <translation type="vanished">1:1</translation>
     </message>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="19"/>
         <source>Export PNG…</source>
-        <translation type="vanished">Export PNG…</translation>
+        <translation>Export PNG…</translation>
     </message>
     <message>
         <location filename="../chart_viewer.py" line="136"/>
@@ -633,12 +715,14 @@
         <translation>All kinds</translation>
     </message>
     <message>
+        <location filename="../ui/journal_dialog.ui" line="15"/>
         <source>Search…</source>
-        <translation type="vanished">Search…</translation>
+        <translation>Search…</translation>
     </message>
     <message>
+        <location filename="../ui/journal_dialog.ui" line="18"/>
         <source>Double-click an entry to open its project or explore the object</source>
-        <translation type="vanished">Double-click an entry to open its project or explore the object</translation>
+        <translation>Double-click an entry to open its project or explore the object</translation>
     </message>
     <message>
         <location filename="../journal_dialog.py" line="94"/>
@@ -700,12 +784,14 @@
 <context>
     <name>MainWindow</name>
     <message>
+        <location filename="../ui/main_window.ui" line="9"/>
         <source>NightScribe</source>
-        <translation type="vanished">NightScribe</translation>
+        <translation>NightScribe</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="17"/>
         <source>Tonight</source>
-        <translation type="vanished">Tonight</translation>
+        <translation>Tonight</translation>
     </message>
     <message>
         <source>Solar system</source>
@@ -721,12 +807,14 @@
         <translation>Blink</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="20"/>
         <source>Projects</source>
-        <translation type="vanished">Projects</translation>
+        <translation>Projects</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="23"/>
         <source>Campaigns</source>
-        <translation type="vanished">Campaigns</translation>
+        <translation>Campaigns</translation>
     </message>
     <message>
         <source>Sun &amp; sky</source>
@@ -737,20 +825,24 @@
         <translation type="vanished">Observatory</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="35"/>
         <source>File</source>
-        <translation type="vanished">File</translation>
+        <translation>File</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="39"/>
         <source>Tools</source>
-        <translation type="vanished">Tools</translation>
+        <translation>Tools</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="50"/>
         <source>Help</source>
-        <translation type="vanished">Help</translation>
+        <translation>Help</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="61"/>
         <source>Quit</source>
-        <translation type="vanished">Quit</translation>
+        <translation>Quit</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="810"/>
@@ -763,44 +855,53 @@
         <translation>English</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="64"/>
         <source>Settings…</source>
-        <translation type="vanished">Settings…</translation>
+        <translation>Settings…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="82"/>
         <source>NightScribe Image Workbench…</source>
-        <translation type="vanished">NightScribe Image Workbench…</translation>
+        <translation>NightScribe Image Workbench…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="91"/>
         <source>Technical Documentation</source>
-        <translation type="vanished">Technical Documentation</translation>
+        <translation>Technical Documentation</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="67"/>
         <source>Explore object…</source>
-        <translation type="vanished">Explore object…</translation>
+        <translation>Explore object…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="70"/>
         <source>Blink (ad-hoc)…</source>
-        <translation type="vanished">Blink (ad-hoc)…</translation>
+        <translation>Blink (ad-hoc)…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="73"/>
         <source>Observing journal…</source>
-        <translation type="vanished">Observing journal…</translation>
+        <translation>Observing journal…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="76"/>
         <source>Sky calendar…</source>
-        <translation type="vanished">Sky calendar…</translation>
+        <translation>Sky calendar…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="79"/>
         <source>Campaigns…</source>
-        <translation type="vanished">Campaigns…</translation>
+        <translation>Campaigns…</translation>
     </message>
     <message>
         <source>FITS editor…</source>
         <translation type="vanished">FITS editor…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="85"/>
         <source>About NightScribe</source>
-        <translation type="vanished">About NightScribe</translation>
+        <translation>About NightScribe</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="386"/>
@@ -819,6 +920,7 @@
     </message>
     <message>
         <location filename="../main_window.py" line="1005"/>
+        <location filename="../ui/main_window.ui" line="88"/>
         <source>Data sources</source>
         <translation>Data sources</translation>
     </message>
@@ -1201,7 +1303,6 @@
     <message>
         <location filename="../main_window.py" line="2658"/>
         <source>Analyse your data</source>
-        
         <translation>Analyse your data</translation>
     </message>
     <message>
@@ -1425,7 +1526,6 @@
     <message>
         <location filename="../main_window.py" line="7812"/>
         <source>Point saved without plate state: this plate is not registered in the project.</source>
-        
         <translation>Point saved without plate state: this plate is not registered in the project.</translation>
     </message>
     <message>
@@ -1559,7 +1659,6 @@ One per line: date  magnitude  [error]  filter</translation>
     <message>
         <location filename="../main_window.py" line="2931"/>
         <source>Files ({})</source>
-        
         <translation>Files ({})</translation>
     </message>
     <message>
@@ -2259,7 +2358,6 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
     <message>
         <location filename="../main_window.py" line="7835"/>
         <source>The plate&apos;s saved state was cleared.</source>
-        
         <translation>The plate&apos;s saved state was cleared.</translation>
     </message>
     <message>
@@ -3578,7 +3676,6 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../main_window.py" line="4275"/>
         <source>After the reduction, upload EXOTIC&apos;s output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story when you publish.</source>
-        
         <translation>After the reduction, upload EXOTIC&apos;s output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story when you publish.</translation>
     </message>
     <message>
@@ -3589,25 +3686,21 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../main_window.py" line="4355"/>
         <source>This measurement no longer exists.</source>
-        
         <translation>This measurement no longer exists.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="4359"/>
         <source>This point has no plate: it was hand-entered, pasted, or saved before this feature.</source>
-        
         <translation>This point has no plate: it was hand-entered, pasted, or saved before this feature.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="4365"/>
         <source>The plate this point came from is not a usable image anymore.</source>
-        
         <translation>The plate this point came from is not a usable image anymore.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="4371"/>
         <source>Enable the unified editor in Settings → Development to open this plate</source>
-        
         <translation>Enable the unified editor in Settings → Development to open this plate</translation>
     </message>
     <message>
@@ -3618,7 +3711,6 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../main_window.py" line="5201"/>
         <source>No points saved yet. Open a visit&apos;s plate in the editor or add a magnitude by hand: the summary updates after every save.</source>
-        
         <translation>No points saved yet. Open a visit&apos;s plate in the editor or add a magnitude by hand: the summary updates after every save.</translation>
     </message>
     <message>
@@ -3762,226 +3854,285 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>NSKinds</name>
     <message>
+        <location filename="../../core/kinds.py" line="47"/>
         <source>Near-Earth objects (NEOs)</source>
-        <translation type="vanished">Near-Earth objects (NEOs)</translation>
+        <translation>Near-Earth objects (NEOs)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="48"/>
         <source>Asteroids and comets on paths that pass close to Earth: the confirmed ones with score, priority, apparent rate, sky uncertainty and flags (NEOCP, impact risk, radar, NHATS), plus the unconfirmed candidates with preliminary orbits computed from the MPC astrometry.</source>
-        <translation type="vanished">Asteroids and comets on paths that pass close to Earth: the confirmed ones with score, priority, apparent rate, sky uncertainty and flags (NEOCP, impact risk, radar, NHATS), plus the unconfirmed candidates with preliminary orbits computed from the MPC astrometry.</translation>
+        <translation>Asteroids and comets on paths that pass close to Earth: the confirmed ones with score, priority, apparent rate, sky uncertainty and flags (NEOCP, impact risk, radar, NHATS), plus the unconfirmed candidates with preliminary orbits computed from the MPC astrometry.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="54"/>
         <source>NEOfixer&apos;s site-specific list + NEOCP (MPC); positions from NASA Horizons</source>
-        <translation type="vanished">NEOfixer&apos;s site-specific list + NEOCP (MPC); positions from NASA Horizons</translation>
+        <translation>NEOfixer&apos;s site-specific list + NEOCP (MPC); positions from NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="61"/>
         <source>Supernovae</source>
-        <translation type="vanished">Supernovae</translation>
+        <translation>Supernovae</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="62"/>
         <source>The newest discoveries, with the complete follow-up: a confirmation blink of your FITS against a PanSTARRS reference, the light curve drawn against the typical templates of each type, an evolution animation, exports and cadence reminders to know when to go back.</source>
-        <translation type="vanished">The newest discoveries, with the complete follow-up: a confirmation blink of your FITS against a PanSTARRS reference, the light curve drawn against the typical templates of each type, an evolution animation, exports and cadence reminders to know when to go back.</translation>
+        <translation>The newest discoveries, with the complete follow-up: a confirmation blink of your FITS against a PanSTARRS reference, the light curve drawn against the typical templates of each type, an evolution animation, exports and cadence reminders to know when to go back.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="68"/>
         <source>Rochester Astronomy discovery list + a PanSTARRS (MAST) reference for the blink</source>
-        <translation type="vanished">Rochester Astronomy discovery list + a PanSTARRS (MAST) reference for the blink</translation>
+        <translation>Rochester Astronomy discovery list + a PanSTARRS (MAST) reference for the blink</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="75"/>
         <source>Comets</source>
-        <translation type="vanished">Comets</translation>
+        <translation>Comets</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="76"/>
         <source>Comets visible tonight with their live observed magnitude, perihelion date and activity flags, so you know how each one is doing now, not last month.</source>
-        <translation type="vanished">Comets visible tonight with their live observed magnitude, perihelion date and activity flags, so you know how each one is doing now, not last month.</translation>
+        <translation>Comets visible tonight with their live observed magnitude, perihelion date and activity flags, so you know how each one is doing now, not last month.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="80"/>
         <source>COBS (MPC) live magnitudes + NASA Horizons</source>
-        <translation type="vanished">COBS (MPC) live magnitudes + NASA Horizons</translation>
+        <translation>COBS (MPC) live magnitudes + NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="85"/>
         <source>Comet candidates (PCCP)</source>
-        <translation type="vanished">Comet candidates (PCCP)</translation>
+        <translation>Comet candidates (PCCP)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="86"/>
         <source>Objects reported as asteroids that might actually be comets, with their comet score: the MPC&apos;s Possible Comet Confirmation Page. Getting there first matters.</source>
-        <translation type="vanished">Objects reported as asteroids that might actually be comets, with their comet score: the MPC&apos;s Possible Comet Confirmation Page. Getting there first matters.</translation>
+        <translation>Objects reported as asteroids that might actually be comets, with their comet score: the MPC&apos;s Possible Comet Confirmation Page. Getting there first matters.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="90"/>
         <source>MPC PCCP (minorplanetcenter.net) + NASA Horizons</source>
-        <translation type="vanished">MPC PCCP (minorplanetcenter.net) + NASA Horizons</translation>
+        <translation>MPC PCCP (minorplanetcenter.net) + NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="96"/>
         <source>Exoplanet transits</source>
-        <translation type="vanished">Exoplanet transits</translation>
+        <translation>Exoplanet transits</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="97"/>
         <source>Exoplanets crossing their star tonight from your site, with the transit time, how much the observed timing is drifting from the prediction (O-C), whether the whole transit fits in your night, the maximum trail-free exposure and a pre-filled export for EXOTIC.</source>
-        <translation type="vanished">Exoplanets crossing their star tonight from your site, with the transit time, how much the observed timing is drifting from the prediction (O-C), whether the whole transit fits in your night, the maximum trail-free exposure and a pre-filled export for EXOTIC.</translation>
+        <translation>Exoplanets crossing their star tonight from your site, with the transit time, how much the observed timing is drifting from the prediction (O-C), whether the whole transit fits in your night, the maximum trail-free exposure and a pre-filled export for EXOTIC.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="103"/>
         <source>ExoClock (ESA Ariel ephemeris programme) + NASA Exoplanet Archive; times from NASA Horizons (HJD)</source>
-        <translation type="vanished">ExoClock (ESA Ariel ephemeris programme) + NASA Exoplanet Archive; times from NASA Horizons (HJD)</translation>
+        <translation>ExoClock (ESA Ariel ephemeris programme) + NASA Exoplanet Archive; times from NASA Horizons (HJD)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="110"/>
         <source>Close approaches and alerts</source>
-        <translation type="vanished">Close approaches and alerts</translation>
+        <translation>Close approaches and alerts</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="111"/>
         <source>Upcoming close approaches from ESA NEOCC (how the visitor gets by, roughly how big, how bright at the closest pass) to catch the week&apos;s fast mover, plus the AAVSO editorial channel: community alerts and the campaigns currently running.</source>
-        <translation type="vanished">Upcoming close approaches from ESA NEOCC (how the visitor gets by, roughly how big, how bright at the closest pass) to catch the week&apos;s fast mover, plus the AAVSO editorial channel: community alerts and the campaigns currently running.</translation>
+        <translation>Upcoming close approaches from ESA NEOCC (how the visitor gets by, roughly how big, how bright at the closest pass) to catch the week&apos;s fast mover, plus the AAVSO editorial channel: community alerts and the campaigns currently running.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="117"/>
         <source>ESA NEOCC + the AAVSO editorial channel (alerts and campaigns)</source>
-        <translation type="vanished">ESA NEOCC + the AAVSO editorial channel (alerts and campaigns)</translation>
+        <translation>ESA NEOCC + the AAVSO editorial channel (alerts and campaigns)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="124"/>
         <source>HADS stars</source>
-        <translation type="vanished">HADS stars</translation>
+        <translation>HADS stars</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="125"/>
         <source>High-amplitude delta Scuti variables: they pulse so fast and so strongly that you can watch them vary in a single session; your run folds by phase into the classic saw-tooth. Priorities are colour coded: period changes, never-observed stars, coverage gaps.</source>
-        <translation type="vanished">High-amplitude delta Scuti variables: they pulse so fast and so strongly that you can watch them vary in a single session; your run folds by phase into the classic saw-tooth. Priorities are colour coded: period changes, never-observed stars, coverage gaps.</translation>
+        <translation>High-amplitude delta Scuti variables: they pulse so fast and so strongly that you can watch them vary in a single session; your run folds by phase into the classic saw-tooth. Priorities are colour coded: period changes, never-observed stars, coverage gaps.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="131"/>
         <source>The living HADS catalogue maintained by P. Wils</source>
-        <translation type="vanished">The living HADS catalogue maintained by P. Wils</translation>
+        <translation>The living HADS catalogue maintained by P. Wils</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="137"/>
         <source>Variable stars and duties</source>
-        <translation type="vanished">Variable stars and duties</translation>
+        <translation>Variable stars and duties</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="138"/>
         <source>Your campaign members that are due by cadence, stars with an event in progress, stars nearing a predicted extremum, and your standing vigils (the T CrB eruption, the R CrB fade) checked day by day against the observatories and the community.</source>
-        <translation type="vanished">Your campaign members that are due by cadence, stars with an event in progress, stars nearing a predicted extremum, and your standing vigils (the T CrB eruption, the R CrB fade) checked day by day against the observatories and the community.</translation>
+        <translation>Your campaign members that are due by cadence, stars with an event in progress, stars nearing a predicted extremum, and your standing vigils (the T CrB eruption, the R CrB fade) checked day by day against the observatories and the community.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="144"/>
         <source>AAVSO VSX + AAVSO community photometry + a ZTF check for the vigils</source>
-        <translation type="vanished">AAVSO VSX + AAVSO community photometry + a ZTF check for the vigils</translation>
+        <translation>AAVSO VSX + AAVSO community photometry + a ZTF check for the vigils</translation>
     </message>
 </context>
 <context>
     <name>NSMigrations</name>
     <message>
+        <location filename="../../core/db.py" line="364"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
-        <translation type="vanished">Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</translation>
+        <translation>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="367"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
-        <translation type="vanished">The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</translation>
+        <translation>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="370"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
-        <translation type="vanished">The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</translation>
+        <translation>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="373"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
-        <translation type="vanished">Projects gained their final state: close date, outcome, tags and favourites.</translation>
+        <translation>Projects gained their final state: close date, outcome, tags and favourites.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="376"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
-        <translation type="vanished">Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</translation>
+        <translation>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="379"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
-        <translation type="vanished">Every project keeps its own container folder, in the place it already was.</translation>
+        <translation>Every project keeps its own container folder, in the place it already was.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="382"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
-        <translation type="vanished">Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</translation>
+        <translation>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="385"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
-        <translation type="vanished">Comparison chart…</translation>
+        <translation>Comparison chart…</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="388"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
-        <translation type="vanished">One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</translation>
+        <translation>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="392"/>
         <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
-        <translation type="vanished">Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</translation>
+        <translation>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</translation>
+    </message>
+    <message>
+        <location filename="../../core/db.py" line="395"/>
+        <source>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</source>
+        <translation>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</translation>
     </message>
 </context>
 <context>
     <name>NSUpdateWizard</name>
     <message>
+        <location filename="../ui/wizard.ui" line="20"/>
         <source>NightScribe - Setup</source>
-        <translation type="vanished">NightScribe - Setup</translation>
+        <translation>NightScribe - Setup</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="27"/>
         <source>Your observatory</source>
-        <translation type="vanished">Your observatory</translation>
+        <translation>Your observatory</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="30"/>
         <source>Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</source>
-        <translation type="vanished">Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</translation>
+        <translation>Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="36"/>
         <source>Detect my location (online)</source>
-        <translation type="vanished">Detect my location (online)</translation>
+        <translation>Detect my location (online)</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="44"/>
         <source>Find my location</source>
-        <translation type="vanished">Find my location</translation>
+        <translation>Find my location</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="76"/>
         <source>Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</source>
-        <translation type="vanished">Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</translation>
+        <translation>Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="89"/>
         <source>Or with an MPC code (optional)</source>
-        <translation type="vanished">Or with an MPC code (optional)</translation>
+        <translation>Or with an MPC code (optional)</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="98"/>
         <source>e.g. Z41</source>
-        <translation type="vanished">e.g. Z41</translation>
+        <translation>e.g. Z41</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="105"/>
         <source>Resolve</source>
-        <translation type="vanished">Resolve</translation>
+        <translation>Resolve</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="128"/>
         <source>Or type the coordinates</source>
-        <translation type="vanished">Or type the coordinates</translation>
+        <translation>Or type the coordinates</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="134"/>
         <source>Name:</source>
-        <translation type="vanished">Name:</translation>
+        <translation>Name:</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="144"/>
         <source>Latitude (degrees):</source>
-        <translation type="vanished">Latitude (degrees):</translation>
+        <translation>Latitude (degrees):</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="164"/>
         <source>Longitude (degrees east):</source>
-        <translation type="vanished">Longitude (degrees east):</translation>
+        <translation>Longitude (degrees east):</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="184"/>
         <source>Height (m):</source>
-        <translation type="vanished">Height (m):</translation>
+        <translation>Height (m):</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="215"/>
         <source>Your targets</source>
-        <translation type="vanished">Your targets</translation>
+        <translation>Your targets</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="218"/>
         <source>Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</source>
-        <translation type="vanished">Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</translation>
+        <translation>Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="256"/>
         <source>Keep at least one kind checked.</source>
-        <translation type="vanished">Keep at least one kind checked.</translation>
+        <translation>Keep at least one kind checked.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="267"/>
         <source>Your data, safe</source>
-        <translation type="vanished">Your data, safe</translation>
+        <translation>Your data, safe</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="270"/>
         <source>Before touching anything, NightScribe copies your database and reports in plain words what this version changes.</source>
-        <translation type="vanished">Before touching anything, NightScribe copies your database and reports in plain words what this version changes.</translation>
+        <translation>Before touching anything, NightScribe copies your database and reports in plain words what this version changes.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="311"/>
         <source>Nothing changes until you leave this window.</source>
-        <translation type="vanished">Nothing changes until you leave this window.</translation>
+        <translation>Nothing changes until you leave this window.</translation>
     </message>
 </context>
 <context>
@@ -4075,32 +4226,39 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>New project</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="13"/>
         <source>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</source>
-        <translation type="vanished">Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</translation>
+        <translation>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="16"/>
         <source>Object:</source>
-        <translation type="vanished">Object:</translation>
+        <translation>Object:</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="18"/>
         <source>Resolve (VSX/SIMBAD)</source>
-        <translation type="vanished">Resolve (VSX/SIMBAD)</translation>
+        <translation>Resolve (VSX/SIMBAD)</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="19"/>
         <source>— not resolved yet —</source>
-        <translation type="vanished">— not resolved yet —</translation>
+        <translation>— not resolved yet —</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="20"/>
         <source>RA (deg):</source>
-        <translation type="vanished">RA (deg):</translation>
+        <translation>RA (deg):</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="22"/>
         <source>Dec (deg):</source>
-        <translation type="vanished">Dec (deg):</translation>
+        <translation>Dec (deg):</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="24"/>
         <source>Mag (approx):</source>
-        <translation type="vanished">Mag (approx):</translation>
+        <translation>Mag (approx):</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="147"/>
@@ -4147,6 +4305,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
     </message>
     <message>
         <location filename="../overview.py" line="392"/>
+        <location filename="../ui/object_panel.ui" line="98"/>
         <source>Create project</source>
         <translation>Create project</translation>
     </message>
@@ -4156,37 +4315,45 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Start a new project for this object</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="52"/>
         <source>Parameters</source>
-        <translation type="vanished">Parameters</translation>
+        <translation>Parameters</translation>
     </message>
     <message>
         <location filename="../overview.py" line="607"/>
+        <location filename="../ui/object_panel.ui" line="32"/>
         <source>Copy</source>
         <translation>Copy</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="32"/>
         <source>Copy the coordinates (decimal and sexagesimal)</source>
-        <translation type="vanished">Copy the coordinates (decimal and sexagesimal)</translation>
+        <translation>Copy the coordinates (decimal and sexagesimal)</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="57"/>
         <source>In depth</source>
-        <translation type="vanished">In depth</translation>
+        <translation>In depth</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="70"/>
         <source>Parameter</source>
-        <translation type="vanished">Parameter</translation>
+        <translation>Parameter</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="71"/>
         <source>Value</source>
-        <translation type="vanished">Value</translation>
+        <translation>Value</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="72"/>
         <source>What it means</source>
-        <translation type="vanished">What it means</translation>
+        <translation>What it means</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="80"/>
         <source>Charts</source>
-        <translation type="vanished">Charts</translation>
+        <translation>Charts</translation>
     </message>
     <message>
         <location filename="../overview.py" line="720"/>
@@ -4504,52 +4671,66 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>PostTab</name>
     <message>
+        <location filename="../ui/post_tab.ui" line="10"/>
         <source>Object:</source>
-        <translation type="vanished">Object:</translation>
+        <translation>Object:</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="15"/>
         <source>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</source>
-        <translation type="vanished">2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</translation>
+        <translation>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="20"/>
         <source>Generate</source>
-        <translation type="vanished">Generate</translation>
+        <translation>Generate</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="21"/>
         <source>Enrich the object and build the drafts</source>
-        <translation type="vanished">Enrich the object and build the drafts</translation>
+        <translation>Enrich the object and build the drafts</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="30"/>
         <source>Save to:</source>
-        <translation type="vanished">Save to:</translation>
+        <translation>Save to:</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="35"/>
         <source>Folder for the drafts and charts</source>
-        <translation type="vanished">Folder for the drafts and charts</translation>
+        <translation>Folder for the drafts and charts</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="40"/>
         <source>Browse…</source>
-        <translation type="vanished">Browse…</translation>
+        <translation>Browse…</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="48"/>
         <source>ES</source>
-        <translation type="vanished">ES</translation>
+        <translation>ES</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="51"/>
+        <location filename="../ui/post_tab.ui" line="58"/>
+        <location filename="../ui/post_tab.ui" line="65"/>
         <source>Copy</source>
-        <translation type="vanished">Copy</translation>
+        <translation>Copy</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="55"/>
         <source>EN</source>
-        <translation type="vanished">EN</translation>
+        <translation>EN</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="62"/>
         <source>X</source>
-        <translation type="vanished">X</translation>
+        <translation>X</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="72"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
 </context>
 <context>
@@ -4562,20 +4743,24 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Project files</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="24"/>
         <source>Kind</source>
-        <translation type="vanished">Kind</translation>
+        <translation>Kind</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="25"/>
         <source>Name</source>
-        <translation type="vanished">Name</translation>
+        <translation>Name</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="26"/>
         <source>Date</source>
-        <translation type="vanished">Date</translation>
+        <translation>Date</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="27"/>
         <source>Size</source>
-        <translation type="vanished">Size</translation>
+        <translation>Size</translation>
     </message>
     <message>
         <location filename="../project_files_dialog.py" line="98"/>
@@ -4624,24 +4809,29 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>ProjectsTab</name>
     <message>
+        <location filename="../ui/projects_tab.ui" line="8"/>
         <source>Projects</source>
-        <translation type="vanished">Projects</translation>
+        <translation>Projects</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="24"/>
         <source>Active</source>
-        <translation type="vanished">Active</translation>
+        <translation>Active</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="25"/>
         <source>All</source>
-        <translation type="vanished">All</translation>
+        <translation>All</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="26"/>
         <source>Done</source>
-        <translation type="vanished">Done</translation>
+        <translation>Done</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="27"/>
         <source>Archived</source>
-        <translation type="vanished">Archived</translation>
+        <translation>Archived</translation>
     </message>
     <message>
         <source>Refresh</source>
@@ -4652,112 +4842,141 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Campaigns…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="17"/>
         <source>New project…</source>
-        <translation type="vanished">New project…</translation>
+        <translation>New project…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="57"/>
         <source>All types</source>
-        <translation type="vanished">All types</translation>
+        <translation>All types</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="58"/>
         <source>SN</source>
-        <translation type="vanished">SN</translation>
+        <translation>SN</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="59"/>
         <source>NEO</source>
-        <translation type="vanished">NEO</translation>
+        <translation>NEO</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="60"/>
         <source>Comet</source>
-        <translation type="vanished">Comet</translation>
+        <translation>Comet</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="61"/>
         <source>PCCP</source>
-        <translation type="vanished">PCCP</translation>
+        <translation>PCCP</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="62"/>
         <source>Transit</source>
-        <translation type="vanished">Transit</translation>
+        <translation>Transit</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="63"/>
         <source>HADS</source>
-        <translation type="vanished">HADS</translation>
+        <translation>HADS</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="64"/>
         <source>Variable</source>
-        <translation type="vanished">Variable</translation>
+        <translation>Variable</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="14"/>
         <source>Search…</source>
-        <translation type="vanished">Search…</translation>
+        <translation>Search…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="32"/>
         <source>Filters ▸</source>
-        <translation type="vanished">Filters ▸</translation>
+        <translation>Filters ▸</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="34"/>
         <source>Show or hide the advanced filters (type, tag, campaign, sort)</source>
-        <translation type="vanished">Show or hide the advanced filters (type, tag, campaign, sort)</translation>
+        <translation>Show or hide the advanced filters (type, tag, campaign, sort)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="69"/>
         <source>tag…</source>
-        <translation type="vanished">tag…</translation>
+        <translation>tag…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="75"/>
         <source>All campaigns</source>
-        <translation type="vanished">All campaigns</translation>
+        <translation>All campaigns</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="84"/>
         <source>Needs you</source>
-        <translation type="vanished">Needs you</translation>
+        <translation>Needs you</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="85"/>
         <source>Updated</source>
-        <translation type="vanished">Updated</translation>
+        <translation>Updated</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="86"/>
         <source>Created</source>
-        <translation type="vanished">Created</translation>
+        <translation>Created</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="87"/>
         <source>Name</source>
-        <translation type="vanished">Name</translation>
+        <translation>Name</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="92"/>
         <source>★ Favorites first</source>
-        <translation type="vanished">★ Favorites first</translation>
+        <translation>★ Favorites first</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="102"/>
         <source>Select a project to see its guided steps</source>
-        <translation type="vanished">Select a project to see its guided steps</translation>
+        <translation>Select a project to see its guided steps</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="184"/>
         <source>Files (0)</source>
-        <translation type="vanished">Your measurements so far</translation>
+        <translation>Your measurements so far</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="187"/>
         <source>Open the project files (FITS plates open in the editor)</source>
-        <translation type="vanished">Open the project files (FITS plates open in the editor)</translation>
+        <translation>Open the project files (FITS plates open in the editor)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="209"/>
+        <location filename="../ui/projects_tab.ui" line="220"/>
+        <location filename="../ui/projects_tab.ui" line="231"/>
         <source>→</source>
-        <translation type="vanished">→</translation>
+        <translation>→</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="288"/>
         <source>⋯</source>
-        <translation type="vanished">⋯</translation>
+        <translation>⋯</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="289"/>
         <source>Manage this project (tags, folder, close, archive, delete)</source>
-        <translation type="vanished">Manage this project (tags, folder, close, archive, delete)</translation>
+        <translation>Manage this project (tags, folder, close, archive, delete)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="317"/>
         <source>✔ Mark done</source>
-        <translation type="vanished">✔ Mark done</translation>
+        <translation>✔ Mark done</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="318"/>
         <source>Mark the current step as done</source>
-        <translation type="vanished">Mark the current step as done</translation>
+        <translation>Mark the current step as done</translation>
     </message>
     <message>
         <source>Skip</source>
@@ -4784,40 +5003,49 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Delete</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="110"/>
         <source>Project details</source>
-        <translation type="vanished">Project details</translation>
+        <translation>Project details</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="118"/>
         <source>Needs your attention</source>
-        <translation type="vanished">Needs your attention</translation>
+        <translation>Needs your attention</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="125"/>
         <source>Your projects calling for action, most urgent first.</source>
-        <translation type="vanished">Your projects calling for action, most urgent first.</translation>
+        <translation>Your projects calling for action, most urgent first.</translation>
     </message>
     <message>
         <source>Select a project or create one from Tonight.</source>
         <translation type="vanished">Select a project or create one from Tonight.</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="251"/>
+        <location filename="../ui/projects_tab.ui" line="305"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="274"/>
         <source>⌂</source>
-        <translation type="vanished">⌂</translation>
+        <translation>⌂</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="275"/>
         <source>Back to the dashboard</source>
-        <translation type="vanished">Back to the dashboard</translation>
+        <translation>Back to the dashboard</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="281"/>
         <source>☆</source>
-        <translation type="vanished">☆</translation>
+        <translation>☆</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="283"/>
         <source>Mark as favorite</source>
-        <translation type="vanished">Mark as favorite</translation>
+        <translation>Mark as favorite</translation>
     </message>
     <message>
         <source>Tags:</source>
@@ -4828,12 +5056,14 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">comma-separated tags…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="301"/>
         <source>Next</source>
-        <translation type="vanished">Next</translation>
+        <translation>Next</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="312"/>
         <source>Go →</source>
-        <translation type="vanished">Go →</translation>
+        <translation>Go →</translation>
     </message>
     <message>
         <source>Details</source>
@@ -4872,20 +5102,24 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Next →</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="39"/>
         <source>«</source>
-        <translation type="vanished">«</translation>
+        <translation>«</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="41"/>
         <source>Hide the project list (bring it back with » on the details side)</source>
-        <translation type="vanished">Hide the project list (bring it back with » on the details side)</translation>
+        <translation>Hide the project list (bring it back with » on the details side)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="266"/>
         <source>»</source>
-        <translation type="vanished">»</translation>
+        <translation>»</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="269"/>
         <source>Bring back the project list</source>
-        <translation type="vanished">Bring back the project list</translation>
+        <translation>Bring back the project list</translation>
     </message>
 </context>
 <context>
@@ -4985,480 +5219,602 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>SettingsDialog</name>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="14"/>
         <source>Settings</source>
-        <translation type="vanished">Settings</translation>
+        <translation>Settings</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="24"/>
         <source>Site &amp; equipment</source>
-        <translation type="vanished">Site &amp; equipment</translation>
+        <translation>Site &amp; equipment</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="28"/>
         <source>Language</source>
-        <translation type="vanished">Language</translation>
+        <translation>Language</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="32"/>
         <source>Interface language:</source>
-        <translation type="vanished">Interface language:</translation>
+        <translation>Interface language:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="43"/>
         <source>Observatory</source>
-        <translation type="vanished">Observatory</translation>
+        <translation>Observatory</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="47"/>
         <source>MPC code:</source>
-        <translation type="vanished">MPC code:</translation>
+        <translation>MPC code:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="49"/>
         <source>Resolve coordinates</source>
-        <translation type="vanished">Resolve coordinates</translation>
+        <translation>Resolve coordinates</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="56"/>
         <source>Name:</source>
-        <translation type="vanished">Name:</translation>
+        <translation>Name:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="64"/>
         <source>Latitude (°):</source>
-        <translation type="vanished">Latitude (°):</translation>
+        <translation>Latitude (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="72"/>
         <source>Longitude (°, east):</source>
-        <translation type="vanished">Longitude (°, east):</translation>
+        <translation>Longitude (°, east):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="80"/>
         <source>Height (m):</source>
-        <translation type="vanished">Height (m):</translation>
+        <translation>Height (m):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="88"/>
         <source>AAVSO code:</source>
-        <translation type="vanished">AAVSO code:</translation>
+        <translation>AAVSO code:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="99"/>
         <source>Equipment and limits</source>
-        <translation type="vanished">Equipment and limits</translation>
+        <translation>Equipment and limits</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="103"/>
         <source>Aperture (inches):</source>
-        <translation type="vanished">Aperture (inches):</translation>
+        <translation>Aperture (inches):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="111"/>
         <source>Limiting magnitude:</source>
-        <translation type="vanished">Limiting magnitude:</translation>
+        <translation>Limiting magnitude:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="142"/>
         <source>Camera type:</source>
-        <translation type="vanished">Camera type:</translation>
+        <translation>Camera type:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="150"/>
         <source>Pixel binning:</source>
-        <translation type="vanished">Pixel binning:</translation>
+        <translation>Pixel binning:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="225"/>
         <source>Observing</source>
-        <translation type="vanished">Observing</translation>
+        <translation>Observing</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="229"/>
         <source>Local limit</source>
-        <translation type="vanished">Local limit</translation>
+        <translation>Local limit</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="233"/>
         <source>Limit file:</source>
-        <translation type="vanished">Limit file:</translation>
+        <translation>Limit file:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="250"/>
         <source>Minimum altitude (°):</source>
-        <translation type="vanished">Minimum altitude (°):</translation>
+        <translation>Minimum altitude (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="262"/>
         <source>Tonight: object kinds</source>
-        <translation type="vanished">Tonight: object kinds</translation>
+        <translation>Tonight: object kinds</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="37"/>
         <source>Interface language; applies when the app restarts</source>
-        <translation type="vanished">Interface language; applies when the app restarts</translation>
+        <translation>Interface language; applies when the app restarts</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="53"/>
         <source>Your MPC observatory code; the site coordinates resolve automatically from it</source>
-        <translation type="vanished">Your MPC observatory code; the site coordinates resolve automatically from it</translation>
+        <translation>Your MPC observatory code; the site coordinates resolve automatically from it</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="61"/>
         <source>Free-text observatory name (posts, reports)</source>
-        <translation type="vanished">Free-text observatory name (posts, reports)</translation>
+        <translation>Free-text observatory name (posts, reports)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="69"/>
         <source>Decimal degrees; north is positive. Your site latitude.</source>
-        <translation type="vanished">Decimal degrees; north is positive. Your site latitude.</translation>
+        <translation>Decimal degrees; north is positive. Your site latitude.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="77"/>
         <source>Decimal degrees; east is positive. Your site longitude.</source>
-        <translation type="vanished">Decimal degrees; east is positive. Your site longitude.</translation>
+        <translation>Decimal degrees; east is positive. Your site longitude.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="85"/>
         <source>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</source>
-        <translation type="vanished">Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</translation>
+        <translation>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="93"/>
         <source>Optional; written into the EXOTIC inits.json handoff (transit projects)</source>
-        <translation type="vanished">Optional; written into the EXOTIC inits.json handoff (transit projects)</translation>
+        <translation>Optional; written into the EXOTIC inits.json handoff (transit projects)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="503"/>
         <source>AAVSO API token:</source>
-        <translation type="vanished">AAVSO API token:</translation>
+        <translation>AAVSO API token:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="507"/>
         <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</source>
-        <translation type="vanished">Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</translation>
+        <translation>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="108"/>
         <source>Scope aperture in inches; used to size transit targets and scale the “why tonight” reasons</source>
-        <translation type="vanished">Scope aperture in inches; used to size transit targets and scale the “why tonight” reasons</translation>
+        <translation>Scope aperture in inches; used to size transit targets and scale the “why tonight” reasons</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="116"/>
         <source>Faintest object you can realistically detect at your site; caps the Tonight scoring</source>
-        <translation type="vanished">Faintest object you can realistically detect at your site; caps the Tonight scoring</translation>
+        <translation>Faintest object you can realistically detect at your site; caps the Tonight scoring</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="131"/>
         <source>Camera pixel size in microns (3.76 for a QHY600); sets arcsec/pixel with focal length</source>
-        <translation type="vanished">Camera pixel size in microns (3.76 for a QHY600); sets arcsec/pixel with focal length</translation>
+        <translation>Camera pixel size in microns (3.76 for a QHY600); sets arcsec/pixel with focal length</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="139"/>
         <source>Telescope focal length in mm; together with the pixel size it sets the arcsec/pixel scale</source>
-        <translation type="vanished">Telescope focal length in mm; together with the pixel size it sets the arcsec/pixel scale</translation>
+        <translation>Telescope focal length in mm; together with the pixel size it sets the arcsec/pixel scale</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="147"/>
         <source>CCD, CMOS or DSLR; written into the EXOTIC inits.json handoff</source>
-        <translation type="vanished">CCD, CMOS or DSLR; written into the EXOTIC inits.json handoff</translation>
+        <translation>CCD, CMOS or DSLR; written into the EXOTIC inits.json handoff</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="155"/>
         <source>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</source>
-        <translation type="vanished">On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</translation>
+        <translation>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="239"/>
         <source>TheSkyX .hrz or “az alt” pairs; when it loads, the file is the safety reference</source>
-        <translation type="vanished">TheSkyX .hrz or “az alt” pairs; when it loads, the file is the safety reference</translation>
+        <translation>TheSkyX .hrz or “az alt” pairs; when it loads, the file is the safety reference</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="247"/>
         <source>Extra degrees of clearance added on top of the limit, for the Sun and for slew safety</source>
-        <translation type="vanished">Extra degrees of clearance added on top of the limit, for the Sun and for slew safety</translation>
+        <translation>Extra degrees of clearance added on top of the limit, for the Sun and for slew safety</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="255"/>
         <source>Flat altitude floor, used only when no limit file is loaded</source>
-        <translation type="vanished">Flat altitude floor, used only when no limit file is loaded</translation>
+        <translation>Flat altitude floor, used only when no limit file is loaded</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="267"/>
         <source>NEOs</source>
-        <translation type="vanished">NEOs</translation>
+        <translation>NEOs</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="268"/>
         <source>Supernovae</source>
-        <translation type="vanished">Supernovae</translation>
+        <translation>Supernovae</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="269"/>
         <source>Comets</source>
-        <translation type="vanished">Comets</translation>
+        <translation>Comets</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="270"/>
         <source>PCCP candidates</source>
-        <translation type="vanished">PCCP candidates</translation>
+        <translation>PCCP candidates</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="271"/>
+        <location filename="../ui/settings_dialog.ui" line="297"/>
         <source>Exoplanet transits</source>
-        <translation type="vanished">Exoplanet transits</translation>
+        <translation>Exoplanet transits</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="272"/>
         <source>Close approaches (alerts)</source>
-        <translation type="vanished">Close approaches (alerts)</translation>
+        <translation>Close approaches (alerts)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="273"/>
         <source>HADS variable stars</source>
-        <translation type="vanished">HADS variable stars</translation>
+        <translation>HADS variable stars</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="274"/>
         <source>Variable stars</source>
-        <translation type="vanished">Variable stars</translation>
+        <translation>Variable stars</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="279"/>
         <source>Which kinds are scored and shown for Tonight and Explore; untick a kind to hide it everywhere</source>
-        <translation type="vanished">Which kinds are scored and shown for Tonight and Explore; untick a kind to hide it everywhere</translation>
+        <translation>Which kinds are scored and shown for Tonight and Explore; untick a kind to hide it everywhere</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="286"/>
         <source>Shown per kind (Tonight):</source>
-        <translation type="vanished">Shown per kind (Tonight):</translation>
+        <translation>Shown per kind (Tonight):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="291"/>
         <source>How many entries of each kind the Tonight grid lists (more in Explore)</source>
-        <translation type="vanished">How many entries of each kind the Tonight grid lists (more in Explore)</translation>
+        <translation>How many entries of each kind the Tonight grid lists (more in Explore)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="307"/>
         <source>ExoClock drops transits too big for your scope when checked</source>
-        <translation type="vanished">ExoClock drops transits too big for your scope when checked</translation>
+        <translation>ExoClock drops transits too big for your scope when checked</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="317"/>
         <source>Projects folder</source>
-        <translation type="vanished">Projects folder</translation>
+        <translation>Projects folder</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="321"/>
         <source>Projects folder:</source>
-        <translation type="vanished">Projects folder:</translation>
+        <translation>Projects folder:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="324"/>
         <source>Reset</source>
-        <translation type="vanished">Reset</translation>
+        <translation>Reset</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="328"/>
         <source>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs</source>
-        <translation type="vanished">Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs.</translation>
+        <translation>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="379"/>
         <source>Readout/slew seconds added to every exposure when sizing the transit capture sequence</source>
-        <translation type="vanished">Readout/slew seconds added to every exposure when sizing the transit capture sequence</translation>
+        <translation>Readout/slew seconds added to every exposure when sizing the transit capture sequence</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="387"/>
         <source>Nights without a visit after which an active supernova project asks to be revisited</source>
-        <translation type="vanished">Nights without a visit after which an active supernova project asks to be revisited</translation>
+        <translation>Nights without a visit after which an active supernova project asks to be revisited</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="301"/>
         <source>Hide transits that need a bigger telescope than mine</source>
-        <translation type="vanished">Hide transits that need a bigger telescope than mine</translation>
+        <translation>Hide transits that need a bigger telescope than mine</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="382"/>
         <source>SN revisit reminder (days):</source>
-        <translation type="vanished">SN revisit reminder (days):</translation>
+        <translation>SN revisit reminder (days):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="436"/>
         <source>CCDciel (JSON-RPC connection)</source>
-        <translation type="vanished">CCDciel (JSON-RPC connection)</translation>
+        <translation>CCDciel (JSON-RPC connection)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="487"/>
         <source>TNS bot name:</source>
-        <translation type="vanished">TNS bot name:</translation>
+        <translation>TNS bot name:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="492"/>
+        <location filename="../ui/settings_dialog.ui" line="500"/>
         <source>Optional: TNS bot credentials to fetch discovery images for transients</source>
-        <translation type="vanished">Optional: TNS bot credentials to fetch discovery images for transients</translation>
+        <translation>Optional: TNS bot credentials to fetch discovery images for transients</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="495"/>
         <source>TNS bot key:</source>
-        <translation type="vanished">TNS bot key:</translation>
+        <translation>TNS bot key:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="440"/>
         <source>Host:</source>
-        <translation type="vanished">Host:</translation>
+        <translation>Host:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="448"/>
         <source>Port:</source>
-        <translation type="vanished">Port:</translation>
+        <translation>Port:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="456"/>
         <source>Auto-connect on start:</source>
-        <translation type="vanished">Auto-connect on start:</translation>
+        <translation>Auto-connect on start:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="122"/>
         <source>Camera (plate scale)</source>
-        <translation type="vanished">Camera (plate scale)</translation>
+        <translation>Camera (plate scale)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="126"/>
         <source>Pixel size (µm):</source>
-        <translation type="vanished">Pixel size (µm):</translation>
+        <translation>Pixel size (µm):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="134"/>
         <source>Focal length (mm):</source>
-        <translation type="vanished">Focal length (mm):</translation>
+        <translation>Focal length (mm):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="161"/>
         <source>Chart annotations</source>
-        <translation type="vanished">Chart annotations</translation>
+        <translation>Chart annotations</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="165"/>
         <source>Observer:</source>
-        <translation type="vanished">Observer:</translation>
+        <translation>Observer:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="170"/>
         <source>Your name as it should read in the chart boxes (Obs); may stay empty</source>
-        <translation type="vanished">Your name as it should read in the chart boxes (Obs); may stay empty</translation>
+        <translation>Your name as it should read in the chart boxes (Obs); may stay empty</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="173"/>
         <source>Measurer:</source>
-        <translation type="vanished">Measurer:</translation>
+        <translation>Measurer:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="178"/>
         <source>Who measured the plate (Msr); empty means the observer</source>
-        <translation type="vanished">Who measured the plate (Msr); empty means the observer</translation>
+        <translation>Who measured the plate (Msr); empty means the observer</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="181"/>
         <source>Telescope:</source>
-        <translation type="vanished">Telescope:</translation>
+        <translation>Telescope:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="182"/>
         <source>0.43-m f/4.9 reflector</source>
-        <translation type="vanished">0.43-m f/4.9 reflector</translation>
+        <translation>0.43-m f/4.9 reflector</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="186"/>
         <source>Free-text telescope line for the chart boxes (Tel)</source>
-        <translation type="vanished">Free-text telescope line for the chart boxes (Tel)</translation>
+        <translation>Free-text telescope line for the chart boxes (Tel)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="189"/>
         <source>Camera model:</source>
-        <translation type="vanished">Camera model:</translation>
+        <translation>Camera model:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="194"/>
         <source>Free-text camera line for the chart boxes (Cam)</source>
-        <translation type="vanished">Free-text camera line for the chart boxes (Cam)</translation>
+        <translation>Free-text camera line for the chart boxes (Cam)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="197"/>
         <source>Object marker:</source>
-        <translation type="vanished">Object marker:</translation>
+        <translation>Object marker:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="202"/>
         <source>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</source>
-        <translation type="vanished">How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</translation>
+        <translation>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="205"/>
         <source>Corner boxes:</source>
-        <translation type="vanished">Corner boxes:</translation>
+        <translation>Corner boxes:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="206"/>
         <source>Stamp the metadata boxes on the charts</source>
-        <translation type="vanished">Stamp the metadata boxes on the charts</translation>
+        <translation>Stamp the metadata boxes on the charts</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="210"/>
         <source>Corner boxes with the object, date, position, brightness, observer, equipment and plate scale; on screen and in the exported PNG/GIF/video</source>
-        <translation type="vanished">Corner boxes with the object, date, position, brightness, observer, equipment and plate scale; on screen and in the exported PNG/GIF/video</translation>
+        <translation>Corner boxes with the object, date, position, brightness, observer, equipment and plate scale; on screen and in the exported PNG/GIF/video</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="235"/>
+        <location filename="../ui/settings_dialog.ui" line="323"/>
         <source>Browse…</source>
-        <translation type="vanished">Browse…</translation>
+        <translation>Browse…</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="242"/>
         <source>Safety margin (°):</source>
-        <translation type="vanished">Safety margin (°):</translation>
+        <translation>Safety margin (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="334"/>
         <source>Moon constraint</source>
-        <translation type="vanished">Moon constraint</translation>
+        <translation>Moon constraint</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="338"/>
         <source>Warn when Moon interferes</source>
-        <translation type="vanished">Warn when Moon interferes</translation>
+        <translation>Warn when Moon interferes</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="343"/>
         <source>Flags targets that sit too close to a bright, high Moon</source>
-        <translation type="vanished">Flags targets that sit too close to a bright, high Moon</translation>
+        <translation>Flags targets that sit too close to a bright, high Moon</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="350"/>
         <source>Min separation (°):</source>
-        <translation type="vanished">Min separation (°):</translation>
+        <translation>Min separation (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="355"/>
         <source>Target-to-Moon angular distance below which the warning fires (degrees)</source>
-        <translation type="vanished">Target-to-Moon angular distance below which the warning fires (degrees)</translation>
+        <translation>Target-to-Moon angular distance below which the warning fires (degrees)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="358"/>
         <source>Max illumination:</source>
-        <translation type="vanished">Max illumination:</translation>
+        <translation>Max illumination:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="363"/>
         <source>Fraction of the lunar disk lit above which the warning starts (0.5 = half Moon)</source>
-        <translation type="vanished">Fraction of the lunar disk lit above which the warning starts (0.5 = half Moon)</translation>
+        <translation>Fraction of the lunar disk lit above which the warning starts (0.5 = half Moon)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="364"/>
         <source>Also list Jupiter&apos;s moon transits when Jupiter is not up (dimmed)</source>
-        <translation type="vanished">Also list Jupiter&apos;s moon transits when Jupiter is not up (dimmed)</translation>
+        <translation>Also list Jupiter&apos;s moon transits when Jupiter is not up (dimmed)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="370"/>
         <source>Session defaults</source>
-        <translation type="vanished">Session defaults</translation>
+        <translation>Session defaults</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="374"/>
         <source>Per-frame overhead (s):</source>
-        <translation type="vanished">Per-frame overhead (s):</translation>
+        <translation>Per-frame overhead (s):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="390"/>
         <source>Event threshold (mag):</source>
-        <translation type="vanished">Event threshold (mag):</translation>
+        <translation>Event threshold (mag):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="395"/>
         <source>Brightness jump (in magnitudes) from which a variable/SN project raises the event advisor</source>
-        <translation type="vanished">Brightness jump (in magnitudes) from which a variable/SN project raises the event advisor</translation>
+        <translation>Brightness jump (in magnitudes) from which a variable/SN project raises the event advisor</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="398"/>
         <source>Extremum window (days):</source>
-        <translation type="vanished">Extremum window (days):</translation>
+        <translation>Extremum window (days):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="403"/>
         <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</source>
-        <translation type="vanished">A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</translation>
+        <translation>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="406"/>
         <source>Variable vigils:</source>
-        <translation type="vanished">Variable vigils:</translation>
+        <translation>Variable vigils:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="410"/>
         <source>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</source>
-        <translation type="vanished">Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</translation>
+        <translation>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="413"/>
         <source>AAVSO channel in Tonight</source>
-        <translation type="vanished">AAVSO channel in Tonight</translation>
+        <translation>AAVSO channel in Tonight</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="417"/>
         <source>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</source>
-        <translation type="vanished">Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</translation>
+        <translation>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="432"/>
         <source>Integrations</source>
-        <translation type="vanished">Integrations</translation>
+        <translation>Integrations</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="445"/>
         <source>Where CCDciel is running; localhost by default. Control only works while CCDciel is open.</source>
-        <translation type="vanished">Where CCDciel is running; localhost by default. Control only works while CCDciel is open.</translation>
+        <translation>Where CCDciel is running; localhost by default. Control only works while CCDciel is open.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="453"/>
         <source>Junction point on the CCDciel machine. The default (3277) matches the JSON-RPC server.</source>
-        <translation type="vanished">Junction point on the CCDciel machine. The default (3277) matches the JSON-RPC server.</translation>
+        <translation>Junction point on the CCDciel machine. The default (3277) matches the JSON-RPC server.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="461"/>
         <source>Connect to CCDciel as soon as the app starts (off by default)</source>
-        <translation type="vanished">Connect to CCDciel as soon as the app starts (off by default)</translation>
+        <translation>Connect to CCDciel as soon as the app starts (off by default)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="467"/>
         <source>API keys (all optional)</source>
-        <translation type="vanished">API keys (all optional)</translation>
+        <translation>API keys (all optional)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="471"/>
         <source>NEOfixer API key:</source>
-        <translation type="vanished">NEOfixer API key:</translation>
+        <translation>NEOfixer API key:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="476"/>
         <source>Optional: report your observing status to NEOfixer</source>
-        <translation type="vanished">Optional: report your observing status to NEOfixer</translation>
+        <translation>Optional: report your observing status to NEOfixer</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="479"/>
         <source>Astrometry.net API key:</source>
-        <translation type="vanished">Astrometry.net API key:</translation>
+        <translation>Astrometry.net API key:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="484"/>
         <source>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</source>
-        <translation type="vanished">Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</translation>
+        <translation>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="522"/>
         <source>Development</source>
-        <translation type="vanished">Development</translation>
+        <translation>Development</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="526"/>
         <source>FITS editor</source>
-        <translation type="vanished">FITS editor</translation>
+        <translation>FITS editor</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="530"/>
         <source>Unified editor (UFE) by default:</source>
-        <translation type="vanished">Unified editor (UFE) by default:</translation>
+        <translation>Unified editor (UFE) by default:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="532"/>
         <source>Icons-only top bar:</source>
-        <translation type="vanished">Icons-only top bar:</translation>
+        <translation>Icons-only top bar:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="537"/>
         <source>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor&apos;s action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them.</source>
-        <translation type="vanished">On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor&apos;s action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them.</translation>
+        <translation>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor&apos;s action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them.</translation>
     </message>
     <message>
         <source>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor&apos;s action buttons show compact glyphs instead of their labels (Solve and Move marker keep their text); off restores them.</source>
@@ -5476,132 +5832,163 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>SkyCalendarContent</name>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="150"/>
         <source>Refresh the Sun</source>
-        <translation type="vanished">Refresh the Sun</translation>
+        <translation>Refresh the Sun</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="155"/>
         <source>Channel:</source>
-        <translation type="vanished">Channel:</translation>
+        <translation>Channel:</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="162"/>
         <source>Corona 193 Å</source>
-        <translation type="vanished">Corona 193 Å</translation>
+        <translation>Corona 193 Å</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="165"/>
         <source>Chromosphere 304 Å</source>
-        <translation type="vanished">Chromosphere 304 Å</translation>
+        <translation>Chromosphere 304 Å</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="168"/>
         <source>Corona 171 Å</source>
-        <translation type="vanished">Corona 171 Å</translation>
+        <translation>Corona 171 Å</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="171"/>
         <source>Sunspots (visible)</source>
-        <translation type="vanished">Sunspots (visible)</translation>
+        <translation>Sunspots (visible)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="174"/>
         <source>Magnetogram</source>
-        <translation type="vanished">Magnetogram</translation>
+        <translation>Magnetogram</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="185"/>
         <source>Render PNG for socials</source>
-        <translation type="vanished">Render PNG for socials</translation>
+        <translation>Render PNG for socials</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="186"/>
         <source>Write today&apos;s Sun panel (with the observatory watermark) for your networks</source>
-        <translation type="vanished">Write today&apos;s Sun panel (with the observatory watermark) for your networks</translation>
+        <translation>Write today&apos;s Sun panel (with the observatory watermark) for your networks</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="61"/>
         <source>Coming up in the next 60 days</source>
-        <translation type="vanished">Coming up in the next 60 days</translation>
+        <translation>Coming up in the next 60 days</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="65"/>
         <source>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</source>
-        <translation type="vanished">Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</translation>
+        <translation>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="26"/>
         <source>Moon calendar</source>
-        <translation type="vanished">Moon calendar</translation>
+        <translation>Moon calendar</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="22"/>
         <source>Moon</source>
-        <translation type="vanished">Moon</translation>
+        <translation>Moon</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="40"/>
         <source>Moon: —</source>
-        <translation type="vanished">Moon: —</translation>
+        <translation>Moon: —</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="53"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="75"/>
         <source>Planets</source>
-        <translation type="vanished">Planets</translation>
+        <translation>Planets</translation>
     </message>
     <message>
         <source>Planets: —</source>
         <translation type="vanished">Planets: —</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="79"/>
         <source>Planets tonight</source>
-        <translation type="vanished">Planets tonight</translation>
+        <translation>Planets tonight</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="83"/>
         <source>Rise, set and best moment for each planet tonight (UTC times; your local time in the tooltip)</source>
-        <translation type="vanished">Rise, set and best moment for each planet tonight (UTC times; your local time in the tooltip)</translation>
+        <translation>Rise, set and best moment for each planet tonight (UTC times; your local time in the tooltip)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="91"/>
         <source>Jupiter&apos;s moons this week</source>
-        <translation type="vanished">Jupiter&apos;s moons this week</translation>
+        <translation>Jupiter&apos;s moons this week</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="95"/>
         <source>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</source>
-        <translation type="vanished">Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</translation>
+        <translation>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="102"/>
         <source>Local computation, planning grade: times to ±10 min. Saturn&apos;s moon transits (Titan) are out of season until ~2040.</source>
-        <translation type="vanished">Local computation, planning grade: times to ±10 min. Saturn&apos;s moon transits (Titan) are out of season until ~2040.</translation>
+        <translation>Local computation, planning grade: times to ±10 min. Saturn&apos;s moon transits (Titan) are out of season until ~2040.</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="112"/>
         <source>Sun</source>
-        <translation type="vanished">Sun</translation>
+        <translation>Sun</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="116"/>
         <source>The Sun now</source>
-        <translation type="vanished">The Sun now</translation>
+        <translation>The Sun now</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="125"/>
         <source>Press Refresh to load today&apos;s Sun (NASA SDO)</source>
-        <translation type="vanished">Press Refresh to load today&apos;s Sun (NASA SDO)</translation>
+        <translation>Press Refresh to load today&apos;s Sun (NASA SDO)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="134"/>
         <source>Active regions map (NOAA)</source>
-        <translation type="vanished">Active regions map (NOAA)</translation>
+        <translation>Active regions map (NOAA)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="202"/>
         <source>Sky post draft…</source>
-        <translation type="vanished">Sky post draft…</translation>
+        <translation>Sky post draft…</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="203"/>
         <source>Draft the bilingual &quot;sky today&quot; post (Sun + Moon + planets)</source>
-        <translation type="vanished">Draft the bilingual &quot;sky today&quot; post (Sun + Moon + planets)</translation>
+        <translation>Draft the bilingual &quot;sky today&quot; post (Sun + Moon + planets)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="208"/>
         <source>More:</source>
-        <translation type="vanished">More:</translation>
+        <translation>More:</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="213"/>
         <source>Raben maps</source>
-        <translation type="vanished">Raben maps</translation>
+        <translation>Raben maps</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="218"/>
         <source>SolarMonitor</source>
-        <translation type="vanished">SolarMonitor</translation>
+        <translation>SolarMonitor</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="223"/>
         <source>SIDC</source>
-        <translation type="vanished">SIDC</translation>
+        <translation>SIDC</translation>
     </message>
 </context>
 <context>
@@ -5804,67 +6191,56 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../widgets/sky_widget.py" line="325"/>
         <source>No astronomical night</source>
-        
         <translation>No astronomical night</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="399"/>
         <source>start by {t}</source>
-        
         <translation>start by {t}</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="414"/>
         <source>best time {t}</source>
-        
         <translation>best time {t}</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="452"/>
         <source>Altitude (°)</source>
-        
         <translation>Altitude (°)</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="460"/>
         <source>UTC (h from dusk)</source>
-        
         <translation>UTC (h from dusk)</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="585"/>
         <source>transit</source>
-        
         <translation>transit</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="598"/>
         <source>Object</source>
-        
         <translation>Object</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="600"/>
         <source>Moon</source>
-        
         <translation>Moon</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="601"/>
         <source>Limit</source>
-        
         <translation>Limit</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="676"/>
         <source> · start by {t}</source>
-        
         <translation> · start by {t}</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="678"/>
         <source>from {a} to {b}</source>
-        
         <translation>from {a} to {b}</translation>
     </message>
 </context>
@@ -5876,12 +6252,14 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Sky post draft</translation>
     </message>
     <message>
+        <location filename="../ui/skypost_dialog.ui" line="12"/>
         <source>Spanish draft</source>
-        <translation type="vanished">Spanish draft</translation>
+        <translation>Spanish draft</translation>
     </message>
     <message>
+        <location filename="../ui/skypost_dialog.ui" line="20"/>
         <source>English draft</source>
-        <translation type="vanished">English draft</translation>
+        <translation>English draft</translation>
     </message>
     <message>
         <location filename="../skypost_dialog.py" line="39"/>
@@ -6115,52 +6493,64 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>TonightTab</name>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="10"/>
         <source>Night: —</source>
-        <translation type="vanished">Night: —</translation>
+        <translation>Night: —</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="26"/>
         <source>Restrict the suggestions and the full list to one object kind</source>
-        <translation type="vanished">Restrict the suggestions and the full list to one object kind</translation>
+        <translation>Restrict the suggestions and the full list to one object kind</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="39"/>
         <source>↻</source>
-        <translation type="vanished">↻</translation>
+        <translation>↻</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="40"/>
         <source>Recompute tonight&apos;s targets</source>
-        <translation type="vanished">Recompute tonight&apos;s targets</translation>
+        <translation>Recompute tonight&apos;s targets</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="50"/>
         <source>Tonight&apos;s best targets</source>
-        <translation type="vanished">Tonight&apos;s best targets</translation>
+        <translation>Tonight&apos;s best targets</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="63"/>
         <source>▾ Show all targets</source>
-        <translation type="vanished">▾ Show all targets</translation>
+        <translation>▾ Show all targets</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="65"/>
         <source>Expand the full sortable table</source>
-        <translation type="vanished">Expand the full sortable table</translation>
+        <translation>Expand the full sortable table</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="72"/>
         <source>Full target list</source>
-        <translation type="vanished">Full target list</translation>
+        <translation>Full target list</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="76"/>
         <source>Show covered</source>
-        <translation type="vanished">Show covered</translation>
+        <translation>Show covered</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="76"/>
         <source>Include objects already covered (a project closed or a post written)</source>
-        <translation type="vanished">Include objects already covered (a project closed or a post written)</translation>
+        <translation>Include objects already covered (a project closed or a post written)</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="83"/>
         <source>Double-click a row to explore the object</source>
-        <translation type="vanished">Double-click a row to explore the object</translation>
+        <translation>Double-click a row to explore the object</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="21"/>
         <source>Filter:</source>
-        <translation type="vanished">Filter:</translation>
+        <translation>Filter:</translation>
     </message>
     <message>
         <source>Show observed</source>
@@ -6224,8 +6614,9 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Advanced</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="15"/>
         <source>Sky:</source>
-        <translation type="vanished">Sky:</translation>
+        <translation>Sky:</translation>
     </message>
     <message>
         <location filename="../ufe_advanced_dialog.py" line="45"/>
@@ -6238,99 +6629,122 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Plane (galactic cores)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="16"/>
         <source>How the annulus estimates the background: a flat median, or a tilted plane when the host galaxy tilts it</source>
-        <translation type="vanished">How the annulus estimates the background: a flat median, or a tilted plane when the host galaxy tilts it</translation>
+        <translation>How the annulus estimates the background: a flat median, or a tilted plane when the host galaxy tilts it</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="19"/>
         <source>Sigma-clip the sky</source>
-        <translation type="vanished">Sigma-clip the sky</translation>
+        <translation>Sigma-clip the sky</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="19"/>
         <source>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</source>
-        <translation type="vanished">Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</translation>
+        <translation>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="20"/>
         <source>Aperture follows the seeing</source>
-        <translation type="vanished">Aperture follows the seeing</translation>
+        <translation>Aperture follows the seeing</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="20"/>
         <source>Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</source>
-        <translation type="vanished">Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</translation>
+        <translation>Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="23"/>
         <source>Colour term</source>
-        <translation type="vanished">Colour term</translation>
+        <translation>Colour term</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="23"/>
         <source>Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</source>
-        <translation type="vanished">Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</translation>
+        <translation>Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="24"/>
         <source>B−V target:</source>
-        <translation type="vanished">B−V target:</translation>
+        <translation>B−V target:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="25"/>
         <source>The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</source>
-        <translation type="vanished">The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</translation>
+        <translation>The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="28"/>
         <source>Subtract host galaxy (PS1 reference)</source>
-        <translation type="vanished">Subtract host galaxy (PS1 reference)</translation>
+        <translation>Subtract host galaxy (PS1 reference)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="28"/>
         <source>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</source>
-        <translation type="vanished">Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</translation>
+        <translation>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</translation>
     </message>
 </context>
 <context>
     <name>UfeAnnotateTab</name>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="15"/>
         <source>Label:</source>
-        <translation type="vanished">Label:</translation>
+        <translation>Label:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="16"/>
         <source>Annotation label</source>
-        <translation type="vanished">Annotation label</translation>
+        <translation>Annotation label</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="22"/>
         <source>Notes:</source>
-        <translation type="vanished">Notes:</translation>
+        <translation>Notes:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="29"/>
         <source>Marker size:</source>
-        <translation type="vanished">Marker size:</translation>
+        <translation>Marker size:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="38"/>
         <source>Nudge</source>
-        <translation type="vanished">Nudge</translation>
+        <translation>Nudge</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="38"/>
         <source>Shift the marker by that many pixels (or click the image)</source>
-        <translation type="vanished">Shift the marker by that many pixels (or click the image)</translation>
+        <translation>Shift the marker by that many pixels (or click the image)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
         <source>Show the annotation marker</source>
-        <translation type="vanished">Show the annotation marker</translation>
+        <translation>Show the annotation marker</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
         <source>Show the annotation marker on the plate (screen only; the annotation is still saved)</source>
-        <translation type="vanished">Show the annotation marker on the plate (screen only; the annotation is still saved)</translation>
+        <translation>Show the annotation marker on the plate (screen only; the annotation is still saved)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="43"/>
         <source>Also annotate (visits):</source>
-        <translation type="vanished">Also annotate (visits):</translation>
+        <translation>Also annotate (visits):</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="47"/>
         <source>Add…</source>
-        <translation type="vanished">Add…</translation>
+        <translation>Add…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="48"/>
         <source>Remove</source>
-        <translation type="vanished">Remove</translation>
+        <translation>Remove</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="51"/>
         <source>Save annotated copy…</source>
-        <translation type="vanished">Save annotated copy…</translation>
+        <translation>Save annotated copy…</translation>
     </message>
     <message>
         <location filename="../ufe_annotate_tab.py" line="240"/>
@@ -6373,52 +6787,64 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeBlinkTab</name>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="15"/>
         <source>SN:</source>
-        <translation type="vanished">SN:</translation>
+        <translation>SN:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="21"/>
         <source>Manual coordinates</source>
-        <translation type="vanished">Manual coordinates</translation>
+        <translation>Manual coordinates</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="26"/>
         <source>RA deg</source>
-        <translation type="vanished">RA deg</translation>
+        <translation>RA deg</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="27"/>
         <source>Dec deg</source>
-        <translation type="vanished">Dec deg</translation>
+        <translation>Dec deg</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="30"/>
         <source>Prepare pair</source>
-        <translation type="vanished">Prepare pair</translation>
+        <translation>Prepare pair</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="34"/>
         <source>Live blink</source>
-        <translation type="vanished">Live blink</translation>
+        <translation>Live blink</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="35"/>
         <source>Interval:</source>
-        <translation type="vanished">Interval:</translation>
+        <translation>Interval:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="41"/>
         <source>Blink</source>
-        <translation type="vanished">Blink</translation>
+        <translation>Blink</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="42"/>
         <source>Fade</source>
-        <translation type="vanished">Fade</translation>
+        <translation>Fade</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="49"/>
         <source>Balance:</source>
-        <translation type="vanished">Balance:</translation>
+        <translation>Balance:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="50"/>
         <source>Multiplies the reference so its sky background matches the plate&apos;s (a blink that does not pump)</source>
-        <translation type="vanished">Multiplies the reference so its sky background matches the plate&apos;s (a blink that does not pump)</translation>
+        <translation>Multiplies the reference so its sky background matches the plate&apos;s (a blink that does not pump)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="51"/>
         <source>Auto</source>
-        <translation type="vanished">Auto</translation>
+        <translation>Auto</translation>
     </message>
     <message>
         <source>Nudge ref:</source>
@@ -6429,52 +6855,64 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Nudge</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="56"/>
         <source>Fine alignment:</source>
-        <translation type="vanished">Fine alignment:</translation>
+        <translation>Fine alignment:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="60"/>
         <source>↑</source>
-        <translation type="vanished">↑</translation>
+        <translation>↑</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="61"/>
         <source>←</source>
-        <translation type="vanished">←</translation>
+        <translation>←</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="63"/>
         <source>→</source>
-        <translation type="vanished">→</translation>
+        <translation>→</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="64"/>
         <source>↓</source>
-        <translation type="vanished">↓</translation>
+        <translation>↓</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="73"/>
         <source>Show the supernova marker</source>
-        <translation type="vanished">Show the supernova marker</translation>
+        <translation>Show the supernova marker</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="73"/>
         <source>Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</source>
-        <translation type="vanished">Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</translation>
+        <translation>Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="74"/>
         <source>Size:</source>
-        <translation type="vanished">Size:</translation>
+        <translation>Size:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="80"/>
         <source>Export zoom:</source>
-        <translation type="vanished">Export zoom:</translation>
+        <translation>Export zoom:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="86"/>
         <source>GIF…</source>
-        <translation type="vanished">GIF…</translation>
+        <translation>GIF…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="87"/>
         <source>MP4…</source>
-        <translation type="vanished">MP4…</translation>
+        <translation>MP4…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="88"/>
         <source>PNG…</source>
-        <translation type="vanished">PNG…</translation>
+        <translation>PNG…</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="176"/>
@@ -6521,36 +6959,43 @@ Double-click a row to open its project. This strip reads the cache of the last T
 <context>
     <name>UfeCompareTab</name>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="20"/>
         <source>Target:</source>
-        <translation type="vanished">Target:</translation>
+        <translation>Target:</translation>
     </message>
     <message>
         <source>Target mag:</source>
         <translation type="vanished">Target mag:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="23"/>
         <source>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</source>
-        <translation type="vanished">Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</translation>
+        <translation>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="29"/>
         <source>Build the sequence…</source>
-        <translation type="vanished">Build the sequence…</translation>
+        <translation>Build the sequence…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="29"/>
         <source>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</source>
-        <translation type="vanished">The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</translation>
+        <translation>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Generate field</source>
-        <translation type="vanished">Generate field</translation>
+        <translation>Generate field</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</source>
-        <translation type="vanished">Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</translation>
+        <translation>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</source>
-        <translation type="vanished">Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</translation>
+        <translation>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</translation>
     </message>
     <message>
         <source>Query the catalog (and VSX variables) around the plate centre</source>
@@ -6561,36 +7006,44 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Load a survey field (DSS2)…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="22"/>
         <source>Mag:</source>
-        <translation type="vanished">Mag:</translation>
+        <translation>Mag:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="30"/>
         <source>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</source>
-        <translation type="vanished">No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</translation>
+        <translation>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="14"/>
         <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
-        <translation type="vanished">Click a star to add or remove it. Known variables (red rings) can never be comparisons.</translation>
+        <translation>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="17"/>
         <source>On click, add as:</source>
-        <translation type="vanished">On click, add as:</translation>
+        <translation>On click, add as:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="18"/>
         <source>Comparison</source>
-        <translation type="vanished">Comparison</translation>
+        <translation>Comparison</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="19"/>
         <source>Check</source>
-        <translation type="vanished">Check</translation>
+        <translation>Check</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="23"/>
         <source>Show catalog magnitudes</source>
-        <translation type="vanished">Show catalog magnitudes</translation>
+        <translation>Show catalog magnitudes</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Propose sequence</source>
-        <translation type="vanished">Propose sequence</translation>
+        <translation>Propose sequence</translation>
     </message>
     <message>
         <source>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</source>
@@ -6621,8 +7074,9 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Export chart PNG…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="30"/>
         <source>DSS2…</source>
-        <translation type="vanished">DSS2…</translation>
+        <translation>DSS2…</translation>
     </message>
     <message>
         <source>Show the target marker</source>
@@ -6646,8 +7100,9 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Sequence ({0})…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="26"/>
         <source>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</source>
-        <translation type="vanished">The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</translation>
+        <translation>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</translation>
     </message>
     <message>
         <location filename="../ufe_compare_tab.py" line="178"/>
@@ -6663,7 +7118,6 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../ufe_compare_tab.py" line="271"/>
         <source>The sequence field is empty: build it with «Generate field…», or restore the one saved with the plate.</source>
-        
         <translation>The sequence field is empty: build it with «Generate field…», or restore the one saved with the plate.</translation>
     </message>
     <message>
@@ -6674,7 +7128,6 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../ufe_compare_tab.py" line="396"/>
         <source>{0}: sequence restored from the plate ({1} stars, {2} in the sequence)</source>
-        
         <translation>{0}: sequence restored from the plate ({1} stars, {2} in the sequence)</translation>
     </message>
     <message>
@@ -6811,12 +7264,14 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">FITS editor</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="20"/>
         <source>Load FITS…</source>
-        <translation type="vanished">Load FITS…</translation>
+        <translation>Load FITS…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="20"/>
         <source>Open a FITS image (Ctrl+O)</source>
-        <translation type="vanished">Open a FITS image (Ctrl+O)</translation>
+        <translation>Open a FITS image (Ctrl+O)</translation>
     </message>
     <message>
         <source>Invert</source>
@@ -6827,61 +7282,75 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Swap black for white: faint objects pop against the sky</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="21"/>
         <source>Export PNG…</source>
-        <translation type="vanished">Export PNG…</translation>
+        <translation>Export PNG…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="21"/>
         <source>Save the visible scene as a PNG (Ctrl+E)</source>
-        <translation type="vanished">Save the visible scene as a PNG (Ctrl+E)</translation>
+        <translation>Save the visible scene as a PNG (Ctrl+E)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="23"/>
         <source>N</source>
-        <translation type="vanished">N</translation>
+        <translation>N</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="23"/>
         <source>North arrow (needs a WCS)</source>
-        <translation type="vanished">North arrow (needs a WCS)</translation>
+        <translation>North arrow (needs a WCS)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="24"/>
         <source>Scale</source>
-        <translation type="vanished">Scale</translation>
+        <translation>Scale</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="24"/>
         <source>Scale bar (needs a WCS)</source>
-        <translation type="vanished">Scale bar (needs a WCS)</translation>
+        <translation>Scale bar (needs a WCS)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="25"/>
         <source>A</source>
-        <translation type="vanished">A</translation>
+        <translation>A</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="25"/>
         <source>Saved annotations (the marks stored on this plate)</source>
-        <translation type="vanished">Saved annotations (the marks stored on this plate)</translation>
+        <translation>Saved annotations (the marks stored on this plate)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="26"/>
         <source>Boxes</source>
-        <translation type="vanished">Boxes</translation>
+        <translation>Boxes</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="26"/>
         <source>Metadata corner boxes: object, date, position, brightness, observer, equipment and plate scale (on screen and in the exported PNG)</source>
-        <translation type="vanished">Metadata corner boxes: object, date, position, brightness, observer, equipment and plate scale (on screen and in the exported PNG)</translation>
+        <translation>Metadata corner boxes: object, date, position, brightness, observer, equipment and plate scale (on screen and in the exported PNG)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="27"/>
         <source>Mark</source>
-        <translation type="vanished">Mark</translation>
+        <translation>Mark</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="27"/>
         <source>Object mark: where the attached object sits on the plate (needs a WCS; on screen and in the exported PNG)</source>
-        <translation type="vanished">Object mark: where the attached object sits on the plate (needs a WCS; on screen and in the exported PNG)</translation>
+        <translation>Object mark: where the attached object sits on the plate (needs a WCS; on screen and in the exported PNG)</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="794"/>
+        <location filename="../ui/ufe_dialog.ui" line="28"/>
         <source>Solve astrometry…</source>
         <translation>Solve astrometry…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="28"/>
         <source>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</source>
-        <translation type="vanished">Blind-solve the plate with Astrometry.net (the file on disk is never modified)</translation>
+        <translation>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</translation>
     </message>
     <message>
         <source>Move marker…</source>
@@ -6892,8 +7361,9 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Move the target mark to a new position on the plate. The marker is a visual aid; the sequence maths never reads it.</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="30"/>
         <source>Zoom:</source>
-        <translation type="vanished">Zoom:</translation>
+        <translation>Zoom:</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="185"/>
@@ -6911,8 +7381,9 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Zoom {0} % (1:1 at 100)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="36"/>
         <source>Current zoom: 100 % is one plate pixel per screen pixel</source>
-        <translation type="vanished">Current zoom: 100 % is one plate pixel per screen pixel</translation>
+        <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
         <source>Measure</source>
@@ -6997,8 +7468,9 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>NightScribe Image Workbench</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="40"/>
         <source>The object this editor was opened from</source>
-        <translation type="vanished">The object this editor was opened from</translation>
+        <translation>The object this editor was opened from</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="292"/>
@@ -7035,24 +7507,30 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Open the Compare tab</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="54"/>
         <source>Band:</source>
-        <translation type="vanished">Band:</translation>
+        <translation>Band:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="68"/>
         <source>Apertures:</source>
-        <translation type="vanished">Apertures:</translation>
+        <translation>Apertures:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="87"/>
+        <location filename="../ui/ufe_measure_tab.ui" line="112"/>
+        <location filename="../ui/ufe_measure_tab.ui" line="137"/>
         <source>Aperture radius, sky annulus inner and outer radius (px)</source>
-        <translation type="vanished">Aperture radius, sky annulus inner and outer radius (px)</translation>
+        <translation>Aperture radius, sky annulus inner and outer radius (px)</translation>
     </message>
     <message>
         <source>Suggest apertures</source>
         <translation type="vanished">Suggest apertures</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="163"/>
         <source>Propose the radii from this target&apos;s growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</source>
-        <translation type="vanished">Propose the radii from this target&apos;s growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</translation>
+        <translation>Propose the radii from this target&apos;s growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</translation>
     </message>
     <message>
         <source>Sky:</source>
@@ -7119,24 +7597,49 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Go to the comparisons</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="29"/>
         <source>Click a star (or the target) to measure it against the sequence (built in the top half of this tab).</source>
-        <translation type="vanished">Click a star (or the target) to measure it against the sequence (built in the top half of this tab).</translation>
+        <translation>Click a star (or the target) to measure it against the sequence (built in the top half of this tab).</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="206"/>
         <source>CSV…</source>
-        <translation type="vanished">CSV…</translation>
+        <translation>CSV…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="216"/>
         <source>AAVSO EFF…</source>
-        <translation type="vanished">AAVSO EFF…</translation>
+        <translation>AAVSO EFF…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="232"/>
         <source>Save in the project</source>
-        <translation type="vanished">Save in the project</translation>
+        <translation>Save in the project</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="242"/>
+        <source>Bring this plate back to the editor defaults (stretch, measurement recipe, sequence field) and clear the state saved with the plate. The measured points of this plate are not touched, and other plates are not affected</source>
+        <translation>Bring this plate back to the editor defaults (stretch, measurement recipe, sequence field) and clear the state saved with the plate. The measured points of this plate are not touched, and other plates are not affected</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="245"/>
+        <source>Reset plate state</source>
+        <translation>Reset plate state</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="255"/>
+        <source>Remove every measured point that was registered in this plate. This action asks for confirmation and cannot be undone; points saved on other plates are not affected</source>
+        <translation>Remove every measured point that was registered in this plate. This action asks for confirmation and cannot be undone; points saved on other plates are not affected</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="258"/>
+        <source>Reset plate points</source>
+        <translation>Reset plate points</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="229"/>
         <source>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</source>
-        <translation type="vanished">Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</translation>
+        <translation>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="291"/>
@@ -7176,16 +7679,19 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Go to the sequence</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="166"/>
         <source>Suggest</source>
-        <translation type="vanished">Suggest</translation>
+        <translation>Suggest</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="178"/>
         <source>Advanced…</source>
-        <translation type="vanished">Advanced…</translation>
+        <translation>Advanced…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="175"/>
         <source>The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</source>
-        <translation type="vanished">The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</translation>
+        <translation>The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</translation>
     </message>
     <message>
         <source>No comparison sequence yet: build one in the Sequence section (Generate field, then pick or propose).</source>
@@ -7253,7 +7759,6 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../ufe_measure_tab.py" line="854"/>
         <source>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</source>
-        
         <translation>Field: {0} {1} at {2:.1f}″ · {3} = {4:.2f}</translation>
     </message>
     <message>
@@ -7294,37 +7799,31 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <location filename="../ufe_measure_tab.py" line="802"/>
         <source>{0} saturated/clipped</source>
-        
         <translation>{0} saturated/clipped</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="249"/>
         <source>Load a plate first: there is no state to reset.</source>
-        
         <translation>Load a plate first: there is no state to reset.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="252"/>
         <source>Plate state reset.</source>
-        
         <translation>Plate state reset.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="255"/>
         <source>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</source>
-        
         <translation>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="266"/>
         <source>Load a plate first: there are no plate points to reset.</source>
-        
         <translation>Load a plate first: there are no plate points to reset.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="269"/>
         <source>Reset the points of this plate</source>
-        
         <translation>Reset the points of this plate</translation>
     </message>
     <message>
@@ -7332,7 +7831,6 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <source>Delete every measurement point saved on this plate?
 They leave the light curve; the CSV files on disk are
 not touched.</source>
-        
         <translation>Delete every measurement point saved on this plate?
 They leave the light curve; the CSV files on disk are
 not touched.</translation>
@@ -7340,13 +7838,11 @@ not touched.</translation>
     <message>
         <location filename="../ufe_measure_tab.py" line="279"/>
         <source>The plate&apos;s measurement points were deleted.</source>
-        
         <translation>The plate&apos;s measurement points were deleted.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="282"/>
         <source>No measurement points saved on this plate.</source>
-        
         <translation>No measurement points saved on this plate.</translation>
     </message>
     <message>
@@ -7382,7 +7878,6 @@ not touched.</translation>
     <message>
         <location filename="../ufe_measure_tab.py" line="911"/>
         <source>assumed</source>
-        
         <translation>assumed</translation>
     </message>
     <message>
@@ -7537,24 +8032,29 @@ not touched.</translation>
         <translation>Sequence</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="19"/>
         <source>Name</source>
-        <translation type="vanished">Name</translation>
+        <translation>Name</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="20"/>
         <source>Type</source>
-        <translation type="vanished">Type</translation>
+        <translation>Type</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="21"/>
         <source>Mag</source>
-        <translation type="vanished">Mag</translation>
+        <translation>Mag</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="27"/>
         <source>Remove all</source>
-        <translation type="vanished">Remove all</translation>
+        <translation>Remove all</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="28"/>
         <source>Export CSV…</source>
-        <translation type="vanished">Export CSV…</translation>
+        <translation>Export CSV…</translation>
     </message>
 </context>
 <context>
@@ -7565,64 +8065,79 @@ not touched.</translation>
         <translation>Visit</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="19"/>
         <source>The visit&apos;s date (its name in the list). Points already saved to it keep their own MJD</source>
-        <translation type="vanished">The visit&apos;s date (its name in the list). Points already saved to it keep their own MJD</translation>
+        <translation>The visit&apos;s date (its name in the list). Points already saved to it keep their own MJD</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="20"/>
         <source>Save date</source>
-        <translation type="vanished">Save date</translation>
+        <translation>Save date</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="20"/>
         <source>Save the visit&apos;s date (the date is its name in the list)</source>
-        <translation type="vanished">Save the visit&apos;s date (the date is its name in the list)</translation>
+        <translation>Save the visit&apos;s date (the date is its name in the list)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="21"/>
         <source>Pin the visit: it floats to the top of the list</source>
-        <translation type="vanished">Pin the visit: it floats to the top of the list</translation>
+        <translation>Pin the visit: it floats to the top of the list</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="22"/>
         <source>Delete visit…</source>
-        <translation type="vanished">Delete visit…</translation>
+        <translation>Delete visit…</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="27"/>
         <source>Resources</source>
-        <translation type="vanished">Resources</translation>
+        <translation>Resources</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="31"/>
         <source>Attach files…</source>
-        <translation type="vanished">Attach files…</translation>
+        <translation>Attach files…</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="31"/>
         <source>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</source>
-        <translation type="vanished">FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</translation>
+        <translation>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="32"/>
         <source>Open</source>
-        <translation type="vanished">Open</translation>
+        <translation>Open</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="32"/>
         <source>Plates open in the FITS editor; everything else opens with the system</source>
-        <translation type="vanished">Plates open in the FITS editor; everything else opens with the system</translation>
+        <translation>Plates open in the FITS editor; everything else opens with the system</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="33"/>
         <source>Remove from visit</source>
-        <translation type="vanished">Remove from visit</translation>
+        <translation>Remove from visit</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="33"/>
         <source>Unlink the selected resource (the file on disk is never touched)</source>
-        <translation type="vanished">Unlink the selected resource (the file on disk is never touched)</translation>
+        <translation>Unlink the selected resource (the file on disk is never touched)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="41"/>
         <source>Night notes (seeing, clouds…)</source>
-        <translation type="vanished">Night notes (seeing, clouds…)</translation>
+        <translation>Night notes (seeing, clouds…)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="45"/>
         <source>Save and close</source>
-        <translation type="vanished">Save and close</translation>
+        <translation>Save and close</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="45"/>
         <source>Flush the date edit if pending and close the window (everything else already saved itself)</source>
-        <translation type="vanished">Flush the date edit if pending and close the window (everything else already saved itself)</translation>
+        <translation>Flush the date edit if pending and close the window (everything else already saved itself)</translation>
     </message>
     <message>
         <location filename="../widgets/visits_panel.py" line="420"/>
@@ -7650,60 +8165,75 @@ not touched.</translation>
         <translation>FITS details</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="14"/>
         <source>File:</source>
-        <translation type="vanished">File:</translation>
+        <translation>File:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="16"/>
+        <location filename="../ui/visit_measurements.ui" line="19"/>
         <source>Filter:</source>
-        <translation type="vanished">Filter:</translation>
+        <translation>Filter:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="18"/>
         <source>Date:</source>
-        <translation type="vanished">Date:</translation>
+        <translation>Date:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="20"/>
         <source>Exptime:</source>
-        <translation type="vanished">Exptime:</translation>
+        <translation>Exptime:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="11"/>
         <source>Measurements</source>
-        <translation type="vanished">Measurements</translation>
+        <translation>Measurements</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="15"/>
         <source>Mag:</source>
-        <translation type="vanished">Mag:</translation>
+        <translation>Mag:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="17"/>
         <source>Err:</source>
-        <translation type="vanished">Err:</translation>
+        <translation>Err:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="21"/>
         <source>Add</source>
-        <translation type="vanished">Add</translation>
+        <translation>Add</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="22"/>
         <source>Delete point</source>
-        <translation type="vanished">Delete point</translation>
+        <translation>Delete point</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="11"/>
         <source>Astrometry (MPC report)</source>
-        <translation type="vanished">Astrometry (MPC report)</translation>
+        <translation>Astrometry (MPC report)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="13"/>
         <source>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</source>
-        <translation type="vanished">Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</translation>
+        <translation>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="14"/>
         <source>Paste MPC 80-column or ADES PSV lines here…</source>
-        <translation type="vanished">Paste MPC 80-column or ADES PSV lines here…</translation>
+        <translation>Paste MPC 80-column or ADES PSV lines here…</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="17"/>
         <source>Validate</source>
-        <translation type="vanished">Validate</translation>
+        <translation>Validate</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="18"/>
         <source>Save report…</source>
-        <translation type="vanished">Save report…</translation>
+        <translation>Save report…</translation>
     </message>
     <message>
         <location filename="../widgets/visits_panel.py" line="661"/>
@@ -7741,28 +8271,33 @@ not touched.</translation>
 <context>
     <name>VisitsPanel</name>
     <message>
+        <location filename="../ui/visits_panel.ui" line="15"/>
         <source>New visit</source>
-        <translation type="vanished">Colour term applied with target B−V = {0:.2f}</translation>
+        <translation>Colour term applied with target B−V = {0:.2f}</translation>
     </message>
     <message>
         <source>Every day you work the object is a visit: images, reports and measurements hang from it</source>
         <translation type="vanished">Every day you work the object is a visit: images, reports and measurements hang from it</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="15"/>
         <source>Every day you work the object is a visit: it opens in its own window, ready for its images, reports and measurements</source>
-        <translation type="vanished">Every day you work the object is a visit: it opens in its own window, ready for its images, reports and measurements</translation>
+        <translation>Every day you work the object is a visit: it opens in its own window, ready for its images, reports and measurements</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="16"/>
         <source>Open visit…</source>
-        <translation type="vanished">Open visit…</translation>
+        <translation>Open visit…</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="16"/>
         <source>Open the selected visit&apos;s window (double-click works too)</source>
-        <translation type="vanished">Open the selected visit&apos;s window (double-click works too)</translation>
+        <translation>Open the selected visit&apos;s window (double-click works too)</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="21"/>
         <source>No visits yet. Each night you work the object starts one: plates, reports and measurements attach to it.</source>
-        <translation type="vanished">No visits yet. Each night you work the object starts one: plates, reports and measurements attach to it.</translation>
+        <translation>No visits yet. Each night you work the object starts one: plates, reports and measurements attach to it.</translation>
     </message>
     <message>
         <location filename="../widgets/visits_panel.py" line="123"/>

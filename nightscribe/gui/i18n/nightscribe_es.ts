@@ -120,176 +120,219 @@
 <context>
     <name>BlinkTab</name>
     <message>
+        <location filename="../ui/blink_tab.ui" line="8"/>
         <source>Supernova:</source>
-        <translation type="vanished">Supernova:</translation>
+        <translation>Supernova:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="9"/>
         <source>2026ziz, SN2023ixf…</source>
-        <translation type="vanished">2026ziz, SN2023ixf…</translation>
+        <translation>2026ziz, SN2023ixf…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="10"/>
         <source>FITS image:</source>
-        <translation type="vanished">Imagen FITS:</translation>
+        <translation>Imagen FITS:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="11"/>
         <source>Plate-solved FITS (with WCS)…</source>
-        <translation type="vanished">FITS con astrometría (WCS)…</translation>
+        <translation>FITS con astrometría (WCS)…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="12"/>
         <source>Browse…</source>
-        <translation type="vanished">Examinar…</translation>
+        <translation>Examinar…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="13"/>
         <source>Prepare pair</source>
-        <translation type="vanished">Preparar pareja</translation>
+        <translation>Preparar pareja</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="18"/>
         <source>Manual coordinates:</source>
-        <translation type="vanished">Coordenadas manuales:</translation>
+        <translation>Coordenadas manuales:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="19"/>
         <source>RA (deg):</source>
-        <translation type="vanished">AR (°):</translation>
+        <translation>AR (°):</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="20"/>
         <source>301.1436</source>
-        <translation type="vanished">301.1436</translation>
+        <translation>301.1436</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="21"/>
         <source>Dec (deg):</source>
-        <translation type="vanished">Dec (°):</translation>
+        <translation>Dec (°):</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="22"/>
         <source>+62.6441</source>
-        <translation type="vanished">+62.6441</translation>
+        <translation>+62.6441</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="33"/>
         <source>Load a plate-solved FITS and press &quot;Prepare pair&quot; — the survey reference (PanSTARRS DR1 g) will be matched automatically.</source>
-        <translation type="vanished">Carga un FITS con astrometría y pulsa «Preparar pareja» — la referencia de survey (PanSTARRS DR1 g) se ajustará automáticamente.</translation>
+        <translation>Carga un FITS con astrometría y pulsa «Preparar pareja» — la referencia de survey (PanSTARRS DR1 g) se ajustará automáticamente.</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="41"/>
         <source>Stretch</source>
-        <translation type="vanished">Estirado</translation>
+        <translation>Estirado</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="43"/>
         <source>Black point</source>
-        <translation type="vanished">Punto negro</translation>
+        <translation>Punto negro</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="45"/>
         <source>White point</source>
-        <translation type="vanished">Punto blanco</translation>
+        <translation>Punto blanco</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="47"/>
         <source>Gamma</source>
-        <translation type="vanished">Gamma</translation>
+        <translation>Gamma</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="49"/>
         <source>Auto stretch</source>
-        <translation type="vanished">Estirado automático</translation>
+        <translation>Estirado automático</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="50"/>
         <source>Brightness balance (survey)</source>
-        <translation type="vanished">Balance de brillo (survey)</translation>
+        <translation>Balance de brillo (survey)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="51"/>
         <source>Gain applied to the survey so both backgrounds match (100 = no change)</source>
-        <translation type="vanished">Ganancia aplicada al survey para igualar los fondos (100 = sin cambio)</translation>
+        <translation>Ganancia aplicada al survey para igualar los fondos (100 = sin cambio)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="52"/>
         <source>Auto balance</source>
-        <translation type="vanished">Balance automático</translation>
+        <translation>Balance automático</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="58"/>
         <source>View</source>
-        <translation type="vanished">Vista</translation>
+        <translation>Vista</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="60"/>
         <source>Live blink</source>
-        <translation type="vanished">Blink en vivo</translation>
+        <translation>Blink en vivo</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="63"/>
         <source>Blink every (ms):</source>
-        <translation type="vanished">Blink cada (ms):</translation>
+        <translation>Blink cada (ms):</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="67"/>
         <source>Fade (survey ↔ yours)</source>
-        <translation type="vanished">Fundido (survey ↔ la tuya)</translation>
+        <translation>Fundido (survey ↔ la tuya)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="71"/>
         <source>Zoom on the SN:</source>
-        <translation type="vanished">Zoom sobre la SN:</translation>
+        <translation>Zoom sobre la SN:</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="73"/>
         <source>×1</source>
-        <translation type="vanished">×1</translation>
+        <translation>×1</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="74"/>
         <source>×2</source>
-        <translation type="vanished">×2</translation>
+        <translation>×2</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="75"/>
         <source>×4</source>
-        <translation type="vanished">×4</translation>
+        <translation>×4</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="79"/>
         <source>Mark the supernova</source>
-        <translation type="vanished">Marcar la supernova</translation>
+        <translation>Marcar la supernova</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="80"/>
         <source>Marker size</source>
-        <translation type="vanished">Tamaño de la marca</translation>
+        <translation>Tamaño de la marca</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="87"/>
         <source>Fine alignment (survey)</source>
-        <translation type="vanished">Alineación fina (survey)</translation>
+        <translation>Alineación fina (survey)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="89"/>
         <source>↑</source>
-        <translation type="vanished">↑</translation>
+        <translation>↑</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="90"/>
         <source>←</source>
-        <translation type="vanished">←</translation>
+        <translation>←</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="91"/>
         <source>(0.0, 0.0)</source>
-        <translation type="vanished">(0.0, 0.0)</translation>
+        <translation>(0.0, 0.0)</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="92"/>
         <source>→</source>
-        <translation type="vanished">→</translation>
+        <translation>→</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="93"/>
         <source>↓</source>
-        <translation type="vanished">↓</translation>
+        <translation>↓</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="99"/>
         <source>Export</source>
-        <translation type="vanished">Exportar</translation>
+        <translation>Exportar</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="101"/>
         <source>Blink GIF</source>
-        <translation type="vanished">GIF blink</translation>
+        <translation>GIF blink</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="102"/>
         <source>Fade GIF</source>
-        <translation type="vanished">GIF fundido</translation>
+        <translation>GIF fundido</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="103"/>
         <source>Export GIF…</source>
-        <translation type="vanished">Exportar GIF…</translation>
+        <translation>Exportar GIF…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="104"/>
         <source>Export video (MP4)…</source>
-        <translation type="vanished">Exportar vídeo (MP4)…</translation>
+        <translation>Exportar vídeo (MP4)…</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="104"/>
         <source>Same animation as the GIF, encoded as H.264 MP4 for sites that reject GIFs</source>
-        <translation type="vanished">La misma animación que el GIF, codificada como MP4 H.264 para sitios que rechazan GIF</translation>
+        <translation>La misma animación que el GIF, codificada como MP4 H.264 para sitios que rechazan GIF</translation>
     </message>
     <message>
+        <location filename="../ui/blink_tab.ui" line="105"/>
         <source>Export side-by-side PNG…</source>
-        <translation type="vanished">Exportar PNG lado a lado…</translation>
+        <translation>Exportar PNG lado a lado…</translation>
     </message>
 </context>
 <context>
@@ -305,48 +348,59 @@
         <translation>Nueva campaña</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="12"/>
         <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</source>
-        <translation type="vanished">Una campaña agrupa los proyectos de un esfuerzo de observación común — varias noches, varios observatorios, un objetivo. Nómbrala por el objetivo, p. ej. «erupción de T CrB 2026» o «curva de luz de WeSb 1».</translation>
+        <translation>Una campaña agrupa los proyectos de un esfuerzo de observación común — varias noches, varios observatorios, un objetivo. Nómbrala por el objetivo, p. ej. «erupción de T CrB 2026» o «curva de luz de WeSb 1».</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="15"/>
         <source>Name:</source>
-        <translation type="vanished">Nombre:</translation>
+        <translation>Nombre:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="17"/>
         <source>Group:</source>
-        <translation type="vanished">Grupo:</translation>
+        <translation>Grupo:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="19"/>
         <source>Coordinator:</source>
-        <translation type="vanished">Coordinador:</translation>
+        <translation>Coordinador:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="21"/>
         <source>Science goal:</source>
-        <translation type="vanished">Objetivo científico:</translation>
+        <translation>Objetivo científico:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="23"/>
         <source>Cadence (nights):</source>
-        <translation type="vanished">Cadencia (noches):</translation>
+        <translation>Cadencia (noches):</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="25"/>
         <source>Filters:</source>
-        <translation type="vanished">Filtros:</translation>
+        <translation>Filtros:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="27"/>
         <source>Comparison stars:</source>
-        <translation type="vanished">Estrellas de comparación:</translation>
+        <translation>Estrellas de comparación:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="29"/>
         <source>Report URL:</source>
-        <translation type="vanished">URL de reporte:</translation>
+        <translation>URL de reporte:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="31"/>
         <source>Data URL:</source>
-        <translation type="vanished">URL de datos:</translation>
+        <translation>URL de datos:</translation>
     </message>
     <message>
+        <location filename="../ui/campaign_edit_dialog.ui" line="33"/>
         <source>Protocol notes:</source>
-        <translation type="vanished">Notas del protocolo:</translation>
+        <translation>Notas del protocolo:</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="85"/>
@@ -370,28 +424,34 @@
 <context>
     <name>CampaignsTab</name>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="53"/>
         <source>Campaigns</source>
-        <translation type="vanished">Campañas</translation>
+        <translation>Campañas</translation>
     </message>
     <message>
         <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</source>
         <translation type="vanished">Una campaña agrupa los proyectos de un esfuerzo de observación común — varias noches, varios observatorios, un objetivo (p. ej. «erupción de T CrB 2026»). Un proyecto es un objeto con sus tres pasos: planificar, procesar, publicar.</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="17"/>
+        <location filename="../ui/campaigns_tab.ui" line="37"/>
         <source>color: #8a90a6; font-style: italic; font-size: 11px;</source>
-        <translation type="vanished">color: #8a90a6; font-style: italic; font-size: 11px;</translation>
+        <translation>color: #8a90a6; font-style: italic; font-size: 11px;</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="58"/>
         <source>Select a campaign to see its detail</source>
-        <translation type="vanished">Selecciona una campaña para ver su detalle</translation>
+        <translation>Selecciona una campaña para ver su detalle</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="63"/>
         <source>New campaign…</source>
-        <translation type="vanished">Nueva campaña…</translation>
+        <translation>Nueva campaña…</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="91"/>
         <source>Edit…</source>
-        <translation type="vanished">Editar…</translation>
+        <translation>Editar…</translation>
     </message>
     <message>
         <source>Delete…</source>
@@ -418,64 +478,82 @@
         <translation type="vanished">Quitar proyecto…</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="8"/>
         <source>Happening now</source>
-        <translation type="vanished">Está pasando ahora</translation>
+        <translation>Está pasando ahora</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="15"/>
         <source>Outbursts, brightness drops and predicted extrema — across the stars you follow (campaigns and vigils)</source>
-        <translation type="vanished">Erupciones, caídas de brillo y máximos previstos — en las estrellas que sigues (campañas y vigilias)</translation>
+        <translation>Erupciones, caídas de brillo y máximos previstos — en las estrellas que sigues (campañas y vigilias)</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="27"/>
+        <location filename="../ui/campaigns_tab.ui" line="66"/>
         <source>ⓘ</source>
-        <translation type="vanished">ⓘ</translation>
+        <translation>ⓘ</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="28"/>
         <source>What do the icons mean?</source>
-        <translation type="vanished">¿Qué significan los iconos?</translation>
+        <translation>¿Qué significan los iconos?</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="67"/>
         <source>What is a campaign?</source>
-        <translation type="vanished">¿Qué es una campaña?</translation>
+        <translation>¿Qué es una campaña?</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="78"/>
         <source>Campaign detail</source>
-        <translation type="vanished">Detalle de campaña</translation>
+        <translation>Detalle de campaña</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="84"/>
         <source>Select a campaign.</source>
-        <translation type="vanished">Selecciona una campaña.</translation>
+        <translation>Selecciona una campaña.</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="85"/>
         <source>font-size: 15px; font-weight: bold;</source>
-        <translation type="vanished">font-size: 15px; font-weight: bold;</translation>
+        <translation>font-size: 15px; font-weight: bold;</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="96"/>
         <source>Close</source>
-        <translation type="vanished">Cerrar</translation>
+        <translation>Cerrar</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="101"/>
         <source>⋯</source>
-        <translation type="vanished">⋯</translation>
+        <translation>⋯</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="102"/>
         <source>More campaign actions (delete, projects)</source>
-        <translation type="vanished">Más acciones de campaña (borrar, proyectos)</translation>
+        <translation>Más acciones de campaña (borrar, proyectos)</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="108"/>
+        <location filename="../ui/campaigns_tab.ui" line="127"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="123"/>
         <source>Protocol</source>
-        <translation type="vanished">Protocolo</translation>
+        <translation>Protocolo</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="136"/>
         <source>Projects in this campaign</source>
-        <translation type="vanished">Proyectos de esta campaña</translation>
+        <translation>Proyectos de esta campaña</translation>
     </message>
     <message>
+        <location filename="../ui/campaigns_tab.ui" line="42"/>
+        <location filename="../ui/campaigns_tab.ui" line="140"/>
         <source>Double-click a row to open its project</source>
-        <translation type="vanished">Doble clic en una fila para abrir su proyecto</translation>
+        <translation>Doble clic en una fila para abrir su proyecto</translation>
     </message>
     <message>
         <source>Signals</source>
@@ -489,24 +567,28 @@
 <context>
     <name>ChartViewer</name>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="15"/>
         <source>Zoom −</source>
-        <translation type="vanished">Zoom −</translation>
+        <translation>Zoom −</translation>
     </message>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="16"/>
         <source>Zoom +</source>
-        <translation type="vanished">Zoom +</translation>
+        <translation>Zoom +</translation>
     </message>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="17"/>
         <source>Fit</source>
-        <translation type="vanished">Ajustar</translation>
+        <translation>Ajustar</translation>
     </message>
     <message>
         <source>1:1</source>
         <translation type="vanished">1:1</translation>
     </message>
     <message>
+        <location filename="../ui/chart_viewer.ui" line="19"/>
         <source>Export PNG…</source>
-        <translation type="vanished">Exportar PNG…</translation>
+        <translation>Exportar PNG…</translation>
     </message>
     <message>
         <location filename="../chart_viewer.py" line="136"/>
@@ -633,12 +715,14 @@
         <translation>Todos los tipos</translation>
     </message>
     <message>
+        <location filename="../ui/journal_dialog.ui" line="15"/>
         <source>Search…</source>
-        <translation type="vanished">Buscar…</translation>
+        <translation>Buscar…</translation>
     </message>
     <message>
+        <location filename="../ui/journal_dialog.ui" line="18"/>
         <source>Double-click an entry to open its project or explore the object</source>
-        <translation type="vanished">Doble clic en una entrada para abrir su proyecto o explorar el objeto</translation>
+        <translation>Doble clic en una entrada para abrir su proyecto o explorar el objeto</translation>
     </message>
     <message>
         <location filename="../journal_dialog.py" line="94"/>
@@ -700,12 +784,14 @@
 <context>
     <name>MainWindow</name>
     <message>
+        <location filename="../ui/main_window.ui" line="9"/>
         <source>NightScribe</source>
-        <translation type="vanished">NightScribe</translation>
+        <translation>NightScribe</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="17"/>
         <source>Tonight</source>
-        <translation type="vanished">Esta noche</translation>
+        <translation>Esta noche</translation>
     </message>
     <message>
         <source>Solar system</source>
@@ -721,12 +807,14 @@
         <translation>Blink</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="20"/>
         <source>Projects</source>
-        <translation type="vanished">Proyectos</translation>
+        <translation>Proyectos</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="23"/>
         <source>Campaigns</source>
-        <translation type="vanished">Campañas</translation>
+        <translation>Campañas</translation>
     </message>
     <message>
         <source>Sun &amp; sky</source>
@@ -737,20 +825,24 @@
         <translation type="vanished">Observatorio</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="35"/>
         <source>File</source>
-        <translation type="vanished">Archivo</translation>
+        <translation>Archivo</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="39"/>
         <source>Tools</source>
-        <translation type="vanished">Herramientas</translation>
+        <translation>Herramientas</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="50"/>
         <source>Help</source>
-        <translation type="vanished">Ayuda</translation>
+        <translation>Ayuda</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="61"/>
         <source>Quit</source>
-        <translation type="vanished">Salir</translation>
+        <translation>Salir</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="810"/>
@@ -763,44 +855,53 @@
         <translation>English</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="64"/>
         <source>Settings…</source>
-        <translation type="vanished">Configuración…</translation>
+        <translation>Configuración…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="82"/>
         <source>NightScribe Image Workbench…</source>
-        <translation type="vanished">NightScribe Image Workbench…</translation>
+        <translation>NightScribe Image Workbench…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="91"/>
         <source>Technical Documentation</source>
-        <translation type="vanished">Documentación técnica</translation>
+        <translation>Documentación técnica</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="67"/>
         <source>Explore object…</source>
-        <translation type="vanished">Explorar objeto…</translation>
+        <translation>Explorar objeto…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="70"/>
         <source>Blink (ad-hoc)…</source>
-        <translation type="vanished">Blink (puntual)…</translation>
+        <translation>Blink (puntual)…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="73"/>
         <source>Observing journal…</source>
-        <translation type="vanished">Diario de observación…</translation>
+        <translation>Diario de observación…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="76"/>
         <source>Sky calendar…</source>
-        <translation type="vanished">Calendario del cielo…</translation>
+        <translation>Calendario del cielo…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="79"/>
         <source>Campaigns…</source>
-        <translation type="vanished">Campañas…</translation>
+        <translation>Campañas…</translation>
     </message>
     <message>
         <source>FITS editor…</source>
         <translation type="vanished">Editor FITS…</translation>
     </message>
     <message>
+        <location filename="../ui/main_window.ui" line="85"/>
         <source>About NightScribe</source>
-        <translation type="vanished">Acerca de NightScribe</translation>
+        <translation>Acerca de NightScribe</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="386"/>
@@ -824,6 +925,7 @@
     </message>
     <message>
         <location filename="../main_window.py" line="1005"/>
+        <location filename="../ui/main_window.ui" line="88"/>
         <source>Data sources</source>
         <translation>Fuentes de datos</translation>
     </message>
@@ -2628,7 +2730,6 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
     <message>
         <location filename="../main_window.py" line="7835"/>
         <source>The plate&apos;s saved state was cleared.</source>
-        
         <translation>Estado guardado de la placa borrado.</translation>
     </message>
     <message>
@@ -2665,7 +2766,6 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
     <message>
         <location filename="../main_window.py" line="7812"/>
         <source>Point saved without plate state: this plate is not registered in the project.</source>
-        
         <translation>Punto guardado sin estado de placa: esta placa no está registrada en el proyecto.</translation>
     </message>
     <message>
@@ -2932,25 +3032,21 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
     <message>
         <location filename="../main_window.py" line="4355"/>
         <source>This measurement no longer exists.</source>
-        
         <translation>Esta medida ya no existe.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="4359"/>
         <source>This point has no plate: it was hand-entered, pasted, or saved before this feature.</source>
-        
         <translation>Este punto no tiene placa: se introdujo a mano, se pegó, o se guardó antes de esta función.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="4365"/>
         <source>The plate this point came from is not a usable image anymore.</source>
-        
         <translation>La placa de donde viene este punto ya no es una imagen usable.</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="4371"/>
         <source>Enable the unified editor in Settings → Development to open this plate</source>
-        
         <translation>Activa el editor unificado en Ajustes → Desarrollo para abrir esta placa</translation>
     </message>
     <message>
@@ -3758,226 +3854,285 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>NSKinds</name>
     <message>
+        <location filename="../../core/kinds.py" line="47"/>
         <source>Near-Earth objects (NEOs)</source>
-        <translation type="vanished">Objetos cercanos a la Tierra (NEOs)</translation>
+        <translation>Objetos cercanos a la Tierra (NEOs)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="48"/>
         <source>Asteroids and comets on paths that pass close to Earth: the confirmed ones with score, priority, apparent rate, sky uncertainty and flags (NEOCP, impact risk, radar, NHATS), plus the unconfirmed candidates with preliminary orbits computed from the MPC astrometry.</source>
-        <translation type="vanished">Asteroides y cometas en órbitas que pasarán cerca de la Tierra: los confirmados, con puntuación, prioridad, velocidad aparente, incertidumbre de posición y banderas (NEOCP, riesgo de impacto, radar, NHATS); más los candidatos sin confirmar, con órbitas provisionales calculadas sobre la astrometría del MPC.</translation>
+        <translation>Asteroides y cometas en órbitas que pasarán cerca de la Tierra: los confirmados, con puntuación, prioridad, velocidad aparente, incertidumbre de posición y banderas (NEOCP, riesgo de impacto, radar, NHATS); más los candidatos sin confirmar, con órbitas provisionales calculadas sobre la astrometría del MPC.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="54"/>
         <source>NEOfixer&apos;s site-specific list + NEOCP (MPC); positions from NASA Horizons</source>
-        <translation type="vanished">Lista de NEOfixer específica de tu sitio + NEOCP (MPC); posiciones por NASA Horizons</translation>
+        <translation>Lista de NEOfixer específica de tu sitio + NEOCP (MPC); posiciones por NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="61"/>
         <source>Supernovae</source>
-        <translation type="vanished">Supernovas</translation>
+        <translation>Supernovas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="62"/>
         <source>The newest discoveries, with the complete follow-up: a confirmation blink of your FITS against a PanSTARRS reference, the light curve drawn against the typical templates of each type, an evolution animation, exports and cadence reminders to know when to go back.</source>
-        <translation type="vanished">Los descubrimientos más recientes, con el seguimiento completo: un blink de confirmación de tus FITS contra una referencia de PanSTARRS, la curva de luz frente a las plantillas típicas de cada tipo, una animación de evolución, exportaciones y avisos de cadencia para saber cuándo volver.</translation>
+        <translation>Los descubrimientos más recientes, con el seguimiento completo: un blink de confirmación de tus FITS contra una referencia de PanSTARRS, la curva de luz frente a las plantillas típicas de cada tipo, una animación de evolución, exportaciones y avisos de cadencia para saber cuándo volver.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="68"/>
         <source>Rochester Astronomy discovery list + a PanSTARRS (MAST) reference for the blink</source>
-        <translation type="vanished">Lista de descubrimientos de Rochester Astronomy + una referencia de PanSTARRS (MAST) para el blink</translation>
+        <translation>Lista de descubrimientos de Rochester Astronomy + una referencia de PanSTARRS (MAST) para el blink</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="75"/>
         <source>Comets</source>
-        <translation type="vanished">Cometas</translation>
+        <translation>Cometas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="76"/>
         <source>Comets visible tonight with their live observed magnitude, perihelion date and activity flags, so you know how each one is doing now, not last month.</source>
-        <translation type="vanished">Cometas visibles esta noche con su magnitud observada en vivo, su fecha de perihelio y sus banderas de actividad, para que sepas cómo va cada uno ahora, no el mes pasado.</translation>
+        <translation>Cometas visibles esta noche con su magnitud observada en vivo, su fecha de perihelio y sus banderas de actividad, para que sepas cómo va cada uno ahora, no el mes pasado.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="80"/>
         <source>COBS (MPC) live magnitudes + NASA Horizons</source>
-        <translation type="vanished">Magnitudes en vivo de COBS (MPC) + NASA Horizons</translation>
+        <translation>Magnitudes en vivo de COBS (MPC) + NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="85"/>
         <source>Comet candidates (PCCP)</source>
-        <translation type="vanished">Candidatos a cometa (PCCP)</translation>
+        <translation>Candidatos a cometa (PCCP)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="86"/>
         <source>Objects reported as asteroids that might actually be comets, with their comet score: the MPC&apos;s Possible Comet Confirmation Page. Getting there first matters.</source>
-        <translation type="vanished">Objetos reportados como asteroides que en realidad podrían ser cometas, con su puntuación de cometa: la página de confirmación de cometas del MPC. Llegar antes importa.</translation>
+        <translation>Objetos reportados como asteroides que en realidad podrían ser cometas, con su puntuación de cometa: la página de confirmación de cometas del MPC. Llegar antes importa.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="90"/>
         <source>MPC PCCP (minorplanetcenter.net) + NASA Horizons</source>
-        <translation type="vanished">MPC PCCP (minorplanetcenter.net) + NASA Horizons</translation>
+        <translation>MPC PCCP (minorplanetcenter.net) + NASA Horizons</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="96"/>
         <source>Exoplanet transits</source>
-        <translation type="vanished">Tránsitos de exoplanetas</translation>
+        <translation>Tránsitos de exoplanetas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="97"/>
         <source>Exoplanets crossing their star tonight from your site, with the transit time, how much the observed timing is drifting from the prediction (O-C), whether the whole transit fits in your night, the maximum trail-free exposure and a pre-filled export for EXOTIC.</source>
-        <translation type="vanished">Exoplanetas que cruzan su estrella esta noche vistos desde tu sitio, con la hora del tránsito, cuánto se desvía la hora observada de la predicha (O-C), si el tránsito entero cabe en tu noche, la exposición máxima sin estelas y una exportación pre-rellenada para EXOTIC.</translation>
+        <translation>Exoplanetas que cruzan su estrella esta noche vistos desde tu sitio, con la hora del tránsito, cuánto se desvía la hora observada de la predicha (O-C), si el tránsito entero cabe en tu noche, la exposición máxima sin estelas y una exportación pre-rellenada para EXOTIC.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="103"/>
         <source>ExoClock (ESA Ariel ephemeris programme) + NASA Exoplanet Archive; times from NASA Horizons (HJD)</source>
-        <translation type="vanished">ExoClock (programa de efemérides Ariel de la ESA) + Archivo de exoplanetas de la NASA; horas por NASA Horizons (HJD)</translation>
+        <translation>ExoClock (programa de efemérides Ariel de la ESA) + Archivo de exoplanetas de la NASA; horas por NASA Horizons (HJD)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="110"/>
         <source>Close approaches and alerts</source>
-        <translation type="vanished">Aproximaciones cercanas y alertas</translation>
+        <translation>Aproximaciones cercanas y alertas</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="111"/>
         <source>Upcoming close approaches from ESA NEOCC (how the visitor gets by, roughly how big, how bright at the closest pass) to catch the week&apos;s fast mover, plus the AAVSO editorial channel: community alerts and the campaigns currently running.</source>
-        <translation type="vanished">Aproximaciones próximas de ESA NEOCC (cómo pasará el visitante, más o menos qué tamaño, qué brillo en el paso más cercano) para cazar al rápido de la semana; y el canal editorial de AAVSO: alertas de la comunidad y las campañas en curso.</translation>
+        <translation>Aproximaciones próximas de ESA NEOCC (cómo pasará el visitante, más o menos qué tamaño, qué brillo en el paso más cercano) para cazar al rápido de la semana; y el canal editorial de AAVSO: alertas de la comunidad y las campañas en curso.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="117"/>
         <source>ESA NEOCC + the AAVSO editorial channel (alerts and campaigns)</source>
-        <translation type="vanished">ESA NEOCC + el canal editorial de AAVSO (alertas y campañas)</translation>
+        <translation>ESA NEOCC + el canal editorial de AAVSO (alertas y campañas)</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="124"/>
         <source>HADS stars</source>
-        <translation type="vanished">Estrellas HADS</translation>
+        <translation>Estrellas HADS</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="125"/>
         <source>High-amplitude delta Scuti variables: they pulse so fast and so strongly that you can watch them vary in a single session; your run folds by phase into the classic saw-tooth. Priorities are colour coded: period changes, never-observed stars, coverage gaps.</source>
-        <translation type="vanished">Variables delta Scuti de amplitud alta: pulsan tan rápido y tan fuerte que puedes seguirlas variar en una sola sesión; tu corrida queda plegada por fase en el clásico diente de sierra. Las prioridades van coloreadas: cambios de periodo, estrellas nunca observadas, huecos de cobertura.</translation>
+        <translation>Variables delta Scuti de amplitud alta: pulsan tan rápido y tan fuerte que puedes seguirlas variar en una sola sesión; tu corrida queda plegada por fase en el clásico diente de sierra. Las prioridades van coloreadas: cambios de periodo, estrellas nunca observadas, huecos de cobertura.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="131"/>
         <source>The living HADS catalogue maintained by P. Wils</source>
-        <translation type="vanished">El catálogo HADS vivo, mantenido por P. Wils</translation>
+        <translation>El catálogo HADS vivo, mantenido por P. Wils</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="137"/>
         <source>Variable stars and duties</source>
-        <translation type="vanished">Estrellas variables y deberes</translation>
+        <translation>Estrellas variables y deberes</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="138"/>
         <source>Your campaign members that are due by cadence, stars with an event in progress, stars nearing a predicted extremum, and your standing vigils (the T CrB eruption, the R CrB fade) checked day by day against the observatories and the community.</source>
-        <translation type="vanished">Los miembros de tus campañas que ya toca medir por cadencia, estrellas con un evento en curso, estrellas cerca de un extremo predicho, y tus vigilias de largo (la erupción de T CrB, el desvanecimiento de R CrB) revisadas día a día contra los observatorios y la comunidad.</translation>
+        <translation>Los miembros de tus campañas que ya toca medir por cadencia, estrellas con un evento en curso, estrellas cerca de un extremo predicho, y tus vigilias de largo (la erupción de T CrB, el desvanecimiento de R CrB) revisadas día a día contra los observatorios y la comunidad.</translation>
     </message>
     <message>
+        <location filename="../../core/kinds.py" line="144"/>
         <source>AAVSO VSX + AAVSO community photometry + a ZTF check for the vigils</source>
-        <translation type="vanished">AAVSO VSX + fotometría de la comunidad de AAVSO + una revisión de ZTF para las vigilias</translation>
+        <translation>AAVSO VSX + fotometría de la comunidad de AAVSO + una revisión de ZTF para las vigilias</translation>
     </message>
 </context>
 <context>
     <name>NSMigrations</name>
     <message>
+        <location filename="../../core/db.py" line="364"/>
         <source>Projects introduced: every target you choose gets its own folder and a plan, capture, process, publish flow.</source>
-        <translation type="vanished">Se introducen los proyectos: cada objetivo que elijas tiene su propia carpeta y un flujo de plan, captura, procesar y publicar.</translation>
+        <translation>Se introducen los proyectos: cada objetivo que elijas tiene su propia carpeta y un flujo de plan, captura, procesar y publicar.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="367"/>
         <source>The &quot;analyse&quot; step left the project flow; the projects stopped on it continue at the publish step.</source>
-        <translation type="vanished">El paso &quot;analizar&quot; salió del flujo de proyectos; los proyectos parados en él continúan en el paso de publicar.</translation>
+        <translation>El paso &quot;analizar&quot; salió del flujo de proyectos; los proyectos parados en él continúan en el paso de publicar.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="370"/>
         <source>The &quot;capture&quot; step was merged into &quot;plan&quot;; whatever work was saved on it is now part of the plan.</source>
-        <translation type="vanished">El paso &quot;captura&quot; se fusionó en &quot;plan&quot;; todo lo guardado en ese paso es ahora parte del plan.</translation>
+        <translation>El paso &quot;captura&quot; se fusionó en &quot;plan&quot;; todo lo guardado en ese paso es ahora parte del plan.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="373"/>
         <source>Projects gained their final state: close date, outcome, tags and favourites.</source>
-        <translation type="vanished">Los proyectos ganaron su estado final: fecha de cierre, resultado, etiquetas y favoritos.</translation>
+        <translation>Los proyectos ganaron su estado final: fecha de cierre, resultado, etiquetas y favoritos.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="376"/>
         <source>Supernova follow-up: the observing sessions, the images of each night and your photometry points, all tied to the project.</source>
-        <translation type="vanished">Seguimiento de supernovas: las sesiones de observación, las imágenes de cada noche y tus puntos de fotometría, todo ligado al proyecto.</translation>
+        <translation>Seguimiento de supernovas: las sesiones de observación, las imágenes de cada noche y tus puntos de fotometría, todo ligado al proyecto.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="379"/>
         <source>Every project keeps its own container folder, in the place it already was.</source>
-        <translation type="vanished">Cada proyecto conserva su propia carpeta contenedora, en el lugar donde ya estaba.</translation>
+        <translation>Cada proyecto conserva su propia carpeta contenedora, en el lugar donde ya estaba.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="382"/>
         <source>Observing campaigns: a first-class list your projects can hang from, with cadence, filters and shared data links.</source>
-        <translation type="vanished">Campañas de observación: una lista de primera clase a la que se cuelgan tus proyectos, con cadencia, filtros y enlaces de datos compartidos.</translation>
+        <translation>Campañas de observación: una lista de primera clase a la que se cuelgan tus proyectos, con cadencia, filtros y enlaces de datos compartidos.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="385"/>
         <source>The project flow is now Ficha, Captura, Análisis, Publicación: the old Process step was renamed Analysis.</source>
-        <translation type="vanished">El flujo del proyecto es ahora Ficha, Captura, Análisis, Publicación: el antiguo paso Procesado pasó a ser Análisis.</translation>
+        <translation>El flujo del proyecto es ahora Ficha, Captura, Análisis, Publicación: el antiguo paso Procesado pasó a ser Análisis.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="388"/>
         <source>One registry for every project file, with its visit linked: the per-night images you had already registered moved over automatically.</source>
-        <translation type="vanished">Un solo registro para cada archivo del proyecto, con su visita enlazada: las imágenes por noche que ya tenías registradas se han movido automáticamente.</translation>
+        <translation>Un solo registro para cada archivo del proyecto, con su visita enlazada: las imágenes por noche que ya tenías registradas se han movido automáticamente.</translation>
     </message>
     <message>
+        <location filename="../../core/db.py" line="392"/>
         <source>Visits can be pinned to the top of the list, and their date is editable from the visit&apos;s window.</source>
-        <translation type="vanished">Las visitas se pueden fijar arriba de la lista, y su fecha se edita desde la ventana de la visita.</translation>
+        <translation>Las visitas se pueden fijar arriba de la lista, y su fecha se edita desde la ventana de la visita.</translation>
+    </message>
+    <message>
+        <location filename="../../core/db.py" line="395"/>
+        <source>Measurements remember the plate they were taken on: reopening that plate in the unified editor restores its stretch, the measurement recipe and the comparison sequence.</source>
+        <translation>Las mediciones recuerdan la placa en la que se tomaron: al reabrir esa placa en el editor unificado se restaura su estiramiento, la receta de medición y la secuencia de comparación.</translation>
     </message>
 </context>
 <context>
     <name>NSUpdateWizard</name>
     <message>
+        <location filename="../ui/wizard.ui" line="20"/>
         <source>NightScribe - Setup</source>
-        <translation type="vanished">NightScribe - Puesta a punto</translation>
+        <translation>NightScribe - Puesta a punto</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="27"/>
         <source>Your observatory</source>
-        <translation type="vanished">Tu observatorio</translation>
+        <translation>Tu observatorio</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="30"/>
         <source>Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</source>
-        <translation type="vanished">Dinos desde dónde miras el cielo: NightScribe calcula salidas, puestas, masa de aire y visibilidad para ese punto exacto.</translation>
+        <translation>Dinos desde dónde miras el cielo: NightScribe calcula salidas, puestas, masa de aire y visibilidad para ese punto exacto.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="36"/>
         <source>Detect my location (online)</source>
-        <translation type="vanished">Detectar mi ubicación (en línea)</translation>
+        <translation>Detectar mi ubicación (en línea)</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="44"/>
         <source>Find my location</source>
-        <translation type="vanished">Buscar mi ubicación</translation>
+        <translation>Buscar mi ubicación</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="76"/>
         <source>Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</source>
-        <translation type="vanished">Solo cuando lo pulses: la consulta usa tu IP pública para adivinar la ciudad y no envía nada más; y nunca actúa por su cuenta.</translation>
+        <translation>Solo cuando lo pulses: la consulta usa tu IP pública para adivinar la ciudad y no envía nada más; y nunca actúa por su cuenta.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="89"/>
         <source>Or with an MPC code (optional)</source>
-        <translation type="vanished">O con un código MPC (opcional)</translation>
+        <translation>O con un código MPC (opcional)</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="98"/>
         <source>e.g. Z41</source>
-        <translation type="vanished">p. ej. Z41</translation>
+        <translation>p. ej. Z41</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="105"/>
         <source>Resolve</source>
-        <translation type="vanished">Resolver</translation>
+        <translation>Resolver</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="128"/>
         <source>Or type the coordinates</source>
-        <translation type="vanished">O escribe las coordenadas</translation>
+        <translation>O escribe las coordenadas</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="134"/>
         <source>Name:</source>
-        <translation type="vanished">Nombre:</translation>
+        <translation>Nombre:</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="144"/>
         <source>Latitude (degrees):</source>
-        <translation type="vanished">Latitud (grados):</translation>
+        <translation>Latitud (grados):</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="164"/>
         <source>Longitude (degrees east):</source>
-        <translation type="vanished">Longitud (grados este):</translation>
+        <translation>Longitud (grados este):</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="184"/>
         <source>Height (m):</source>
-        <translation type="vanished">Altitud (m):</translation>
+        <translation>Altitud (m):</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="215"/>
         <source>Your targets</source>
-        <translation type="vanished">Tus objetivos</translation>
+        <translation>Tus objetivos</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="218"/>
         <source>Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</source>
-        <translation type="vanished">Cada tipo de abajo es un flujo completo en NightScribe. Deja marcados los que quieras seguir: dirigen la lista de la noche, los proyectos y los informes.</translation>
+        <translation>Cada tipo de abajo es un flujo completo en NightScribe. Deja marcados los que quieras seguir: dirigen la lista de la noche, los proyectos y los informes.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="256"/>
         <source>Keep at least one kind checked.</source>
-        <translation type="vanished">Deja al menos un tipo marcado.</translation>
+        <translation>Deja al menos un tipo marcado.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="267"/>
         <source>Your data, safe</source>
-        <translation type="vanished">Tus datos, a salvo</translation>
+        <translation>Tus datos, a salvo</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="270"/>
         <source>Before touching anything, NightScribe copies your database and reports in plain words what this version changes.</source>
-        <translation type="vanished">Antes de tocar nada, NightScribe copia tu base de datos y te cuenta en palabras llanas lo que cambia esta versión.</translation>
+        <translation>Antes de tocar nada, NightScribe copia tu base de datos y te cuenta en palabras llanas lo que cambia esta versión.</translation>
     </message>
     <message>
+        <location filename="../ui/wizard.ui" line="311"/>
         <source>Nothing changes until you leave this window.</source>
-        <translation type="vanished">No cambia nada hasta que salgas de esta ventana.</translation>
+        <translation>No cambia nada hasta que salgas de esta ventana.</translation>
     </message>
 </context>
 <context>
@@ -4071,32 +4226,39 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Nuevo proyecto</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="13"/>
         <source>Creates a new project for this object and links it to the selected campaign. If the project already exists, use “Attach project…” in the campaigns tab instead.</source>
-        <translation type="vanished">Crea un proyecto nuevo para este objeto y lo vincula a la campaña seleccionada. Si el proyecto ya existe, usa «Vincular proyecto…» en la pestaña de campañas.</translation>
+        <translation>Crea un proyecto nuevo para este objeto y lo vincula a la campaña seleccionada. Si el proyecto ya existe, usa «Vincular proyecto…» en la pestaña de campañas.</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="16"/>
         <source>Object:</source>
-        <translation type="vanished">Objeto:</translation>
+        <translation>Objeto:</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="18"/>
         <source>Resolve (VSX/SIMBAD)</source>
-        <translation type="vanished">Resolver (VSX/SIMBAD)</translation>
+        <translation>Resolver (VSX/SIMBAD)</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="19"/>
         <source>— not resolved yet —</source>
-        <translation type="vanished">— sin resolver aún —</translation>
+        <translation>— sin resolver aún —</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="20"/>
         <source>RA (deg):</source>
-        <translation type="vanished">AR (°):</translation>
+        <translation>AR (°):</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="22"/>
         <source>Dec (deg):</source>
-        <translation type="vanished">Dec (°):</translation>
+        <translation>Dec (°):</translation>
     </message>
     <message>
+        <location filename="../ui/new_project_dialog.ui" line="24"/>
         <source>Mag (approx):</source>
-        <translation type="vanished">Mag (aprox):</translation>
+        <translation>Mag (aprox):</translation>
     </message>
     <message>
         <location filename="../campaigns_dialog.py" line="147"/>
@@ -4143,6 +4305,7 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     </message>
     <message>
         <location filename="../overview.py" line="392"/>
+        <location filename="../ui/object_panel.ui" line="98"/>
         <source>Create project</source>
         <translation>Crear proyecto</translation>
     </message>
@@ -4152,37 +4315,45 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Empezar un proyecto nuevo de este objeto</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="52"/>
         <source>Parameters</source>
-        <translation type="vanished">Parámetros</translation>
+        <translation>Parámetros</translation>
     </message>
     <message>
         <location filename="../overview.py" line="607"/>
+        <location filename="../ui/object_panel.ui" line="32"/>
         <source>Copy</source>
         <translation>Copiar</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="32"/>
         <source>Copy the coordinates (decimal and sexagesimal)</source>
-        <translation type="vanished">Copiar las coordenadas (decimal y sexagesimal)</translation>
+        <translation>Copiar las coordenadas (decimal y sexagesimal)</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="57"/>
         <source>In depth</source>
-        <translation type="vanished">A fondo</translation>
+        <translation>A fondo</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="70"/>
         <source>Parameter</source>
-        <translation type="vanished">Parámetro</translation>
+        <translation>Parámetro</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="71"/>
         <source>Value</source>
-        <translation type="vanished">Valor</translation>
+        <translation>Valor</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="72"/>
         <source>What it means</source>
-        <translation type="vanished">Qué significa</translation>
+        <translation>Qué significa</translation>
     </message>
     <message>
+        <location filename="../ui/object_panel.ui" line="80"/>
         <source>Charts</source>
-        <translation type="vanished">Gráficos</translation>
+        <translation>Gráficos</translation>
     </message>
     <message>
         <location filename="../overview.py" line="720"/>
@@ -4500,52 +4671,66 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>PostTab</name>
     <message>
+        <location filename="../ui/post_tab.ui" line="10"/>
         <source>Object:</source>
-        <translation type="vanished">Objeto:</translation>
+        <translation>Objeto:</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="15"/>
         <source>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</source>
-        <translation type="vanished">2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</translation>
+        <translation>2021EQ3, 29P, SN2023ixf, HD 209458 b, sol…</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="20"/>
         <source>Generate</source>
-        <translation type="vanished">Generar</translation>
+        <translation>Generar</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="21"/>
         <source>Enrich the object and build the drafts</source>
-        <translation type="vanished">Enriquece el objeto y genera los borradores</translation>
+        <translation>Enriquece el objeto y genera los borradores</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="30"/>
         <source>Save to:</source>
-        <translation type="vanished">Guardar en:</translation>
+        <translation>Guardar en:</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="35"/>
         <source>Folder for the drafts and charts</source>
-        <translation type="vanished">Carpeta de los borradores y gráficos</translation>
+        <translation>Carpeta de los borradores y gráficos</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="40"/>
         <source>Browse…</source>
-        <translation type="vanished">Examinar…</translation>
+        <translation>Examinar…</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="48"/>
         <source>ES</source>
-        <translation type="vanished">ES</translation>
+        <translation>ES</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="51"/>
+        <location filename="../ui/post_tab.ui" line="58"/>
+        <location filename="../ui/post_tab.ui" line="65"/>
         <source>Copy</source>
-        <translation type="vanished">Copiar</translation>
+        <translation>Copiar</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="55"/>
         <source>EN</source>
-        <translation type="vanished">EN</translation>
+        <translation>EN</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="62"/>
         <source>X</source>
-        <translation type="vanished">X</translation>
+        <translation>X</translation>
     </message>
     <message>
+        <location filename="../ui/post_tab.ui" line="72"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
 </context>
 <context>
@@ -4558,20 +4743,24 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Ficheros del proyecto</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="24"/>
         <source>Kind</source>
-        <translation type="vanished">Tipo</translation>
+        <translation>Tipo</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="25"/>
         <source>Name</source>
-        <translation type="vanished">Nombre</translation>
+        <translation>Nombre</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="26"/>
         <source>Date</source>
-        <translation type="vanished">Fecha</translation>
+        <translation>Fecha</translation>
     </message>
     <message>
+        <location filename="../ui/project_files_dialog.ui" line="27"/>
         <source>Size</source>
-        <translation type="vanished">Tamaño</translation>
+        <translation>Tamaño</translation>
     </message>
     <message>
         <location filename="../project_files_dialog.py" line="98"/>
@@ -4620,24 +4809,29 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>ProjectsTab</name>
     <message>
+        <location filename="../ui/projects_tab.ui" line="8"/>
         <source>Projects</source>
-        <translation type="vanished">Proyectos</translation>
+        <translation>Proyectos</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="24"/>
         <source>Active</source>
-        <translation type="vanished">Activos</translation>
+        <translation>Activos</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="25"/>
         <source>All</source>
-        <translation type="vanished">Todos</translation>
+        <translation>Todos</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="26"/>
         <source>Done</source>
-        <translation type="vanished">Terminados</translation>
+        <translation>Terminados</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="27"/>
         <source>Archived</source>
-        <translation type="vanished">Archivados</translation>
+        <translation>Archivados</translation>
     </message>
     <message>
         <source>Refresh</source>
@@ -4648,112 +4842,141 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Campañas…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="17"/>
         <source>New project…</source>
-        <translation type="vanished">Nuevo proyecto…</translation>
+        <translation>Nuevo proyecto…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="57"/>
         <source>All types</source>
-        <translation type="vanished">Todos los tipos</translation>
+        <translation>Todos los tipos</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="58"/>
         <source>SN</source>
-        <translation type="vanished">SN</translation>
+        <translation>SN</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="59"/>
         <source>NEO</source>
-        <translation type="vanished">NEO</translation>
+        <translation>NEO</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="60"/>
         <source>Comet</source>
-        <translation type="vanished">Cometa</translation>
+        <translation>Cometa</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="61"/>
         <source>PCCP</source>
-        <translation type="vanished">PCCP</translation>
+        <translation>PCCP</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="62"/>
         <source>Transit</source>
-        <translation type="vanished">Tránsito</translation>
+        <translation>Tránsito</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="63"/>
         <source>HADS</source>
-        <translation type="vanished">HADS</translation>
+        <translation>HADS</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="64"/>
         <source>Variable</source>
-        <translation type="vanished">Variable</translation>
+        <translation>Variable</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="14"/>
         <source>Search…</source>
-        <translation type="vanished">Buscar…</translation>
+        <translation>Buscar…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="32"/>
         <source>Filters ▸</source>
-        <translation type="vanished">Filtros ▸</translation>
+        <translation>Filtros ▸</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="34"/>
         <source>Show or hide the advanced filters (type, tag, campaign, sort)</source>
-        <translation type="vanished">Muestra u oculta los filtros avanzados (tipo, etiqueta, campaña, orden)</translation>
+        <translation>Muestra u oculta los filtros avanzados (tipo, etiqueta, campaña, orden)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="69"/>
         <source>tag…</source>
-        <translation type="vanished">etiqueta…</translation>
+        <translation>etiqueta…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="75"/>
         <source>All campaigns</source>
-        <translation type="vanished">Todas las campañas</translation>
+        <translation>Todas las campañas</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="84"/>
         <source>Needs you</source>
-        <translation type="vanished">Te necesita</translation>
+        <translation>Te necesita</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="85"/>
         <source>Updated</source>
-        <translation type="vanished">Actualización</translation>
+        <translation>Actualización</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="86"/>
         <source>Created</source>
-        <translation type="vanished">Creación</translation>
+        <translation>Creación</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="87"/>
         <source>Name</source>
-        <translation type="vanished">Nombre</translation>
+        <translation>Nombre</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="92"/>
         <source>★ Favorites first</source>
-        <translation type="vanished">★ Favoritos primero</translation>
+        <translation>★ Favoritos primero</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="102"/>
         <source>Select a project to see its guided steps</source>
-        <translation type="vanished">Selecciona un proyecto para ver sus pasos guiados</translation>
+        <translation>Selecciona un proyecto para ver sus pasos guiados</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="184"/>
         <source>Files (0)</source>
-        <translation type="vanished">Archivos (0)</translation>
+        <translation>Archivos (0)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="187"/>
         <source>Open the project files (FITS plates open in the editor)</source>
-        <translation type="vanished">Abrir los archivos del proyecto (las placas FITS abren en el editor)</translation>
+        <translation>Abrir los archivos del proyecto (las placas FITS abren en el editor)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="209"/>
+        <location filename="../ui/projects_tab.ui" line="220"/>
+        <location filename="../ui/projects_tab.ui" line="231"/>
         <source>→</source>
-        <translation type="vanished">→</translation>
+        <translation>→</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="288"/>
         <source>⋯</source>
-        <translation type="vanished">⋯</translation>
+        <translation>⋯</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="289"/>
         <source>Manage this project (tags, folder, close, archive, delete)</source>
-        <translation type="vanished">Gestionar este proyecto (etiquetas, carpeta, cerrar, archivar, borrar)</translation>
+        <translation>Gestionar este proyecto (etiquetas, carpeta, cerrar, archivar, borrar)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="317"/>
         <source>✔ Mark done</source>
-        <translation type="vanished">✔ Marcar hecho</translation>
+        <translation>✔ Marcar hecho</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="318"/>
         <source>Mark the current step as done</source>
-        <translation type="vanished">Marca el paso actual como hecho</translation>
+        <translation>Marca el paso actual como hecho</translation>
     </message>
     <message>
         <source>Skip</source>
@@ -4780,40 +5003,49 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Borrar</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="110"/>
         <source>Project details</source>
-        <translation type="vanished">Detalles del proyecto</translation>
+        <translation>Detalles del proyecto</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="118"/>
         <source>Needs your attention</source>
-        <translation type="vanished">Necesita tu atención</translation>
+        <translation>Necesita tu atención</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="125"/>
         <source>Your projects calling for action, most urgent first.</source>
-        <translation type="vanished">Tus proyectos pidiendo acción, el más urgente primero.</translation>
+        <translation>Tus proyectos pidiendo acción, el más urgente primero.</translation>
     </message>
     <message>
         <source>Select a project or create one from Tonight.</source>
         <translation type="vanished">Selecciona un proyecto o crea uno desde «Esta noche».</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="251"/>
+        <location filename="../ui/projects_tab.ui" line="305"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="274"/>
         <source>⌂</source>
-        <translation type="vanished">⌂</translation>
+        <translation>⌂</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="275"/>
         <source>Back to the dashboard</source>
-        <translation type="vanished">Volver al panel</translation>
+        <translation>Volver al panel</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="281"/>
         <source>☆</source>
-        <translation type="vanished">☆</translation>
+        <translation>☆</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="283"/>
         <source>Mark as favorite</source>
-        <translation type="vanished">Marcar como favorito</translation>
+        <translation>Marcar como favorito</translation>
     </message>
     <message>
         <source>Tags:</source>
@@ -4824,12 +5056,14 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">etiquetas separadas por comas…</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="301"/>
         <source>Next</source>
-        <translation type="vanished">Siguiente</translation>
+        <translation>Siguiente</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="312"/>
         <source>Go →</source>
-        <translation type="vanished">Ir →</translation>
+        <translation>Ir →</translation>
     </message>
     <message>
         <source>Details</source>
@@ -4868,20 +5102,24 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Siguiente →</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="39"/>
         <source>«</source>
-        <translation type="vanished">«</translation>
+        <translation>«</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="41"/>
         <source>Hide the project list (bring it back with » on the details side)</source>
-        <translation type="vanished">Ocultar la lista de proyectos (devuélvela con » en el lado de los detalles)</translation>
+        <translation>Ocultar la lista de proyectos (devuélvela con » en el lado de los detalles)</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="266"/>
         <source>»</source>
-        <translation type="vanished">»</translation>
+        <translation>»</translation>
     </message>
     <message>
+        <location filename="../ui/projects_tab.ui" line="269"/>
         <source>Bring back the project list</source>
-        <translation type="vanished">Mostrar de nuevo la lista de proyectos</translation>
+        <translation>Mostrar de nuevo la lista de proyectos</translation>
     </message>
 </context>
 <context>
@@ -4981,376 +5219,471 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>SettingsDialog</name>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="14"/>
         <source>Settings</source>
-        <translation type="vanished">Configuración</translation>
+        <translation>Configuración</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="24"/>
         <source>Site &amp; equipment</source>
-        <translation type="vanished">Sitio y equipo</translation>
+        <translation>Sitio y equipo</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="28"/>
         <source>Language</source>
-        <translation type="vanished">Idioma</translation>
+        <translation>Idioma</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="32"/>
         <source>Interface language:</source>
-        <translation type="vanished">Idioma de la interfaz:</translation>
+        <translation>Idioma de la interfaz:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="43"/>
         <source>Observatory</source>
-        <translation type="vanished">Observatorio</translation>
+        <translation>Observatorio</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="47"/>
         <source>MPC code:</source>
-        <translation type="vanished">Código MPC:</translation>
+        <translation>Código MPC:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="37"/>
         <source>Interface language; applies when the app restarts</source>
-        <translation type="vanished">Idioma de la interfaz; se aplica al reiniciar la app</translation>
+        <translation>Idioma de la interfaz; se aplica al reiniciar la app</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="49"/>
         <source>Resolve coordinates</source>
-        <translation type="vanished">Resolver coordenadas</translation>
+        <translation>Resolver coordenadas</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="53"/>
         <source>Your MPC observatory code; the site coordinates resolve automatically from it</source>
-        <translation type="vanished">Tu código MPC de observatorio; las coordenadas del sitio se resuelven automáticamente a partir de él</translation>
+        <translation>Tu código MPC de observatorio; las coordenadas del sitio se resuelven automáticamente a partir de él</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="56"/>
         <source>Name:</source>
-        <translation type="vanished">Nombre:</translation>
+        <translation>Nombre:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="61"/>
         <source>Free-text observatory name (posts, reports)</source>
-        <translation type="vanished">Nombre libre del observatorio (posts, informes)</translation>
+        <translation>Nombre libre del observatorio (posts, informes)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="64"/>
         <source>Latitude (°):</source>
-        <translation type="vanished">Latitud (°):</translation>
+        <translation>Latitud (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="69"/>
         <source>Decimal degrees; north is positive. Your site latitude.</source>
-        <translation type="vanished">Grados decimales; norte positivo. Latitud de tu sitio.</translation>
+        <translation>Grados decimales; norte positivo. Latitud de tu sitio.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="72"/>
         <source>Longitude (°, east):</source>
-        <translation type="vanished">Longitud (°, este):</translation>
+        <translation>Longitud (°, este):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="77"/>
         <source>Decimal degrees; east is positive. Your site longitude.</source>
-        <translation type="vanished">Grados decimales; este positivo. Longitud de tu sitio.</translation>
+        <translation>Grados decimales; este positivo. Longitud de tu sitio.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="80"/>
         <source>Height (m):</source>
-        <translation type="vanished">Altitud (m):</translation>
+        <translation>Altitud (m):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="85"/>
         <source>Altitude of the observatory above sea level (m) — enters the parallax and atmospheric terms</source>
-        <translation type="vanished">Altitud del observatorio sobre el nivel del mar (m); entra en los términos de paralaje y atmósfera</translation>
+        <translation>Altitud del observatorio sobre el nivel del mar (m); entra en los términos de paralaje y atmósfera</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="88"/>
         <source>AAVSO code:</source>
-        <translation type="vanished">Código AAVSO:</translation>
+        <translation>Código AAVSO:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="93"/>
         <source>Optional; written into the EXOTIC inits.json handoff (transit projects)</source>
-        <translation type="vanished">Opcional; se escribe en el handoff inits.json de EXOTIC (proyectos de tránsito)</translation>
+        <translation>Opcional; se escribe en el handoff inits.json de EXOTIC (proyectos de tránsito)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="108"/>
         <source>Scope aperture in inches; used to size transit targets and scale the “why tonight” reasons</source>
-        <translation type="vanished">Apertura del telescopio en pulgadas; define los objetivos de tránsito y calibra los motivos de “esta noche”</translation>
+        <translation>Apertura del telescopio en pulgadas; define los objetivos de tránsito y calibra los motivos de “esta noche”</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="131"/>
         <source>Camera pixel size in microns (3.76 for a QHY600); sets arcsec/pixel with focal length</source>
-        <translation type="vanished">Tamaño de píxel en micras (3.76 para una QHY600); fija la escala arcsec/píxel junto con la focal</translation>
+        <translation>Tamaño de píxel en micras (3.76 para una QHY600); fija la escala arcsec/píxel junto con la focal</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="147"/>
         <source>CCD, CMOS or DSLR; written into the EXOTIC inits.json handoff</source>
-        <translation type="vanished">CCD, CMOS o DSLR; se escribe en el handoff inits.json de EXOTIC</translation>
+        <translation>CCD, CMOS o DSLR; se escribe en el handoff inits.json de EXOTIC</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="155"/>
         <source>On-chip binning (1x1, 2x2…); written into the EXOTIC inits.json handoff</source>
-        <translation type="vanished">Binning del sensor (1x1, 2x2…); se escribe en el handoff inits.json de EXOTIC</translation>
+        <translation>Binning del sensor (1x1, 2x2…); se escribe en el handoff inits.json de EXOTIC</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="239"/>
         <source>TheSkyX .hrz or “az alt” pairs; when it loads, the file is the safety reference</source>
-        <translation type="vanished">Pares .hrz de TheSkyX o «az alt»; al cargarse, el fichero es la referencia de seguridad</translation>
+        <translation>Pares .hrz de TheSkyX o «az alt»; al cargarse, el fichero es la referencia de seguridad</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="247"/>
         <source>Extra degrees of clearance added on top of the limit, for the Sun and for slew safety</source>
-        <translation type="vanished">Grados extra de margen sobre el límite, para el Sol y para seguridad de slew</translation>
+        <translation>Grados extra de margen sobre el límite, para el Sol y para seguridad de slew</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="255"/>
         <source>Flat altitude floor, used only when no limit file is loaded</source>
-        <translation type="vanished">Piso fijo de altitud, usado solo cuando no hay archivo de límite cargado</translation>
+        <translation>Piso fijo de altitud, usado solo cuando no hay archivo de límite cargado</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="273"/>
         <source>HADS variable stars</source>
-        <translation type="vanished">Estrellas variables HADS</translation>
+        <translation>Estrellas variables HADS</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="274"/>
         <source>Variable stars</source>
-        <translation type="vanished">Estrellas variables</translation>
+        <translation>Estrellas variables</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="291"/>
         <source>How many entries of each kind the Tonight grid lists (more in Explore)</source>
-        <translation type="vanished">Cuántas entradas por tipo enumera la cuadrícula de Esta_noche (más en Explorar)</translation>
+        <translation>Cuántas entradas por tipo enumera la cuadrícula de Esta_noche (más en Explorar)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="307"/>
         <source>ExoClock drops transits too big for your scope when checked</source>
-        <translation type="vanished">ExoClock descarta los tránsitos que exigen un telescopio mayor que el tuyo al marcarlo</translation>
+        <translation>ExoClock descarta los tránsitos que exigen un telescopio mayor que el tuyo al marcarlo</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="317"/>
         <source>Projects folder</source>
-        <translation type="vanished">Carpeta de proyectos</translation>
+        <translation>Carpeta de proyectos</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="321"/>
         <source>Projects folder:</source>
-        <translation type="vanished">Carpeta de proyectos:</translation>
+        <translation>Carpeta de proyectos:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="324"/>
         <source>Reset</source>
-        <translation type="vanished">Restablecer</translation>
+        <translation>Restablecer</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="328"/>
         <source>Where every project builds its own container folder. Empty uses the app data folder; new projects pick this up, existing ones keep theirs</source>
-        <translation type="vanished">Donde cada proyecto crea su carpeta. Vacío usa la carpeta de datos de la app; los nuevos la heredan, los existentes se quedan con la suya.</translation>
+        <translation>Donde cada proyecto crea su carpeta. Vacío usa la carpeta de datos de la app; los nuevos la heredan, los existentes se quedan con la suya.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="379"/>
         <source>Readout/slew seconds added to every exposure when sizing the transit capture sequence</source>
-        <translation type="vanished">Segundos de lectura/slew que se suman a cada exposición al dimensionar la secuencia de captura del tránsito</translation>
+        <translation>Segundos de lectura/slew que se suman a cada exposición al dimensionar la secuencia de captura del tránsito</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="387"/>
         <source>Nights without a visit after which an active supernova project asks to be revisited</source>
-        <translation type="vanished">Noches sin observación tras las cuales un proyecto de supernova activo pide ser revisado</translation>
+        <translation>Noches sin observación tras las cuales un proyecto de supernova activo pide ser revisado</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="99"/>
         <source>Equipment and limits</source>
-        <translation type="vanished">Equipo y límites</translation>
+        <translation>Equipo y límites</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="503"/>
         <source>AAVSO API token:</source>
-        <translation type="vanished">Token de API AAVSO:</translation>
+        <translation>Token de API AAVSO:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="507"/>
         <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</source>
-        <translation type="vanished">Opcional; de tu cuenta AAVSO. Las vigilias de estrellas brillantes (basal por debajo de ~11,5 mag, p. ej. T CrB / R CrB) leen la fotometría de la comunidad, que exige este token — sin él permanecen en silencio</translation>
+        <translation>Opcional; de tu cuenta AAVSO. Las vigilias de estrellas brillantes (basal por debajo de ~11,5 mag, p. ej. T CrB / R CrB) leen la fotometría de la comunidad, que exige este token — sin él permanecen en silencio</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="103"/>
         <source>Aperture (inches):</source>
-        <translation type="vanished">Apertura (pulgadas):</translation>
+        <translation>Apertura (pulgadas):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="111"/>
         <source>Limiting magnitude:</source>
-        <translation type="vanished">Magnitud límite:</translation>
+        <translation>Magnitud límite:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="116"/>
         <source>Faintest object you can realistically detect at your site; caps the Tonight scoring</source>
-        <translation type="vanished">Objeto más tenue que puedes detectar realísticamente en tu sitio; pone tope al score de Esta_noche</translation>
+        <translation>Objeto más tenue que puedes detectar realísticamente en tu sitio; pone tope al score de Esta_noche</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="139"/>
         <source>Telescope focal length in mm; together with the pixel size it sets the arcsec/pixel scale</source>
-        <translation type="vanished">Distancia focal del telescopio en mm; con el tamaño de píxel fija la escala de arc/píxel</translation>
+        <translation>Distancia focal del telescopio en mm; con el tamaño de píxel fija la escala de arc/píxel</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="142"/>
         <source>Camera type:</source>
-        <translation type="vanished">Tipo de cámara:</translation>
+        <translation>Tipo de cámara:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="150"/>
         <source>Pixel binning:</source>
-        <translation type="vanished">Binning de píxel:</translation>
+        <translation>Binning de píxel:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="161"/>
         <source>Chart annotations</source>
-        <translation type="vanished">Anotación de cartas</translation>
+        <translation>Anotación de cartas</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="165"/>
         <source>Observer:</source>
-        <translation type="vanished">Observador:</translation>
+        <translation>Observador:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="170"/>
         <source>Your name as it should read in the chart boxes (Obs); may stay empty</source>
-        <translation type="vanished">Tu nombre tal como debe leerse en las cajas de las cartas (Obs); puede quedar vacío</translation>
+        <translation>Tu nombre tal como debe leerse en las cajas de las cartas (Obs); puede quedar vacío</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="173"/>
         <source>Measurer:</source>
-        <translation type="vanished">Medidor:</translation>
+        <translation>Medidor:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="178"/>
         <source>Who measured the plate (Msr); empty means the observer</source>
-        <translation type="vanished">Quien midió la placa (Msr); vacío significa el observador</translation>
+        <translation>Quien midió la placa (Msr); vacío significa el observador</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="181"/>
         <source>Telescope:</source>
-        <translation type="vanished">Telescopio:</translation>
+        <translation>Telescopio:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="182"/>
         <source>0.43-m f/4.9 reflector</source>
-        <translation type="vanished">0.43-m f/4.9 reflector</translation>
+        <translation>0.43-m f/4.9 reflector</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="186"/>
         <source>Free-text telescope line for the chart boxes (Tel)</source>
-        <translation type="vanished">Línea libre del telescopio para las cajas (Tel)</translation>
+        <translation>Línea libre del telescopio para las cajas (Tel)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="189"/>
         <source>Camera model:</source>
-        <translation type="vanished">Modelo de cámara:</translation>
+        <translation>Modelo de cámara:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="194"/>
         <source>Free-text camera line for the chart boxes (Cam)</source>
-        <translation type="vanished">Línea libre de la cámara para las cajas (Cam)</translation>
+        <translation>Línea libre de la cámara para las cajas (Cam)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="197"/>
         <source>Object marker:</source>
-        <translation type="vanished">Marcador del objeto:</translation>
+        <translation>Marcador del objeto:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="202"/>
         <source>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</source>
-        <translation type="vanished">Cómo se marca el objeto en las cartas: anillo con ticks (clásico) o cruz a todo el campo con caja</translation>
+        <translation>Cómo se marca el objeto en las cartas: anillo con ticks (clásico) o cruz a todo el campo con caja</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="205"/>
         <source>Corner boxes:</source>
-        <translation type="vanished">Cajas en las esquinas:</translation>
+        <translation>Cajas en las esquinas:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="206"/>
         <source>Stamp the metadata boxes on the charts</source>
-        <translation type="vanished">Estampa las cajas de metadatos en las cartas</translation>
+        <translation>Estampa las cajas de metadatos en las cartas</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="210"/>
         <source>Corner boxes with the object, date, position, brightness, observer, equipment and plate scale; on screen and in the exported PNG/GIF/video</source>
-        <translation type="vanished">Cajas en las esquinas con el objeto, la fecha, la posición, el brillo, el observador, el equipo y la escala de placa; en pantalla y en el PNG/GIF/vídeo exportado</translation>
+        <translation>Cajas en las esquinas con el objeto, la fecha, la posición, el brillo, el observador, el equipo y la escala de placa; en pantalla y en el PNG/GIF/vídeo exportado</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="225"/>
         <source>Observing</source>
-        <translation type="vanished">Observación</translation>
+        <translation>Observación</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="229"/>
         <source>Local limit</source>
-        <translation type="vanished">Límite local</translation>
+        <translation>Límite local</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="233"/>
         <source>Limit file:</source>
-        <translation type="vanished">Archivo de límites:</translation>
+        <translation>Archivo de límites:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="250"/>
         <source>Minimum altitude (°):</source>
-        <translation type="vanished">Altitud mínima (°):</translation>
+        <translation>Altitud mínima (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="262"/>
         <source>Tonight: object kinds</source>
-        <translation type="vanished">Esta noche: tipos de objeto</translation>
+        <translation>Esta noche: tipos de objeto</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="267"/>
         <source>NEOs</source>
-        <translation type="vanished">NEOs</translation>
+        <translation>NEOs</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="268"/>
         <source>Supernovae</source>
-        <translation type="vanished">Supernovas</translation>
+        <translation>Supernovas</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="269"/>
         <source>Comets</source>
-        <translation type="vanished">Cometas</translation>
+        <translation>Cometas</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="270"/>
         <source>PCCP candidates</source>
-        <translation type="vanished">Candidatos PCCP</translation>
+        <translation>Candidatos PCCP</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="271"/>
+        <location filename="../ui/settings_dialog.ui" line="297"/>
         <source>Exoplanet transits</source>
-        <translation type="vanished">Tránsitos de exoplanetas</translation>
+        <translation>Tránsitos de exoplanetas</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="272"/>
         <source>Close approaches (alerts)</source>
-        <translation type="vanished">Acercamientos (alertas)</translation>
+        <translation>Acercamientos (alertas)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="279"/>
         <source>Which kinds are scored and shown for Tonight and Explore; untick a kind to hide it everywhere</source>
-        <translation type="vanished">Qué tipos se puntúan y muestran en Esta_noche y Explorar; desmarca un tipo para ocultarlo por todas partes</translation>
+        <translation>Qué tipos se puntúan y muestran en Esta_noche y Explorar; desmarca un tipo para ocultarlo por todas partes</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="286"/>
         <source>Shown per kind (Tonight):</source>
-        <translation type="vanished">Mostrados por tipo (Esta noche):</translation>
+        <translation>Mostrados por tipo (Esta noche):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="301"/>
         <source>Hide transits that need a bigger telescope than mine</source>
-        <translation type="vanished">Ocultar los tránsitos que piden un telescopio mayor que el mío</translation>
+        <translation>Ocultar los tránsitos que piden un telescopio mayor que el mío</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="364"/>
         <source>Also list Jupiter&apos;s moon transits when Jupiter is not up (dimmed)</source>
-        <translation type="vanished">También muestra los tránsitos de las lunas de Júpiter cuando no está arriba (en gris)</translation>
+        <translation>También muestra los tránsitos de las lunas de Júpiter cuando no está arriba (en gris)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="382"/>
         <source>SN revisit reminder (days):</source>
-        <translation type="vanished">Recordatorio de revisita SN (días):</translation>
+        <translation>Recordatorio de revisita SN (días):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="390"/>
         <source>Event threshold (mag):</source>
-        <translation type="vanished">Umbral de evento (mag):</translation>
+        <translation>Umbral de evento (mag):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="395"/>
         <source>Brightness jump (in magnitudes) from which a variable/SN project raises the event advisor</source>
-        <translation type="vanished">Salto de brillo (en magnitudes) a partir del cual un proyecto de variable/SN activa el asesor de eventos</translation>
+        <translation>Salto de brillo (en magnitudes) a partir del cual un proyecto de variable/SN activa el asesor de eventos</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="398"/>
         <source>Extremum window (days):</source>
-        <translation type="vanished">Ventana del extremo (días):</translation>
+        <translation>Ventana del extremo (días):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="403"/>
         <source>A campaign variable whose maximum/minimum is this many days or less away counts as imminent — it lands in Tonight (window of 0 = today)</source>
-        <translation type="vanished">Una variable de campaña cuyo máximo o mínimo está a este número de días o menos cuenta como inminente — entra en &quot;Esta noche&quot; (ventana de 0 = hoy)</translation>
+        <translation>Una variable de campaña cuyo máximo o mínimo está a este número de días o menos cuenta como inminente — entra en &quot;Esta noche&quot; (ventana de 0 = hoy)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="406"/>
         <source>Variable vigils:</source>
-        <translation type="vanished">Vigilias de variables:</translation>
+        <translation>Vigilias de variables:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="410"/>
         <source>Standing watch list checked against the latest ZTF magnitude — one star per line: name | rise/drop | baseline mag | threshold (optionally | RA° | Dec°, else resolved via VSX). rise = eruption watch (T CrB), drop = fade watch (R CrB)</source>
-        <translation type="vanished">Lista de guardia permanente chequeada contra la última magnitud ZTF — una estrella por línea: nombre | rise/drop | magnitud basal | umbral (opcionalmente | RA° | Dec°; si falta, se resuelve vía VSX). rise = vigilia de erupción (T CrB), drop = vigilia de caída (R CrB)</translation>
+        <translation>Lista de guardia permanente chequeada contra la última magnitud ZTF — una estrella por línea: nombre | rise/drop | magnitud basal | umbral (opcionalmente | RA° | Dec°; si falta, se resuelve vía VSX). rise = vigilia de erupción (T CrB), drop = vigilia de caída (R CrB)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="413"/>
         <source>AAVSO channel in Tonight</source>
-        <translation type="vanished">Canal AAVSO en Esta noche</translation>
+        <translation>Canal AAVSO en Esta noche</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="417"/>
         <source>Show the AAVSO editorial channel — forum alerts and active observing campaigns — as Tonight suggestions when the star is up</source>
-        <translation type="vanished">Muestra el canal editorial AAVSO — alertas del foro y campañas de observación activas — como sugerencias en Esta noche cuando la estrella está arriba</translation>
+        <translation>Muestra el canal editorial AAVSO — alertas del foro y campañas de observación activas — como sugerencias en Esta noche cuando la estrella está arriba</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="436"/>
         <source>CCDciel (JSON-RPC connection)</source>
-        <translation type="vanished">CCDciel (conexión JSON-RPC)</translation>
+        <translation>CCDciel (conexión JSON-RPC)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="487"/>
         <source>TNS bot name:</source>
-        <translation type="vanished">Nombre del bot TNS:</translation>
+        <translation>Nombre del bot TNS:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="492"/>
+        <location filename="../ui/settings_dialog.ui" line="500"/>
         <source>Optional: TNS bot credentials to fetch discovery images for transients</source>
-        <translation type="vanished">Opcional: credenciales del bot TNS para obtener imágenes de descubrimiento de transitorios</translation>
+        <translation>Opcional: credenciales del bot TNS para obtener imágenes de descubrimiento de transitorios</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="495"/>
         <source>TNS bot key:</source>
-        <translation type="vanished">Clave del bot TNS:</translation>
+        <translation>Clave del bot TNS:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="522"/>
         <source>Development</source>
-        <translation type="vanished">Desarrollo</translation>
+        <translation>Desarrollo</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="526"/>
         <source>FITS editor</source>
-        <translation type="vanished">Editor FITS</translation>
+        <translation>Editor FITS</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="530"/>
         <source>Unified editor (UFE) by default:</source>
-        <translation type="vanished">Editor unificado (UFE) por defecto:</translation>
+        <translation>Editor unificado (UFE) por defecto:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="532"/>
         <source>Icons-only top bar:</source>
-        <translation type="vanished">Barra superior solo con iconos:</translation>
+        <translation>Barra superior solo con iconos:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="537"/>
         <source>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor&apos;s action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them.</source>
-        <translation type="vanished">Activado: Blink, la carta de comparación y el FITS anotado abren en el editor unificado (Herramientas → NightScribe Image Workbench…). Desactivado: los diálogos clásicos siguen siendo los predeterminados. En ambos casos los dos siguen disponibles durante el periodo de revisión, para compararlos; se aplica al momento, sin reiniciar. Barra superior solo con iconos: los botones de acción del editor muestran glifos compactos en lugar de sus etiquetas (Resolver conserva su texto); desactivado los recupera.</translation>
+        <translation>Activado: Blink, la carta de comparación y el FITS anotado abren en el editor unificado (Herramientas → NightScribe Image Workbench…). Desactivado: los diálogos clásicos siguen siendo los predeterminados. En ambos casos los dos siguen disponibles durante el periodo de revisión, para compararlos; se aplica al momento, sin reiniciar. Barra superior solo con iconos: los botones de acción del editor muestran glifos compactos en lugar de sus etiquetas (Resolver conserva su texto); desactivado los recupera.</translation>
     </message>
     <message>
         <source>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor&apos;s action buttons show compact glyphs instead of their labels (Solve and Move marker keep their text); off restores them.</source>
@@ -5365,239 +5698,297 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Activado: Blink, la carta de comparación y el FITS anotado se abren en el editor unificado (Herramientas → Editor FITS…). Desactivado: los diálogos clásicos siguen siendo los predeterminados. En ambos casos los dos siguen disponibles durante el periodo de revisión para que los compares; se aplica al instante, sin reiniciar.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="440"/>
         <source>Host:</source>
-        <translation type="vanished">Host:</translation>
+        <translation>Host:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="448"/>
         <source>Port:</source>
-        <translation type="vanished">Puerto:</translation>
+        <translation>Puerto:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="456"/>
         <source>Auto-connect on start:</source>
-        <translation type="vanished">Auto-conexión al inicio:</translation>
+        <translation>Auto-conexión al inicio:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="122"/>
         <source>Camera (plate scale)</source>
-        <translation type="vanished">Cámara (escala de placa)</translation>
+        <translation>Cámara (escala de placa)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="126"/>
         <source>Pixel size (µm):</source>
-        <translation type="vanished">Tamaño de píxel (µm):</translation>
+        <translation>Tamaño de píxel (µm):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="134"/>
         <source>Focal length (mm):</source>
-        <translation type="vanished">Distancia focal (mm):</translation>
+        <translation>Distancia focal (mm):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="235"/>
+        <location filename="../ui/settings_dialog.ui" line="323"/>
         <source>Browse…</source>
-        <translation type="vanished">Examinar…</translation>
+        <translation>Examinar…</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="242"/>
         <source>Safety margin (°):</source>
-        <translation type="vanished">Margen de seguridad (°):</translation>
+        <translation>Margen de seguridad (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="334"/>
         <source>Moon constraint</source>
-        <translation type="vanished">Restricción de la Luna</translation>
+        <translation>Restricción de la Luna</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="338"/>
         <source>Warn when Moon interferes</source>
-        <translation type="vanished">Avisar cuando la Luna interfiera</translation>
+        <translation>Avisar cuando la Luna interfiera</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="343"/>
         <source>Flags targets that sit too close to a bright, high Moon</source>
-        <translation type="vanished">Marca los objetivos que están demasiado cerca de una Luna brillante y alta</translation>
+        <translation>Marca los objetivos que están demasiado cerca de una Luna brillante y alta</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="350"/>
         <source>Min separation (°):</source>
-        <translation type="vanished">Separación mínima (°):</translation>
+        <translation>Separación mínima (°):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="355"/>
         <source>Target-to-Moon angular distance below which the warning fires (degrees)</source>
-        <translation type="vanished">Distancia angular objetivo-Luna por debajo de la cual dispara la advertencia (grados)</translation>
+        <translation>Distancia angular objetivo-Luna por debajo de la cual dispara la advertencia (grados)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="358"/>
         <source>Max illumination:</source>
-        <translation type="vanished">Iluminación máxima:</translation>
+        <translation>Iluminación máxima:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="363"/>
         <source>Fraction of the lunar disk lit above which the warning starts (0.5 = half Moon)</source>
-        <translation type="vanished">Fracción del disco lunar iluminada a partir de la cual empieza la advertencia (0.5 = media Luna)</translation>
+        <translation>Fracción del disco lunar iluminada a partir de la cual empieza la advertencia (0.5 = media Luna)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="370"/>
         <source>Session defaults</source>
-        <translation type="vanished">Valores por defecto de sesión</translation>
+        <translation>Valores por defecto de sesión</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="374"/>
         <source>Per-frame overhead (s):</source>
-        <translation type="vanished">Overhead por toma (s):</translation>
+        <translation>Overhead por toma (s):</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="432"/>
         <source>Integrations</source>
-        <translation type="vanished">Integraciones</translation>
+        <translation>Integraciones</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="445"/>
         <source>Where CCDciel is running; localhost by default. Control only works while CCDciel is open.</source>
-        <translation type="vanished">Donde corre CCDciel; localhost por defecto. El control solo funciona con CCDciel abierto.</translation>
+        <translation>Donde corre CCDciel; localhost por defecto. El control solo funciona con CCDciel abierto.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="453"/>
         <source>Junction point on the CCDciel machine. The default (3277) matches the JSON-RPC server.</source>
-        <translation type="vanished">Punto de conexión en la máquina de CCDciel. El valor por defecto (3277) coincide con el servidor JSON-RPC.</translation>
+        <translation>Punto de conexión en la máquina de CCDciel. El valor por defecto (3277) coincide con el servidor JSON-RPC.</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="461"/>
         <source>Connect to CCDciel as soon as the app starts (off by default)</source>
-        <translation type="vanished">Conectar a CCDciel nada más arrancar la app (desactivado por defecto)</translation>
+        <translation>Conectar a CCDciel nada más arrancar la app (desactivado por defecto)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="467"/>
         <source>API keys (all optional)</source>
-        <translation type="vanished">Claves API (todas opcionales)</translation>
+        <translation>Claves API (todas opcionales)</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="471"/>
         <source>NEOfixer API key:</source>
-        <translation type="vanished">Clave API NEOfixer:</translation>
+        <translation>Clave API NEOfixer:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="476"/>
         <source>Optional: report your observing status to NEOfixer</source>
-        <translation type="vanished">Opcional: reporta tus estados de observación a NEOfixer</translation>
+        <translation>Opcional: reporta tus estados de observación a NEOfixer</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="479"/>
         <source>Astrometry.net API key:</source>
-        <translation type="vanished">Clave API de Astrometry.net:</translation>
+        <translation>Clave API de Astrometry.net:</translation>
     </message>
     <message>
+        <location filename="../ui/settings_dialog.ui" line="484"/>
         <source>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</source>
-        <translation type="vanished">Opcional: resuelve FITS sin WCS en la pestaña Blink (clave gratuita en nova.astrometry.net)</translation>
+        <translation>Opcional: resuelve FITS sin WCS en la pestaña Blink (clave gratuita en nova.astrometry.net)</translation>
     </message>
 </context>
 <context>
     <name>SkyCalendarContent</name>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="150"/>
         <source>Refresh the Sun</source>
-        <translation type="vanished">Actualizar el Sol</translation>
+        <translation>Actualizar el Sol</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="155"/>
         <source>Channel:</source>
-        <translation type="vanished">Canal:</translation>
+        <translation>Canal:</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="162"/>
         <source>Corona 193 Å</source>
-        <translation type="vanished">Corona 193 Å</translation>
+        <translation>Corona 193 Å</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="165"/>
         <source>Chromosphere 304 Å</source>
-        <translation type="vanished">Cromosfera 304 Å</translation>
+        <translation>Cromosfera 304 Å</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="168"/>
         <source>Corona 171 Å</source>
-        <translation type="vanished">Corona 171 Å</translation>
+        <translation>Corona 171 Å</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="171"/>
         <source>Sunspots (visible)</source>
-        <translation type="vanished">Manchas (visible)</translation>
+        <translation>Manchas (visible)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="174"/>
         <source>Magnetogram</source>
-        <translation type="vanished">Magnetograma</translation>
+        <translation>Magnetograma</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="185"/>
         <source>Render PNG for socials</source>
-        <translation type="vanished">Generar PNG para redes</translation>
+        <translation>Generar PNG para redes</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="186"/>
         <source>Write today&apos;s Sun panel (with the observatory watermark) for your networks</source>
-        <translation type="vanished">Escribe el panel del Sol de hoy (con la marca de agua del observatorio) para tus redes</translation>
+        <translation>Escribe el panel del Sol de hoy (con la marca de agua del observatorio) para tus redes</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="61"/>
         <source>Coming up in the next 60 days</source>
-        <translation type="vanished">Próximos 60 días</translation>
+        <translation>Próximos 60 días</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="65"/>
         <source>Moon phases, conjunctions, oppositions, eclipses and meteor showers — computed locally, no network</source>
-        <translation type="vanished">Fases lunares, conjunciones, oposiciones, eclipses y lluvias de meteoros — calculado en local, sin red</translation>
+        <translation>Fases lunares, conjunciones, oposiciones, eclipses y lluvias de meteoros — calculado en local, sin red</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="26"/>
         <source>Moon calendar</source>
-        <translation type="vanished">Calendario lunar</translation>
+        <translation>Calendario lunar</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="22"/>
         <source>Moon</source>
-        <translation type="vanished">Luna</translation>
+        <translation>Luna</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="40"/>
         <source>Moon: —</source>
-        <translation type="vanished">Luna: —</translation>
+        <translation>Luna: —</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="53"/>
         <source>—</source>
-        <translation type="vanished">—</translation>
+        <translation>—</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="75"/>
         <source>Planets</source>
-        <translation type="vanished">Planetas</translation>
+        <translation>Planetas</translation>
     </message>
     <message>
         <source>Planets: —</source>
         <translation type="vanished">Planetas: —</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="79"/>
         <source>Planets tonight</source>
-        <translation type="vanished">Planetas hoy</translation>
+        <translation>Planetas hoy</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="83"/>
         <source>Rise, set and best moment for each planet tonight (UTC times; your local time in the tooltip)</source>
-        <translation type="vanished">Salida, ocaso y mejor momento de cada planeta esta noche (horas UTC; tu hora local en la acotación)</translation>
+        <translation>Salida, ocaso y mejor momento de cada planeta esta noche (horas UTC; tu hora local en la acotación)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="91"/>
         <source>Jupiter&apos;s moons this week</source>
-        <translation type="vanished">Las lunas de Júpiter esta semana</translation>
+        <translation>Las lunas de Júpiter esta semana</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="95"/>
         <source>Transits of the Galilean moons and their shadows across Jupiter&apos;s disc — visible from your site at night</source>
-        <translation type="vanished">Tránsitos de las lunas galileanas y sus sombras sobre el disco de Júpiter — visibles desde tu sitio de noche</translation>
+        <translation>Tránsitos de las lunas galileanas y sus sombras sobre el disco de Júpiter — visibles desde tu sitio de noche</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="102"/>
         <source>Local computation, planning grade: times to ±10 min. Saturn&apos;s moon transits (Titan) are out of season until ~2040.</source>
-        <translation type="vanished">Cálculo local, grado de planificación: horas con ±10 min. Los tránsitos de las lunas de Saturno (Titán) están fuera de temporada hasta ~2040.</translation>
+        <translation>Cálculo local, grado de planificación: horas con ±10 min. Los tránsitos de las lunas de Saturno (Titán) están fuera de temporada hasta ~2040.</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="112"/>
         <source>Sun</source>
-        <translation type="vanished">Sol</translation>
+        <translation>Sol</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="116"/>
         <source>The Sun now</source>
-        <translation type="vanished">El Sol ahora</translation>
+        <translation>El Sol ahora</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="125"/>
         <source>Press Refresh to load today&apos;s Sun (NASA SDO)</source>
-        <translation type="vanished">Pulsa Actualizar para cargar el Sol de hoy (NASA SDO)</translation>
+        <translation>Pulsa Actualizar para cargar el Sol de hoy (NASA SDO)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="134"/>
         <source>Active regions map (NOAA)</source>
-        <translation type="vanished">Mapa de regiones activas (NOAA)</translation>
+        <translation>Mapa de regiones activas (NOAA)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="202"/>
         <source>Sky post draft…</source>
-        <translation type="vanished">Borrador de post del cielo…</translation>
+        <translation>Borrador de post del cielo…</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="203"/>
         <source>Draft the bilingual &quot;sky today&quot; post (Sun + Moon + planets)</source>
-        <translation type="vanished">Redacta el post bilingüe del «cielo hoy» (Sol + Luna + planetas)</translation>
+        <translation>Redacta el post bilingüe del «cielo hoy» (Sol + Luna + planetas)</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="208"/>
         <source>More:</source>
-        <translation type="vanished">Más:</translation>
+        <translation>Más:</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="213"/>
         <source>Raben maps</source>
-        <translation type="vanished">Mapas Raben</translation>
+        <translation>Mapas Raben</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="218"/>
         <source>SolarMonitor</source>
-        <translation type="vanished">SolarMonitor</translation>
+        <translation>SolarMonitor</translation>
     </message>
     <message>
+        <location filename="../ui/sky_calendar.ui" line="223"/>
         <source>SIDC</source>
-        <translation type="vanished">SIDC</translation>
+        <translation>SIDC</translation>
     </message>
 </context>
 <context>
@@ -5800,67 +6191,56 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <location filename="../widgets/sky_widget.py" line="325"/>
         <source>No astronomical night</source>
-        
         <translation>Sin noche astronómica</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="399"/>
         <source>start by {t}</source>
-        
         <translation>empezar hasta {t}</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="414"/>
         <source>best time {t}</source>
-        
         <translation>mejor hora {t}</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="452"/>
         <source>Altitude (°)</source>
-        
         <translation>Altitud (°)</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="460"/>
         <source>UTC (h from dusk)</source>
-        
         <translation>UTC (h desde anochecer)</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="585"/>
         <source>transit</source>
-        
         <translation>tránsito</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="598"/>
         <source>Object</source>
-        
         <translation>Objeto</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="600"/>
         <source>Moon</source>
-        
         <translation>Luna</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="601"/>
         <source>Limit</source>
-        
         <translation>Límite</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="676"/>
         <source> · start by {t}</source>
-        
         <translation> · empezar hasta {t}</translation>
     </message>
     <message>
         <location filename="../widgets/sky_widget.py" line="678"/>
         <source>from {a} to {b}</source>
-        
         <translation>de {a} a {b}</translation>
     </message>
 </context>
@@ -5872,12 +6252,14 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Borrador de post del cielo</translation>
     </message>
     <message>
+        <location filename="../ui/skypost_dialog.ui" line="12"/>
         <source>Spanish draft</source>
-        <translation type="vanished">Borrador en español</translation>
+        <translation>Borrador en español</translation>
     </message>
     <message>
+        <location filename="../ui/skypost_dialog.ui" line="20"/>
         <source>English draft</source>
-        <translation type="vanished">Borrador en inglés</translation>
+        <translation>Borrador en inglés</translation>
     </message>
     <message>
         <location filename="../skypost_dialog.py" line="39"/>
@@ -6111,52 +6493,64 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>TonightTab</name>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="10"/>
         <source>Night: —</source>
-        <translation type="vanished">Noche: —</translation>
+        <translation>Noche: —</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="26"/>
         <source>Restrict the suggestions and the full list to one object kind</source>
-        <translation type="vanished">Limita las sugerencias y la lista completa a un solo tipo de objeto</translation>
+        <translation>Limita las sugerencias y la lista completa a un solo tipo de objeto</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="39"/>
         <source>↻</source>
-        <translation type="vanished">↻</translation>
+        <translation>↻</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="40"/>
         <source>Recompute tonight&apos;s targets</source>
-        <translation type="vanished">Recalcular los objetivos de esta noche</translation>
+        <translation>Recalcular los objetivos de esta noche</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="50"/>
         <source>Tonight&apos;s best targets</source>
-        <translation type="vanished">Los mejores objetivos de esta noche</translation>
+        <translation>Los mejores objetivos de esta noche</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="63"/>
         <source>▾ Show all targets</source>
-        <translation type="vanished">▾ Mostrar todos los objetivos</translation>
+        <translation>▾ Mostrar todos los objetivos</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="65"/>
         <source>Expand the full sortable table</source>
-        <translation type="vanished">Expandir la tabla completa ordenable</translation>
+        <translation>Expandir la tabla completa ordenable</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="72"/>
         <source>Full target list</source>
-        <translation type="vanished">Listado completo</translation>
+        <translation>Listado completo</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="76"/>
         <source>Show covered</source>
-        <translation type="vanished">Mostrar cubiertos</translation>
+        <translation>Mostrar cubiertos</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="76"/>
         <source>Include objects already covered (a project closed or a post written)</source>
-        <translation type="vanished">Incluye los objetos ya cubiertos (proyecto cerrado o post escrito)</translation>
+        <translation>Incluye los objetos ya cubiertos (proyecto cerrado o post escrito)</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="83"/>
         <source>Double-click a row to explore the object</source>
-        <translation type="vanished">Doble-clic en una fila para explorar el objeto</translation>
+        <translation>Doble-clic en una fila para explorar el objeto</translation>
     </message>
     <message>
+        <location filename="../ui/tonight_tab.ui" line="21"/>
         <source>Filter:</source>
-        <translation type="vanished">Filtrar:</translation>
+        <translation>Filtrar:</translation>
     </message>
     <message>
         <source>Show observed</source>
@@ -6220,8 +6614,9 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Avanzado</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="15"/>
         <source>Sky:</source>
-        <translation type="vanished">Cielo:</translation>
+        <translation>Cielo:</translation>
     </message>
     <message>
         <location filename="../ufe_advanced_dialog.py" line="45"/>
@@ -6234,99 +6629,122 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Plano (núcleos galácticos)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="16"/>
         <source>How the annulus estimates the background: a flat median, or a tilted plane when the host galaxy tilts it</source>
-        <translation type="vanished">Cómo estima el anillo el fondo: una mediana plana, o un plano inclinado cuando la galaxia huésped lo inclina</translation>
+        <translation>Cómo estima el anillo el fondo: una mediana plana, o un plano inclinado cuando la galaxia huésped lo inclina</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="19"/>
         <source>Sigma-clip the sky</source>
-        <translation type="vanished">Sigma-clip del cielo</translation>
+        <translation>Sigma-clip del cielo</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="19"/>
         <source>Two 2.5-sigma rounds on the annulus: extra skin against hot pixels and crowded cores</source>
-        <translation type="vanished">Dos rondas a 2,5σ en el anillo: protección extra contra píxeles calientes y núcleos concurridos</translation>
+        <translation>Dos rondas a 2,5σ en el anillo: protección extra contra píxeles calientes y núcleos concurridos</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="20"/>
         <source>Aperture follows the seeing</source>
-        <translation type="vanished">La apertura sigue al seeing</translation>
+        <translation>La apertura sigue al seeing</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="20"/>
         <source>Measure the FWHM of the comparison stars and size the aperture as 1.35 times the seeing (H3)</source>
-        <translation type="vanished">Mide el FWHM de las comparaciones y dimensiona la apertura como 1,35 veces el seeing (H3)</translation>
+        <translation>Mide el FWHM de las comparaciones y dimensiona la apertura como 1,35 veces el seeing (H3)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="23"/>
         <source>Colour term</source>
-        <translation type="vanished">Término de color</translation>
+        <translation>Término de color</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="23"/>
         <source>Fit the zero point AND its slope against the comps&apos; B−V (H1); needs at least 6 comps with colour spread</source>
-        <translation type="vanished">Ajusta el punto cero Y su pendiente frente al B−V de las comps (H1); hacen falta al menos 6 comps con dispersión de color</translation>
+        <translation>Ajusta el punto cero Y su pendiente frente al B−V de las comps (H1); hacen falta al menos 6 comps con dispersión de color</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="24"/>
         <source>B−V target:</source>
-        <translation type="vanished">B−V objetivo:</translation>
+        <translation>B−V objetivo:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="25"/>
         <source>The target&apos;s B−V when known (variables: VSX). A supernova near peak is about 0; the panel warns when the colour term is applied with this assumption</source>
-        <translation type="vanished">El B−V del objetivo cuando se conoce (variables: VSX). Una supernova cerca del pico es ~0; el panel avisa cuando el término de color se aplica con esta suposición</translation>
+        <translation>El B−V del objetivo cuando se conoce (variables: VSX). Una supernova cerca del pico es ~0; el panel avisa cuando el término de color se aplica con esta suposición</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="28"/>
         <source>Subtract host galaxy (PS1 reference)</source>
-        <translation type="vanished">Restar la galaxia huésped (referencia PS1)</translation>
+        <translation>Restar la galaxia huésped (referencia PS1)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_advanced_dialog.ui" line="28"/>
         <source>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</source>
-        <translation type="vanished">Descarga la referencia PanSTARRS alineada, la escala para que las comparaciones desaparezcan y mide el objetivo en la imagen diferencia (H2b; necesita red una vez por campo)</translation>
+        <translation>Descarga la referencia PanSTARRS alineada, la escala para que las comparaciones desaparezcan y mide el objetivo en la imagen diferencia (H2b; necesita red una vez por campo)</translation>
     </message>
 </context>
 <context>
     <name>UfeAnnotateTab</name>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="15"/>
         <source>Label:</source>
-        <translation type="vanished">Etiqueta:</translation>
+        <translation>Etiqueta:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="16"/>
         <source>Annotation label</source>
-        <translation type="vanished">Etiqueta de la anotación</translation>
+        <translation>Etiqueta de la anotación</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="22"/>
         <source>Notes:</source>
-        <translation type="vanished">Notas:</translation>
+        <translation>Notas:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="29"/>
         <source>Marker size:</source>
-        <translation type="vanished">Tamaño del marcador:</translation>
+        <translation>Tamaño del marcador:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="38"/>
         <source>Nudge</source>
-        <translation type="vanished">Ajustar</translation>
+        <translation>Ajustar</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="38"/>
         <source>Shift the marker by that many pixels (or click the image)</source>
-        <translation type="vanished">Desplaza el marcador esa cantidad de píxeles (o haz clic en la imagen)</translation>
+        <translation>Desplaza el marcador esa cantidad de píxeles (o haz clic en la imagen)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
         <source>Show the annotation marker</source>
-        <translation type="vanished">Mostrar el marcador de la anotación</translation>
+        <translation>Mostrar el marcador de la anotación</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="39"/>
         <source>Show the annotation marker on the plate (screen only; the annotation is still saved)</source>
-        <translation type="vanished">Muestra el marcador de la anotación sobre la placa (solo en pantalla; la anotación se guarda igual)</translation>
+        <translation>Muestra el marcador de la anotación sobre la placa (solo en pantalla; la anotación se guarda igual)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="43"/>
         <source>Also annotate (visits):</source>
-        <translation type="vanished">Anotar también (visitas):</translation>
+        <translation>Anotar también (visitas):</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="47"/>
         <source>Add…</source>
-        <translation type="vanished">Añadir…</translation>
+        <translation>Añadir…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="48"/>
         <source>Remove</source>
-        <translation type="vanished">Quitar</translation>
+        <translation>Quitar</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_annotate_tab.ui" line="51"/>
         <source>Save annotated copy…</source>
-        <translation type="vanished">Guardar copia anotada…</translation>
+        <translation>Guardar copia anotada…</translation>
     </message>
     <message>
         <location filename="../ufe_annotate_tab.py" line="240"/>
@@ -6369,52 +6787,64 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>UfeBlinkTab</name>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="15"/>
         <source>SN:</source>
-        <translation type="vanished">SN:</translation>
+        <translation>SN:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="21"/>
         <source>Manual coordinates</source>
-        <translation type="vanished">Coordenadas manuales</translation>
+        <translation>Coordenadas manuales</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="26"/>
         <source>RA deg</source>
-        <translation type="vanished">AR °</translation>
+        <translation>AR °</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="27"/>
         <source>Dec deg</source>
-        <translation type="vanished">Dec °</translation>
+        <translation>Dec °</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="30"/>
         <source>Prepare pair</source>
-        <translation type="vanished">Preparar pareja</translation>
+        <translation>Preparar pareja</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="34"/>
         <source>Live blink</source>
-        <translation type="vanished">Blink en vivo</translation>
+        <translation>Blink en vivo</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="35"/>
         <source>Interval:</source>
-        <translation type="vanished">Intervalo:</translation>
+        <translation>Intervalo:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="41"/>
         <source>Blink</source>
-        <translation type="vanished">Blink</translation>
+        <translation>Blink</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="42"/>
         <source>Fade</source>
-        <translation type="vanished">Fundido</translation>
+        <translation>Fundido</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="49"/>
         <source>Balance:</source>
-        <translation type="vanished">Balance:</translation>
+        <translation>Balance:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="50"/>
         <source>Multiplies the reference so its sky background matches the plate&apos;s (a blink that does not pump)</source>
-        <translation type="vanished">Multiplica la referencia para igualar el fondo de cielo con el de la placa (un blink que no bombea)</translation>
+        <translation>Multiplica la referencia para igualar el fondo de cielo con el de la placa (un blink que no bombea)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="51"/>
         <source>Auto</source>
-        <translation type="vanished">Auto</translation>
+        <translation>Auto</translation>
     </message>
     <message>
         <source>Nudge ref:</source>
@@ -6425,52 +6855,64 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Ajustar</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="56"/>
         <source>Fine alignment:</source>
-        <translation type="vanished">Alineación fina:</translation>
+        <translation>Alineación fina:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="60"/>
         <source>↑</source>
-        <translation type="vanished">↑</translation>
+        <translation>↑</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="61"/>
         <source>←</source>
-        <translation type="vanished">←</translation>
+        <translation>←</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="63"/>
         <source>→</source>
-        <translation type="vanished">→</translation>
+        <translation>→</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="64"/>
         <source>↓</source>
-        <translation type="vanished">↓</translation>
+        <translation>↓</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="73"/>
         <source>Show the supernova marker</source>
-        <translation type="vanished">Mostrar el marcador de la supernova</translation>
+        <translation>Mostrar el marcador de la supernova</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="73"/>
         <source>Show the supernova marker on the plate, and in the exported GIF/MP4/PNG. Uncheck to hide it.</source>
-        <translation type="vanished">Muestra el marcador de la supernova sobre la placa, y también en el GIF/MP4/PNG exportado. Desmárcalo para ocultarlo.</translation>
+        <translation>Muestra el marcador de la supernova sobre la placa, y también en el GIF/MP4/PNG exportado. Desmárcalo para ocultarlo.</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="74"/>
         <source>Size:</source>
-        <translation type="vanished">Tamaño:</translation>
+        <translation>Tamaño:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="80"/>
         <source>Export zoom:</source>
-        <translation type="vanished">Zoom de exportación:</translation>
+        <translation>Zoom de exportación:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="86"/>
         <source>GIF…</source>
-        <translation type="vanished">GIF…</translation>
+        <translation>GIF…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="87"/>
         <source>MP4…</source>
-        <translation type="vanished">MP4…</translation>
+        <translation>MP4…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_blink_tab.ui" line="88"/>
         <source>PNG…</source>
-        <translation type="vanished">PNG…</translation>
+        <translation>PNG…</translation>
     </message>
     <message>
         <location filename="../ufe_blink_tab.py" line="176"/>
@@ -6517,36 +6959,43 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
 <context>
     <name>UfeCompareTab</name>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="20"/>
         <source>Target:</source>
-        <translation type="vanished">Objetivo:</translation>
+        <translation>Objetivo:</translation>
     </message>
     <message>
         <source>Target mag:</source>
         <translation type="vanished">Mag del objetivo:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="23"/>
         <source>Approximate magnitude of the target: the proposal picks comparisons brighter than or similar to it</source>
-        <translation type="vanished">Magnitud aproximada del objetivo: la propuesta elige comparaciones de brillo parecido o mayor</translation>
+        <translation>Magnitud aproximada del objetivo: la propuesta elige comparaciones de brillo parecido o mayor</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="29"/>
         <source>Build the sequence…</source>
-        <translation type="vanished">Construir la secuencia…</translation>
+        <translation>Construir la secuencia…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="29"/>
         <source>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</source>
-        <translation type="vanished">El camino normal: consulta el catálogo (y las variables VSX) alrededor del centro de la placa y propone las comparaciones de una vez</translation>
+        <translation>El camino normal: consulta el catálogo (y las variables VSX) alrededor del centro de la placa y propone las comparaciones de una vez</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Generate field</source>
-        <translation type="vanished">Generar campo</translation>
+        <translation>Generar campo</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</source>
-        <translation type="vanished">Solo consulta el catálogo (y las variables VSX) alrededor del centro de la placa, sin proponer la secuencia</translation>
+        <translation>Solo consulta el catálogo (y las variables VSX) alrededor del centro de la placa, sin proponer la secuencia</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</source>
-        <translation type="vanished">Solo vuelve a ejecutar la propuesta automática sobre el campo ya cargado (estrellas aisladas y no variables, a juego con el brillo del objetivo)</translation>
+        <translation>Solo vuelve a ejecutar la propuesta automática sobre el campo ya cargado (estrellas aisladas y no variables, a juego con el brillo del objetivo)</translation>
     </message>
     <message>
         <source>Query the catalog (and VSX variables) around the plate centre</source>
@@ -6557,36 +7006,44 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Cargar campo del survey (DSS2)…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="22"/>
         <source>Mag:</source>
-        <translation type="vanished">Mag:</translation>
+        <translation>Mag:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="30"/>
         <source>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</source>
-        <translation type="vanished">¿No tienes placa propia? Descarga el campo del survey (PS1-g, DSS2-rojo como reserva) como FITS con WCS y trabaja directamente sobre él</translation>
+        <translation>¿No tienes placa propia? Descarga el campo del survey (PS1-g, DSS2-rojo como reserva) como FITS con WCS y trabaja directamente sobre él</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="14"/>
         <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
-        <translation type="vanished">Pulsa una estrella para añadirla o quitarla. Las variables conocidas (anillos rojos) nunca sirven de comparación.</translation>
+        <translation>Pulsa una estrella para añadirla o quitarla. Las variables conocidas (anillos rojos) nunca sirven de comparación.</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="17"/>
         <source>On click, add as:</source>
-        <translation type="vanished">Al pulsar, añadir como:</translation>
+        <translation>Al pulsar, añadir como:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="18"/>
         <source>Comparison</source>
-        <translation type="vanished">Comparación</translation>
+        <translation>Comparación</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="19"/>
         <source>Check</source>
-        <translation type="vanished">Check</translation>
+        <translation>Check</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="23"/>
         <source>Show catalog magnitudes</source>
-        <translation type="vanished">Ver las magnitudes del catálogo</translation>
+        <translation>Ver las magnitudes del catálogo</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Propose sequence</source>
-        <translation type="vanished">Proponer secuencia</translation>
+        <translation>Proponer secuencia</translation>
     </message>
     <message>
         <source>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</source>
@@ -6617,8 +7074,9 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Exportar carta PNG…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="30"/>
         <source>DSS2…</source>
-        <translation type="vanished">DSS2…</translation>
+        <translation>DSS2…</translation>
     </message>
     <message>
         <source>Show the target marker</source>
@@ -6642,8 +7100,9 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Secuencia ({0})…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_manual.ui" line="26"/>
         <source>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</source>
-        <translation type="vanished">La tabla de la secuencia: las comparaciones y la estrella de control con sus magnitudes de catálogo (una ventana pequeña: sigue trabajando mientras esté abierta)</translation>
+        <translation>La tabla de la secuencia: las comparaciones y la estrella de control con sus magnitudes de catálogo (una ventana pequeña: sigue trabajando mientras esté abierta)</translation>
     </message>
     <message>
         <location filename="../ufe_compare_tab.py" line="178"/>
@@ -6659,7 +7118,6 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <location filename="../ufe_compare_tab.py" line="271"/>
         <source>The sequence field is empty: build it with «Generate field…», or restore the one saved with the plate.</source>
-        
         <translation>El campo de la secuencia está vacío: constrúyelo con «Generar campo…», o restaura el guardado con la placa.</translation>
     </message>
     <message>
@@ -6670,7 +7128,6 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <location filename="../ufe_compare_tab.py" line="396"/>
         <source>{0}: sequence restored from the plate ({1} stars, {2} in the sequence)</source>
-        
         <translation>{0}: secuencia restaurada de la placa ({1} estrellas, {2} en la secuencia)</translation>
     </message>
     <message>
@@ -6807,12 +7264,14 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Editor FITS</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="20"/>
         <source>Load FITS…</source>
-        <translation type="vanished">Cargar FITS…</translation>
+        <translation>Cargar FITS…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="20"/>
         <source>Open a FITS image (Ctrl+O)</source>
-        <translation type="vanished">Abrir una imagen FITS (Ctrl+O)</translation>
+        <translation>Abrir una imagen FITS (Ctrl+O)</translation>
     </message>
     <message>
         <source>Invert</source>
@@ -6823,61 +7282,75 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Cambia negro por blanco: los objetos débiles resaltan sobre el cielo</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="21"/>
         <source>Export PNG…</source>
-        <translation type="vanished">Exportar PNG…</translation>
+        <translation>Exportar PNG…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="21"/>
         <source>Save the visible scene as a PNG (Ctrl+E)</source>
-        <translation type="vanished">Guardar la escena visible como PNG (Ctrl+E)</translation>
+        <translation>Guardar la escena visible como PNG (Ctrl+E)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="23"/>
         <source>N</source>
-        <translation type="vanished">N</translation>
+        <translation>N</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="23"/>
         <source>North arrow (needs a WCS)</source>
-        <translation type="vanished">Flecha de norte (requiere WCS)</translation>
+        <translation>Flecha de norte (requiere WCS)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="24"/>
         <source>Scale</source>
-        <translation type="vanished">Escala</translation>
+        <translation>Escala</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="24"/>
         <source>Scale bar (needs a WCS)</source>
-        <translation type="vanished">Barra de escala (requiere WCS)</translation>
+        <translation>Barra de escala (requiere WCS)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="25"/>
         <source>A</source>
-        <translation type="vanished">A</translation>
+        <translation>A</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="25"/>
         <source>Saved annotations (the marks stored on this plate)</source>
-        <translation type="vanished">Anotaciones guardadas (las marcas almacenadas en esta placa)</translation>
+        <translation>Anotaciones guardadas (las marcas almacenadas en esta placa)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="26"/>
         <source>Boxes</source>
-        <translation type="vanished">Cajas</translation>
+        <translation>Cajas</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="26"/>
         <source>Metadata corner boxes: object, date, position, brightness, observer, equipment and plate scale (on screen and in the exported PNG)</source>
-        <translation type="vanished">Cajas de metadatos en las esquinas: objeto, fecha, posición, brillo, observador, equipo y escala de placa (en pantalla y en el PNG exportado)</translation>
+        <translation>Cajas de metadatos en las esquinas: objeto, fecha, posición, brillo, observador, equipo y escala de placa (en pantalla y en el PNG exportado)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="27"/>
         <source>Mark</source>
-        <translation type="vanished">Marca</translation>
+        <translation>Marca</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="27"/>
         <source>Object mark: where the attached object sits on the plate (needs a WCS; on screen and in the exported PNG)</source>
-        <translation type="vanished">Marca del objeto: dónde cae el objeto adjunto en la placa (necesita WCS; en pantalla y en el PNG exportado)</translation>
+        <translation>Marca del objeto: dónde cae el objeto adjunto en la placa (necesita WCS; en pantalla y en el PNG exportado)</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="794"/>
+        <location filename="../ui/ufe_dialog.ui" line="28"/>
         <source>Solve astrometry…</source>
         <translation>Resolver astrometría…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="28"/>
         <source>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</source>
-        <translation type="vanished">Resuelve la placa a ciegas con Astrometry.net (el archivo en disco nunca se modifica)</translation>
+        <translation>Resuelve la placa a ciegas con Astrometry.net (el archivo en disco nunca se modifica)</translation>
     </message>
     <message>
         <source>Move marker…</source>
@@ -6888,8 +7361,9 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Mueve la marca del objetivo a una nueva posición sobre la placa. El marcador es una ayuda visual; el cálculo de la secuencia nunca lo lee.</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="30"/>
         <source>Zoom:</source>
-        <translation type="vanished">Zoom:</translation>
+        <translation>Zoom:</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="185"/>
@@ -6907,8 +7381,9 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Zoom {0} % (1:1 en 100)</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="36"/>
         <source>Current zoom: 100 % is one plate pixel per screen pixel</source>
-        <translation type="vanished">Zoom actual: 100 % es un píxel de placa por píxel de pantalla</translation>
+        <translation>Zoom actual: 100 % es un píxel de placa por píxel de pantalla</translation>
     </message>
     <message>
         <source>Measure</source>
@@ -6993,8 +7468,9 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>NightScribe Image Workbench</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_dialog.ui" line="40"/>
         <source>The object this editor was opened from</source>
-        <translation type="vanished">El objeto desde el que se abrió este editor</translation>
+        <translation>El objeto desde el que se abrió este editor</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="292"/>
@@ -7031,24 +7507,30 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Abrir la pestaña Comparar</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="54"/>
         <source>Band:</source>
-        <translation type="vanished">Banda:</translation>
+        <translation>Banda:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="68"/>
         <source>Apertures:</source>
-        <translation type="vanished">Aperturas:</translation>
+        <translation>Aperturas:</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="87"/>
+        <location filename="../ui/ufe_measure_tab.ui" line="112"/>
+        <location filename="../ui/ufe_measure_tab.ui" line="137"/>
         <source>Aperture radius, sky annulus inner and outer radius (px)</source>
-        <translation type="vanished">Radio de apertura y radios interior y exterior del anillo de cielo (px)</translation>
+        <translation>Radio de apertura y radios interior y exterior del anillo de cielo (px)</translation>
     </message>
     <message>
         <source>Suggest apertures</source>
         <translation type="vanished">Sugerir aperturas</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="163"/>
         <source>Propose the radii from this target&apos;s growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</source>
-        <translation type="vanished">Propone los radios desde la curva de crecimiento del objetivo y su entorno (vecinos, gradiente del fondo), con las razones en lenguaje llano</translation>
+        <translation>Propone los radios desde la curva de crecimiento del objetivo y su entorno (vecinos, gradiente del fondo), con las razones en lenguaje llano</translation>
     </message>
     <message>
         <source>Sky:</source>
@@ -7115,24 +7597,49 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Ir a las comparaciones</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="29"/>
         <source>Click a star (or the target) to measure it against the sequence (built in the top half of this tab).</source>
-        <translation type="vanished">Haz clic en una estrella (o en el objetivo) para medirla contra la secuencia (se construye en la mitad superior de esta pestaña).</translation>
+        <translation>Haz clic en una estrella (o en el objetivo) para medirla contra la secuencia (se construye en la mitad superior de esta pestaña).</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="206"/>
         <source>CSV…</source>
-        <translation type="vanished">CSV…</translation>
+        <translation>CSV…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="216"/>
         <source>AAVSO EFF…</source>
-        <translation type="vanished">AAVSO EFF…</translation>
+        <translation>AAVSO EFF…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="232"/>
         <source>Save in the project</source>
-        <translation type="vanished">Guardar en el proyecto</translation>
+        <translation>Guardar en el proyecto</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="242"/>
+        <source>Bring this plate back to the editor defaults (stretch, measurement recipe, sequence field) and clear the state saved with the plate. The measured points of this plate are not touched, and other plates are not affected</source>
+        <translation>Devuelve esta placa a los valores por defecto del editor (estiramiento, receta de medición, campo de la secuencia) y borra el estado guardado con la placa. Los puntos medidos de esta placa no se tocan, y las demás placas no se ven afectadas</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="245"/>
+        <source>Reset plate state</source>
+        <translation>Restablecer el estado de la placa</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="255"/>
+        <source>Remove every measured point that was registered in this plate. This action asks for confirmation and cannot be undone; points saved on other plates are not affected</source>
+        <translation>Elimina todos los puntos medidos registrados en esta placa. Esta acción pide confirmación y no se puede deshacer; los puntos guardados en otras placas no se ven afectados</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="258"/>
+        <source>Reset plate points</source>
+        <translation>Reiniciar los puntos de la placa</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="229"/>
         <source>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</source>
-        <translation type="vanished">Registra este punto calibrado en el proyecto que abrió el editor: queda en la curva de luz y alimenta el resumen de la campaña (fuente «measure»)</translation>
+        <translation>Registra este punto calibrado en el proyecto que abrió el editor: queda en la curva de luz y alimenta el resumen de la campaña (fuente «measure»)</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="291"/>
@@ -7172,16 +7679,19 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation type="vanished">Ir a la secuencia</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="166"/>
         <source>Suggest</source>
-        <translation type="vanished">Sugerir</translation>
+        <translation>Sugerir</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="178"/>
         <source>Advanced…</source>
-        <translation type="vanished">Avanzado…</translation>
+        <translation>Avanzado…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_measure_tab.ui" line="175"/>
         <source>The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</source>
-        <translation type="vanished">La receta completa: modelo de cielo, sigma-clip, aperturas según el seeing, término de color, resta de la galaxia huésped (una ventana pequeña: sigue midiendo mientras esté abierta)</translation>
+        <translation>La receta completa: modelo de cielo, sigma-clip, aperturas según el seeing, término de color, resta de la galaxia huésped (una ventana pequeña: sigue midiendo mientras esté abierta)</translation>
     </message>
     <message>
         <source>No comparison sequence yet: build one in the Sequence section (Generate field, then pick or propose).</source>
@@ -7294,31 +7804,26 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <location filename="../ufe_measure_tab.py" line="249"/>
         <source>Load a plate first: there is no state to reset.</source>
-        
         <translation>Carga primero una placa: no hay estado que reiniciar.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="252"/>
         <source>Plate state reset.</source>
-        
         <translation>Estado de la placa reiniciado.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="255"/>
         <source>Plate state reset locally: this plate is not registered in the project, so there was no saved state to clear.</source>
-        
         <translation>Estado de la placa reiniciado en local: esta placa no está registrada en el proyecto, así que no había estado guardado que borrar.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="266"/>
         <source>Load a plate first: there are no plate points to reset.</source>
-        
         <translation>Carga primero una placa: no hay puntos de placa que reiniciar.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="269"/>
         <source>Reset the points of this plate</source>
-        
         <translation>Reiniciar los puntos de esta placa</translation>
     </message>
     <message>
@@ -7326,7 +7831,6 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <source>Delete every measurement point saved on this plate?
 They leave the light curve; the CSV files on disk are
 not touched.</source>
-        
         <translation>¿Borrar todos los puntos de medida guardados en esta placa?
 Saldrán de la curva de luz; los CSV en disco no se
 tocan.</translation>
@@ -7334,13 +7838,11 @@ tocan.</translation>
     <message>
         <location filename="../ufe_measure_tab.py" line="279"/>
         <source>The plate&apos;s measurement points were deleted.</source>
-        
         <translation>Los puntos de medida de la placa fueron borrados.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="282"/>
         <source>No measurement points saved on this plate.</source>
-        
         <translation>No hay puntos de medida guardados en esta placa.</translation>
     </message>
     <message>
@@ -7530,24 +8032,29 @@ tocan.</translation>
         <translation>Secuencia</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="19"/>
         <source>Name</source>
-        <translation type="vanished">Nombre</translation>
+        <translation>Nombre</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="20"/>
         <source>Type</source>
-        <translation type="vanished">Tipo</translation>
+        <translation>Tipo</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="21"/>
         <source>Mag</source>
-        <translation type="vanished">Mag</translation>
+        <translation>Mag</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="27"/>
         <source>Remove all</source>
-        <translation type="vanished">Quitar todas</translation>
+        <translation>Quitar todas</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_sequence_dialog.ui" line="28"/>
         <source>Export CSV…</source>
-        <translation type="vanished">Exportar CSV…</translation>
+        <translation>Exportar CSV…</translation>
     </message>
 </context>
 <context>
@@ -7558,64 +8065,79 @@ tocan.</translation>
         <translation>Visita</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="19"/>
         <source>The visit&apos;s date (its name in the list). Points already saved to it keep their own MJD</source>
-        <translation type="vanished">La fecha de la visita (su nombre en la lista). Los puntos ya guardados conservan su MJD propio</translation>
+        <translation>La fecha de la visita (su nombre en la lista). Los puntos ya guardados conservan su MJD propio</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="20"/>
         <source>Save date</source>
-        <translation type="vanished">Guardar fecha</translation>
+        <translation>Guardar fecha</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="20"/>
         <source>Save the visit&apos;s date (the date is its name in the list)</source>
-        <translation type="vanished">Guardar la fecha de la visita (la fecha es su nombre en la lista)</translation>
+        <translation>Guardar la fecha de la visita (la fecha es su nombre en la lista)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="21"/>
         <source>Pin the visit: it floats to the top of the list</source>
-        <translation type="vanished">Fijar la visita: flota al principio de la lista</translation>
+        <translation>Fijar la visita: flota al principio de la lista</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="22"/>
         <source>Delete visit…</source>
-        <translation type="vanished">Eliminar visita…</translation>
+        <translation>Eliminar visita…</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="27"/>
         <source>Resources</source>
-        <translation type="vanished">Recursos</translation>
+        <translation>Recursos</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="31"/>
         <source>Attach files…</source>
-        <translation type="vanished">Adjuntar archivos…</translation>
+        <translation>Adjuntar archivos…</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="31"/>
         <source>FITS plates, imported photometry, ephemeris, reports… registered to this visit (the file on disk is linked, never copied or moved)</source>
-        <translation type="vanished">Placas FITS, fotometría importada, efemérides, reportes… registrados a esta visita (el archivo en disco se enlaza, nunca se copia ni se mueve)</translation>
+        <translation>Placas FITS, fotometría importada, efemérides, reportes… registrados a esta visita (el archivo en disco se enlaza, nunca se copia ni se mueve)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="32"/>
         <source>Open</source>
-        <translation type="vanished">Abrir</translation>
+        <translation>Abrir</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="32"/>
         <source>Plates open in the FITS editor; everything else opens with the system</source>
-        <translation type="vanished">Las placas abren en el editor FITS; todo lo demás abre con el sistema</translation>
+        <translation>Las placas abren en el editor FITS; todo lo demás abre con el sistema</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="33"/>
         <source>Remove from visit</source>
-        <translation type="vanished">Quitar de la visita</translation>
+        <translation>Quitar de la visita</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="33"/>
         <source>Unlink the selected resource (the file on disk is never touched)</source>
-        <translation type="vanished">Desvincular el recurso seleccionado (el archivo en disco jamás se toca)</translation>
+        <translation>Desvincular el recurso seleccionado (el archivo en disco jamás se toca)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="41"/>
         <source>Night notes (seeing, clouds…)</source>
-        <translation type="vanished">Notas de la noche (seeing, nubes…)</translation>
+        <translation>Notas de la noche (seeing, nubes…)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="45"/>
         <source>Save and close</source>
-        <translation type="vanished">Guardar y cerrar</translation>
+        <translation>Guardar y cerrar</translation>
     </message>
     <message>
+        <location filename="../ui/visit_window.ui" line="45"/>
         <source>Flush the date edit if pending and close the window (everything else already saved itself)</source>
-        <translation type="vanished">Vacía la edición de fecha si queda pendiente y cierra la ventana (todo lo demás ya se guardó solo)</translation>
+        <translation>Vacía la edición de fecha si queda pendiente y cierra la ventana (todo lo demás ya se guardó solo)</translation>
     </message>
     <message>
         <location filename="../widgets/visits_panel.py" line="420"/>
@@ -7643,60 +8165,75 @@ tocan.</translation>
         <translation>Detalles del FITS</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="14"/>
         <source>File:</source>
-        <translation type="vanished">Archivo:</translation>
+        <translation>Archivo:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="16"/>
+        <location filename="../ui/visit_measurements.ui" line="19"/>
         <source>Filter:</source>
-        <translation type="vanished">Filtro:</translation>
+        <translation>Filtro:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="18"/>
         <source>Date:</source>
-        <translation type="vanished">Fecha:</translation>
+        <translation>Fecha:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_file_meta.ui" line="20"/>
         <source>Exptime:</source>
-        <translation type="vanished">Exposición:</translation>
+        <translation>Exposición:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="11"/>
         <source>Measurements</source>
-        <translation type="vanished">Medidas</translation>
+        <translation>Medidas</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="15"/>
         <source>Mag:</source>
-        <translation type="vanished">Mag:</translation>
+        <translation>Mag:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="17"/>
         <source>Err:</source>
-        <translation type="vanished">Error:</translation>
+        <translation>Error:</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="21"/>
         <source>Add</source>
-        <translation type="vanished">Añadir</translation>
+        <translation>Añadir</translation>
     </message>
     <message>
+        <location filename="../ui/visit_measurements.ui" line="22"/>
         <source>Delete point</source>
-        <translation type="vanished">Eliminar punto</translation>
+        <translation>Eliminar punto</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="11"/>
         <source>Astrometry (MPC report)</source>
-        <translation type="vanished">Astrometría (reporte MPC)</translation>
+        <translation>Astrometría (reporte MPC)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="13"/>
         <source>Paste the night&apos;s astrometric measurements (MPC 80-col or ADES PSV)</source>
-        <translation type="vanished">Pega las medidas astrométricas de la noche (MPC 80 columnas o ADES PSV)</translation>
+        <translation>Pega las medidas astrométricas de la noche (MPC 80 columnas o ADES PSV)</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="14"/>
         <source>Paste MPC 80-column or ADES PSV lines here…</source>
-        <translation type="vanished">Pega aquí líneas MPC de 80 columnas o ADES PSV…</translation>
+        <translation>Pega aquí líneas MPC de 80 columnas o ADES PSV…</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="17"/>
         <source>Validate</source>
-        <translation type="vanished">Validar</translation>
+        <translation>Validar</translation>
     </message>
     <message>
+        <location filename="../ui/visit_mpc_block.ui" line="18"/>
         <source>Save report…</source>
-        <translation type="vanished">Guardar reporte…</translation>
+        <translation>Guardar reporte…</translation>
     </message>
     <message>
         <location filename="../widgets/visits_panel.py" line="661"/>
@@ -7734,28 +8271,33 @@ tocan.</translation>
 <context>
     <name>VisitsPanel</name>
     <message>
+        <location filename="../ui/visits_panel.ui" line="15"/>
         <source>New visit</source>
-        <translation type="vanished">Nueva visita</translation>
+        <translation>Nueva visita</translation>
     </message>
     <message>
         <source>Every day you work the object is a visit: images, reports and measurements hang from it</source>
         <translation type="vanished">Cada día que trabajas el objeto es una visita: imágenes, reportes y medidas cuelgan de ella</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="15"/>
         <source>Every day you work the object is a visit: it opens in its own window, ready for its images, reports and measurements</source>
-        <translation type="vanished">Cada día que trabajas el objeto es una visita: abre en su propia ventana, lista para sus imágenes, reportes y medidas</translation>
+        <translation>Cada día que trabajas el objeto es una visita: abre en su propia ventana, lista para sus imágenes, reportes y medidas</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="16"/>
         <source>Open visit…</source>
-        <translation type="vanished">Abrir visita…</translation>
+        <translation>Abrir visita…</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="16"/>
         <source>Open the selected visit&apos;s window (double-click works too)</source>
-        <translation type="vanished">Abrir la ventana de la visita seleccionada (el doble clic también vale)</translation>
+        <translation>Abrir la ventana de la visita seleccionada (el doble clic también vale)</translation>
     </message>
     <message>
+        <location filename="../ui/visits_panel.ui" line="21"/>
         <source>No visits yet. Each night you work the object starts one: plates, reports and measurements attach to it.</source>
-        <translation type="vanished">Aún no hay visitas. Cada noche que trabajes el objeto inicia una: placas, reportes y medidas se le adjuntan.</translation>
+        <translation>Aún no hay visitas. Cada noche que trabajes el objeto inicia una: placas, reportes y medidas se le adjuntan.</translation>
     </message>
     <message>
         <location filename="../widgets/visits_panel.py" line="123"/>

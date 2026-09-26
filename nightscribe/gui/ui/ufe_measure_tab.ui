@@ -1,46 +1,279 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  UFE Photometry tab, Measure section (ADR-044 rev): one click into a
-  catalog-calibrated magnitude. Loaded by gui/ufe_measure_tab.py through
-  gui/ui_loader.py. The band combo and the aperture spins' values are
-  data (the sequence's bands, core/photometry's defaults), so code fills
-  them; the advanced recipe lives in ui/ufe_advanced_dialog.ui.
--->
 <ui version="4.0">
  <class>UfeMeasureTab</class>
  <widget class="QWidget" name="UfeMeasureTab">
-  <layout class="QVBoxLayout" name="vbox_measure"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
-    <item><widget class="QLabel" name="lbl_hint"><property name="text"><string>Click a star (or the target) to measure it against the sequence (built in the top half of this tab).</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
-   <item><widget class="QLabel" name="lbl_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>406</width>
+    <height>486</height>
+   </rect>
+  </property>
+  <layout class="QVBoxLayout" name="vbox_measure">
+   <property name="leftMargin">
+    <number>9</number>
+   </property>
+   <property name="topMargin">
+    <number>9</number>
+   </property>
+   <property name="rightMargin">
+    <number>9</number>
+   </property>
+   <property name="bottomMargin">
+    <number>9</number>
+   </property>
+   <item>
+    <widget class="QLabel" name="lbl_hint">
+     <property name="text">
+      <string>Click a star (or the target) to measure it against the sequence (built in the top half of this tab).</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_status">
+     <property name="text">
+      <string/>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
    <item>
     <layout class="QHBoxLayout" name="row_band">
-     <property name="layoutStretch"><string notr="true">0,1</string></property>
-     <item><widget class="QLabel" name="lbl_band"><property name="text"><string>Band:</string></property></widget></item>
-     <item><widget class="QComboBox" name="cmb_band"/></item>
+     <property name="layoutStretch" stdset="0">
+      <string notr="true">0,1</string>
+     </property>
+     <item>
+      <widget class="QLabel" name="lbl_band">
+       <property name="text">
+        <string>Band:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="cmb_band"/>
+     </item>
     </layout>
    </item>
    <item>
     <layout class="QHBoxLayout" name="row_apertures">
-     <item><widget class="QLabel" name="lbl_apertures"><property name="text"><string>Apertures:</string></property></widget></item>
-     <item><widget class="QDoubleSpinBox" name="spn_rap"><property name="toolTip"><string>Aperture radius, sky annulus inner and outer radius (px)</string></property><property name="decimals"><number>1</number></property><property name="singleStep"><double>0.5</double></property><property name="minimumSize"><size><width>56</width><height>0</height></size></property><property name="maximumSize"><size><width>56</width><height>16777215</height></size></property></widget></item>
-     <item><widget class="QDoubleSpinBox" name="spn_rin"><property name="toolTip"><string>Aperture radius, sky annulus inner and outer radius (px)</string></property><property name="decimals"><number>1</number></property><property name="singleStep"><double>0.5</double></property><property name="minimumSize"><size><width>56</width><height>0</height></size></property><property name="maximumSize"><size><width>56</width><height>16777215</height></size></property></widget></item>
-     <item><widget class="QDoubleSpinBox" name="spn_rout"><property name="toolTip"><string>Aperture radius, sky annulus inner and outer radius (px)</string></property><property name="decimals"><number>1</number></property><property name="singleStep"><double>0.5</double></property><property name="minimumSize"><size><width>56</width><height>0</height></size></property><property name="maximumSize"><size><width>56</width><height>16777215</height></size></property></widget></item>
-     <item><spacer name="hsp_apertures"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-     <item><widget class="QPushButton" name="btn_suggest"><property name="text"><string>Suggest</string></property><property name="toolTip"><string>Propose the radii from this target's growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</string></property></widget></item>
+     <item>
+      <widget class="QLabel" name="lbl_apertures">
+       <property name="text">
+        <string>Apertures:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="spn_rap">
+       <property name="minimumSize">
+        <size>
+         <width>70</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>70</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string>Aperture radius, sky annulus inner and outer radius (px)</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="singleStep">
+        <double>0.500000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="spn_rin">
+       <property name="minimumSize">
+        <size>
+         <width>70</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>70</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string>Aperture radius, sky annulus inner and outer radius (px)</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="singleStep">
+        <double>0.500000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QDoubleSpinBox" name="spn_rout">
+       <property name="minimumSize">
+        <size>
+         <width>70</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>70</width>
+         <height>16777215</height>
+        </size>
+       </property>
+       <property name="toolTip">
+        <string>Aperture radius, sky annulus inner and outer radius (px)</string>
+       </property>
+       <property name="decimals">
+        <number>1</number>
+       </property>
+       <property name="singleStep">
+        <double>0.500000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_apertures">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_suggest">
+       <property name="toolTip">
+        <string>Propose the radii from this target's growth curve and its surroundings (crowding, background gradient), with the reasons in plain language</string>
+       </property>
+       <property name="text">
+        <string>Suggest</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
-   <item><widget class="QPushButton" name="btn_advanced"><property name="text"><string>Advanced…</string></property><property name="toolTip"><string>The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</string></property></widget></item>
-   <item><widget class="QTextEdit" name="lbl_result"><property name="readOnly"><bool>true</bool></property><property name="plainText"><string notr="true">–</string></property><property name="minimumSize"><size><width>0</width><height>120</height></size></property></widget></item>
+   <item>
+    <widget class="QPushButton" name="btn_advanced">
+     <property name="toolTip">
+      <string>The full recipe: sky model, sigma-clip, seeing apertures, colour term, host-galaxy subtraction (a small window: keep measuring while it is open)</string>
+     </property>
+     <property name="text">
+      <string>Advanced…</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTextEdit" name="lbl_result">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>120</height>
+      </size>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="plainText">
+      <string notr="true">–</string>
+     </property>
+    </widget>
+   </item>
    <item>
     <layout class="QHBoxLayout" name="row_export">
-     <item><widget class="QPushButton" name="btn_csv"><property name="text"><string>CSV…</string></property><property name="enabled"><bool>false</bool></property></widget></item>
-     <item><widget class="QPushButton" name="btn_eff"><property name="text"><string>AAVSO EFF…</string></property><property name="enabled"><bool>false</bool></property></widget></item>
-     <item><widget class="QPushButton" name="btn_save_project"><property name="text"><string>Save in the project</string></property><property name="toolTip"><string>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</string></property><property name="enabled"><bool>false</bool></property><property name="visible"><bool>false</bool></property></widget></item>
-      <item><widget class="QPushButton" name="btn_reset_state"><property name="text"><string>Reset plate state</string></property><property name="toolTip"><string>Bring this plate back to the editor defaults (stretch, measurement recipe, sequence field) and clear the state saved with the plate. The measured points of this plate are not touched, and other plates are not affected</string></property><property name="visible"><bool>false</bool></property></widget></item>
-      <item><widget class="QPushButton" name="btn_reset_points"><property name="text"><string>Reset plate points</string></property><property name="toolTip"><string>Remove every measured point that was registered in this plate. This action asks for confirmation and cannot be undone; points saved on other plates are not affected</string></property><property name="visible"><bool>false</bool></property></widget></item>
+     <item>
+      <widget class="QPushButton" name="btn_csv">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>CSV…</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_eff">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="text">
+        <string>AAVSO EFF…</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_save_project">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</string>
+       </property>
+       <property name="text">
+        <string>Save in the project</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_reset_state">
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Bring this plate back to the editor defaults (stretch, measurement recipe, sequence field) and clear the state saved with the plate. The measured points of this plate are not touched, and other plates are not affected</string>
+       </property>
+       <property name="text">
+        <string>Reset plate state</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_reset_points">
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Remove every measured point that was registered in this plate. This action asks for confirmation and cannot be undone; points saved on other plates are not affected</string>
+       </property>
+       <property name="text">
+        <string>Reset plate points</string>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
-   <item><spacer name="vsp_measure"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
+   <item>
+    <spacer name="vsp_measure">
+     <property name="orientation">
+      <enum>Qt::Orientation::Vertical</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>20</width>
+       <height>40</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
   </layout>
  </widget>
  <resources/>

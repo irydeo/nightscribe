@@ -635,7 +635,7 @@ def test_suggest_shares_the_apertures_row(dlg):
     assert tab.btn_advanced not in widgets          # off the daily line
     # the radius spins stay narrow so the row never overflows
     for spn in (tab.spn_rap, tab.spn_rin, tab.spn_rout):
-        assert spn.minimumWidth() == 56 == spn.maximumWidth()
+        assert spn.minimumWidth() == 70 == spn.maximumWidth()
 
 
 # ---------------- review round 2 (subtract + options re-measure) -----

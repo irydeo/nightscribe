@@ -196,6 +196,10 @@ class UfeMeasureTab(QWidget):
         self.lbl_series_frames = self._ui.lbl_series_frames
         self.lbl_series_cadence = self._ui.lbl_series_cadence
         self.prg_series = self._ui.prg_series
+        self.chk_series_live = self._ui.chk_series_live
+        self.chk_series_live.toggled.connect(self._on_series_live_toggled)
+        self._live_worker = None
+        self._live_points = []
         self.chart_series = LightCurveChart()
         drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
                 self.chart_series)
@@ -369,7 +373,11 @@ class UfeMeasureTab(QWidget):
                 and self._series_worker.isRunning():
             self._series_worker.cancel()
             self._series_worker.wait(3000)
+        if self._live_worker is not None and self._live_worker.isRunning():
+            self._live_worker.cancel()
+            self._live_worker.wait(3000)
         self._series_worker = None
+        self._live_worker = None
         self._sub_worker = None
 
     # ------------------------------------------------------------- state
@@ -690,6 +698,12 @@ class UfeMeasureTab(QWidget):
         self.grp_series.setVisible(self._series_attached)
         if not self._series_attached and self._series_worker is not None:
             self._series_worker.cancel()
+        if not self._series_attached and self._live_worker is not None:
+            self._live_worker.cancel()
+            self._live_worker = None
+            self.chk_series_live.blockSignals(True)
+            self.chk_series_live.setChecked(False)
+            self.chk_series_live.blockSignals(False)
 
     def _series_context(self):
         # @return: the visit context {"paths", "session_id", ...} the host
@@ -977,6 +991,56 @@ class UfeMeasureTab(QWidget):
         self._series_run_id = None
         self.btn_series_undo.setEnabled(False)
         self.chart_series.set_data([])
+
+    def _on_series_live_toggled(self, checked):
+        # D21 (opt-in, off by default): watch the visit folder and measure
+        # each new batch with the same engine; the curve grows live.
+        if not checked:
+            if self._live_worker is not None:
+                self._live_worker.cancel()
+                self._live_worker = None
+            self.lbl_status.setText(self.tr("Live mode off."))
+            return
+        ctx = self._series_context()
+        entries = self._sequence()
+        target = self._series_target()
+        if not ctx or not ctx.get("paths") or not entries or target is None:
+            self.lbl_status.setText(self.tr(
+                "Live mode needs a visit with frames, a sequence and a "
+                "measured target."))
+            self.chk_series_live.blockSignals(True)
+            self.chk_series_live.setChecked(False)
+            self.chk_series_live.blockSignals(False)
+            return
+        folder = str(Path(ctx["paths"][0]).parent)
+        self._series_cfg = self._series_config(entries, target)
+        self._series_cfg_dict = self._series_config_dict(self._series_cfg)
+        self._live_points = []
+        from .workers import LiveSeriesWorker
+        self._live_worker = LiveSeriesWorker(folder, self._series_cfg)
+        self._live_worker.progress.connect(
+            lambda m: self.lbl_status.setText(m))
+        self._live_worker.batch.connect(self._on_live_batch)
+        self._live_worker.failed.connect(
+            lambda m: self.lbl_status.setText(m))
+        self._live_worker.start()
+        self.lbl_status.setText(self.tr(
+            "Live mode on: watching the visit folder…"))
+
+    def _on_live_batch(self, result):
+        # A committed batch: persist it as a run and grow the curve.
+        rows = self._series_rows(result.points)
+        dlg = self.window()
+        notify = getattr(dlg, "notify_points", None)
+        if callable(notify) and rows:
+            try:
+                notify(rows, self._series_cfg_dict or {})
+            except Exception as err:
+                logger.warning("live save failed: %s", err)
+        self._live_points.extend(result.points)
+        self._draw_series(self._live_points)
+        self._update_series_counter(self._series_context() or {},
+                                    self._live_points)
 
     def _open_series_docs(self):
         # D37: the "?" opens the sequences guide in the docs browser.

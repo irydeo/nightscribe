@@ -339,6 +339,16 @@
        </layout>
       </item>
       <item>
+       <widget class="QCheckBox" name="chk_series_live">
+        <property name="toolTip">
+         <string>Live mode (opt-in): watch this visit's folder and measure each new frame as it lands, updating the curve every few frames. Off by default</string>
+        </property>
+        <property name="text">
+         <string>Live (watch the folder)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <layout class="QHBoxLayout" name="row_series_info">
         <item>
          <widget class="QLabel" name="lbl_series_frames">

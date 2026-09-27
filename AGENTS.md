@@ -109,6 +109,9 @@ nightscribe/
                       #   ExoClock_info.txt con Comments relleno (plan fase 8)
     solve.py          # dispatcher de resolución de placa: auto|astap|astrometry
                       #   (auto prueba ASTAP local y cae a nova; ADR-051)
+    live.py           # modo en vivo (ADR-050): sondeo de carpeta, estabilidad
+                      #   de tamaño, lotes por N tomas/T s por el mismo motor
+                      #   (plan fase 10; opt-in, apagado por defecto)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

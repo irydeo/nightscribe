@@ -144,8 +144,12 @@
        </property>
       </widget>
      </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_suggest">
      <item>
-      <spacer name="hsp_apertures">
+      <spacer name="hsp_suggest">
        <property name="orientation">
         <enum>Qt::Orientation::Horizontal</enum>
        </property>

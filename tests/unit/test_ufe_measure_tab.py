@@ -622,22 +622,30 @@ def _innermost_row_of(tab, target):
     return None
 
 
-def test_suggest_shares_the_apertures_row(dlg):
-    # The daily flow is band, apertures and Suggest on one line
-    # (ADR-044 rev, 2026-09-25): fewer hops, no second button row.
-    # The recipe knobs open in the Advanced window, not on this tab.
+def test_suggest_sits_on_its_own_row_below_the_apertures(dlg):
+    # The daily flow is band, apertures, then Suggest on its own line
+    # right under them (ADR-044 rev, 2026-09-27): the button left the
+    # apertures row so the radii line never overflows on wide-font
+    # platforms. The recipe knobs open in the Advanced window, not here.
     tab = dlg.tab_measure
-    row = _innermost_row_of(tab, tab.btn_suggest)
-    assert row is not None
-    widgets = [row.itemAt(i).widget() for i in range(row.count())
-               if row.itemAt(i).widget() is not None]
+    apt_row = _innermost_row_of(tab, tab.spn_rin)
+    assert apt_row is not None
+    apt_widgets = [apt_row.itemAt(i).widget() for i in range(apt_row.count())
+                   if apt_row.itemAt(i).widget() is not None]
     for spn in (tab.spn_rap, tab.spn_rin, tab.spn_rout):
-        assert spn in widgets                       # all three radii
-    assert any(w.text().startswith("Apertures") for w in widgets)
-    assert tab.btn_advanced not in widgets          # off the daily line
-    # the radius spins stay narrow so the row never overflows
+        assert spn in apt_widgets                   # all three radii
+    assert any(w.text().startswith("Apertures") for w in apt_widgets)
+    assert tab.btn_suggest not in apt_widgets       # its own row now
+    assert tab.btn_advanced not in apt_widgets      # off the daily line
+    # the radius spins stay narrow so the radii row never overflows
     for spn in (tab.spn_rap, tab.spn_rin, tab.spn_rout):
         assert spn.minimumWidth() == 70 == spn.maximumWidth()
+    # Suggest on its own row, never sharing it with Advanced
+    sug_row = _innermost_row_of(tab, tab.btn_suggest)
+    assert sug_row is not None and sug_row is not apt_row
+    sug_widgets = [sug_row.itemAt(i).widget() for i in range(sug_row.count())
+                   if sug_row.itemAt(i).widget() is not None]
+    assert tab.btn_advanced not in sug_widgets
 
 
 # ---------------- review round 2 (subtract + options re-measure) -----

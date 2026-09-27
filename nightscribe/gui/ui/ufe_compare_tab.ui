@@ -26,7 +26,7 @@
    <item>
     <layout class="QHBoxLayout" name="row_target">
      <property name="layoutStretch" stdset="0">
-      <string notr="true">0,0,0,0,1</string>
+      <string notr="true">0,0,0,1</string>
      </property>
      <item>
       <widget class="QLabel" name="lbl_target">
@@ -77,6 +77,10 @@
        </property>
       </widget>
      </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_catalog">
      <item>
       <widget class="QComboBox" name="cmb_catalog"/>
      </item>
@@ -104,6 +108,10 @@
        </property>
       </widget>
      </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_manual">
      <item>
       <widget class="QPushButton" name="btn_manual">
        <property name="toolTip">

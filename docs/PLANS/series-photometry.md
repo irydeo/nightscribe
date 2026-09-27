@@ -392,6 +392,12 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 
 ### Fase 7 · Ajuste de tránsito (COMPUERTA)
 
+> **⚠ PENDIENTE (para retomar cuando lo indique el autor): mejorar la fotometría real de la
+> fase 7.** La compuerta EXOTIC queda **abierta** por precisión del dato (σ por punto de
+> decenas de mmag frente a un tránsito de 26 mmag), no por el motor de ajuste. Trabajo acordado
+> para después: aperturas/PSF adaptadas, blend del binario, tratamiento de saturación y
+> precisión del registro; ver el «Resultado» al final de esta fase.
+
 - **Decisiones**: D1, D2, D27, D28, D29, D38.
 - **Por qué**: T5+T7 dan la curva; el usuario de tránsitos necesita T_mid, profundidad y
   errores, dentro de la app, con la calidad de EXOTIC y sin su stack.
@@ -426,11 +432,14 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
   cuadrático, <1e-5; de hecho ~1e-9) y el ajuste recupera tránsitos sintéticos. La **compuerta
   end-to-end con EXOTIC no pasa**: el set MicroObservatory (142 FITS, sin WCS) se traslada y rota
   entre frames; con la alineación nueva (D44/`core/register.py`) la serie sale completa
-  (142/142) pero la fotometría diferencial queda ruidosa (σ ≈ 42 mmag), el ajuste da
-  Rp/Rs = 0,186 (21 % alto) y T_mid 439 s antes de la referencia. **No se relajan los umbrales**;
+  (142/142) pero la fotometría diferencial queda ruidosa: σ ≈ 40–180 mmag según la configuración,
+  con saturados a 4095 ADU y sin flats. El mejor ajuste (sin binar) da Rp/Rs = 0,186 (21 % alto)
+  y T_mid 439 s antes de la referencia; binar agrava la señal sistemática. El límite es el dato,
+  no el ajuste: con una profundidad de 26 mmag y σ por punto de decenas de mmag, ninguna
+  implementación alcanza el 5 % en Rp/Rs ni el 3σ en T_mid. **No se relajan los umbrales**;
   la compuerta queda **abierta** y el handoff a EXOTIC sigue siendo la vía experta. Diagnóstico
-  apuntado: apertura/psf y blend del binario, y precisión de la alineación, antes que el motor
-  de ajuste (que es correcto).
+  apuntado: apertura/PSF y blend del binario, flats inexistentes en el set y precisión de la
+  alineación, antes que el motor de ajuste (que es correcto).
 
 ### Fase 8 · ExoClock
 

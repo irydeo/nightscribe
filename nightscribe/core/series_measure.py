@@ -84,9 +84,11 @@ class SeriesConfig:
     site_height_m: float = 0.0
     group_n: int = 1
     auto_aperture: bool = False     # T3: per-night k sweep (phase 3)
-    align: str = "off"              # "off" | "similarity" (register.py):
-                                    # opt-in per-frame registration for
-                                    # datasets whose frames drift/rotate
+    align: str = "off"              # "off" | "warp"|"similarity" | "coords"
+                                    # (register.py, D44): opt-in per-frame
+                                    # registration; warp/similarity resample
+                                    # onto the reference grid, coords measure
+                                    # on the native grid at the mapped coords
     guide_jump_px: float = 2.0      # centroid off the reference (T7)
     cosmic_sigma: float = 8.0       # single-pixel spike over the noise
     zp_outlier_sigma: float = 3.0   # cloud / zero-point outlier (T7)
@@ -339,9 +341,11 @@ def _read_frame(path):
     return (header, data), None
 
 
-def _measure_frame(path, header, data, cfg, apertures=None):
-    # One (already loaded, possibly registered) frame through the shared
-    # plate recipe (T1/T2 raw material).
+def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
+                   target_ov=None):
+    # One (already loaded) frame through the shared plate recipe. With
+    # registration the frame is measured on its NATIVE grid at the mapped
+    # coordinates (wcs_ov/target_ov), so the PSF is never resampled (D44).
     # @return: the frame dict
     meta = fits_meta.meta_from_header(header)
     night = _night_of(meta.get("mjd"))
@@ -351,8 +355,10 @@ def _measure_frame(path, header, data, cfg, apertures=None):
     if radii is None:
         radii = cfg.radii
     pcfg = photometry.PlateConfig(
-        target_xy=cfg.target_xy, entries=list(cfg.comp_set),
-        header=header, wcs=cfg.wcs, band=cfg.band,
+        target_xy=target_ov if target_ov is not None else cfg.target_xy,
+        entries=list(cfg.comp_set),
+        header=header, wcs=wcs_ov if wcs_ov is not None else cfg.wcs,
+        band=cfg.band,
         fallback_band=cfg.fallback_band, radii=radii,
         sigmaclip=cfg.sigmaclip, sky_mode=cfg.sky_mode,
         color=cfg.color, target_bv=cfg.target_bv,
@@ -766,7 +772,8 @@ def detrend_series(points, policy="airmass", auto_improve=_AUTO_IMPROVE):
         for i in ids:
             trend = a1 * math.exp(a2 * points[i].airmass) + a3
             for name in used:
-                trend += coef.get(name, 0.0) * getattr(points[i], name, 0.0)
+                trend += coef.get(name, 0.0) * (getattr(points[i], name, 0.0)
+                                                or 0.0)
             detrended[i] = points[i].mag - trend
         nights.append({"night": night, "a1": a1, "a2": a2, "a3": a3,
                        "n": len(ids), "fallback": None, "terms": used,
@@ -873,6 +880,8 @@ def measure_series(paths, cfg, progress=None, cancel=None):
             continue
         header, data = loaded
         align_info = None
+        wcs_ov = None
+        target_ov = None
         if cfg.align != "off":
             # the first readable frame is the reference grid (target_xy
             # and the comps live in ITS pixels)
@@ -880,10 +889,28 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                 ref_data = data
             else:
                 from . import register
-                data, align_info = register.register_frame(data, ref_data)
-        frame = _measure_frame(path, header, data, cfg, apertures)
+                align_info = register.estimate_transform(ref_data, data)
+                if cfg.align in ("warp", "similarity"):
+                    data = register.apply_transform(
+                        data, align_info["angle"], align_info["dx"],
+                        align_info["dy"])
+                elif cfg.align == "coords":
+                    # measure on the native grid at the mapped
+                    # coordinates: the PSF is never resampled
+                    if cfg.wcs is not None:
+                        wcs_ov = register.compose_wcs(cfg.wcs, align_info)
+                    target_ov = register.ref_to_src_point(
+                        align_info, cfg.target_xy, data.shape)
+        frame = _measure_frame(path, header, data, cfg, apertures,
+                               wcs_ov=wcs_ov, target_ov=target_ov)
         if align_info is not None:
             frame["align"] = align_info
+            if cfg.align == "coords" and frame["res"].col is not None:
+                frame["res"].col, frame["res"].row = \
+                    register.src_to_ref_point(align_info,
+                                              (frame["res"].col,
+                                               frame["res"].row),
+                                              data.shape)
         frames.append(frame)
         if progress is not None:
             progress(i + 1, total)

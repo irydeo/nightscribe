@@ -233,3 +233,45 @@ def register_frame(src, ref):
     tr = estimate_transform(ref, src)
     warped = apply_transform(src, tr["angle"], tr["dx"], tr["dy"])
     return warped, tr
+
+
+def ref_to_src_point(tr, point, shape):
+    # Map a reference-frame pixel to its source-frame position.
+    # @args: tr - the estimate_transform result, point - (x, y) in the
+    #        reference frame, shape - the (h, w) frame shape
+    # @return: (x, y) in the source frame
+    cx, cy = shape[1] / 2.0, shape[0] / 2.0
+    ca, sa = math.cos(-tr["angle"]), math.sin(-tr["angle"])
+    px, py = point[0] - cx, point[1] - cy
+    return (ca * px - sa * py + cx + tr["dx"],
+            sa * px + ca * py + cy + tr["dy"])
+
+
+def src_to_ref_point(tr, point, shape):
+    # The inverse: a source-frame pixel back to reference coordinates.
+    # @return: (x, y) in the reference frame
+    cx, cy = shape[1] / 2.0, shape[0] / 2.0
+    ca, sa = math.cos(tr["angle"]), math.sin(tr["angle"])
+    px, py = point[0] - cx - tr["dx"], point[1] - cy - tr["dy"]
+    return (ca * px - sa * py + cx, sa * px + ca * py + cy)
+
+
+def compose_wcs(wcs, tr):
+    # A per-frame WCS: the reference WCS composed with the measured
+    # transform, so sky_to_pixel maps onto the source frame's native grid
+    # (rotation about the centre + translation; TAN stays linear here).
+    # @args: wcs - the reference Wcs, tr - estimate_transform result
+    # @return: a Wcs onto the source frame
+    from . import wcs as wcs_mod
+    angle, dx, dy = tr["angle"], tr["dx"], tr["dy"]
+    ca, sa = math.cos(angle), math.sin(angle)
+    cd = wcs.cd
+    new_cd = [[cd[0][0] * ca + cd[0][1] * sa,
+               cd[0][0] * (-sa) + cd[0][1] * ca],
+              [cd[1][0] * ca + cd[1][1] * sa,
+               cd[1][0] * (-sa) + cd[1][1] * ca]]
+    cx, cy = wcs.naxis1 / 2.0, wcs.naxis2 / 2.0
+    q0 = (wcs.crpix1 - 1.0, wcs.crpix2 - 1.0)
+    px, py = ref_to_src_point(tr, q0, (wcs.naxis2, wcs.naxis1))
+    return wcs_mod.Wcs(wcs.crval1, wcs.crval2, px + 1.0, py + 1.0,
+                       new_cd, wcs.naxis1, wcs.naxis2)

@@ -463,6 +463,23 @@ y con apéndice técnico de implementación:
 * [ ] Repite la medida por noche: dos puntos por sesión detectan
       problemas que uno solo esconde.
 
+### 8.1 Prácticas para el milimagnitud (T8)
+
+Para una serie de tránsitos que baje al nivel de mmag, la receta de campo:
+
+* **Flats a nivel mmag**: un flat con 1 % de error deja estructura que se ve a
+  0,01 mag en la curva; llévalo por debajo del 0,1 % (varios flats combinados
+  y sin clipping).
+* **Dithering**: desplaza unos píxeles entre tomas; reparte los defectos del
+  detector y el patrón de flat en la medida.
+* **Desenfoque leve deliberado**: una PSF algo mayor que la nominal usa más
+  píxeles por estrella (mejor SNR y menos sensibilidad al guiado) sin saturar;
+  nunca hasta confundir estrellas cercanas.
+* **Cadencia constante**: misma exposición y mismo hueco entre tomas; una
+  cadencia irregular contamina la fase y el detrend.
+* **Nada saturado**: ni el objetivo ni las comparaciones; una comp comprimida
+  miente el punto cero (y la check no lo ve).
+
 ---
 
 ## 9. Glosario mínimo

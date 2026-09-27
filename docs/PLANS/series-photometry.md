@@ -508,6 +508,12 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
   limpia).
 - **Tests**: solo si se construye: contrato con endpoint simulado, sin secretos en tests.
 - **Salida limpia**: el plan cierra este apéndice en cualquier caso, con su porqué escrito.
+- **Resultado (2026-09-27)**: verificado que **no existe** endpoint público de subida
+  (`/api/` responde 404; `/upload/` tras login + CSRF y con robots.txt que prohíbe el scraping;
+  el paquete `exoclock` de PyPI es solo lectura) y el autor no ha autorizado una API. El
+  apéndice se **cierra documentando** el envío manual de la fase 8 (ADR-049 y `SEQUENCES`); no
+  se construye cliente alguno. Si algún día aparece endpoint y permiso, la fase 8 sirve de
+  payload sin cambios.
 
 ### Fase 12 · Documentación, i18n y WORKFLOWS
 
@@ -529,6 +535,12 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Tests**: docs sin enlaces rotos (los `.md` locales navegan en el visor), i18n limpio, suite
   completa verde.
 - **Salida limpia**: fin del plan: T1–T8 completos y documentados en ambos idiomas.
+- **Resultado (2026-09-27)**: `docs/SEQUENCES.es.md` + `docs/SEQUENCES.md` publicados (12
+  secciones, incluida ExoClock y modo en vivo); `PHOTOMETRY` gana la sección 8.1 (T8);
+  `PRECISION` marca T1–T8 como hechos (con la compuerta EXOTIC end-to-end abierta y el detalle en
+  la fase 7) y C2 suma `SEQUENCES`; `WORKFLOWS` enlaza `SEQUENCES` como el «cómo» del flujo de
+  proyecto; i18n sin `unfinished`. Queda **pendiente de retomar** la mejora de la fotometría real
+  de la fase 7 (marcada arriba).
 
 ---
 

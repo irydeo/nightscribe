@@ -114,7 +114,7 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 | Medida calibrada en una placa (punto cero con las comps) | Existe (mitad Medir de la pestaña Fotometría del Editor FITS, fase G) |
 | Término de color, cielo en gradiente, apertura por FWHM, saturación real, error total, semáforo check | Existe (fase H, 2026-09-23: `core/photometry.py` + pestaña Fotometría) |
 | Sustracción de galaxia huésped | Existe (fase H: referencia PS1 alineada del blink, escalada por las comps) |
-| Serie normalizada por frame + detrending para tránsitos | En curso: piezas T1–T8 en `docs/PLANS/series-photometry.md` (ADR-015 reabierto 2026-09-27; ADR-048 a ADR-051) |
+| Serie normalizada por frame + detrending para tránsitos | Hecho (2026-09-27): T1–T7 y el ajuste (T8) en `core/series_measure.py`, `core/transit_fit.py` y `core/exoclock_export.py`; paridad de modelo D27 cerrada (<1e-5 vs batman) y compuerta EXOTIC end-to-end abierta por la fotometría real. Ver `docs/SEQUENCES.es.md` y `docs/PLANS/series-photometry.md` |
 
 ---
 
@@ -246,7 +246,7 @@ y rms de la check dentro de lo que predice el modelo de ruido.
 
 1. Cada pieza llega con tests de unidad con semilla y la suite completa
    verde (`.venv/bin/python -m pytest tests/unit`).
-2. La doc de usuario (PHOTOMETRY + PRECISION, ambos idiomas) explica la
+2. La doc de usuario (PHOTOMETRY + PRECISION + SEQUENCES, ambos idiomas) explica la
    pieza nueva con un ejemplo; i18n sin `unfinished`.
 3. Los flujos legacy (series quicklook, blink, carta legacy, EXOTIC
    handoff) siguen verdes sin tocarlos.

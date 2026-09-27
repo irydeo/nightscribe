@@ -465,6 +465,23 @@ implementation appendix: [docs/PRECISION.md](PRECISION.md).
 * [ ] Repeat the measurement each night: two points per session catch
       problems a single one hides.
 
+### 8.1 Practices for the millimagnitude (T8)
+
+For a transit series that reaches the mmag level, the field recipe:
+
+* **Flats at the mmag level**: a flat with 1 % error leaves structure visible
+  at 0.01 mag on the curve; bring it below 0.1 % (several combined flats, no
+  clipping).
+* **Dithering**: shift a few pixels between frames; it spreads the detector
+  defects and the flat pattern through the measurement.
+* **Deliberate slight defocus**: a PSF a bit larger than the nominal one uses
+  more pixels per star (better SNR and less sensitivity to guiding) without
+  saturating; never enough to blend nearby stars.
+* **Constant cadence**: same exposure and same gap between frames; an
+  irregular cadence pollutes the phase and the detrend.
+* **Nothing saturated**: neither the target nor the comparisons; a compressed
+  comp lies about the zero point (and the check does not see it).
+
 ---
 
 ## 9. The minimal glossary

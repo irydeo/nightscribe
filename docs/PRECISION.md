@@ -61,7 +61,7 @@ H):
 | Your camera's real saturation level | Photometry tab (H4: SATURATE card or `ccd_saturate` setting) | no clipped star sneaks in as a good one |
 | Colour term fitted with the comps | Photometry tab (H1) | your equipment's response stops biasing the zero |
 | Host-galaxy subtraction (SNe) | Photometry tab (H2b) | on galactic cores: from 0.05–0.15 to 0.03–0.05 mag |
-| Per-frame normalization + detrending (series) | in progress (ADR-015 rev. + ADR-048; plan `docs/PLANS/series-photometry.md`) | the transits' requirement: 0.001–0.005 mag relative |
+| Per-frame normalization + detrending (series) | Done (2026-09-27): T1–T7 and the fit (T8) in `core/series_measure.py`, `core/transit_fit.py` and `core/exoclock_export.py`; model parity D27 closed (1e-5 vs batman) and the EXOTIC end-to-end gate open on the real photometry. See `docs/SEQUENCES.md` and `docs/PLANS/series-photometry.md` | the transits' requirement: 0.001–0.005 mag relative |
 
 ### 3. Three scenarios, honest figures
 
@@ -248,7 +248,7 @@ star's rms inside what the noise model predicts.
 
 1. Every piece arrives with seeded unit tests and the full suite green
    (`.venv/bin/python -m pytest tests/unit`).
-2. The user docs (PHOTOMETRY + PRECISION, both languages) explain the
+2. The user docs (PHOTOMETRY + PRECISION + SEQUENCES, both languages) explain the
    new piece with an example; i18n with no `unfinished` strings.
 3. The legacy flows (series quick-look, blink, legacy chart, EXOTIC
    handoff) stay green untouched.

@@ -37,7 +37,9 @@ around the **visits manager** for every kind — every day you work the
 object is a visit, and its resources (plates, reports, imports) hang from
 it, registered in `project_files` with `session_id`; nothing attaches
 without a visit. ADR-019's 2026-09-06 review merged the Capture step into
-Plan and added real CCDciel control — ADR-030).
+Plan and added real CCDciel control — ADR-030). The **how** of measuring a
+series from the visit (photometric sequences, detrend, multi-night, ExoClock
+and live mode) lives in [SEQUENCES.md](SEQUENCES.md).
 
 ## 4. Flow — supernova / transient
 

@@ -38,7 +38,9 @@ trabaja el objeto es una visita y de ella cuelgan sus recursos — placas,
 reportes, importaciones — registrados en `project_files` con
 `session_id`; nada se adjunta sin visita. Revisión 2026-09-06 de ADR-019:
 el paso Captura se fundió en el Plan y gana el control real de CCDciel —
-ADR-030).
+ADR-030). El **cómo** de medir una serie desde la visita (fotometría de
+secuencias, detrend, multinoche, ExoClock y modo en vivo) está en
+[SEQUENCES.es.md](SEQUENCES.es.md).
 
 ## 4. Flujo — supernova / transitorio
 

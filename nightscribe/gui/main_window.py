@@ -716,6 +716,76 @@ class MainWindow(QMainWindow):
         rep = astap.probe(dlg.edt_astap_path.text().strip())
         QMessageBox.information(dlg, self.tr("ASTAP"), rep["message"])
 
+    def _pick_exotic_python(self, dlg):
+        # Browse for the Python <=3.10 interpreter that will host EXOTIC.
+        from PySide6.QtWidgets import QFileDialog
+        path, _sel = QFileDialog.getOpenFileName(
+            dlg, self.tr("Select the Python 3.10 interpreter"), "",
+            self.tr("Executables (*)"))
+        if path:
+            dlg.edt_exotic_python.setText(path)
+
+    def _pick_exotic_dir(self, dlg):
+        # Browse for the folder the EXOTIC environment will live in.
+        from PySide6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Select the EXOTIC environment folder"))
+        if path:
+            dlg.edt_exotic_install.setText(path)
+
+    def _exotic_python(self, dlg):
+        # @return: the interpreter to use (configured, else detected)
+        from ..core import exotic_env
+        return exotic_env.detect_python(
+            dlg.edt_exotic_python.text().strip())
+
+    def _test_exotic(self, dlg):
+        # Probe the interpreter for a working EXOTIC import.
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_env
+        python = self._exotic_python(dlg)
+        rep = exotic_env.probe(python)
+        QMessageBox.information(dlg, self.tr("EXOTIC"), rep["message"])
+
+    def _prepare_exotic(self, dlg):
+        # Build the external EXOTIC environment in the background.
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_env, paths as paths_mod
+        from .workers import PrepareExoticWorker
+        python = self._exotic_python(dlg)
+        if not python:
+            QMessageBox.warning(dlg, self.tr("EXOTIC"), self.tr(
+                "No Python 3.10 interpreter found: install it or point to "
+                "one above."))
+            return
+        install = dlg.edt_exotic_install.text().strip() or str(
+            paths_mod.data_dir() / "exotic-venv")
+        self._exotic_worker = PrepareExoticWorker(install, python)
+        self._exotic_worker.progress.connect(
+            lambda stage: self.statusBar().showMessage(
+                self.tr("Preparing EXOTIC: {0}").format(stage), 0))
+        self._exotic_worker.finished.connect(
+            lambda ok, log: self._exotic_prepared(dlg, install, ok, log))
+        self._exotic_worker.start()
+        self.statusBar().showMessage(
+            self.tr("Preparing the EXOTIC environment…"), 0)
+
+    def _exotic_prepared(self, dlg, install, ok, log):
+        # The environment build finished: report and point the setting at
+        # the new venv interpreter.
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_env
+        self._exotic_worker = None
+        self.statusBar().clearMessage()
+        if ok:
+            dlg.edt_exotic_install.setText(install)
+            dlg.edt_exotic_python.setText(str(exotic_env.venv_python(install)))
+            QMessageBox.information(dlg, self.tr("EXOTIC"), self.tr(
+                "EXOTIC environment ready."))
+        else:
+            QMessageBox.warning(dlg, self.tr("EXOTIC"), self.tr(
+                "Could not prepare EXOTIC:\n{0}").format(log[-600:]))
+
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
         # 3-tab layout with per-field help labels BELOW each widget —
@@ -767,6 +837,17 @@ class MainWindow(QMainWindow):
         dlg.btn_astap_browse.clicked.connect(
             lambda: self._pick_astap(dlg))
         dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
+        # EXOTIC orchestration (plan phase A): the external Python <=3.10
+        # and its private environment
+        dlg.edt_exotic_python.setText(config.get("exotic_python_path", ""))
+        dlg.edt_exotic_install.setText(config.get("exotic_install_dir", ""))
+        dlg.btn_exotic_py_browse.clicked.connect(
+            lambda: self._pick_exotic_python(dlg))
+        dlg.btn_exotic_dir_browse.clicked.connect(
+            lambda: self._pick_exotic_dir(dlg))
+        dlg.btn_exotic_prepare.clicked.connect(
+            lambda: self._prepare_exotic(dlg))
+        dlg.btn_exotic_test.clicked.connect(lambda: self._test_exotic(dlg))
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         # Track D (EXOTIC handoff): AAVSO code, camera type and binning
@@ -871,6 +952,10 @@ class MainWindow(QMainWindow):
         config.set("solver", dlg.cmb_solver.currentData() or "auto")
         config.set("astap_path", dlg.edt_astap_path.text().strip())
         config.set("astap_update", dlg.chk_astap_update.isChecked())
+        config.set("exotic_python_path",
+                   dlg.edt_exotic_python.text().strip())
+        config.set("exotic_install_dir",
+                   dlg.edt_exotic_install.text().strip())
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
         config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())

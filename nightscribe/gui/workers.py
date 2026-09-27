@@ -571,3 +571,32 @@ class LiveSeriesWorker(QThread):
         except Exception as err:      # never crash the GUI thread
             logger.exception("live worker failed: %s", err)
             self.failed.emit(str(err))
+
+
+class PrepareExoticWorker(QThread):
+    # Builds the external EXOTIC environment in the background
+    # (orchestration phase A): a private venv with EXOTIC installed.
+
+    progress = Signal(str)          # stage key: venv | pip | exotic | done
+    finished = Signal(bool, str)    # (ok, log tail)
+
+    def __init__(self, install_dir, base_python):
+        super().__init__()
+        self._install = install_dir
+        self._base = base_python
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import exotic_env
+        try:
+            ok, log = exotic_env.prepare(
+                self._install, self._base,
+                progress=self.progress.emit,
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("prepare exotic failed: %s", err)
+            ok, log = False, str(err)
+        self.finished.emit(bool(ok), log or "")

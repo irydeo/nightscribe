@@ -42,6 +42,10 @@ DEFAULTS = {
     "solver": "auto",       # auto | astap | astrometry (ADR-051)
     "astap_path": "",       # local ASTAP binary; empty = look on PATH
     "astap_update": False,  # let a local solve rewrite the FITS header
+    # EXOTIC orchestration (series plan option A): the external Python <=3.10
+    # used to run EXOTIC and the venv it lives in. Empty = autodetect.
+    "exotic_python_path": "",
+    "exotic_install_dir": "",
     # Container root for the projects: empty -> platformdirs data dir's
     # projects/ folder (the legacy location, see ADR-032)
     "projects_root": "",

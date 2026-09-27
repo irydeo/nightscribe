@@ -143,6 +143,17 @@ curva y sus parámetros.
 Salida limpia: con un clic se prepara (o valida) el entorno; con el botón Probar
 se sabe si EXOTIC está listo, sin bloquear la UI.
 
+### Resultado de la fase A (2026-09-27)
+
+`core/exotic_env.py` (`detect_python`, `probe`, `prepare`, `venv_python`),
+`gui/workers.PrepareExoticWorker` y el grupo «EXOTIC (transit reduction)» en
+Ajustes (intérprete, carpeta del entorno, «Preparar entorno», «Probar»), con
+las claves `exotic_python_path`/`exotic_install_dir`. `prepare` crea el venv
+con `--without-pip` y arranca pip por el intérprete base (`pip --python`),
+cubriendo el `ensurepip` roto; en Windows usa `Scripts/python.exe`. Tests en
+`tests/unit/test_exotic_env.py` (detección, probe, secuencia de pip, fallo y
+cancelación) e i18n sin `unfinished`.
+
 ---
 
 ## 4. Fase B · `inits.json` de la visita

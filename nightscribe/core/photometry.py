@@ -34,10 +34,11 @@ language and says it the way the app already says things.
 
 import logging
 import math
+from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import series
+from . import coords, fits_meta, series
 
 logger = logging.getLogger(__name__)
 
@@ -1000,3 +1001,267 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
                      "snr_peak_r": snr_peak[0], "peak_snr": peak_snr,
                      "nearest": nearest, "gradient": gradient,
                      "sky_pp": sky_pp}}
+
+
+# ---------------- single-plate recipe extraction (series plan, phase 1) -
+#
+# The whole single-plate recipe (H3..H7) as one pure function so the UFE
+# Measure tab and the series engine can never drift apart: the GUI is a
+# facade that reads its widgets into a PlateConfig and paints the result.
+
+def band_of(star, band):
+    # The star's value in one photometric band.
+    # @args: star - a sequence star dict, band - a label like "V"
+    # @return: (value, derived), or (None, False) when the star lacks it
+    for item in star.get("bands", []):
+        if item.get("label") == band and item.get("value") is not None:
+            return item["value"], bool(item.get("derived"))
+    return None, False
+
+
+def available_bands(entries):
+    # @args: entries - the comparison sequence
+    # @return: the photometric bands present (colour indices like B-V are
+    #          not bands), V first
+    labels = []
+    for e in entries:
+        for item in e["star"].get("bands", []):
+            lab = item.get("label") or ""
+            if item.get("value") is None or "-" in lab:
+                continue
+            if lab not in labels:
+                labels.append(lab)
+    return sorted(labels, key=lambda l: (l != "V", l))
+
+
+def pick_band(entries, preferred=None, fallback="V"):
+    # The band this plate calibrates in: the observer's pick when the
+    # sequence carries it, else the first available band, else the
+    # fallback (a plate with no usable band still reports honestly).
+    # @return: (band, available bands)
+    bands = available_bands(entries)
+    band = preferred or fallback
+    if bands and band not in bands:
+        band = bands[0]
+    return band, bands
+
+
+@dataclass
+class PlateConfig:
+    # Every knob of the single-plate recipe, resolved by the caller (the
+    # GUI reads its widgets and Ajustes; the series engine its own cfg).
+    target_xy: tuple = (0.0, 0.0)   # the click, in plate pixels
+    entries: list = field(default_factory=list)
+    header: dict = field(default_factory=dict)
+    wcs: object = None
+    band: str = None                # the observer's pick, or None
+    fallback_band: str = "V"
+    radii: tuple = None             # (rap, rin, rout) or None for defaults
+    fwhm: float = None              # measured seeing (px), for the centroid
+    sigmaclip: bool = True
+    sky_mode: str = "median"
+    color: bool = False
+    target_bv: float = 0.0
+    # site (Ajustes, ADR-028): the same values the panel has always used
+    site_gain: float = None
+    site_ron: float = None
+    site_flat: float = 0.007
+    site_saturate: float = None
+    site_lon: float = None
+    site_lat: float = None
+    site_aperture_m: float = 0.254
+    site_height_m: float = 0.0
+    # host subtraction (H2b): the comps read on another frame, in the
+    # plate orientation, at comp_scale plate px per comp-image px
+    comp_image: object = None
+    comp_scale: float = 1.0
+
+
+@dataclass
+class PlateResult:
+    # The recipe's output: the target, its comps, the zero point, the
+    # honest error budget and the check verdict. Never raises.
+    ok: bool = False
+    reason: dict = None
+    target: dict = None
+    col: float = None               # measured centroid, in plate pixels
+    row: float = None
+    fwhm: float = None
+    radii: tuple = None
+    band: str = None
+    bands_avail: list = field(default_factory=list)
+    used: list = field(default_factory=list)   # [(entry, result), ...]
+    skipped: dict = field(default_factory=dict)
+    derived: bool = False
+    inst_t: float = None
+    zp: dict = None
+    mag: float = None
+    err_total: float = None
+    err_internal: float = None
+    scint: float = None
+    check: dict = None
+    sky_mode: str = "median"
+    sigma_clip: bool = True
+    gain: float = None
+
+
+def _check_verdict(entries, used_entries, band, zp, err_total):
+    # H6: measure the check star on this same plate and compare with its
+    # catalog value; beyond 2.5 sigma the night is not trusted.
+    # @args: zp - the calibration dict (with the colour term, when fitted:
+    #        the check's OWN B-V moves its zero point)
+    # @return: None or {"delta", "ok", "name", "mag", "catalog"}
+    check = next((e for e in entries if e["kind"] == "check"), None)
+    if check is None or zp.get("zp") is None or err_total is None:
+        return None
+    used = next((r for e, r in used_entries
+                 if e["star"] is check["star"]), None)
+    if used is None:
+        return None
+    catalog, _d = band_of(check["star"], band)
+    if catalog is None:
+        return None
+    zp_check = zp["zp"]
+    if zp.get("color_used") and zp.get("k") is not None \
+            and check["star"].get("bv") is not None:
+        zp_check = zp["zp"] + zp["k"] * check["star"]["bv"]
+    measured = -2.5 * math.log10(used["flux"]) + zp_check
+    delta = measured - catalog
+    return {"delta": delta, "ok": abs(delta) <= 2.5 * err_total,
+            "name": check["name"], "mag": measured, "catalog": catalog}
+
+
+def _plate_scintillation(cfg, col, row, exptime):
+    # H5: Young's formula with the site from Ajustes and the target's
+    # altitude from the plate's WCS + DATE-OBS. None when it cannot be
+    # computed (the combiner skips it).
+    meta = fits_meta.meta_from_header(cfg.header or {})
+    if meta["mjd"] is None or cfg.wcs is None:
+        return None
+    try:
+        ra, dec = cfg.wcs.pixel_to_sky(col, row)
+        jd = meta["mjd"] + 2400000.5
+        lst = coords.lst_degrees(jd, float(cfg.site_lon))
+        alt, _az = coords.altaz(ra, dec, float(cfg.site_lat), lst)
+        return scintillation_mag(alt, exptime, cfg.site_aperture_m,
+                                 cfg.site_height_m)
+    except Exception:
+        return None
+
+
+def measure_plate(image, cfg):
+    # The single-plate recipe as one pure function: target, comps on the
+    # same plate (or the paired work frame while subtracting the host),
+    # zero point with the colour term, honest error budget, check
+    # semaphore. No Qt, never raises: the guards become bilingual reasons.
+    # @args: image - the work frame the target reads on (the plate, or
+    #        the difference when cfg.comp_image is set), cfg - PlateConfig
+    # @return: a PlateResult
+    scale = float(cfg.comp_scale) if cfg.comp_image is not None else 1.0
+    radii = tuple(cfg.radii) if cfg.radii else (R_AP, R_ANN_IN, R_ANN_OUT)
+    fwhm = cfg.fwhm
+    sat = saturation_ceiling(cfg.header,
+                             {"ccd_saturate": cfg.site_saturate})
+    res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
+                      sigma_clip=cfg.sigmaclip)
+    tx, ty = cfg.target_xy
+    if cfg.comp_image is not None:
+        # H2b: the target on the difference, the comps on the work frame
+        target = measure_point(
+            image, tx / scale, ty / scale,
+            r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
+            r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
+            sat_adu=None, sky_mode=cfg.sky_mode,
+            fwhm=(fwhm / scale if fwhm else None))
+    else:
+        target = measure_point(
+            image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
+            r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
+            sky_mode=cfg.sky_mode, fwhm=fwhm)
+    res.target = target
+    if not target["ok"]:
+        res.reason = target.get("reason")
+        return res
+    mx, my = target["x"], target["y"]
+    if cfg.comp_image is not None:
+        mx, my = mx * scale, my * scale
+    res.col, res.row = mx, my
+    res.ok = True
+    band, bands = pick_band(cfg.entries, cfg.band, cfg.fallback_band)
+    res.band, res.bands_avail = band, bands
+    inst_t = -2.5 * math.log10(target["flux"])
+    res.inst_t = inst_t
+    # the comps on the same plate (or the paired work frame); the ceiling
+    # applies to them too: a clipped comp poisons the zero point
+    inst, cat, bvs, used_entries = [], [], [], []
+    skipped = {}
+    for e in cfg.entries:
+        star = e["star"]
+        try:
+            ccol, crow = cfg.wcs.sky_to_pixel(star["ra"], star["dec"])
+        except Exception:
+            skipped["off"] = skipped.get("off", 0) + 1
+            continue
+        if cfg.comp_image is not None:
+            r = measure_point(
+                cfg.comp_image, ccol / scale, crow / scale,
+                r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
+                r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
+                sat_adu=None, sky_mode=cfg.sky_mode,
+                fwhm=(fwhm / scale if fwhm else None))
+        else:
+            r = measure_point(image, ccol, crow, r_ap=radii[0],
+                              r_ann_in=radii[1], r_ann_out=radii[2],
+                              sigma_clip=cfg.sigmaclip, sat_adu=sat,
+                              sky_mode=cfg.sky_mode, fwhm=fwhm)
+        value, derived = band_of(star, band)
+        if not r["ok"]:
+            key = "sat" if r.get("saturated") else "other"
+            skipped[key] = skipped.get(key, 0) + 1
+            continue
+        if value is None:
+            skipped["band"] = skipped.get("band", 0) + 1
+            continue
+        inst.append(-2.5 * math.log10(r["flux"]))
+        cat.append(value)
+        bvs.append(star.get("bv"))
+        used_entries.append((e, r))
+    res.used = used_entries
+    res.skipped = skipped
+    res.derived = any(band_of(e["star"], band)[1]
+                      for e, _r in used_entries)
+    if cfg.color:
+        zp = calibrate_with_color(inst, cat, bvs,
+                                  target_bv=cfg.target_bv)
+    else:
+        zp = calibrate_zero_point(inst, cat)
+    zp.setdefault("color_used", False)   # the plain path carries none
+    res.zp = zp
+    # error budget: CCD equation (gain from header or Ajustes) + the
+    # zero point + scintillation + the flat residual + the colour term
+    inst_header = header_instrument(cfg.header)
+    gain = (inst_header["gain"] if inst_header["gain"] is not None
+            else cfg.site_gain)
+    ron = (inst_header["ron"] if inst_header["ron"] is not None
+           else cfg.site_ron)
+    res.gain = gain
+    flux_err = ccd_flux_error(target["flux"], target["sky_pp"],
+                              target["n_pix"], gain=gain, ron=ron,
+                              exptime=inst_header["exptime"])
+    ccd_mag_err = mag_error(target["flux"], flux_err)
+    res.err_internal = ccd_mag_err
+    scint = _plate_scintillation(cfg, mx, my, inst_header["exptime"])
+    res.scint = scint
+    color_err = zp.get("target_color_err")
+    err_total = combine_errors(ccd_mag_err, zp["zp_err"], scint,
+                               cfg.site_flat, color_err)
+    res.err_total = err_total
+    zp_for_mag = zp["zp"]
+    if zp.get("color_used") and zp["k"] is not None:
+        # the fit's zero point is at B-V = 0: move the target onto it
+        zp_for_mag = zp["zp"] + zp["k"] * cfg.target_bv
+    mag, _e = calibrated_mag(inst_t, zp_for_mag)
+    res.mag = mag
+    res.check = _check_verdict(cfg.entries, used_entries, band, zp,
+                               err_total)
+    return res

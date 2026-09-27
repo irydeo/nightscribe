@@ -712,3 +712,114 @@ def test_lock_local_peak_nearest_and_honest():
     assert phot.lock_local_peak(plate, 103.4, 100.6) == (103.0, 101.0)
     # nothing significant within reach: the honest answer is None
     assert phot.lock_local_peak(plate, 40.0, 40.0, max_dist=3.0) is None
+
+
+# ---------------- single-plate recipe (series plan, phase 1) ----------
+
+class _FlatWcs:
+    # Pixel <-> sky identity: measure_plate only needs the mapping, the
+    # plate math lives elsewhere (the GUI tests bring a real TAN WCS).
+
+    def sky_to_pixel(self, ra, dec):
+        return ra, dec
+
+    def pixel_to_sky(self, x, y):
+        return x, y
+
+
+ZP_CONTRACT = 22.0
+_CONTRACT_TARGET = (100.0, 100.0)
+_CONTRACT_COMPS = [(40, 40), (160, 40), (40, 160), (160, 160), (100, 170)]
+_CONTRACT_CHECK = (60, 100)
+
+
+def _contract_plate():
+    # Fixed seed, fixed stars: the frozen reference plate of the recipe
+    # contract test.
+    stars = [(_CONTRACT_TARGET[0], _CONTRACT_TARGET[1], 8000.0)]
+    stars += [(x, y, a) for (x, y), a in
+              zip(_CONTRACT_COMPS, (12000, 11000, 10500, 11500, 10800))]
+    stars.append((_CONTRACT_CHECK[0], _CONTRACT_CHECK[1], 9000.0))
+    return _plate(200, 200, stars, sky=100.0, noise=1.0, seed=7)
+
+
+def _contract_entries(data):
+    # Catalog values bootstrapped from the plate itself at the known
+    # zero point (the wiring contract; the physics has its own tests).
+    entries = []
+    for j, (x, y) in enumerate(_CONTRACT_COMPS):
+        r = phot.measure_point(data, x, y)
+        inst = -2.5 * math.log10(r["flux"])
+        entries.append({"name": f"C{j + 1}", "kind": "comp",
+                        "star": {"ra": x, "dec": y, "mag": inst
+                                 + ZP_CONTRACT, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": inst + ZP_CONTRACT,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    r = phot.measure_point(data, *_CONTRACT_CHECK)
+    inst = -2.5 * math.log10(r["flux"])
+    entries.append({"name": "CHK", "kind": "check",
+                    "star": {"ra": _CONTRACT_CHECK[0],
+                             "dec": _CONTRACT_CHECK[1], "mag": inst
+                             + ZP_CONTRACT, "band": "V",
+                             "bands": [{"label": "V",
+                                        "value": inst + ZP_CONTRACT,
+                                        "err": 0.01, "derived": False}],
+                             "bv": 0.6}})
+    return entries
+
+
+def test_measure_plate_frozen_reference():
+    # The phase-1 contract: same inputs, same outputs as the GUI recipe
+    # before its extraction (frozen synthetic plate, fixed seed).
+    data = _contract_plate()
+    cfg = phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, entries=_contract_entries(data),
+        wcs=_FlatWcs(), band="V", radii=(6.0, 10.0, 15.0), fwhm=None,
+        site_gain=2.0, site_ron=5.0, site_flat=0.007,
+        site_lat=40.0, site_lon=-3.0, site_aperture_m=0.254,
+        site_height_m=650.0)
+    res = phot.measure_plate(data, cfg)
+    assert res.ok and res.reason is None
+    assert res.target["flux"] == pytest.approx(388555.97, rel=1e-3)
+    assert res.col == pytest.approx(100.0002, abs=0.05)
+    assert res.row == pytest.approx(100.0, abs=0.05)
+    assert res.zp["zp"] == pytest.approx(ZP_CONTRACT, abs=1e-6)
+    assert res.zp["n"] == 6
+    assert res.mag == pytest.approx(8.0264, abs=1e-3)
+    assert res.err_total == pytest.approx(0.007111, abs=5e-4)
+    assert res.err_internal == pytest.approx(0.001252, abs=5e-4)
+    assert res.err_total >= res.err_internal
+    assert res.band == "V" and res.bands_avail == ["V"]
+    assert len(res.used) == 6 and res.skipped == {}
+    assert res.check is not None and res.check["ok"]
+    assert res.check["delta"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_measure_plate_guards_become_reason_pairs():
+    # A saturated target is refused, never raised, and the reason is the
+    # bilingual pair the panel already knows how to say.
+    data = _contract_plate()
+    entries = _contract_entries(data)   # catalog values from the clean plate
+    # a SATURATE card below the target's peak: the recipe refuses it
+    res = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, entries=entries,
+        wcs=_FlatWcs(), band="V", header={"SATURATE": 5000.0}))
+    assert res.ok is False
+    assert res.reason == {"es": "saturada", "en": "saturated"}
+
+
+def test_band_helpers():
+    entries = [{"star": {"bands": [
+        {"label": "B-V", "value": 0.6, "derived": False},
+        {"label": "G", "value": 14.0, "derived": True}]}},
+        {"star": {"bands": [
+            {"label": "V", "value": 13.0, "derived": False},
+            {"label": "G", "value": 14.1, "derived": True}]}}]
+    assert phot.available_bands(entries) == ["V", "G"]
+    assert phot.band_of(entries[1]["star"], "G") == (14.1, True)
+    assert phot.band_of(entries[1]["star"], "R") == (None, False)
+    assert phot.pick_band(entries, "G") == ("G", ["V", "G"])
+    assert phot.pick_band(entries, "R") == ("V", ["V", "G"])
+    assert phot.pick_band([], None) == ("V", [])

@@ -203,8 +203,9 @@ viven en el diálogo que enmarca la tabla; el panel conserva los alias
 «Sequence (N)…» se sienta junto a «Propose sequence» con el recuento
 vivo de las estrellas de la tabla. La fila de objetivo y magnitud cabe
 en una línea: el campo de nombre es estrecho (130 px) y la etiqueta es
-solo «Mag». En el panel Medir, «Suggest» comparte la fila de
-aperturas y las tres cajas de numeración se estrechan (56 px).
+solo «Mag». En el panel Medir, «Suggest» pasa a su propia línea,
+justo debajo de las aperturas (así la fila de radios no desborda con
+fuentes anchas) y las tres cajas de numeración se estrechan (70 px).
 
 **Controles de marca del objeto: nombres y tooltips honestos (2026-09-25)**.
 Los cuatro controles de marca (los casilleros de las pestañas Blink,
@@ -493,8 +494,10 @@ table; the panel keeps the `btn_clear` / `btn_csv` aliases (the
 integration tests pin them) and "Sequence (N)…" sits next to "Propose
 sequence" with the live count of the table's stars. The target and
 magnitude row fits one line: the name field is narrow (130 px) and
-the label is just "Mag". On the Measure panel, "Suggest" shares the
-apertures row and the three spin boxes go narrow (56 px).
+the label is just "Mag". On the Measure panel, "Suggest" moves to
+its own line right under the apertures (so the radii row never
+overflows on wide-font platforms) and the three spin boxes go narrow
+(70 px).
 
 **Object-mark controls: honest names and tooltips (2026-09-25)**.
 The four object-mark controls (the Blink, Annotate and Sequence

@@ -15,6 +15,9 @@ es `docs/PLANS/series-photometry.md` (registro D1–D39, trece fases).
 - **Motor**: `core/series_measure.py`, alimentado por `core/photometry.measure_plate`
   (la receta de la placa única extraída de la GUI en la fase 1; una sola receta, una
   sola precisión).
+- **Registro opt-in**: para sets sin WCS ni frames alineados, `core/register.py` alinea cada
+  frame a la referencia (rotación sobre el centro + traslación subpíxel, por correlación de
+  fase, numpy puro) y `SeriesConfig.align="similarity"` lo activa; por defecto apagado (D17).
 - **Agnóstico por parámetros**: `SeriesConfig(zp_mode="catalog"|"relative",
   detrend_policy="off"|"airmass"|"auto", host_ref, comp_set, ...)`; **ninguna rama
   `if kind`**: los tipos (tránsito, variable, SN, HADS) cambian parámetros y las
@@ -78,6 +81,10 @@ variables, and requires reopening ADR-015 before any code. The full plan is
 - **Engine**: `core/series_measure.py`, fed by `core/photometry.measure_plate`
   (the single-plate recipe extracted from the GUI in phase 1; one recipe, one
   precision).
+- **Opt-in registration**: for sets without WCS or aligned frames, `core/register.py`
+  aligns each frame to the reference (rotation about the centre plus subpixel
+  translation, by phase correlation, pure numpy) and `SeriesConfig.align="similarity"`
+  turns it on; off by default (D17).
 - **Kind-agnostic by parameters**: `SeriesConfig(zp_mode="catalog"|"relative",
   detrend_policy="off"|"airmass"|"auto", host_ref, comp_set, ...)`; **no `if kind`
   branch**: the types change parameters and the analysis-layer rules, not the

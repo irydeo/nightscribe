@@ -84,6 +84,9 @@ class SeriesConfig:
     site_height_m: float = 0.0
     group_n: int = 1
     auto_aperture: bool = False     # T3: per-night k sweep (phase 3)
+    align: str = "off"              # "off" | "similarity" (register.py):
+                                    # opt-in per-frame registration for
+                                    # datasets whose frames drift/rotate
     guide_jump_px: float = 2.0      # centroid off the reference (T7)
     cosmic_sigma: float = 8.0       # single-pixel spike over the noise
     zp_outlier_sigma: float = 3.0   # cloud / zero-point outlier (T7)
@@ -327,15 +330,19 @@ def _cosmic_hit(data, x, y, r_ap, sky_pp, sigma_sky, k):
 
 # ---------------- frame measurement ----------------
 
-def _run_one(path, cfg, apertures=None):
-    # One frame through the shared plate recipe (T1/T2 raw material): the
-    # target and the comps' fluxes, plus the guard reason when refused.
-    # @args: apertures - optional {night: {"radii": ...}} from the T3 sweep
-    # @return: (frame dict, None) or (None, error string)
+def _read_frame(path):
+    # @return: (header, data) or (None, error string)
     try:
         header, data = fits_io.read_fits(path)
     except fits_io.FitsError as err:
         return None, str(err)
+    return (header, data), None
+
+
+def _measure_frame(path, header, data, cfg, apertures=None):
+    # One (already loaded, possibly registered) frame through the shared
+    # plate recipe (T1/T2 raw material).
+    # @return: the frame dict
     meta = fits_meta.meta_from_header(header)
     night = _night_of(meta.get("mjd"))
     radii = None
@@ -359,7 +366,19 @@ def _run_one(path, cfg, apertures=None):
     mjd_mid, exptime = _mid_exposure(meta)
     return {"path": str(path), "data": data, "meta": meta, "res": res,
             "mjd": mjd_mid, "exptime": exptime,
-            "filter": meta.get("filter")}, None
+            "filter": meta.get("filter")}
+
+
+def _run_one(path, cfg, apertures=None):
+    # One frame through the shared plate recipe (T1/T2 raw material): the
+    # target and the comps' fluxes, plus the guard reason when refused.
+    # @args: apertures - optional {night: {"radii": ...}} from the T3 sweep
+    # @return: (frame dict, None) or (None, error string)
+    loaded, err = _read_frame(path)
+    if loaded is None:
+        return None, err
+    header, data = loaded
+    return _measure_frame(path, header, data, cfg, apertures), None
 
 
 def _frame_flux(frame, cfg):
@@ -841,15 +860,31 @@ def measure_series(paths, cfg, progress=None, cancel=None):
         apertures = sweep_aperture(paths, cfg)
         result.apertures = apertures
     frames = []
+    ref_data = None
     for i, path in enumerate(paths):
         if cancel is not None and cancel():
             result.status = "incomplete"
             break
-        frame, err = _run_one(path, cfg, apertures=apertures)
-        if frame is None:
+        loaded, err = _read_frame(path)
+        if loaded is None:
             result.errors[str(path)] = err
-        else:
-            frames.append(frame)
+            if progress is not None:
+                progress(i + 1, total)
+            continue
+        header, data = loaded
+        align_info = None
+        if cfg.align != "off":
+            # the first readable frame is the reference grid (target_xy
+            # and the comps live in ITS pixels)
+            if ref_data is None:
+                ref_data = data
+            else:
+                from . import register
+                data, align_info = register.register_frame(data, ref_data)
+        frame = _measure_frame(path, header, data, cfg, apertures)
+        if align_info is not None:
+            frame["align"] = align_info
+        frames.append(frame)
         if progress is not None:
             progress(i + 1, total)
     frames.sort(key=lambda f: (f["mjd"] if f["mjd"] is not None

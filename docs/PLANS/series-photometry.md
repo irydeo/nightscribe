@@ -104,7 +104,10 @@ de implementación).
 - **D17 · Sin astrometría por frame (por defecto).** El objetivo se toma de la referencia (WCS
   de una placa del set, o coords del proyecto); el centroide por frame se usa como señal de
   guiado (flag de salto), no como posición. El costo de la astrometría por frame en 3,000–5,000
-  frames no paga el beneficio (D30: el handoff EXOTIC sigue siendo la vía experta).
+  frames no paga el beneficio (D30: el handoff EXOTIC sigue siendo la vía experta). Cuando el
+  set no trae WCS ni frames alineados (montura alt-az sin derotador, MicroObservatory),
+  `SeriesConfig.align="similarity"` registra cada frame sobre el primero (rotación sobre el
+  centro + traslación subpíxel, por Fourier, numpy puro; D44).
 - **D18 · Esquema v12 (migración aditiva en `core/db.py`).** En `photometry_points` (la única
   tabla que almacena magnitudes): `mag_raw REAL`, `flags TEXT` y `run_id INTEGER NULL`; el
   `session_id` existente **sigue siendo la visita** y no se reusa como corrida (es FK a
@@ -206,6 +209,12 @@ de implementación).
   documentando el envío manual de la fase 8 (ADR-049).
 - **D43 · Presupuesto de rendimiento.** <0,5 s por frame y UI responsive con la serie de 142
   frames (el dataset de EXOTIC); es referencia para afinar, no compuerta (D38).
+- **D44 · Alineación por frame (opt-in).** Para sets sin WCS ni frames alineados,
+  `core/register.py` estima la similitud (rotación sobre el centro + traslación subpíxel) por
+  correlación de fase (numpy puro, sin scipy/astropy) y remuestrea cada frame a la rejilla de
+  referencia; `SeriesConfig.align="similarity"` lo activa. Por defecto apagado (D17): la serie
+  asume frames alineados y resueltos. Nace de la compuerta real de la fase 7 sobre el set
+  MicroObservatory de EXOTIC, cuyos frames se trasladan y rotan.
 
 ---
 
@@ -413,6 +422,15 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Salida limpia (o compuerta cerrada)**: si la paridad pasa, la fase 8 arranca sobre ese
   ajuste; si no, se reporta el resultado, **no se relaja el umbral** (D38), y el ajuste sigue la
   vía handoff a EXOTIC mientras se diagnostica. En ningún caso queda la app rota.
+- **Resultado (2026-09-27)**: la **paridad de modelo D27 pasa** (numpy vs `batman` en modo
+  cuadrático, <1e-5; de hecho ~1e-9) y el ajuste recupera tránsitos sintéticos. La **compuerta
+  end-to-end con EXOTIC no pasa**: el set MicroObservatory (142 FITS, sin WCS) se traslada y rota
+  entre frames; con la alineación nueva (D44/`core/register.py`) la serie sale completa
+  (142/142) pero la fotometría diferencial queda ruidosa (σ ≈ 42 mmag), el ajuste da
+  Rp/Rs = 0,186 (21 % alto) y T_mid 439 s antes de la referencia. **No se relajan los umbrales**;
+  la compuerta queda **abierta** y el handoff a EXOTIC sigue siendo la vía experta. Diagnóstico
+  apuntado: apertura/psf y blend del binario, y precisión de la alineación, antes que el motor
+  de ajuste (que es correcto).
 
 ### Fase 8 · ExoClock
 
@@ -559,7 +577,11 @@ ADR-015, publicar ADR-048/049/050/051, cerrar el checklist de la sección 5 y ac
 firmado, ADR-048–051, `docs/adr/README.md`, la fila de T1–T8 de `PRECISION` y `AGENTS.md`
 actualizados); queda fusionarla en la rama. La verificación 6 del checklist ya está cerrada
 (hay que extender `_point_style`); las verificaciones 1–5 siguen pendientes de binarios y datos
-reales.
+reales. Fases 1–6 implementadas y verdes. La fase 7 tiene el modelo y el ajuste hechos y la
+**paridad de modelo D27 cerrada** (<1e-5 vs batman), pero la **compuerta end-to-end con EXOTIC
+queda abierta**: el set sin WCS exige alineación por frame (D44) y, aun así, la fotometría
+sobre esos frames rota/saturados no alcanza la tolerancia; umbrales sin relajar y handoff
+EXOTIC como vía experta (detalle en la fase 7).
 
 **Después**: fases 1→12 en orden, con la compuerta de la fase 7 (paridad con EXOTIC, umbrales
 fijos: T_mid 3σ, Rp/Rs 5 %, σ 20 %) y la compuerta de la fase 11 (permiso explícito para la

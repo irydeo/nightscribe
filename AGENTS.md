@@ -99,6 +99,11 @@ nightscribe/
                       #   agrupación en el dominio de la medida, apertura
                       #   óptima por noche (T3) y detrend honesto multinoche
                       #   a1·exp(a2·X)+a3 (T5; plan fase 3)
+    register.py      # registro opt-in de frames sin WCS/alineación (D44):
+                      #   rotación + traslación subpíxel por Fourier, numpy puro
+    transit_fit.py   # modelo de tránsito con limb darkening cuadrático (numpy,
+                      #   paridad <1e-5 vs batman) + ajuste LM con detrend
+                      #   conjunto y errores OOT (plan fase 7; compuerta abierta)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

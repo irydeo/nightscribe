@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 # FITS date keywords tried in order — DATE-OBS is the classic, but some
 # pipelines write DATE or UTC-OBS instead.
 _DATE_KEYS = ("DATE-OBS", "DATE", "UTC-OBS")
+_MJD_KEYS = ("MJD-OBS", "MJD")          # numeric UTC, when the header has it
 _FILTER_KEYS = ("FILTER", "FILTERS", "FILT")
 _EXPTIME_KEYS = ("EXPTIME", "EXPOSURE", "ELAPSED")
 
@@ -75,6 +76,16 @@ def meta_from_header(header):
     if dt is not None:
         jd = coords.jd_from_datetime(dt)
         mjd = jd - 2400000.5
+    if mjd is None:
+        # some headers (MicroObservatory, several amateur rigs) carry the
+        # numeric UTC MJD instead of a parseable DATE-OBS
+        for key in _MJD_KEYS:
+            if key in header:
+                try:
+                    mjd = float(header[key])
+                    break
+                except (TypeError, ValueError):
+                    continue
 
     filt = None
     for key in _FILTER_KEYS:

@@ -556,3 +556,33 @@ def test_build_payload_carries_measure_points_and_folds():
     assert folded["fold_period_d"] == 0.5
     assert folded["epoch_mjd"] == 0.2
     assert "schematic" in folded
+
+
+# ---------------- phase 7B: opt-in per-frame registration -------------
+
+def test_series_alignment_recovers_a_drifting_field(tmp_path):
+    # A field that translates between frames (an alt-az mount without
+    # derotation, no WCS): with align="off" the fixed-coordinate recipe
+    # cannot follow it; with align="similarity" the curve is flat.
+    from nightscribe.core import register
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    ref = _plate(noise=1.0, seed=70)
+    # a drifting AND rotating field (an alt-az mount without derotation)
+    moves = [(0.0, 0, 0), (3.0, 6, -4), (-4.0, -5, 8), (5.0, 10, 5),
+             (-6.0, -8, -6), (2.0, 4, 9)]
+    paths = []
+    for i, (ang, dx, dy) in enumerate(moves):
+        data = register.apply_transform(ref, math.radians(ang), dx, dy)
+        paths.append(_write_plate(tmp_path / f"a{i}.fits", data,
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    cfg = _config(wcs, comps, align="similarity", guide_jump_px=1.0)
+    res = sm.measure_series(paths, cfg)
+    mags = [p.mag for p in res.points if p.mag is not None]
+    assert len(mags) == len(moves)
+    assert float(np.std(mags)) < 0.02
+    # without alignment the fixed coordinates measure a rotated field and
+    # the differential curve scatters (or points drop out)
+    res_off = sm.measure_series(paths, _config(wcs, comps))
+    mags_off = [p.mag for p in res_off.points if p.mag is not None]
+    assert len(mags_off) < len(moves) or float(np.std(mags_off)) > 0.05

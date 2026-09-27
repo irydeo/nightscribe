@@ -57,3 +57,4 @@
 | [049](ADR-049-exoclock-submission.md) | ExoClock: export manual HOPS + `ExoClock_info.txt`, sin credenciales ni scraping / ExoClock: manual HOPS export + `ExoClock_info.txt`, no credentials, no scraping |
 | [050](ADR-050-live-mode-grouping.md) | En vivo y agrupación de tomas cortas en el dominio de la medida (nunca apilado de píxeles) / live mode and short-exposure grouping in the measurement domain (never pixel stacking) |
 | [051](ADR-051-local-plate-solver.md) | Solver local ASTAP tras un dispatcher, WCS en memoria, `-update` solo explícito / local ASTAP solver behind a dispatcher, in-memory WCS, `-update` opt-in only |
+| [052](ADR-052-exotic-orchestration.md) | Orquestación de EXOTIC: ejecución externa headless e importación de su curva y parámetros (la vía numpy queda de previsualización) / EXOTIC orchestration: external headless run and import of its curve and parameters (the numpy path stays as a preview) |

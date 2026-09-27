@@ -321,6 +321,15 @@ cadenas nuevas pasan por `tr()` y el i18n queda sin `unfinished`.
 Salida limpia: la decisión queda firmada y documentada; la compuerta mide lo que
 debe medir (el ajuste).
 
+### Resultado de la fase F (2026-09-27)
+
+ADR-015 gana la **actualización de la opción A** (orquestación de EXOTIC; numpy
+como previsualización) en ambos idiomas, y nace **ADR-052** (orquestación:
+ejecución externa headless e importación) con su entrada en `docs/adr/README.md`
+y el rango de ADRs de `AGENTS.md` hasta 052. La compuerta redefinida se midió en
+la fase 0 (nuestro `transit_fit` sobre la curva de EXOTIC: las cuatro pruebas
+pasan). No se copió código de EXOTIC.
+
 ---
 
 ## 9. Fase G · Documentación de usuario, i18n y WORKFLOWS
@@ -336,6 +345,15 @@ debe medir (el ajuste).
 - **i18n**: `pyside6-lupdate` + traducción; `tests/unit/test_i18n.py` verde.
 
 Salida limpia: la funcionalidad y su documentación cierran en ambos idiomas.
+
+### Resultado de la fase G (2026-09-27)
+
+`docs/SEQUENCES.es.md`/`.md` ganan la sección «Reducción externa con EXOTIC» (y
+el glosario/enlaces citan ADR-052); `docs/WORKFLOWS.es.md`/`.md` enlazan el cierre
+de tránsito con EXOTIC; `AGENTS.md` lista los módulos `exotic_env.py`,
+`exotic_run.py` e `exotic_import.py` y su rango de ADRs llega a 052; el i18n de
+la GUI queda sin `unfinished`. El plan de orquestación queda completo
+(fases 0 y A–G), con la compuerta redefinida pasando.
 
 ---
 

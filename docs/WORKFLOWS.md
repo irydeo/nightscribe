@@ -39,7 +39,9 @@ it, registered in `project_files` with `session_id`; nothing attaches
 without a visit. ADR-019's 2026-09-06 review merged the Capture step into
 Plan and added real CCDciel control — ADR-030). The **how** of measuring a
 series from the visit (photometric sequences, detrend, multi-night, ExoClock
-and live mode) lives in [SEQUENCES.md](SEQUENCES.md).
+and live mode) lives in [SEQUENCES.md](SEQUENCES.md); a transit's scientific
+close goes through **orchestrating EXOTIC** from the app (see SEQUENCES and
+ADR-052).
 
 ## 4. Flow — supernova / transient
 

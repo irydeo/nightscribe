@@ -141,7 +141,31 @@ subida en el navegador.
   ingress, sin flags rojos, dip coherente). Avisa, no bloquea.
 - Al confirmar, el proyecto registra el outcome **`reported_exoclock`**.
 
-## 11. Solución de problemas
+## 11. Reducción externa con EXOTIC
+
+Para un tránsito con pretensión científica, la reducción y el ajuste los hace
+**EXOTIC** (NASA/JPL), que NightScribe **orquesta** como herramienta externa (no
+lo embebe). Es la vía principal; la serie numpy del bloque de fotometría queda
+como **previsualización** rápida.
+
+1. **Prepara el entorno** una vez en **Ajustes → EXOTIC**: indica un intérprete
+   **Python ≤ 3.10** (o deja que lo detecte) y pulsa **«Preparar entorno»**; crea
+   un entorno privado e instala EXOTIC (necesita red la primera vez). **«Probar»**
+   comprueba que importa.
+2. En el proyecto de tránsito, **Análisis → «Reducir y ajustar con EXOTIC…»**:
+   la app escribe el `inits.json` de la visita (tomas, objetivo y comparaciones
+   en píxeles), ejecuta EXOTIC en modo headless con el log a la vista (puedes
+   cancelar) e **importa su curva y sus parámetros** (T_mid, Rp/Rs, profundidad,
+   inclinación, duración) al proyecto. La curva entra como puntos «exotic» y se
+   ve en la gráfica como cualquier otra.
+3. Después, sube el resultado a ExoClock con **«ExoClock…»** (o a la AAVSO
+   Exoplanet Database).
+
+Sin entorno EXOTIC, el botón manual **«Exportar a EXOTIC (inits.json)…»** sigue
+disponible para reducir fuera y volver. La primera corrida de EXOTIC necesita
+red (NASA Archive, datos de limb darkening, astrometry.net).
+
+## 12. Solución de problemas
 
 - **«No hay visita con tomas»**: abre el editor desde una visita; no desde el
   menú Herramientas suelto.
@@ -156,7 +180,7 @@ subida en el navegador.
   los puntos se marcan (`guide_jump`). La alineación por frame está disponible
   como opción avanzada.
 
-## 12. Glosario y enlaces
+## 13. Glosario y enlaces
 
 - **ZP**: punto cero; la diferencia entre la magnitud instrumental y la de
   catálogo de las comparaciones.
@@ -170,4 +194,5 @@ subida en el navegador.
 Enlaces: [PHOTOMETRY.es.md](PHOTOMETRY.es.md) (prácticas),
 [PRECISION.es.md](PRECISION.es.md) (calidad y números),
 [WORKFLOWS.es.md](WORKFLOWS.es.md) (flujo de proyecto),
-ADR-048 (serie), ADR-049 (ExoClock), ADR-050 (en vivo), ADR-051 (solver local).
+ADR-048 (serie), ADR-049 (ExoClock), ADR-050 (en vivo), ADR-051 (solver local),
+ADR-052 (orquestación de EXOTIC).

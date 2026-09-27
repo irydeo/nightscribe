@@ -40,7 +40,8 @@ reportes, importaciones — registrados en `project_files` con
 el paso Captura se fundió en el Plan y gana el control real de CCDciel —
 ADR-030). El **cómo** de medir una serie desde la visita (fotometría de
 secuencias, detrend, multinoche, ExoClock y modo en vivo) está en
-[SEQUENCES.es.md](SEQUENCES.es.md).
+[SEQUENCES.es.md](SEQUENCES.es.md); el cierre científico de un tránsito pasa por
+**orquestar EXOTIC** desde la app (ver SEQUENCES y ADR-052).
 
 ## 4. Flujo — supernova / transitorio
 

@@ -63,6 +63,22 @@ nunca embebido. La subida a ExoClock queda en la app como export manual en forma
 HOPS (ADR-049). Plan: `docs/PLANS/series-photometry.md`; compañeros: ADR-048
 (series), ADR-050 (en vivo y agrupación), ADR-051 (ASTAP).
 
+**Actualización (2026-09-27, opción A: orquestación de EXOTIC)**: la reapertura
+anterior (vía numpy la primera) se **matiza**. La reducción real de los 142 FITS
+de MicroObservatory (sin WCS, frames desplazados y rotados, saturados) no alcanza
+la precisión de EXOTIC con la vía numpy, así que el flujo científico de tránsitos
+pasa a **orquestar EXOTIC**: NightScribe genera el `inits.json` de la visita
+(`core/exotic.make_inits_for_visit`), lo ejecuta headless en un entorno
+Python ≤3.10 externo (`core/exotic_env.py`, `core/exotic_run.py`; `exotic -red
+inits.json -ov`) y **importa** su curva y parámetros al proyecto
+(`core/exotic_import.py`). La vía numpy (`core/series_measure.py` +
+`core/transit_fit.py`) queda como **previsualización** y se valida contra la
+curva reducida por EXOTIC. La compuerta de paridad se mide ya sobre el ajuste
+(nuestro `transit_fit` sobre la curva de EXOTIC) y **pasa**: T_mid a 2 s, Rp/Rs
+a 1,2 %, σ al 96 % y profundidad a 2,3 %. Se sigue **sin copiar** código de
+EXOTIC (licencia Caltech/JPL): se ejecuta y se lee su salida. ADR-052
+(orquestación de EXOTIC); plan: `docs/PLANS/exotic-orchestration.md`.
+
 ## English
 
 **Context**: exoplanet transits are the first *event*-based feature with a time
@@ -122,3 +138,19 @@ expert path** for the heavy stack (nested sampling, LDTK, multi-night fits, PSF
 photometry), never embedded. Uploading to ExoClock stays in the app as a manual
 HOPS-format export (ADR-049). Plan: `docs/PLANS/series-photometry.md`;
 companions: ADR-048 (series), ADR-050 (live mode and grouping), ADR-051 (ASTAP).
+
+**Update (2026-09-27, option A: EXOTIC orchestration)**: the earlier reopening
+(the numpy path first) is **nuanced**. Reducing the 142 MicroObservatory FITS
+(no WCS, drifting and rotating frames, saturated stars) with the numpy path does
+not reach EXOTIC's precision, so the scientific transit flow now **orchestrates
+EXOTIC**: NightScribe writes the visit's `inits.json`
+(`core/exotic.make_inits_for_visit`), runs it headless in an external Python
+≤3.10 environment (`core/exotic_env.py`, `core/exotic_run.py`; `exotic -red
+inits.json -ov`) and **imports** its light curve and parameters into the project
+(`core/exotic_import.py`). The numpy path (`core/series_measure.py` +
+`core/transit_fit.py`) becomes a **preview** and is validated against EXOTIC's
+reduced curve. The parity gate is now measured on the fit (our `transit_fit` on
+EXOTIC's curve) and **passes**: T_mid within 2 s, Rp/Rs within 1.2 %, sigma at
+96 % and depth within 2.3 %. No line of EXOTIC code is copied (Caltech/JPL
+licence): it is run and its output read. ADR-052 (EXOTIC orchestration); plan:
+`docs/PLANS/exotic-orchestration.md`.

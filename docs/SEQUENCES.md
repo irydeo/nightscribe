@@ -138,7 +138,31 @@ the upload page in the browser.
   ingress, no red flags, coherent dip). It warns, it does not block.
 - On confirming, the project records the outcome **`reported_exoclock`**.
 
-## 11. Troubleshooting
+## 11. External reduction with EXOTIC
+
+For a scientifically-minded transit, the reduction and the fit are done by
+**EXOTIC** (NASA/JPL), which NightScribe **orchestrates** as an external tool
+(it does not embed it). This is the primary path; the numpy series in the
+photometry block stays as a quick **preview**.
+
+1. **Prepare the environment** once in **Settings → EXOTIC**: point to a
+   **Python <= 3.10** interpreter (or let it detect one) and click **"Prepare
+   environment"**; it builds a private environment and installs EXOTIC (needs
+   network the first time). **"Test"** checks that it imports.
+2. In the transit project, **Analysis → "Reduce and fit with EXOTIC..."**: the
+   app writes the visit's `inits.json` (frames, target and comparisons in
+   pixels), runs EXOTIC headless with the log in sight (you can cancel) and
+   **imports its light curve and parameters** (T_mid, Rp/Rs, depth, inclination,
+   duration) into the project. The curve lands as "exotic" points and shows in
+   the chart like any other.
+3. Then upload the result to ExoClock with **"ExoClock..."** (or to the AAVSO
+   Exoplanet Database).
+
+Without an EXOTIC environment, the manual **"Export to EXOTIC (inits.json)..."**
+button stays available to reduce outside and come back. EXOTIC's first run needs
+network (NASA Archive, limb-darkening data, astrometry.net).
+
+## 12. Troubleshooting
 
 - **"No visit with frames"**: open the editor from a visit, not from the loose
   Tools menu.
@@ -152,7 +176,7 @@ the upload page in the browser.
   flagged (`guide_jump`). Per-frame registration is available as an advanced
   option.
 
-## 12. Glossary and links
+## 13. Glossary and links
 
 - **ZP**: zero point; the difference between the instrumental magnitude and the
   comps' catalogue magnitude.
@@ -164,4 +188,5 @@ the upload page in the browser.
 
 Links: [PHOTOMETRY.md](PHOTOMETRY.md) (practices), [PRECISION.md](PRECISION.md)
 (quality and figures), [WORKFLOWS.md](WORKFLOWS.md) (project flow), ADR-048
-(series), ADR-049 (ExoClock), ADR-050 (live mode), ADR-051 (local solver).
+(series), ADR-049 (ExoClock), ADR-050 (live mode), ADR-051 (local solver),
+ADR-052 (EXOTIC orchestration).

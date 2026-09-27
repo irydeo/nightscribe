@@ -76,6 +76,45 @@ Salida limpia: EXOTIC corre de punta a punta sobre el set de prueba (los 142 FIT
 de MicroObservatory o el pre-reducido) desde línea de comandos y produce su
 curva y sus parámetros.
 
+### Resultado de la fase 0 (verificado 2026-09-27)
+
+- **Entorno**: `python3.10 -m venv --without-pip <dir>` + `python3.10 -m pip
+  --python <dir>/bin/python install exotic` (el `ensurepip` de este sistema está
+  roto: `No module named ensurepip`). Queda `exotic` 4.3.1 con astropy, scipy,
+  pylightcurve, ultranest, astroalign, LDTk, barycorrpy, etc.
+- **Invocación headless**: `<dir>/bin/exotic -red <inits.json> -ov < /dev/null`
+  desde el directorio de trabajo. El flag **`-ov/--override`** evita el prompt de
+  «tus parámetros vs NASA Archive» (sin él, `check_parameters` pide 1 o 2 y
+  revienta con EOFError al no haber terminal). Modos: `-red` (reducción
+  completa), `-phot` (solo fotometría), `-pre` (pre-reducido), `-rt` (en vivo).
+- **Inits fiables headless**: en `user_info`, **`"Add Comparison Stars from
+  AAVSO? (y/n)" = "n"`** con las comparaciones dadas en píxeles
+  (`"Comparison Star(s) X & Y Pixel"`); con «y», `vsp_query` a AAVSO devolvió
+  HTML y EXOTIC murió con `JSONDecodeError`. `"Plate Solution? (y/n)"` puede
+  quedarse en "y". `"Pre-reduced File:"` a `null` en modo `-red`.
+- **Red**: NASA Exoplanet Archive, datos LDTk (se cachean tras la primera
+  corrida) y astrometry.net si se pide solución de placa.
+- **Salidas** (en `"Directory to Save Plots"`): figura publicable
+  `FinalLightCurve_<planeta>_<fecha>.png`/`.pdf` y reporte AAVSO
+  `AAVSO_<planeta>_<fecha>.txt` en la raíz; en `temp/`:
+  `FinalLightCurve_<...>.csv` (BJD_TDB, Phase, Flux, Uncertainty, Model,
+  Airmass), `NormalizedFlux_<...>.txt` (BJD, Norm Flux, Norm Err, AM),
+  `FinalParams_<...>.json` (T_mid, Rp/Rs, profundidad, inc, coeficientes de
+  masa de aire, duración, apertura/anillo óptimos), `PlateStatus_<...>.csv` y
+  varias figuras.
+- **Corrida de prueba real** (142 FITS de MicroObservatory, HAT-P-32 b):
+  T_mid 2458107.71358 ± 0.00094 BJD_TDB; Rp/Rs 0.1569 ± 0.0034; profundidad
+  2.46 %; inc 88.17; duración 0.1303 d. Coincide con la referencia publicada
+  (2458107.71406 ± 0.00097; 0.1541 ± 0.0033) a 41 s y 1.8 %.
+- **Compuerta redefinida (nuestro `transit_fit` sobre la curva de EXOTIC)**:
+  **PASA las cuatro**: T_mid a 0,000023 d (≈2 s, dentro de 3σ), Rp/Rs a 1,2 %
+  (dentro de 5 %), σ al 96 % de la de EXOTIC (dentro de 20 %) y profundidad
+  (Rp/Rs²) 2,52 % frente a 2,46 % (2,3 %, dentro del 10 %); χ²ᵣ 0,98. Con esto,
+  la compuerta de la fase 7 mide ya lo que debe (el ajuste) y queda **cerrada**.
+- **Nota para la importación**: usar `temp/FinalLightCurve_*.csv` para los puntos
+  y `temp/FinalParams_*.json` para los parámetros; `FinalLightCurve_*.png` como
+  figura publicable.
+
 ---
 
 ## 3. Fase A · Entorno EXOTIC en Ajustes

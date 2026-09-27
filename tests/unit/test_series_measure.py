@@ -384,3 +384,114 @@ def test_performance_reference(tmp_path):
     elapsed = time.perf_counter() - t0
     assert len(res.points) == 142
     assert elapsed / 142 < 0.5, f"{elapsed:.2f}s for 142 frames"
+
+
+# ---------------- phase 3: T3 aperture + T5 detrend ----------------
+
+def _plate_sigma(sigma, target_amp=7000.0, sky=100.0, noise=0.0, seed=1):
+    data = np.full((H, W), sky, dtype=np.float64)
+    yy, xx = np.ogrid[:H, :W]
+    for sx, sy, amp in _stars(target_amp):
+        data += amp * np.exp(-((xx - sx) ** 2 + (yy - sy) ** 2)
+                             / (2 * sigma ** 2))
+    if noise > 0.0:
+        data += np.random.default_rng(seed).normal(0.0, noise, (H, W))
+    return data
+
+
+def test_detrend_keeps_the_dip(tmp_path):
+    # D12 anchor (a) WITH detrend: a 1 % dip on an airmass-flat series is
+    # still recovered to +/-0.001 mag; the detrend is additive and does
+    # not eat the signal.
+    amps = [7000.0, 7000.0, 6930.0, 6930.0, 7000.0]
+    paths, wcs, comps = _write_frames(tmp_path, 5, amps=amps)
+    res = sm.measure_series(paths, _config(wcs, comps,
+                                           detrend_policy="airmass"))
+    assert res.detrend is not None
+    vals = [p.mag_detrended for p in res.points]
+    assert all(v is not None for v in vals)
+    assert max(vals) - min(vals) == pytest.approx(
+        -2.5 * math.log10(0.99), abs=0.001)
+
+
+def test_detrend_leaves_a_sine_undistorted():
+    # D12 anchor (b): a 0.3 mag (peak-to-peak) / 2 h artificial sine on
+    # top of an airmass trend passes through the detrend undistorted: the
+    # oscillation keeps its amplitude and its shape (the raw curve is in
+    # any case always kept beside it, T5).
+    n = 80
+    cycles = 1.5
+    pts = []
+    for i in range(n):
+        mjd = 61300.2 + i * (3.0 / 24.0) / n       # 3 h, 1.5 cycles
+        airmass = 1.0 + 0.5 * i / n
+        trend = 0.30 * math.exp(-1.0 * (airmass - 1.0))
+        sine = 0.15 * math.sin(2 * math.pi * cycles * i / n)
+        pts.append(sm.SeriesPoint(mjd=mjd, airmass=airmass, err=0.005,
+                                  mag=8.0 + trend + sine))
+    info = sm.detrend_series(pts, policy="airmass")
+    assert info is not None
+    det = np.asarray(info["detrended"], dtype=np.float64)
+    det = det - det.mean()
+    inj = np.asarray([0.15 * math.sin(2 * math.pi * cycles * i / n)
+                      for i in range(n)])
+    assert (det.max() - det.min()) == pytest.approx(0.30, rel=0.1)
+    assert float(np.corrcoef(det, inj)[0, 1]) > 0.95
+    assert info["rms_after"] < info["rms_before"]
+
+
+def test_two_nights_transparency_offset_is_flat_after_detrend():
+    # Two nights with a 3 % transparency offset: the per-night detrend
+    # flattens the curve; the raw one jumps.
+    pts = []
+    for i in range(6):
+        pts.append(sm.SeriesPoint(mjd=61300.2 + i * 0.001, airmass=1.2,
+                                  err=0.005, mag=8.0, fwhm=4.0, sky=100.0,
+                                  x=80.0, y=80.0))
+    for i in range(6):
+        pts.append(sm.SeriesPoint(mjd=61301.2 + i * 0.001, airmass=1.2,
+                                  err=0.005, mag=8.03, fwhm=4.0, sky=100.0,
+                                  x=80.0, y=80.0))
+    raw = [p.mag for p in pts]
+    assert max(raw) - min(raw) == pytest.approx(0.03, abs=1e-6)
+    info = sm.detrend_series(pts, policy="airmass")
+    det = [d for d in info["detrended"]]
+    assert max(det) - min(det) < 1e-6
+    # both nights fell back to an offset (constant airmass)
+    assert all(n["fallback"] == "offset" for n in info["nights"])
+
+
+def test_short_night_falls_back_to_offset():
+    pts = [sm.SeriesPoint(mjd=61300.2 + i * 0.01, airmass=1.0 + 0.2 * i,
+                          err=0.005, mag=8.0 + i * 0.01)
+           for i in range(2)]
+    info = sm.detrend_series(pts, policy="airmass")
+    assert info is not None
+    assert info["nights"][0]["fallback"] == "offset"
+
+
+def test_sweep_aperture_picks_per_night(tmp_path):
+    # Two nights with different seeing: the T3 sweep returns per-night
+    # radii that follow the FWHM (larger seeing -> larger aperture).
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    nights = [("2026-09-20T23:30:00", 2.0), ("2026-09-21T23:30:00", 4.5)]
+    paths = []
+    for j, (date, sigma) in enumerate(nights):
+        for i in range(5):
+            data = _plate_sigma(sigma, noise=3.0, seed=100 + 10 * j + i)
+            paths.append(_write_plate(tmp_path / f"n{j}_{i}.fits", data,
+                                      date_obs=date))
+    swept = sm.sweep_aperture(paths, _config(wcs, comps))
+    assert len(swept) == 2
+    radii = [swept[k]["radii"][0] for k in swept]
+    assert all(1.0 <= swept[k]["k"] <= 2.0 for k in swept)
+    assert abs(radii[0] - radii[1]) > 0.5     # the seeing drives it
+
+
+def test_measure_series_auto_aperture_runs(tmp_path):
+    paths, wcs, comps = _write_frames(tmp_path, 5, noise=1.0)
+    res = sm.measure_series(paths, _config(wcs, comps,
+                                           auto_aperture=True))
+    assert res.points                      # the sweep ran and measured
+    assert res.apertures                   # per-night entry recorded

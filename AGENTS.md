@@ -96,7 +96,9 @@ nightscribe/
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame y ensemble con veto MAD, puertas que marcan y
                       #   nunca borran, tiempo a media exposición (MJD/HJD),
-                      #   agrupación en el dominio de la medida (plan fase 2)
+                      #   agrupación en el dominio de la medida, apertura
+                      #   óptima por noche (T3) y detrend honesto multinoche
+                      #   a1·exp(a2·X)+a3 (T5; plan fase 3)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

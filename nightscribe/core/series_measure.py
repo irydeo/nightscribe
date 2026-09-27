@@ -83,6 +83,7 @@ class SeriesConfig:
     site_aperture_m: float = 0.254
     site_height_m: float = 0.0
     group_n: int = 1
+    auto_aperture: bool = False     # T3: per-night k sweep (phase 3)
     guide_jump_px: float = 2.0      # centroid off the reference (T7)
     cosmic_sigma: float = 8.0       # single-pixel spike over the noise
     zp_outlier_sigma: float = 3.0   # cloud / zero-point outlier (T7)
@@ -99,10 +100,14 @@ class SeriesPoint:
     exptime: float = None
     x: float = None
     y: float = None
+    fwhm: float = None
+    sky: float = None
+    airmass: float = None
     flux: float = None
     flux_err: float = None
     inst: float = None              # instrumental mag (goes to mag_raw)
     mag: float = None               # calibrated (catalog) or differential
+    mag_detrended: float = None     # after the honest detrend (T5)
     err: float = None               # total error
     err_internal: float = None
     zp: float = None
@@ -124,6 +129,7 @@ class SeriesResult:
     zp_mode: str = "catalog"
     detrend: dict = None
     group_n: int = 1
+    apertures: dict = field(default_factory=dict)   # per-night k (T3)
 
 
 # ---------------- small numeric helpers ----------------
@@ -231,24 +237,42 @@ def _hjd_of(mjd, wcs, xy):
     return variables.jd_to_hjd(mjd + variables.MJD0, ra, dec)
 
 
-def _scintillation(cfg, mjd, span_s):
-    # T4/H5: Young's scintillation with the site from Ajustes and the
-    # target's altitude from the reference WCS and the point's instant.
-    # @return: sigma in mag, or None
-    if not span_s or mjd is None or cfg.wcs is None \
-            or cfg.site_lon is None or cfg.site_lat is None:
-        return None
+def _target_altaz(cfg, mjd):
+    # The target's alt-az from the reference WCS and the point's instant.
+    # @return: (alt_deg, az_deg) or (None, None)
+    if mjd is None or cfg.wcs is None or cfg.site_lon is None \
+            or cfg.site_lat is None:
+        return None, None
     try:
         from . import coords
         ra, dec = cfg.wcs.pixel_to_sky(cfg.target_xy[0], cfg.target_xy[1])
         jd = mjd + variables.MJD0
         lst = coords.lst_degrees(jd, float(cfg.site_lon))
-        alt, _az = coords.altaz(ra, dec, float(cfg.site_lat), lst)
-        return photometry.scintillation_mag(alt, span_s,
-                                            cfg.site_aperture_m,
-                                            cfg.site_height_m)
+        return coords.altaz(ra, dec, float(cfg.site_lat), lst)
     except Exception:
+        return None, None
+
+
+def _airmass(cfg, mjd):
+    # T5: the airmass is the detrend's minimum regressor.
+    # @return: clamped airmass, or None when the geometry is unknown
+    alt, _az = _target_altaz(cfg, mjd)
+    if alt is None:
         return None
+    return photometry.airmass_from_alt(alt)
+
+
+def _scintillation(cfg, mjd, span_s):
+    # T4/H5: Young's scintillation with the site from Ajustes and the
+    # target's altitude from the reference WCS and the point's instant.
+    # @return: sigma in mag, or None
+    if not span_s or mjd is None:
+        return None
+    alt, _az = _target_altaz(cfg, mjd)
+    if alt is None:
+        return None
+    return photometry.scintillation_mag(alt, span_s, cfg.site_aperture_m,
+                                        cfg.site_height_m)
 
 
 def _sky_sigma(data, x, y, r_ap):
@@ -303,19 +327,26 @@ def _cosmic_hit(data, x, y, r_ap, sky_pp, sigma_sky, k):
 
 # ---------------- frame measurement ----------------
 
-def _run_one(path, cfg):
+def _run_one(path, cfg, apertures=None):
     # One frame through the shared plate recipe (T1/T2 raw material): the
     # target and the comps' fluxes, plus the guard reason when refused.
+    # @args: apertures - optional {night: {"radii": ...}} from the T3 sweep
     # @return: (frame dict, None) or (None, error string)
     try:
         header, data = fits_io.read_fits(path)
     except fits_io.FitsError as err:
         return None, str(err)
     meta = fits_meta.meta_from_header(header)
+    night = _night_of(meta.get("mjd"))
+    radii = None
+    if apertures and night in apertures:
+        radii = apertures[night].get("radii")
+    if radii is None:
+        radii = cfg.radii
     pcfg = photometry.PlateConfig(
         target_xy=cfg.target_xy, entries=list(cfg.comp_set),
         header=header, wcs=cfg.wcs, band=cfg.band,
-        fallback_band=cfg.fallback_band, radii=cfg.radii,
+        fallback_band=cfg.fallback_band, radii=radii,
         sigmaclip=cfg.sigmaclip, sky_mode=cfg.sky_mode,
         color=cfg.color, target_bv=cfg.target_bv,
         site_gain=cfg.site_gain, site_ron=cfg.site_ron,
@@ -472,9 +503,13 @@ def _build_point(group, cfg):
     comb, comb_err, _used, _rej = _combine_fluxes(fluxes, errs)
     pt.flux, pt.flux_err = comb, comb_err
     pt.x, pt.y = _group_centroid(group)
+    pt.fwhm = first["res"].fwhm
+    _tgt = first["res"].target or {}
+    pt.sky = _tgt.get("sky_pp")
     weights = [1.0 / (e ** 2) if (e and e > 0) else 1.0 for e in errs]
     pt.mjd = _weighted_mean([f["mjd"] for f in group], weights)
     pt.hjd = _hjd_of(pt.mjd, cfg.wcs, cfg.target_xy)
+    pt.airmass = _airmass(cfg, pt.mjd)
     _flag_gates(pt, group, cfg)
     if comb is None:
         _add_flag(pt, "unusable")
@@ -542,6 +577,253 @@ def _flag_clouds(points, cfg):
             _add_flag(p, "cloud")
 
 
+# ---------------- T5: honest detrend ----------------
+
+# a2 on a grid with the bounds EXOTIC uses; a1 (and a3) solved
+# analytically at each a2, so the only non-linear parameter is a2.
+_A2_GRID = tuple(x / 20.0 for x in range(-20, 21))
+_AUTO_IMPROVE = 0.10        # keep the extra terms only if the rms drops
+_MIN_NIGHT_POINTS = 4       # below this a night is "short" (D34)
+_MIN_AIRMASS_RANGE = 0.05   # below this there is no trend to fit (D34)
+
+
+def _night_of(mjd):
+    # Observing night: the day boundary sits at local noon, so a run that
+    # crosses midnight stays one night.
+    # @return: an integer night key, or None
+    if mjd is None:
+        return None
+    return int(math.floor(mjd - 0.5))
+
+
+def _rms(values):
+    # @return: the plain rms, or None
+    vals = [v for v in values if v is not None]
+    if not vals:
+        return None
+    return float(np.sqrt(np.mean(np.square(vals))))
+
+
+def _robust_std(values):
+    # @return: the robust (MAD) scatter, or None
+    vals = [v for v in values if v is not None]
+    if len(vals) < 2:
+        return None
+    arr = np.asarray(vals, dtype=np.float64)
+    return float(1.4826 * np.median(np.abs(arr - np.median(arr))))
+
+
+def _wls(y, cols, w):
+    # Weighted least squares for the linear coefficients of `cols`.
+    # @return: (coeffs, yhat, weighted rms) or (None, None, None)
+    a = np.column_stack(cols)
+    aw = a * w[:, None]
+    try:
+        coef, *_ = np.linalg.lstsq(aw, y * w, rcond=None)
+    except np.linalg.LinAlgError:
+        return None, None, None
+    yhat = a @ coef
+    resid = y - yhat
+    rms = math.sqrt(float(np.sum((w * resid) ** 2) / np.sum(w ** 2)))
+    return coef, yhat, rms
+
+
+def _columns(x, a2, extra):
+    # @return: (design columns, names) for a1*exp(a2*X) + a3 + extras
+    cols = [np.exp(a2 * np.asarray(x, dtype=np.float64)),
+            np.ones(len(x))]
+    names = ["a1", "a3"]
+    for name, col in (extra or {}).items():
+        cols.append(np.asarray(col, dtype=np.float64))
+        names.append(name)
+    return cols, names
+
+
+def _fit_night(x, y, w, extra=None, sigma_clip=3.0):
+    # Fit a1*exp(a2*X) + a3 (+ optional extra linear terms) for one night:
+    # a2 on the bounded grid, a1 and a3 analytic at each a2, then one
+    # robust sigma-clip round so a transit does not bend the trend (the
+    # trend is the OUT-of-transit level, never the signal).
+    # @args: x - airmass, y - magnitudes, w - weights (1/sigma),
+    #        extra - optional {name: column} (FWHM, sky, x, y)
+    # @return: (coeffs dict, trend array, rms) or (None, None, None)
+    x = np.asarray(x, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    w = np.asarray(w, dtype=np.float64)
+    best = None
+    for a2 in _A2_GRID:
+        cols, names = _columns(x, a2, extra)
+        coef, yhat, rms = _wls(y, cols, w)
+        if rms is not None and (best is None or rms < best[3]):
+            best = (dict(zip(names, coef)), a2, yhat, rms)
+    if best is None:
+        return None, None, None
+    coeffs, a2, yhat, rms = best
+    coeffs["a2"] = a2
+    resid = y - yhat
+    mad = float(np.median(np.abs(resid - np.median(resid))))
+    if mad > 0.0:
+        keep = np.abs(resid) <= sigma_clip * 1.4826 * mad
+        if max(3, len(y) // 2) <= int(keep.sum()) < len(y):
+            cols, names = _columns(x[keep], a2, None if extra is None else
+                                   {k: np.asarray(v)[keep]
+                                    for k, v in extra.items()})
+            coef, yhat, rms = _wls(y[keep], cols, w[keep])
+            if coef is not None:
+                coeffs = dict(zip(names, coef))
+                coeffs["a2"] = a2
+    return coeffs, yhat, rms
+
+
+def _extra_terms(points, ids):
+    # @return: the optional phase-H columns for the "auto" policy
+    return {"fwhm": [points[i].fwhm if points[i].fwhm is not None
+                     else 0.0 for i in ids],
+            "sky": [points[i].sky if points[i].sky is not None else 0.0
+                    for i in ids],
+            "x": [points[i].x if points[i].x is not None else 0.0
+                  for i in ids],
+            "y": [points[i].y if points[i].y is not None else 0.0
+                  for i in ids]}
+
+
+def detrend_series(points, policy="airmass", auto_improve=_AUTO_IMPROVE):
+    # The honest detrend (T5/D13): a1*exp(a2*X) + a3 per night with a1
+    # analytic, a2 bounded to [-1, 1] and a robust clip; the "auto"
+    # policy adds FWHM/sky/x/y only when the residual rms drops by at
+    # least `auto_improve`. A short night or one with too little airmass
+    # range falls back to an offset (D34), said in the returned block.
+    #
+    # T5 honesty: a smooth signal that shares the airmass' timescale can
+    # be partly absorbed by the trend (a transit does not: it is sharp),
+    # so the RAW curve is always kept beside the detrended one and the
+    # phase-7 joint fit (model + detrend solved together) is where a
+    # transit is never touched. This function is the standalone minimum.
+    # @args: points - SeriesPoints with mag, err, airmass and mjd,
+    #        policy - "airmass" | "auto" (caller checks "off")
+    # @return: {"detrended": [mag or None per point], "nights": [...],
+    #          "policy", "terms", "rms_before", "rms_after"} or None
+    idx = [i for i, p in enumerate(points)
+           if p.mag is not None and p.airmass is not None]
+    if not idx:
+        return None
+    by_night = {}
+    for i in idx:
+        by_night.setdefault(_night_of(points[i].mjd), []).append(i)
+    detrended = [None] * len(points)
+    nights = []
+    terms = set()
+    for night, ids in sorted(by_night.items(),
+                             key=lambda kv: (kv[0] is None, kv[0])):
+        xs = [points[i].airmass for i in ids]
+        ys = [points[i].mag for i in ids]
+        ws = [1.0 / (points[i].err ** 2) if points[i].err else 1.0
+              for i in ids]
+        short = len(ids) < _MIN_NIGHT_POINTS \
+            or (max(xs) - min(xs)) < _MIN_AIRMASS_RANGE
+        if short:
+            base = float(np.median(ys))
+            for i in ids:
+                detrended[i] = points[i].mag - base
+            nights.append({"night": night, "a1": base, "a2": 0.0,
+                           "a3": 0.0, "n": len(ids), "fallback": "offset",
+                           "rms_before": _rms(ys),
+                           "rms_after": _rms([detrended[i]
+                                              for i in ids])})
+            continue
+        coef, _yhat, rms = _fit_night(xs, ys, ws)
+        used = []
+        if policy == "auto" and coef is not None:
+            coef_x, _yhx, rms_x = _fit_night(xs, ys, ws,
+                                             extra=_extra_terms(points, ids))
+            if rms_x is not None and rms is not None \
+                    and rms_x <= (1.0 - auto_improve) * rms:
+                coef, rms = coef_x, rms_x
+                used = ["fwhm", "sky", "x", "y"]
+        if coef is None:
+            continue
+        terms.update(used)
+        a1, a2, a3 = coef.get("a1"), coef.get("a2"), coef.get("a3")
+        for i in ids:
+            trend = a1 * math.exp(a2 * points[i].airmass) + a3
+            for name in used:
+                trend += coef.get(name, 0.0) * getattr(points[i], name, 0.0)
+            detrended[i] = points[i].mag - trend
+        nights.append({"night": night, "a1": a1, "a2": a2, "a3": a3,
+                       "n": len(ids), "fallback": None, "terms": used,
+                       "rms_before": _rms(ys),
+                       "rms_after": _rms([detrended[i] for i in ids])})
+    return {"detrended": detrended, "nights": nights, "policy": policy,
+            "terms": sorted(terms),
+            "rms_before": _rms([points[i].mag for i in idx]),
+            "rms_after": _rms([detrended[i] for i in idx])}
+
+
+# ---------------- T3: aperture sweep per night ----------------
+
+def _check_star(cfg):
+    # @return: the check star's star dict, else the first comp's, else None
+    for e in cfg.comp_set:
+        if e.get("kind") == "check":
+            return e.get("star")
+    for e in cfg.comp_set:
+        if e.get("star"):
+            return e.get("star")
+    return None
+
+
+def sweep_aperture(paths, cfg, ks=None):
+    # T3: per night, pick the k in [1.0, 2.0] whose check-star scatter is
+    # smallest (FWHM measured per frame, so guide defences cannot break
+    # the curve).
+    # @args: paths - FITS paths, cfg - SeriesConfig with comp_set and wcs,
+    #        ks - the multipliers to try (default: 1.0 .. 2.0 step 0.1)
+    # @return: {night: {"k", "rms", "radii", "fwhm"}}
+    ks = ks or [1.0 + 0.1 * i for i in range(11)]
+    star = _check_star(cfg)
+    if star is None or cfg.wcs is None:
+        return {}
+    try:
+        cx, cy = cfg.wcs.sky_to_pixel(star["ra"], star["dec"])
+    except Exception:
+        return {}
+    by_night = {}
+    for path in paths:
+        try:
+            header, data = fits_io.read_fits(path)
+        except fits_io.FitsError:
+            continue
+        night = _night_of(fits_meta.meta_from_header(header).get("mjd"))
+        by_night.setdefault(night, []).append(data)
+    out = {}
+    for night, frames in by_night.items():
+        positions = [(cx, cy)]
+        best = None
+        for k in ks:
+            mags, fwhms = [], []
+            for data in frames:
+                fwhm = photometry.estimate_fwhm(data, positions)
+                r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm, k=k)
+                r = photometry.measure_point(data, cx, cy, r_ap=r_ap,
+                                             r_ann_in=r_in, r_ann_out=r_out)
+                if not r["ok"] or r["flux"] is None or r["flux"] <= 0:
+                    continue
+                mags.append(-2.5 * math.log10(r["flux"]))
+                if fwhm is not None:
+                    fwhms.append(fwhm)
+            if len(mags) < 3:
+                continue
+            spread = _robust_std(mags)
+            if spread is not None and (best is None or spread < best[1]):
+                fwhm = float(np.median(fwhms)) if fwhms else None
+                best = (k, spread, photometry.aperture_for_fwhm(fwhm, k=k),
+                        fwhm)
+        if best is not None:
+            out[night] = {"k": best[0], "rms": best[1], "radii": best[2],
+                          "fwhm": best[3]}
+    return out
+
+
 def measure_series(paths, cfg, progress=None, cancel=None):
     # Measure a whole series frame by frame (T1-T7), grouping when asked
     # (D19). Never raises for a bad frame: unreadable files are recorded
@@ -554,12 +836,16 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     total = len(paths)
     result = SeriesResult(zp_mode=cfg.zp_mode,
                           group_n=max(1, int(cfg.group_n)))
+    apertures = {}
+    if cfg.auto_aperture and cfg.radii is None:
+        apertures = sweep_aperture(paths, cfg)
+        result.apertures = apertures
     frames = []
     for i, path in enumerate(paths):
         if cancel is not None and cancel():
             result.status = "incomplete"
             break
-        frame, err = _run_one(path, cfg)
+        frame, err = _run_one(path, cfg, apertures=apertures)
         if frame is None:
             result.errors[str(path)] = err
         else:
@@ -573,6 +859,13 @@ def measure_series(paths, cfg, progress=None, cancel=None):
               for i in range(0, len(frames), n)]
     _fill_neighbour_zp(points, cfg)
     _flag_clouds(points, cfg)
+    if cfg.detrend_policy != "off":
+        info = detrend_series(
+            points, "auto" if cfg.detrend_policy == "auto" else "airmass")
+        result.detrend = info
+        if info:
+            for p, d in zip(points, info["detrended"]):
+                p.mag_detrended = d
     for i, p in enumerate(points):
         p.index = i
     result.points = points

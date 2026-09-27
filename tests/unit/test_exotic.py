@@ -221,3 +221,35 @@ def test_export_inits_writes_parseable_json(tmp_path):
     data = json.loads(open(out, encoding="utf-8").read())
     assert data["planetary_parameters"]["Planet Name"] == "WASP-999 b"
     assert data["user_info"]["Directory to Save Plots"] == str(tmp_path)
+
+
+# ---------------- visit inits (orchestration phase B) ----------------
+
+def test_make_inits_for_visit_points_at_the_frames(tmp_path):
+    frames = [tmp_path / "a.fits", tmp_path / "b.fits"]
+    inits = exotic.make_inits_for_visit(
+        _ctx(), _d(), _Cfg(), frames, target_xy=(424, 286),
+        comps_xy=[(465, 183), (512, 263)], plan={"filter": "R"})
+    ui = inits["user_info"]
+    assert ui["Directory with FITS files"] == str(tmp_path)
+    assert ui["Directory to Save Plots"] == str(tmp_path)
+    # EXOTIC's sample writes these as strings
+    assert ui["Target Star X & Y Pixel"] == "[424, 286]"
+    assert ui["Comparison Star(s) X & Y Pixel"].startswith(
+        "[[465, 183], [512, 263]")
+    # padded to EXOTIC's ten slots
+    assert ui["Comparison Star(s) X & Y Pixel"].count("[]") == 8
+    # headless: comps in pixels, no AAVSO fetch; plate solution on
+    assert ui["Add Comparison Stars from AAVSO? (y/n)"] == "n"
+    assert ui["Plate Solution? (y/n)"] == "y"
+
+
+def test_make_inits_for_visit_out_dir_and_prereduced(tmp_path):
+    frames = [tmp_path / "a.fits"]
+    plots = tmp_path / "plots"
+    inits = exotic.make_inits_for_visit(
+        _ctx(), _d(), _Cfg(), frames, target_xy=(1, 2), comps_xy=[],
+        out_dir=str(plots), pre_reduced="/data/curve.txt")
+    ui = inits["user_info"]
+    assert ui["Directory to Save Plots"] == str(plots)
+    assert inits["optional_info"]["Pre-reduced File:"] == "/data/curve.txt"

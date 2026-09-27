@@ -241,6 +241,40 @@ def make_inits(ctx, d, cfg, plan=None, out_dir=None):
     }
 
 
+def make_inits_for_visit(ctx, d, cfg, paths, target_xy, comps_xy,
+                         plan=None, out_dir=None, pre_reduced=None):
+    # The inits.json for a project VISIT: it points EXOTIC at the visit's
+    # frames and marks the target and comparison stars in pixels, so EXOTIC
+    # runs without asking (verified 2026-09-27: see the orchestration plan).
+    # @args: ctx, d, cfg, plan - as make_inits; paths - the visit's FITS
+    #        paths; target_xy - (x, y) of the target; comps_xy - list of
+    #        (x, y) comparisons; out_dir - plots folder (defaults to the
+    #        frames' folder); pre_reduced - a pre-reduced curve path or None
+    # @return: the inits dict
+    folder = str(Path(paths[0]).parent) if paths else None
+    inits = make_inits(ctx, d, cfg, plan=plan,
+                       out_dir=out_dir or folder)
+    ui = inits["user_info"]
+    if folder:
+        ui["Directory with FITS files"] = folder
+        if out_dir is None:
+            ui["Directory to Save Plots"] = folder
+    # EXOTIC's own sample writes these as strings; keep that exact form
+    ui["Target Star X & Y Pixel"] = str(
+        [int(round(target_xy[0])), int(round(target_xy[1]))])
+    comps = [[int(round(x)), int(round(y))] for x, y in (comps_xy or [])][:10]
+    while len(comps) < 10:
+        comps.append([])
+    ui["Comparison Star(s) X & Y Pixel"] = str(comps)
+    ui["Plate Solution? (y/n)"] = "y"
+    # headless: the comparison stars are already given in pixels; asking
+    # AAVSO makes EXOTIC crash when VSP returns HTML (plan phase 0)
+    ui["Add Comparison Stars from AAVSO? (y/n)"] = "n"
+    if pre_reduced:
+        inits["optional_info"]["Pre-reduced File:"] = str(pre_reduced)
+    return inits
+
+
 def suggested_name(now=None):
     # EXOTIC's own naming convention for the file.
     # @args: now - datetime (default: now)

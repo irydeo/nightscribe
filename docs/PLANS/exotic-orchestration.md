@@ -184,6 +184,16 @@ extenderlo:
 Salida limpia: el `inits.json` de una visita es autocontenido y EXOTIC arranca
 sin pedir la carpeta ni las coordenadas.
 
+### Resultado de la fase B (2026-09-27)
+
+`core/exotic.make_inits_for_visit(ctx, d, cfg, paths, target_xy, comps_xy,
+plan, out_dir, pre_reduced)`: apunta «Directory with FITS files» a la carpeta de
+las tomas, rellena objetivo y comparaciones en píxeles con la **forma de cadena
+del sample de EXOTIC** (`"[424, 286]"`, lista de 10 con `[]` de relleno), pone
+`"Add Comparison Stars from AAVSO?" = "n"` (headless, fase 0) y `"Plate
+Solution?" = "y"`, y admite `out_dir` y una curva pre-reducida. Tests en
+`tests/unit/test_exotic.py`.
+
 ---
 
 ## 5. Fase C · Ejecución headless

@@ -14,8 +14,9 @@ las tres aperturas); la fase I.5 subió el centroide
 al **filtro adaptado gaussiano** (`gaussian_centroid`: plantilla del
 seeing en malla de 0,1 px con refinado parabólico, ~0,01 px con señal
 decente, guardas honestas con débiles) con la **retícula que se pega al
-centroide** al pasar el ratón; solo el régimen de tránsitos de
-exoplanetas queda pendiente de una decisión (ADR-015).
+centroide** al pasar el ratón; el régimen de tránsitos de exoplanetas
+arranca con la reapertura firmada de ADR-015 (2026-09-27), dirigida por
+`docs/PLANS/series-photometry.md` (piezas T1–T8, trece fases).
 
 Documentación del proceso fotométrico base:
 [PHOTOMETRY.es.md](PHOTOMETRY.es.md). Este documento es su continuación
@@ -58,7 +59,7 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 | Nivel de saturación real de tu cámara | pestaña Fotometría (H4: tarjeta SATURATE o ajuste `ccd_saturate`) | ninguna estrella cortada se cuela como buena |
 | Término de color ajustado con las comps | pestaña Fotometría (H1) | la respuesta de tu equipo deja de sesgar el cero |
 | Sustracción de la galaxia huésped (SNe) | pestaña Fotometría (H2b) | en núcleos galácticos: de 0,05–0,15 a 0,03–0,05 mag |
-| Normalización por frame + detrending (series) | pendiente (ADR-015) | el requisito de los tránsitos: 0,001–0,005 mag relativo |
+| Normalización por frame + detrending (series) | en curso (ADR-015 rev. + ADR-048; plan `docs/PLANS/series-photometry.md`) | el requisito de los tránsitos: 0,001–0,005 mag relativo |
 
 ### 3. Tres escenarios, cifras honestas
 
@@ -83,8 +84,9 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
   aire mostrando siempre la cruda al lado. Con eso y buenas prácticas,
   un aficionado alcanza 0,001–0,005 mag por punto bineado: suficiente
   para curvas de tránsito publicables. Hoy esa reducción la hace EXOTIC
-  (decisión firmada, ADR-015); hacerlo dentro es posible pero es la obra
-  mayor que queda.
+  (ADR-015 original); desde la reapertura firmada (2026-09-27) se hace
+  dentro, con EXOTIC como espejo de calidad: es la obra mayor del plan
+  `docs/PLANS/series-photometry.md`.
 
 ### 4. Cuándo fiarse de un número
 
@@ -112,7 +114,7 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 | Medida calibrada en una placa (punto cero con las comps) | Existe (mitad Medir de la pestaña Fotometría del Editor FITS, fase G) |
 | Término de color, cielo en gradiente, apertura por FWHM, saturación real, error total, semáforo check | Existe (fase H, 2026-09-23: `core/photometry.py` + pestaña Fotometría) |
 | Sustracción de galaxia huésped | Existe (fase H: referencia PS1 alineada del blink, escalada por las comps) |
-| Serie normalizada por frame + detrending para tránsitos | Falta: piezas T1–T8; decisión ADR-015 por reabrir o acotar |
+| Serie normalizada por frame + detrending para tránsitos | En curso: piezas T1–T8 en `docs/PLANS/series-photometry.md` (ADR-015 reabierto 2026-09-27; ADR-048 a ADR-051) |
 
 ---
 
@@ -122,7 +124,8 @@ casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 `core/photometry.py` y `gui/ufe_measure_tab.py`, con tests en
 `tests/unit/test_photometry.py` y `test_ufe_measure_tab.py`; la fase G
 (medida calibrada en placa) está en `docs/PLANS/ufe-photometry.md`. Las
-piezas T1–T8 (tránsitos) quedan pendientes de la decisión ADR-015. Este
+piezas T1–T8 (tránsitos) están en curso en `docs/PLANS/series-photometry.md`
+(ADR-015 reabierto y firmado el 2026-09-27). Este
 apéndice queda como la especificación de referencia para futuras
 extensiones.
 
@@ -201,12 +204,12 @@ panel de la pestaña Fotometría; nada toca los flujos legacy.
 
 ### B. Tránsitos de exoplanetas: piezas T1–T8
 
-**Nota de decisión (leer primero)**: ADR-015 firmó que la reducción de
-tránsitos es 100 % EXOTIC (handoff con `inits.json`; EXOTIC necesita
-astropy y Python ≤3.10, vetados por ADR-004). Implementar T1–T8 exige
-reabrir ADR-015 o acotar el trabajo como «series calibradas de alta
-precisión» dejando el ajuste de tránsito a EXOTIC. Firmarlo con el
-usuario antes de escribir código.
+**Nota de decisión (leer primero)**: **firmada el 2026-09-27**. ADR-015 se
+reabre: la reducción de tránsitos se hace en local (numpy puro; sin scipy ni
+astropy por ADR-004), con EXOTIC como espejo de calidad y su handoff con
+`inits.json` intacto como vía experta para el stack pesado. T1–T8 viven en
+`docs/PLANS/series-photometry.md` (registro D1–D39, trece fases, compuerta de
+paridad con EXOTIC en la fase 7, umbrales fijos).
 
 * **T1. Serie con punto cero por frame**: cada imagen se normaliza con
   las comps medidas en ESA imagen (la extinción y las nubes finas dejan

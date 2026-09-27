@@ -47,6 +47,22 @@ caché v2) y el usuario lo ejecuta en su propio entorno Python ≤ 3.10 — nunc
 embebido (ADR-004). El cierre del flujo científico (subida a ExoClock / AAVSO
 Exoplanet Database) se guía desde la pestaña Process.
 
+**Actualización (2026-09-27, reapertura firmada; plan de fotometría de series)**:
+la reducción de tránsitos pasa a hacerse **en local**: NightScribe calcula su
+detrend, su ajuste de tránsito y su profundidad en numpy puro (sin scipy ni
+astropy, ADR-004), tomando a EXOTIC como espejo de calidad con su **método citado**
+(detrend `a1·exp(a2·X)+a3` con `a1` analítico, bounds `rprs ∈ [0; 1,25·prior]` y
+`tmid ± 25σ` con tope `±P/4`, sigma-clip de 25–30 min por `lstsq` deslizante,
+errores desde la dispersión OOT, diagnósticos con duración medida vs. esperada) y
+sin copiar ni una línea de su código (licencia Caltech/JPL). La compuerta de
+paridad se fija **antes** de medir (T_mid dentro de 3σ, Rp/Rs dentro de 5 %, σ de
+parámetros dentro de 20 %; si no, bootstrap paramétrico) y **no se relaja** para
+que un test pase. El handoff con `inits.json` **sigue siendo la vía experta** para
+el stack pesado (muestreo anidado, LDTk, ajustes multi-noche, fotometría PSF),
+nunca embebido. La subida a ExoClock queda en la app como export manual en formato
+HOPS (ADR-049). Plan: `docs/PLANS/series-photometry.md`; compañeros: ADR-048
+(series), ADR-050 (en vivo y agrupación), ADR-051 (ASTAP).
+
 ## English
 
 **Context**: exoplanet transits are the first *event*-based feature with a time
@@ -91,3 +107,18 @@ with a v2 cache bump) and the user runs it in their own Python ≤ 3.10
 environment — never embedded (ADR-004). The closing of the scientific loop
 (upload to ExoClock / AAVSO Exoplanet Database) is guided from the Process
 tab.
+
+**Update (2026-09-27, signed reopening; photometric series plan)**: transit
+reduction now happens **in-house**: NightScribe computes its detrend, its transit
+fit and its depth in pure numpy (no scipy, no astropy, ADR-004), taking EXOTIC as
+the quality mirror with its **method cited** (detrend `a1·exp(a2·X)` with analytic
+`a1`, bounds `rprs ∈ [0; 1.25×prior]` and `tmid ± 25σ` capped at `±P/4`, 25–30 min
+sigma-clip via sliding `lstsq`, errors from the OOT scatter, diagnostics including
+measured vs. expected duration) and copying not one line of its code (Caltech/JPL
+licence). The parity gate is fixed **before** measuring (T_mid within 3σ, Rp/Rs
+within 5 %, parameter σ within 20 %; otherwise a parametric bootstrap) and is
+**never relaxed** to make a test pass. The `inits.json` handoff **remains the
+expert path** for the heavy stack (nested sampling, LDTK, multi-night fits, PSF
+photometry), never embedded. Uploading to ExoClock stays in the app as a manual
+HOPS-format export (ADR-049). Plan: `docs/PLANS/series-photometry.md`;
+companions: ADR-048 (series), ADR-050 (live mode and grouping), ADR-051 (ASTAP).

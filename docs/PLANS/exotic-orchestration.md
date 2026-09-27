@@ -249,6 +249,16 @@ fallo, cancelación y timeout).
 Salida limpia: tras correr EXOTIC, la curva y el ajuste aparecen en el
 proyecto, listos para ExoClock y para el post.
 
+### Resultado de la fase D (2026-09-27)
+
+`core/exotic_import.py`: `load_curve` (CSV de EXOTIC -> puntos con `mjd`/`mag`/
+`err`/`flux`/`airmass` y `source="exotic"`), `load_params` (JSON con cadenas
+`valor +/- incertidumbre` -> T_mid, Rp/Rs, profundidad en fracción, inclinación
+y duración), `load_result` (localiza curva, parámetros, figura y reporte AAVSO)
+y `persist` (una corrida con `source="exotic"` y sus puntos vía `followup`).
+Parser tolerante: sin carpeta o formato raro devuelve vacío y avisa, no revienta.
+Tests en `tests/unit/test_exotic_import.py`.
+
 ---
 
 ## 7. Fase E · UI y estado (la numpy como previsualización)

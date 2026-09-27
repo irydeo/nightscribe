@@ -117,6 +117,8 @@ nightscribe/
     exotic_run.py     # ejecución headless de EXOTIC (fase C): `exotic -red
                       #   inits.json -ov`, log fusionado, cancelación y timeout;
                       #   localiza sus salidas (curva, parámetros, figura)
+    exotic_import.py  # importa la salida de EXOTIC (fase D): curva a puntos
+                      #   source="exotic" y parámetros T_mid/Rp/Rs al proyecto
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

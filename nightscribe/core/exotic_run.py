@@ -1,0 +1,125 @@
+############################################################
+# -*- coding: utf-8 -*-
+#
+# NightScribe - EXOTIC headless runner (orchestration phase C)
+# Python  v3.12
+#
+# Francisco José Calvo Fernández
+# (c) 2026
+#
+# Licence GPL v3
+#
+############################################################
+
+"""Run EXOTIC headless and locate its outputs (plan phase C).
+
+The verified invocation (2026-09-27) is the console script inside the
+external venv: `exotic -red <inits.json> -ov`, from a work directory, with
+stdin closed so any prompt fails fast instead of hanging the app. stdout
+and stderr are merged into one log file; the process can be cancelled and
+is killed on timeout.
+"""
+
+import logging
+import queue
+import subprocess
+import threading
+import time
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+DEFAULT_TIMEOUT_S = 7200.0     # a full EXOTIC run can take a while
+LOG_NAME = "exotic_run.log"
+
+
+def run(exotic_bin, work_dir, inits_path, mode="red", override=True,
+        progress=None, cancel=None, timeout_s=DEFAULT_TIMEOUT_S):
+    # @args: exotic_bin - the `exotic` console script, work_dir - cwd (its
+    #        plots land here per the inits), inits_path - the inits.json,
+    #        mode - red|phot|pre|rt, override - pass -ov (adopt our params,
+    #        skips the interactive parameter prompt),
+    #        progress - callable(line), cancel - callable() -> bool,
+    #        timeout_s - hard cap
+    # @return: {"ok", "returncode", "log_path", "out_dir", "cancelled"}
+    work_dir = Path(work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    log_path = work_dir / LOG_NAME
+    cmd = [str(exotic_bin), f"-{mode}", str(inits_path)]
+    if override:
+        cmd.append("-ov")
+    logger.info("running EXOTIC: %s (cwd=%s)", " ".join(cmd), work_dir)
+    start = time.monotonic()
+    cancelled = False
+    proc = None
+    try:
+        with open(log_path, "w", encoding="utf-8", errors="replace") as lf:
+            proc = subprocess.Popen(
+                cmd, cwd=str(work_dir), stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                bufsize=1)
+            lines = queue.Queue()
+
+            def _reader(pipe):
+                # a thread so a silent EXOTIC cannot freeze cancel/timeout
+                for line in pipe:
+                    lines.put(line)
+                lines.put(None)
+
+            threading.Thread(target=_reader, args=(proc.stdout,),
+                             daemon=True).start()
+            while True:
+                try:
+                    line = lines.get(timeout=0.5)
+                except queue.Empty:
+                    line = ""
+                if line is None:
+                    break
+                if line:
+                    lf.write(line)
+                    lf.flush()
+                    if progress is not None:
+                        progress(line.rstrip())
+                if cancel is not None and cancel():
+                    cancelled = True
+                    proc.terminate()
+                    break
+                if timeout_s and time.monotonic() - start > timeout_s:
+                    logger.warning("EXOTIC timed out after %ss", timeout_s)
+                    proc.terminate()
+                    break
+            try:
+                proc.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+    except (OSError, subprocess.SubprocessError) as err:
+        logger.warning("EXOTIC run failed: %s", err)
+        return {"ok": False, "returncode": None, "log_path": str(log_path),
+                "out_dir": str(work_dir), "cancelled": False}
+    rc = proc.returncode if proc is not None else None
+    return {"ok": (rc == 0 and not cancelled), "returncode": rc,
+            "log_path": str(log_path), "out_dir": str(work_dir),
+            "cancelled": cancelled}
+
+
+def find_outputs(out_dir):
+    # Locate EXOTIC's result files in its output folder (root plus temp/).
+    # @args: out_dir - the "Directory to Save Plots"
+    # @return: {"curve_csv", "params_json", "normalized_txt", "figure_png",
+    #          "aavso_txt"} each a path string or None
+    out = Path(out_dir)
+    temp = out / "temp"
+
+    def _first(folder, pattern):
+        if not folder.is_dir():
+            return None
+        hits = sorted(folder.glob(pattern))
+        return str(hits[0]) if hits else None
+
+    return {
+        "curve_csv": _first(temp, "FinalLightCurve_*.csv"),
+        "params_json": _first(temp, "FinalParams_*.json"),
+        "normalized_txt": _first(temp, "NormalizedFlux_*.txt"),
+        "figure_png": _first(out, "FinalLightCurve_*.png"),
+        "aavso_txt": _first(out, "AAVSO_*.txt"),
+    }

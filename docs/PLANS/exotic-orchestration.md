@@ -215,6 +215,17 @@ Solution?" = "y"`, y admite `out_dir` y una curva pre-reducida. Tests en
 Salida limpia: EXOTIC corre desde la app con log, cancelación y timeout; el
 usuario ve avanzar (o parar) el proceso.
 
+### Resultado de la fase C (2026-09-27)
+
+`core/exotic_run.py` (`run` y `find_outputs`) y `gui/workers.ExoticRunWorker`:
+corre `exotic -red <inits.json> -ov` con `stdin` cerrado (un prompt falla en
+seco, no cuelga), fusiona stdout/stderr en `exotic_run.log`, y comprueba
+cancelación y timeout con un hilo lector (una EXOTIC muda no congela la app);
+`find_outputs` localiza `FinalLightCurve_*.csv`, `FinalParams_*.json`,
+`NormalizedFlux_*.txt`, `FinalLightCurve_*.png` y `AAVSO_*.txt`. `exotic_env`
+gana `exotic_bin`. Tests en `tests/unit/test_exotic_run.py` (éxito y salidas,
+fallo, cancelación y timeout).
+
 ---
 
 ## 6. Fase D · Importación del resultado

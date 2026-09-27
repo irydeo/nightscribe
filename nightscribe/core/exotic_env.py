@@ -54,6 +54,12 @@ def venv_python(install_dir):
     return bin_dir(install_dir) / exe
 
 
+def exotic_bin(install_dir):
+    # @return: the EXOTIC console script inside the venv (may not exist)
+    exe = "exotic.exe" if os.name == "nt" else "exotic"
+    return bin_dir(install_dir) / exe
+
+
 def detect_python(preferred=None):
     # @args: preferred - a configured interpreter path or None
     # @return: the path of a Python <= 3.10 interpreter, or None

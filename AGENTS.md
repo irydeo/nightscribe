@@ -114,6 +114,9 @@ nightscribe/
                       #   (plan fase 10; opt-in, apagado por defecto)
     exotic_env.py     # entorno EXOTIC externo (orquestación, fase A): detectar
                       #   Python <=3.10, probar el import y crear el venv
+    exotic_run.py     # ejecución headless de EXOTIC (fase C): `exotic -red
+                      #   inits.json -ov`, log fusionado, cancelación y timeout;
+                      #   localiza sus salidas (curva, parámetros, figura)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

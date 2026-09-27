@@ -600,3 +600,40 @@ class PrepareExoticWorker(QThread):
             logger.exception("prepare exotic failed: %s", err)
             ok, log = False, str(err)
         self.finished.emit(bool(ok), log or "")
+
+
+class ExoticRunWorker(QThread):
+    # Runs EXOTIC headless off the GUI thread (orchestration phase C):
+    # merged log streamed as progress, cancellable, killed on timeout.
+
+    progress = Signal(str)          # a log line
+    finished = Signal(dict)         # exotic_run.run result
+
+    def __init__(self, exotic_bin, work_dir, inits_path, mode="red",
+                 timeout_s=None):
+        super().__init__()
+        self._bin = exotic_bin
+        self._dir = work_dir
+        self._inits = inits_path
+        self._mode = mode
+        self._timeout = timeout_s
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import exotic_run
+        kwargs = {}
+        if self._timeout is not None:
+            kwargs["timeout_s"] = self._timeout
+        try:
+            res = exotic_run.run(
+                self._bin, self._dir, self._inits, mode=self._mode,
+                progress=self.progress.emit,
+                cancel=lambda: self._cancel, **kwargs)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("EXOTIC run worker failed: %s", err)
+            res = {"ok": False, "returncode": None, "log_path": None,
+                   "out_dir": str(self._dir), "cancelled": False}
+        self.finished.emit(res)

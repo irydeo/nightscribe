@@ -28,13 +28,10 @@
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
      </property>
-     <property name="sizeType">
-      <enum>QSizePolicy::Policy::Expanding</enum>
-     </property>
      <property name="sizeHint" stdset="0">
       <size>
        <width>20</width>
-       <height>15</height>
+       <height>2</height>
       </size>
      </property>
     </spacer>
@@ -115,16 +112,6 @@
       <number>5</number>
      </property>
      <item>
-      <widget class="QPushButton" name="btn_seq_open">
-       <property name="toolTip">
-        <string>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</string>
-       </property>
-       <property name="text">
-        <string/>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QPushButton" name="btn_field">
        <property name="toolTip">
         <string>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</string>
@@ -147,6 +134,16 @@
     </layout>
    </item>
    <item>
+    <widget class="QPushButton" name="btn_seq_open">
+     <property name="toolTip">
+      <string>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</string>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer_2">
      <property name="orientation">
       <enum>Qt::Orientation::Vertical</enum>
@@ -157,7 +154,7 @@
      <property name="sizeHint" stdset="0">
       <size>
        <width>20</width>
-       <height>15</height>
+       <height>2</height>
       </size>
      </property>
     </spacer>

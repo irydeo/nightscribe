@@ -36,19 +36,19 @@ import math
 from pathlib import Path
 
 import numpy as np
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QHBoxLayout, QLabel,
-                               QPushButton, QVBoxLayout, QWidget,
+from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
                                QGraphicsEllipseItem)
 
 from ..core import coords, fits_meta, photometry, photometry_export, \
     stretch
+from ..viz import palette
+from .ufe_advanced_dialog import UfeAdvancedDialog
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
-_C_AP = "#ffb347"      # the amber marker family the UFE already wears
+_C_AP = palette.ACCENT   # the shared amber marker family the UFE wears
 _C_ANN = "#6ec1ff"     # sky annulus rings in the cool accent
 _C_COMP = "#4dd0e1"    # used comps ring in the compare tab's cyan
 
@@ -58,21 +58,26 @@ class UfeMeasureTab(QWidget):
                            # the pick cursor + snapping reticle on stage
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView, compare_tab - the Compare tab the
-    #        sequence is read from (D5), go_compare - callable switching
-    #        the dialog to that tab
+    #        sequence is read from (D5)
 
     def __init__(self, state, lang="es", view=None, compare_tab=None,
-                 go_compare=None, parent=None):
+                 parent=None):
         super().__init__(parent)
         self._state = state
         self._lang = lang
         self._view = view
         self._compare = compare_tab
-        self._go_compare = go_compare
-        self._active = False
+        self._active = False         # owns the view's clicks right now
+        self._on_stage = False       # the Photometry tab is on stage and
+                                     # this section is visible (armed or
+                                     # not): its overlays may be drawn
         self._project_attached = False     # point hook set on the dialog
         self._items = []             # aperture + comps overlays
         self._last = None            # the last measurement bundle
+        self._band = None            # the band of the last plate (the
+                                     # combo is refilled per measurement,
+                                     # ADR-047 keeps a stable pick across
+                                     # plate re-opens)
         # where the target B-V came from: "assumed" (the 0.00 default),
         # "catalog" (the field star under the click), "project" (the host
         # record), "manual" (a hand edit, which wins until the next click)
@@ -90,165 +95,115 @@ class UfeMeasureTab(QWidget):
         if view is not None:
             view.scene_clicked.connect(self._on_scene_clicked)
         self._on_image_loaded()
+        # ADR-047: the recipe as the .ui shipped it, captured once the
+        # widgets exist: what the state reset applies back (.ui = the
+        # single source of the defaults, no mirror in Python).
+        self._ui_defaults = self.capture_state()
 
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        hint = QLabel(self.tr(
-            "Click a star (or the target) to measure it against the "
-            "Compare tab's sequence."))
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setWordWrap(True)
-        lay.addWidget(self.lbl_status)
-        self.btn_go_compare = QPushButton(self.tr(
-            "Open the Compare tab"))
-        self.btn_go_compare.setVisible(False)
-        if self._go_compare is not None:
-            self.btn_go_compare.clicked.connect(self._go_compare)
-        lay.addWidget(self.btn_go_compare)
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets, sizes the aperture spins from
+        # core/photometry's defaults and wires every signal.
+        self._ui = adopt_ui(self, "ufe_measure_tab")
+                                            # over: no wrapper margins
+        self.lbl_status = self._ui.lbl_status
+        self.cmb_band = self._ui.cmb_band
 
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Band:")))
-        self.cmb_band = QComboBox()
-        row.addWidget(self.cmb_band, 1)
-        lay.addLayout(row)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Apertures:")))
-        self.spn_rap = self._spin(photometry.R_AP, 1.0, 20.0)
-        self.spn_rin = self._spin(photometry.R_ANN_IN, 2.0, 40.0)
-        self.spn_rout = self._spin(photometry.R_ANN_OUT, 3.0, 60.0)
-        for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
-            row.addWidget(spn)
-        row.addStretch(1)
-        lay.addLayout(row)
-        tip = self.tr("Aperture radius, sky annulus inner and outer "
-                      "radius (px)")
+        # The recipe knobs live one click open (ADR-044 rev): the daily
+        # flow is band, apertures, Suggest; the rest (sky model,
+        # sigma-clip, seeing, colour term, host subtraction) opens in
+        # its own small non-modal window; the tab keeps the public
+        # attributes and wires every signal itself.
+        self._advanced = UfeAdvancedDialog(self)
+        self.btn_suggest = self._ui.btn_suggest
+        self.btn_suggest.clicked.connect(self._on_suggest)
+        self.spn_rap = self._spin(self._ui.spn_rap, photometry.R_AP,
+                                  1.0, 20.0)
+        self.spn_rin = self._spin(self._ui.spn_rin, photometry.R_ANN_IN,
+                                  2.0, 40.0)
+        self.spn_rout = self._spin(self._ui.spn_rout,
+                                   photometry.R_ANN_OUT, 3.0, 60.0)
         self._radii_manual = False   # True once the observer edits a spin
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
-            spn.setToolTip(tip)
             spn.valueChanged.connect(self._on_radii_edited)
-        row2 = QHBoxLayout()
-        self.btn_suggest = QPushButton(self.tr("Suggest apertures"))
-        self.btn_suggest.setToolTip(self.tr(
-            "Propose the radii from this target's growth curve and its "
-            "surroundings (crowding, background gradient), with the "
-            "reasons in plain language"))
-        self.btn_suggest.clicked.connect(self._on_suggest)
-        row2.addWidget(self.btn_suggest)
-        row2.addStretch(1)
-        lay.addLayout(row2)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Sky:")))
-        self.cmb_sky = QComboBox()
-        self.cmb_sky.addItem(self.tr("Median (flat sky)"), "median")
-        self.cmb_sky.addItem(self.tr("Plane (galactic cores)"), "plane")
-        self.cmb_sky.setToolTip(self.tr(
-            "How the annulus estimates the background: a flat median, or "
-            "a tilted plane when the host galaxy tilts it"))
-        row.addWidget(self.cmb_sky, 1)
-        lay.addLayout(row)
+        self.btn_advanced = self._ui.btn_advanced
+        self.btn_advanced.clicked.connect(self._open_advanced)
+        # the public attributes the tests and the measure flow pin
+        self.chk_sigmaclip = self._advanced.chk_sigmaclip
+        self.chk_seeing = self._advanced.chk_seeing
+        self.chk_color = self._advanced.chk_color
+        self.chk_subtract = self._advanced.chk_subtract
+        self.cmb_sky = self._advanced.cmb_sky
+        self.spn_target_bv = self._advanced.spn_target_bv
         # every measuring control re-measures the live point at once
         self.cmb_sky.currentIndexChanged.connect(
             lambda _i: self._remeasure())
-
-        self.chk_sigmaclip = QCheckBox(self.tr("Sigma-clip the sky"))
-        self.chk_sigmaclip.setChecked(True)
-        self.chk_sigmaclip.setToolTip(self.tr(
-            "Two 2.5-sigma rounds on the annulus: extra skin against hot "
-            "pixels and crowded cores"))
-        lay.addWidget(self.chk_sigmaclip)
         self.chk_sigmaclip.toggled.connect(lambda _c: self._remeasure())
-        self.chk_seeing = QCheckBox(self.tr("Aperture follows the seeing"))
-        self.chk_seeing.setChecked(True)
-        self.chk_seeing.setToolTip(self.tr(
-            "Measure the FWHM of the comparison stars and size the "
-            "aperture as 1.35 times the seeing (H3)"))
-        lay.addWidget(self.chk_seeing)
         self.chk_seeing.toggled.connect(self._on_seeing_toggled)
-        row = QHBoxLayout()
-        self.chk_color = QCheckBox(self.tr("Colour term"))
-        self.chk_color.setChecked(True)
-        self.chk_color.setToolTip(self.tr(
-            "Fit the zero point AND its slope against the comps' B−V "
-            "(H1); needs at least 6 comps with colour spread"))
         self.chk_color.toggled.connect(lambda _c: self._remeasure())
-        row.addWidget(self.chk_color)
-        row.addWidget(QLabel(self.tr("B−V target:")))
-        self.spn_target_bv = QDoubleSpinBox()
-        self.spn_target_bv.setRange(-1.0, 3.0)
-        self.spn_target_bv.setDecimals(2)
-        self.spn_target_bv.setSingleStep(0.05)
-        self.spn_target_bv.setValue(0.0)
-        self.spn_target_bv.setToolTip(self.tr(
-            "The target's B−V when known (variables: VSX). A supernova "
-            "near peak is about 0; the panel warns when the colour term "
-            "is applied with this assumption"))
-        self.spn_target_bv.setKeyboardTracking(False)
         self.spn_target_bv.valueChanged.connect(self._on_bv_edited)
-        row.addWidget(self.spn_target_bv)
-        lay.addLayout(row)
-        self.chk_subtract = QCheckBox(self.tr(
-            "Subtract host galaxy (PS1 reference)"))
-        self.chk_subtract.setToolTip(self.tr(
-            "Download the aligned PanSTARRS reference, scale it so the "
-            "comparison stars vanish, and measure the target on the "
-            "difference image (H2b; needs network once per field)"))
         self.chk_subtract.toggled.connect(self._on_subtract_toggled)
-        lay.addWidget(self.chk_subtract)
 
-        self.lbl_result = QLabel("–")
-        self.lbl_result.setWordWrap(True)
-        self.lbl_result.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        lay.addWidget(self.lbl_result)
+        # The result log is plain text in a scrollable editor: a long
+        # report (comps, guards, verdict) must never squash the tab.
+        self.lbl_result = self._ui.lbl_result
 
-        row = QHBoxLayout()
-        self.btn_csv = QPushButton(self.tr("CSV…"))
-        self.btn_csv.setEnabled(False)
+        self.btn_csv = self._ui.btn_csv
         self.btn_csv.clicked.connect(lambda: self._export("csv"))
-        row.addWidget(self.btn_csv)
-        self.btn_eff = QPushButton(self.tr("AAVSO EFF…"))
-        self.btn_eff.setEnabled(False)
+        self.btn_eff = self._ui.btn_eff
         self.btn_eff.clicked.connect(lambda: self._export("eff"))
-        row.addWidget(self.btn_eff)
         # ADR-044: the editor opened from a project registers the point
         # there (source “measure”); ad-hoc opens hide this button.
-        self.btn_save_project = QPushButton(self.tr("Save in the project"))
-        self.btn_save_project.setToolTip(self.tr(
-            "Register this calibrated point in the project that opened "
-            "the editor: it lands on the light curve and feeds the "
-            "campaign summary (source “measure”)"))
-        self.btn_save_project.setEnabled(False)
-        self.btn_save_project.setVisible(False)
+        self.btn_save_project = self._ui.btn_save_project
         self.btn_save_project.clicked.connect(self._on_save_project)
-        row.addWidget(self.btn_save_project)
-        lay.addLayout(row)
-        lay.addStretch(1)
+        # ADR-047: the plate's two resets, visible only when the dialog
+        # is opened from a project (same rule as the save button).
+        self.btn_reset_state = self._ui.btn_reset_state
+        self.btn_reset_state.clicked.connect(self._on_reset_state)
+        self.btn_reset_points = self._ui.btn_reset_points
+        self.btn_reset_points.clicked.connect(self._on_reset_points)
 
-    def _spin(self, value, lo, hi):
-        # @return: one aperture spinbox (px, half-pixel steps)
-        sb = QDoubleSpinBox()
+    def _spin(self, sb, value, lo, hi):
+        # Sizes one aperture spin (px, half-pixel steps) from
+        # core/photometry's defaults: the widget itself is the .ui's.
+        # @return: the given spin, configured
         sb.setRange(lo, hi)
-        sb.setDecimals(1)
-        sb.setSingleStep(0.5)
         sb.setValue(value)
         return sb
 
+    def _open_advanced(self):
+        # @return: the recipe window rises, non-modal, so measuring
+        # keeps going while it is open
+        self._advanced.show()
+        self._advanced.raise_()
+        self._advanced.activateWindow()
+
     # ------------------------------------------------------- activation
 
-    def set_active(self, flag):
-        # Only the visible tab owns the view's clicks and its overlays;
-        # on stage it also gets the pick cursor and the snapping reticle.
+    def set_active(self, flag, keep_overlays=False):
+        # Only the section that owns the stage takes the clicks, and on
+        # stage it also gets the pick cursor and the snapping reticle.
+        # The OVERLAYS follow the Photometry tab's stage instead
+        # (self._on_stage): both sections stay visible, so a disarmed
+        # Measure half keeps its rings and a re-measure still paints.
+        # @args: keep_overlays - the Sequence section is taking over the
+        #        stage: our markers and result stay on the chart (with
+        #        the clicks disarmed), they are dropped on a full leave
         self._active = bool(flag)
         if not self._active:
+            if keep_overlays:
+                # disarmed but on stage (the visit deep link can land
+                # here without this section ever being armed)
+                self._on_stage = True
+                return
+            self._on_stage = False
             self._drop_items()
             if self._diff is not None and self._view is not None:
                 self._view.set_frame_override(None)
         else:
+            self._on_stage = True
             if self._diff is not None and self._view is not None:
                 self._view.set_frame_override(self._display_diff)
             if self._last is not None:
@@ -265,6 +220,66 @@ class UfeMeasureTab(QWidget):
             self.btn_save_project.setEnabled(False)
         elif self._last is not None and self._last.get("mag") is not None:
             self.btn_save_project.setEnabled(True)
+
+    # -------------------------------------------------- resets (ADR-047)
+
+    def set_reset_attached(self, flag):
+        # ADR-047: the dialog carries reset hooks (it was opened from a
+        # project): the two plate resets show. Same rule as the save
+        # button: not attached, not visible.
+        # @args: flag - True when the dialog's state/points hooks are set
+        self.btn_reset_state.setVisible(bool(flag))
+        self.btn_reset_points.setVisible(bool(flag))
+
+    def ui_defaults(self):
+        # ADR-047: the recipe the .ui shipped with, for the state reset
+        # (the dialog applies it back on the tab).
+        # @args: none
+        # @return: a copy of the captured defaults dict
+        return dict(self._ui_defaults)
+
+    def _on_reset_state(self):
+        # ADR-047: the working state back to the editor's defaults: the
+        # recipe, the stretch, the sequence. No confirmation: nothing on
+        # disk is lost, the saved state is just overwritable.
+        dlg = self.window()
+        f = getattr(dlg, "reset_state_local", None)
+        if not callable(f) or not f():
+            self.lbl_status.setText(self.tr(
+                "Load a plate first: there is no state to reset."))
+            return
+        if dlg.notify_reset_state():
+            self.lbl_status.setText(self.tr("Plate state reset."))
+        else:
+            self.lbl_status.setText(self.tr(
+                "Plate state reset locally: this plate is not "
+                "registered in the project, so there was no saved "
+                "state to clear."))
+
+    def _on_reset_points(self):
+        # ADR-047: destructive for the light curve: every measured point
+        # saved on THIS plate is dropped. The plan requires a
+        # confirmation here, and the hook fires only after a yes.
+        dlg = self.window()
+        if not dlg.state.has_image:
+            self.lbl_status.setText(self.tr(
+                "Load a plate first: there are no plate points to reset."))
+            return
+        box = QMessageBox.question(
+            self, self.tr("Reset the points of this plate"),
+            self.tr(
+                "Delete every measurement point saved on this plate?\n"
+                "They leave the light curve; the CSV files on disk are\n"
+                "not touched."),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if box != QMessageBox.Yes:
+            return
+        if dlg.notify_reset_points():
+            self.lbl_status.setText(self.tr(
+                "The plate's measurement points were deleted."))
+        else:
+            self.lbl_status.setText(self.tr(
+                "No measurement points saved on this plate."))
 
     def _on_save_project(self):
         # ADR-044: the host (Main window) set a point hook when it opened
@@ -289,6 +304,9 @@ class UfeMeasureTab(QWidget):
             "mag": self._last["mag"],
             "err": self._last.get("err"),
             "name": meta.get("object"),
+            # ADR-047: the plate this point belongs to, so the host ties
+            # it to its project_files row and saves the plate's state.
+            "path": self._state.path,
         }
         dlg = self.window()
         if not dlg or not dlg.notify_point(payload):
@@ -319,7 +337,6 @@ class UfeMeasureTab(QWidget):
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
         self.lbl_status.setText("")
-        self.btn_go_compare.setVisible(False)
 
     # -------------------------------------------------------- measuring
 
@@ -334,11 +351,9 @@ class UfeMeasureTab(QWidget):
         entries = self._sequence()
         if not entries:
             self.lbl_status.setText(self.tr(
-                "No comparison sequence yet: build one in the Compare "
-                "tab (Generate field, then pick or propose)."))
-            self.btn_go_compare.setVisible(True)
+                "No comparison sequence yet: build one above with "
+                "«Build the sequence…»."))
             return
-        self.btn_go_compare.setVisible(False)
         self._last_suggestions = []     # a new target: stale reasons go
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
         self._prefill_bv_from_field(col, row)
@@ -403,6 +418,68 @@ class UfeMeasureTab(QWidget):
             except (TypeError, ValueError):
                 pass
             self.spn_target_bv.blockSignals(False)
+
+    # ----------------------------------------------------- state (ADR-047)
+
+    def capture_state(self):
+        # The recipe, as plain JSON (ADR-047): band, the aperture
+        # triple, the manual flag, the advanced switches, the sky
+        # method and the target B-V. Read-only: nothing here moves a
+        # widget.
+        # @return: the dict the dialog stores alongside the plate
+        return {
+            "band": self.cmb_band.currentText() or None,
+            "rap": float(self.spn_rap.value()),
+            "rin": float(self.spn_rin.value()),
+            "rout": float(self.spn_rout.value()),
+            "radii_manual": bool(self._radii_manual),
+            "sigmaclip": bool(self.chk_sigmaclip.isChecked()),
+            "seeing": bool(self.chk_seeing.isChecked()),
+            "color": bool(self.chk_color.isChecked()),
+            "sky": self.cmb_sky.currentData() or "median",
+            "target_bv": float(self.spn_target_bv.value()),
+        }
+
+    def apply_state(self, st):
+        # Restores a saved recipe (ADR-047). Signals are blocked while
+        # the widgets move: re-measures cannot fire there is no
+        # point yet, and the seeing toggle must not reset the manual
+        # radii we restore right after.
+        # @args: st - capture_state dict (empty/None is a no-op)
+        if not st:
+            return
+        band = st.get("band")
+        if band:
+            self.cmb_band.setCurrentText(str(band))
+        for spn, key in ((self.spn_rap, "rap"),
+                         (self.spn_rin, "rin"),
+                         (self.spn_rout, "rout")):
+            if st.get(key) is None:
+                continue
+            spn.blockSignals(True)
+            spn.setValue(float(st[key]))
+            spn.blockSignals(False)
+        self._radii_manual = False
+        for chk, key in ((self.chk_sigmaclip, "sigmaclip"),
+                         (self.chk_seeing, "seeing"),
+                         (self.chk_color, "color")):
+            want = bool(st.get(key, False))
+            if chk.isChecked() != want:
+                chk.setChecked(want)
+        sky = st.get("sky")
+        if sky:
+            row = self.cmb_sky.findData(sky)
+            if row >= 0:
+                self.cmb_sky.setCurrentIndex(row)
+        if st.get("target_bv") is not None:
+            self.spn_target_bv.blockSignals(True)
+            try:
+                self.spn_target_bv.setValue(float(st["target_bv"]))
+            except (TypeError, ValueError):
+                pass
+            self.spn_target_bv.blockSignals(False)
+        self._bv_source = "assumed"
+        self._radii_manual = bool(st.get("radii_manual", False))
 
     def _on_seeing_toggled(self, checked):
         # Re-arming the checkbox hands the radii back to the seeing
@@ -537,10 +614,11 @@ class UfeMeasureTab(QWidget):
         # Comps on the same plate, zero point (with the colour term when
         # there is spread), the error budget, the check semaphore, and
         # the panel.
-        band = self.cmb_band.currentText() or "V"
+        band = self.cmb_band.currentText() or self._band or "V"
         bands = self._available_bands(entries)
         if bands and band not in bands:
             band = bands[0]
+        self._band = band
         if bands:
             self.cmb_band.blockSignals(True)
             self.cmb_band.clear()
@@ -714,6 +792,24 @@ class UfeMeasureTab(QWidget):
         last = self._last
         result = last["result"]
         zp = last["zp"]
+        # the skip breakdown, computed once: with no calibration the
+        # causes ARE the answer, so they ride right under the headline
+        # instead of drowning at the bottom of the notes
+        n_skip = sum(skipped.values()) if isinstance(skipped, dict) else 0
+        parts = []
+        if isinstance(skipped, dict):
+            if skipped.get("sat"):
+                parts.append(self.tr("{0} saturated/clipped")
+                             .format(skipped["sat"]))
+            if skipped.get("off"):
+                parts.append(self.tr("{0} off the plate")
+                             .format(skipped["off"]))
+            if skipped.get("band"):
+                parts.append(self.tr("{0} without the {1} band")
+                             .format(skipped["band"], band))
+            if skipped.get("other"):
+                parts.append(self.tr("{0} not measurable")
+                             .format(skipped["other"]))
         lines = []
         lines.append(self.tr("Pixel ({0:.1f}, {1:.1f}) · net flux {2:,.0f}")
                      .format(last["col"], last["row"], result["flux"]))
@@ -722,6 +818,15 @@ class UfeMeasureTab(QWidget):
         if zp["zp"] is None:
             lines.append(self.tr(
                 "No comparison star could be used: no calibration."))
+            if n_skip:
+                lines.append(self.tr(
+                    "Why: {0} (of {1} sequence stars).")
+                    .format(", ".join(parts), n_seq))
+                if isinstance(skipped, dict) and skipped.get("sat"):
+                    lines.append(self.tr(
+                        "The proposed comps are too bright for this "
+                        "plate: re-propose with a fainter target "
+                        "magnitude, or check the saturation ceiling."))
         elif zp.get("color_used"):
             lines.append(self.tr(
                 "Zero point: {0:.3f} ± {1:.3f}, colour slope {2:+.3f} "
@@ -781,21 +886,7 @@ class UfeMeasureTab(QWidget):
                 "apertures set by hand (the seeing auto-scale is paused)"))
         for reason in self._last_suggestions:
             notes.append(reason)
-        n_skip = sum(skipped.values()) if isinstance(skipped, dict) else 0
-        if n_skip:
-            parts = []
-            if skipped.get("sat"):
-                parts.append(self.tr("{0} saturated/clipped")
-                             .format(skipped["sat"]))
-            if skipped.get("off"):
-                parts.append(self.tr("{0} off the plate")
-                             .format(skipped["off"]))
-            if skipped.get("band"):
-                parts.append(self.tr("{0} without the {1} band")
-                             .format(skipped["band"], band))
-            if skipped.get("other"):
-                parts.append(self.tr("{0} not measurable")
-                             .format(skipped["other"]))
+        if n_skip and zp["zp"] is not None:
             notes.append(self.tr(
                 "{0} of {1} sequence stars not usable: {2}")
                 .format(n_skip, n_seq, ", ".join(parts)))
@@ -870,7 +961,7 @@ class UfeMeasureTab(QWidget):
         # Aperture + annulus on the measured point, thin rings on the
         # comps that calibrated it (all in plate px, cosmetic pens).
         self._drop_items()
-        if not self._active or self._view is None or self._last is None:
+        if not self._on_stage or self._view is None or self._last is None:
             return
         last = self._last
         x, y = self._state.data_to_scene(last["col"], last["row"])

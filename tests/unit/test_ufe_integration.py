@@ -96,11 +96,23 @@ def test_settings_has_the_development_tab(qapp):
     assert 'ufe_default' in src and 'chk_ufe_default.isChecked()' in src
 
 
-def test_open_plate_and_show_tab(dlg):
+def test_open_plate_and_show_tab(dlg, qapp):
     assert dlg.open_plate(str(MONO))
     assert not dlg.open_plate(str(FIXTURES / "missing.fits"))
+    # the legacy section names are routed to the Photometry tab; there
+    # are no modes anymore (ADR-044 rev 2026-09-25): both links land on
+    # the same tab, and the closed manual window leaves the clicks
+    # measuring
     dlg.show_tab(dlg.tab_measure)
-    assert dlg.tabs.currentWidget() is dlg.tab_measure
+    assert dlg.tabs.currentWidget() is dlg.tab_photometry
+    assert dlg.tab_measure._active
+    dlg.show_tab("compare")
+    assert dlg.tabs.currentWidget() is dlg.tab_photometry
+    # opening the manual window hands the clicks to the star picking
+    dlg.tab_compare.btn_manual.click()
+    qapp.processEvents()
+    dlg.tab_photometry._apply()
+    assert dlg.tab_compare._active and not dlg.tab_measure._active
 
 
 def test_prefills_land(dlg):
@@ -394,6 +406,9 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
             pass
 
         def set_point_hook(self, fn):
+            pass
+
+        def set_reset_hooks(self, state_fn, points_fn):
             pass
 
         def show_tab(self, tab):

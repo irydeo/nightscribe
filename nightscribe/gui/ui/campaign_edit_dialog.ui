@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Campaign create/edit form (UX-a). Loaded by gui/campaigns_dialog.py
+  through gui/ui_loader.py. The window title ("New campaign" / "Edit
+  campaign") and the field prefill from the campaign dict are data and
+  stay in code (ADR-005).
+-->
+<ui version="4.0">
+ <class>CampaignEditDialog</class>
+ <widget class="QWidget" name="CampaignEditDialog">
+  <layout class="QVBoxLayout" name="vbox_camp"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item><widget class="QLabel" name="lbl_intro"><property name="text"><string>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal. Name it after the goal, e.g. “T CrB 2026 eruption” or “WeSb 1 light curve”.</string></property></widget></item>
+   <item>
+    <layout class="QFormLayout" name="form_camp">
+     <item row="0" column="0"><widget class="QLabel" name="lbl_name"><property name="text"><string>Name:</string></property></widget></item>
+     <item row="0" column="1"><widget class="QLineEdit" name="edt_name"/></item>
+     <item row="1" column="0"><widget class="QLabel" name="lbl_group"><property name="text"><string>Group:</string></property></widget></item>
+     <item row="1" column="1"><widget class="QLineEdit" name="edt_group"/></item>
+     <item row="2" column="0"><widget class="QLabel" name="lbl_coord"><property name="text"><string>Coordinator:</string></property></widget></item>
+     <item row="2" column="1"><widget class="QLineEdit" name="edt_coord"/></item>
+     <item row="3" column="0"><widget class="QLabel" name="lbl_goal"><property name="text"><string>Science goal:</string></property></widget></item>
+     <item row="3" column="1"><widget class="QLineEdit" name="edt_goal"/></item>
+     <item row="4" column="0"><widget class="QLabel" name="lbl_cadence"><property name="text"><string>Cadence (nights):</string></property></widget></item>
+     <item row="4" column="1"><widget class="QSpinBox" name="spn_cadence"><property name="minimum"><number>1</number></property><property name="maximum"><number>30</number></property><property name="value"><number>1</number></property></widget></item>
+     <item row="5" column="0"><widget class="QLabel" name="lbl_filters"><property name="text"><string>Filters:</string></property></widget></item>
+     <item row="5" column="1"><widget class="QLineEdit" name="edt_filters"/></item>
+     <item row="6" column="0"><widget class="QLabel" name="lbl_comps"><property name="text"><string>Comparison stars:</string></property></widget></item>
+     <item row="6" column="1"><widget class="QLineEdit" name="edt_comps"/></item>
+     <item row="7" column="0"><widget class="QLabel" name="lbl_report"><property name="text"><string>Report URL:</string></property></widget></item>
+     <item row="7" column="1"><widget class="QLineEdit" name="edt_report"/></item>
+     <item row="8" column="0"><widget class="QLabel" name="lbl_data"><property name="text"><string>Data URL:</string></property></widget></item>
+     <item row="8" column="1"><widget class="QLineEdit" name="edt_data"/></item>
+     <item row="9" column="0"><widget class="QLabel" name="lbl_notes"><property name="text"><string>Protocol notes:</string></property></widget></item>
+     <item row="9" column="1"><widget class="QPlainTextEdit" name="edt_notes"/></item>
+    </layout>
+   </item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

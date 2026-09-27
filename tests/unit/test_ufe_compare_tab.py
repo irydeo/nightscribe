@@ -54,7 +54,11 @@ def dlg(qapp):
     d.resize(1280, 860)
     d.show()
     d.state.load(MONO)
-    d.tabs.setCurrentWidget(d.tab_compare)      # take the stage
+    d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
+    # the picking state: manual window open, clicks add stars
+    d.tab_compare.btn_manual.click()
+    qapp.processEvents()
+    d.tab_photometry._apply()
     yield d
     d.tab_blink.shutdown()
     d.view._render_timer.stop()
@@ -122,7 +126,7 @@ class _HoldingFieldWorker(_FakeFieldWorker):
 
 def test_tab_is_real_and_enabled(dlg):
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate"]
     assert dlg.tab_compare.isEnabled()
     assert dlg.tab_compare.edt_target.text() == "sn2026zji_new_image"
 
@@ -206,11 +210,32 @@ def test_generate_runs_behind_the_busy_dialog(dlg, monkeypatch):
     waits = tab.findChildren(QProgressDialog)
     assert len(waits) == 1
     wait = waits[0]
+    assert wait.isVisible()                   # indeterminate dialogs only
+                                              # ever show on setValue:
+                                              # the explicit show() matters
     assert wait.windowTitle() == "Comparison field"
+    # and it sits centred over the editor window, not wherever the
+    # platform drops it — also after a long stage label resizes it
+    from PySide6.QtWidgets import QApplication
+    QApplication.processEvents()
+    centre = wait.geometry().center()
+    win = dlg.geometry().center()
+    assert abs(centre.x() - win.x()) < 100
+    assert abs(centre.y() - win.y()) < 100
     assert not wait.findChildren(QPushButton)  # no cancel button: nothing to abort
-    assert wait.maximum() == 0               # indeterminate
+    assert wait.maximum() == 3               # real stages, not a frozen
+    assert wait.value() == 1                 # indeterminate bar: the
+                                             # catalog stage moved it
     assert "Consultando el catálogo Gaia EDR3" in wait.labelText()
     assert "Consultando el catálogo Gaia EDR3" in tab.lbl_status.text()
+    # a long stage label resizes the dialog: it re-centres, not drifts
+    created["worker"].progress.emit(
+        {"es": "Comprobando variables conocidas (VSX)…",
+         "en": "Checking known variables (VSX)…"})
+    QApplication.processEvents()
+    centre = wait.geometry().center()
+    assert abs(centre.x() - win.x()) < 100
+    assert abs(centre.y() - win.y()) < 100
     # the field lands: the dialog is reaped before the result is taken
     created["worker"].land()
     _spin_events()                              # let the deleteLater run
@@ -283,6 +308,67 @@ def test_table_edits_flow_to_the_sequence(dlg):
     assert tab._entries == [] and tab.table.rowCount() == 0
 
 
+# ADR-044 rev (2026-09-25): "Remove all" and "Export CSV…" live in the
+# Sequence dialog (the table's home), the Target row is one line, and
+# the tab's old target mark is gone entirely (the dialog's global red
+# object mark, the top bar's toggle, is the one object marker now).
+
+def test_sequence_actions_live_in_the_dialog(dlg):
+    tab = dlg.tab_compare
+    assert tab._seqdlg is not None
+    assert tab._seqdlg.btn_clear.text() == "Remove all"
+    assert tab._seqdlg.btn_export.text() == "Export CSV…"
+    # the tab keeps working aliases to the dialog's own buttons
+    assert tab.btn_clear is tab._seqdlg.btn_clear
+    assert tab.btn_csv is tab._seqdlg.btn_export
+    assert tab.table is tab._seqdlg.table
+    # no section-owned target mark anymore (the global one is the bar's)
+    assert not hasattr(tab, "btn_move_target")
+    assert not hasattr(tab, "chk_target")
+
+
+def test_clear_via_the_dialog_button_empties_the_sequence(dlg):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    assert len(tab._entries) > 0 and tab.table.rowCount() == len(tab._entries)
+    tab.btn_clear.click()                       # the dialog's own button
+    assert tab._entries == [] and tab.table.rowCount() == 0
+    assert tab.entries() == []
+
+
+def test_manual_actions_live_in_the_manual_tweak(dlg):
+    # The hand-driven path (field alone, proposal alone, the table)
+    # lives inside the «Manual tweak» window (right of the DSS2 button);
+    # the table button wears the live count (ADR-044 rev, 2026-09-25).
+    from PySide6.QtWidgets import QPushButton
+    tab = dlg.tab_compare
+    manual_buttons = tab.manual.findChildren(QPushButton)
+    assert tab.btn_field in manual_buttons
+    assert tab.btn_propose in manual_buttons
+    assert tab.btn_seq_open in manual_buttons
+    assert tab.btn_seq_open.text() == "Sequence (0)…"
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    n = len(tab._entries)
+    assert tab.btn_seq_open.text() == "Sequence ({0})…".format(n)
+    # and the one-click button lives on the tab, outside the window
+    assert tab.btn_auto not in manual_buttons
+
+
+def test_target_and_magnitude_share_one_row(dlg):
+    from PySide6.QtWidgets import QLabel
+    tab = dlg.tab_compare
+    # a narrow name field, the magnitude straight beside it
+    assert tab.edt_target.minimumWidth() == 130
+    assert tab.edt_target.maximumWidth() == 130   # fixed, not growing
+    labels = [l.text() for l in tab.findChildren(QLabel)]
+    assert "Mag:" in labels
+    assert not any("Target magnitude" in t for t in labels)
+    assert 0.0 <= tab.spn_mag.value() <= 25.0
+    assert tab.spn_mag.decimals() == 2
+
+
 def test_catalog_labels_toggle(dlg):
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
@@ -308,7 +394,7 @@ def test_leaving_the_tab_restores_the_pixel_probe(dlg):
     dlg.tabs.setCurrentIndex(0)
     assert dlg.view._hover_probe == dlg.state.probe_text
     assert tab._items == []
-    dlg.tabs.setCurrentWidget(tab)
+    dlg.tabs.setCurrentWidget(dlg.tab_photometry)   # back: sequence resumes
     assert len(tab._items) > 0
 
 
@@ -336,9 +422,11 @@ def test_loading_a_new_plate_invalidates_the_field(dlg):
     assert tab.table.rowCount() == 0
 
 
-def test_sequence_overlays_survive_switching_to_measure(dlg):
-    # the sequence is the Measure tab's input: leaving Compare for
-    # Measure keeps rings and labels visible (with clicks disarmed)
+def test_sequence_overlays_survive_closing_the_manual_window(dlg, qapp):
+    # the sequence is the Measure section's input: closing the manual
+    # window (back to measuring) keeps rings and labels visible (with the
+    # picking clicks disarmed); only leaving the Photometry tab for real
+    # drops them
     from PySide6.QtCore import QPointF
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
@@ -346,14 +434,273 @@ def test_sequence_overlays_survive_switching_to_measure(dlg):
     dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
     assert len(tab._entries) == 1
     assert len(tab._items) > 0
-    dlg.tabs.setCurrentWidget(dlg.tab_measure)
+    tab.manual.hide()                           # back to measuring
+    qapp.processEvents()
+    dlg.tab_photometry._apply()
     assert len(tab._items) > 0                  # still drawn
     assert not tab._active                      # but disarmed
+    assert dlg.tab_measure._active              # the clicks measure now
     # and the star probe still answers while measuring
     hit, lines = dlg.view._hover_probe(s["_sx"], s["_sy"])
     assert hit and "Gaia EDR3" in lines[0]
-    # leaving Compare for anywhere else drops them as before
-    dlg.tabs.setCurrentWidget(dlg.tab_compare)
+    # opening the window again restores the picking
+    tab.btn_manual.click()
+    qapp.processEvents()
+    dlg.tab_photometry._apply()
+    assert tab._active and not dlg.tab_measure._active
     assert len(tab._items) > 0
     dlg.tabs.setCurrentWidget(dlg.tab_annotate)
     assert tab._items == []
+
+
+def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
+    # Regression, the exact visit path (2026-09-24): a fresh dialog whose
+    # Photometry tab is armed on Measure WITHOUT the Comparisons section
+    # ever being armed first painted nothing on Generate field, because
+    # keep_overlays kept _on_stage's initial False instead of setting
+    # the stage. There are no modes now: the default (manual window
+    # closed) IS the measuring state.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(1280, 860)
+    d.show()
+    d.tabs.setCurrentWidget(d.tab_photometry)
+    d.state.load(MONO)
+    try:
+        tab = d.tab_compare
+        assert not tab.manual_visible()         # the normal state: closed
+        assert not tab._active                    # never armed...
+        assert tab._on_stage                      # ...but on stage
+        tab._on_field_ready(_field(d))
+        assert len(tab._items) > 0                # the field paints
+        assert any(it.isVisible() for it, _ in tab._catalog_items)
+        tab._on_propose()
+        assert len(tab._entries) > 0
+        assert len(tab._entry_items) == 2 * len(tab._entries)
+        # clicks measure, they never mark stars with the window closed
+        from PySide6.QtCore import QPointF
+        s = tab._stars[0]
+        n = len(tab._entries)
+        d.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+        assert len(tab._entries) == n
+    finally:
+        d.tab_blink.shutdown()
+        d.view._render_timer.stop()
+        d.deleteLater()
+
+
+def test_deep_links_land_on_the_photometry_tab(qapp):
+    # No modes anymore (ADR-044 rev 2026-09-25): the legacy deep links
+    # ("compare" / "measure", by name or widget) all land on the same
+    # Photometry tab; the manual window, not the link, rules the clicks.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    d = UfeDialog()
+    d.resize(1280, 860)
+    d.show()
+    d.state.load(MONO)
+    try:
+        d.show_tab(d.tab_measure)
+        assert d.tabs.currentWidget() is d.tab_photometry
+        assert d.tab_measure._active              # window closed: measuring
+        assert not d.tab_compare._active
+        d.show_tab("compare")
+        assert d.tabs.currentWidget() is d.tab_photometry
+        # opening the manual window hands the clicks to the picking
+        d.tab_compare.btn_manual.click()
+        qapp.processEvents()
+        d.tab_photometry._apply()
+        assert d.tab_compare._active and not d.tab_measure._active
+    finally:
+        d.tab_blink.shutdown()
+        d.view._render_timer.stop()
+        d.deleteLater()
+
+
+def test_field_paints_while_the_measure_section_owns_the_stage(dlg, qapp):
+    # Regression (ADR-044 rev): opened from a visit, the Photometry tab
+    # sits in the measuring state (manual window closed) and the
+    # Comparisons half stays visible but disarmed. Generating the field
+    # there painted NOTHING (the draw gates read the click ownership
+    # instead of the stage).
+    tab = dlg.tab_compare
+    tab.manual.hide()                           # the fixture opens it
+    qapp.processEvents()
+    dlg.tab_photometry._apply()
+    assert not tab._active                      # disarmed...
+    assert tab._on_stage                        # ...but still on stage
+    tab._on_field_ready(_field(dlg))
+    assert len(tab._items) > 0                  # catalog paints
+    assert any(it.isVisible() for it, _ in tab._catalog_items)
+    # the proposal paints its rings too, and the table keeps ticking
+    tab.spn_mag.setValue(12.5)
+    tab._on_propose()
+    assert len(tab._entries) > 0
+    assert len(tab._entry_items) == 2 * len(tab._entries)
+    # the clicks measure, they never mark stars with the window closed
+    from PySide6.QtCore import QPointF
+    s = tab._stars[0]
+    n = len(tab._entries)
+    dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+    assert len(tab._entries) == n
+    # and the star probe keeps answering (the Measure section needs it)
+    hit, lines = dlg.view._hover_probe(s["_sx"], s["_sy"])
+    assert hit and "Gaia EDR3" in lines[0]
+
+
+def test_sequence_edits_paint_while_disarmed(dlg, qapp):
+    # The sequence window stays open while measuring: renaming,
+    # re-typing and removing rows must repaint the rings on the chart.
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    tab.manual.hide()                           # measuring state
+    qapp.processEvents()
+    dlg.tab_photometry._apply()
+    assert not tab._active
+    n = len(tab._entries)
+    tab.table.cellWidget(0, 1).setCurrentIndex(1)     # Comp -> Check
+    assert tab._entries[0]["kind"] == "check"
+    assert len(tab._entry_items) == 2 * n
+    tab._remove(0)
+    assert len(tab._entry_items) == 2 * (n - 1)
+    tab._on_clear()
+    assert tab._entry_items == []
+    # the catalog labels of the removed stars come back
+    assert any(it.isVisible() for it, _ in tab._catalog_items)
+
+
+# -------------------------------------- one-click path (ADR-044 rev 2026-09-25)
+
+def test_build_sequence_proposes_on_the_fields_arrival(dlg, monkeypatch):
+    # «Build the sequence…» without a field: the catalog query runs and
+    # the proposal rides the landing (no second click, no hang look: the
+    # busy dialog covers the network and the status line narrates).
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
+                        lambda *a: _FakeFieldWorker(*a, field=_field(dlg)))
+    tab = dlg.tab_compare
+    tab.spn_mag.setValue(12.5)
+    tab.btn_auto.click()
+    assert len(tab._stars) == 60
+    kinds = [e["kind"] for e in tab._entries]
+    assert kinds.count("comp") >= 6 and "check" in kinds
+    assert "Proposed" in tab.lbl_status.text()
+
+
+def test_build_sequence_with_a_field_only_reproposes(dlg, monkeypatch):
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    called = []
+    monkeypatch.setattr(
+        "nightscribe.gui.workers.UfeFieldWorker",
+        lambda *a: called.append(a) or _FakeFieldWorker(*a))
+    tab.btn_auto.click()
+    assert called == []                         # no second catalog query
+    assert len(tab._entries) > 0
+
+
+def test_repropose_is_covered_by_the_busy_dialog(dlg, monkeypatch):
+    # The second (and later) clicks only re-propose, but the proposal is
+    # not instant on a big field: it rides under the busy dialog like
+    # the field query does (a bare freeze reads as a hang).
+    from PySide6.QtWidgets import QProgressDialog
+    from nightscribe.core import compstars
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    seen = {}
+    real = compstars.propose_comps
+
+    def spy(stars, mag):
+        seen["visible"] = any(w.isVisible()
+                              for w in tab.findChildren(QProgressDialog))
+        return real(stars, mag)
+    monkeypatch.setattr(compstars, "propose_comps", spy)
+    tab.btn_auto.click()
+    assert seen.get("visible") is True
+    _spin_events()
+    assert not tab.findChildren(QProgressDialog)   # reaped at the end
+
+
+def test_build_sequence_needs_a_wcs(dlg, tmp_path):
+    from test_fits_annotate import _make_fits
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))
+    tab = dlg.tab_compare
+    tab.btn_auto.click()
+    assert "WCS" in tab.lbl_status.text()
+    assert tab._worker is None
+    assert tab._auto_propose is False
+
+
+def test_manual_tweak_starts_closed(dlg, qapp):
+    # The hand-picking window is the exception path: closed by
+    # default, raised on demand; the radios work either way. (The
+    # fixture opens it to arm the picking; close it first.)
+    tab = dlg.tab_compare
+    tab.manual.hide()
+    qapp.processEvents()
+    assert not tab.manual_visible()
+    assert not tab.btn_manual.isChecked()
+    tab.btn_manual.click()
+    qapp.processEvents()
+    dlg.tab_photometry._apply()
+    assert tab.manual_visible()
+    tab._on_field_ready(_field(dlg))
+    tab.rdo_check.setChecked(True)
+    from PySide6.QtCore import QPointF
+    s = tab._stars[0]
+    dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
+    assert tab._entries[0]["kind"] == "check"
+
+
+def test_busy_dialog_is_reaped_even_on_a_field_error(dlg, monkeypatch):
+    # A modal dialog surviving an exception reads as a hang: the reap is
+    # unconditional (finally), and the status line tells the story.
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
+                        lambda *a: _FakeFieldWorker(*a, field=_field(dlg)))
+    tab = dlg.tab_compare
+
+    def _boom(field):
+        raise RuntimeError("boom")
+    monkeypatch.setattr(tab, "_on_field_ready", _boom)
+    tab._on_generate()
+    from PySide6.QtWidgets import QProgressDialog
+    _spin_events()                              # let the deleteLater run
+    assert not tab.findChildren(QProgressDialog)
+    assert "boom" in tab.lbl_status.text()
+
+
+def test_manual_window_toggle_arms_the_picking(dlg, qapp):
+    # The toggle (right of the DSS2 button) raises the manual window
+    # and hands the plate clicks to the picking; closing the window
+    # gives the clicks back to the Measure half (ADR-044 rev,
+    # 2026-09-26).
+    ph = dlg.tab_photometry
+    tab = dlg.tab_compare
+    tab.manual.hide()                           # the fixture opens it
+    qapp.processEvents()
+    ph._apply()
+    assert not tab.manual_visible()             # closed...
+    assert not tab.btn_manual.isChecked()       # ...and the button follows
+    assert not tab._active                      # the Measure half owns it
+    assert dlg.tab_measure._active
+    tab.btn_manual.click()
+    qapp.processEvents()
+    ph._apply()
+    assert tab.manual_visible()
+    assert tab.btn_manual.isChecked()
+    assert tab._active                          # the picking is armed
+    assert not dlg.tab_measure._active
+
+
+def test_manual_window_cannot_squish_its_buttons(dlg):
+    # The buttons' row is the width floor of the window: a wider font or
+    # a longer label must grow the row and fail this test before it can
+    # truncate the labels in production (the old 460x120 minimum sat
+    # just under the row's real need of about 428 px)
+    w = dlg.tab_compare.manual
+    need = (w.btn_seq_open.sizeHint().width()
+            + w.btn_field.sizeHint().width()
+            + w.btn_propose.sizeHint().width()
+            + 6 * 2      # the actions row spacing
+            + 9 * 2)     # the layout margins
+    assert w.minimumWidth() >= need
+    assert w.minimumHeight() >= w.minimumSizeHint().height()

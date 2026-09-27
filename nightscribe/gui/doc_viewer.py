@@ -14,10 +14,10 @@
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QDialog, QSplitter, QTextBrowser,
-                               QTreeWidget, QTreeWidgetItem, QVBoxLayout)
+from PySide6.QtWidgets import QDialog, QTreeWidgetItem
 
 from . import markdown
+from .ui_loader import adopt_ui
 
 # The docs live at the repo root (source) or bundled (PyInstaller); the
 # browser lists every .md file and renders the selected one in a
@@ -60,26 +60,21 @@ class DocViewer(QDialog):
         self.resize(1100, 760)
         self.setStyleSheet(_TREE_STYLE)
 
-        layout = QVBoxLayout(self)
-        self._split = QSplitter()
-
-        self._tree = QTreeWidget()
-        self._tree.setHeaderHidden(True)
-        self._tree.setMinimumWidth(220)
+        # the structure is the Designer file's (ADR-005); the tree's
+        # content and the page styles are data, applied here
+        self._ui = adopt_ui(self, "doc_viewer")
+        self._split = self._ui.split
+        self._tree = self._ui.tree
         self._fill_tree()
         self._tree.itemClicked.connect(self._on_item)
 
-        self._view = QTextBrowser()
+        self._view = self._ui.view
         self._view.setStyleSheet(_DOC_STYLE)
-        self._view.setOpenExternalLinks(False)
         self._view.anchorClicked.connect(self._on_link)
 
-        self._split.addWidget(self._tree)
-        self._split.addWidget(self._view)
         self._split.setStretchFactor(0, 0)
         self._split.setStretchFactor(1, 1)
         self._split.setSizes([240, 860])
-        layout.addWidget(self._split)
 
     # ---- tree -------------------------------------------------------------
 

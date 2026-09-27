@@ -148,6 +148,7 @@ class FinderChart(ChartView):
         self._draw_ticks()
         self._draw_scale()
         self._draw_compass()
+        self._draw_boxes()
         self._draw_target()
         self._draw_variables()
         self._draw_catalog_labels()
@@ -305,22 +306,87 @@ class FinderChart(ChartView):
                                 vy + dy * arm * 1.4, palette.FG,
                                 self._w * 0.02, bold=True, anchor="center"))
 
+    def _draw_boxes(self):
+        # The metadata corner boxes (ADR-046): the target's position and
+        # the site/scale block. The object name is NOT one of them: the
+        # chart's title already carries it (the compass owns top-left).
+        from ...config import config
+        if not config.get("chart_boxes", False):
+            return
+        from ...core import chart_annotate
+        if self._wcs is not None:
+            scale = self._wcs.pixel_scale()
+            fov = (self._w * scale / 60.0, self._h * scale / 60.0)
+        else:
+            scale = self._fov * 60.0 / field_math.CANVAS
+            fov = (self._fov, self._fov)
+        wcs_info = {"scale_arcsec_px": scale, "fov_arcmin": fov}
+        if self._target and self._target.get("ra") is not None:
+            wcs_info["ra_deg"] = self._target["ra"]
+            wcs_info["dec_deg"] = self._target["dec"]
+        boxes = chart_annotate.build_boxes(
+            wcs_info=wcs_info,
+            site=chart_annotate.site_from_config(config))
+        for key in ("top_right", "bottom_left"):
+            lines = boxes.get(key)
+            if lines:
+                self._draw_box(lines, top=(key == "top_right"))
+
+    def _draw_box(self, lines, top):
+        # One corner box: dark square background + monospace lines, just
+        # inside the frame (scene units, so it exports exactly as seen).
+        from PySide6.QtGui import QFont
+        txt = QGraphicsSimpleTextItem("\n".join(lines))
+        f = QFont("monospace")
+        f.setPixelSize(max(6, int(self._w * 0.014)))
+        txt.setFont(f)
+        txt.setBrush(QBrush(QColor(palette.FG)))
+        br = txt.boundingRect()
+        pad, margin = self._w * 0.004, self._w * 0.008
+        bg = QGraphicsRectItem(0, 0, br.width() + 2 * pad,
+                               br.height() + 2 * pad)
+        bgc = QColor(palette.BG)
+        bgc.setAlpha(215)
+        bg.setBrush(QBrush(bgc))
+        bg.setPen(_pen(palette.MUTED, 0.8))
+        x = (self._w - margin - bg.rect().width()) if top else margin
+        y = margin if top else self._h - margin - bg.rect().height()
+        bg.setPos(x, y)
+        txt.setPos(x + pad, y + pad)
+        bg.setZValue(45)
+        txt.setZValue(46)
+        self.add_item(bg)
+        self.add_item(txt)
+
     def _draw_target(self):
         if self._target:
             x, y = self._to_scene(self._target["ra"], self._target["dec"])
         else:
             x, y = self._w / 2.0, self._h / 2.0
-        r = self._w * 0.022
-        ring = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-        ring.setPen(_pen(palette.ACCENT, 2.2))
-        self.add_item(ring)
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            ln = QGraphicsLineItem(x + dx * r * 1.15, y + dy * r * 1.15,
-                                   x + dx * r * 1.7, y + dy * r * 1.7)
-            ln.setPen(_pen(palette.ACCENT, 2.2))
-            self.add_item(ln)
+        # ADR-046: two looks for the object marker (Settings); the cross
+        # spans the frame with a box, the ring is the classic
+        from ...config import config
+        cross = config.get("marker_style", "ring") == "cross"
+        if cross:
+            from .ufe_image_view import cross_marker_items
+            half = self._w * 0.011
+            for it in cross_marker_items(x, y, self._w, self._h,
+                                         palette.ACCENT, half):
+                self.add_item(it)
+            label_dy = half * 2.6
+        else:
+            r = self._w * 0.022
+            ring = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
+            ring.setPen(_pen(palette.ACCENT, 2.2))
+            self.add_item(ring)
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                ln = QGraphicsLineItem(x + dx * r * 1.15, y + dy * r * 1.15,
+                                       x + dx * r * 1.7, y + dy * r * 1.7)
+                ln.setPen(_pen(palette.ACCENT, 2.2))
+                self.add_item(ln)
+            label_dy = r * 2.4
         if self._target and self._target.get("name"):
-            self.add_item(_text(self._target["name"], x, y + r * 2.4,
+            self.add_item(_text(self._target["name"], x, y + label_dy,
                                 palette.ACCENT, self._w * 0.018, bold=True,
                                 anchor="center"))
 

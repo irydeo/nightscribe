@@ -218,3 +218,43 @@ def test_pick_radius_is_screen_constant(qapp):
     assert chart._nearest_star(star["_sx"] + r1 * 0.75, star["_sy"]) is None
     assert chart._nearest_star(star["_sx"] + r1 * 0.25, star["_sy"]) is star
     chart.close()
+
+
+def test_boxes_and_cross_marker_follow_the_config(qapp, monkeypatch):
+    # ADR-046: with the settings on, the corner boxes land in the scene
+    # and the target marker is the full-frame cross; off, nothing changes
+    from nightscribe.config import config
+    from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem,
+                                   QGraphicsSimpleTextItem)
+    monkeypatch.setitem(config._data, "chart_boxes", True)
+    monkeypatch.setitem(config._data, "observer_name", "F. Calvo")
+    monkeypatch.setitem(config._data, "mpc_code", "Z41")
+    monkeypatch.setitem(config._data, "marker_style", "cross")
+    chart = _chart(qapp)
+    texts = [it.text() for it in chart.scene().items()
+             if isinstance(it, QGraphicsSimpleTextItem)]
+    assert any("Stn: Z41" in t for t in texts)          # site box
+    assert any("RA: " in t for t in texts)              # position box
+    assert any("PSc: " in t for t in texts)             # scale line
+    # no top-left box: the title/name label already owns the object name
+    assert not any(t.startswith("V0001 Cyg\n") for t in texts)
+    # the cross: four long arms + a box, no amber ring
+    arms = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsLineItem)
+            and it.pen().color().name().lower() == "#ffb347"]
+    xs = [c for ln in arms for c in (ln.line().x1(), ln.line().x2())]
+    assert len(arms) == 4 and min(xs) == 0.0 and max(xs) == 1000.0
+    chart.deleteLater()
+    # classic defaults: no boxes, the ring marker
+    monkeypatch.setitem(config._data, "chart_boxes", False)
+    monkeypatch.setitem(config._data, "marker_style", "ring")
+    chart = _chart(qapp)
+    texts = [it.text() for it in chart.scene().items()
+             if isinstance(it, QGraphicsSimpleTextItem)]
+    assert not any("Stn:" in t for t in texts)
+    arms = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsLineItem)
+            and it.pen().color().name().lower() == "#ffb347"]
+    assert len(arms) == 4
+    assert max(ln.line().x2() - ln.line().x1() for ln in arms) < 100.0
+    chart.deleteLater()

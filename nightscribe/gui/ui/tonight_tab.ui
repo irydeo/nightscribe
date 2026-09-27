@@ -35,12 +35,13 @@
        </widget>
       </item>
       <item>
-       <widget class="QPushButton" name="btn_compute">
-       <property name="text"><string>↻</string></property>
-       <property name="toolTip"><string>Recompute tonight's targets</string></property>
-       <property name="maximumWidth"><number>32</number></property>
-       <property name="flat"><bool>true</bool></property>
-      </widget>
+        <widget class="QPushButton" name="btn_compute">
+        <property name="text"><string>↻</string></property>
+        <property name="toolTip"><string>Recompute tonight's targets</string></property>
+        <property name="maximumWidth"><number>32</number></property>
+        <property name="flat"><bool>true</bool></property>
+        <property name="compact"><bool>true</bool></property>
+       </widget>
      </item>
     </layout>
    </item>

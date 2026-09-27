@@ -41,6 +41,25 @@ def qapp():
     return QApplication([])
 
 
+@pytest.fixture
+def es_tr(qapp):
+    # Spanish rendering of the widget strings (ADR-014: the code base
+    # is English, Spanish is a translation served by the .qm). Install it
+    # for one test and remove it after: it must not leak into the tests
+    # that read the English base text. Not in conftest on purpose
+    # (per-module install/uninstall, like test_overview_panel does).
+    from pathlib import Path
+    from PySide6.QtCore import QTranslator
+    qm = (Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
+          / "nightscribe_es.qm")
+    tr = QTranslator(qapp)
+    assert tr.load(str(qm)), "nightscribe_es.qm must load"
+    qapp.installTranslator(tr)
+    yield
+    qapp.removeTranslator(tr)
+    tr.deleteLater()
+
+
 # a representative northern-night target (RA ~ 10h, Dec ~ +20°) at a
 # mid-latitude site (Observatorio Irydeo, lat 40.6 N, lon 4.4 W).
 _RA, _DEC = 10.0, 20.0
@@ -120,7 +139,7 @@ def test_hover_on_target_curve(qapp):
     w.close()
 
 
-def test_hover_in_safe_band(qapp):
+def test_hover_in_safe_band(qapp, es_tr):
     # a cursor inside the safe band answers the session-planning reading
     # ("de HH:MM a HH:MM · empezar hasta HH:MM") — beats the raw curve.
     w = _mk_chart(qapp)
@@ -237,7 +256,7 @@ def test_curve_never_drawn_below_zero_altitude(qapp):
     w.close()
 
 
-def test_legend_identifies_each_line(qapp):
+def test_legend_identifies_each_line(qapp, es_tr):
     # The chart must say what each line is: the target curve, the Moon and
     # the horizon limit — three swatches (QGraphicsLineItem at _Z_LABEL)
     # with the matching labels.

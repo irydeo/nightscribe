@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Visit window fragment (ADR-045): the Measurements group, loaded only
+  for the light-curve kinds (sn/hads/variable). The class tag is
+  VisitWindow so the i18n context carries over. The spins and the list
+  are the wheel-guarded Passive widgets, inserted in code (ADR-005).
+-->
+<ui version="4.0">
+ <class>VisitWindow</class>
+ <widget class="QGroupBox" name="grp_meas">
+  <property name="title"><string>Measurements</string></property>
+  <layout class="QVBoxLayout" name="vbox_meas"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_meas">
+     <item><widget class="QLabel" name="lbl_meas_mag"><property name="text"><string>Mag:</string></property></widget></item>
+     <item><widget class="QWidget" name="ph_mag"/></item>
+     <item><widget class="QLabel" name="lbl_meas_err"><property name="text"><string>Err:</string></property></widget></item>
+     <item><widget class="QWidget" name="ph_err"/></item>
+     <item><widget class="QLabel" name="lbl_meas_filter"><property name="text"><string>Filter:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_filt"><property name="editable"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_add_meas"><property name="text"><string>Add</string></property></widget></item>
+     <item><widget class="QPushButton" name="vp_btn_del_meas"><property name="text"><string>Delete point</string></property></widget></item>
+     <item><spacer name="hsp_meas"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="QWidget" name="ph_meas_list"/></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

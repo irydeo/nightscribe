@@ -143,3 +143,84 @@ def test_apply_theme_is_idempotent(qapp):
     qss_before = qapp.styleSheet()
     theme_a.apply_theme(qapp)
     assert qapp.styleSheet() == qss_before, "re-applying must not accumulate"
+
+
+# ------------------------------------------------- arrows and glyphs
+
+def _light_pixels(widget, x0, x1, y0, y1):
+    # @args: widget - shown widget, x0..y1 - region to scan (widget coords)
+    # @return: how many pixels in the region are clearly brighter than the
+    #          input chrome (arrows/glyphs read light on the dark fills)
+    img = widget.grab().toImage()
+    n = 0
+    for y in range(max(0, y0), min(y1, img.height())):
+        for x in range(max(0, x0), min(x1, img.width())):
+            if img.pixelColor(x, y).lightness() > 110:
+                n += 1
+    return n
+
+
+def test_style_spinbox_and_combo_arrows_have_images(qapp):
+    # A styled widget paints its own subcontrols: without an explicit
+    # image the up/down/drop-down arrows are simply never drawn.
+    from pathlib import Path
+    from nightscribe.gui import theme
+
+    theme.apply_theme(qapp)
+    qss = qapp.styleSheet()
+    assert "QComboBox::down-arrow" in qss
+    assert "QSpinBox::up-arrow" in qss
+    assert "QDoubleSpinBox::down-arrow" in qss
+    assert theme.ARROW_UP_SVG in qss and theme.ARROW_DOWN_SVG in qss
+    assert Path(theme.ARROW_UP_SVG).is_file(), "arrow_up.svg asset missing"
+    assert Path(theme.ARROW_DOWN_SVG).is_file(), "arrow_down.svg asset missing"
+    assert "\\" not in theme.ARROW_UP_SVG, "QSS url() needs a POSIX path"
+
+
+def test_spinbox_arrows_actually_paint(qapp):
+    from PySide6.QtWidgets import QSpinBox, QDoubleSpinBox
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    theme.apply_theme(qapp)
+    for cls in (QSpinBox, QDoubleSpinBox):
+        w = cls()
+        w.resize(120, 28)
+        w.show()
+        right = w.width() - 18
+        assert _light_pixels(w, right, w.width() - 1, 1, 14) > 0, \
+            f"{cls.__name__}: the up arrow paints nothing"
+        assert _light_pixels(w, right, w.width() - 1, 14, 27) > 0, \
+            f"{cls.__name__}: the down arrow paints nothing"
+        w.close()
+        w.deleteLater()
+
+
+def test_combo_arrow_actually_paints(qapp):
+    from PySide6.QtWidgets import QComboBox
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    theme.apply_theme(qapp)
+    c = QComboBox()
+    c.addItems(["aaa", "bbb"])
+    c.resize(140, 28)
+    c.show()
+    assert _light_pixels(c, c.width() - 22, c.width() - 1,
+                         1, c.height() - 1) > 0, \
+        "the combo drop-down arrow paints nothing"
+    c.close()
+    c.deleteLater()
+
+
+def test_compact_button_glyph_survives_the_small_width(qapp):
+    # The global 6px/16px padding leaves a 28 px button no content rect:
+    # the glyph clips away and the button reads empty (the sequence
+    # tables' ×, the header's ↻). compact="true" restores it.
+    from PySide6.QtWidgets import QPushButton
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    theme.apply_theme(qapp)
+    btn = QPushButton("×")
+    btn.setFixedWidth(28)
+    btn.setProperty("compact", True)
+    btn.show()
+    assert _light_pixels(btn, 0, 28, 0, btn.height()) > 0, \
+        "the compact glyph button paints no glyph"
+    btn.close()
+    btn.deleteLater()

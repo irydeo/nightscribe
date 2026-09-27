@@ -754,12 +754,69 @@ def test_blink_real_mirrored_frame():
 @pytest.mark.skipif(not config.get("astrometry_key"),
                     reason="no astrometry.net API key configured")
 def test_astrometry_solve_live(tmp_path):
-    # blind-solve of a synthetic star field (only with a configured key)
+    # Blind-solve a real star field: the server refuses synthetic plates
+    # (they come back as a bare failure), so we hand it a genuine square
+    # crop of the local fixture. The recovered WCS must match the plate's
+    # own solved astrometry: centre within 1 arcmin, scale within 10%.
+    # The crop bytes are deterministic and the result is cached by the
+    # file sha256, so only the first run ever spends a server job (ADR-018).
+    from nightscribe.core import fits_io, wcs as wcs_mod
     from nightscribe.core.sources import astrometry
-    img = _solved_fits(tmp_path / "raw.fits", 210.9107, 54.3117,
-                       width=200, height=150)
+    fixture = Path(__file__).parents[1] / "fixtures" / "sn2026zji_new_image.fits"
+    header, data = fits_io.read_fits(str(fixture))
+    plate = wcs_mod.Wcs.from_header(header)
+    assert plate is not None and plate.pixel_scale() > 0
+
+    size = 500
+    img, r0, c0 = _blind_crop_fits(tmp_path / "crop.fits", data, size)
     cards = astrometry.solve(img)
     assert cards and "CRVAL1" in cards and "CD1_1" in cards
+
+    # the solved wcs.fits carries NAXIS=0, so size the solution with our own
+    # crop dimensions before reading its centre and scale
+    solved = wcs_mod.Wcs.from_header({"NAXIS1": size, "NAXIS2": size, **cards})
+    assert solved is not None, "server returned a non-TAN or cardless solution"
+    ra1, dec1 = solved.center()
+
+    # where the crop centre sits on the plate (0-based fixture pixels)
+    cx = c0 + (size - 1) / 2.0
+    cy = r0 + (size - 1) / 2.0
+    ra0, dec0 = plate.pixel_to_sky(cx, cy)
+
+    assert _sep_arcsec(ra0, dec0, ra1, dec1) < 60.0
+    assert solved.pixel_scale() == pytest.approx(plate.pixel_scale(), rel=0.10)
+
+
+def _blind_crop_fits(path, data, size=500):
+    # Writes a clean blind plate: a centred square crop of a real frame with
+    # every WCS card stripped (only SIMPLE and the sizes remain). The layout
+    # is fixed on purpose: the solver caches results by the file sha256, so
+    # the crop must be byte-deterministic to stay a cache hit (ADR-018).
+    # @args: path - output FITS, data - 2-D array, size - crop width/height
+    # @return: (path, row0, col0) of the crop in data coordinates
+    h, w = data.shape
+    r0 = int(h / 2.0 - size / 2.0)
+    c0 = int(w / 2.0 - size / 2.0)
+    crop = data[r0:r0 + size, c0:c0 + size].astype(">f4")
+    cards = ["SIMPLE  =                    T", "BITPIX  =                  -32",
+             "NAXIS   =                    2",
+             f"NAXIS1  ={size:21d}", f"NAXIS2  ={size:21d}"]
+    blob = "".join(c.ljust(80) for c in cards + ["END"]).encode("ascii")
+    blob += b" " * ((-len(blob)) % 2880)
+    payload = crop.tobytes()
+    payload += b"\0" * ((-len(payload)) % 2880)
+    path.write_bytes(blob + payload)
+    return path, r0, c0
+
+
+def _sep_arcsec(ra0, dec0, ra1, dec1):
+    # Angular separation of two (ra, dec) pairs in arcseconds; a flat
+    # tangent-plane approximation is plenty at these sub-degree scales.
+    # @args: ra0, dec0, ra1, dec1 - degrees
+    # @return: arcseconds
+    import math
+    dra = (ra1 - ra0 + 180.0) % 360.0 - 180.0
+    return math.hypot(dra * math.cos(math.radians(dec0)), dec1 - dec0) * 3600.0
 
 
 
@@ -771,6 +828,26 @@ def _solved_fits(path, ra, dec, width=600, height=400, pixscale=1.5,
     rng = np.random.default_rng(3)
     data = rng.normal(900, 15, (height, width))
     data[height // 2, width // 2] += 9000
+    # a faint star field besides the SN: astrometry.net cannot blind-solve
+    # a one-star plate, and the blink SN must stay the brightest source.
+    # keep a clear zone around the centre so nothing crowds it.
+    n_stars = int(width * height / 1200)
+    clear = int(max(6, 0.08 * min(width, height)))
+    cx, cy = width / 2.0, height / 2.0
+    added = 0
+    while added < n_stars:
+        x = int(rng.uniform(0, width))
+        y = int(rng.uniform(0, height))
+        if abs(x - cx) < clear and abs(y - cy) < clear:
+            continue
+        peak = 120 + 5000 * rng.random() ** 3
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                yy, xx = y + dy, x + dx
+                if 0 <= yy < height and 0 <= xx < width:
+                    wgt = 1.0 if (dx == 0 and dy == 0) else 0.35
+                    data[yy, xx] += peak * wgt
+        added += 1
     scale = pixscale / 3600.0
     c, s = math.cos(math.radians(rot_deg)), math.sin(math.radians(rot_deg))
     cards = [
@@ -895,8 +972,9 @@ def test_gui_boots_offscreen():
     # lazily, on first open; the hub ships with the empty page
     assert w.projects.page_container is not None
     assert w._tab_pages == {} and w._active_tab is None
-    # the five flat tab buttons exist (follow-up is kind-gated per project)
-    for key in ("details", "plan", "process", "publish", "followup"):
+    # the four flat tab buttons exist (ADR-045: "process" was renamed to
+    # "analysis" and the follow-up button was dropped)
+    for key in ("details", "plan", "analysis", "publish"):
         getattr(w.projects, f"btn_tab_{key}")
     # menu bar with ad-hoc tools
     menu_texts = [a.text() for a in w.menuBar().actions()]

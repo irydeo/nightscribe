@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UFE Photometry tab (ADR-044 rev 2026-09-25): the Comparisons and
+  Measure sections stacked in one vertical splitter, both always
+  visible; there is no mode toggle (what a click does follows the
+  Comparisons section's "Manual tweak" fold). Loaded by
+  gui/ufe_photometry_tab.py through gui/ui_loader.py; the two sections
+  are code-built classes inserted into the placeholders (the house's
+  custom-widget rule, ADR-005).
+-->
+<ui version="4.0">
+ <class>UfePhotometryTab</class>
+ <widget class="QWidget" name="UfePhotometryTab">
+  <layout class="QVBoxLayout" name="vbox_photometry"><property name="leftMargin"><number>9</number></property><property name="topMargin"><number>9</number></property><property name="rightMargin"><number>9</number></property><property name="bottomMargin"><number>9</number></property>
+   <item>
+    <widget class="QSplitter" name="splitter">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <widget class="QWidget" name="ph_compare"/>
+     <widget class="QWidget" name="ph_measure"/>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
+

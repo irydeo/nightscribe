@@ -41,7 +41,7 @@ débiles cuando el ruido lo permite; cuando no, conserva tu punto y lo
 dice. El quicklook de series conserva su centroide de momento clásico
 (comparabilidad durante la revisión).
 
-Al marcar con el ratón (Medir, Anotar, Comparar), el cursor se vuelve
+Al marcar con el ratón (Fotometría, Anotar), el cursor se vuelve
 una cruz con retícula que **se pega al centroide gaussiano** de la
 fuente bajo el ratón: el clic nace centrado.
 
@@ -123,10 +123,10 @@ SN), el programa elige solo a sus comparaciones:
 Es el criterio del astrónomo hecho algoritmo: una buena comparación es
 la que no se mueve.
 
-### 3.2 La secuencia de catálogo (pestaña Comparar del Editor FITS)
+### 3.2 La secuencia de catálogo (mitad Secuencia de la pestaña Fotometría del Editor FITS)
 
-Para fotometría con magnitudes de catálogo, la pestaña **Comparar** del
-Editor FITS trae estrellas con magnitud conocida alrededor del centro de
+Para fotometría con magnitudes de catálogo, la mitad **Secuencia** de la
+pestaña **Fotometría** del Editor FITS trae estrellas con magnitud conocida alrededor del centro de
 la placa:
 
 * **Gaia EDR3**: magnitud G nativa y B, V, Rc, Ic **estimadas** a partir
@@ -141,10 +141,10 @@ la placa:
 La secuencia elegida (clic a clic, o la propuesta automática por brillo
 parecido al objetivo) se exporta a CSV con todas las bandas.
 
-### 3.3 La medida calibrada (pestaña Medir del Editor FITS)
+### 3.3 La medida calibrada (mitad Medir de la pestaña Fotometría del Editor FITS)
 
-Con la placa cargada y la secuencia construida, la pestaña **Medir**
-convierte un clic en una magnitud de catálogo:
+Con la placa cargada y la secuencia construida, la mitad **Medir** de la
+pestaña **Fotometría** convierte un clic en una magnitud de catálogo:
 
 1. El clic mide el objetivo (centroide, apertura, cielo con sigma-clip;
   las guardas de la sección 2.4 hablan en lenguaje llano: «saturada»,
@@ -180,10 +180,16 @@ nunca se modifica.
   píxel de la posición real, en vez de las décimas del momento crudo.
   El anillo y la línea «Píxel» se dibujan en el centroide medido, no en
   el clic; si el centroide se movió más de 1 px, el panel lo dice.
-* **«Sugerir aperturas»**: propone los radios desde la curva de
-  crecimiento del propio objetivo y su entorno medido (vecino más
-  cercano, gradiente del fondo), y explica las razones en lenguaje llano
-  en el panel; tu edición manual nunca se pisa sola. La regla de la
+* **«Sugerir aperturas»**: el botón vive en la sección Medir, justo
+  bajo las tres aperturas, en el flujo diario (banda, aperturas,
+  sugerir); las demás opciones de receta (cielo, sigma-clip, seeing,
+  término de color, sustracción del anfitrión) se abren en la pequeña
+  ventana no modal «Advanced…», que deja seguir midiendo mientras
+  está abierta, y el registro de resultados tiene scroll propio para
+  los informes largos. Propone los radios desde la curva de crecimiento
+  del propio objetivo y su entorno medido (vecino más cercano,
+  gradiente del fondo), y explica las razones en lenguaje llano en el
+  registro; tu edición manual nunca se pisa sola. La regla de la
   meseta del 99 % solo se cree lo compatible con una fuente puntual
   (4 × FWHM): si la curva no se aplana ahí (mezcla o fondo mal
   restado), propone la apertura de seeing y dice por qué.
@@ -354,14 +360,14 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
   medida al sistema fotométrico estándar (eso requeriría conocer los
   coeficientes de color y extinción de tu equipo).
 * `CNAME`/`CMAG` y `KNAME`/`KMAG` se rellenan desde la secuencia de
-  comparación guardada en el proyecto (pestaña Comparar / carta);
+  comparación guardada en el proyecto (pestaña Fotometría / carta);
   `na` cuando no la hay.
 * `#OBSCODE` sale de tu código AAVSO en Ajustes, `#SOFTWARE=NightScribe`
   y `#OBSTYPE=CCD`.
 
 **Qué significa MAG aquí**: en los puntos del quicklook es la magnitud
 diferencial instrumental (Δmag contra el ensemble), no una magnitud
-calibrada de catálogo. En la medida de la pestaña Medir sí es una
+calibrada de catálogo. En la medida de la pestaña Fotometría sí es una
 magnitud calibrada al catálogo vía el punto cero (TRANS sigue siendo
 `NA` con honestidad: no hay transformación de color al sistema
 estándar). Los puntos importados de fuera (medidos con otra
@@ -421,7 +427,7 @@ Por orden de impacto habitual:
    B−V muy distintos (una SN azul frente a estrellas solares), aparece
    una deriva de centésimas de magnitud. Regla práctica: elige
    comparaciones de color parecido al objetivo (el B−V está en la
-   pestaña Comparar), o deja que la pestaña Medir lo ajuste con las
+   pestaña Fotometría), o deja que la mitad Medir lo ajuste con las
    comps (fase H).
 3. **La transformación de catálogo**: la V derivada de Gaia añade
    ~0,01–0,03 mag de sistemático; la V directa de APASS lo evita.
@@ -467,7 +473,7 @@ y con apéndice técnico de implementación:
   conjunto de comparaciones.
 * **Punto cero (ZP)**: la constante que convierte la magnitud
   instrumental en magnitud de catálogo. En el flujo de series no se usa
-  (Δmag ya cancela lo común); la pestaña Medir del Editor FITS sí lo
+  (Δmag ya cancela lo común); la pestaña Fotometría del Editor FITS sí lo
   calcula a partir de las comps (mediana de `cat − inst`).
 * **Ensemble**: el grupo de estrellas constantes elegido como referencia
   en una serie.

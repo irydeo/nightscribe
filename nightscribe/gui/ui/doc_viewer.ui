@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Documentation browser (ADR-005): markdown file tree on the left,
+  rendered document on the right. Loaded by gui/doc_viewer.py through
+  gui/ui_loader.py. The tree content is data (filled in code); the
+  stylesheets are theme constants (applied in code); the splitter's
+  stretch factors and sizes are not .ui properties, so code sets them.
+-->
+<ui version="4.0">
+ <class>DocViewer</class>
+ <widget class="QWidget" name="DocViewer">
+  <layout class="QVBoxLayout" name="vbox_docs"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item>
+    <widget class="QSplitter" name="split">
+     <property name="orientation"><enum>Qt::Horizontal</enum></property>
+     <widget class="QTreeWidget" name="tree">
+      <property name="headerHidden"><bool>true</bool></property>
+      <property name="minimumSize"><size><width>220</width><height>0</height></size></property>
+     </widget>
+     <widget class="QTextBrowser" name="view">
+      <property name="openExternalLinks"><bool>false</bool></property>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

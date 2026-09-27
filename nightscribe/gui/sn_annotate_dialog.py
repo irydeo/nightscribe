@@ -247,6 +247,7 @@ class SnAnnotateDialog(QDialog):
         self.edit_dest = QLineEdit(self._default_dest(project, object_name))
         save_row.addWidget(self.edit_dest, 1)
         self.btn_browse = QPushButton("...")
+        self.btn_browse.setProperty("compact", True)   # see ufe_compare_tab
         self.btn_browse.setAccessibleName("browse")
         self.btn_browse.clicked.connect(self._browse_dest)
         save_row.addWidget(self.btn_browse)

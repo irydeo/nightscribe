@@ -11,39 +11,41 @@
 #
 ############################################################
 
-"""The UFE's Compare tab (ADR-044, phase F): the photometric comparison
-sequence picker on top of core/compstars (VizieR Gaia/APASS + VSX
-cross-match), with the FinderChart's visual language reimplemented as
-overlays on the shared plate view (the legacy SeqChartDialog keeps
-living untouched).
+"""The UFE's Comparisons section (ADR-044, phase F; rev 2026-09-25): the
+photometric comparison sequence on top of core/compstars (VizieR
+Gaia/APASS + VSX cross-match), with the FinderChart's visual language
+reimplemented as overlays on the shared plate view (the legacy
+SeqChartDialog keeps living untouched).
 
-The loaded plate IS the field background, so the tab needs it to carry a
-WCS (the common «Solve astrometry…» button fixes that in place). The
-field (catalog stars + known variables) loads around the plate centre
-with the plate's field of view, off the GUI thread. Clicks on the plate
-toggle stars in and out of the sequence (known VSX variables can never
-be comparisons); the table edits names and kinds; the CSV export comes
-out next to the plate (the chart PNG goes through the shared
-"Export PNG…" button in the dialog's top bar).
+The normal path is ONE click: «Build the sequence…» generates the
+catalog field around the plate centre and proposes the comparisons; the
+observer only tweaks by clicking stars, and the «Manual tweak…» toggle
+(right of the DSS2 button) raises the small window that holds the
+hand-driven controls. The loaded plate IS the field background, so the
+section needs it to carry a WCS (the common «Solve astrometry…» button
+fixes that in place). Known VSX variables can never be comparisons; the
+table edits names and kinds; the CSV export comes out next to the plate
+(the chart PNG goes through the shared "Export PNG…" button in the
+dialog's top bar). The object itself wears the dialog's global red mark
+(the top bar's toggle), not a marker of this section.
 """
 
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QObject, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
-                               QFileDialog, QHBoxLayout, QLabel,
-                               QLineEdit, QProgressDialog,
-                               QPushButton, QRadioButton,
-                               QTableWidget, QTableWidgetItem,
-                               QVBoxLayout, QWidget,
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QProgressDialog,
+                               QPushButton, QTableWidgetItem, QWidget,
                                QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsRectItem, QGraphicsSimpleTextItem)
 
 from ..core import compstars
 from ..core.sources import vizier
 from ..viz import palette
+from .ufe_manual_dialog import UfeManualDialog
+from .ufe_sequence_dialog import UfeSequenceDialog
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_compare_tab")
 
@@ -57,6 +59,28 @@ _PICK_PX = 11.0         # click/hover radius in SCREEN px at any zoom
 _MAX_LABELS = 34        # catalog magnitude labels, brightest first
 
 
+class _CenterOnWindow(QObject):
+    # Keeps the busy dialog centred over the editor window. The stage
+    # labels change its size (long bilingual texts), and the window
+    # manager's placement is not ours to trust: re-centre on every
+    # Show/Resize instead of a single move() that ages with the first
+    # label change.
+    # @args: dialog - the QProgressDialog, host - the widget whose
+    #        top-level window is the reference
+
+    def __init__(self, dialog, host):
+        super().__init__(dialog)
+        self._dialog = dialog
+        self._host = host
+
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.Type.Show, QEvent.Type.Resize):
+            win = self._host.window()
+            self._dialog.move(win.geometry().center()
+                              - self._dialog.rect().center())
+        return False
+
+
 def _busy_wait(host, label, title):
     # A modal busy dialog without Cancel for the seconds of network work:
     # the legacy comparison-chart flow leaned on it (a status line alone
@@ -64,12 +88,21 @@ def _busy_wait(host, label, title):
     # restoring it here.
     # @args: host - parent widget, label - first busy message,
     #        title - the window title
-    # @return: the ready dialog (zero minimumDuration: it appears at once)
+    # @return: the shown dialog, centred over the UFE window (an
+    #          indeterminate QProgressDialog never gets a setValue, which
+    #          is the only call that auto-shows it: without an explicit
+    #          show() it simply never appears)
     wait = QProgressDialog(label, "", 0, 0, host)
     wait.setWindowTitle(title)
     wait.setWindowModality(Qt.WindowModal)
     wait.setCancelButton(None)
     wait.setMinimumDuration(0)
+    # only _reap_wait closes it: no auto-close/reset when the bar hits
+    # its maximum (the caller's last setValue is not the end signal)
+    wait.setAutoClose(False)
+    wait.setAutoReset(False)
+    wait.installEventFilter(_CenterOnWindow(wait, host))
+    wait.show()
     return wait
 
 
@@ -90,7 +123,10 @@ class UfeCompareTab(QWidget):
         self._state = state
         self._lang = lang
         self._view = view
-        self._active = False
+        self._active = False         # owns the view's clicks right now
+        self._on_stage = False       # the Photometry tab is on stage and
+                                     # this section is visible (armed or
+                                     # not): its overlays may be drawn
         self._field = None           # compstars.load_field result
         self._entries = []           # the sequence: name/kind/star dicts
         self._stars = []             # catalog stars with _sx/_sy cached
@@ -98,6 +134,8 @@ class UfeCompareTab(QWidget):
         self._pick_kind = "comp"
         self._catalog_visible = True
         self._catalog_items = []     # subset hidden with the checkbox
+        self._auto_propose = False   # the field worker landed from the
+                                     # one-click path: propose on arrival
         self._worker = None
         self._cutout_worker = None   # UfeCutoutWorker while DSS2 lands
         self._prefill_sky = None     # (ra, dec) from the host, for DSS2
@@ -110,106 +148,125 @@ class UfeCompareTab(QWidget):
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Target:")))
-        self.edt_target = QLineEdit()
-        row.addWidget(self.edt_target, 1)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Target mag:")))
-        self.spn_mag = QDoubleSpinBox()
-        self.spn_mag.setRange(0.0, 25.0)
-        self.spn_mag.setDecimals(2)
-        self.spn_mag.setValue(12.0)
-        self.spn_mag.setToolTip(self.tr(
-            "Approximate magnitude of the target: the proposal picks "
-            "comparisons brighter than or similar to it"))
-        row.addWidget(self.spn_mag)
-        self.cmb_catalog = QComboBox()
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets, fills the catalog combo (its items carry
+        # userData, which a .ui cannot hold), raises the manual tweak
+        # window from its toggle button and connects the signals.
+        self._ui = adopt_ui(self, "ufe_compare_tab")
+                                            # over: no wrapper, no extra
+                                            # margins, and layout-walking
+                                            # code sees the rows directly
+        self.edt_target = self._ui.edt_target
+        self.spn_mag = self._ui.spn_mag
+        self.cmb_catalog = self._ui.cmb_catalog
         for key, spec in vizier.CATALOGS.items():
             self.cmb_catalog.addItem(spec["name"], key)
-        row.addWidget(self.cmb_catalog)
-        lay.addLayout(row)
-        self.btn_field = QPushButton(self.tr("Generate field"))
-        self.btn_field.setToolTip(self.tr(
-            "Query the catalog (and VSX variables) around the plate "
-            "centre"))
-        self.btn_field.clicked.connect(self._on_generate)
-        lay.addWidget(self.btn_field)
-        self.btn_dss = QPushButton(self.tr("Load a survey field (DSS2)…"))
-        self.btn_dss.setToolTip(self.tr(
-            "No plate of your own? Download the field from the survey "
-            "(PS1-g, DSS2-red fallback) as a FITS with WCS and work on "
-            "it directly"))
+        # the one-click path: field + proposal in a single action
+        self.btn_auto = self._ui.btn_auto
+        self.btn_auto.clicked.connect(self._on_auto)
+        self.btn_dss = self._ui.btn_dss
         self.btn_dss.clicked.connect(self._on_load_survey)
-        lay.addWidget(self.btn_dss)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setWordWrap(True)
-        lay.addWidget(self.lbl_status)
-        hint = QLabel(self.tr(
-            "Click a star to add or remove it. Known variables (red "
-            "rings) can never be comparisons."))
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("On click, add as:")))
-        self.rdo_comp = QRadioButton(self.tr("Comparison"))
-        self.rdo_comp.setChecked(True)
-        self.rdo_check = QRadioButton(self.tr("Check"))
+        self.lbl_status = self._ui.lbl_status
+
+        # the manual tweak: its controls are translatable, so they live
+        # in their own window (ui/ufe_manual_dialog.ui). The toggle
+        # button, right of the DSS2 one, raises it; while it is open the
+        # plate clicks pick stars, while it is closed they measure. Its
+        # widgets are aliased here, so the old call sites keep finding
+        # them, and their state (picking kind, labels) lives on the
+        # widgets and survives close/reopen
+        self._manual = UfeManualDialog(self)
+        self.manual = self._manual
+        self.manual.openStateChanged.connect(self._on_manual_visibility)
+        self.btn_manual = self._ui.btn_manual
+        self.btn_manual.toggled.connect(self._on_manual_toggled)
+        self.rdo_comp = self._manual.rdo_comp
+        self.rdo_check = self._manual.rdo_check
         self.rdo_check.toggled.connect(
             lambda on: setattr(self, "_pick_kind",
                                "check" if on else "comp"))
-        row.addWidget(self.rdo_comp)
-        row.addWidget(self.rdo_check)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        self.chk_labels = QCheckBox(self.tr("Show catalog magnitudes"))
-        self.chk_labels.setChecked(True)
+        self.chk_labels = self._manual.chk_labels
         self.chk_labels.toggled.connect(self._on_catalog_visible)
-        row.addWidget(self.chk_labels)
-        self.btn_propose = QPushButton(self.tr("Propose sequence"))
-        self.btn_propose.setToolTip(self.tr(
-            "Automatic proposal: isolated, non-variable stars matched to "
-            "the target's brightness"))
+        self.btn_field = self._manual.btn_field
+        self.btn_field.clicked.connect(self._on_generate)
+        self.btn_propose = self._manual.btn_propose
         self.btn_propose.clicked.connect(self._on_propose)
-        row.addWidget(self.btn_propose)
-        lay.addLayout(row)
+        self.btn_seq_open = self._manual.btn_seq_open
+        self.btn_seq_open.clicked.connect(self._open_sequence)
 
-        self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(
-            [self.tr("Name"), self.tr("Type"), self.tr("Mag"), ""])
-        self.table.verticalHeader().setVisible(False)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        lay.addWidget(self.table, 1)
+        # The table lives in its own small non-modal window (ADR-044 rev):
+        # the tab stays compact, the window stays open for reading;
+        # _reload_table rebuilds it through self.table and refreshes the
+        # count behind the button. The window also carries the two
+        # actions that used to sit on the tab ("Remove all", "Export
+        # CSV…"), and we alias them here so old code keeps finding them.
+        self._seqdlg = UfeSequenceDialog(self, on_clear=self._on_clear,
+                                         on_export=self._export_csv)
+        self.table = self._seqdlg.table
+        self.btn_clear = self._seqdlg.btn_clear
+        self.btn_csv = self._seqdlg.btn_export
 
-        row = QHBoxLayout()
-        self.btn_clear = QPushButton(self.tr("Remove all"))
-        self.btn_clear.clicked.connect(self._on_clear)
-        row.addWidget(self.btn_clear)
-        self.btn_csv = QPushButton(self.tr("Export CSV…"))
-        self.btn_csv.clicked.connect(self._export_csv)
-        row.addWidget(self.btn_csv)
-        lay.addLayout(row)
+    def _open_sequence(self):
+        # @return: the sequence window rises, non-modal, so picking stars
+        # keeps going while it is open
+        self._seqdlg.show()
+        self._seqdlg.raise_()
+        self._seqdlg.activateWindow()
+
+    def _on_manual_toggled(self, on):
+        # The button is the switch of the manual tweak window: check it
+        # and the window rises, uncheck it and it goes away (the plate
+        # clicks go back to measuring).
+        # @args: on - toggle checked (show) or unchecked (hide)
+        if on:
+            self._manual.show()
+            self._manual.raise_()
+            self._manual.activateWindow()
+        else:
+            self._manual.hide()
+
+    def _on_manual_visibility(self, visible):
+        # The window can also be closed through its X (or die with the
+        # host): keep the toggle honest in that case.
+        # @args: visible - the dialog's new visibility state
+        if not visible and self.btn_manual.isChecked():
+            self.btn_manual.blockSignals(True)
+            self.btn_manual.setChecked(False)
+            self.btn_manual.blockSignals(False)
+
+    def manual_visible(self):
+        # @return: the manual tweak window is up: the plate clicks then
+        #          pick stars, and closed state they measure
+        return self._manual.isVisible()
 
     # ------------------------------------------------------- activation
 
     def set_active(self, flag, keep_overlays=False):
-        # Only the visible tab owns the view's clicks, overlays and the
-        # hover probe (the state's pixel/DN/RA probe returns on leave).
-        # @args: flag - on stage or not, keep_overlays - leaving for the
-        #        Measure tab: the sequence stays visible and its probe
-        #        keeps talking (the Measure tab measures WITH it)
+        # Stage handoff, two distinct concepts (ADR-044 rev): the CLICKS
+        # follow the armed section (self._active), the OVERLAYS follow
+        # the Photometry tab's stage (self._on_stage): both sections are
+        # visible at once, so a disarmed section keeps its rings and its
+        # probe, and its buttons (Generate field, Propose) must paint.
+        # @args: flag - owns the clicks or not, keep_overlays - leaving
+        #        the stage for the sister section: the sequence stays
+        #        visible and its probe keeps talking (the Measure
+        #        section measures WITH it); a full leave drops all
         self._active = bool(flag)
         if self._view is None:
             return
         if self._active:
+            self._on_stage = True
             self._view.set_hover_probe(self._probe)
             self._redraw_overlays()
+        elif keep_overlays:
+            # disarmed but on stage: the overlays follow the TAB, so the
+            # stage flag must be set even when this section was never
+            # armed (the visit deep link lands straight on Measure)
+            self._on_stage = True
         else:
-            if not keep_overlays:
-                self._view.set_hover_probe(self._state.probe_text)
-                self._drop_items()
+            self._on_stage = False
+            self._view.set_hover_probe(self._state.probe_text)
+            self._drop_items()
 
     # ------------------------------------------------------------- state
 
@@ -217,21 +274,156 @@ class UfeCompareTab(QWidget):
         # A new plate stalemates the field; the target name defaults to
         # the plate's stem. The tab never disables: without a plate the
         # survey button is the way in (ADR-044 rev).
+        self.reset_state()
+        if self._state.has_image:
+            self.edt_target.setText(Path(self._state.path).stem)
+            if self._state.wcs is None:
+                self.lbl_status.setText(self.tr(
+                    "The plate has no WCS: solve it with «Solve "
+                    "astrometry…» to build the comparison field."))
+
+    def reset_state(self):
+        # ADR-047: the sequence field's zero point: no catalog, no
+        # entries, empty table, a neutral status. The state reset in the
+        # Measure tab goes through here (the new-plate stalemate above
+        # reuses it too).
+        # @args: none
+        # @return: None
         self._field = None
         self._entries = []
         self._stars = []
         self._drop_items()
         if self._state.has_image:
-            self.edt_target.setText(Path(self._state.path).stem)
-            self.lbl_status.setText(
-                "" if self._state.wcs is not None else self.tr(
-                    "The plate has no WCS: solve it with «Solve "
-                    "astrometry…» to build the comparison field."))
+            self.lbl_status.setText(self.tr(
+                "The sequence field is empty: build it with «Generate "
+                "field…», or restore the one saved with the plate."))
         else:
             self.lbl_status.setText(self.tr(
                 "No plate loaded: load a FITS or fetch the field from "
                 "the survey."))
         self._reload_table()
+
+    # ----------------------------------------------------- state (ADR-047)
+
+    def capture_state(self):
+        # The field and the sequence, as plain JSON (ADR-047): the
+        # catalog, the sky centre and width that produced it, the
+        # target magnitude and every chosen star with the photometry
+        # the calibration needs (band + bands). Only stars inside
+        # entries are kept: the rest is re-derivable from the catalog.
+        # @return: None when there is no field, else the dict
+        if self._field is None:
+            return None
+        field = self._field
+        return {
+            "catalog": field.get("catalog"),
+            "catalog_name": field.get("catalog_name"),
+            "center": list(field.get("center") or ()),
+            "fov_arcmin": float(field.get("fov_arcmin") or 0.0),
+            "target_mag": float(self.spn_mag.value()),
+            "entries": [
+                {
+                    "name": e["name"],
+                    "kind": e["kind"],
+                    "star": {
+                        "id": e["star"].get("id"),
+                        "ra": e["star"].get("ra"),
+                        "dec": e["star"].get("dec"),
+                        "band": e["star"].get("band"),
+                        "mag": e["star"].get("mag"),
+                        "bv": e["star"].get("bv"),
+                        "color_origin": e["star"].get("color_origin"),
+                        "catalog": e["star"].get("catalog"),
+                        "bands": [
+                            {"label": b.get("label"),
+                             "value": b.get("value"),
+                             "err": b.get("err"),
+                             "derived": bool(b.get("derived", False))}
+                            for b in (e["star"].get("bands") or [])
+                            if isinstance(b, dict)],
+                    },
+                }
+                for e in self._entries
+            ],
+        }
+
+    def apply_state(self, st):
+        # Restores a plate's saved field and sequence (ADR-047): the
+        # saved stars are re-placed by their sky coordinates into THIS
+        # plate (no WCS or out of the plate means the star is dropped,
+        # it stays only in the table via _stars when placed), the
+        # catalog combo points back at the saved key and the target
+        # magnitude returns. No proposal: that is the observer's beat.
+        # @args: st - capture_state dict (None/empty is a no-op)
+        if not st or not st.get("catalog"):
+            return
+        catalog = st["catalog"]
+        self._field = {
+            "catalog": catalog,
+            "catalog_name": (st.get("catalog_name") or catalog),
+            "center": list(st.get("center") or ()),
+            "fov_arcmin": float(st.get("fov_arcmin") or 0.0),
+            "stars": [],
+            "variables": [],
+            # the VSX cross-match is a network artifact: it re-runs
+            # with the next live query, and the restored stars carry
+            # no variable flag rather than a stale one
+            "vsx_warning": None,
+        }
+        placed = []      # stars that landed on this plate
+        pairs = []       # (star, saved entry), for the entries below
+        for raw in (st.get("entries") or []):
+            rs = raw.get("star") or {}
+            star = {
+                "id": rs.get("id"),
+                "name": None,
+                "ra": rs.get("ra"),
+                "dec": rs.get("dec"),
+                "band": rs.get("band"),
+                "mag": rs.get("mag"),
+                "bv": rs.get("bv"),
+                "color_origin": rs.get("color_origin"),
+                "catalog": rs.get("catalog"),
+                "bands": [b for b in (rs.get("bands") or [])
+                          if isinstance(b, dict)],
+                "vsx": None,
+            }
+            if star.get("mag") is None:
+                continue     # the table formats the magnitude
+            pos = self._sky_to_scene(star["ra"], star["dec"])
+            if pos is None:
+                continue
+            star["_sx"], star["_sy"] = pos
+            placed.append(star)
+            pairs.append((star, raw))
+        self._stars = placed
+        self._entries = []
+        for star, raw in pairs:
+            kind = raw.get("kind") or "comp"
+            self._entries.append({
+                "name": str(raw.get("name") or self._next_name(kind)),
+                "kind": kind,
+                "star": star,
+                "why": {"es": "devuelta de la placa",
+                        "en": "restored from the plate"}})
+        # the combo lists the shipped catalogs; a saved one from an
+        # older build gets added so the export keeps its label
+        if self.cmb_catalog.findData(catalog) < 0:
+            self.cmb_catalog.addItem(
+                self._field["catalog_name"], catalog)
+        self.cmb_catalog.setCurrentIndex(
+            self.cmb_catalog.findData(catalog))
+        if st.get("target_mag") is not None:
+            self.spn_mag.setValue(float(st["target_mag"]))
+        self._auto_propose = False   # the restored field must not be
+                                     # re-proposed under the observer's feet
+        self._reload_table()
+        self._redraw_overlays()     # no-ops off stage (it checks itself)
+        self.lbl_status.setText(self.tr(
+            "{0}: sequence restored from the plate ({1} stars, "
+            "{2} in the sequence)").format(
+                self._field["catalog_name"], len(self._stars),
+                len(self._entries)))
 
     # ------------------------------------------------------------- field
 
@@ -274,8 +466,15 @@ class UfeCompareTab(QWidget):
             lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
 
         def survey_landed(result):
-            _reap_wait(wait)
-            self._on_survey_landed(result)
+            # same rule as the field chain: the modal dialog is always
+            # reaped, whatever the landing does
+            try:
+                self._on_survey_landed(result)
+            except Exception as err:
+                logger.exception("survey landing failed: %s", err)
+                self.lbl_status.setText(str(err))
+            finally:
+                _reap_wait(wait)
         self._cutout_worker.finished.connect(survey_landed)
         self._cutout_worker.start()
 
@@ -296,12 +495,38 @@ class UfeCompareTab(QWidget):
             return
         self.lbl_status.setText(self.tr("Field loaded: {0}").format(label))
 
+    def _on_auto(self):
+        # The one-click path (ADR-044 rev 2026-09-25): with a field
+        # already loaded it only re-proposes; without one it generates
+        # the field and the proposal runs the moment the field lands.
+        # Both paths sit under the busy dialog: the proposal is local
+        # math, but on a big field it still takes its moment, and a
+        # bare freeze reads as a hang.
+        if self._field is not None:
+            wait = _busy_wait(self, self.tr("Proposing the sequence…"),
+                              self.tr("Comparison field"))
+            wait.setRange(0, 1)
+            wait.setValue(0)
+            from PySide6.QtWidgets import QApplication
+            QApplication.processEvents()   # let the dialog paint before
+                                           # the synchronous proposal
+            try:
+                self._on_propose()
+            finally:
+                wait.setValue(1)
+                _reap_wait(wait)
+            return
+        self._auto_propose = True
+        self._on_generate()
+
     def _on_generate(self):
         # Generate field: VizieR catalog + VSX variables around the plate
         # centre, off the GUI thread.
         if not self._state.has_image:
+            self._auto_propose = False
             return
         if self._state.wcs is None:
+            self._auto_propose = False
             self.lbl_status.setText(self.tr(
                 "The plate has no WCS: solve it with «Solve astrometry…» "
                 "to build the comparison field."))
@@ -313,21 +538,44 @@ class UfeCompareTab(QWidget):
         self.btn_field.setEnabled(False)
         self.lbl_status.setText(self.tr("Querying the catalog…"))
         # The queries take seconds: cover them with the busy dialog the
-        # legacy flow had (a status line alone reads as "nothing happens")
+        # legacy flow had (a status line alone reads as "nothing
+        # happens"). The bar walks the real stages (catalog → VSX →
+        # proposal): an indeterminate bar that never moves reads as
+        # stuck.
         wait = _busy_wait(self, self.tr("Querying the catalog…"),
                           self.tr("Comparison field"))
+        wait.setRange(0, 3)
+        wait.setValue(0)
+        stage = {"n": 0}
         self._worker = UfeFieldWorker(self.cmb_catalog.currentData(),
                                       ra, dec, fov_arcmin)
-        # Pipeline stages (catalog query, VSX crossmatch) reach the
-        # dialog label as well as the status line
-        self._worker.progress.connect(
-            lambda msg: wait.setLabelText(msg.get(self._lang, "")))
-        self._worker.progress.connect(
-            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+
+        def _stage(msg):
+            # @args: msg - the worker's {"es", "en"} stage text
+            wait.setLabelText(msg.get(self._lang, ""))
+            self.lbl_status.setText(msg.get(self._lang, ""))
+            stage["n"] = min(stage["n"] + 1, 1)
+            wait.setValue(stage["n"])
+        self._worker.progress.connect(_stage)
 
         def field_landed(field):
-            _reap_wait(wait)
-            self._on_field_ready(field)
+            # the one-click chain stays covered end to end: the proposal
+            # runs under the dialog, and the dialog is ALWAYS reaped (a
+            # modal dialog surviving an exception reads as a hang)
+            try:
+                if self._auto_propose:
+                    wait.setLabelText(self.tr("Proposing the sequence…"))
+                    wait.setValue(2)
+                self._on_field_ready(field)
+            except Exception as err:
+                logger.exception("field handling failed: %s", err)
+                self._auto_propose = False
+                self.lbl_status.setText(self.tr(
+                    "The field landed but its handling failed: {0}")
+                    .format(err))
+            finally:
+                wait.setValue(3)
+                _reap_wait(wait)
         self._worker.finished.connect(field_landed)
         self._worker.start()
 
@@ -336,6 +584,7 @@ class UfeCompareTab(QWidget):
         self.btn_field.setEnabled(True)
         self._worker = None
         if not field:
+            self._auto_propose = False
             self.lbl_status.setText(self.tr(
                 "The catalog query failed (offline?). Try again later."))
             return
@@ -359,8 +608,17 @@ class UfeCompareTab(QWidget):
                         len(self._stars),
                         len(field.get("variables", []))) + wcs_note)
         self._reload_table()
-        if self._active:
+        # paint follows the stage, not the clicks: the field can land
+        # while the Measure section is armed (opened from a visit) and
+        # the Comparisons half is still on view
+        if self._on_stage:
             self._redraw_overlays()
+        # the one-click path: the proposal rides the landing (local math,
+        # but it gets its own beat in the status line so the chain reads)
+        if self._auto_propose:
+            self._auto_propose = False
+            self.lbl_status.setText(self.tr("Proposing the sequence…"))
+            self._on_propose()
 
     def _sky_to_scene(self, ra, dec):
         # @return: (x, y) scene coords for a sky position through the
@@ -420,7 +678,7 @@ class UfeCompareTab(QWidget):
         # first, collision-free), known-variable rings, the target and
         # the sequence entries.
         self._drop_items()
-        if not self._active or self._view is None or self._field is None:
+        if not self._on_stage or self._view is None or self._field is None:
             return
         w, h = self._state.plate_shape
         # catalog: only the brightest stars get ring + magnitude label
@@ -463,22 +721,6 @@ class UfeCompareTab(QWidget):
                                         2 * radius, 2 * radius)
             ring.setPen(self._pen(C_VAR, 1.6))
             self._items.append(self._view.add_overlay(ring))
-        # the target (plate centre): amber ring + ticks + name
-        cx, cy = w / 2.0, h / 2.0
-        r = w * 0.022
-        target = QGraphicsEllipseItem(cx - r, cy - r, 2 * r, 2 * r)
-        target.setPen(self._pen(palette.ACCENT, 2.2))
-        self._items.append(self._view.add_overlay(target))
-        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            ln = QGraphicsLineItem(cx + dx * r * 1.15, cy + dy * r * 1.15,
-                                   cx + dx * r * 1.7, cy + dy * r * 1.7)
-            ln.setPen(self._pen(palette.ACCENT, 2.2))
-            self._items.append(self._view.add_overlay(ln))
-        name = self.edt_target.text().strip()
-        if name:
-            self._items.append(self._view.add_overlay(
-                self._text(name, cx, cy + r * 2.4, palette.ACCENT,
-                           w * 0.018, bold=True, anchor="center")))
         self._redraw_entries()
 
     def _redraw_entries(self):
@@ -496,7 +738,7 @@ class UfeCompareTab(QWidget):
             except RuntimeError:
                 pass
         self._entry_items = []
-        if not self._active or self._field is None:
+        if not self._on_stage or self._field is None:
             return
         w, _h = self._state.plate_shape
         in_seq = {id(e["star"]) for e in self._entries}
@@ -658,10 +900,15 @@ class UfeCompareTab(QWidget):
             self.table.setItem(i, 2, mag)
             btn = QPushButton("×")
             btn.setFixedWidth(28)
+            btn.setProperty("compact", True)   # the global padding would
+                                               # clip the glyph away
             btn.clicked.connect(lambda _c=False, row=i: self._remove(row))
             self.table.setCellWidget(i, 3, btn)
         self.table.blockSignals(False)
         self.table.resizeColumnsToContents()
+        # the button wears the live count, so the observer sees growth
+        self.btn_seq_open.setText(
+            self.tr("Sequence ({0})…").format(len(self._entries)))
 
     def _flush_table(self):
         # Names edited in the table land in the entries (and the overlay).

@@ -182,15 +182,18 @@ def delete_image(db, image_id):
 # ---------------- photometry points ----------------
 
 def add_point(db, project_id, mjd, filter_name, mag, err=None, source="manual",
-              session_id=None):
+              session_id=None, file_id=None):
     # @args: mjd - Modified Julian Date (float), filter_name - band or
     #        "Clear"/"None", mag - magnitude (float), err - uncertainty or
-    #        None, source - manual|paste|file|quicklook|measure|survey
+    #        None, source - manual|paste|file|quicklook|measure|survey,
+    #        session_id - the visit it belongs to (or None), file_id - the
+    #        plate it was measured on (project_files row, ADR-047) or None
     # @return: point id
     cur = db.execute(
         "INSERT INTO photometry_points (project_id, session_id, mjd,"
-        " filter, mag, err, source) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (project_id, session_id, mjd, filter_name, mag, err, source),
+        " filter, mag, err, source, file_id)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (project_id, session_id, mjd, filter_name, mag, err, source, file_id),
     )
     db.commit()
     return cur.lastrowid
@@ -198,23 +201,40 @@ def add_point(db, project_id, mjd, filter_name, mag, err=None, source="manual",
 
 def list_points(db, project_id, filter_name=None):
     # @args: filter_name - filter to select, or None for all
-    # @return: list of point dicts ordered by mjd
+    # @return: list of point dicts ordered by mjd (file_id: the plate it
+    #          was measured on, or None)
+    col = ("id, project_id, session_id, mjd, filter, mag, err, source,"
+           " file_id")
     if filter_name:
         rows = db.execute(
-            "SELECT id, project_id, session_id, mjd, filter, mag, err, source"
-            " FROM photometry_points WHERE project_id=? AND filter=?"
-            " ORDER BY mjd",
+            f"SELECT {col} FROM photometry_points WHERE project_id=?"
+            " AND filter=? ORDER BY mjd",
             (project_id, filter_name),
         ).fetchall()
     else:
         rows = db.execute(
-            "SELECT id, project_id, session_id, mjd, filter, mag, err, source"
-            " FROM photometry_points WHERE project_id=? ORDER BY mjd",
+            f"SELECT {col} FROM photometry_points WHERE project_id=?"
+            " ORDER BY mjd",
             (project_id,),
         ).fetchall()
     return [{"id": r[0], "project_id": r[1], "session_id": r[2],
              "mjd": r[3], "filter": r[4], "mag": r[5], "err": r[6],
-             "source": r[7]} for r in rows]
+             "source": r[7], "file_id": r[8]} for r in rows]
+
+
+def point_by_id(db, point_id):
+    # Looks up a single photometry point by its id (ADR-047: the visit
+    # window's click-a-measurement flow needs the full row, with file_id).
+    # @return: point dict (as list_points), or None
+    row = db.execute(
+        "SELECT id, project_id, session_id, mjd, filter, mag, err,"
+        " source, file_id FROM photometry_points WHERE id=?",
+        (point_id,)).fetchone()
+    if not row:
+        return None
+    return {"id": row[0], "project_id": row[1], "session_id": row[2],
+            "mjd": row[3], "filter": row[4], "mag": row[5], "err": row[6],
+            "source": row[7], "file_id": row[8]}
 
 
 def delete_point(db, point_id):
@@ -222,6 +242,17 @@ def delete_point(db, point_id):
     cur = db.execute("DELETE FROM photometry_points WHERE id=?", (point_id,))
     db.commit()
     return cur.rowcount > 0
+
+
+def delete_points_for_file(db, file_id):
+    # The UFE's "delete this plate's measurements" reset (ADR-047): only
+    # the points tied to ONE plate go. Points without a plate (legacy,
+    # paste, survey) are never touched here.
+    # @return: number of points deleted
+    cur = db.execute("DELETE FROM photometry_points WHERE file_id=?",
+                     (file_id,))
+    db.commit()
+    return cur.rowcount
 
 
 def upsert_survey_points(db, project_id, points, source="survey:ztf"):

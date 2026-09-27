@@ -9,7 +9,8 @@ parte, sin matemáticas); y a una IA o desarrollador que extienda la
 implementación (apéndice técnico, al final). Casi todo lo descrito ya
 existe en NightScribe (fases G y H, 2026-09-23); la fase I (misma fecha)
 añadió el centroide de precisión y la sugerencia de aperturas
-(`suggest_apertures` + botón en Medir); la fase I.5 subió el centroide
+(`suggest_apertures` + botón Sugerir en la sección Medir, justo bajo
+las tres aperturas); la fase I.5 subió el centroide
 al **filtro adaptado gaussiano** (`gaussian_centroid`: plantilla del
 seeing en malla de 0,1 px con refinado parabólico, ~0,01 px con señal
 decente, guardas honestas con débiles) con la **retícula que se pega al
@@ -46,29 +47,29 @@ sistemáticos.
 ### 2. La escalera de calidad
 
 De lo gratis a lo heroico; cada peldaño «compra» una mejora típica, y
-casi todos viven ya en el Editor FITS (pestaña Medir, fase H):
+casi todos viven ya en el Editor FITS (pestaña Fotometría, fase H):
 
 | Peldaño | Dónde vive | Qué compra |
 |---|---|---|
 | Placa bien reducida (bias, darks, **flats**) | tú, al apilar | un campo plano: sin esto, 1–5 % de error según la posición |
-| Comparaciones de color parecido al objetivo | tú, pestaña Comparar | quita la mayor parte del término de color |
-| Apertura que sigue al seeing de la noche | pestaña Medir (H3) | SNR óptima y consistencia noche a noche |
-| Cielo bien estimado (mediana robusta o plano) | pestaña Medir (H2a) | la SN deja de medirse «con galaxia incluida» |
-| Nivel de saturación real de tu cámara | pestaña Medir (H4: tarjeta SATURATE o ajuste `ccd_saturate`) | ninguna estrella cortada se cuela como buena |
-| Término de color ajustado con las comps | pestaña Medir (H1) | la respuesta de tu equipo deja de sesgar el cero |
-| Sustracción de la galaxia huésped (SNe) | pestaña Medir (H2b) | en núcleos galácticos: de 0,05–0,15 a 0,03–0,05 mag |
+| Comparaciones de color parecido al objetivo | tú, pestaña Fotometría | quita la mayor parte del término de color |
+| Apertura que sigue al seeing de la noche | pestaña Fotometría (H3) | SNR óptima y consistencia noche a noche |
+| Cielo bien estimado (mediana robusta o plano) | pestaña Fotometría (H2a) | la SN deja de medirse «con galaxia incluida» |
+| Nivel de saturación real de tu cámara | pestaña Fotometría (H4: tarjeta SATURATE o ajuste `ccd_saturate`) | ninguna estrella cortada se cuela como buena |
+| Término de color ajustado con las comps | pestaña Fotometría (H1) | la respuesta de tu equipo deja de sesgar el cero |
+| Sustracción de la galaxia huésped (SNe) | pestaña Fotometría (H2b) | en núcleos galácticos: de 0,05–0,15 a 0,03–0,05 mag |
 | Normalización por frame + detrending (series) | pendiente (ADR-015) | el requisito de los tránsitos: 0,001–0,005 mag relativo |
 
 ### 3. Tres escenarios, cifras honestas
 
 * **Variable en buena noche, placa reducida**: el flujo de series da
-  Δmag con 0,02–0,05 mag de precisión total; la pestaña Medir (apertura
+  Δmag con 0,02–0,05 mag de precisión total; la pestaña Fotometría (apertura
   adaptativa, término de color y la check vigilando) lo deja en
   **0,01–0,02 mag**. A partir de ahí manda la calibración del color, y
   bajar más exige medir los coeficientes de transformación propios de tu
   cámara sobre campos estándar (otra liga, anotada como v2).
 * **Supernova pegada a un núcleo galáctico**: el enemigo no es el ruido,
-  es la galaxia. La pestaña Medir hace las dos cosas: el cielo por plano
+  es la galaxia. La pestaña Fotometría hace las dos cosas: el cielo por plano
   en el anillo ya mejora la medida, y con la **sustracción de la
   huésped** (la referencia PS1 alineada por el blink se resta, escalada
   para que las estrellas desaparezcan y solo quede la SN) se pasa de
@@ -87,7 +88,7 @@ casi todos viven ya en el Editor FITS (pestaña Medir, fase H):
 
 ### 4. Cuándo fiarse de un número
 
-* **La estrella check es el semáforo**: la pestaña Medir la mide como si
+* **La estrella check es el semáforo**: la pestaña Fotometría la mide como si
   fuera el objetivo y la compara con su valor de catálogo. Si ella se
   mueve, la culpa no es de la variable: la noche, la placa o la
   secuencia no son de fiar. Si solo se mueve el objetivo, eso es
@@ -105,11 +106,11 @@ casi todos viven ya en el Editor FITS (pestaña Medir, fase H):
 | Pieza | Estado |
 |---|---|
 | Centroide sub-píxel, apertura, cielo por mediana, guards | Existe (`core/series.py`) |
-| Secuencias de comparación con magnitudes de catálogo (Gaia/APASS, veto VSX) | Existe (pestaña Comparar del Editor FITS) |
+| Secuencias de comparación con magnitudes de catálogo (Gaia/APASS, veto VSX) | Existe (mitad Secuencia de la pestaña Fotometría del Editor FITS) |
 | Series Δmag con ensemble automático + quicklook de SN | Existe (`core/series.py`, flujo Seguimiento) |
 | Export CSV / AAVSO EFF | Existe (`core/photometry_export.py`) |
-| Medida calibrada en una placa (punto cero con las comps) | Existe (pestaña Medir del Editor FITS, fase G) |
-| Término de color, cielo en gradiente, apertura por FWHM, saturación real, error total, semáforo check | Existe (fase H, 2026-09-23: `core/photometry.py` + pestaña Medir) |
+| Medida calibrada en una placa (punto cero con las comps) | Existe (mitad Medir de la pestaña Fotometría del Editor FITS, fase G) |
+| Término de color, cielo en gradiente, apertura por FWHM, saturación real, error total, semáforo check | Existe (fase H, 2026-09-23: `core/photometry.py` + pestaña Fotometría) |
 | Sustracción de galaxia huésped | Existe (fase H: referencia PS1 alineada del blink, escalada por las comps) |
 | Serie normalizada por frame + detrending para tránsitos | Falta: piezas T1–T8; decisión ADR-015 por reabrir o acotar |
 
@@ -196,7 +197,7 @@ Las piezas, en orden de impacto por esfuerzo:
   la mediana.
 
 Todo aterriza en `core/photometry.py` (el módulo de la fase G) y en el
-panel de la pestaña Medir; nada toca los flujos legacy.
+panel de la pestaña Fotometría; nada toca los flujos legacy.
 
 ### B. Tránsitos de exoplanetas: piezas T1–T8
 

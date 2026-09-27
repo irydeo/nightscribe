@@ -322,7 +322,7 @@ class SkyChart(QWidget):
         if not self._samples:
             # no astronomical night: a single centered notice, nothing else
             it = QGraphicsSimpleTextItem(
-                self.tr("Sin noche astronómica"))
+                self.tr("No astronomical night"))
             it.setBrush(QBrush(QColor(palette.FG)))
             f = self._label_font
             f.setPixelSize(_FONT_LABEL + 6)
@@ -396,7 +396,7 @@ class SkyChart(QWidget):
                                               QColor(palette.ACCENT), 1.2,
                                               _DASH, _Z_BEST)
                         self._add_band_label(
-                            self.tr("empezar hasta {t}").format(
+                            self.tr("start by {t}").format(
                                 t=f"{bt:%H:%M}Z"),
                             (bx0 + bx1) / 2.0, by1 + _FONT_LABEL)
 
@@ -411,7 +411,7 @@ class SkyChart(QWidget):
                                       QColor(palette.ACCENT), 1.2,
                                       _DASH, _Z_BEST)
                 self._add_band_label(
-                    self.tr("mejor hora {t}").format(t=f"{bt:%H:%M}Z"),
+                    self.tr("best time {t}").format(t=f"{bt:%H:%M}Z"),
                     (bx0 + bx1) / 2.0, by1 + _FONT_LABEL)
 
         # the concrete chart may add a transit band on top (TransitChart)
@@ -446,10 +446,10 @@ class SkyChart(QWidget):
         return it
 
     def _add_axis_caption_alt(self):
-        # "Alt (°)" — the altitude axis title, in the TOP band (above the
-        # data), left-aligned and clearly clear of the "90°" tick, so it
+        # "Altitude (°)" — the altitude axis title, in the TOP band (above
+        # the data), left-aligned and clearly clear of the "90°" tick, so it
         # never sits on the plot or on another label.
-        it = self._caption(self.tr("Alt (°)"))
+        it = self._caption(self.tr("Altitude (°)"))
         # anchor the caption's centre a little above the data top edge
         cy = -_HALF - _BAND_TOP * 0.55
         it.setPos(-_HALF + 6, cy - it.boundingRect().height() / 2.0)
@@ -457,7 +457,7 @@ class SkyChart(QWidget):
     def _add_axis_caption_time(self):
         # "UTC…" — the time axis title, in the BOTTOM band (below the data),
         # centred under the hour labels, clear of them by its real height.
-        it = self._caption(self.tr("UTC (h desde anochecer)"))
+        it = self._caption(self.tr("UTC (h from dusk)"))
         w = it.boundingRect().width()
         cy = _HALF + _BAND_BOT * 0.75
         it.setPos(-(w / 2.0), cy - it.boundingRect().height() / 2.0)
@@ -582,7 +582,7 @@ class SkyChart(QWidget):
         self._transit_rect = self._add_band(
             min(x0, x1), min(y0, y1), abs(x1 - x0), abs(y1 - y0),
             _hex_alpha(palette.ACCENT, 46), "transit", _Z_TRANSIT)
-        self._add_band_label(self.tr("tránsito"),
+        self._add_band_label(self.tr("transit"),
                              (x0 + x1) / 2.0, y1 + _FONT_LABEL)
 
     def _add_legend(self):
@@ -595,10 +595,10 @@ class SkyChart(QWidget):
         if not self._samples:
             return
         entries = [
-            (self._obj_name or self.tr("Objeto"),
+            (self._obj_name or self.tr("Object"),
              palette.ACCENT, 1.8, []),
-            (self.tr("Luna"), "#c9c9c9", 1.2, _DOTTED),
-            (self.tr("Límite"), palette.MUTED, 1.0, _DASH),
+            (self.tr("Moon"), "#c9c9c9", 1.2, _DOTTED),
+            (self.tr("Limit"), palette.MUTED, 1.0, _DASH),
         ]
         fmt = self._label_font
         fmt.setPixelSize(_FONT_LABEL)
@@ -673,9 +673,9 @@ class SkyChart(QWidget):
             if self._safe_rect.rect().contains(QPointF(sx, sy)):
                 t0, t1 = self._safe_window
                 bt = self._best_time
-                tail = (self.tr(" · empezar hasta {t}").format(
+                tail = (self.tr(" · start by {t}").format(
                     t=f"{bt:%H:%M}Z") if bt else "")
-                txt = (self.tr("de {a} a {b}").format(
+                txt = (self.tr("from {a} to {b}").format(
                     a=f"{t0:%H:%M}", b=f"{t1:%H:%M}") + tail)
                 return (True, txt)
         if d2 > tol * tol:

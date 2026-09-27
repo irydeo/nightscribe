@@ -9,7 +9,8 @@ one, no mathematics); and an AI or developer extending the
 implementation (technical appendix at the end). Almost everything
 described here already exists in NightScribe (phases G and H,
 2026-09-23); phase I (same date) added the precision centroid and the
-aperture suggestion (`suggest_apertures` plus the Measure tab's button);
+aperture suggestion (`suggest_apertures` plus the Suggest button on
+the Measure section, right under the three apertures);
 phase I.5 raised the centroid to the **gaussian matched filter**
 (`gaussian_centroid`: the seeing template on a 0.1 px lattice with
 parabolic refinement, ~0.01 px with decent signal, honest guards on the
@@ -46,30 +47,30 @@ systematics.
 ### 2. The quality ladder
 
 From the free to the heroic; each rung "buys" a typical improvement, and
-almost all of them already live in the FITS editor (Measure tab, phase
+almost all of them already live in the FITS editor (Photometry tab, phase
 H):
 
 | Rung | Where it lives | What it buys |
 |---|---|---|
 | Well-reduced plate (bias, darks, **flats**) | you, when stacking | a flat field: without it, 1–5 % error depending on position |
-| Comparisons of similar colour to the target | you, Compare tab | removes most of the colour term |
-| Aperture that follows the night's seeing | Measure tab (H3) | optimal SNR and night-to-night consistency |
-| Well-estimated sky (robust median or plane) | Measure tab (H2a) | the SN stops being measured "galaxy included" |
-| Your camera's real saturation level | Measure tab (H4: SATURATE card or `ccd_saturate` setting) | no clipped star sneaks in as a good one |
-| Colour term fitted with the comps | Measure tab (H1) | your equipment's response stops biasing the zero |
-| Host-galaxy subtraction (SNe) | Measure tab (H2b) | on galactic cores: from 0.05–0.15 to 0.03–0.05 mag |
+| Comparisons of similar colour to the target | you, Photometry tab | removes most of the colour term |
+| Aperture that follows the night's seeing | Photometry tab (H3) | optimal SNR and night-to-night consistency |
+| Well-estimated sky (robust median or plane) | Photometry tab (H2a) | the SN stops being measured "galaxy included" |
+| Your camera's real saturation level | Photometry tab (H4: SATURATE card or `ccd_saturate` setting) | no clipped star sneaks in as a good one |
+| Colour term fitted with the comps | Photometry tab (H1) | your equipment's response stops biasing the zero |
+| Host-galaxy subtraction (SNe) | Photometry tab (H2b) | on galactic cores: from 0.05–0.15 to 0.03–0.05 mag |
 | Per-frame normalization + detrending (series) | pending (ADR-015) | the transits' requirement: 0.001–0.005 mag relative |
 
 ### 3. Three scenarios, honest figures
 
 * **Variable star on a good night, reduced plate**: the series flow
-  gives Δmag with 0.02–0.05 mag total precision; the Measure tab
+  gives Δmag with 0.02–0.05 mag total precision; the Photometry tab
   (adaptive aperture, colour term and the check star watching) brings it
   to **0.01–0.02 mag**. Beyond that the colour calibration rules, and
   going further means measuring your own camera's transformation
   coefficients on standard fields (another league, noted as v2).
 * **Supernova against a galactic core**: the enemy is not noise, it is
-  the galaxy. The Measure tab does both things: the plane-fitted sky
+  the galaxy. The Photometry tab does both things: the plane-fitted sky
   already improves the measurement, and with **host subtraction** (the
   PS1 reference aligned by the blink is subtracted, scaled so the stars
   vanish and only the SN remains) you go from 0.05–0.15 to **0.03–0.05
@@ -88,7 +89,7 @@ H):
 
 ### 4. When to trust a number
 
-* **The check star is the traffic light**: the Measure tab measures it
+* **The check star is the traffic light**: the Photometry tab measures it
   as if it were the target and compares it with its catalog value. If it
   moves, the variable is not to blame: the night, the plate or the
   sequence is not trustworthy. If only the target moves, that is
@@ -106,11 +107,11 @@ H):
 | Piece | Status |
 |---|---|
 | Sub-pixel centroid, aperture, median sky, guards | Exists (`core/series.py`) |
-| Comparison sequences with catalog magnitudes (Gaia/APASS, VSX veto) | Exists (the FITS editor's Compare tab) |
+| Comparison sequences with catalog magnitudes (Gaia/APASS, VSX veto) | Exists (the Sequence half of the FITS editor's Photometry tab) |
 | Δmag series with automatic ensemble + SN quick-look | Exists (`core/series.py`, Follow-up flow) |
 | CSV / AAVSO EFF export | Exists (`core/photometry_export.py`) |
-| Calibrated measurement on one plate (zero point from comps) | Exists (the FITS editor's Measure tab, phase G) |
-| Colour term, gradient sky, FWHM aperture, real saturation, total error, check semaphore | Exists (phase H, 2026-09-23: `core/photometry.py` + Measure tab) |
+| Calibrated measurement on one plate (zero point from comps) | Exists (the Measure half of the FITS editor's Photometry tab, phase G) |
+| Colour term, gradient sky, FWHM aperture, real saturation, total error, check semaphore | Exists (phase H, 2026-09-23: `core/photometry.py` + Photometry tab) |
 | Host-galaxy subtraction | Exists (phase H: the blink's aligned PS1 reference, comp-scaled) |
 | Per-frame normalized series + detrending for transits | Missing: pieces T1–T8; ADR-015 decision to revisit or scope |
 
@@ -198,7 +199,7 @@ The pieces, in impact-per-effort order:
   does not move the median.
 
 Everything lands in `core/photometry.py` (the phase-G module) and in
-the Measure tab's panel; nothing touches the legacy flows.
+the Photometry tab's panel; nothing touches the legacy flows.
 
 ### B. Exoplanet transits: pieces T1–T8
 

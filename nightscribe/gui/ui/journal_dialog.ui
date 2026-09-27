@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Observing journal dialog (ADR-036, J2): the derived journal grouped by
+  night, with kind filter and search. Loaded by gui/journal_dialog.py
+  through gui/ui_loader.py; the kind combo's items carry userData and
+  the list's rows are data, both filled in code (ADR-005).
+-->
+<ui version="4.0">
+ <class>JournalDialog</class>
+ <widget class="QWidget" name="JournalDialog">
+  <layout class="QVBoxLayout" name="vbox_journal"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item>
+    <layout class="QHBoxLayout" name="row_filter">
+     <item><widget class="QComboBox" name="cmb_kind"/></item>
+     <item><widget class="QLineEdit" name="edt_search"><property name="placeholderText"><string>Search…</string></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QListWidget" name="lst"><property name="toolTip"><string>Double-click an entry to open its project or explore the object</string></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Close</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

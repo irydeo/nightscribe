@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Chart viewer (ADR-005): the toolbar, with the payload inserted into
+  ph_payload by code (a scrollable pixmap or a live chart widget,
+  depending on the mode). The "1:1" button is pixmap-mode-only and gets
+  hidden in code when a live widget is hosted.
+-->
+<ui version="4.0">
+ <class>ChartViewer</class>
+ <widget class="QWidget" name="ChartViewer">
+  <layout class="QVBoxLayout" name="vbox_viewer"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <property name="layoutStretch"><string notr="true">0,1</string></property>
+   <item>
+    <layout class="QHBoxLayout" name="toolbar">
+     <item><widget class="QPushButton" name="btn_zoom_out"><property name="text"><string>Zoom −</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_zoom_in"><property name="text"><string>Zoom +</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_fit"><property name="text"><string>Fit</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_11"><property name="text"><string notr="true">1:1</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_export"><property name="text"><string>Export PNG…</string></property></widget></item>
+     <item><spacer name="hsp_toolbar"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="QWidget" name="ph_payload"/></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

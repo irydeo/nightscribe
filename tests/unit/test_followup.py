@@ -55,7 +55,7 @@ def test_migration_v3_to_current_preserves_projects(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     # project survived
     row = db.execute(
         "SELECT kind, object_name FROM projects WHERE id=1").fetchone()
@@ -111,7 +111,7 @@ def test_migration_v9_moves_session_images_into_the_registry(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     row = db.execute(
         "SELECT path, kind, session_id, meta FROM project_files"
         " WHERE project_id=1").fetchone()
@@ -146,7 +146,7 @@ def test_migration_v5_is_idempotent(tmp_path):
 
     Database(str(file))  # 3 -> current
     db = Database(str(file))  # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
 
 
 # ---------------- sessions CRUD ----------------
@@ -300,10 +300,93 @@ def test_migration_v10_adds_the_pin_column(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(project_sessions)").fetchall()}
     assert "pinned" in cols
     from nightscribe.core import followup as fu
     s = fu.list_sessions(db, 1)
     assert len(s) == 1 and s[0]["pinned"] is False
+
+
+def test_migration_v10_gains_the_plate_link(tmp_path):
+    # A v10 database with a point keeps the row on reopen and gains the
+    # plate link (NULL today) plus its index (ADR-047).
+    import sqlite3
+    import time
+    from nightscribe.core.db import Database
+
+    f = tmp_path / "v10.db"
+    db = Database(str(f))
+    pid = db.execute(
+        "INSERT INTO projects (kind, object_name, status, created, updated,"
+        " context, root_dir) VALUES ('sn', 'SNx', 'active', 1.0, 1.0, '{}',"
+        " '/tmp/p')").lastrowid
+    fid = db.execute(
+        "INSERT INTO project_files (project_id, path, kind, created, meta)"
+        " VALUES (?, '/tmp/old.fits', 'fits', 1.0, '{}')", (pid,)).lastrowid
+    db.execute(
+        "INSERT INTO photometry_points (project_id, mjd, filter, mag, source)"
+        " VALUES (?, 60600.5, 'Clear', 17.1, 'manual')", (pid,))
+    db.execute("PRAGMA user_version = 10")
+    db.commit()
+    db.close()
+
+    db = Database(str(f))           # replays the v11 migration
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    cols = {r[1] for r in db.execute(
+        "PRAGMA table_info(photometry_points)").fetchall()}
+    assert "file_id" in cols
+    idx = {r[1] for r in db.execute(
+        "PRAGMA index_list(photometry_points)").fetchall()}
+    assert "idx_photo_points_file" in idx
+    assert db.execute("SELECT file_id FROM photometry_points").fetchone()[0] is None
+    # the link is a real FK with the detach-on-plate-delete rule: the
+    # point survives, its file_id simply goes NULL
+    db.execute("DELETE FROM project_files WHERE id=?", (fid,))
+    db.commit()
+    assert db.execute("SELECT COUNT(*) FROM photometry_points").fetchone()[0] == 1
+    assert db.execute("SELECT file_id FROM photometry_points").fetchone()[0] is None
+    db.close()
+
+
+# ---------------- ADR-047: point plate link (file_id) ----------------
+
+def test_point_carries_its_plate_link(tmp_db):
+    p = project.create(tmp_db, "sn", "SN2026plt")
+    fid = project.add_file(tmp_db, p["id"], "/tmp/plate.fits", "fits",
+                           meta={"filter": "Clear"})
+    pid = followup.add_point(tmp_db, p["id"], 60602.5, "Clear", 16.5,
+                             err=0.01, source="measure", file_id=fid)
+    assert followup.point_by_id(tmp_db, pid)["file_id"] == fid
+    pts = followup.list_points(tmp_db, p["id"])
+    assert len(pts) == 1 and pts[0]["file_id"] == fid
+
+
+def test_point_without_plate_stays_null(tmp_db):
+    # Paste, survey and ad-hoc UFE rows never get a plate link (ADR-047).
+    p = project.create(tmp_db, "sn", "SN2026noplt")
+    pid = followup.add_point(tmp_db, p["id"], 60602.5, "Clear", 16.5,
+                             source="paste")
+    assert followup.point_by_id(tmp_db, pid)["file_id"] is None
+    assert followup.list_points(tmp_db, p["id"])[0]["file_id"] is None
+
+
+def test_delete_points_only_for_its_plate(tmp_db):
+    # The UFE reset "delete this plate's measurements" must never touch
+    # points that belong to another plate or to no plate.
+    p = project.create(tmp_db, "sn", "SN2026dplt")
+    fid = project.add_file(tmp_db, p["id"], "/tmp/plate.fits", "fits")
+    other = project.add_file(tmp_db, p["id"], "/tmp/other.fits", "fits")
+    followup.add_point(tmp_db, p["id"], 60602.5, "Clear", 16.5, file_id=fid)
+    followup.add_point(tmp_db, p["id"], 60603.5, "Clear", 16.6, file_id=fid)
+    followup.add_point(tmp_db, p["id"], 60604.5, "Clear", 16.7,
+                       file_id=other)       # different plate
+    pid = followup.add_point(tmp_db, p["id"], 60605.5, "Clear", 16.8,
+                             source="paste")  # no plate
+    assert followup.delete_points_for_file(tmp_db, fid) == 2
+    pts = followup.list_points(tmp_db, p["id"])
+    assert [q["file_id"] for q in pts] == [other, None]
+    assert followup.point_by_id(tmp_db, pid) is not None
+    assert followup.delete_point(tmp_db, pid) is True
+    assert followup.point_by_id(tmp_db, pid) is None

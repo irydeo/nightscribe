@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  "Sky post" draft dialog (ADR-036, S3): the bilingual draft in two
+  copyable boxes. Loaded by gui/skypost_dialog.py through
+  gui/ui_loader.py; the drafts' contents and the copy buttons' labels
+  (formatted with the language tag) are data, set in code (ADR-005).
+-->
+<ui version="4.0">
+ <class>SkyPostDialog</class>
+ <widget class="QWidget" name="SkyPostDialog">
+  <layout class="QVBoxLayout" name="vbox_skypost"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item><widget class="QLabel" name="lbl_es"><property name="text"><string>Spanish draft</string></property></widget></item>
+   <item><widget class="QPlainTextEdit" name="txt_es"><property name="readOnly"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_copy_es">
+     <item><spacer name="hsp_copy_es"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_copy_es"><property name="text"><string/></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_en"><property name="text"><string>English draft</string></property></widget></item>
+   <item><widget class="QPlainTextEdit" name="txt_en"><property name="readOnly"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_copy_en">
+     <item><spacer name="hsp_copy_en"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_copy_en"><property name="text"><string/></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Close</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

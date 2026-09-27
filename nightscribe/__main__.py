@@ -189,16 +189,30 @@ def cmd_blink(args):
     png = outdir / f"{safe}_before_after.png"
     lang = cfg.ui_language()
     observatory = cfg.get("observatory_name", "")
+    # ADR-046: corner boxes, marker look and the N/E compass follow the
+    # settings
+    boxes = compass = None
+    if cfg.get("chart_boxes", False):
+        from .core import chart_annotate, fits_meta
+        boxes = blink_view.pair_boxes(
+            pair, fits_meta.read_meta(pair["image_path"]),
+            chart_annotate.site_from_config(cfg))
+        compass = blink_view.pair_compass(pair)
+    marker_style = cfg.get("marker_style", "ring")
     blink_view.make_blink_gif(ref8, obs8, pair["sn_xy"], gif,
                               effect=args.efecto, name=pair["name"],
                               ref_label=pair["ref_label"],
                               watermark=f"NightScribe · {pair['ref_label']}",
                               lang=lang, observatory=observatory,
-                              zoom=args.zoom, interval_ms=args.intervalo)
+                              zoom=args.zoom, interval_ms=args.intervalo,
+                              boxes=boxes, marker_style=marker_style,
+                              compass=compass)
     blink_view.draw_pair(ref8, obs8, pair["sn_xy"], name=pair["name"],
                          ref_label=pair["ref_label"], out=png,
                          watermark=f"NightScribe · {pair['ref_label']}",
-                         lang=lang, observatory=observatory, zoom=args.zoom)
+                         lang=lang, observatory=observatory, zoom=args.zoom,
+                         boxes=boxes, marker_style=marker_style,
+                         compass=compass)
     mp4 = None
     print(f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:.5f}) "
           f"— {pair['ref_label']}")
@@ -212,7 +226,8 @@ def cmd_blink(args):
             name=pair["name"], ref_label=pair["ref_label"],
             watermark=f"NightScribe · {pair['ref_label']}",
             lang=lang, observatory=observatory, zoom=args.zoom,
-            interval_ms=args.intervalo)
+            interval_ms=args.intervalo, boxes=boxes,
+            marker_style=marker_style, compass=compass)
         print(f"MP4 -> {mp4}")
     if args.post:
         # bilingual draft that references the blink resources, ready for a
@@ -346,9 +361,25 @@ def cmd_sequence(args):
     png_path = outdir / f"{safe}_carta.png"
     target = {"name": name, "ra": ra, "dec": dec}
     wm = f"NightScribe · {img_label}" if img_label else "NightScribe"
+    # ADR-046: corner boxes (position + site + scale) and the marker look
+    boxes = None
+    if cfg.get("chart_boxes", False):
+        from .core import chart_annotate
+        if wcs is not None:
+            wcs_info = {"scale_arcsec_px": wcs.pixel_scale(),
+                        "fov_arcmin": (wcs.naxis1 * wcs.pixel_scale() / 60.0,
+                                       wcs.naxis2 * wcs.pixel_scale() / 60.0),
+                        "ra_deg": ra, "dec_deg": dec}
+        else:
+            wcs_info = {"scale_arcsec_px": fov * 60.0 / 1000.0,
+                        "fov_arcmin": (fov, fov), "ra_deg": ra,
+                        "dec_deg": dec}
+        boxes = chart_annotate.build_boxes(
+            wcs_info=wcs_info, site=chart_annotate.site_from_config(cfg))
     finder_view.draw_finder(field, target=target, entries=entries,
                             image=image, wcs=wcs, out=png_path, lang=lang,
-                            watermark=wm)
+                            watermark=wm, boxes=boxes,
+                            marker_style=cfg.get("marker_style", "ring"))
     print(f"{name} @ ({ra:.5f}, {dec:+.5f}) — {field['catalog_name']}, "
           f"{len(entries)} estrellas / stars (objetivo mag "
           f"{target_mag:.2f} / target)")

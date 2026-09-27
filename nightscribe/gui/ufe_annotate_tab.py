@@ -29,19 +29,15 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QCheckBox, QDoubleSpinBox, QFileDialog,
-                               QHBoxLayout, QLabel, QLineEdit,
-                               QListWidget, QMessageBox, QPushButton,
-                               QSlider, QVBoxLayout, QWidget,
-                               QGraphicsEllipseItem, QGraphicsLineItem,
-                               QGraphicsSimpleTextItem)
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (QFileDialog, QMessageBox,
+                               QGraphicsSimpleTextItem, QWidget)
 
 from ..core import fits_annotate, fits_io, wcs as wcs_mod
+from ..viz import palette
+from .ui_loader import adopt_ui
 
 logger = logging.getLogger("nightscribe.gui.ufe_annotate_tab")
-
-_MARKER_DEFAULT = "#ffb347"   # the same amber the legacy dialog uses
 
 
 class UfeAnnotateTab(QWidget):
@@ -57,7 +53,7 @@ class UfeAnnotateTab(QWidget):
         self._view = view
         self._active = False
         self._marker = None          # (col, row) in data coords, or None
-        self._marker_color = QColor(_MARKER_DEFAULT)
+        self._marker_color = QColor(palette.ACCENT)
         self._items = []             # the marker's scene items
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
@@ -70,82 +66,34 @@ class UfeAnnotateTab(QWidget):
     # ------------------------------------------------------------------ UI
 
     def _build_ui(self):
-        lay = QVBoxLayout(self)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Label:")))
-        self.edit_label = QLineEdit()
-        self.edit_label.setPlaceholderText(self.tr("Annotation label"))
+        # The structure is the Designer file's (ADR-005); this method
+        # aliases the widgets and connects the signals.
+        self._ui = adopt_ui(self, "ufe_annotate_tab")
+                                            # over: no wrapper margins
+        self.edit_label = self._ui.edit_label
         self.edit_label.textChanged.connect(self._refresh_marker)
-        row.addWidget(self.edit_label, 1)
-        lay.addLayout(row)
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Notes:")))
-        self.edit_notes = QLineEdit()
-        row.addWidget(self.edit_notes, 1)
-        lay.addLayout(row)
-
-        row = QHBoxLayout()
-        row.addWidget(QLabel(self.tr("Marker size:")))
-        self.sld_marker = QSlider(Qt.Horizontal)
-        self.sld_marker.setRange(2, 30)
-        self.sld_marker.setValue(10)
+        self.edit_notes = self._ui.edit_notes
+        self.sld_marker = self._ui.sld_marker
         self.sld_marker.valueChanged.connect(self._refresh_marker)
-        row.addWidget(self.sld_marker, 1)
-        self.btn_color = QPushButton(_MARKER_DEFAULT)
+        self.btn_color = self._ui.btn_color
+        self.btn_color.setText(palette.ACCENT)      # data, not text
         self.btn_color.setAccessibleName("marker color")
         self.btn_color.clicked.connect(self._pick_color)
-        row.addWidget(self.btn_color)
-        lay.addLayout(row)
-
-        row = QHBoxLayout()
-        self.spin_dx = self._nudge_spinbox()
-        self.spin_dy = self._nudge_spinbox()
-        row.addWidget(self.spin_dx)
-        row.addWidget(self.spin_dy)
-        self.btn_nudge = QPushButton(self.tr("Nudge"))
-        self.btn_nudge.setToolTip(self.tr(
-            "Shift the marker by that many pixels (or click the image)"))
+        self.spin_dx = self._ui.spin_dx
+        self.spin_dy = self._ui.spin_dy
+        self.btn_nudge = self._ui.btn_nudge
         self.btn_nudge.clicked.connect(self._apply_nudge)
-        row.addWidget(self.btn_nudge)
-        self.chk_marker = QCheckBox(self.tr("Marker"))
-        self.chk_marker.setChecked(True)
-        self.chk_marker.setToolTip(self.tr("Show the annotation marker"))
+        self.chk_marker = self._ui.chk_marker
         self.chk_marker.toggled.connect(self._refresh_marker)
-        row.addWidget(self.chk_marker)
-        lay.addLayout(row)
-
-        self.lbl_position = QLabel("–")
-        self.lbl_position.setWordWrap(True)
-        lay.addWidget(self.lbl_position)
-
-        lay.addWidget(QLabel(self.tr("Also annotate (visits):")))
-        self.lst_extra = QListWidget()
-        self.lst_extra.setMaximumHeight(90)
-        lay.addWidget(self.lst_extra)
-        row = QHBoxLayout()
-        self.btn_add = QPushButton(self.tr("Add…"))
+        self.lbl_position = self._ui.lbl_position
+        self.lst_extra = self._ui.lst_extra
+        self.btn_add = self._ui.btn_add
         self.btn_add.clicked.connect(self._add_extras)
-        row.addWidget(self.btn_add)
-        self.btn_remove = QPushButton(self.tr("Remove"))
+        self.btn_remove = self._ui.btn_remove
         self.btn_remove.clicked.connect(self._remove_extra)
-        row.addWidget(self.btn_remove)
-        lay.addLayout(row)
-
-        self.btn_save = QPushButton(self.tr("Save annotated copy…"))
+        self.btn_save = self._ui.btn_save
         self.btn_save.clicked.connect(self._save)
-        lay.addWidget(self.btn_save)
-        self.lbl_status = QLabel("")
-        self.lbl_status.setWordWrap(True)
-        lay.addWidget(self.lbl_status)
-        lay.addStretch(1)
-
-    def _nudge_spinbox(self):
-        # @return: one nudge field, in plate pixels (y positive = up)
-        sb = QDoubleSpinBox()
-        sb.setRange(-100.0, 100.0)
-        sb.setDecimals(1)
-        sb.setSingleStep(0.5)
-        return sb
+        self.lbl_status = self._ui.lbl_status
 
     # ------------------------------------------------------- activation
 
@@ -239,19 +187,22 @@ class UfeAnnotateTab(QWidget):
         scale = max(self._view.current_factor(), 1e-3)
         r = self.sld_marker.value() / scale      # scene radius, screen px
         x, y = self._state.data_to_scene(*self._marker)
-        pen = QPen(self._marker_color)
-        pen.setWidthF(2.0)
-        pen.setCosmetic(True)
-        circle = QGraphicsEllipseItem(x - r, y - r, 2 * r, 2 * r)
-        circle.setPen(pen)
-        self._items.append(self._view.add_overlay(circle))
-        for x0, y0, x1, y1 in ((x - 1.6 * r, y, x - 0.5 * r, y),
-                               (x + 0.5 * r, y, x + 1.6 * r, y),
-                               (x, y - 1.6 * r, x, y - 0.5 * r),
-                               (x, y + 0.5 * r, x, y + 1.6 * r)):
-            tick = QGraphicsLineItem(x0, y0, x1, y1)
-            tick.setPen(pen)
-            self._items.append(self._view.add_overlay(tick))
+        # ADR-046: the marker has two looks (Settings); the cross spans
+        # the plate with a box on the object, the ring is the classic.
+        # Both draw through the shared helpers so every tab matches.
+        from ..config import config
+        from .widgets.ufe_image_view import (cross_marker_items,
+                                             ring_marker_items)
+        if config.get("marker_style", "ring") == "cross":
+            w, h = self._state.plate_shape
+            half = max(9.0, self.sld_marker.value() * 0.9) / scale
+            for it in cross_marker_items(x, y, w, h, self._marker_color,
+                                         half):
+                self._items.append(self._view.add_overlay(it))
+            r = half                    # the label anchors below the box
+        else:
+            for it in ring_marker_items(x, y, self._marker_color, r):
+                self._items.append(self._view.add_overlay(it))
         text = self.edit_label.text().strip()
         if text:
             label = QGraphicsSimpleTextItem(text)

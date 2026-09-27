@@ -49,9 +49,9 @@ def dlg(qapp):
 
 
 def test_layout_three_placeholder_tabs(dlg):
-    assert dlg.tabs.count() == 4          # Blink, Compare, Measure, Annotate
+    assert dlg.tabs.count() == 3          # Blink, Photometry, Annotate
     titles = [dlg.tabs.tabText(i) for i in range(dlg.tabs.count())]
-    assert titles == ["Blink", "Compare", "Measure", "Annotate"]
+    assert titles == ["Blink", "Photometry", "Annotate"]
     assert dlg.histogram is not None      # the phase-B histogram strip
     # the image dominates: at 1280 px the view is wider than the tab column
     assert dlg.view.width() > dlg.tabs.width()
@@ -127,7 +127,7 @@ def test_export_png_via_dialog(dlg, monkeypatch, tmp_path):
 def test_add_feature_tab_is_the_whole_extension_api(dlg):
     from PySide6.QtWidgets import QLabel
     idx = dlg.add_feature_tab("Future", QLabel("soon"))
-    assert dlg.tabs.count() == 5
+    assert dlg.tabs.count() == 4
     assert dlg.tabs.tabText(idx) == "Future"
 
 
@@ -251,3 +251,164 @@ def test_solve_failure_warns(dlg, monkeypatch):
     dlg.state.load(MONO)
     dlg._on_solved({})
     assert seen
+
+
+# ------------------------------------------------- chart boxes (ADR-046)
+
+def test_chart_boxes_provider_reads_the_live_state(dlg, monkeypatch):
+    # name: the plate stem when nothing else speaks; the attached object
+    # wins over it. Date/exposure from the header, position/scale/FOV
+    # from the WCS, brightness only after a measurement.
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "observer_name", "F. Calvo")
+    monkeypatch.setitem(config._data, "mpc_code", "Z41")
+    monkeypatch.setitem(config._data, "chart_boxes", True)
+    assert dlg._chart_boxes() == {}                    # no plate, no boxes
+    dlg.state.load(MONO)
+    boxes = dlg._chart_boxes()
+    assert boxes["top_left"] == ["sn2026zji_new_image"]
+    assert "Date: 2026-08-21 20:54 UT" in boxes["top_right"]
+    assert "Exp: 10.0 s" in boxes["top_right"]
+    # solved plate: scale and FOV always; the RA/Dec lines wait for a
+    # known object position (a field centre is not the object)
+    assert not any(ln.startswith("RA: ") for ln in boxes["top_right"])
+    assert any(ln.startswith("PSc: ") for ln in boxes["bottom_left"])
+    assert "Obs: F. Calvo" in boxes["bottom_left"]
+    assert "Stn: Z41" in boxes["bottom_left"]
+    # no measurement yet: no Mag line
+    assert not any(ln.startswith("Mag: ") for ln in boxes["top_right"])
+    # the attached object wins the name and pins the position (an
+    # off-plate object would paint no position lines at all)
+    from nightscribe.core import coords
+    cra, cdec = dlg.state.wcs.center()
+    dlg.set_object({"name": "AT 2026zji", "ra": cra, "dec": cdec,
+                    "mag": 17.1})
+    boxes = dlg._chart_boxes()
+    assert boxes["top_left"] == ["AT 2026zji"]
+    col, row = dlg.state.wcs.sky_to_pixel(cra, cdec)
+    era, edec = dlg.state.wcs.pixel_to_sky(col, row)
+    assert f"RA: {coords.ra_deg_to_hms(era)}" in boxes["top_right"]
+    assert f"Dec: {coords.dec_deg_to_dms(edec)}" in boxes["top_right"]
+    # a catalog magnitude from the project is NOT a calibration: no Mag
+    assert not any(ln.startswith("Mag: ") for ln in boxes["top_right"])
+    # a calibrated measurement this session is
+    dlg.tab_measure._last = {"mag": 16.391, "err": 0.04, "band": "V",
+                             "col": 100.0, "row": 200.0}
+    boxes = dlg._chart_boxes()
+    assert "Mag: 16.39 ± 0.04 (V)" in boxes["top_right"]
+    # ... and the position now speaks from the measured centroid
+    ra, dec = dlg.state.wcs.pixel_to_sky(100.0, 200.0)
+    assert f"RA: {coords.ra_deg_to_hms(ra)}" in boxes["top_right"]
+
+
+def test_chart_boxes_toggle_default_comes_from_config(dlg, monkeypatch):
+    from nightscribe.config import config
+    monkeypatch.setitem(config._data, "chart_boxes", True)
+    dlg.hide()
+    dlg.show()                          # showEvent re-reads the default
+    assert dlg.btn_boxes.isChecked()
+    assert dlg.view.show_boxes
+    monkeypatch.setitem(config._data, "chart_boxes", False)
+    dlg.hide()
+    dlg.show()
+    assert not dlg.btn_boxes.isChecked()
+    assert not dlg.view.show_boxes
+
+
+# ------------------------------------- top-bar style (ADR-044 rev, 2026-09-24)
+
+
+def test_topbar_icons_only_is_the_default(dlg):
+    # Pinned ufe_bar_icons: True -> a compact glyph bar. The short
+    # actions drop their labels entirely; Solve keeps its own in both
+    # modes, because the action is long and the glyph only hints at it.
+    from PySide6.QtGui import QIcon
+    from nightscribe.gui import theme
+    for name in ("btn_load", "btn_export", "btn_north", "btn_scale",
+                 "btn_annot", "btn_boxes", "btn_mark"):
+        btn = getattr(dlg, name)
+        assert btn.text() == ""
+        assert not btn.icon().isNull()
+    # the checked toggles sit on the _on glyph (they start checked)
+    want = QIcon(str(theme.asset("ufe_north_on.svg"))).pixmap(16, 16)
+    assert dlg.btn_north.icon().pixmap(16, 16).toImage() == \
+        want.toImage()
+    assert dlg.btn_solve.text() == "Solve astrometry…"
+    assert dlg.lbl_zoom_hint.isVisible() == False
+    for btn in dlg.btn_zoom.values():
+        assert btn.text() == ""
+        assert not btn.icon().isNull()
+
+
+def test_topbar_text_mode_restores_the_labels(dlg, monkeypatch):
+    from PySide6.QtGui import QIcon
+    from nightscribe.config import config
+    from nightscribe.gui import theme
+    # The same cached dialog reskins between shows: text mode brings the
+    # labels back (icon stays as a hint), icon mode puts them away again.
+    monkeypatch.setitem(config._data, "ufe_bar_icons", False)
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_load.text() == "Load FITS…"
+    assert dlg.btn_north.text() == "N"
+    assert dlg.btn_scale.text() == "Scale"
+    assert dlg.btn_annot.text() == "A"
+    assert dlg.btn_boxes.text() == "Boxes"
+    assert dlg.btn_mark.text() == "Mark"
+    assert dlg.btn_solve.text() == "Solve astrometry…"   # unchanged either way
+    assert dlg.lbl_zoom_hint.isVisible()
+    assert dlg.btn_zoom["100"].text() == "100"
+    assert not dlg.btn_zoom["100"].icon().isNull()
+    monkeypatch.setitem(config._data, "ufe_bar_icons", True)
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_load.text() == ""
+    assert dlg.btn_north.text() == ""
+    assert dlg.btn_zoom["Fit"].text() == ""
+    # a checked-state flip re-skins the glyph in icon mode
+    dlg.btn_north.setChecked(False)
+    off = QIcon(str(theme.asset("ufe_north_off.svg"))).pixmap(16, 16)
+    assert dlg.btn_north.icon().pixmap(16, 16).toImage() == off.toImage()
+    dlg.btn_north.setChecked(True)
+
+
+def test_topbar_missing_asset_keeps_the_text(dlg, monkeypatch):
+    # The SVG is missing: the button must not go silent.
+    from pathlib import Path
+    from nightscribe.gui import theme
+    monkeypatch.setattr(
+        theme, "asset",
+        staticmethod(lambda name: Path("/nonexistent") / name))
+    dlg.hide()
+    dlg.show()
+    assert dlg.btn_load.text() == "Load FITS…"
+    assert dlg.btn_load.icon().isNull()
+    assert dlg.btn_zoom["100"].text() == "100"
+    # and the toggle re-skin silently does nothing with no asset
+    dlg.btn_north.setChecked(False)
+    assert dlg.btn_north.text() == "N"
+
+
+# ADR-044 rev 2026-09-25: the Sequence section's own amber target mark
+# (and the bar's «Move marker…») went away; the dialog's global red
+# object mark (btn_mark) is the one object marker now.
+
+
+def test_move_marker_is_gone_and_the_object_mark_covers_it(dlg):
+    assert not hasattr(dlg, "btn_move")
+    comp = dlg.tab_photometry.tab_compare
+    assert not hasattr(comp, "chk_target")
+    assert not hasattr(comp, "_target_pos")
+    assert not hasattr(comp, "request_target_move")
+    # the global mark follows set_object and the bar toggle
+    dlg.state.load(MONO)
+    w, h = dlg.state.plate_shape
+    ra, dec = dlg.state.wcs.pixel_to_sky(w / 2.0, h / 2.0)
+    dlg.set_object({"name": "SN test", "ra": ra, "dec": dec})
+    assert dlg.btn_mark.isEnabled()
+    assert len(dlg.view._object_mark_items) == 5
+    dlg.btn_mark.setChecked(False)
+    assert all(not it.isVisible() for it in dlg.view._object_mark_items)
+    dlg.set_object(None)
+    assert not dlg.btn_mark.isEnabled()
+    assert dlg.view._object_mark_items == []

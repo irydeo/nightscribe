@@ -82,6 +82,22 @@ def test_site_tab_widgets(qapp):
     dlg.deleteLater()
 
 
+def test_chart_annotations_group_on_the_site_tab(qapp):
+    # ADR-046: the identity stamped in the chart corner boxes and the
+    # two independent style switches (marker shape, boxes layer)
+    dlg = _dlg()
+    names = set(_tab_widgets(dlg, 0))
+    for w in ["grp_chartann", "edt_observer", "edt_measurer",
+              "edt_telescope", "edt_camera_model", "cmb_marker_style",
+              "chk_chart_boxes"]:
+        assert w in names, f"{w} expected on the Site & equipment tab"
+    # every field keeps its help-below label (the dialog's layout rule)
+    for w in ["lblH_observer", "lblH_measurer", "lblH_teldesc",
+              "lblH_cammodel", "lblH_marker_style", "lblH_chart_boxes"]:
+        assert w in names, f"{w} expected on the Site & equipment tab"
+    dlg.deleteLater()
+
+
 def test_language_combo_populated_by_on_open_settings(qapp):
     dlg = _dlg()
     assert dlg.cmb_language is not None

@@ -4230,6 +4230,10 @@ class MainWindow(QMainWindow):
                 self._visit_open_in_editor(pid, path, sid),
             # ADR-047: a measurement row is a shortcut to its plate
             on_measure_click=self._visit_open_measure,
+            # ADR-048: the visit's "Measure the sequence" opens the
+            # editor's series block for this visit (D8/D36)
+            measure_series=lambda sid:
+                self._visit_measure_series(pid, sid),
             on_change=lambda: self._visit_data_changed(pid),
             kind=kind)
         panel.set_project(pid)
@@ -4340,6 +4344,32 @@ class MainWindow(QMainWindow):
         row = project.find_file(db, pid, path)
         if row is not None and (row.get("meta") or {}).get("ufe"):
             dlg.apply_plate_state(row["meta"]["ufe"])
+
+    def _visit_measure_series(self, pid, session_id):
+        # ADR-048 (D8/D36): the visit's frames become a series. The
+        # editor opens on the visit's first plate (the reference WCS) with
+        # the series block armed; a visit with no FITS says so.
+        # @args: pid - project id, session_id - the visit
+        if not self._use_ufe():
+            self.statusBar().showMessage(
+                self.tr("Enable the unified editor in Settings → Development "
+                        "to measure from the editor"), 8000)
+            return
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            self.statusBar().showMessage(
+                self.tr("This visit has no FITS frames to measure."), 8000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                             session_id=session_id)
+        dlg.open_plate(paths[0])
+        dlg.set_object(obj)
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -7844,7 +7874,9 @@ class MainWindow(QMainWindow):
                        if f.get("kind") == "fits" and f.get("path"))
         if not paths:
             return None
-        return {"pid": pid, "session_id": session_id, "paths": paths}
+        p = project.get(db, pid) or {}
+        return {"pid": pid, "session_id": session_id, "paths": paths,
+                "kind": p.get("kind"), "context": p.get("context") or {}}
 
     def _ufe_points_hook(self, pid, session_id, rows, cfg):
         # ADR-048 (D9): one series run = one measurement_runs row; its

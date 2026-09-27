@@ -495,3 +495,64 @@ def test_measure_series_auto_aperture_runs(tmp_path):
                                            auto_aperture=True))
     assert res.points                      # the sweep ran and measured
     assert res.apertures                   # per-night entry recorded
+
+
+# ---------------- phase 6: cadence guard, multi-night QC, analysis ---
+
+def _pts(n, cadence_s, mjd0=61300.2, **kw):
+    return [sm.SeriesPoint(mjd=mjd0 + i * cadence_s / 86400.0, **kw)
+            for i in range(n)]
+
+
+def test_cadence_guard_transit_ingress():
+    # 2.5 h transit: the ingress window is 0.15*9000 = 1350 s. A 60 s
+    # cadence resolves it; a 900 s one leaves 1.5 points (red).
+    good = sm.cadence_guard(_pts(30, 60), "transit", duration_h=2.5)
+    assert good["level"] == "ok" and not good["messages"]
+    bad = sm.cadence_guard(_pts(20, 900), "transit", duration_h=2.5)
+    assert bad["level"] == "red" and bad["messages"]
+
+
+def test_cadence_guard_hads_and_variable():
+    hads = sm.cadence_guard(_pts(10, 1000), "hads", period_h=2.0)
+    assert hads["level"] == "warn"
+    var = sm.cadence_guard(_pts(10, 5000), "variable", period_d=0.1)
+    assert var["level"] == "warn"
+    fine = sm.cadence_guard(_pts(40, 200), "variable", period_d=0.1)
+    assert fine["level"] == "ok"
+
+
+def test_night_qc_band_and_zp():
+    pts = []
+    for i, (night, filt, zp) in enumerate([
+            (61300.2, "V", 22.00), (61301.2, "V", 22.01),
+            (61302.2, "V", 22.02), (61303.2, "V", 22.50)]):
+        pts.append(sm.SeriesPoint(mjd=night, filter=filt, zp=zp,
+                                  mag=10.0))
+    qc = sm.night_qc(pts)
+    assert qc["level"] == "warn"
+    assert any("22.50" in m["es"] or "desplazado" in m["es"]
+               for m in qc["messages"])
+    # a second filter trips the band guard
+    pts[0].filter = "R"
+    qc2 = sm.night_qc(pts)
+    assert any("filtros" in m["es"] for m in qc2["messages"])
+    assert qc2["filters"] == ["R", "V"]
+
+
+def test_build_payload_carries_measure_points_and_folds():
+    # D24/D33: the series points (source "measure") flow into the analysis
+    # payload as any other, and a variable still folds by its VSX period.
+    from nightscribe.core import lightcurve_data as lc
+    pts = [{"mjd": 61300.2, "mag": 12.0, "source": "measure",
+            "filter": "V"},
+           {"mjd": 61300.3, "mag": 11.9, "source": "measure",
+            "filter": "V"}]
+    payload = lc.build_payload({"points": pts})
+    assert len(payload["points"]) == 2
+    var = {"period_d": 0.5, "epoch_mjd": 0.2, "amp": 0.3,
+           "max": 12.0, "min": 12.3}
+    folded = lc.build_payload({"points": pts}, variable=var)
+    assert folded["fold_period_d"] == 0.5
+    assert folded["epoch_mjd"] == 0.2
+    assert "schematic" in folded

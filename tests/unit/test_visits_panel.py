@@ -394,3 +394,22 @@ def test_save_and_close_reverts_an_invalid_date(panel, qapp):
     assert fu.get_session(vp._db, sid)["obs_date"] == stored
     qapp.processEvents()
     assert vp._win is None
+
+
+def test_visit_window_measure_series_action(qapp, tmp_path):
+    # ADR-048 (D8/D36): the visit window carries a "Measure the sequence"
+    # action that hands the visit id to the host (which opens the editor's
+    # series block). The action exists only with a callback armed.
+    from nightscribe.core.db import Database
+    from nightscribe.core import project, followup as fu
+    from nightscribe.gui.widgets.visits_panel import VisitWindow
+    db = Database(tmp_path / "v.db")
+    p = project.create(db, "transit", "HAT-P-32 b")
+    sid = fu.create_session(db, p["id"], obs_date="2026-09-20")
+    seen = []
+    w = VisitWindow(db, p["id"], sid, lang="en", kind="transit",
+                    measure_series=lambda s: seen.append(s))
+    w._ui.vp_btn_series.click()
+    assert seen == [sid]
+    w.close()
+    db.close()

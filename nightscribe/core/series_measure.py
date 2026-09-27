@@ -871,3 +871,133 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     result.points = points
     result.band = cfg.band or cfg.fallback_band
     return result
+
+
+# ---------------- D20: cadence guard (analysis layer) ----------------
+
+def _median_cadence(points):
+    # @return: the median spacing in seconds, or None with <2 points
+    mids = sorted(p.mjd for p in points if p.mjd is not None)
+    if len(mids) < 2:
+        return None
+    gaps = [(mids[i + 1] - mids[i]) * 86400.0 for i in range(len(mids) - 1)]
+    gaps = [g for g in gaps if g > 0]
+    if not gaps:
+        return None
+    return float(np.median(gaps))
+
+
+def _msg(es, en):
+    # @return: a bilingual message pair (the panel picks the language)
+    return {"es": es, "en": en}
+
+
+def cadence_guard(points, kind, duration_h=None, period_h=None,
+                  period_d=None):
+    # D20: warn in plain language when the cadence cannot resolve the
+    # type. It never blocks: the observer decides. "red" is reserved for
+    # a transit whose ingress is lost (fewer than three points).
+    # @args: points - measured SeriesPoints, kind - project kind,
+    #        duration_h - transit duration (h), period_h - HADS period (h),
+    #        period_d - variable period (days)
+    # @return: {"level": ok|warn|red, "cadence_s", "messages": [{es,en}]}
+    cad = _median_cadence(points)
+    msgs, level = [], "ok"
+    if cad is None:
+        return {"level": level, "cadence_s": None, "messages": msgs}
+    kind = (kind or "").lower()
+    if kind == "transit":
+        if duration_h:
+            ingress_s = 0.15 * float(duration_h) * 3600.0
+            pts = ingress_s / cad
+            if pts < 3:
+                level = "red"
+                msgs.append(_msg(
+                    "la cadencia deja {:.1f} puntos por ingress: el "
+                    "ingress se pierde".format(pts),
+                    "the cadence leaves {:.1f} points per ingress: the "
+                    "ingress is lost".format(pts)))
+            elif pts < 5:
+                level = "warn"
+                msgs.append(_msg(
+                    "solo {:.1f} puntos por ingress: justo para "
+                    "resolverlo".format(pts),
+                    "only {:.1f} points per ingress: barely enough".format(
+                        pts)))
+        else:
+            level = "warn"
+            msgs.append(_msg(
+                "sin la duración del tránsito no se puede comprobar el "
+                "ingress: revisa la cadencia",
+                "without the transit duration the ingress cannot be "
+                "checked: review the cadence"))
+    elif kind == "hads":
+        from . import hads as hads_mod
+        if cad > hads_mod.CADENCE_CAP_S:
+            level = "warn"
+            msgs.append(_msg(
+                "cadencia de {:.0f} s: por encima del tope AAVSO de "
+                "{:.0f} s".format(cad, hads_mod.CADENCE_CAP_S),
+                "cadence {:.0f} s: above the AAVSO cap of {:.0f} s".format(
+                    cad, hads_mod.CADENCE_CAP_S)))
+        if period_h:
+            per_cycle = float(period_h) * 3600.0 / cad
+            if per_cycle < hads_mod.POINTS_PER_CYCLE:
+                level = "warn"
+                msgs.append(_msg(
+                    "{:.0f} puntos por ciclo: hacen falta {}".format(
+                        per_cycle, hads_mod.POINTS_PER_CYCLE),
+                    "{:.0f} points per cycle: {} are needed".format(
+                        per_cycle, hads_mod.POINTS_PER_CYCLE)))
+    elif kind == "variable" and period_d:
+        if cad > float(period_d) * 86400.0 / 2.0:
+            level = "warn"
+            msgs.append(_msg(
+                "cadencia de {:.0f} s: por debajo del criterio de Nyquist "
+                "para P = {:.3f} d".format(cad, float(period_d)),
+                "cadence {:.0f} s: below Nyquist for P = {:.3f} d".format(
+                    cad, float(period_d))))
+    return {"level": level, "cadence_s": cad, "messages": msgs}
+
+
+# ---------------- D35: multi-night QC (ZP and band guard) ----------
+
+def night_qc(points, zp_sigma=3.0):
+    # D35: per-night zero-point check against the series median and the
+    # band guard. Mixed filters are never combined into one magnitude
+    # curve: the guard says so out loud.
+    # @args: points - measured SeriesPoints, zp_sigma - offset threshold
+    # @return: {"level": ok|warn, "nights": {night: zp}, "filters": [...],
+    #          "messages": [{es,en}]}
+    msgs, level = [], "ok"
+    filters = sorted({p.filter for p in points if p.filter})
+    if len(filters) > 1:
+        level = "warn"
+        msgs.append(_msg(
+            "hay varios filtros ({}): no se combinan en una sola curva de "
+            "magnitudes".format(", ".join(filters)),
+            "several filters ({}): they are not combined into one "
+            "magnitude curve".format(", ".join(filters))))
+    by_night = {}
+    for p in points:
+        if p.zp is None:
+            continue
+        by_night.setdefault(_night_of(p.mjd), []).append(p.zp)
+    meds = {n: float(np.median(v)) for n, v in by_night.items() if v}
+    if len(meds) >= 2:
+        arr = np.asarray(list(meds.values()), dtype=np.float64)
+        gm = float(np.median(arr))
+        mad = float(np.median(np.abs(arr - gm)))
+        if mad > 0.0:
+            for night, m in sorted(meds.items(),
+                                   key=lambda kv: (kv[0] is None, kv[0])):
+                if abs(m - gm) > zp_sigma * 1.4826 * mad:
+                    level = "warn"
+                    msgs.append(_msg(
+                        "la noche {} tiene el punto cero desplazado "
+                        "({:+.3f} mag)".format(night, m - gm),
+                        "night {} has a shifted zero point "
+                        "({:+.3f} mag)".format(night, m - gm)))
+    return {"level": level,
+            "nights": {str(n): m for n, m in meds.items()},
+            "filters": filters, "messages": msgs}

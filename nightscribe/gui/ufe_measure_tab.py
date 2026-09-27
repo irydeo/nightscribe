@@ -828,6 +828,52 @@ class UfeMeasureTab(QWidget):
                 logger.warning("series save failed: %s", err)
         self.btn_series_undo.setEnabled(self._series_run_id is not None)
         self._draw_series(result.points)
+        self._fill_series_panel(result, context)
+
+    def _fill_series_panel(self, result, context):
+        # Plain-language summary (D13/D25/D35/D20): points and frames,
+        # the flags, the detrend coefficients per night, the cadence
+        # guard and the multi-night zero-point / band warnings.
+        points = result.points
+        lines = [self.tr("Series: {0} points from {1} frames").format(
+            len(points), len((context or {}).get("paths", [])))]
+        nflag = sum(1 for p in points if p.flags)
+        if nflag:
+            counts = {}
+            for p in points:
+                for f in p.flags:
+                    counts[f] = counts.get(f, 0) + 1
+            lines.append(self.tr("Flagged points: {0} ({1})").format(
+                nflag, ", ".join(f"{k} × {v}"
+                                 for k, v in sorted(counts.items()))))
+        det = result.detrend
+        if det:
+            for n in det.get("nights", []):
+                if n.get("fallback"):
+                    lines.append(self.tr(
+                        "Night {0}: no airmass range, offset only "
+                        "({1} points)").format(n["night"], n["n"]))
+                else:
+                    lines.append(self.tr(
+                        "Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} "
+                        "(rms {4:.4f} → {5:.4f})").format(
+                            n["night"], n["a1"], n["a2"], n["a3"],
+                            n["rms_before"] or 0.0,
+                            n["rms_after"] or 0.0))
+        ctxd = (context or {}).get("context") or {}
+        transit = ctxd.get("transit") or {}
+        guard = series_measure.cadence_guard(
+            points, (context or {}).get("kind"),
+            duration_h=ctxd.get("duration_h") or transit.get("duration_h"),
+            period_h=ctxd.get("period_h"),
+            period_d=ctxd.get("period_d") or ctxd.get("period"))
+        qc = series_measure.night_qc(points)
+        if guard["level"] == "red":
+            lines.append("⚠ " + self.tr(
+                "Cadence too short for the transit ingress"))
+        for m in guard["messages"] + qc["messages"]:
+            lines.append("⚠ " + m.get(self._lang, m.get("en", "")))
+        self.lbl_result.setText("\n".join(lines))
 
     def _on_series_failed(self, message):
         self.btn_series.setEnabled(True)

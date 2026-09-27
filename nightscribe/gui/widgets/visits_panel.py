@@ -90,13 +90,14 @@ class VisitsPanel(QWidget):
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
                  curve_kind=True, kind=None, on_measure_click=None,
-                 parent=None):
+                 measure_series=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
         self._open_in_editor = open_in_editor
         self._on_change = on_change
         self._on_measure_click = on_measure_click
+        self._measure_series = measure_series
         # the project's kind drives what a visit carries: light-curve
         # kinds get the measurements block, MPC kinds the astrometry one
         self._kind = kind if kind is not None else (
@@ -221,6 +222,7 @@ class VisitsPanel(QWidget):
                                 kind=self._kind,
                                 open_in_editor=self._open_in_editor,
                                 on_measure_click=self._on_measure_click,
+                                measure_series=self._measure_series,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -274,7 +276,7 @@ class VisitWindow(QDialog):
 
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
-                 on_measure_click=None, parent=None):
+                 on_measure_click=None, measure_series=None, parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -287,6 +289,7 @@ class VisitWindow(QDialog):
         self._open_in_editor = open_in_editor
         self._data_changed = data_changed
         self._on_measure_click = on_measure_click
+        self._measure_series = measure_series
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -321,6 +324,7 @@ class VisitWindow(QDialog):
 
         # ---- resources
         self._ui.vp_btn_attach.clicked.connect(self._on_attach)
+        self._ui.vp_btn_series.clicked.connect(self._on_measure_series)
         self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
         self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
         self.lst_res = PassiveList()
@@ -443,6 +447,13 @@ class VisitWindow(QDialog):
             item.setToolTip(f["path"])
             item.setData(Qt.UserRole, f["id"])
             self.lst_res.addItem(item)
+
+    def _on_measure_series(self):
+        # D8/D36: the series starts from the visit (its frames), never a
+        # folder dialog. The host opens the editor's measure tab with the
+        # series block armed for this visit.
+        if callable(self._measure_series):
+            self._measure_series(self._sid)
 
     def _on_attach(self):
         # File picker (multi) -> per-FITS editable metadata confirmation

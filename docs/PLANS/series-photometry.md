@@ -6,8 +6,8 @@
 - **Alcance**: piezas **T1–T8** de `docs/PRECISION.es.md` (apéndice B, líneas 202–241), más los
   apéndices separables (ASTAP, modo en vivo, API ExoClock) y la documentación de usuario.
 - **Estado**: decisiones cerradas en conversación con el autor; la **fase 0** las convierte en
-  ADRs firmados antes de escribir código (la nota de `PRECISION.es.md:204` exige firmar la
-  reapertura de ADR-015 con el usuario).
+  ADRs firmados antes de escribir código (la nota de decisión del apéndice B de `PRECISION`
+  exige firmar la reapertura de ADR-015 con el usuario).
 - **Estilo**: este documento sigue las reglas de la casa (escribimos con «:», «,» y «;»; la
   semirraya «–» solo para rangos numéricos, nunca como raya).
 
@@ -27,152 +27,143 @@ honestos, y de ahí al ajuste de tránsito, a ExoClock y al modo en vivo. Eso es
 
 La decisión maestra está firmada en este ciclo: **se reabre ADR-015**; NightScribe hace su
 detrend, su ajuste y su profundidad en numpy puro (sin scipy, sin astropy, ADR-004), tomando a
-EXOTIC como espejo de calidad sin copiar su código; el handoff con `inits.json` (ADR-004/015)
-queda intacto como vía experta para el stack pesado.
+EXOTIC como espejo de calidad y dejando su handoff como vía experta (D30). El estándar es el de
+la sección «Validación» del apéndice B de `PRECISION`: una serie sintética con dip conocido de
+0,01 mag recuperado a ±0,001 mag y, con datos reales, una profundidad dentro del 10 % con el rms
+de la check acorde al modelo de ruido.
 
 ---
 
-## 2. Registro de decisiones (D1–D39)
+## 2. Decisiones firmadas con el autor
 
-### Maestras
+Se firman aquí y se convierten en ADRs en la fase 0 (D1, D2 con la reabertura de ADR-015;
+D6, D7, D8, D9, D10, D11, D14, D15, D16, D17, D18, D19, D20, D21, D24, D25, D26, D27, D33,
+D35, D36, D37, D38, D39; las fases 9, 10 y 11 viven en ADR-051, ADR-050 y ADR-049
+respectivamente; D22, D23, D28, D29, D30, D31, D32, D40, D41, D42 y D43 quedan como decisiones
+de implementación).
 
-- **D1 · Reabrir ADR-015 de verdad.** NightScribe calcula su detrend, su ajuste de tránsito y su
-  profundidad en numpy puro. *Por qué*: T1–T8 exigen curvas y ajustes dentro de la app; EXOTIC
-  (astropy, Python ≤3.10, ultranest) es inviable en nuestro PyInstaller con Py3.12 (ADR-004).
-- **D2 · EXOTIC como espejo de calidad, no como código.** Adoptamos su *método* (detrend
-  `a1·exp(a2·X)`, bounds de parámetros, sigma-clip por ventanas, errores OOT, diagnósticos) con
-  fórmulas citadas (Zellem et al. 2020); **no se copia ni una línea** (licencia Caltech/JPL).
-  El stack pesado (muestreo anidado, limb darkening LDTk, ajustes multi-noche, fotometría PSF) se
-  queda detrás del handoff a EXOTIC.
-- **D3 · Alcance por fases.** Núcleo T1–T8 = fases 0–8. Apéndices separables que no bloquean al
-  núcleo: **9** ASTAP, **10** modo en vivo, **11** API ExoClock. El barrido
-  apertura×anillo×comp (práctica de EXOTIC) entra **por defecto apagado**; la salida AAVSO
-  `#TYPE=EXOPLANET` se **documenta** pero no se construye.
-- **D4 · Orden de fases 0–12 con dos compuertas.** Fase 7: paridad con EXOTIC sobre su dataset;
-  fase 11: petición a ExoClock, con permiso explícito del autor. Cada fase termina con la app
-  funcionando y una salida limpia.
-- **D5 · ADRs de este plan.** Revisión de **ADR-015** (exigida por `PRECISION.es.md:204`) y
-  nuevos **ADR-048** (fotometría de series), **ADR-049** (ExoClock), **ADR-050** (modo en vivo y
-  agrupación de tomas cortas), **ADR-051** (solver local ASTAP). El registro arranca en 048
-  porque ADR-047 ya existe.
+### Núcleo T1–T8
 
-### Entrada, interfaz y semántica de corrida
-
-- **D6 · La acción por lotes vive en la pestaña Fotometría del UFE**, con un **`LightCurveChart`
-  compacto embebido** en esa misma pestaña (no una ventana nueva). *Por qué*: el usuario ya
-  está midiendo la placa ahí; la serie es «más de lo mismo», no otro sitio.
-- **D7 · Auto-guardado con «Deshacer esta corrida»**, en vez de previsualizar-y-confirmar: cada
-  punto se guarda a medida que los frames completan, y una sola acción revierte la corrida
-  entera. Los frames con gate **se marcan, nunca se borran**; la curva detrendada se pinta
-  **siempre** junto a la cruda.
-- **D8 · Las imágenes de la serie salen siempre de la visita/sección** (nunca diálogo de
-  carpeta). El UFE abierto ad-hoc (imagen suelta) **esconde** el botón de serie, con la misma
-  regla que `btn_save_project`. *Por qué*: la serie necesita un contexto de proyecto para sus
-  puntos, su undo y su análisis.
-- **D9 · `run_id` persistido y presupuesto de rendimiento.** El «deshacer» sobrevive a
-  reinicios; el estado «serie incompleta» (corrida cancelada o a medias) es visible; presupuesto
-  **<0,5 s por frame** y UI responsive con una serie de 142 frames (el dataset real de EXOTIC).
-
-### Motor
-
-- **D10 · `measure_plate`, la receta única.** La receta de la placa única se extrae de
-  `gui/ufe_measure_tab.py` a `core/photometry.measure_plate(...)`; placa única y serie la
-  comparten. *Por qué*: dos recetas distintas significan dos precisiones distintas.
-- **D11 · Motor agnóstico por parámetros, sin ramas `if kind`.** `SeriesConfig` con
-  `zp_mode="catalog"|"relative"`, `detrend_policy="off"|"airmass"|"auto"`, `host_ref` opcional
-  y `comp_set` opcional; los tipos (tránsito, variable, SN, HADS) solo cambian esos parámetros y
-  las reglas de la capa de análisis.
-- **D12 · Validación del motor con pruebas sintéticas de semilla.** Tres pruebas ancla: (a) dip
-  de **0,01 mag** recuperado a **±0,001 mag**; (b) seno puro de **0,3 mag en 2 h** sin
-  distorsionar por el detrend; (c) SN con gradiente de galaxia recuperado al **1 %** en modo
-  `relative`. Más la serie de dos noches del D34.
-- **D13 · Detrend `a1·exp(a2·X)` con `a1` analítico; guardado sin columnas nuevas.** Los
-  coeficientes y el resumen viven en el panel de resumen, en la columna `notes` del CSV y en la
-  meta de la serie; **no se añaden columnas a la base para el detrend** (solo `mag_raw` y
-  `flags`, ver D18).
-- **D14 · Error honesto por punto, con el centilleo sobre el span del grupo.** Ecuación CCD
-  (ganancia/RON) + centilleo (Young 1967, con los parámetros del sitio) + término ZP/color; con
-  agrupación, el centilleo se integra sobre la extensión temporal del grupo (D19). El panel y
-  el CSV distinguen **error interno** de **error total**; el total nunca baja del interno.
-- **D15 · Ensemble ponderado con veto MAD por frame (T2).** Media ponderada por el error de
-  cada comp, con veto de la comp outlier en cada frame; sin dispersión de color, la pendiente se
-  reporta indeterminada y no rompe nada (regla H1).
-- **D16 · Convención temporal única.** Por defecto, instante a **media exposición**; para ExoClock
-  se exporta el **arranque** de la exposición (D30); `BJD_TDB` se calcula bajo demanda con tabla
-  de bumeranes embebida + corrección heliocéntrica, con el sesgo residual (<0,02 s) **medido y
-  documentado**.
-- **D17 · Sin astrometría por frame.** La serie se siembra desde la placa de referencia (WCS si
-  hay, o un clic del usuario), sigue al objetivo por centroide local y marca `guide_jump` cuando
-  el salto es grande (reanclaje); la anotación de puntos degrada con «sin WCS» en vez de mentir.
-- **D18 · Migración v12 mínima.** Solo `mag_raw REAL` y `flags TEXT` en la tabla de puntos, más
-  los helpers de escritura en lote (`add_points`, `delete_points(db, ids)`) en
-  `core/followup.py`/`core/db.py`. Nada más cambia de esquema.
-
-### Serie, cadencia y honestidad
-
-- **D19 · Agrupación en el dominio de la medida, nunca apilado de píxeles.** Se mide cada
-  sub-toma y se combinan los **flujos** con pesos `1/σ²` y veto MAD (≥2 tomas válidas); el error
-  del grupo incluye el centilleo sobre su span; el tiempo efectivo es la media ponderada de los
-  medios de sus miembros; para ExoClock, arranque = media − integración total/2, documentado en
-  el `ExoClock_info.txt`. *Por qué*: apilar en píxel destroza la fotometría de precisión y el
-  modelo de error (práctica CMOS/sCMOS del Gsense 400 y de la literatura del autor: QHY42Pro).
-- **D20 · Guardia de cadencia: aviso, no bloqueo.** Reglas por tipo (tránsitos: ≥3 puntos por
-  ingress con la ventana recomendada de `core/transits.py`; HADS: `POINTS_PER_CYCLE=12` y
-  `CADENCE_CAP_S=900` de `core/hads.py`; variables: criterio de Nyquist). Si se rompe el ingress,
-  el aviso pasa a **rojo**; `group_n=1` por defecto para tránsitos y variables (agrupar ahí es
-  un riesgo, no una ganancia). Las reglas viven en la capa de análisis, no en el motor.
-- **D21 · En vivo y agrupación componen.** El driver en vivo cierra un punto cuando el grupo se
-  completa (N tomas o T segundos); los ficheros en vivo **no necesitan estar resueltos**
-  astrométricamente.
-- **D22 · Guardas de honestidad.** Puntos en modo `relative` quedan **bloqueados** para el
-  export AAVSO EFF; la cabecera del CSV lleva el `mode`; el panel dice en lenguaje llano qué es
-  cada columna.
-- **D23 · Modo en vivo barato.** Sondeo de carpeta ~2 s, chequeo de estabilidad de tamaño antes
-  de leer, commits de SQLite agrupados (5 frames o 10 s), `notify_points` por lote, y **un solo
-  motor**: el mismo `measure_series` del D10/D11, sin «otro motor para en vivo».
-- **D24 · No reimplementar el plegado.** El análisis periódico se alimenta con
-  `lightcurve_data.build_payload(source="measure")`; NightScribe ya pliega y esquematiza bien,
-  así que la serie solo aporta puntos.
-- **D25 · Sin concesiones de calidad ni de facilidad.** El flujo por defecto **es** el de máxima
-  precisión; todo default está citado en el código, cubierto por tests con semilla y
-  configurable: parámetros del **sitio** en Configuración (ADR-028) y parámetros de
-  **placa/serie** en el `UfeAdvancedDialog` existente (ampliado, nunca un diálogo nuevo). Cada
-  control muestra su default, su tooltip con unidades y razón, y un «restaurar default».
-
-### Solucionador y ajuste
-
-- **D26 · ASTAP como solver local.** `core/sources/astap.py` con el contrato de
-  `core/sources/astrometry.py` (`solve(path, progress) -> cards|None`), dispatcher `core/solve.py`
-  con `solver=auto|astap|astrometry` y `astap_path`; WCS **en memoria** vía el lado `-wcs`
-  parseado con `fits_io.read_header` (nunca mutar el FITS del usuario); `-update` opcional y solo
-  desde el botón Solve del UFE; hints `-fov` (de `pixel_um`/`focal_mm`), `-ra`, `-spd`; caché por
-  hash+backend; mensajes de fallo bilingües.
-- **D27 · Limb darkening cuadrático (Claret)** con paridad de modelo <1e-5 frente a
-  `pylightcurve` en modo cuadrático; la diferencia del no lineal queda absorbida por la
-  tolerancia fin a fin (T_mid 3σ, Rp/Rs 5 %); se revisa solo si aparecen residuos de ingress en
-  el dataset de validación.
-- **D28 · Validación de las σ contra EXOTIC.** Si la desviación de nuestros parámetros se sale
-  >20 % de la del posterior de EXOTIC, se cambia a **bootstrap paramétrico**.
-- **D29 · La combinación de comps la arbitra el dato.** Implementadas las dos (ponderada, la del
-  T2, por defecto; y suma de flujos, la de EXOTIC/AIJ); gana la de **menor dispersión OOT** en el
-  dataset; la perdedora se documenta como alternativa.
-
-### ExoClock
-
-- **D30 · Export con formato HOPS, envío manual.** Archivo de **3 columnas** (JD_UTC de arranque
-  de exposición, flujo relativo, error) + `ExoClock_info.txt` con el Comments prefilled (planeta,
-  formato de tiempo, sello, filtro, exposición, autocalificación del observador); el botón
-  **abre `https://exoclock.space/upload/` en el navegador** del usuario; al confirmar, outcome
-  `reported_exoclock` (`core/project.py`). **Sin credenciales guardadas y sin scraping** de
-  `/upload/` (lo prohíbe robots.txt). *Por qué*: no hay API pública de subida (verificado
-  2026-09-27: `/api/` responde 404, solo hay endpoint de lectura `database/planets_json`, y el
-  paquete oficial `exoclock` de PyPI es solo lectura).
-- **D31 · Checklist previo con semáforo.** Antes de exportar: baseline ≥1 h a cada lado, ≥3
-  puntos por ingress, sin flags rojos, dip coherente con la efemérides. **No bloquea**: es un
-  consejo honesto, no un muro.
-- **D32 · La API de ExoClock es la compuerta de la fase 11.** Solo se construye si existe un
-  endpoint público documentado y el autor da permiso explícito; en caso contrario la fase 11 se
-  cierra documentando el envío manual de la fase 8.
+- **D1 · T1/T2 juntas: punto cero y comps por frame.** Cada frame se mide con su ZP propio y sus
+  comps propias (ZP por frame, nunca fijo); cuando las comps útiles de un frame son <3, el
+  fallback es un ZP interpolado de los frames vecinos de la propia corrida (T2); nunca un ZP
+  global fijado.
+- **D2 · ADR-015 se reabre.** La vía numpy puro de NightScribe pasa a ser la primera de las dos;
+  el handoff EXOTIC se conserva como la segunda (experta). El plan se rige por la sección
+  «Validación» del apéndice B de `PRECISION` con umbrales fijos antes de codear (D38).
+- **D3 · Medible y comparable.** NightScribe reporta **T_mid y la profundidad** con errores
+  honestos: la curva son puntos con error total (D12), la profundidad de un tránsito conocido
+  dentro del 10 % de la referencia, y **T_mid del ajuste de tránsito** (fase 7). La corrida
+  EXOTIC real del usuario sigue siendo la referencia de paridad de la fase 7.
+- **D4 · Sin astropy.** `BJD_TDB` de EXOTIC no puede copiarse; NightScribe usa su propia
+  `core/coords.py` / `ephem_minor.py` (schlyter) para BJD_TDB/TDB y HJD (D1).
+- **D5 · Checklist por tipo, no genérico.** Transito: baseline y puntos por ingress;
+  HADS: 12 puntos + tope de cadencia; variable: Nyquist + huecos. Un punto suelto sin serie solo
+  avisa en la vista de Análisis (jamás calcula una profundidad por tipo: un punto suelto no es
+  por sí un tránsito, D11).
+- **D6 · Undo por corrida, no por visita.** «Deshacer esta corrida» borra los puntos de ese
+  `run_id` (D9), sin tocar el resto de la visita.
+- **D7 · Flags de calidad visibles y persistidos.** Cada punto guarda sus flags (T7) y la curva
+  los pinta (forma/color distinto); en CSV/EFF van a `notes`/`comments` (D13). **Nunca se borra
+  un punto por flag**.
+- **D8 · Se trabaja desde la visita.** El flujo es: visita → ficheros de la visita → «Medir la
+  secuencia». Sin visita no hay serie (regla D8 de la casa); desde un listado se llega con
+  «Añadir ficheros a la visita» (D36), nunca con diálogo de carpeta suelto.
+- **D9 · `run_id` de corrida.** Cada «Medir» es una corrida con su id; los puntos de la serie
+  llevan ese id (junto a `session_id` de la visita) para Undo, auditoría y multinoche (D36).
+- **D10 · Reuso del motor de placa.** T1 reutiliza el bloque `_measure`/`_calibrate_and_fill`
+  de `gui/ufe_measure_tab.py` (y su extracción en `measure_plate` de la fase 1) para cada frame;
+  no se escribe un segundo motor.
+- **D11 · Motor agnóstico, tipos por parámetros.** Un solo `core/series_measure.py` paramétrico
+  (tipo, forma esperada, cadencia, flags): un tránsito se lee con **T_mid + profundidad**; una
+  variable con fase y periodo (plegado), no un único T_mid; una SN con noches y ascenso; HADS
+  hereda sus flags H6 (D5). El tipo solo elige parámetros y checklist, no otro código (D39).
+- **D12 · Errores honestos.** El error total ≥ el interno **siempre**; el semáforo H6 dispara
+  con ruido de fondo simulado; la dispersión de la curva no esconde la incertidumbre.
+  **Pruebas ancla** (semilla fija): (a) el dip de 0,01 mag del tránsito de referencia (rango
+  típico de dips: 0,005–0,030 mag) se recupera dentro de ±0,001 mag **con** y **sin** detrend;
+  (b) una curva con seno artificial de 0,3 mag / 2 h entra intacta (el detrend no la distorsiona);
+  (c) la mediana de comps resiste una comp corrupta inyectada (ensemble + MAD, T2); (d) un punto
+  con flag en rojo no mueve la mediana del conjunto; (e) una SN sobre el gradiente de su galaxia
+  se recupera al 1 % en modo `relative` (la validación que también firma ADR-048).
+- **D13 · Detrend simple, visible, sin columnas nuevas.** `a1·exp(a2·X)+a3` con `a1` analítico
+  (la receta de EXOTIC, citada); `a2` libre con bounds `[-1;1]`; la salida son los tres
+  coeficientes mostrados en el resumen y en `notes` del CSV; **no** se añaden columnas de
+  parámetros al export (los coeficientes del detrend no son una variable física medible: añadir
+  su columna sería ruido sobre la señal; regla de oro de T5: la cruda siempre visible).
+- **D14 · Sin agrupación por defecto (group_n = 1).** Cada frame es un punto; la agrupación es
+  opt-in y documentada (D19).
+- **D15 · Tiempo a media exposición.** Cada punto lleva `T_mid = T_inicio + EXPTIME/2` como
+  tiempo central, y `mjd`/`hjd` según política (D16); el `EXPTIME` de cada frame sale de
+  `project_files.meta` vía `file_id` (ADR-047); la convención se documenta.
+- **D16 · HJD/BJD_TDB propio, sin `barycorrpy`.** Se usa el código propio (Schlyter vía
+  `ephem_minor.py`) para HJD/BJD_TDB; la tabla de segundos intercalares (UTC→TT) queda embebida
+  con fecha de corte documentada (2026-09-27) y actualización manual con cada release. Si falta,
+  valores de referencia *golden* + tabla propia, con residual <0,02 s documentado; `barycorrpy`
+  es opcional (`importorskip`). El HJD de EXOTIC no puede copiarse (depende de astropy, ADR-004).
+- **D17 · Sin astrometría por frame (por defecto).** El objetivo se toma de la referencia (WCS
+  de una placa del set, o coords del proyecto); el centroide por frame se usa como señal de
+  guiado (flag de salto), no como posición. El costo de la astrometría por frame en 3,000–5,000
+  frames no paga el beneficio (D30: el handoff EXOTIC sigue siendo la vía experta).
+- **D18 · Esquema v12 (migración aditiva en `core/db.py`).** En `photometry_points` (la única
+  tabla que almacena magnitudes): `mag_raw REAL`, `flags TEXT` y `run_id INTEGER NULL`; el
+  `session_id` existente **sigue siendo la visita** y no se reusa como corrida (es FK a
+  `project_sessions` y `db.py` activa `PRAGMA foreign_keys = ON`: un id de corrida ahí rompería
+  la FK y el enlace punto→visita que necesita el multinoche, D36). Tabla nueva
+  `measurement_runs(id, session_id, created, cfg_json, status)` con la configuración y el estado
+  de la corrida (`complete`/`incomplete`/`undone`); el Undo borra los puntos del `run_id` y marca
+  la corrida `undone` (auditoría, D9). Las filas legacy se conservan intactas; la vía
+  `add_point` (punto suelto del UFE) mantiene el contrato de hoy: escribe con `flags=NULL`,
+  `mag_raw=NULL` y `run_id=NULL`; no se toca ninguna otra tabla.
+- **D19 · Agrupación (grouping, `group_n`).** Agrupa N frames para suavizar cadencias típicas
+  (10–30 s, minutos si acaso); el tiempo es el centro del grupo; default por tipo = 1
+  (transito y variable), configurable y documentado (D19 es una decisión de comodidad, no una
+  necesidad física).
+- **D20 · Cadencia por tipo (guardia en UI y en serie).** Transito: puntos por ingress
+  (aviso, y rojo si se rompe); HADS: 12 puntos + tope de cadencia; variable: Nyquist. `group_n`
+  no sustituye la cadencia; se avisa con texto llano, no se bloquea.
+- **D21 · Modo en vivo = sondeo de carpeta.** No hace la app de «servidor»: un driver ligero
+  observa la carpeta de la sesión, detecta FITS nuevo, mide en lote, actualiza la curva; se
+  activa manualmente por sesión (ADR-050).
+- **D22 · Export de serie = CSV con punto por frame.** El export de serie no genera el
+  «punto suelto» de hoy (que sí hace la vía de un solo frame del UFE); la serie exportada es
+  una tabla CSV/AAVSO con un punto por frame, con `notes` con flags y coefs.
+- **D23 · Un solo punto suelto es una acción de una sola placa.** Medir «un punto suelto»
+  (p. ej. una SN entre otras observaciones) usa la misma receta de placa (`measure_plate`) pero
+  **sin** serie, sin agrupación y sin detrend: es H3 de `PRECISION`, no T1–T8. El motor de
+  serie solo arranca con ≥2 frames y su checklist D20.
+- **D24 · Reutilizar lo que ya existe.** La vista de Análisis
+  (`main_window._analysis_transit_block`, `_fu_science_blocks`) consume la serie vía
+  `lightcurve_data.build_payload` **extendido con el parámetro `source`** (hoy la firma es
+  `(fu, sn_type_fallback, hads, variable)`; el parámetro se añade en la fase 6) y la dibuja con
+  `lightcurve_widget` existente; el plegado (variables) y la comparación contra lo esperado
+  (HADS) ocurren allí, no se reimplementa aquí; igual el punto suelto de hoy (pestaña
+  Fotometría del UFE → `photometry_points`).
+- **D25 · Facilidad de uso es requisito.** La serie se mide con un botón por visita, con
+  defaults sensatos y avisos llanos; los knobs avanzados (aperturas, agrupación, detrend,
+  sigma-clip, comp set) viven en el diálogo Avanzado y se pueden abrir sin miedo.
+- **D26 · ASTAP como opción local a nova.** Selector auto / ASTAP / nova; fallback a nova si
+  falta o falla; no toca el flujo de resolución (la regla nova se mantiene, ADR-051).
+- **D27 · Paridad de modelo con EXOTIC (limb darkening).** El modelo de tránsito de la fase 7
+  reproduce la curva de EXOTIC con <1e-5 de diferencia sobre el dataset de referencia
+  (D27: el modelo de limb darkening de EXOTIC, implementado en numpy, sin `batman`/
+  `pylightcurve` en producción; estas son solo referencia de test, `importorskip`).
+- **D28 · Errores por bootstrap paramétrico (fallback del ajuste).** Si la covarianza de
+  Gauss-Newton/LM no converge o da σ no fiables, se usa bootstrap paramétrico para el σ final;
+  siempre mostrando el método usado (D12 honestidad).
+- **D29 · Ensemble de comps: arbitraje ponderada vs suma.** Cuando hay >3 comps, NightScribe
+  arbitra entre el ensemble ponderado (1/σ²) y la suma simple, eligiendo el de menor dispersión
+  OOT en tránsitos o el de menor dispersión de la estrella check en el resto de tipos; si ambas
+  son iguales, ponderada; el resultado se muestra en el panel. (Arbitraje T2, D5.)
+- **D30 · Handoff EXOTIC sigue siendo la vía experta.** Nada cambia en el flujo de hoy (ADR-015
+  actual); el plan añade por encima la vía numpy; el handoff se conserva.
+- **D31 · Salida de serie = curva + punto por frame.** La «serie medida» no es un solo número:
+  es la tabla de puntos (con flags, errores, coeficientes). El punto suelto se usa si el
+  proyecto solo lo pide (D23), pero el flujo es serie → curva → export.
+- **D32 · Umbral de profundidad: 10 % de referencia.** La profundidad del tránsito en la
+  serie debe estar dentro del 10 % del valor de referencia (la corrida EXOTIC de HAT-P-32b de
+  la verificación 2; con datos propios, un tránsito conocido como HD 209458 b, sección 6); si
+  no, se avisa en el semáforo (D12) y se deja el diagnóstico al usuario.
 
 ### Disciplina y reuso
 
@@ -190,18 +181,31 @@ queda intacto como vía experta para el stack pesado.
 - **D36 · Multinoche: una corrida por noche, agrega Análisis.** Cada noche es una corrida con su
   `run_id` y su Undo independiente; la agregación por objetivo la hace la vista Análisis (ya
   existe vía `fu["points"]`); **binning solo de visualización** (el `time_bin` de EXOTIC, nunca
-  altera datos) para series de miles de puntos; entrada de listados con acción «Añadir ficheros
-  a la visita» (selección múltiple; **no** diálogo de carpeta: la regla D8 se mantiene).
+  altera datos) para series de decenas de miles de puntos; entrada de listados con acción «Añadir
+  ficheros a la visita» (selección múltiple; **no** diálogo de carpeta: la regla D8 se mantiene).
 - **D37 · Documento de usuario `SEQUENCES`.** Nueva pareja `docs/SEQUENCES.es.md` +
   `docs/SEQUENCES.md` (el «qué es y cómo se trabaja»; `PHOTOMETRY` sigue siendo las prácticas y
-  `PRECISION` los números). Bilingüe, progresivo por fases (5, 8, 10, 12), con botón «?» en el
-  bloque de serie que lo abre en el visor de docs (que descubre los `.md` solo).
+  `PRECISION` los números). El documento incluye la sección de ExoClock (fase 8) y la de en vivo
+  (fase 10) desde el principio, progresivo por fases (5, 8, 10, 12), con botón «?» en el bloque
+  de serie que lo abre en el visor de docs (que descubre los `.md` solo).
 - **D38 · Compuertas con umbrales fijos.** Los umbrales de la fase 7 (y de la 11) se escriben
   **antes** de medir y **no se relajan para que un test pase**; si algo no pasa, se reporta y se
   actúa según el plan (vía handoff / cerrar apéndice), nunca ajustando el umbral hacia abajo.
 - **D39 · Validación de tipos en este ciclo.** SN, variables y HADS de seguimiento, y el modo en
   vivo, se validan **ahora**, en este plan (pruebas sintéticas + dataset real), no «más tarde»:
   el motor es agnóstico (D11), así que validar un tipo es validar parámetros, no código nuevo.
+- **D40 · Honestidad del modo `relative`.** Los puntos medidos con `zp_mode="relative"` (sin
+  catálogo) quedan **bloqueados** para el export AAVSO EFF, que exige magnitud calibrada, con
+  aviso en lenguaje llano; la cabecera del CSV declara el modo. ExoClock es la excepción
+  natural: su formato es flujo relativo por definición (ADR-049).
+- **D41 · Checklist ExoClock con semáforo, sin bloqueo.** Antes de exportar: baseline ≥1 h a
+  cada lado, ≥3 puntos por ingress, sin flags rojos, dip coherente con la efeméride. Avisa, no
+  bloquea (ADR-049).
+- **D42 · API ExoClock = compuerta con permiso.** Solo se construye si existe un endpoint
+  público documentado y el autor lo autoriza explícitamente; si no, la fase 11 se cierra
+  documentando el envío manual de la fase 8 (ADR-049).
+- **D43 · Presupuesto de rendimiento.** <0,5 s por frame y UI responsive con la serie de 142
+  frames (el dataset de EXOTIC); es referencia para afinar, no compuerta (D38).
 
 ---
 
@@ -212,7 +216,7 @@ queda intacto como vía experta para el stack pesado.
 | **Núcleo T1–T8** | 0–8 | ADRs, `measure_plate`, motor, detrend, migración v12, worker+UI, visitas/multinoche, ajuste de tránsito, ExoClock manual | **No se recorta**: es lo que firma PRECISION |
 | Apéndice A | 9 | Solver local ASTAP | Se aplaza al final |
 | Apéndice B | 10 | Modo en vivo | Se aplaza |
-| Apéndice C | 11 | API ExoClock | Depende de permiso y de endpoint (D32) |
+| Apéndice C | 11 | API ExoClock | Depende de permiso y de endpoint (D42) |
 | Por defecto apagado | 3/7 | Barrido apertura×anillo×comp estilo EXOTIC | Entra desactivado; se enciende desde Avanzado |
 | Documentado, no construido | 8/12 | Salida AAVSO `#TYPE=EXOPLANET` | Solo doc |
 
@@ -230,26 +234,28 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 ### Fase 0 · Documentos y decisiones firmadas
 
 - **Decisiones**: D1, D2, D5, D38; y el checklist de verificaciones de la sección 5.
-- **Por qué**: `PRECISION.es.md:204` exige firmar la reapertura de ADR-015 antes de código; los
+- **Por qué**: la nota de decisión del apéndice B de `PRECISION` exige firmar la reapertura de
+  ADR-015 antes de código; los
   ADRs nuevos fijan el marco (48 serie, 49 ExoClock, 50 en vivo+agrupación, 51 ASTAP) para que
   las fases siguientes no reabran discusiones.
 - **Implementación**: revisión de `docs/adr/ADR-015-exoplanets.md` (estado: reabierto; la vía
   numpy pasa a ser la primera, el handoff queda como vía experta); cuatro ADRs nuevos en
   `docs/adr/` y entrada en `docs/adr/README.md`; este documento ya está escrito
-  (`docs/PLANS/series-photometry.md`, con su **PUNTO DE ENTRADA** en la sección 7); actualizar
-  `docs/PRECISION.es.md:115` y su par inglés (la fila «Falta: piezas T1–T8; decisión ADR-015…»
-  pasa a «en curso, ver PLANS/series-photometry»); cerrar el checklist de la sección 5 con el
-  resultado de cada verificación y su fallback ya elegido.
-- **Tests**: comprobación de enlaces de docs y ADR README; ningún código se toca.
-- **Salida limpia**: ADR-015 firmado por el autor; 5 ADRs publicados; checklist cerrado; el
-  plan no deja preguntas abiertas antes de la fase 1.
+  (`docs/PLANS/series-photometry.md`, con su **PUNTO DE ENTRADA** en la sección 7); la fila de
+  T1–T8 de la tabla «Qué es hoy qué» de `docs/PRECISION.es.md` y su par inglés ya quedó
+  actualizada («En curso: piezas T1–T8…»), solo hay que verificarla; cerrar el checklist de la
+  sección 5 con el resultado de cada verificación y su fallback ya elegido.
+- **Tests**: revisión de enlaces de docs y del ADR README (hoy no hay test automático de
+  enlaces; si se quiere, se añade uno simple que recorra los `.md`); ningún código se toca.
+- **Salida limpia**: ADR-015 revisado y firmado por el autor; los 4 ADRs nuevos (048–051)
+  publicados; checklist cerrado; el plan no deja preguntas abiertas antes de la fase 1.
 
 ### Fase 1 · `measure_plate`: extraer la receta de la placa
 
 - **Decisiones**: D10, D25.
 - **Por qué**: la receta completa de medida vive hoy en la GUI
-  (`gui/ufe_measure_tab.py`: bloque `_measure`/`_calibrate_and_fill`, y el área de export EFF en
-  `_measure` de la pestaña). La serie necesita llamarla sin GUI y sin duplicarla; dos recetas
+  (`gui/ufe_measure_tab.py`: bloque `_measure`/`_calibrate_and_fill`, y el área de export
+  CSV/EFF en `_export`). La serie necesita llamarla sin GUI y sin duplicarla; dos recetas
   serían dos precisiones.
 - **Implementación**: extraer a `core/photometry.measure_plate(image, cfg) -> PlateResult`
   (dataclass: flujo del objetivo, comps con errores, FWHM, cielo, flags, ZP±err, término de
@@ -270,33 +276,35 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Implementación**: `SeriesConfig` (frozen dataclass: `zp_mode`, `detrend_policy`, `host_ref`,
   `comp_set`, aperturas, techo de saturación, parámetros de sitio, `group_n`) y
   `measure_series(paths, cfg, progress, cancel) -> SeriesResult` con un punto por frame: ZP por
-  frame desde las comps de **esa** imagen (T1, reutilizando `measure_plate`), ensemble ponderado
+  frame con ensemble (T1–T2, reutilizando `measure_plate`), ensemble ponderado
   con veto MAD por frame (T2), puertas por frame (T7: saturación, `guide_jump` por centroide
   sobre la placa de referencia, cósmico sigma-clip local, ZP outlier/nube; **marcado, nunca
   borrado**), error total por punto (T4, con `scintillation_mag` sobre el span), instante a
   media exposición y `mjd`/`hjd` con la convención del D16. Sin astrometría por frame (D17).
   Progreso y cancelación al estilo de `SequenceWorker` en `gui/workers.py`.
-- **Tests**: `tests/unit/test_series_measure.py` con las tres pruebas ancla del D12 y semillas
-  fijas; test de rendimiento (142 frames sintéticos <0,5 s/frame); test de cancelación (estado
-  «serie incompleta»).
+- **Tests**: `tests/unit/test_series_measure.py` con las anclas del D12 que no necesitan detrend
+  ((a) sin detrend, (c), (d) y (e)) y semillas fijas; referencia de rendimiento (142 frames
+  sintéticos <0,5 s/frame; referencial para afinar, no compuerta: D43); test de cancelación
+  (estado «serie incompleta», persistido en `measurement_runs.status`, D18).
 - **Salida limpia**: motor usable desde tests y CLI; la GUI todavía no expone la acción.
 
 ### Fase 3 · T3 y T5: apertura óptima y detrend honesto
 
 - **Decisiones**: D13, D25, D34.
 - **Por qué**: T3 (apertura por noche) y T5 (detrend) son donde la curva se ganan o se pierde el
-  rms; y el detrend mal construido se come señal (advertencia literal de `PRECISION:226`).
+  rms; y el detrend mal construido se come señal (la regla de oro de T5 de `PRECISION`).
 - **Implementación**: barrido de `k ∈ [1,0; 2,0]·FWHM` por noche eligiendo el que minimiza el
   rms de la check (con FWHM por frame, para que las defensas de guiado no rompan la curva);
-  `detrend_series(...)` con `a1·exp(a2·X)` y `a1` **analítico** (EXOTIC), política por capas:
-  `off` (curva cruda), `airmass` (mínimo honesto), `auto` (añade FWHM/cielo/x-y solo si el
-  residuo baja con umbral de mejora citado). En multinoche, coeficientes por noche con fallback
+  `detrend_series(...)` con `a1·exp(a2·X)+a3` y `a1` **analítico** (EXOTIC), política por capas:
+  `off` (curva cruda), `airmass` (mínimo honesto), `auto` (añade FWHM/cielo/x-y solo si el rms
+  del residuo baja al menos un 10 %; umbral fijo, mostrado en el panel). En multinoche,
+  coeficientes por noche con fallback
   `a1`-solo (D34). Salida en tres sitios: panel de resumen, columna `notes` del CSV, meta de la
   serie (D13: sin columnas nuevas). La pestaña pinta **cruda + detrendada** con la leyenda
   explicando que el detrend puede comerse señal.
-- **Tests**: las tres anclas del D12 (el dip no debe moverse con el detrend; el seno no debe
-  distorsionarse), la prueba A/B de dos noches con transparencia desplazada un 3 % (plana con
-  detrend por noche, salta sin él) y el fallback de noche corta.
+- **Tests**: las anclas (a) **con** detrend y (b) del D12 (el dip no se mueve con el detrend; el
+  seno no se distorsiona), la prueba A/B de dos noches con transparencia desplazada un 3 %
+  (plana con detrend por noche, salta sin él) y el fallback de noche corta.
 - **Salida limpia**: curva cruda y detrendada con coeficientes a la vista; nada de magia.
 
 ### Fase 4 · Migración v12
@@ -304,14 +312,15 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Decisiones**: D18, D7 (flags persistidos), D9 (`run_id`).
 - **Por qué**: los puntos de serie necesitan su crudo (`mag_raw`) y sus puertas (`flags`)
   **sin** tocar el resto del esquema ni romper el flujo de puntos existentes de las visitas.
-- **Implementación**: en `core/db.py` (`_migrate`, tras la v11): `mag_raw REAL`, `flags TEXT`,
-  y guardar `run_id` en la fila (hoy la columna de sesión ya existe en el patrón de visitas; si
-  no, se reutiliza `session_id` con el id de corrida); helpers `add_points(db, rows)` en lote y
+- **Implementación**: en `core/db.py` (`_migrate`, tras la v11): `mag_raw REAL`, `flags TEXT` y
+  `run_id INTEGER NULL` en `photometry_points`, más la tabla nueva `measurement_runs(id,
+  session_id, created, cfg_json, status)` (D18); helpers `add_points(db, rows)` en lote y
   `delete_points(db, ids)` en `core/followup.py` (junto a `add_point`, `list_points`,
-  `delete_points_for_file`); la migración es idempotente y avisa si el esquema viene de otra
-  versión conocida.
+  `delete_points_for_file`), más `create_run`/`set_run_status` para la tabla de corridas; la
+  migración es idempotente y avisa si el esquema viene de otra versión conocida.
 - **Tests**: `tests/unit/test_db_v12.py`: migración desde v11 y desde esquema limpio, idempotencia,
-  escritura en lote + `delete_points` por `run_id` (el «deshacer» de una corrida sin tocar otras).
+  escritura en lote + `delete_points` por `run_id` (el «deshacer» de una corrida sin tocar otras)
+  y puntos legacy con su `session_id` de visita intacto.
 - **Salida limpia**: bases existentes actualizan sin pérdida; los flujos de puntos de hoy no se
   enteran.
 
@@ -330,7 +339,8 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
     «Deshacer esta corrida», botón «?»). El botón se oculta si la pestaña no tiene visita (D8).
   - `LightCurveChart` compacto embebido en la pestaña (placeholder `QWidget` +
     `replaceWidget`): cruda + detrendada, puntos con flag en color y forma distintos
-    (extender `lightcurve_widget._point_style` si aún no soporta tres series, verificación 6),
+    (hay que extender `lightcurve_widget._point_style`: hoy solo distingue
+    survey/quicklook/manual por `source`; verificación 6 cerrada),
     leyenda por noche en multinoche, decimación de visualización (D36).
   - `gui/ufe_advanced_dialog.py` + `.ui` ampliados con los knobs de serie (aperturas, `group_n`,
     política de detrend, ventana de sigma-clip, techo de saturación), cada uno con default
@@ -340,7 +350,8 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
   - Textos con `tr()`; el botón «?» abre `SEQUENCES` en el visor de docs (D37).
 - **Tests**: `tests/unit/test_ufe_measure_tab.py` ampliado (señales, ocultación del botón sin
   visita, undo), test offscreen del worker con serie sintética, test de que la serie cancelada
-  deja el estado «incompleta», i18n sin `unfinished`.
+  deja el estado «incompleta», test de que el export EFF bloquea puntos en modo `relative` con
+  aviso llano (D40), i18n sin `unfinished`.
 - **Salida limpia**: flujo completo en la GUI: visita → Medir → progreso → curva → flags →
   deshacer; app funcional y legacy intacto.
 
@@ -350,14 +361,16 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Por qué**: es donde las tres misiones de uso (tránsito, variable, SN multinoche) se
   conectan al análisis existente; sin esta fase, la serie sería un adorno sin análisis.
 - **Implementación**:
-  - `gui/widgets/visits_panel.py` (`_on_measure_clicked`): arranca la serie de la visita (no
-    de una carpeta), y la nueva acción «Añadir ficheros a la visita» (selección múltiple) para
+  - `gui/widgets/visits_panel.py`: acción nueva «Medir la secuencia» en la ventana de la visita
+    (handler nuevo, p. ej. `_on_measure_series_clicked`; el `_on_measure_clicked` actual abre
+    una medida suelta y no se toca), que arranca la serie de la visita (no de una carpeta), y la
+    nueva acción «Añadir ficheros a la visita» (selección múltiple) para
     llegar ahí desde un listado (D36).
   - Cada noche = una corrida con su `run_id` y su Undo; en la curva, línea/leyenda por noche.
   - Análisis (`main_window._analysis_transit_block`, `_fu_science_blocks`,
-    `_fu_export_report`): alimentar `lightcurve_data.build_payload` con `source="measure"` para
-    que la curva medida entre en el plegado de variables/HADS y en la vista de SN **sin
-    reimplementar nada** (D24/D33).
+    `_fu_export_report`): la serie entra en el plegado (variables) y la comparación contra el
+    esperado (HADS/SN) vía `lightcurve_data.build_payload`, extendido en esta fase con el
+    parámetro `source` (`source="measure"`), **sin reimplementar nada** más (D24/D33).
   - Guardia de cadencia (D20) al crear la serie: aviso con las reglas del tipo (tránsito: puntos
     por ingress; HADS: 12 puntos y tope de cadencia; variable: Nyquist); rojo si se rompe el
     ingress; `group_n=1` por defecto en tránsitos y variables.
@@ -376,7 +389,10 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Implementación**: `core/transit_fit.py`:
   - Modelo: tránsito cuadrático con limb darkening de Claret (D27), efemérides de
     `core/transits.py` como semilla (T0 + n·P), parámetros `rprs`, `tmid`, `a/R*` (o duración
-    equivalente) y baseline local.
+    equivalente) y baseline local. Los coeficientes de limb darkening (u1, u2) salen de una
+    rejilla de Claret embebida, interpolada con los parámetros estelares de la ficha del
+    planeta (NASA Archive, ya en caché vía el handoff de `core/exotic.py`), editables a mano;
+    el panel declara siempre su origen.
   - Ajuste: Gauss-Newton/LM en numpy con jacobiano analítico (sin scipy), bounds como en EXOTIC:
     `rprs ∈ [0; 1,25·prior]`, `tmid ± 25σ` con tope `±P/4`, `a2 ∈ [-1; 1]`; sigma-clip de 25–30
     min por `lstsq` deslizante; errores desde la dispersión OOT (no de la covarianza interna
@@ -386,9 +402,10 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
   - Entrada desde Análisis (`_analysis_transit_block`), para proyectos de tipo tránsito; para
     SN y variables el motor no se toca (D11).
   - **Compuerta**: paridad con EXOTIC sobre su dataset real (ver verificación 2): **T_mid dentro
-    de 3σ** de EXOTIC, **Rp/Rs dentro de 5 %**, **σ de parámetros dentro de 20 %** (si no, D28:
+    de 3σ combinados** (cuadratura de la σ de EXOTIC y la nuestra), **Rp/Rs dentro de 5 %**,
+    **σ de parámetros dentro de 20 %** (si no, D28:
     bootstrap paramétrico), profundidad de la muestra conocida dentro del 10 %
-    (`PRECISION:237–240`) y rms de la check acorde al modelo de ruido. Umbrales fijados en el
+    (D32) y rms de la check acorde al modelo de ruido. Umbrales fijados en el
     ADR-015 revisado **antes** de medir (D38).
 - **Tests**: `tests/unit/test_transit_fit.py` con el dataset sintético de semilla, la paridad de
   modelo D27 (<1e-5 vs `pylightcurve` o, si no instala, vs `batman`, verificación 3) y la suite
@@ -406,17 +423,19 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Implementación**: `core/exoclock_export.py`:
   - Archivo de 3 columnas (JD_UTC de **arranque** de exposición, flujo relativo, error), con la
     media de los comps en el denominador (convención HOPS) y, con agrupación, arranque = media −
-    integración total/2 (D19).
+    integración total/2 (D19). El arranque de cada punto es su `mjd` (media exposición, D15) −
+    EXPTIME/2, con el EXPTIME de `project_files.meta` vía `file_id` (ADR-047); un punto sin
+    EXPTIME bloquea el export con aviso llano.
   - `ExoClock_info.txt`: Planeta, Time format JD_UTC, Time stamp Exposure start, Flux format
     Flux, Filter, Exposure time, Comments prefilled (autocalificación honesta y, si procede, la
     nota de agrupación).
-  - Checklist con semáforo (D31) antes del botón; botón que genera ambos ficheros y abre
+  - Checklist con semáforo (D41) antes del botón; botón que genera ambos ficheros y abre
     `https://exoclock.space/upload/` en el navegador; al confirmar en la app, outcome
     `reported_exoclock` en el proyecto (`core/project.py:62`, ya existe el estado).
-  - Sin credenciales, sin scraping, sin peticiones (la fase 11 mira si algún día hay API: D32).
+  - Sin credenciales, sin scraping, sin peticiones (la fase 11 mira si algún día hay API: D42).
 - **Tests**: `tests/unit/test_exoclock_export.py`: número de columnas y de filas, JD de arranque
   con y sin agrupación, contenido del `info.txt`, campo Comments no vacío, outcome del proyecto,
-  y que **no** se exporten puntos en modo `relative` (D22).
+  y que un punto sin EXPTIME bloquea el export con aviso (D15).
 - **Salida limpia**: el usuario puede preparar y enviar su observación a ExoClock a mano, con el
   checklist avisándole si va a mandar algo flojo.
 
@@ -426,8 +445,8 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Por qué**: tener un solver local evita la clave de Astrometry.net para series en vivo y
   reduces puntos sin WCS (D17), sin renunciar a nova.
 - **Implementación**: `core/sources/astap.py` (`solve(path, progress) -> cards|None`, mismo
-  contrato y claves `_WCS_KEYS` que `core/sources/astrometry.py`), `core/solve.py` (dispatcher
-  `solver=auto|astap|astrometry`, `astap_path`, caché por hash+backend), ajustes en
+  contrato y claves `_WCS_KEYS` que `core/sources/astrometry.py`), `core/solve.py` (módulo
+  nuevo: dispatcher `solver=auto|astap|astrometry`, `astap_path`, caché por hash+backend), ajustes en
   `gui/ui/settings_dialog.ui` (`cmb_solver`, `edt_astap_path` con Examinar, botón «Probar»,
   `chk_astap_update`), WCS en memoria desde el lado `-wcs` parseado con `fits_io.read_header`,
   `-update` opcional y solo desde el botón Solve del UFE (`ufe_dialog._on_solve`), hints `-fov`
@@ -438,21 +457,21 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 
 ### Fase 10 · Modo en vivo (apéndice B)
 
-- **Decisiones**: D21, D23, D17 (anotación sin WCS), D19 (agrupación compone).
+- **Decisiones**: D21, D33 (un solo motor), D17 (anotación sin WCS), D19 (agrupación compone).
 - **Por qué**: en directo con el telescopio, el usuario quiere ver la curva formarse; y sus
   ficheros aún no están resueltos.
 - **Implementación**: driver de sondeo (~2 s) sobre la carpeta de la sesión, chequeo de
   estabilidad de tamaño antes de leer, mismos commits agrupados (5 frames o 10 s) y
   `notify_points` por lote hacia la curva embebida; el driver cierra un punto cuando el grupo se
   completa (N tomas o T segundos); entrada y salida por el mismo worker/curva que la fase 5 (un
-  solo motor, D23).
+  solo motor, D33).
 - **Tests**: carpeta sintética que crece (offline), detección de fichero a medias, agrupación en
   vivo, y cancelación sin dejar corrida colgada.
 - **Salida limpia**: en vivo apagado por defecto; activarlo es opt-in y no cambia el flujo normal.
 
 ### Fase 11 · API ExoClock (compuerta con permiso)
 
-- **Decisiones**: D32, D38.
+- **Decisiones**: D42, D38.
 - **Por qué**: solo si algún día ExoClock publica endpoint de subida (hoy no existe, verificado)
   y el autor lo autoriza, tiene sentido automatizar.
 - **Implementación (condicionada)**: si hay endpoint documentado y permiso: cliente en
@@ -465,7 +484,7 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 
 ### Fase 12 · Documentación, i18n y WORKFLOWS
 
-- **Decisiones**: D37, y el criterio global C2 de `PRECISION:246`.
+- **Decisiones**: D37, y el criterio global C2 del apéndice C de `PRECISION`.
 - **Por qué**: la facilidad de uso es requisito del plan (D25), y `PRECISION` exige que la doc
   de usuario explique cada pieza con un ejemplo en ambos idiomas.
 - **Implementación**:
@@ -475,8 +494,8 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
     en las fases 8 y 10 (D37 es progresivo).
   - `docs/PHOTOMETRY.es.md`/`.md`: sección **T8** (flats a nivel mmag, dithering, desenfoque
     leve deliberado, cadencia constante, nada saturado).
-  - `docs/PRECISION.es.md`/`.md`: T1–T8 pasan a «hecho», fila 115 actualizada, C1–C4 revisados
-    (C2 suma `SEQUENCES`).
+  - `docs/PRECISION.es.md`/`.md`: T1–T8 pasan a «hecho» en la tabla «Qué es hoy qué», C1–C4
+    revisados (C2 suma `SEQUENCES`).
   - `docs/WORKFLOWS.es.md`/`.md`: enlaza `SEQUENCES` como el «cómo» del flujo de proyecto;
     `docs/adr/README.md` con los ADRs nuevos.
   - i18n: `lupdate` + traducción, sin `unfinished` (ADR-014).
@@ -500,13 +519,13 @@ decidido (no abren preguntas nuevas):
    HAT-P-32b como referencia documental.
 3. **`pylightcurve` en Py3.12**: comprobar instalabilidad. *Fallback decidido*: `batman` como
    referencia de paridad de modelo (mismo criterio <1e-5, D27).
-4. **`barycorrpy`**: opcional con `importorskip` en tests. *Fallback decidido*:
-   `astropy.light_travel_time` no aplica (sin astropy), así que: valores dorados de referencia +
-   tabla propia, con el residual <0,02 s documentado (D16).
-5. **Tabla de bumeranes**: fijar embebida con su fecha de corte documentada y política de
-   actualización (revisión manual con cada release).
-6. **`lightcurve_widget._point_style`**: comprobar si ya soporta tres series (cruda, detrendada,
-   marcada). *Fallback*: extenderlo en la fase 5 (ya estaba previsto).
+4. **`barycorrpy`**: opcional con `importorskip` en tests. *Fallback decidido*: valores
+   *golden* de referencia + tabla propia, residual <0,02 s documentado (D16).
+5. **Tabla de segundos intercalares (UTC→TT)**: fijarla embebida con su fecha de corte
+   documentada (2026-09-27) y política de actualización (revisión manual con cada release).
+6. **`lightcurve_widget._point_style`**: **verificado 2026-09-27**: hoy solo distingue
+   `survey`/`quicklook`/`manual` por `source`; no soporta flags ni tres series. *Fallback
+   (elegido)*: extenderlo en la fase 5, como estaba previsto.
 
 ---
 
@@ -515,16 +534,16 @@ decidido (no abren preguntas nuevas):
 | Pieza (PRECISION apéndice B) | Fase | Aceptación |
 |---|---|---|
 | **T1** Serie con punto cero por frame | 1, 2 | Prueba A/B: con ZP por frame una nube fina no deja señal; sin él, la deja |
-| **T2** Ensemble ponderado con veto MAD | 2, 7 (arbitraje D29) | Comps sintéticas recuperadas; comp corrupta no mueve la mediana; arbitraje ponderada/suma por menor dispersión OOT |
-| **T3** Apertura óptima por noche | 3 | Barrido `k ∈ [1,0; 2,0]·FWHM`: rms de la check mínimo; dos veings dan aperturas distintas |
+| **T2** Ensemble ponderado con veto MAD | 2, 7 (arbitraje D29) | Comps sintéticas recuperadas; comp corrupta no mueve la mediana; arbitraje ponderada/suma por menor dispersión OOT (D29); si las comps del frame son <3, fallback al ensemble por frame (D1) |
+| **T3** Apertura óptima por noche | 3 | Barrido `k ∈ [1,0; 2,0]·FWHM`: rms de la check mínimo; dos seeings dan aperturas distintas |
 | **T4** Ruido completo (centilleo + CCD) | 2, 3 | Error total ≥ interno siempre; centilleo incluido sobre el span del grupo |
-| **T5** Detrending honesto | 3 | Dip 0,01 mag a ±0,001 mag intacto; seno 0,3 mag/2 h sin distorsionar; cruda siempre visible junto a detrendada |
+| **T5** Detrending honesto | 3 | Dip 0,01 mag a ±0,001 mag intacto; seno 0,3 mag/2 h sin distorsionar (D12); cruda siempre visible junto a detrendada |
 | **T6** Tiempo a media exposición / HJD | 2 | Convención documentada; ExoClock con arranque (D19); `BJD_TDB` con residual <0,02 s medido |
 | **T7** Gates de calidad por frame | 2, 5 | Saturación, salto de guiado, cósmico y nube **marcados** y nunca borrados; semáforo H6 dispara con nube simulada |
 | **T8** Prácticas de observación | 5, 8, 10, 12 (doc) | `SEQUENCES` (ambos idiomas) explica defaults, flags y flujo con ejemplos; `PHOTOMETRY` gana la sección de prácticas |
-| **Validación global** (`PRECISION:237`) | 7 | Serie sintética con dip 0,01 mag a ±0,001 mag; y con datos reales (p. ej. HD 209458 b) profundidad dentro del 10 % y rms de la check acorde al modelo de ruido |
+| **Validación global** (`PRECISION`, apéndice B, «Validación») | 7 | Serie sintética con dip 0,01 mag a ±0,001 mag; y con datos reales (p. ej. HD 209458 b) profundidad dentro del 10 % y rms de la check acorde al modelo de ruido |
 | **C1** Suite verde con semilla | todas | `pytest tests/unit` verde al cerrar cada fase |
-| **C2** Doc de usuario en ambos idiomas | 12 | `PHOTOMETRY` + `PRECISION` + `SEQUENCES`, sin `unfinished` en i18n |
+| **C2** Doc de usuario en ambos idiomas | 12 | `PHOTOMETRY` + `SEQUENCES`; la doc de usuario explica cada pieza con un ejemplo en ambos idiomas (`PRECISION`, criterio C2 del apéndice C), sin `unfinished` en i18n |
 | **C3** Flujos legacy intactos | todas | quicklook, blink, carta legacy y handoff EXOTIC sin tocar y verdes |
 | **C4** Honestidad de errores y avisos | todas | total ≥ interno; los datos faltantes se dicen en lenguaje llano, no se callan |
 
@@ -534,7 +553,13 @@ decidido (no abren preguntas nuevas):
 
 **Punto de entrada**: rama `plan/series-photometry` → **fase 0**: firmar la revisión de
 ADR-015, publicar ADR-048/049/050/051, cerrar el checklist de la sección 5 y actualizar
-`PRECISION` línea 115. Nada de código hasta que eso esté firmado.
+`PRECISION` (la fila de T1–T8 de «Qué es hoy qué»). Nada de código hasta que eso esté firmado.
+
+**Estado al 2026-09-27**: la fase 0 ya está escrita en el árbol de trabajo (ADR-015 revisado y
+firmado, ADR-048–051, `docs/adr/README.md`, la fila de T1–T8 de `PRECISION` y `AGENTS.md`
+actualizados); queda fusionarla en la rama. La verificación 6 del checklist ya está cerrada
+(hay que extender `_point_style`); las verificaciones 1–5 siguen pendientes de binarios y datos
+reales.
 
 **Después**: fases 1→12 en orden, con la compuerta de la fase 7 (paridad con EXOTIC, umbrales
 fijos: T_mid 3σ, Rp/Rs 5 %, σ 20 %) y la compuerta de la fase 11 (permiso explícito para la

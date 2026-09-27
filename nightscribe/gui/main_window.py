@@ -4384,6 +4384,14 @@ class MainWindow(QMainWindow):
         layout.addWidget(QLabel(self.tr(
             "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
             "Python ≤3.10 environment.")))
+        btn_reduce = QPushButton(
+            self.tr("Reduce and fit with EXOTIC…"))
+        btn_reduce.setToolTip(self.tr(
+            "Generate the visit's inits.json, run EXOTIC headless in the "
+            "environment prepared in Settings and import its light curve "
+            "and fitted parameters"))
+        btn_reduce.clicked.connect(self._transit_reduce_exotic)
+        layout.addWidget(btn_reduce)
         btn_exotic = QPushButton(
             self.tr("Export to EXOTIC (inits.json)…"))
         btn_exotic.setToolTip(self.tr(
@@ -5241,6 +5249,137 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage(
             self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
                     "environment"), 10000)
+
+    def _transit_reduce_exotic(self):
+        # Gather the planet data (worker), then run the orchestration.
+        p = self._current_project
+        if not p:
+            return
+        from .workers import ExploreWorker
+        self.statusBar().showMessage(
+            self.tr("Gathering planet data for EXOTIC…"), 4000)
+        worker = ExploreWorker(config, p["object_name"],
+                               fallback_target=p.get("context") or {})
+        worker.finished.connect(lambda e: self._exotic_reduce(p["id"], e))
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_reduce(self, pid, e):
+        # Generate the visit's inits.json, check the environment and run
+        # EXOTIC headless; the result is imported on finish (phase E).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic, exotic_env, fits_io, wcs as wcs_mod
+        p = project.get(db, pid)
+        if not p:
+            return
+        if not e or not e.get("data"):
+            self.statusBar().showMessage(
+                self.tr("No planet data — check the name and retry"), 8000)
+            return
+        # the environment prepared in Settings
+        install = config.get("exotic_install_dir") or str(
+            paths.data_dir() / "exotic-venv")
+        exe = exotic_env.exotic_bin(install)
+        if not Path(exe).is_file():
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No EXOTIC environment yet: prepare it in Settings → "
+                "EXOTIC (transit reduction)."))
+            return
+        # the visit's frames (the latest visit that has FITS)
+        from ..core import followup as fu
+        session_id, frame_paths = None, []
+        for s in fu.list_sessions(db, pid):
+            fs = [f["path"] for f in project.files_for_session(db, s["id"])
+                  if f.get("kind") == "fits"]
+            if fs:
+                session_id, frame_paths = s["id"], fs
+                break
+        if not frame_paths:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "This project has no FITS frames in a visit yet."))
+            return
+        try:
+            header, _data = fits_io.read_fits(frame_paths[0])
+        except Exception:
+            header = {}
+        wcs = wcs_mod.Wcs.from_header(header)
+        obj = self._ufe_object_from_project(p)
+        if wcs is None or (obj or {}).get("ra") is None:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "The first frame has no WCS: solve the plate (or open it "
+                "in the editor) so the target pixel is known."))
+            return
+        tx, ty = wcs.sky_to_pixel(obj["ra"], obj["dec"])
+        ctx = p.get("context") or {}
+        entries = (ctx.get("sequence") or {}).get("entries") or []
+        comps = []
+        for ent in entries:
+            star = ent.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                comps.append(wcs.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+        if not comps:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No comparison stars found: build the sequence in the "
+                "editor first."))
+            return
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        plan = {"filter": plan_data.get("filter", "L"),
+                "exp_s": plan_data.get("exp_s")}
+        work = Path(project.storage_dir(p)) / "exotic"
+        inits = exotic.make_inits_for_visit(
+            ctx, e["data"], config, frame_paths, (tx, ty), comps,
+            plan=plan, out_dir=str(work))
+        inits_path = work / "inits.json"
+        exotic.export_inits(inits, inits_path)
+        project.add_file(db, pid, str(inits_path), "exotic_inits",
+                         session_id=session_id)
+        self._populate_project_files(pid)
+        self._exotic_pid = pid
+        self._exotic_session = session_id
+        basis = plan.get("filter") or "V"
+        self._exotic_filter = "V" if basis in ("L", "CV", None) else basis
+        from .workers import ExoticRunWorker
+        self._exotic_worker = ExoticRunWorker(exe, str(work), str(inits_path))
+        self._exotic_worker.progress.connect(
+            lambda line: self.statusBar().showMessage(line[-120:], 0))
+        self._exotic_worker.finished.connect(
+            lambda res: self._exotic_done(res))
+        self._exotic_worker.start()
+        self.statusBar().showMessage(
+            self.tr("Running EXOTIC (this can take a while)…"), 0)
+
+    def _exotic_done(self, res):
+        # EXOTIC finished: import its curve and parameters into the project.
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_import
+        self._exotic_worker = None
+        self.statusBar().clearMessage()
+        pid = getattr(self, "_exotic_pid", None)
+        if not res.get("ok") or pid is None:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "EXOTIC did not finish:\n{0}").format(
+                    (res.get("log_path") or "")[-600:]))
+            return
+        result = exotic_import.load_result(res["out_dir"])
+        _run_id, n = exotic_import.persist(
+            db, pid, getattr(self, "_exotic_session", None), result,
+            filter_name=getattr(self, "_exotic_filter", None))
+        par = result.get("params") or {}
+        msg = self.tr(
+            "EXOTIC finished: {0} points imported.\n"
+            "T_mid = {1} (BJD_TDB)\nRp/Rs = {2}").format(
+                n,
+                f"{par.get('tmid'):.5f} ± {par.get('tmid_err'):.5f}"
+                if par.get("tmid") else "?",
+                f"{par.get('rprs'):.4f} ± {par.get('rprs_err'):.4f}"
+                if par.get("rprs") else "?")
+        QMessageBox.information(self, self.tr("EXOTIC"), msg)
+        self._project_selected()
 
     def _build_publish_tab(self, p, kind, ctx):
         layout = self._step_section("publish")

@@ -285,6 +285,18 @@ Tests en `tests/unit/test_exotic_import.py`.
 Salida limpia: el flujo de tránsito se cierra con EXOTIC desde la app, y la vía
 numpy sigue disponible como previsualización clara.
 
+### Resultado de la fase E (2026-09-27)
+
+Bloque de tránsito (Análisis) gana **«Reducir y ajustar con EXOTIC…»**: recoge
+los datos del planeta (worker), resuelve el entorno preparado en Ajustes
+(guía a Ajustes si falta), toma las tomas de la última visita con FITS, calcula
+los píxeles de objetivo y comparaciones desde la WCS de la primera toma y la
+secuencia del proyecto, escribe el `inits.json` de la visita y corre EXOTIC con
+el log en la barra de estado. Al terminar, importa la curva y los parámetros
+(`exotic_import.load_result` + `persist`), informa de T_mid y Rp/Rs y refresca el
+proyecto. El botón de exportar el `inits.json` se conserva como vía manual. Las
+cadenas nuevas pasan por `tr()` y el i18n queda sin `unfinished`.
+
 ---
 
 ## 8. Fase F · Compuerta redefinida y ADRs

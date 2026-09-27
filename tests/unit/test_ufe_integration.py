@@ -411,6 +411,15 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
         def set_reset_hooks(self, state_fn, points_fn):
             pass
 
+        def set_series_hook(self, fn):
+            pass
+
+        def set_points_hook(self, fn):
+            pass
+
+        def set_run_undo_hook(self, fn):
+            pass
+
         def show_tab(self, tab):
             pass
 

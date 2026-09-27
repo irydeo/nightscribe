@@ -86,6 +86,12 @@ class UfeDialog(QDialog):
                                         # tab first)
         self._object = None         # {"name","ra","dec","mag"} when the
                                     # editor was opened from a project
+        # series hooks (series plan, phase 5): the visit context (frames),
+        # the batch writer (one run) and the per-run undo. All None on an
+        # ad-hoc open, so the Measure tab hides its series block (D8).
+        self._series_hook = None
+        self._points_hook = None
+        self._run_undo_hook = None
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("NightScribe Image Workbench"))
@@ -501,6 +507,60 @@ class UfeDialog(QDialog):
         except Exception as err:
             logger.warning("reset-points hook failed: %s", err)
             return False
+
+    # ---------------------------------------------------- series hooks
+
+    def set_series_hook(self, fn):
+        # @args: fn - callable() -> {"pid", "session_id", "paths"} or None.
+        #        The host arms it only when the editor was opened from a
+        #        visit; the Measure tab shows its series block only then
+        #        (D8: without a visit there is no series).
+        self._series_hook = fn if callable(fn) else None
+        if hasattr(self, "tab_measure"):
+            self.tab_measure.set_series_attached(self._series_hook is not None)
+
+    def series_context(self):
+        # @return: the visit context the host hooked, or None
+        if self._series_hook is None:
+            return None
+        try:
+            return self._series_hook()
+        except Exception as err:
+            logger.warning("series hook failed: %s", err)
+            return None
+
+    def set_points_hook(self, fn):
+        # @args: fn - callable(rows, cfg) -> run_id, or None. The Measure
+        #        tab sends a whole series run so the host creates one run
+        #        and writes its points in a batch (ADR-048, D9).
+        self._points_hook = fn if callable(fn) else None
+
+    def set_run_undo_hook(self, fn):
+        # @args: fn - callable(run_id) -> deleted count, or None. Backs
+        #        the tab's "Undo this run" (D6).
+        self._run_undo_hook = fn if callable(fn) else None
+
+    def notify_points(self, rows, cfg):
+        # @args: rows - point dicts of one run, cfg - JSON-safe run echo
+        # @return: the new run id, or None when there is no hook / it failed
+        if self._points_hook is None:
+            return None
+        try:
+            return self._points_hook(rows or [], cfg or {})
+        except Exception as err:
+            logger.warning("points hook failed: %s", err)
+            return None
+
+    def undo_run(self, run_id):
+        # @args: run_id - the run to undo
+        # @return: the number of points deleted (0 with no hook)
+        if self._run_undo_hook is None:
+            return 0
+        try:
+            return int(self._run_undo_hook(run_id) or 0)
+        except Exception as err:
+            logger.warning("run-undo hook failed: %s", err)
+            return 0
 
     # --------------------------------------------------- the object
 

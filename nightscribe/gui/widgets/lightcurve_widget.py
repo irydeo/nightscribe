@@ -24,10 +24,11 @@ The data comes from `core/followup.list_points`; the template from
 """
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import (QBrush, QColor, QPen, QFont)
+from PySide6.QtGui import (QBrush, QColor, QPen, QFont, QPolygonF)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout,
                                 QGraphicsEllipseItem, QGraphicsLineItem,
-                                QGraphicsRectItem, QGraphicsSimpleTextItem)
+                                QGraphicsPolygonItem, QGraphicsRectItem,
+                                QGraphicsSimpleTextItem)
 
 from ...core import sn_templates
 from ...viz import palette
@@ -51,12 +52,14 @@ _HALF = 500.0
 
 
 def _series_style(src_class):
-    # @args: src_class - "manual" | "quicklook" | "survey"
+    # @args: src_class - "manual" | "quicklook" | "survey" | "detrend"
     # @return: (colour or None for "use the filter colour", filled bool)
     if src_class == "survey":
         return "#8a90a6", False
     if src_class == "quicklook":
         return None, False
+    if src_class == "detrend":
+        return palette.MUTED, False
     return None, True
 
 
@@ -69,6 +72,8 @@ def _point_style(p):
         src_class = "survey"
     elif src == "quicklook":
         src_class = "quicklook"
+    elif src == "detrend":
+        src_class = "detrend"
     else:
         src_class = "manual"
     colour, filled = _series_style(src_class)
@@ -76,6 +81,10 @@ def _point_style(p):
         colour = palette.ACCENT if not p.get("filter") \
             else _FILTER_COLOURS.get(p.get("filter"), palette.ACCENT)
     return QColor(colour), filled
+
+# Quality-gate colour: a flagged point keeps its place on the curve but is
+# drawn as a hollow diamond, never hidden (ADR-048, T7).
+FLAG_COLOUR = "#e0a030"
 
 # Distinct colours per filter (matching the PNG export)
 _FILTER_COLOURS = {
@@ -120,6 +129,10 @@ class LightCurveChart(ChartView):
             return self.tr("Survey · ALeRCE/ZTF")
         if source == "quicklook":
             return self.tr("Quick-look · indicative")
+        if source == "measure":
+            return self.tr("Series · measured")
+        if source == "detrend":
+            return self.tr("Series · detrended")
         if source == "paste":
             return self.tr("Pasted data")
         if source == "file":
@@ -263,15 +276,28 @@ class LightCurveChart(ChartView):
                 self.add_item(line)
             has_overlay = True
         # data points (drawn twice in fold mode: cycle 0 and cycle 1)
+        flagged_seen = False
         for p in self._points:
             for xv in self._xs(p):
                 x = self._map_x(xv)
                 y = self._map_y(p["mag"])
                 colour, filled = _point_style(p)
                 r = 6.0
-                dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
-                dot.setBrush(QBrush(colour if filled else QColor(palette.BG)))
-                dot.setPen(QPen(colour, 1.5))
+                if p.get("flags"):
+                    # a flagged point keeps its place: a hollow diamond in
+                    # the quality colour, never hidden (ADR-048, T7)
+                    poly = QPolygonF([
+                        QPointF(x, y - r), QPointF(x + r, y),
+                        QPointF(x, y + r), QPointF(x - r, y)])
+                    dot = QGraphicsPolygonItem(poly)
+                    dot.setBrush(QBrush(QColor(palette.BG)))
+                    dot.setPen(QPen(QColor(FLAG_COLOUR), 1.8))
+                    flagged_seen = True
+                else:
+                    dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
+                    dot.setBrush(QBrush(colour if filled
+                                        else QColor(palette.BG)))
+                    dot.setPen(QPen(colour, 1.5))
                 dot.setZValue(_Z_DATA)
                 self.add_item(dot)
                 # error bar
@@ -283,7 +309,7 @@ class LightCurveChart(ChartView):
                     bar.setZValue(_Z_ERROR)
                     self.add_item(bar)
         # legend: one entry per (filter, source) series the data has
-        self._add_legend(has_overlay)
+        self._add_legend(has_overlay, flagged_seen)
 
     def _link_pen(self, source, band):
         # @args: source - the series' source, band - the series' filter
@@ -323,8 +349,9 @@ class LightCurveChart(ChartView):
                     line.setZValue(_Z_LINK)
                     self.add_item(line)
 
-    def _add_legend(self, has_template):
-        # @args: has_template - whether the schematic overlay is drawn
+    def _add_legend(self, has_template, flagged=False):
+        # @args: has_template - whether the schematic overlay is drawn,
+        #        flagged - whether any point carries quality flags
         # Draws a compact legend in the bottom-right of the data area
         # (same corner as sky_widget); entries mirror the PNG export so
         # the two renderers cannot disagree (B4).
@@ -334,6 +361,9 @@ class LightCurveChart(ChartView):
             entries.append(
                 (self.tr("schematic (sawtooth)") if self._fold_p
                  else self.tr("Typical template"), QColor(palette.MUTED)))
+        if flagged:
+            entries.append((self.tr("flagged (quality gate)"),
+                            QColor(FLAG_COLOUR)))
         # one entry per (band, source) series: human labels, so the
         # observer sees "Pasted data", "From file", "Survey · ALeRCE/ZTF"
         seen = set()
@@ -453,6 +483,8 @@ class LightCurveChart(ChartView):
             lines.append(f"({self.source_label(best['source'])})")
         if best.get("err") is not None:
             lines.append(f"±{best['err']:.3f}")
+        if best.get("flags"):
+            lines.append("⚠ " + ", ".join(best["flags"]))
         return True, lines
 
 

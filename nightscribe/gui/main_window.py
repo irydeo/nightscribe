@@ -7686,9 +7686,20 @@ class MainWindow(QMainWindow):
             dlg.set_reset_hooks(
                 lambda: self._ufe_reset_state(dlg, hook_pid),
                 lambda: self._ufe_reset_points(dlg, hook_pid))
+            # ADR-048: the visit context (its frames), the batch writer
+            # for a series run and the per-run undo (D8/D9)
+            dlg.set_series_hook(
+                lambda: self._ufe_series_context(hook_pid, session_id))
+            dlg.set_points_hook(
+                lambda rows, cfg: self._ufe_points_hook(
+                    hook_pid, session_id, rows, cfg))
+            dlg.set_run_undo_hook(self._ufe_run_undo)
         else:
             dlg.set_point_hook(None)
             dlg.set_reset_hooks(None, None)
+            dlg.set_series_hook(None)
+            dlg.set_points_hook(None)
+            dlg.set_run_undo_hook(None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
@@ -7820,6 +7831,58 @@ class MainWindow(QMainWindow):
         self._project_selected()
 
     # ---------------- UFE plate resets (ADR-047) ----------------
+
+    def _ufe_series_context(self, pid, session_id):
+        # ADR-048 (D8): the series works from the visit's frames, never a
+        # folder dialog. No visit (or no FITS in it): no series block.
+        # @args: pid - project id, session_id - the visit or None
+        # @return: {"pid", "session_id", "paths"} or None
+        if session_id is None:
+            return None
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            return None
+        return {"pid": pid, "session_id": session_id, "paths": paths}
+
+    def _ufe_points_hook(self, pid, session_id, rows, cfg):
+        # ADR-048 (D9): one series run = one measurement_runs row; its
+        # points go in a single batch with the run id, so "Undo this run"
+        # removes exactly them. A point keeps its plate link when the
+        # frame is registered (ADR-047).
+        # @args: rows - point dicts, cfg - JSON-safe run echo
+        # @return: the new run id
+        from ..core import followup as fu
+        run_id = fu.create_run(db, session_id=session_id,
+                               cfg={"series": cfg or {}})
+        by_path = {f["path"]: f["id"]
+                   for f in project.list_files(db, pid)
+                   if f.get("kind") == "fits"}
+        for r in rows:
+            r["project_id"] = pid
+            r["session_id"] = session_id
+            r["run_id"] = run_id
+            r["file_id"] = by_path.get(r.get("path"))
+        if rows:
+            fu.add_points(db, rows)
+        self.statusBar().showMessage(
+            self.tr("Series saved: {} points").format(len(rows)), 8000)
+        self._project_selected()
+        return run_id
+
+    def _ufe_run_undo(self, run_id):
+        # ADR-048 (D6): undo one run's points, keep the run row for the
+        # audit trail, and refresh the project view.
+        # @args: run_id - the run to undo
+        # @return: the number of points deleted
+        from ..core import followup as fu
+        count = fu.delete_points_for_run(db, run_id)
+        fu.set_run_status(db, run_id, "undone")
+        self.statusBar().showMessage(
+            self.tr("Run undone: {} points removed").format(count), 8000)
+        self._project_selected()
+        return count
 
     def _ufe_reset_state(self, dlg, pid):
         # The tab already restored the editor's defaults locally (and

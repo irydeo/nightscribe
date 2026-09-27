@@ -883,3 +883,101 @@ def test_at2026acka_sn_centroid_locks_on_the_galaxy(dlg):
     # the faint bump's flux, not the bright neighbour's (~122k ADU)
     assert last["result"]["flux"] < 60000
     assert "no source could be locked" not in tab.lbl_result.toPlainText()
+
+
+# ---------------- series plan, phase 5 ----------------
+
+def _wait_series(tab, qapp, timeout=30.0):
+    import time
+    t0 = time.time()
+    while tab._series_worker is not None and time.time() - t0 < timeout:
+        qapp.processEvents()
+        time.sleep(0.02)
+    qapp.processEvents()
+
+
+def test_series_block_is_hidden_without_a_visit(dlg):
+    tab = dlg.tab_measure
+    assert not tab.grp_series.isVisible()      # ad-hoc open: no series
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab._on_measure_series()
+    assert "No visit" in tab.lbl_status.text()
+
+
+def test_series_block_shows_with_a_visit_and_runs(dlg, qapp, tmp_path):
+    tab = dlg.tab_measure
+    rows_seen = {}
+
+    def points_hook(rows, cfg):
+        rows_seen["rows"] = rows
+        rows_seen["cfg"] = cfg
+        return 55
+
+    def undo_hook(run_id):
+        rows_seen["undone"] = run_id
+        return 4
+
+    frames = []
+    for i in range(4):
+        frames.append(_write_plate(tmp_path / f"ser{i}.fits",
+                                   dlg.state.data))
+    entries = _sequence(dlg, dlg._test_comps)
+    assert entries
+    _click(dlg, *dlg._test_target)              # the series target
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    assert tab.grp_series.isVisible()
+    dlg.set_points_hook(points_hook)
+    dlg.set_run_undo_hook(undo_hook)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert tab._series_worker is None
+    assert len(rows_seen["rows"]) == 4          # one point per frame
+    assert rows_seen["cfg"]["group_n"] == 1
+    assert tab._series_run_id == 55
+    assert tab.btn_series_undo.isEnabled()
+    assert tab.chart_series._points              # the curve is drawn
+    # undo touches only this run
+    tab._on_series_undo()
+    assert rows_seen["undone"] == 55
+    assert not tab.btn_series_undo.isEnabled()
+    # detaching the visit hides the block again
+    dlg.set_series_hook(None)
+    assert not tab.grp_series.isVisible()
+
+
+def test_series_worker_offscreen_measures_a_synthetic_series(qapp, tmp_path):
+    from PySide6.QtWidgets import QApplication
+    from nightscribe.core import series_measure as sm
+    from nightscribe.gui.workers import SeriesWorker
+    from nightscribe.core import wcs as wcs_mod
+    from nightscribe.core import fits_io
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "ref.fits", data)
+    header, _d = fits_io.read_fits(plate)
+    wcs = wcs_mod.Wcs.from_header(header)
+    entries = []
+    for j, (cx, cy) in enumerate(comps):
+        r = __import__("nightscribe.core.photometry", fromlist=["x"]) \
+            .measure_point(data, cx, cy)
+        import math as _m
+        inst = -2.5 * _m.log10(r["flux"])
+        ra, dec = wcs.pixel_to_sky(cx, cy)
+        entries.append({"name": f"C{j}", "kind": "comp",
+                        "star": {"ra": ra, "dec": dec, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": inst + ZP_TRUE,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    paths = [_write_plate(tmp_path / f"w{i}.fits", data) for i in range(3)]
+    cfg = sm.SeriesConfig(wcs=wcs, target_xy=target, comp_set=tuple(entries),
+                          band="V", site_gain=2.0, site_ron=5.0)
+    got = {}
+    w = SeriesWorker(paths, cfg)
+    w.finished.connect(lambda res: got.update(res=res))
+    w.start()
+    assert w.wait(30000)
+    QApplication.processEvents()
+    assert got["res"].status == "complete"
+    assert len(got["res"].points) == 3

@@ -26,6 +26,26 @@
     </layout>
    </item>
    <item><widget class="QCheckBox" name="chk_subtract"><property name="text"><string>Subtract host galaxy (PS1 reference)</string></property><property name="toolTip"><string>Download the aligned PanSTARRS reference, scale it so the comparison stars vanish, and measure the target on the difference image (H2b; needs network once per field)</string></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_group">
+     <item><widget class="QLabel" name="lbl_group"><property name="text"><string>Group frames:</string></property></widget></item>
+     <item><widget class="QSpinBox" name="spn_group_n"><property name="toolTip"><string>Series only: combine N frames per point in the measurement domain (fluxes with 1/σ² weights), never pixel stacking. 1 = one point per frame (the default for transits and variables)</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>100</number></property><property name="value"><number>1</number></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_detrend">
+     <item><widget class="QLabel" name="lbl_detrend"><property name="text"><string>Detrend:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_detrend"><property name="toolTip"><string>Series only: off keeps the raw curve; airmass removes the minimum (a1·exp(a2·X)+a3); auto adds FWHM/sky/x-y only when the residual really improves. The raw curve is always kept</string></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QCheckBox" name="chk_auto_aperture"><property name="text"><string>Aperture sweep per night (T3)</string></property><property name="toolTip"><string>Series only: pick the aperture k in [1.0, 2.0]·FWHM whose check-star scatter is smallest, one choice per night</string></property></widget></item>
+   <item>
+    <layout class="QHBoxLayout" name="row_saturate">
+     <item><widget class="QLabel" name="lbl_saturate"><property name="text"><string>Saturation (ADU):</string></property></widget></item>
+     <item><widget class="QDoubleSpinBox" name="spn_saturate"><property name="toolTip"><string>Series only: the detector ceiling as an absolute ADU value; 0 = use the header's SATURATE card or the Ajustes value</string></property><property name="maximum"><double>1000000.0</double></property><property name="decimals"><number>0</number></property><property name="value"><double>0.0</double></property></widget></item>
+    </layout>
+   </item>
+   <item><widget class="QPushButton" name="btn_restore"><property name="text"><string>Restore defaults</string></property><property name="toolTip"><string>Back to the recipe the editor ships with: sky medians with sigma-clip, seeing apertures, colour term, no grouping, no detrend</string></property></widget></item>
    <item><spacer name="vsp_advanced"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>40</height></size></property></spacer></item>
   </layout>
  </widget>

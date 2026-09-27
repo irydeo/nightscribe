@@ -498,3 +498,39 @@ class SequenceWorker(QThread):
                    fov_arcmin=field["fov_arcmin"],
                    n_variables=len(field["variables"]))
         self.finished.emit(out)
+
+
+class SeriesWorker(QThread):
+    # Measures a photometric series off the GUI thread (series plan,
+    # phase 5): the same core/series_measure.measure_series the tests and
+    # the CLI use, wrapped with progress and cancellation. The result is
+    # a SeriesResult (signal(object) passes it through untouched); the
+    # tab persists its points and paints the curve.
+
+    progress = Signal(int, int)      # (done, total)
+    finished = Signal(object)        # SeriesResult
+    failed = Signal(str)             # an unexpected error, in English
+
+    def __init__(self, paths, cfg):
+        super().__init__()
+        self._paths = list(paths)
+        self._cfg = cfg
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the tab (the Cancel button or a tab shutdown): the
+        # engine stops between frames and returns status "incomplete".
+        self._cancel = True
+
+    def run(self):
+        from ..core import series_measure
+        try:
+            result = series_measure.measure_series(
+                self._paths, self._cfg,
+                progress=lambda done, total: self.progress.emit(done, total),
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("series worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(result)

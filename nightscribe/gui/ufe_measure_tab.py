@@ -41,16 +41,31 @@ from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
                                QGraphicsEllipseItem)
 
 from ..core import coords, fits_meta, photometry, photometry_export, \
-    stretch
+    series_measure, stretch
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
-from .ui_loader import adopt_ui
+from .ui_loader import adopt_ui, drop_in
+from .widgets.lightcurve_widget import LightCurveChart
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
 
 _C_AP = palette.ACCENT   # the shared amber marker family the UFE wears
 _C_ANN = "#6ec1ff"     # sky annulus rings in the cool accent
 _C_COMP = "#4dd0e1"    # used comps ring in the compare tab's cyan
+
+
+def _decimate(points, max_points=1500):
+    # Display-only decimation (D36): a huge series must not stall the
+    # chart. A stride keeps the shape; flagged points are never dropped.
+    # @args: points - chart point dicts, max_points - display budget
+    # @return: the (possibly shortened) list
+    if len(points) <= max_points:
+        return points
+    step = len(points) / float(max_points)
+    out = [points[int(i * step)] for i in range(max_points)]
+    seen = {id(p) for p in out}
+    out += [p for p in points if p.get("flags") and id(p) not in seen]
+    return out
 
 
 class UfeMeasureTab(QWidget):
@@ -164,6 +179,33 @@ class UfeMeasureTab(QWidget):
         self.btn_reset_state.clicked.connect(self._on_reset_state)
         self.btn_reset_points = self._ui.btn_reset_points
         self.btn_reset_points.clicked.connect(self._on_reset_points)
+
+        # series block (series plan, phase 5): hidden unless the dialog was
+        # opened from a visit (D8). The compact curve is our custom widget
+        # (ADR-005: a .ui placeholder swapped for the real one).
+        self.grp_series = self._ui.grp_series
+        self.lbl_series_hint = self._ui.lbl_series_hint
+        self.btn_series = self._ui.btn_series
+        self.btn_series.clicked.connect(self._on_measure_series)
+        self.btn_series_undo = self._ui.btn_series_undo
+        self.btn_series_undo.clicked.connect(self._on_series_undo)
+        self.btn_series_help = self._ui.btn_series_help
+        self.btn_series_help.clicked.connect(self._open_series_docs)
+        self.lbl_series_frames = self._ui.lbl_series_frames
+        self.lbl_series_cadence = self._ui.lbl_series_cadence
+        self.prg_series = self._ui.prg_series
+        self.chart_series = LightCurveChart()
+        drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
+                self.chart_series)
+        self._series_worker = None
+        self._series_run_id = None
+        self._series_cfg = None
+        self._series_cfg_dict = None
+        self._series_attached = False
+        # the Advanced window stays a dumb container: its restore button
+        # is wired here, where the defaults live
+        self._advanced.btn_restore.clicked.connect(
+            self._restore_advanced_defaults)
 
     def _spin(self, sb, value, lo, hi):
         # Sizes one aperture spin (px, half-pixel steps) from
@@ -318,7 +360,13 @@ class UfeMeasureTab(QWidget):
             "counts for the campaign summary."))
 
     def shutdown(self):
-        # Nothing timer-driven here; the subtraction worker may run.
+        # Nothing timer-driven here; the subtraction worker may run, and a
+        # running series is asked to stop (its points stay, D18).
+        if self._series_worker is not None \
+                and self._series_worker.isRunning():
+            self._series_worker.cancel()
+            self._series_worker.wait(3000)
+        self._series_worker = None
         self._sub_worker = None
 
     # ------------------------------------------------------------- state
@@ -628,6 +676,224 @@ class UfeMeasureTab(QWidget):
         # (only a check ratio) has nothing to register
         self.btn_save_project.setEnabled(res.mag is not None)
         self._draw_measurement()
+
+    # ------------------------------------------------------------ series
+
+    def set_series_attached(self, flag):
+        # The dialog arms a series context hook only when the editor was
+        # opened from a visit (D8): without a visit the whole block stays
+        # hidden, and a running worker is cancelled on a detach.
+        self._series_attached = bool(flag)
+        self.grp_series.setVisible(self._series_attached)
+        if not self._series_attached and self._series_worker is not None:
+            self._series_worker.cancel()
+
+    def _series_context(self):
+        # @return: the visit context {"paths", "session_id", ...} the host
+        #          hooked, or None (ad-hoc open)
+        dlg = self.window()
+        getter = getattr(dlg, "series_context", None)
+        return getter() if callable(getter) else None
+
+    def _series_target(self):
+        # The target position on the open (reference) plate: the last
+        # measured centroid, else the object's coordinates through the
+        # plate's WCS (D17: no per-frame astrometry).
+        # @return: (x, y) in plate pixels, or None
+        if self._state.wcs is None:
+            return None
+        if self._last is not None and self._last.get("col") is not None:
+            return (self._last["col"], self._last["row"])
+        obj = getattr(self.window(), "object", lambda: None)()
+        if obj and obj.get("ra") is not None and obj.get("dec") is not None:
+            try:
+                return self._state.wcs.sky_to_pixel(float(obj["ra"]),
+                                                    float(obj["dec"]))
+            except Exception:
+                return None
+        return None
+
+    def _series_config(self, entries, target_xy):
+        # Builds the engine config from the tab's widgets and Ajustes.
+        from ..config import config
+        sat = self._advanced.spn_saturate.value()
+        return series_measure.SeriesConfig(
+            wcs=self._state.wcs, target_xy=tuple(target_xy),
+            comp_set=tuple(entries),
+            band=self.cmb_band.currentText() or self._band,
+            radii=(self.spn_rap.value(), self.spn_rin.value(),
+                   self.spn_rout.value()),
+            sigmaclip=self.chk_sigmaclip.isChecked(),
+            sky_mode=self.cmb_sky.currentData() or "median",
+            color=self.chk_color.isChecked(),
+            target_bv=self.spn_target_bv.value(),
+            site_gain=config.get("ccd_gain"),
+            site_ron=config.get("ccd_read_noise"),
+            site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
+            site_saturate=float(sat) if sat and sat > 0
+            else config.get("ccd_saturate"),
+            site_lon=config.get("lon"), site_lat=config.get("lat"),
+            site_aperture_m=float(config.get("aperture_inches", 10.0))
+            * 0.0254,
+            site_height_m=float(config.get("height", 0) or 0.0),
+            group_n=int(self._advanced.spn_group_n.value()),
+            auto_aperture=self._advanced.chk_auto_aperture.isChecked(),
+            detrend_policy=self._advanced.cmb_detrend.currentData()
+            or "off")
+
+    def _series_config_dict(self, cfg):
+        # A JSON-safe echo of the config for the run row (audit trail).
+        return {"band": cfg.band, "zp_mode": cfg.zp_mode,
+                "detrend_policy": cfg.detrend_policy,
+                "group_n": cfg.group_n,
+                "auto_aperture": cfg.auto_aperture,
+                "sigmaclip": cfg.sigmaclip, "sky_mode": cfg.sky_mode,
+                "color": cfg.color, "target_bv": cfg.target_bv,
+                "radii": list(cfg.radii) if cfg.radii else None,
+                "target_xy": list(cfg.target_xy)}
+
+    def _update_series_counter(self, context, points=None):
+        n = len((context or {}).get("paths", []))
+        txt = self.tr("Frames: {0}").format(n)
+        if points is not None:
+            txt = self.tr("Frames: {0} · points: {1}").format(
+                n, len(points))
+        self.lbl_series_frames.setText(txt)
+        grp = int(self._advanced.spn_group_n.value())
+        self.lbl_series_cadence.setText(
+            self.tr("group {0} · cadence from the frames").format(grp))
+
+    def _on_measure_series(self):
+        # D8: from the visit's files; with no visit (or no sequence, or no
+        # target) the status line says exactly what is missing.
+        ctx = self._series_context()
+        if not ctx or not ctx.get("paths"):
+            self.lbl_status.setText(self.tr(
+                "No visit with frames: open the editor from a visit to "
+                "measure a series."))
+            return
+        if self._series_worker is not None \
+                and self._series_worker.isRunning():
+            return
+        entries = self._sequence()
+        if not entries:
+            self.lbl_status.setText(self.tr(
+                "No comparison sequence yet: build one above with "
+                "«Build the sequence…»."))
+            return
+        target = self._series_target()
+        if target is None:
+            self.lbl_status.setText(self.tr(
+                "Measure the target once (a click on it) so the series "
+                "knows where to measure."))
+            return
+        self._series_cfg = self._series_config(entries, target)
+        self._series_cfg_dict = self._series_config_dict(self._series_cfg)
+        self._update_series_counter(ctx)
+        self.prg_series.setRange(0, len(ctx["paths"]))
+        self.prg_series.setValue(0)
+        self.btn_series.setEnabled(False)
+        self.btn_series_undo.setEnabled(False)
+        from .workers import SeriesWorker
+        self._series_worker = SeriesWorker(ctx["paths"], self._series_cfg)
+        self._series_worker.progress.connect(self._on_series_progress)
+        self._series_worker.finished.connect(self._on_series_finished)
+        self._series_worker.failed.connect(self._on_series_failed)
+        self._series_worker.start()
+        self.lbl_status.setText(self.tr("Measuring the series…"))
+
+    def _on_series_progress(self, done, total):
+        self.prg_series.setRange(0, total)
+        self.prg_series.setValue(done)
+
+    def _on_series_finished(self, result):
+        self.btn_series.setEnabled(True)
+        self._series_worker = None
+        context = self._series_context() or {}
+        self._update_series_counter(context, result.points)
+        if result.status == "incomplete":
+            self.lbl_status.setText(self.tr(
+                "Series cancelled: it stays “incomplete”; the points "
+                "measured so far are kept."))
+        else:
+            self.lbl_status.setText("")
+        rows = self._series_rows(result.points)
+        dlg = self.window()
+        notify = getattr(dlg, "notify_points", None)
+        self._series_run_id = None
+        if callable(notify) and rows:
+            try:
+                self._series_run_id = notify(rows, self._series_cfg_dict)
+            except Exception as err:
+                logger.warning("series save failed: %s", err)
+        self.btn_series_undo.setEnabled(self._series_run_id is not None)
+        self._draw_series(result.points)
+
+    def _on_series_failed(self, message):
+        self.btn_series.setEnabled(True)
+        self._series_worker = None
+        self.lbl_status.setText(self.tr("The series failed: {0}")
+                                .format(message))
+
+    def _series_rows(self, points):
+        # @return: the rows the host persists (one run, one batch)
+        rows = []
+        for p in points:
+            if p.mjd is None:
+                continue
+            rows.append({"mjd": p.mjd, "filter": p.filter, "mag": p.mag,
+                         "err": p.err, "mag_raw": p.inst, "path": p.path,
+                         "flags": list(p.flags), "source": "measure"})
+        return rows
+
+    def _draw_series(self, points):
+        # Raw + detrended, flagged points as hollow diamonds (D13/T7).
+        raw = [{"mjd": p.mjd, "mag": p.mag, "err": p.err,
+                "filter": p.filter, "source": "measure",
+                "flags": list(p.flags)}
+               for p in points if p.mjd is not None and p.mag is not None]
+        det = [{"mjd": p.mjd, "mag": p.mag_detrended, "err": p.err,
+                "filter": p.filter, "source": "detrend",
+                "flags": list(p.flags)}
+               for p in points if p.mjd is not None
+               and p.mag_detrended is not None]
+        self.chart_series.set_data(_decimate(raw) + _decimate(det))
+
+    def _on_series_undo(self):
+        # D6: undo this run only; never the visit.
+        if self._series_run_id is None:
+            return
+        dlg = self.window()
+        undo = getattr(dlg, "undo_run", None)
+        count = undo(self._series_run_id) if callable(undo) else 0
+        self.lbl_status.setText(
+            self.tr("Run undone: {0} points removed.").format(count))
+        self._series_run_id = None
+        self.btn_series_undo.setEnabled(False)
+        self.chart_series.set_data([])
+
+    def _open_series_docs(self):
+        # D37: the "?" opens the sequences guide in the docs browser.
+        from .. import paths as paths_mod
+        from .doc_viewer import open_browser
+        root = paths_mod.docs_dir()
+        name = "SEQUENCES.es.md" if self._lang != "en" else "SEQUENCES.md"
+        start = root / name if (root / name).exists() else None
+        open_browser(root, self.window(), start=start)
+
+    def _restore_advanced_defaults(self):
+        # D25: every knob back to the .ui's shipped default.
+        self.cmb_sky.setCurrentIndex(0)
+        self.chk_sigmaclip.setChecked(True)
+        self.chk_seeing.setChecked(True)
+        self.chk_color.setChecked(True)
+        self.spn_target_bv.setValue(0.0)
+        self.chk_subtract.setChecked(False)
+        self._advanced.spn_group_n.setValue(1)
+        self._advanced.cmb_detrend.setCurrentIndex(0)
+        self._advanced.chk_auto_aperture.setChecked(False)
+        self._advanced.spn_saturate.setValue(0.0)
+        self.lbl_status.setText(self.tr("Advanced defaults restored."))
 
     # ------------------------------------------------------------- panel
 

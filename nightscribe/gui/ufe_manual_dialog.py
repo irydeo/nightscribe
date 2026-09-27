@@ -54,9 +54,10 @@ class UfeManualDialog(QDialog):
         # the sizing lives here, not in the .ui: adopt_ui's hidden shell
         # is what would receive the root's size properties there, so
         # this file deliberately carries none.
-        # 500x185 keeps the buttons' row from ever squishing (measured
-        # it needs 428, a wide font eats about 15% more) and 540x200
-        # gives the spacers a little air to spend
+        # 500x185 stays generous: the widest row (field plus proposal
+        # buttons, 292 measured) wants a wide font to eat about 15%
+        # more; the sequence button wears a row of its own; and 540
+        # x200 opens with a little air for the spacers
         self.setMinimumSize(500, 185)
         self.resize(540, 200)
         # the structure is the Designer file's (ADR-005); this class

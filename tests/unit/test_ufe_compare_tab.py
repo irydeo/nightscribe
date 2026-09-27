@@ -692,15 +692,19 @@ def test_manual_window_toggle_arms_the_picking(dlg, qapp):
 
 
 def test_manual_window_cannot_squish_its_buttons(dlg):
-    # The buttons' row is the width floor of the window: a wider font or
-    # a longer label must grow the row and fail this test before it can
-    # truncate the labels in production (the old 460x120 minimum sat
-    # just under the row's real need of about 428 px)
+    # The widest row is the width floor of the window: a wider font or a
+    # longer label must grow it and fail this test before it can truncate
+    # the labels in production. The actions row pairs the field and the
+    # proposal buttons (their spacing plus the margins); the sequence
+    # button wears a live count on a row of its own, so it is measured
+    # dressed with one
     w = dlg.tab_compare.manual
-    need = (w.btn_seq_open.sizeHint().width()
-            + w.btn_field.sizeHint().width()
-            + w.btn_propose.sizeHint().width()
-            + 6 * 2      # the actions row spacing
-            + 9 * 2)     # the layout margins
-    assert w.minimumWidth() >= need
+    margins = 9 * 2
+    actions = (w.btn_field.sizeHint().width()
+               + w.btn_propose.sizeHint().width() + 6 + margins)
+    bare = w.btn_seq_open.text()
+    w.btn_seq_open.setText("Sequence (1)…")
+    seq = w.btn_seq_open.sizeHint().width() + margins
+    w.btn_seq_open.setText(bare)
+    assert w.minimumWidth() >= max(actions, seq)
     assert w.minimumHeight() >= w.minimumSizeHint().height()

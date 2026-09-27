@@ -1062,6 +1062,8 @@ class PlateConfig:
     sky_mode: str = "median"
     color: bool = False
     target_bv: float = 0.0
+    require_catalog: bool = True    # False = relative mode: comps count
+                                    # even without a catalog value
     # site (Ajustes, ADR-028): the same values the panel has always used
     site_gain: float = None
     site_ron: float = None
@@ -1219,12 +1221,13 @@ def measure_plate(image, cfg):
             key = "sat" if r.get("saturated") else "other"
             skipped[key] = skipped.get(key, 0) + 1
             continue
-        if value is None:
+        if value is None and cfg.require_catalog:
             skipped["band"] = skipped.get("band", 0) + 1
             continue
-        inst.append(-2.5 * math.log10(r["flux"]))
-        cat.append(value)
-        bvs.append(star.get("bv"))
+        if value is not None:
+            inst.append(-2.5 * math.log10(r["flux"]))
+            cat.append(value)
+            bvs.append(star.get("bv"))
         used_entries.append((e, r))
     res.used = used_entries
     res.skipped = skipped

@@ -93,6 +93,10 @@ nightscribe/
                       #   campo: saturan), CSV (ADR-042)
     field_math.py     # proyección TAN de la carta, ticks de borde, escala,
                       #   anti-colisión de rótulos (compartido viz/widget, ADR-042)
+    series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
+                      #   frame y ensemble con veto MAD, puertas que marcan y
+                      #   nunca borran, tiempo a media exposición (MJD/HJD),
+                      #   agrupación en el dominio de la medida (plan fase 2)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

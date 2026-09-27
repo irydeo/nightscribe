@@ -6983,9 +6983,8 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>El camino normal: consulta el catálogo (y las variables VSX) alrededor del centro de la placa y propone las comparaciones de una vez</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Generate field</source>
-        <translation>Generar campo</translation>
+        <translation type="vanished">Generar campo</translation>
     </message>
     <message>
         <location filename="../ui/ufe_compare_manual.ui" line="27"/>
@@ -7016,34 +7015,28 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>¿No tienes placa propia? Descarga el campo del survey (PS1-g, DSS2-rojo como reserva) como FITS con WCS y trabaja directamente sobre él</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="14"/>
         <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
-        <translation>Pulsa una estrella para añadirla o quitarla. Las variables conocidas (anillos rojos) nunca sirven de comparación.</translation>
+        <translation type="vanished">Pulsa una estrella para añadirla o quitarla. Las variables conocidas (anillos rojos) nunca sirven de comparación.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="17"/>
         <source>On click, add as:</source>
-        <translation>Al pulsar, añadir como:</translation>
+        <translation type="vanished">Al pulsar, añadir como:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="18"/>
         <source>Comparison</source>
-        <translation>Comparación</translation>
+        <translation type="vanished">Comparación</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="19"/>
         <source>Check</source>
-        <translation>Check</translation>
+        <translation type="vanished">Check</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="23"/>
         <source>Show catalog magnitudes</source>
-        <translation>Ver las magnitudes del catálogo</translation>
+        <translation type="vanished">Ver las magnitudes del catálogo</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Propose sequence</source>
-        <translation>Proponer secuencia</translation>
+        <translation type="vanished">Proponer secuencia</translation>
     </message>
     <message>
         <source>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</source>
@@ -7079,6 +7072,16 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>DSS2…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="110"/>
+        <source>Open the manual tweak window: while it is open clicking the plate picks your comparison and check stars (and the sequence actions live in it)</source>
+        <translation>Abre la ventana de ajuste manual: mientras esté abierta, cada clic sobre la placa elige comparaciones y estrellas de control (y en ella viven las acciones de la secuencia)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="113"/>
+        <source>Manual tweak…</source>
+        <translation>Ajuste manual…</translation>
+    </message>
+    <message>
         <source>Show the target marker</source>
         <translation type="vanished">Mostrar la marca del objetivo</translation>
     </message>
@@ -7100,14 +7103,12 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Secuencia ({0})…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="26"/>
         <source>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</source>
-        <translation>La tabla de la secuencia: las comparaciones y la estrella de control con sus magnitudes de catálogo (una ventana pequeña: sigue trabajando mientras esté abierta)</translation>
+        <translation type="vanished">La tabla de la secuencia: las comparaciones y la estrella de control con sus magnitudes de catálogo (una ventana pequeña: sigue trabajando mientras esté abierta)</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="178"/>
         <source>Manual tweak</source>
-        <translation>Ajuste manual</translation>
+        <translation type="vanished">Ajuste manual</translation>
     </message>
     <message>
         <location filename="../ufe_compare_tab.py" line="255"/>
@@ -7995,6 +7996,64 @@ tocan.</translation>
         <location filename="../ufe_measure_tab.py" line="1186"/>
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
+    </message>
+</context>
+<context>
+    <name>UfeManualDialog</name>
+    <message>
+        <location filename="../ufe_manual_dialog.py" line="45"/>
+        <source>Manual tweak</source>
+        <translation>Ajuste manual</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="14"/>
+        <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
+        <translation>Pulsa una estrella para añadirla o quitarla. Las variables conocidas (anillos rojos) nunca sirven de comparación.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="17"/>
+        <source>On click, add as:</source>
+        <translation>Al pulsar, añadir como:</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="18"/>
+        <source>Comparison</source>
+        <translation>Comparación</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="19"/>
+        <source>Check</source>
+        <translation>Check</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="23"/>
+        <source>Show catalog magnitudes</source>
+        <translation>Ver las magnitudes del catálogo</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="26"/>
+        <source>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</source>
+        <translation>La tabla de la secuencia: las comparaciones y la estrella de control con sus magnitudes de catálogo (una ventana pequeña: sigue trabajando mientras esté abierta)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="27"/>
+        <source>Generate field</source>
+        <translation>Generar campo</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="27"/>
+        <source>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</source>
+        <translation>Solo consulta el catálogo (y las variables VSX) alrededor del centro de la placa, sin proponer la secuencia</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="28"/>
+        <source>Propose sequence</source>
+        <translation>Proponer secuencia</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="28"/>
+        <source>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</source>
+        <translation>Solo vuelve a ejecutar la propuesta automática sobre el campo ya cargado (estrellas aisladas y no variables, a juego con el brillo del objetivo)</translation>
     </message>
 </context>
 <context>

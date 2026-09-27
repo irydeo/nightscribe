@@ -6983,19 +6983,16 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>The normal path: query the catalog (and VSX variables) around the plate centre and propose the comparisons in one go</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Generate field</source>
-        <translation>Generate field</translation>
+        <translation type="vanished">Generate field</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="27"/>
         <source>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</source>
-        <translation>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</translation>
+        <translation type="vanished">Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</source>
-        <translation>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</translation>
+        <translation type="vanished">Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</translation>
     </message>
     <message>
         <source>Query the catalog (and VSX variables) around the plate centre</source>
@@ -7016,34 +7013,28 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>No plate of your own? Download the field from the survey (PS1-g, DSS2-red fallback) as a FITS with WCS and work on it directly</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="14"/>
         <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
-        <translation>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</translation>
+        <translation type="vanished">Click a star to add or remove it. Known variables (red rings) can never be comparisons.</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="17"/>
         <source>On click, add as:</source>
-        <translation>On click, add as:</translation>
+        <translation type="vanished">On click, add as:</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="18"/>
         <source>Comparison</source>
-        <translation>Comparison</translation>
+        <translation type="vanished">Comparison</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="19"/>
         <source>Check</source>
-        <translation>Check</translation>
+        <translation type="vanished">Check</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="23"/>
         <source>Show catalog magnitudes</source>
-        <translation>Show catalog magnitudes</translation>
+        <translation type="vanished">Show catalog magnitudes</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="28"/>
         <source>Propose sequence</source>
-        <translation>Propose sequence</translation>
+        <translation type="vanished">Propose sequence</translation>
     </message>
     <message>
         <source>Automatic proposal: isolated, non-variable stars matched to the target&apos;s brightness</source>
@@ -7079,6 +7070,16 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>DSS2…</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="110"/>
+        <source>Open the manual tweak window: while it is open clicking the plate picks your comparison and check stars (and the sequence actions live in it)</source>
+        <translation>Open the manual tweak window: while it is open clicking the plate picks your comparison and check stars (and the sequence actions live in it)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_compare_tab.ui" line="113"/>
+        <source>Manual tweak…</source>
+        <translation>Manual tweak…</translation>
+    </message>
+    <message>
         <source>Show the target marker</source>
         <translation type="vanished">Show the target marker</translation>
     </message>
@@ -7100,14 +7101,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Sequence ({0})…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_compare_manual.ui" line="26"/>
         <source>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</source>
-        <translation>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</translation>
+        <translation type="vanished">The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="178"/>
         <source>Manual tweak</source>
-        <translation>Manual tweak</translation>
+        <translation type="vanished">Manual tweak</translation>
     </message>
     <message>
         <location filename="../ufe_compare_tab.py" line="255"/>
@@ -7995,6 +7994,64 @@ not touched.</translation>
         <location filename="../ufe_measure_tab.py" line="1186"/>
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
+    </message>
+</context>
+<context>
+    <name>UfeManualDialog</name>
+    <message>
+        <location filename="../ufe_manual_dialog.py" line="45"/>
+        <source>Manual tweak</source>
+        <translation>Manual tweak</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="14"/>
+        <source>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</source>
+        <translation>Click a star to add or remove it. Known variables (red rings) can never be comparisons.</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="17"/>
+        <source>On click, add as:</source>
+        <translation>On click, add as:</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="18"/>
+        <source>Comparison</source>
+        <translation>Comparison</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="19"/>
+        <source>Check</source>
+        <translation>Check</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="23"/>
+        <source>Show catalog magnitudes</source>
+        <translation>Show catalog magnitudes</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="26"/>
+        <source>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</source>
+        <translation>The sequence table: the comparison stars and the check star with their catalog magnitudes (a small window: keep working while it is open)</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="27"/>
+        <source>Generate field</source>
+        <translation>Generate field</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="27"/>
+        <source>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</source>
+        <translation>Only query the catalog (and VSX variables) around the plate centre, without proposing the sequence</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="28"/>
+        <source>Propose sequence</source>
+        <translation>Propose sequence</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_manual_dialog.ui" line="28"/>
+        <source>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</source>
+        <translation>Only re-run the automatic proposal on the field already loaded (isolated, non-variable stars matched to the target&apos;s brightness)</translation>
     </message>
 </context>
 <context>

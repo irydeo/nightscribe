@@ -130,7 +130,7 @@ def dlg(qapp, tmp_path):
     d._test_target = target
     d._test_comps = comps
     d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
-    # no modes: the folded manual tweak already arms the measuring
+    # no modes: the closed manual window already arms the measuring
     yield d
     d.tab_blink.shutdown()
     d.view._render_timer.stop()
@@ -190,24 +190,26 @@ def test_full_measurement_calibrates(dlg):
     assert tab.btn_csv.isEnabled() and tab.btn_eff.isEnabled()
 
 
-def test_remeasure_keeps_painting_while_the_sequence_owns_the_stage(dlg):
+def test_remeasure_keeps_painting_while_the_sequence_owns_the_stage(dlg, qapp):
     # Regression (ADR-044 rev): the overlays follow the Photometry tab's
     # stage, not the click ownership. Re-measuring (any recipe control
-    # ends in _remeasure) with the manual tweak unfolded (the picking
-    # owns the clicks) used to drop the rings and paint nothing back.
+    # ends in _remeasure) with the manual window open (the picking owns
+    # the clicks) used to drop the rings and paint nothing back.
     tab = dlg.tab_measure
     _sequence(dlg, dlg._test_comps)
     _click(dlg, *dlg._test_target)
     assert len(tab._items) == 3 + 5
-    # unfolded tweak: picking owns the clicks, Measure stays on stage
-    dlg.tab_compare.sec_manual.setCollapsed(False)
+    # window open: picking owns the clicks, Measure stays on stage
+    dlg.tab_compare.btn_manual.click()
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert not tab._active and tab._on_stage
     tab._remeasure()
     assert tab._last is not None and tab._last.get("mag") is not None
     assert len(tab._items) == 3 + 5
-    # folded again: Measure re-arms, still coherent; a full leave drops
-    dlg.tab_compare.sec_manual.setCollapsed(True)
+    # window closed: Measure re-arms, still coherent; a full leave drops
+    dlg.tab_compare.manual.hide()
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert len(tab._items) == 3 + 5
     dlg.tabs.setCurrentWidget(dlg.tab_blink)

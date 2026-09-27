@@ -15,9 +15,10 @@
 sections stacked in one vertical splitter, both always visible (ADR-044
 rev, 2026-09-25, third revision of the day: the mode toggle is gone).
 There are no modes: what a plate click does follows the Comparisons
-section's «Manual tweak» fold. Folded (the normal state) the click
-measures; expanded it picks stars. Both sections keep their overlays
-while the tab is on stage, because the measurement reads the sequence.
+section's «Manual tweak…» window. While it is closed (the normal state)
+the click measures; while it is open it picks stars. Both sections keep
+their overlays while the tab is on stage, because the measurement reads
+the sequence.
 
 The container plays the tab contract the dialog knows: pick_clicks and
 set_active(flag). Deep links may still name the old tabs by widget
@@ -42,7 +43,7 @@ class UfePhotometryTab(QWidget):
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView, parent - the dialog (or None)
     # @return: the Photometry tab; the Measure section owns the clicks
-    #          until the observer unfolds the manual tweak
+    #          until the observer opens the manual tweak window
     def __init__(self, state, lang="es", view=None, parent=None):
         super().__init__(parent)
         self._state = state
@@ -58,7 +59,7 @@ class UfePhotometryTab(QWidget):
             state, lang, view=view, compare_tab=self.tab_compare)
 
         # the structure is the Designer file's (ADR-005); the section
-        # insertion and the fold-driven click routing happen here
+        # insertion and the window-driven click routing happen here
         self._ui = adopt_ui(self, "ufe_photometry_tab")
                                             # over: no wrapper, no extra
                                             # margins
@@ -73,36 +74,25 @@ class UfePhotometryTab(QWidget):
         self.tab_measure.setMinimumSize(QSize(0, 260))
         self.splitter.setSizes([320, 540])
 
-        # the fold decides what a click does (expanded: pick stars;
-        # folded: measure); re-arm on every toggle, and give the
-        # Comparisons half the room the unfolded tweak needs
-        self.tab_compare.sec_manual.sectionToggled.connect(
+        # the manual window decides what a click does (open: pick stars;
+        # closed: measure); re-arm on every visibility change
+        self.tab_compare.manual.openStateChanged.connect(
             self._on_manual_toggled)
 
     # -------------------------------------------------------- activation
 
-    def _on_manual_toggled(self, _expanded):
-        # The unfolded tweak is only as tall as its content: the splitter
-        # re-deals to the section's size hint (a fixed share left a big
-        # dead strip under it), and folds back to the measuring share.
-        picking = self.tab_compare.sec_manual.isExpanded()
-        if picking:
-            lay = self.tab_compare.layout()
-            if lay is not None:
-                lay.activate()          # the visibility flip, applied now
-            hint = self.tab_compare.sizeHint().height()
-            total = self.splitter.height()
-            top = max(200, min(hint, total - 280))
-            self.splitter.setSizes([top, total - top])
-        else:
-            self.splitter.setSizes([320, 540])
+    def _on_manual_toggled(self, _visible):
+        # Window-driven (ADR-044 rev 2026-09-26): the manual tweak lives
+        # in a floating window of its own, so the splitter keeps its
+        # fixed share and there is nothing to re-deal; only the click
+        # routing flips.
         self._apply()
 
     def _apply(self):
-        # Arms the section the fold points at; the other keeps its
-        # overlays (the measurement reads the sequence, the sequence's
-        # rings stay readable under the measurement).
-        picking = self.tab_compare.sec_manual.isExpanded()
+        # Arms the section the manual window points at; the other keeps
+        # its overlays (the measurement reads the sequence, the
+        # sequence's rings stay readable under the measurement).
+        picking = self.tab_compare.manual_visible()
         self.tab_compare.set_active(picking,
                                     keep_overlays=not picking)
         self.tab_measure.set_active(not picking,
@@ -110,8 +100,8 @@ class UfePhotometryTab(QWidget):
 
     def set_active(self, flag):
         # Stage handoff between the dialog's feature tabs: on stage, the
-        # fold rules the clicks; a full leave drops both sections'
-        # overlays and diffs, to be rebuilt on the return.
+        # manual window rules the clicks; a full leave drops both
+        # sections' overlays and diffs, to be rebuilt on the return.
         # @args: flag - on stage or not
         self._on_stage = bool(flag)
         if flag:

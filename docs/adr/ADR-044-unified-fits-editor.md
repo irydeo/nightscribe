@@ -1,6 +1,6 @@
 # ADR-044: Editor FITS unificado (UFE): una ventana, una pestaña por funcionalidad, escena en píxeles de placa
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría». **rev. 2026-09-25**: la barra superior gana glifos SVG conmutables (ajuste `ufe_bar_icons`, por defecto solo iconos: carga, export, los conmutadores de HUD y los presets de zoom; «Solve astrometry…» y «Move marker…» conservan siempre su texto), «Move marker…» pasa a la barra como acción global desde cualquier pestaña, «Remove all» y «Export CSV…» se mudan al diálogo de Secuencia que enmarca la tabla, y la fila de objetivo y magnitud cabe en una línea; los controles de marca del objeto ganan nombres que dicen qué muestran y tooltips honestos, el anillo dibuja con el helper compartido `ring_marker_items` (gemelo de `cross_marker_items`) y el ámbar de esta familia de marcadores pasa a tener una única fuente, `palette.ACCENT`)
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-22 · **rev. 2026-09-23** (fases A-F + G/H implementadas. En D la pestaña Anotar fijó que las pestañas reciben `(state, lang, view)` y la activación por `set_active`; D.5: lectura y pintado de tarjetas ANNOTATE, flecha de norte y barra de escala como HUD común también en el PNG, resolución astrométrica común y en memoria; en E la pestaña Blink añadió el gancho `set_frame_override`; en F la pestaña Comparar usa la placa cargada como fondo del campo; G/H: la pestaña Medir con la fotometría calibrada y sus controles de calidad sobre `core/photometry.py`. **Conexión (2026-09-23)**: por defecto los flujos abren el UFE — ajuste `ufe_default` en Ajustes → Desarrollo, efecto inmediato — con prefill por pestaña, registro en el proyecto vía `set_save_hook` (incluidos contexto de secuencia y protocolo de campaña) y descarga del campo DSS2/PS1 dentro del UFE (esto supera la nota de la fase F: el fondo DSS2 ya no es exclusivo del legacy); la pestaña Medir puede guardar el punto calibrado en el proyecto (`source="measure"`) y la lista de visitas de Seguimiento abre el editor por visita («Medir en el Editor…» / "Measure in the editor…"), con resumen de campaña que se recalcula en cada guardado (retira el quick-look «Análisis rápido», ver ADR-019). Los tres diálogos legacy siguen vivos, intactos y alcanzables durante el periodo de revisión. **rev. 2026-09-24**: las secciones Comparar y Medir dejan de ser dos pestañas y viven juntas en la pestaña «Photometry» / «Fotometría». **rev. 2026-09-25**: la barra superior gana glifos SVG conmutables (ajuste `ufe_bar_icons`, por defecto solo iconos: carga, export, los conmutadores de HUD y los presets de zoom; «Solve astrometry…» y «Move marker…» conservan siempre su texto), «Move marker…» pasa a la barra como acción global desde cualquier pestaña, «Remove all» y «Export CSV…» se mudan al diálogo de Secuencia que enmarca la tabla, y la fila de objetivo y magnitud cabe en una línea; los controles de marca del objeto ganan nombres que dicen qué muestran y tooltips honestos, el anillo dibuja con el helper compartido `ring_marker_items` (gemelo de `cross_marker_items`) y el ámbar de esta familia de marcadores pasa a tener una única fuente, `palette.ACCENT`) · **rev. 2026-09-26**: el ajuste manual sale de la sección y vive en su propia pequeña ventana no modal, `UfeManualDialog` (cuerpo en `ui/ufe_manual_dialog.ui`), que abre y cierra el botón conmutable «Manual tweak…», a la derecha de DSS2: abierta el clic elige estrellas y cerrada (el estado normal) la placa mide; la pestaña de Comparar aliasa los widgets de la ventana y su estado sobrevive a cierre y reapertura, y el splitter de Fotometría conserva su reparto fijo; el estado de la ventana lo reporta la señal `openStateChanged` de la propia ventana, porque `visibilityChanged` no está expuesta en esta build de PySide6.
 
 **Ver / See**: [docs/unified-fits-editor.md](../unified-fits-editor.md) (requisitos del observador) · [docs/PLANS/unified-fits-editor.md](../PLANS/unified-fits-editor.md) (plan vivo)
 
@@ -283,6 +283,25 @@ quepa todo); y el panel de Medir, cuando no hay calibración, desglosa
 las causas junto al titular («Why: 5 saturated/clipped…») con la guía
 en lenguaje llano, en vez de ahogarlas al final de las notas.
 
+**Ajuste manual en su ventana (2026-09-26, cuarta revisión)**. Los
+controles de marcado manual salen de la sección y viven en la pequeña
+ventana no modal `UfeManualDialog`; su cuerpo es
+`ui/ufe_manual_dialog.ui` (renombre de `ui/ufe_compare_manual.ui`) para
+que los textos sigan siendo traducibles. La abre y cierra un botón
+conmutable, «Manual tweak…», a la derecha del botón DSS2, y es ahora
+la única cara del ajuste manual en la sección. Lo que hace un clic en
+la placa sigue la visibilidad de la ventana: abierta, el clic elige
+comparaciones y estrellas de control; cerrada (el estado normal), la
+placa mide como siempre. La pestaña de Comparar aliasa los widgets de
+la ventana (los radios, las etiquetas, «Generate field»,
+«Propose sequence», «Sequence (N)…» y la pista de clics) y el estado
+vive en ellos, así que cerrar y reabrir la ventana conserva todo lo ya
+elegido; y cerrar por la X desmarca el botón, con el estado de la
+ventana reportado por la señal `openStateChanged` de la propia
+ventana, porque `visibilityChanged` no está expuesto en esta build de
+PySide6. Y el splitter de Fotometría ya no reparte para el ajuste
+manual: la ventana flota y las dos mitades conservan su tamaño.
+
 **Consecuencias**: cargar y trabajar un FITS tiene un solo camino; las
 mejoras del motor de estiramiento (fase B) llegan a la vez a todo lo que
 lo use; añadir una funcionalidad al editor no modifica `ufe_dialog.py`
@@ -548,6 +567,25 @@ exception reads as a hang); the Photometry splitter re-deals when
 Measure panel, with no calibration, itemises the causes right under the
 headline ("Why: 5 saturated/clipped…") with plain-language guidance
 instead of drowning them at the bottom of the notes.
+
+**Manual tweak in its own window (2026-09-26, fourth revision)**. The
+manual picking controls leave the section and live in a small
+non-modal window of their own, `UfeManualDialog`; its body is
+`ui/ufe_manual_dialog.ui` (renamed from `ui/ufe_compare_manual.ui`) so
+the texts stay translatable. A checkable button, "Manual tweak…",
+right of the DSS2 button, opens and closes it, and it is now the only
+face of the manual tweak in the section. What a plate click does
+follows the window's visibility: open, the click picks comparisons and
+check stars; closed (the normal state), the plate measures as before.
+The Compare tab aliases the window's widgets (the radios, the labels,
+"Generate field", "Propose sequence", "Sequence (N)…" and the click
+hint) and the state lives on them, so closing and reopening the window
+keeps everything already chosen; and closing it by the X unchecks the
+button, the window's state being reported by the window's own
+`openStateChanged` signal, because `visibilityChanged` is not exposed
+in this PySide6 build. And the Photometry splitter no longer re-deals
+for the manual tweak: the window floats and the two halves keep their
+size.
 
 **Consequences**: loading and working a FITS has a single path; stretch
 engine improvements (phase B) reach every consumer at once; adding a

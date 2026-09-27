@@ -96,20 +96,21 @@ def test_settings_has_the_development_tab(qapp):
     assert 'ufe_default' in src and 'chk_ufe_default.isChecked()' in src
 
 
-def test_open_plate_and_show_tab(dlg):
+def test_open_plate_and_show_tab(dlg, qapp):
     assert dlg.open_plate(str(MONO))
     assert not dlg.open_plate(str(FIXTURES / "missing.fits"))
     # the legacy section names are routed to the Photometry tab; there
     # are no modes anymore (ADR-044 rev 2026-09-25): both links land on
-    # the same tab, and the folded manual tweak leaves the clicks
+    # the same tab, and the closed manual window leaves the clicks
     # measuring
     dlg.show_tab(dlg.tab_measure)
     assert dlg.tabs.currentWidget() is dlg.tab_photometry
     assert dlg.tab_measure._active
     dlg.show_tab("compare")
     assert dlg.tabs.currentWidget() is dlg.tab_photometry
-    # unfolding the manual tweak hands the clicks to the star picking
-    dlg.tab_compare.sec_manual.setCollapsed(False)
+    # opening the manual window hands the clicks to the star picking
+    dlg.tab_compare.btn_manual.click()
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert dlg.tab_compare._active and not dlg.tab_measure._active
 

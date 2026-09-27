@@ -19,8 +19,9 @@ SeqChartDialog keeps living untouched).
 
 The normal path is ONE click: «Build the sequence…» generates the
 catalog field around the plate centre and proposes the comparisons; the
-observer only tweaks by clicking stars (the manual controls live folded
-under «Manual tweak»). The loaded plate IS the field background, so the
+observer only tweaks by clicking stars, and the «Manual tweak…» toggle
+(right of the DSS2 button) raises the small window that holds the
+hand-driven controls. The loaded plate IS the field background, so the
 section needs it to carry a WCS (the common «Solve astrometry…» button
 fixes that in place). Known VSX variables can never be comparisons; the
 table edits names and kinds; the CSV export comes out next to the plate
@@ -42,6 +43,7 @@ from PySide6.QtWidgets import (QComboBox, QFileDialog, QProgressDialog,
 from ..core import compstars
 from ..core.sources import vizier
 from ..viz import palette
+from .ufe_manual_dialog import UfeManualDialog
 from .ufe_sequence_dialog import UfeSequenceDialog
 from .ui_loader import adopt_ui
 
@@ -148,9 +150,8 @@ class UfeCompareTab(QWidget):
     def _build_ui(self):
         # The structure is the Designer file's (ADR-005); this method
         # aliases the widgets, fills the catalog combo (its items carry
-        # userData, which a .ui cannot hold), folds the manual picking
-        # controls into their collapsible section and connects the
-        # signals.
+        # userData, which a .ui cannot hold), raises the manual tweak
+        # window from its toggle button and connects the signals.
         self._ui = adopt_ui(self, "ufe_compare_tab")
                                             # over: no wrapper, no extra
                                             # margins, and layout-walking
@@ -168,29 +169,29 @@ class UfeCompareTab(QWidget):
         self.lbl_status = self._ui.lbl_status
 
         # the manual tweak: its controls are translatable, so they live
-        # in their own Designer file; here they fold into the collapsed
-        # section that takes the .ui's placeholder. Everything hand-driven
-        # lives inside: picking hints and kind, catalog labels, and the
-        # step-by-step actions (field alone, proposal alone, the table)
-        from .ui_loader import load_ui, drop_in
-        from .widgets.collapsible_section import CollapsibleSection
-        manual = load_ui("ufe_compare_manual", self)
-        self.sec_manual = CollapsibleSection(self.tr("Manual tweak"))
-        self.sec_manual.setContentWidget(manual)
-        self.sec_manual.setCollapsed(True)
-        drop_in(self.layout(), self._ui.ph_manual, self.sec_manual)
-        self.rdo_comp = manual.rdo_comp
-        self.rdo_check = manual.rdo_check
+        # in their own window (ui/ufe_manual_dialog.ui). The toggle
+        # button, right of the DSS2 one, raises it; while it is open the
+        # plate clicks pick stars, while it is closed they measure. Its
+        # widgets are aliased here, so the old call sites keep finding
+        # them, and their state (picking kind, labels) lives on the
+        # widgets and survives close/reopen
+        self._manual = UfeManualDialog(self)
+        self.manual = self._manual
+        self.manual.openStateChanged.connect(self._on_manual_visibility)
+        self.btn_manual = self._ui.btn_manual
+        self.btn_manual.toggled.connect(self._on_manual_toggled)
+        self.rdo_comp = self._manual.rdo_comp
+        self.rdo_check = self._manual.rdo_check
         self.rdo_check.toggled.connect(
             lambda on: setattr(self, "_pick_kind",
                                "check" if on else "comp"))
-        self.chk_labels = manual.chk_labels
+        self.chk_labels = self._manual.chk_labels
         self.chk_labels.toggled.connect(self._on_catalog_visible)
-        self.btn_field = manual.btn_field
+        self.btn_field = self._manual.btn_field
         self.btn_field.clicked.connect(self._on_generate)
-        self.btn_propose = manual.btn_propose
+        self.btn_propose = self._manual.btn_propose
         self.btn_propose.clicked.connect(self._on_propose)
-        self.btn_seq_open = manual.btn_seq_open
+        self.btn_seq_open = self._manual.btn_seq_open
         self.btn_seq_open.clicked.connect(self._open_sequence)
 
         # The table lives in its own small non-modal window (ADR-044 rev):
@@ -211,6 +212,32 @@ class UfeCompareTab(QWidget):
         self._seqdlg.show()
         self._seqdlg.raise_()
         self._seqdlg.activateWindow()
+
+    def _on_manual_toggled(self, on):
+        # The button is the switch of the manual tweak window: check it
+        # and the window rises, uncheck it and it goes away (the plate
+        # clicks go back to measuring).
+        # @args: on - toggle checked (show) or unchecked (hide)
+        if on:
+            self._manual.show()
+            self._manual.raise_()
+            self._manual.activateWindow()
+        else:
+            self._manual.hide()
+
+    def _on_manual_visibility(self, visible):
+        # The window can also be closed through its X (or die with the
+        # host): keep the toggle honest in that case.
+        # @args: visible - the dialog's new visibility state
+        if not visible and self.btn_manual.isChecked():
+            self.btn_manual.blockSignals(True)
+            self.btn_manual.setChecked(False)
+            self.btn_manual.blockSignals(False)
+
+    def manual_visible(self):
+        # @return: the manual tweak window is up: the plate clicks then
+        #          pick stars, and closed state they measure
+        return self._manual.isVisible()
 
     # ------------------------------------------------------- activation
 

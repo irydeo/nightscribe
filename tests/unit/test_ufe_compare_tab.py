@@ -55,8 +55,9 @@ def dlg(qapp):
     d.show()
     d.state.load(MONO)
     d.tabs.setCurrentWidget(d.tab_photometry)   # take the stage
-    # the picking state: manual tweak unfolded, clicks add stars
-    d.tab_compare.sec_manual.setCollapsed(False)
+    # the picking state: manual window open, clicks add stars
+    d.tab_compare.btn_manual.click()
+    qapp.processEvents()
     d.tab_photometry._apply()
     yield d
     d.tab_blink.shutdown()
@@ -338,11 +339,11 @@ def test_clear_via_the_dialog_button_empties_the_sequence(dlg):
 
 def test_manual_actions_live_in_the_manual_tweak(dlg):
     # The hand-driven path (field alone, proposal alone, the table)
-    # lives inside the folded «Manual tweak» section; the table button
-    # wears the live count (ADR-044 rev, 2026-09-25).
+    # lives inside the «Manual tweak» window (right of the DSS2 button);
+    # the table button wears the live count (ADR-044 rev, 2026-09-25).
     from PySide6.QtWidgets import QPushButton
     tab = dlg.tab_compare
-    manual_buttons = tab.sec_manual.findChildren(QPushButton)
+    manual_buttons = tab.manual.findChildren(QPushButton)
     assert tab.btn_field in manual_buttons
     assert tab.btn_propose in manual_buttons
     assert tab.btn_seq_open in manual_buttons
@@ -351,7 +352,7 @@ def test_manual_actions_live_in_the_manual_tweak(dlg):
     tab._on_propose()
     n = len(tab._entries)
     assert tab.btn_seq_open.text() == "Sequence ({0})…".format(n)
-    # and the one-click button is the visible face of the section
+    # and the one-click button lives on the tab, outside the window
     assert tab.btn_auto not in manual_buttons
 
 
@@ -421,9 +422,9 @@ def test_loading_a_new_plate_invalidates_the_field(dlg):
     assert tab.table.rowCount() == 0
 
 
-def test_sequence_overlays_survive_folding_the_manual_tweak(dlg):
-    # the sequence is the Measure section's input: folding the manual
-    # tweak (back to measuring) keeps rings and labels visible (with the
+def test_sequence_overlays_survive_closing_the_manual_window(dlg, qapp):
+    # the sequence is the Measure section's input: closing the manual
+    # window (back to measuring) keeps rings and labels visible (with the
     # picking clicks disarmed); only leaving the Photometry tab for real
     # drops them
     from PySide6.QtCore import QPointF
@@ -433,7 +434,8 @@ def test_sequence_overlays_survive_folding_the_manual_tweak(dlg):
     dlg.view.scene_clicked.emit(QPointF(s["_sx"], s["_sy"]))
     assert len(tab._entries) == 1
     assert len(tab._items) > 0
-    tab.sec_manual.setCollapsed(True)           # back to measuring
+    tab.manual.hide()                           # back to measuring
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert len(tab._items) > 0                  # still drawn
     assert not tab._active                      # but disarmed
@@ -441,8 +443,9 @@ def test_sequence_overlays_survive_folding_the_manual_tweak(dlg):
     # and the star probe still answers while measuring
     hit, lines = dlg.view._hover_probe(s["_sx"], s["_sy"])
     assert hit and "Gaia EDR3" in lines[0]
-    # unfolding again restores the picking
-    tab.sec_manual.setCollapsed(False)
+    # opening the window again restores the picking
+    tab.btn_manual.click()
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert tab._active and not dlg.tab_measure._active
     assert len(tab._items) > 0
@@ -455,8 +458,8 @@ def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
     # Photometry tab is armed on Measure WITHOUT the Comparisons section
     # ever being armed first painted nothing on Generate field, because
     # keep_overlays kept _on_stage's initial False instead of setting
-    # the stage. There are no modes now: the default (manual tweak
-    # folded) IS the measuring state.
+    # the stage. There are no modes now: the default (manual window
+    # closed) IS the measuring state.
     from nightscribe.gui.ufe_dialog import UfeDialog
     d = UfeDialog()
     d.resize(1280, 860)
@@ -465,7 +468,7 @@ def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
     d.state.load(MONO)
     try:
         tab = d.tab_compare
-        assert tab.sec_manual.isCollapsed()     # the normal state
+        assert not tab.manual_visible()         # the normal state: closed
         assert not tab._active                    # never armed...
         assert tab._on_stage                      # ...but on stage
         tab._on_field_ready(_field(d))
@@ -474,7 +477,7 @@ def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
         tab._on_propose()
         assert len(tab._entries) > 0
         assert len(tab._entry_items) == 2 * len(tab._entries)
-        # clicks measure, they never mark stars with the tweak folded
+        # clicks measure, they never mark stars with the window closed
         from PySide6.QtCore import QPointF
         s = tab._stars[0]
         n = len(tab._entries)
@@ -489,7 +492,7 @@ def test_fresh_dialog_paints_with_measure_armed_from_the_start(qapp):
 def test_deep_links_land_on_the_photometry_tab(qapp):
     # No modes anymore (ADR-044 rev 2026-09-25): the legacy deep links
     # ("compare" / "measure", by name or widget) all land on the same
-    # Photometry tab; the fold, not the link, rules the clicks.
+    # Photometry tab; the manual window, not the link, rules the clicks.
     from nightscribe.gui.ufe_dialog import UfeDialog
     d = UfeDialog()
     d.resize(1280, 860)
@@ -498,12 +501,13 @@ def test_deep_links_land_on_the_photometry_tab(qapp):
     try:
         d.show_tab(d.tab_measure)
         assert d.tabs.currentWidget() is d.tab_photometry
-        assert d.tab_measure._active              # folded: clicks measure
+        assert d.tab_measure._active              # window closed: measuring
         assert not d.tab_compare._active
         d.show_tab("compare")
         assert d.tabs.currentWidget() is d.tab_photometry
-        # unfolding the manual tweak hands the clicks to the picking
-        d.tab_compare.sec_manual.setCollapsed(False)
+        # opening the manual window hands the clicks to the picking
+        d.tab_compare.btn_manual.click()
+        qapp.processEvents()
         d.tab_photometry._apply()
         assert d.tab_compare._active and not d.tab_measure._active
     finally:
@@ -512,14 +516,15 @@ def test_deep_links_land_on_the_photometry_tab(qapp):
         d.deleteLater()
 
 
-def test_field_paints_while_the_measure_section_owns_the_stage(dlg):
+def test_field_paints_while_the_measure_section_owns_the_stage(dlg, qapp):
     # Regression (ADR-044 rev): opened from a visit, the Photometry tab
-    # sits in the measuring state (tweak folded) and the Comparisons
-    # half stays visible but disarmed. Generating the field there painted
-    # NOTHING (the draw gates read the click ownership instead of the
-    # stage).
+    # sits in the measuring state (manual window closed) and the
+    # Comparisons half stays visible but disarmed. Generating the field
+    # there painted NOTHING (the draw gates read the click ownership
+    # instead of the stage).
     tab = dlg.tab_compare
-    tab.sec_manual.setCollapsed(True)           # the fixture unfolds it
+    tab.manual.hide()                           # the fixture opens it
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert not tab._active                      # disarmed...
     assert tab._on_stage                        # ...but still on stage
@@ -531,7 +536,7 @@ def test_field_paints_while_the_measure_section_owns_the_stage(dlg):
     tab._on_propose()
     assert len(tab._entries) > 0
     assert len(tab._entry_items) == 2 * len(tab._entries)
-    # the clicks measure, they never mark stars with the tweak folded
+    # the clicks measure, they never mark stars with the window closed
     from PySide6.QtCore import QPointF
     s = tab._stars[0]
     n = len(tab._entries)
@@ -542,13 +547,14 @@ def test_field_paints_while_the_measure_section_owns_the_stage(dlg):
     assert hit and "Gaia EDR3" in lines[0]
 
 
-def test_sequence_edits_paint_while_disarmed(dlg):
+def test_sequence_edits_paint_while_disarmed(dlg, qapp):
     # The sequence window stays open while measuring: renaming,
     # re-typing and removing rows must repaint the rings on the chart.
     tab = dlg.tab_compare
     tab._on_field_ready(_field(dlg))
     tab._on_propose()
-    tab.sec_manual.setCollapsed(True)           # measuring state
+    tab.manual.hide()                           # measuring state
+    qapp.processEvents()
     dlg.tab_photometry._apply()
     assert not tab._active
     n = len(tab._entries)
@@ -624,16 +630,19 @@ def test_build_sequence_needs_a_wcs(dlg, tmp_path):
     assert tab._auto_propose is False
 
 
-def test_manual_tweak_lives_folded(dlg):
-    # The hand-picking controls are the exception path: folded by
-    # default, unfolded on demand; the radios work either way. (The
-    # fixture unfolds it to arm the picking; fold it back first.)
+def test_manual_tweak_starts_closed(dlg, qapp):
+    # The hand-picking window is the exception path: closed by
+    # default, raised on demand; the radios work either way. (The
+    # fixture opens it to arm the picking; close it first.)
     tab = dlg.tab_compare
-    tab.sec_manual.setCollapsed(True)
-    assert tab.sec_manual.isCollapsed()
-    tab.sec_manual.setCollapsed(False)
+    tab.manual.hide()
+    qapp.processEvents()
+    assert not tab.manual_visible()
+    assert not tab.btn_manual.isChecked()
+    tab.btn_manual.click()
+    qapp.processEvents()
     dlg.tab_photometry._apply()
-    assert tab.sec_manual.isExpanded()
+    assert tab.manual_visible()
     tab._on_field_ready(_field(dlg))
     tab.rdo_check.setChecked(True)
     from PySide6.QtCore import QPointF
@@ -659,26 +668,39 @@ def test_busy_dialog_is_reaped_even_on_a_field_error(dlg, monkeypatch):
     assert "boom" in tab.lbl_status.text()
 
 
-def test_unfolding_the_manual_tweak_fits_its_content(dlg):
-    # No dead strip under the unfolded tweak: the top half gets its
-    # content height, not a fixed share; folding restores the split.
+def test_manual_window_toggle_arms_the_picking(dlg, qapp):
+    # The toggle (right of the DSS2 button) raises the manual window
+    # and hands the plate clicks to the picking; closing the window
+    # gives the clicks back to the Measure half (ADR-044 rev,
+    # 2026-09-26).
     ph = dlg.tab_photometry
     tab = dlg.tab_compare
-    tab.sec_manual.setCollapsed(True)           # the fixture unfolds it
-    ph._on_manual_toggled(False)
-    from PySide6.QtWidgets import QApplication
-    QApplication.processEvents()
+    tab.manual.hide()                           # the fixture opens it
+    qapp.processEvents()
+    ph._apply()
+    assert not tab.manual_visible()             # closed...
+    assert not tab.btn_manual.isChecked()       # ...and the button follows
+    assert not tab._active                      # the Measure half owns it
+    assert dlg.tab_measure._active
+    tab.btn_manual.click()
+    qapp.processEvents()
+    ph._apply()
+    assert tab.manual_visible()
+    assert tab.btn_manual.isChecked()
+    assert tab._active                          # the picking is armed
+    assert not dlg.tab_measure._active
 
-    def share():
-        s = ph.splitter.sizes()
-        return s[0] / max(1, sum(s))
-    folded = share()
-    tab.sec_manual._btn.click()                 # the user path
-    QApplication.processEvents()
-    hint = tab.sizeHint().height()
-    expected = max(200, min(hint, ph.splitter.height() - 280))
-    top = ph.splitter.sizes()[0]
-    assert abs(top - expected) <= 40            # content, not dead space
-    tab.sec_manual._btn.click()
-    QApplication.processEvents()
-    assert share() == pytest.approx(folded, abs=0.03)
+
+def test_manual_window_cannot_squish_its_buttons(dlg):
+    # The buttons' row is the width floor of the window: a wider font or
+    # a longer label must grow the row and fail this test before it can
+    # truncate the labels in production (the old 460x120 minimum sat
+    # just under the row's real need of about 428 px)
+    w = dlg.tab_compare.manual
+    need = (w.btn_seq_open.sizeHint().width()
+            + w.btn_field.sizeHint().width()
+            + w.btn_propose.sizeHint().width()
+            + 6 * 2      # the actions row spacing
+            + 9 * 2)     # the layout margins
+    assert w.minimumWidth() >= need
+    assert w.minimumHeight() >= w.minimumSizeHint().height()

@@ -351,6 +351,42 @@ def _migrate(conn):
                 "CREATE INDEX IF NOT EXISTS idx_photo_points_file"
                 " ON photometry_points(file_id)")
         conn.execute("PRAGMA user_version = 11")
+    if v < 12:
+        # ADR-048 (series photometry, plan phase 4): a series point keeps
+        # its raw (uncalibrated) magnitude, its quality flags and the run
+        # it came from, and a runs table stores the config and the status
+        # so "undo this run" and the "incomplete series" state survive
+        # restarts. The table/column guards mirror v9/v10/v11: a
+        # hand-seeded old database may not have photometry_points.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS measurement_runs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  INTEGER REFERENCES project_sessions(id)
+                        ON DELETE SET NULL,
+            created     REAL NOT NULL,
+            cfg_json    TEXT DEFAULT '{}',
+            status      TEXT NOT NULL DEFAULT 'complete'
+        );
+        """)
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            if "mag_raw" not in cols:
+                conn.execute("ALTER TABLE photometry_points ADD COLUMN"
+                             " mag_raw REAL")
+            if "flags" not in cols:
+                conn.execute("ALTER TABLE photometry_points ADD COLUMN"
+                             " flags TEXT")
+            if "run_id" not in cols:
+                conn.execute(
+                    "ALTER TABLE photometry_points ADD COLUMN run_id INTEGER"
+                    " REFERENCES measurement_runs(id) ON DELETE SET NULL")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_photo_points_run"
+                " ON photometry_points(run_id)")
+        conn.execute("PRAGMA user_version = 12")
     conn.commit()
 
 
@@ -396,6 +432,10 @@ MIGRATION_NOTES = {
         "Measurements remember the plate they were taken on: reopening "
         "that plate in the unified editor restores its stretch, the "
         "measurement recipe and the comparison sequence."),
+    12: QT_TRANSLATE_NOOP("NSMigrations",
+        "Photometric series: each point keeps its raw magnitude, its "
+        "quality flags and the run it belongs to, so a bad run can be "
+        "undone without touching the rest of the visit."),
 }
 
 

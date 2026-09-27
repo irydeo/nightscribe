@@ -22,6 +22,7 @@ All SQL goes through db.execute (ADR-002). The module mirrors the
 pragmatic style of core/project.py: short functions, no ORM, no magic.
 """
 
+import json
 import logging
 import time
 
@@ -202,9 +203,10 @@ def add_point(db, project_id, mjd, filter_name, mag, err=None, source="manual",
 def list_points(db, project_id, filter_name=None):
     # @args: filter_name - filter to select, or None for all
     # @return: list of point dicts ordered by mjd (file_id: the plate it
-    #          was measured on, or None)
+    #          was measured on, or None; mag_raw/flags/run_id carry the
+    #          series data when the point came from one, ADR-048)
     col = ("id, project_id, session_id, mjd, filter, mag, err, source,"
-           " file_id")
+           " file_id, mag_raw, flags, run_id")
     if filter_name:
         rows = db.execute(
             f"SELECT {col} FROM photometry_points WHERE project_id=?"
@@ -217,9 +219,28 @@ def list_points(db, project_id, filter_name=None):
             " ORDER BY mjd",
             (project_id,),
         ).fetchall()
-    return [{"id": r[0], "project_id": r[1], "session_id": r[2],
-             "mjd": r[3], "filter": r[4], "mag": r[5], "err": r[6],
-             "source": r[7], "file_id": r[8]} for r in rows]
+    return [_point_dict(r) for r in rows]
+
+
+def _point_dict(row):
+    # @args: row - a photometry_points row in the list_points column order
+    # @return: the point dict the callers use (flags parsed from JSON)
+    return {"id": row[0], "project_id": row[1], "session_id": row[2],
+            "mjd": row[3], "filter": row[4], "mag": row[5], "err": row[6],
+            "source": row[7], "file_id": row[8], "mag_raw": row[9],
+            "flags": _flags_in(row[10]), "run_id": row[11]}
+
+
+def _flags_in(raw):
+    # @args: raw - the stored flags TEXT (JSON list) or None
+    # @return: a list of flags, tolerating legacy/blank values
+    if not raw:
+        return []
+    try:
+        val = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    return val if isinstance(val, list) else []
 
 
 def point_by_id(db, point_id):
@@ -228,13 +249,87 @@ def point_by_id(db, point_id):
     # @return: point dict (as list_points), or None
     row = db.execute(
         "SELECT id, project_id, session_id, mjd, filter, mag, err,"
-        " source, file_id FROM photometry_points WHERE id=?",
-        (point_id,)).fetchone()
-    if not row:
-        return None
-    return {"id": row[0], "project_id": row[1], "session_id": row[2],
-            "mjd": row[3], "filter": row[4], "mag": row[5], "err": row[6],
-            "source": row[7], "file_id": row[8]}
+        " source, file_id, mag_raw, flags, run_id FROM photometry_points"
+        " WHERE id=?", (point_id,)).fetchone()
+    return _point_dict(row) if row else None
+
+
+def create_run(db, session_id=None, cfg=None, status="complete"):
+    # ADR-048: one "Measure" is a run (D9). Its config and status are
+    # stored so the run survives a restart and "incomplete" is visible.
+    # @args: cfg - dict stored as JSON (may be None), status - complete |
+    #        incomplete | undone
+    # @return: the new run id
+    cur = db.execute(
+        "INSERT INTO measurement_runs (session_id, created, cfg_json,"
+        " status) VALUES (?, ?, ?, ?)",
+        (session_id, time.time(),
+         json.dumps(cfg or {}, ensure_ascii=False), status))
+    db.commit()
+    return cur.lastrowid
+
+
+def set_run_status(db, run_id, status):
+    # @return: True if the run was found and updated
+    cur = db.execute("UPDATE measurement_runs SET status=? WHERE id=?",
+                     (status, run_id))
+    db.commit()
+    return cur.rowcount > 0
+
+
+def add_points(db, rows):
+    # Batch write of series points (ADR-048, D9/D18): one transaction for
+    # a whole run. Each row is a dict with project_id, session_id, mjd,
+    # filter, mag, err, source, file_id, mag_raw, flags, run_id; missing
+    # keys become NULL (the legacy single-point contract is unchanged).
+    # @return: the list of new point ids
+    ids = []
+    for r in rows:
+        flags = r.get("flags")
+        if isinstance(flags, (list, tuple)):
+            flags = json.dumps(list(flags), ensure_ascii=False)
+        cur = db.execute(
+            "INSERT INTO photometry_points (project_id, session_id, mjd,"
+            " filter, mag, err, source, file_id, mag_raw, flags, run_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (r.get("project_id"), r.get("session_id"), r.get("mjd"),
+             r.get("filter"), r.get("mag"), r.get("err"),
+             r.get("source") or "measure", r.get("file_id"),
+             r.get("mag_raw"), flags, r.get("run_id")))
+        ids.append(cur.lastrowid)
+    db.commit()
+    return ids
+
+
+def list_points_for_run(db, run_id):
+    # @return: the points of one run, mjd-ordered
+    rows = db.execute(
+        "SELECT id, project_id, session_id, mjd, filter, mag, err, source,"
+        " file_id, mag_raw, flags, run_id FROM photometry_points"
+        " WHERE run_id=? ORDER BY mjd", (run_id,)).fetchall()
+    return [_point_dict(r) for r in rows]
+
+
+def delete_points(db, ids):
+    # Undo by explicit id list (ADR-048): never touches another run.
+    # @return: the number of points deleted
+    if not ids:
+        return 0
+    marks = ",".join("?" for _ in ids)
+    cur = db.execute(f"DELETE FROM photometry_points WHERE id IN ({marks})",
+                     tuple(ids))
+    db.commit()
+    return cur.rowcount
+
+
+def delete_points_for_run(db, run_id):
+    # "Undo this run" (D6): the run's points go; the run row stays for
+    # the audit trail.
+    # @return: the number of points deleted
+    cur = db.execute("DELETE FROM photometry_points WHERE run_id=?",
+                     (run_id,))
+    db.commit()
+    return cur.rowcount
 
 
 def delete_point(db, point_id):

@@ -179,10 +179,12 @@ class UfeSolveWorker(QThread):
         self._path = path
 
     def run(self):
-        from ..core.sources import astrometry
+        from ..config import config
+        from ..core import solve as solve_mod
         try:
-            cards = astrometry.solve(self._path,
-                                     progress=self.progress.emit)
+            cards = solve_mod.solve(
+                self._path, progress=self.progress.emit,
+                update=bool(config.get("astap_update")))
         except Exception as err:    # never crash the GUI on solve problems
             logger.exception("ufe solve worker failed: %s", err)
             cards = None

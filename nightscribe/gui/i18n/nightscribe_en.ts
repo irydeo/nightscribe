@@ -15,52 +15,52 @@
         <translation type="vanished">No signals right now</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2216" />
+        <location filename="../main_window.py" line="2247" />
         <source>You follow no campaigns yet — create one below and its stars will show up here.</source>
         <translation>You follow no campaigns yet — create one below and its stars will show up here.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2219" />
+        <location filename="../main_window.py" line="2250" />
         <source>Measured within their campaign's cadence</source>
         <translation>Measured within their campaign's cadence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2222" />
+        <location filename="../main_window.py" line="2253" />
         <source>Up to date: %1 of %2 campaign projects</source>
         <translation>Up to date: %1 of %2 campaign projects</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2249" />
+        <location filename="../main_window.py" line="2280" />
         <source>✨ All calm — when a star you follow erupts, dims or nears a predicted extremum, it will show up here.</source>
         <translation>✨ All calm — when a star you follow erupts, dims or nears a predicted extremum, it will show up here.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2262" />
+        <location filename="../main_window.py" line="2293" />
         <source>%1 mag %2 in %3 — measure tonight</source>
         <translation>%1 mag %2 in %3 — measure tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2266" />
+        <location filename="../main_window.py" line="2297" />
         <source>%1 expected in %2 d</source>
         <translation>%1 expected in %2 d</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2533" />
+        <location filename="../main_window.py" line="2564" />
         <source>today</source>
         <translation>today</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2535" />
+        <location filename="../main_window.py" line="2566" />
         <source>yesterday</source>
         <translation>yesterday</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2536" />
+        <location filename="../main_window.py" line="2567" />
         <source>%1 d ago</source>
         <translation>%1 d ago</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2562" />
+        <location filename="../main_window.py" line="2593" />
         <source>✕ not up tonight</source>
         <translation>✕ not up tonight</translation>
     </message>
@@ -73,7 +73,7 @@
         <translation type="vanished">%1 in %2 d</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2274" />
+        <location filename="../main_window.py" line="2305" />
         <source>%1 mag %2 in ZTF %3 (baseline %4)</source>
         <translation>%1 mag %2 in ZTF %3 (baseline %4)</translation>
     </message>
@@ -816,7 +816,7 @@
         <translation type="vanished">History</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6968" />
+        <location filename="../main_window.py" line="6999" />
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
@@ -859,12 +859,12 @@
         <translation>Quit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="810" />
+        <location filename="../main_window.py" line="838" />
         <source>System</source>
         <translation>System</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="811" />
+        <location filename="../main_window.py" line="839" />
         <source>English</source>
         <translation>English</translation>
     </message>
@@ -923,165 +923,165 @@
         <translation>Ready — press 'Compute tonight'</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="920" />
+        <location filename="../main_window.py" line="951" />
         <source>Settings saved</source>
         <translation>Settings saved</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="998" />
+        <location filename="../main_window.py" line="1029" />
         <source>Plan your night, understand every object, tell your science.</source>
         <translation>Plan your night, understand every object, tell your science.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1005" />
+        <location filename="../main_window.py" line="1036" />
         <location filename="../ui/main_window.ui" line="88" />
         <source>Data sources</source>
         <translation>Data sources</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1006" />
+        <location filename="../main_window.py" line="1037" />
         <source>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</source>
         <translation>NEOfixer · MPC (PCCP, ObsCodes) · JPL SBDB/Horizons/CAD · COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI Legacy Survey · CDS hips2fits</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1019" />
+        <location filename="../main_window.py" line="1050" />
         <source>Documentation not found at %1</source>
         <translation>Documentation not found at %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1145" />
-        <location filename="../main_window.py" line="1209" />
+        <location filename="../main_window.py" line="1176" />
+        <location filename="../main_window.py" line="1240" />
         <source>Computing tonight…</source>
         <translation>Computing tonight…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1214" />
+        <location filename="../main_window.py" line="1245" />
         <source>Computing…</source>
         <translation>Computing…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1222" />
+        <location filename="../main_window.py" line="1253" />
         <source>no sources answered</source>
         <translation>no sources answered</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1225" />
+        <location filename="../main_window.py" line="1256" />
         <source>Error: %1</source>
         <translation>Error: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1249" />
+        <location filename="../main_window.py" line="1280" />
         <source>No targets found</source>
         <translation>No targets found</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1250" />
+        <location filename="../main_window.py" line="1281" />
         <source>Check your network and try again.</source>
         <translation>Check your network and try again.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1259" />
+        <location filename="../main_window.py" line="1290" />
         <source>No data</source>
         <translation>No data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1278" />
+        <location filename="../main_window.py" line="1309" />
         <source>%1  ·  Night %2–%3 (UTC)</source>
         <translation>%1  ·  Night %2–%3 (UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1284" />
+        <location filename="../main_window.py" line="1315" />
         <source>%1  ·  no astronomical night tonight</source>
         <translation>%1  ·  no astronomical night tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1297" />
+        <location filename="../main_window.py" line="1328" />
         <source>Moon: %1% lit now, %2% by dawn</source>
         <translation>Moon: %1% lit now, %2% by dawn</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1750" />
+        <location filename="../main_window.py" line="1781" />
         <source>mag &gt;%1</source>
         <translation>mag &gt;%1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1752" />
+        <location filename="../main_window.py" line="1783" />
         <source>Predicted magnitude beyond your limiting magnitude by %1 mags. Still scored for its scientific priority, but it will need a longer exposure.</source>
         <translation>Predicted magnitude beyond your limiting magnitude by %1 mags. Still scored for its scientific priority, but it will need a longer exposure.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1875" />
+        <location filename="../main_window.py" line="1906" />
         <source>Hide full list</source>
         <translation>Hide full list</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1879" />
-        <location filename="../main_window.py" line="2046" />
+        <location filename="../main_window.py" line="1910" />
+        <location filename="../main_window.py" line="2077" />
         <source>Show all targets (%1)</source>
         <translation>Show all targets (%1)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1235" />
+        <location filename="../main_window.py" line="1266" />
         <source>%1 targets evaluated</source>
         <translation>%1 targets evaluated</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1665" />
-        <location filename="../main_window.py" line="1804" />
+        <location filename="../main_window.py" line="1696" />
+        <location filename="../main_window.py" line="1835" />
         <source>now</source>
         <translation>now</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1680" />
+        <location filename="../main_window.py" line="1711" />
         <source>close to the Moon (%1)</source>
         <translation>close to the Moon (%1)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1684" />
+        <location filename="../main_window.py" line="1715" />
         <source>high illumination (%1)</source>
         <translation>high illumination (%1)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1687" />
+        <location filename="../main_window.py" line="1718" />
         <source>Moon at %1 separation, %2 illuminated — bright night sky, faint targets need longer exposures. Reason: %3</source>
         <translation>Moon at %1 separation, %2 illuminated — bright night sky, faint targets need longer exposures. Reason: %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1690" />
+        <location filename="../main_window.py" line="1721" />
         <source> and </source>
         <translation> and </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1692" />
+        <location filename="../main_window.py" line="1723" />
         <source>Moon %1 · %2</source>
         <translation>Moon %1 · %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1887" />
+        <location filename="../main_window.py" line="1918" />
         <source>Supernova</source>
         <translation>Supernova</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1888" />
-        <location filename="../main_window.py" line="2469" />
-        <location filename="../main_window.py" line="2579" />
+        <location filename="../main_window.py" line="1919" />
+        <location filename="../main_window.py" line="2500" />
+        <location filename="../main_window.py" line="2610" />
         <source>Comet</source>
         <translation>Comet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1889" />
+        <location filename="../main_window.py" line="1920" />
         <source>Possible comet</source>
         <translation>Possible comet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1890" />
-        <location filename="../main_window.py" line="2470" />
-        <location filename="../main_window.py" line="2580" />
+        <location filename="../main_window.py" line="1921" />
+        <location filename="../main_window.py" line="2501" />
+        <location filename="../main_window.py" line="2611" />
         <source>Transit</source>
         <translation>Transit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1891" />
+        <location filename="../main_window.py" line="1922" />
         <source>Close approach</source>
         <translation>Close approach</translation>
     </message>
@@ -1090,22 +1090,22 @@
         <translation type="vanished">No projects yet. Create one from Tonight.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3473" />
+        <location filename="../main_window.py" line="3504" />
         <source>Capture plan</source>
         <translation>Capture plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3477" />
+        <location filename="../main_window.py" line="3508" />
         <source>Frames:</source>
         <translation>Frames:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3480" />
+        <location filename="../main_window.py" line="3511" />
         <source>Exposure (s):</source>
         <translation>Exposure (s):</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3484" />
+        <location filename="../main_window.py" line="3515" />
         <source>Filter:</source>
         <translation>Filter:</translation>
     </message>
@@ -1118,22 +1118,22 @@
         <translation type="vanished">Plan saved</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6096" />
+        <location filename="../main_window.py" line="6127" />
         <source>Export capture sequence</source>
         <translation>Export capture sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3602" />
+        <location filename="../main_window.py" line="3633" />
         <source>Export sequence…</source>
         <translation>Export sequence…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3609" />
+        <location filename="../main_window.py" line="3640" />
         <source>Export ephemeris for planetarium</source>
         <translation>Export ephemeris for planetarium</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3610" />
+        <location filename="../main_window.py" line="3641" />
         <source>Export ephemeris…</source>
         <translation>Export ephemeris…</translation>
     </message>
@@ -1162,7 +1162,7 @@
         <translation type="vanished">Path to plate-solved FITS…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5722" />
+        <location filename="../main_window.py" line="5753" />
         <source>Browse…</source>
         <translation>Browse…</translation>
     </message>
@@ -1180,147 +1180,177 @@
         <translation>Your projects: one object with its three steps: capture, track, follow-up — and what needs your attention</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="757" />
+        <location filename="../main_window.py" line="707" />
+        <source>Select the ASTAP executable</source>
+        <translation>Select the ASTAP executable</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="708" />
+        <source>Executables (*)</source>
+        <translation>Executables (*)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="717" />
+        <source>ASTAP</source>
+        <translation>ASTAP</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="759" />
+        <source>Auto (ASTAP, then nova)</source>
+        <translation>Auto (ASTAP, then nova)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="760" />
+        <source>ASTAP (local)</source>
+        <translation>ASTAP (local)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="761" />
+        <source>Astrometry.net (nova)</source>
+        <translation>Astrometry.net (nova)</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="785" />
         <source>Ring with ticks (classic)</source>
         <translation>Ring with ticks (classic)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="759" />
+        <location filename="../main_window.py" line="787" />
         <source>Full-frame cross with box</source>
         <translation>Full-frame cross with box</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="810" />
+        <location filename="../main_window.py" line="838" />
         <source>Spanish</source>
         <translation>Spanish</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="889" />
+        <location filename="../main_window.py" line="920" />
         <source>Enable at least one object kind.</source>
         <translation>Enable at least one object kind.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="917" />
+        <location filename="../main_window.py" line="948" />
         <source>Settings saved — restart the app to change the language</source>
         <translation>Settings saved — restart the app to change the language</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="926" />
+        <location filename="../main_window.py" line="957" />
         <source>Choose the limit file</source>
         <translation>Choose the limit file</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="937" />
+        <location filename="../main_window.py" line="968" />
         <source>Choose the projects folder</source>
         <translation>Choose the projects folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="960" />
+        <location filename="../main_window.py" line="991" />
         <source>Could not be read as a limit file — the flat minimum altitude is used instead</source>
         <translation>Could not be read as a limit file — the flat minimum altitude is used instead</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="966" />
+        <location filename="../main_window.py" line="997" />
         <source>peak at azimuth %1°</source>
         <translation>peak at azimuth %1°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1160" />
+        <location filename="../main_window.py" line="1191" />
         <source>Loading NEOfixer targets…</source>
         <translation>Loading NEOfixer targets…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1161" />
+        <location filename="../main_window.py" line="1192" />
         <source>Loading supernovae…</source>
         <translation>Loading supernovae…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1162" />
+        <location filename="../main_window.py" line="1193" />
         <source>Locating comets…</source>
         <translation>Locating comets…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1163" />
+        <location filename="../main_window.py" line="1194" />
         <source>Checking PCCP candidates…</source>
         <translation>Checking PCCP candidates…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1164" />
+        <location filename="../main_window.py" line="1195" />
         <source>Scanning exoplanet transits…</source>
         <translation>Scanning exoplanet transits…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1169" />
+        <location filename="../main_window.py" line="1200" />
         <source>Fetching close approaches…</source>
         <translation>Fetching close approaches…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1170" />
+        <location filename="../main_window.py" line="1201" />
         <source>Scoring targets…</source>
         <translation>Scoring targets…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1175" />
+        <location filename="../main_window.py" line="1206" />
         <source>Step %1 of %2 — %3</source>
         <translation>Step %1 of %2 — %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1345" />
+        <location filename="../main_window.py" line="1376" />
         <source>Due for a revisit: click to open its Follow-up</source>
         <translation>Due for a revisit: click to open its Follow-up</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1537" />
+        <location filename="../main_window.py" line="1568" />
         <source>All</source>
         <translation>All</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1632" />
+        <location filename="../main_window.py" line="1663" />
         <source>Best time to observe: visible %1–%2 UTC (above the limit)</source>
         <translation>Best time to observe: visible %1–%2 UTC (above the limit)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1647" />
+        <location filename="../main_window.py" line="1678" />
         <source>Safe window %1–%2 UTC — the planned session fits, latest safe start ≤ %3</source>
         <translation>Safe window %1–%2 UTC — the planned session fits, latest safe start ≤ %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1657" />
+        <location filename="../main_window.py" line="1688" />
         <source>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</source>
         <translation>The planned {0} min session does not fit in the time the object is above your local limit. Do NOT force the instrument.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1666" />
+        <location filename="../main_window.py" line="1697" />
         <source>Above the limit right now</source>
         <translation>Above the limit right now</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1671" />
+        <location filename="../main_window.py" line="1702" />
         <source>Rises above the limit at %1 UTC</source>
         <translation>Rises above the limit at %1 UTC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1834" />
+        <location filename="../main_window.py" line="1865" />
         <source>Resume the active project for this object</source>
         <translation>Resume the active project for this object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1845" />
+        <location filename="../main_window.py" line="1876" />
         <source>Open the object in the Explore dialog (you can also create a project from there)</source>
         <translation>Open the object in the Explore dialog (you can also create a project from there)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2314" />
+        <location filename="../main_window.py" line="2345" />
         <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: capture, track, follow-up.</source>
         <translation>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: capture, track, follow-up.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2658" />
+        <location filename="../main_window.py" line="2689" />
         <source>Analyse your data</source>
         <translation>Analyse your data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2753" />
+        <location filename="../main_window.py" line="2784" />
         <source>A project is one object with its three steps: capture, track, follow-up. Pick an object in Tonight and it becomes a project that guides you.</source>
         <translation>A project is one object with its three steps: capture, track, follow-up. Pick an object in Tonight and it becomes a project that guides you.</translation>
     </message>
@@ -1329,84 +1359,84 @@
         <translation type="vanished">Project files</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3570" />
+        <location filename="../main_window.py" line="3601" />
         <source>Filters (add rows for multi-band)</source>
         <translation>Filters (add rows for multi-band)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3572" />
+        <location filename="../main_window.py" line="3603" />
         <source>Add filter</source>
         <translation>Add filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3595" />
+        <location filename="../main_window.py" line="3626" />
         <source>Export format</source>
         <translation>Export format</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3718" />
+        <location filename="../main_window.py" line="3749" />
         <source>Telescope</source>
         <translation>Telescope</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3724" />
+        <location filename="../main_window.py" line="3755" />
         <source>Quick slew to the freshly-computed position of a moving target: J2000_to_Apparent + Telescope_slewasync, no plate-solve. Fast, but assumes the ephemeris is already accurate.</source>
         <translation>Quick slew to the freshly-computed position of a moving target: J2000_to_Apparent + Telescope_slewasync, no plate-solve. Fast, but assumes the ephemeris is already accurate.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3730" />
+        <location filename="../main_window.py" line="3761" />
         <source>Slew + capture + plate-solve and correct to the true sky position. Absorbs residual ephemeris error; the reliable route for NEOCPs and preliminary orbits.</source>
         <translation>Slew + capture + plate-solve and correct to the true sky position. Absorbs residual ephemeris error; the reliable route for NEOCPs and preliminary orbits.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3739" />
+        <location filename="../main_window.py" line="3770" />
         <source>Live capture</source>
         <translation>Live capture</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3747" />
+        <location filename="../main_window.py" line="3778" />
         <source>Stage the current project's saved plan (frames × exposure) in CCDciel's Capture module</source>
         <translation>Stage the current project's saved plan (frames × exposure) in CCDciel's Capture module</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3750" />
+        <location filename="../main_window.py" line="3781" />
         <source>Start the staged capture in CCDciel</source>
         <translation>Start the staged capture in CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3760" />
+        <location filename="../main_window.py" line="3791" />
         <source>Uses the current project's saved plan (its Capture step holds frames × exposure).</source>
         <translation>Uses the current project's saved plan (its Capture step holds frames × exposure).</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3856" />
+        <location filename="../main_window.py" line="3887" />
         <source>CCDciel</source>
         <translation>CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4003" />
+        <location filename="../main_window.py" line="4034" />
         <source>Position at %1 UT</source>
         <translation>Position at %1 UT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4004" />
+        <location filename="../main_window.py" line="4035" />
         <source>Position from the plan (not refreshed)</source>
         <translation>Position from the plan (not refreshed)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4005" />
+        <location filename="../main_window.py" line="4036" />
         <source>Fixed coordinates</source>
         <translation>Fixed coordinates</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4078" />
+        <location filename="../main_window.py" line="4109" />
         <source>No fresh ephemeris; using the plan coordinates.</source>
         <translation>No fresh ephemeris; using the plan coordinates.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4088" />
-        <location filename="../main_window.py" line="4131" />
-        <location filename="../main_window.py" line="4163" />
+        <location filename="../main_window.py" line="4119" />
+        <location filename="../main_window.py" line="4162" />
+        <location filename="../main_window.py" line="4194" />
         <source>Open a project first (the Capture step needs one)</source>
         <translation>Open a project first (the Capture step needs one)</translation>
     </message>
@@ -1415,22 +1445,22 @@
         <translation type="vanished">After the reduction, upload EXOTIC's output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story in the Follow-up step.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4291" />
+        <location filename="../main_window.py" line="4322" />
         <source>Reduce the series with FotoDif (its AUTO mode follows the capture live) or AIJ. FotoDif writes the AAVSO Extended File Format report directly; the cadence and exposure are in the Capture step.</source>
         <translation>Reduce the series with FotoDif (its AUTO mode follows the capture live) or AIJ. FotoDif writes the AAVSO Extended File Format report directly; the cadence and exposure are in the Capture step.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5131" />
+        <location filename="../main_window.py" line="5162" />
         <source>Generate post…</source>
         <translation>Generate post…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5157" />
+        <location filename="../main_window.py" line="5188" />
         <source>Last visit: {} days ago</source>
         <translation>Last visit: {} days ago</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5178" />
+        <location filename="../main_window.py" line="5209" />
         <source>No visits yet. Add one to start the follow-up.</source>
         <translation>No visits yet. Add one to start the follow-up.</translation>
     </message>
@@ -1439,17 +1469,17 @@
         <translation type="vanished">Add visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5279" />
+        <location filename="../main_window.py" line="5310" />
         <source>Paste photometry…</source>
         <translation>Paste photometry…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5281" />
+        <location filename="../main_window.py" line="5312" />
         <source>Import file…</source>
         <translation>Import file…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5348" />
+        <location filename="../main_window.py" line="5379" />
         <source>Campaign summary</source>
         <translation>Campaign summary</translation>
     </message>
@@ -1458,47 +1488,47 @@
         <translation type="vanished">No points saved yet. Measure a visit's stacked plate in the editor («Measure in the editor…» on the visit row) or add a magnitude by hand: the summary updates after every save.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5238" />
+        <location filename="../main_window.py" line="5269" />
         <source>{n} nights · {p} points</source>
         <translation>{n} nights · {p} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5242" />
+        <location filename="../main_window.py" line="5273" />
         <source> · {:.2f} mag/day</source>
         <translation> · {:.2f} mag/day</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5245" />
+        <location filename="../main_window.py" line="5276" />
         <source> · {:.2f} mag from peak</source>
         <translation> · {:.2f} mag from peak</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5247" />
+        <location filename="../main_window.py" line="5278" />
         <source>consistent with the typical curve</source>
         <translation>consistent with the typical curve</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5248" />
+        <location filename="../main_window.py" line="5279" />
         <source>fading faster than typical</source>
         <translation>fading faster than typical</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5249" />
+        <location filename="../main_window.py" line="5280" />
         <source>fading slower than typical</source>
         <translation>fading slower than typical</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5250" />
+        <location filename="../main_window.py" line="5281" />
         <source>no template to compare against</source>
         <translation>no template to compare against</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5251" />
+        <location filename="../main_window.py" line="5282" />
         <source>no data</source>
         <translation>no data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5253" />
+        <location filename="../main_window.py" line="5284" />
         <source> · verdict: {}</source>
         <translation> · verdict: {}</translation>
     </message>
@@ -1523,33 +1553,33 @@
         <translation type="vanished">Night notes (seeing, clouds…)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7824" />
+        <location filename="../main_window.py" line="7855" />
         <source>Point not saved: no magnitude to record</source>
         <translation>Point not saved: no magnitude to record</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7828" />
+        <location filename="../main_window.py" line="7859" />
         <source>Point not saved: the plate has no observation date</source>
         <translation>Point not saved: the plate has no observation date</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7842" />
+        <location filename="../main_window.py" line="7873" />
         <source>Point not saved: %1</source>
         <translation>Point not saved: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7856" />
+        <location filename="../main_window.py" line="7887" />
         <source>Point saved without plate state: this plate is not registered in the project.</source>
         <translation>Point saved without plate state: this plate is not registered in the project.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7860" />
+        <location filename="../main_window.py" line="7891" />
         <source>Point saved: {} band, {:.3f} mag</source>
         <translation>Point saved: {} band, {:.3f} mag</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4328" />
-        <location filename="../main_window.py" line="4355" />
+        <location filename="../main_window.py" line="4359" />
+        <location filename="../main_window.py" line="4386" />
         <source>Enable the unified editor in Settings → Development to measure from the editor</source>
         <translation>Enable the unified editor in Settings → Development to measure from the editor</translation>
     </message>
@@ -1582,54 +1612,54 @@
         <translation type="vanished">Choose stacked FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5520" />
+        <location filename="../main_window.py" line="5551" />
         <source>Paste photometry</source>
         <translation>Paste photometry</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5523" />
+        <location filename="../main_window.py" line="5554" />
         <source>Paste your AIJ / Tycho / CSV measurements.
 One per line: date  magnitude  [error]  filter</source>
         <translation>Paste your AIJ / Tycho / CSV measurements.
 One per line: date  magnitude  [error]  filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5532" />
+        <location filename="../main_window.py" line="5563" />
         <source>Default filter:</source>
         <translation>Default filter:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5535" />
+        <location filename="../main_window.py" line="5566" />
         <source>Preview:</source>
         <translation>Preview:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5568" />
+        <location filename="../main_window.py" line="5599" />
         <source>({} lines skipped)</source>
         <translation>({} lines skipped)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5587" />
+        <location filename="../main_window.py" line="5618" />
         <source>Import photometry file</source>
         <translation>Import photometry file</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5595" />
+        <location filename="../main_window.py" line="5626" />
         <source>Cannot read file: %1</source>
         <translation>Cannot read file: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5599" />
+        <location filename="../main_window.py" line="5630" />
         <source>{} points parsed</source>
         <translation>{} points parsed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5601" />
+        <location filename="../main_window.py" line="5632" />
         <source>, {} lines skipped</source>
         <translation>, {} lines skipped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5603" />
+        <location filename="../main_window.py" line="5634" />
         <source>Import</source>
         <translation>Import</translation>
     </message>
@@ -1642,335 +1672,335 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">current</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3395" />
+        <location filename="../main_window.py" line="3426" />
         <source>pending</source>
         <translation>pending</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3397" />
+        <location filename="../main_window.py" line="3428" />
         <source>skipped</source>
         <translation>skipped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3599" />
+        <location filename="../main_window.py" line="3630" />
         <source>CSV (generic)</source>
         <translation>CSV (generic)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3598" />
+        <location filename="../main_window.py" line="3629" />
         <source>NINA (JSON)</source>
         <translation>NINA (JSON)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3597" />
+        <location filename="../main_window.py" line="3628" />
         <source>CCDciel (targets)</source>
         <translation>CCDciel (targets)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3532" />
+        <location filename="../main_window.py" line="3563" />
         <source>Calibration</source>
         <translation>Calibration</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2931" />
+        <location filename="../main_window.py" line="2962" />
         <source>Files ({})</source>
         <translation>Files ({})</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3052" />
+        <location filename="../main_window.py" line="3083" />
         <source>Files (0)</source>
         <translation>Files (0)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3537" />
+        <location filename="../main_window.py" line="3568" />
         <source>Darks:</source>
         <translation>Darks:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3541" />
+        <location filename="../main_window.py" line="3572" />
         <source>Dark exposure (s):</source>
         <translation>Dark exposure (s):</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3544" />
+        <location filename="../main_window.py" line="3575" />
         <source>Bias:</source>
         <translation>Bias:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3690" />
+        <location filename="../main_window.py" line="3721" />
         <source>CCDciel control</source>
         <translation>CCDciel control</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3694" />
+        <location filename="../main_window.py" line="3725" />
         <source>Connect CCDciel</source>
         <translation>Connect CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3695" />
+        <location filename="../main_window.py" line="3726" />
         <source>Disconnect</source>
         <translation>Disconnect</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3696" />
+        <location filename="../main_window.py" line="3727" />
         <source>Refresh</source>
         <translation>Refresh</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3697" />
-        <location filename="../main_window.py" line="3819" />
+        <location filename="../main_window.py" line="3728" />
+        <location filename="../main_window.py" line="3850" />
         <source>CCDciel: not connected</source>
         <translation>CCDciel: not connected</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3706" />
+        <location filename="../main_window.py" line="3737" />
         <source>Observatory status</source>
         <translation>Observatory status</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3712" />
+        <location filename="../main_window.py" line="3743" />
         <source>Version:</source>
         <translation>Version:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3713" />
+        <location filename="../main_window.py" line="3744" />
         <source>CCD temperature:</source>
         <translation>CCD temperature:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3714" />
+        <location filename="../main_window.py" line="3745" />
         <source>Tracking:</source>
         <translation>Tracking:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3715" />
+        <location filename="../main_window.py" line="3746" />
         <source>Slew:</source>
         <translation>Slew:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3743" />
+        <location filename="../main_window.py" line="3774" />
         <source>Filter on wheel:</source>
         <translation>Filter on wheel:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3745" />
+        <location filename="../main_window.py" line="3776" />
         <source>Send plan</source>
         <translation>Send plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3749" />
+        <location filename="../main_window.py" line="3780" />
         <source>Start capture</source>
         <translation>Start capture</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3722" />
+        <location filename="../main_window.py" line="3753" />
         <source>Point telescope</source>
         <translation>Point telescope</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3728" />
+        <location filename="../main_window.py" line="3759" />
         <source>Astrometric Goto</source>
         <translation>Astrometric Goto</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4154" />
+        <location filename="../main_window.py" line="4185" />
         <source>Astrometric pointing finished.</source>
         <translation>Astrometric pointing finished.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3985" />
+        <location filename="../main_window.py" line="4016" />
         <source>No filter</source>
         <translation>No filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3857" />
+        <location filename="../main_window.py" line="3888" />
         <source>Could not connect to CCDciel.</source>
         <translation>Could not connect to CCDciel.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3820" />
-        <location filename="../main_window.py" line="3821" />
-        <location filename="../main_window.py" line="3822" />
-        <location filename="../main_window.py" line="3823" />
-        <location filename="../main_window.py" line="3839" />
-        <location filename="../main_window.py" line="3863" />
-        <location filename="../main_window.py" line="3878" />
-        <location filename="../main_window.py" line="3931" />
-        <location filename="../main_window.py" line="3940" />
-        <location filename="../main_window.py" line="3952" />
+        <location filename="../main_window.py" line="3851" />
+        <location filename="../main_window.py" line="3852" />
+        <location filename="../main_window.py" line="3853" />
+        <location filename="../main_window.py" line="3854" />
+        <location filename="../main_window.py" line="3870" />
+        <location filename="../main_window.py" line="3894" />
+        <location filename="../main_window.py" line="3909" />
+        <location filename="../main_window.py" line="3962" />
+        <location filename="../main_window.py" line="3971" />
+        <location filename="../main_window.py" line="3983" />
         <source>—</source>
         <translation>—</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3954" />
-        <location filename="../main_window.py" line="4101" />
+        <location filename="../main_window.py" line="3985" />
+        <location filename="../main_window.py" line="4132" />
         <source>Slewing…</source>
         <translation>Slewing…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3956" />
-        <location filename="../main_window.py" line="4114" />
+        <location filename="../main_window.py" line="3987" />
+        <location filename="../main_window.py" line="4145" />
         <source>Idle</source>
         <translation>Idle</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3944" />
+        <location filename="../main_window.py" line="3975" />
         <source>Stopped</source>
         <translation>Stopped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3942" />
+        <location filename="../main_window.py" line="3973" />
         <source>Tracking</source>
         <translation>Tracking</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4114" />
+        <location filename="../main_window.py" line="4145" />
         <source>Failed</source>
         <translation>Failed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3999" />
-        <location filename="../main_window.py" line="4096" />
-        <location filename="../main_window.py" line="4139" />
+        <location filename="../main_window.py" line="4030" />
+        <location filename="../main_window.py" line="4127" />
+        <location filename="../main_window.py" line="4170" />
         <source>This object has no coordinates yet.</source>
         <translation>This object has no coordinates yet.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4120" />
+        <location filename="../main_window.py" line="4151" />
         <source>Telescope pointed at the object.</source>
         <translation>Telescope pointed at the object.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4201" />
+        <location filename="../main_window.py" line="4232" />
         <source>Capture plan sent to CCDciel.</source>
         <translation>Capture plan sent to CCDciel.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4211" />
+        <location filename="../main_window.py" line="4242" />
         <source>Capture started in CCDciel.</source>
         <translation>Capture started in CCDciel.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5866" />
-        <location filename="../main_window.py" line="6133" />
+        <location filename="../main_window.py" line="5897" />
+        <location filename="../main_window.py" line="6164" />
         <source>Format:</source>
         <translation>Format:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6131" />
-        <location filename="../main_window.py" line="6170" />
+        <location filename="../main_window.py" line="6162" />
+        <location filename="../main_window.py" line="6201" />
         <source>Export ephemeris</source>
         <translation>Export ephemeris</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1165" />
+        <location filename="../main_window.py" line="1196" />
         <source>Checking HADS variables…</source>
         <translation>Checking HADS variables…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1166" />
+        <location filename="../main_window.py" line="1197" />
         <source>Checking campaigns…</source>
         <translation>Checking campaigns…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1167" />
+        <location filename="../main_window.py" line="1198" />
         <source>Checking vigils…</source>
         <translation>Checking vigils…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1168" />
+        <location filename="../main_window.py" line="1199" />
         <source>Checking the AAVSO channel…</source>
         <translation>Checking the AAVSO channel…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1720" />
+        <location filename="../main_window.py" line="1751" />
         <source>Next expected extremum (VSX epoch)</source>
         <translation>Next expected extremum (VSX epoch)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1727" />
+        <location filename="../main_window.py" line="1758" />
         <source>👁 ZTF %1 %2</source>
         <translation>👁 ZTF %1 %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1730" />
+        <location filename="../main_window.py" line="1761" />
         <source>Vigil alert: the latest ZTF point shows it at %1 mag versus its %2 baseline (Δ %3)</source>
         <translation>Vigil alert: the latest ZTF point shows it at %1 mag versus its %2 baseline (Δ %3)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1744" />
+        <location filename="../main_window.py" line="1775" />
         <source>📣 AAVSO</source>
         <translation>📣 AAVSO</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1892" />
+        <location filename="../main_window.py" line="1923" />
         <source>HADS star</source>
         <translation>HADS star</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1893" />
+        <location filename="../main_window.py" line="1924" />
         <source>Variable star</source>
         <translation>Variable star</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1961" />
+        <location filename="../main_window.py" line="1992" />
         <source>max</source>
         <translation>max</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1962" />
+        <location filename="../main_window.py" line="1993" />
         <source>min</source>
         <translation>min</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2088" />
+        <location filename="../main_window.py" line="2119" />
         <source>All campaigns</source>
         <translation>All campaigns</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2472" />
-        <location filename="../main_window.py" line="2582" />
+        <location filename="../main_window.py" line="2503" />
+        <location filename="../main_window.py" line="2613" />
         <source>Variable</source>
         <translation>Variable</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2866" />
-        <location filename="../main_window.py" line="6254" />
+        <location filename="../main_window.py" line="2897" />
+        <location filename="../main_window.py" line="6285" />
         <source>Show in folder</source>
         <translation>Show in folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6256" />
+        <location filename="../main_window.py" line="6287" />
         <source>Change folder…</source>
         <translation>Change folder…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2986" />
+        <location filename="../main_window.py" line="3017" />
         <source>Choose the project folder</source>
         <translation>Choose the project folder</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2995" />
+        <location filename="../main_window.py" line="3026" />
         <source>Project folder changed — new files will go there</source>
         <translation>Project folder changed — new files will go there</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3113" />
+        <location filename="../main_window.py" line="3144" />
         <source>This project has been idle for {} days. Consider closing it. (click to dismiss)</source>
         <translation>This project has been idle for {} days. Consider closing it. (click to dismiss)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2654" />
+        <location filename="../main_window.py" line="2685" />
         <source>Measure tonight — %1 d since the last visit</source>
         <translation>Measure tonight — %1 d since the last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2651" />
+        <location filename="../main_window.py" line="2682" />
         <source>First measurement — it opens the series</source>
         <translation>First measurement — it opens the series</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2661" />
+        <location filename="../main_window.py" line="2692" />
         <source>Plan the capture</source>
         <translation>Plan the capture</translation>
     </message>
@@ -1979,12 +2009,12 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Process your data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2662" />
+        <location filename="../main_window.py" line="2693" />
         <source>Draft the post</source>
         <translation>Draft the post</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2663" />
+        <location filename="../main_window.py" line="2694" />
         <source>All steps done — consider closing the project</source>
         <translation>All steps done — consider closing the project</translation>
     </message>
@@ -1993,22 +2023,22 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Object card</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3400" />
+        <location filename="../main_window.py" line="3431" />
         <source>done %1</source>
         <translation>done %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3420" />
+        <location filename="../main_window.py" line="3451" />
         <source>✔ done on %1</source>
         <translation>✔ done on %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3421" />
+        <location filename="../main_window.py" line="3452" />
         <source>– skipped</source>
         <translation>– skipped</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3424" />
+        <location filename="../main_window.py" line="3455" />
         <source>Reopen step</source>
         <translation>Reopen step</translation>
     </message>
@@ -2021,17 +2051,17 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Skip step</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4269" />
+        <location filename="../main_window.py" line="4300" />
         <source>Reduce the photometry with EXOTIC (NASA/JPL), in your own Python ≤3.10 environment.</source>
         <translation>Reduce the photometry with EXOTIC (NASA/JPL), in your own Python ≤3.10 environment.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4272" />
+        <location filename="../main_window.py" line="4303" />
         <source>Export to EXOTIC (inits.json)…</source>
         <translation>Export to EXOTIC (inits.json)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4274" />
+        <location filename="../main_window.py" line="4305" />
         <source>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter — EXOTIC skips its wizard where it can</source>
         <translation>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter — EXOTIC skips its wizard where it can</translation>
     </message>
@@ -2044,22 +2074,22 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Reduce the series with FotoDif (its AUTO mode follows the capture live) or AIJ. FotoDif writes the AAVSO Extended File Format report directly; the cadence and exposure are in the Plan step.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4300" />
+        <location filename="../main_window.py" line="4331" />
         <source>Your AAVSO observer code: %1</source>
         <translation>Your AAVSO observer code: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4304" />
+        <location filename="../main_window.py" line="4335" />
         <source>No AAVSO observer code yet — set it in Settings</source>
         <translation>No AAVSO observer code yet — set it in Settings</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4308" />
+        <location filename="../main_window.py" line="4339" />
         <source>Open AAVSO WebObs…</source>
         <translation>Open AAVSO WebObs…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4310" />
+        <location filename="../main_window.py" line="4341" />
         <source>Submit the FotoDif/AAVSO report to the AAVSO database</source>
         <translation>Submit the FotoDif/AAVSO report to the AAVSO database</translation>
     </message>
@@ -2072,328 +2102,328 @@ One per line: date  magnitude  [error]  filter</translation>
         <translation type="vanished">Session products</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4466" />
+        <location filename="../main_window.py" line="4497" />
         <source>Register what you keep from the session: the FITS frames and the annotated images (e.g. from Tycho). The MPC report is registered automatically when you save it.</source>
         <translation>Register what you keep from the session: the FITS frames and the annotated images (e.g. from Tycho). The MPC report is registered automatically when you save it.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4472" />
+        <location filename="../main_window.py" line="4503" />
         <source>Register FITS…</source>
         <translation>Register FITS…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4474" />
+        <location filename="../main_window.py" line="4505" />
         <source>One or more FITS from the session — date, filter and exposure are read from each header</source>
         <translation>One or more FITS from the session — date, filter and exposure are read from each header</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4478" />
+        <location filename="../main_window.py" line="4509" />
         <source>Register annotated image…</source>
         <translation>Register annotated image…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4480" />
+        <location filename="../main_window.py" line="4511" />
         <source>Annotated image with the object marked (e.g. Tycho-Tracker output)</source>
         <translation>Annotated image with the object marked (e.g. Tycho-Tracker output)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4487" />
+        <location filename="../main_window.py" line="4518" />
         <source>Motion animation</source>
         <translation>Motion animation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4489" />
+        <location filename="../main_window.py" line="4520" />
         <source>GIF/MP4 following the predicted position — if a point stays under the marker while the stars drift, it is that object</source>
         <translation>GIF/MP4 following the predicted position — if a point stays under the marker while the stars drift, it is that object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4493" />
+        <location filename="../main_window.py" line="4524" />
         <source>Zoom:</source>
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4498" />
+        <location filename="../main_window.py" line="4529" />
         <source>Crop zoom (1 = full frame)</source>
         <translation>Crop zoom (1 = full frame)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4536" />
+        <location filename="../main_window.py" line="4567" />
         <source>Choose session FITS</source>
         <translation>Choose session FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4560" />
+        <location filename="../main_window.py" line="4591" />
         <source>Choose annotated images</source>
         <translation>Choose annotated images</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4561" />
+        <location filename="../main_window.py" line="4592" />
         <source>Images (*.png *.jpg *.jpeg *.bmp);;All files (*)</source>
         <translation>Images (*.png *.jpg *.jpeg *.bmp);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4584" />
+        <location filename="../main_window.py" line="4615" />
         <source>Register at least 2 session FITS first</source>
         <translation>Register at least 2 session FITS first</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4598" />
+        <location filename="../main_window.py" line="4629" />
         <source>Motion animation failed: %1</source>
         <translation>Motion animation failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4604" />
+        <location filename="../main_window.py" line="4635" />
         <source>Need at least 2 frames with WCS and ephemeris (skipped: {})</source>
         <translation>Need at least 2 frames with WCS and ephemeris (skipped: {})</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4621" />
+        <location filename="../main_window.py" line="4652" />
         <source>Motion animation saved ({} frames)</source>
         <translation>Motion animation saved ({} frames)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4623" />
+        <location filename="../main_window.py" line="4654" />
         <source> — {} skipped (no WCS/date/ephemeris)</source>
         <translation> — {} skipped (no WCS/date/ephemeris)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4647" />
+        <location filename="../main_window.py" line="4678" />
         <source>Registered {} file(s)</source>
         <translation>Registered {} file(s)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4663" />
-        <location filename="../main_window.py" line="4844" />
+        <location filename="../main_window.py" line="4694" />
+        <location filename="../main_window.py" line="4875" />
         <source>Transit capture plan</source>
         <translation>Transit capture plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4732" />
+        <location filename="../main_window.py" line="4763" />
         <source>Capture (with baselines): {cs} → {ce} UTC  ·  ({cs_l} → {ce_l} local)
 Ingress {i} · Mid {m} · Egress {e} UTC</source>
         <translation>Capture (with baselines): {cs} → {ce} UTC  ·  ({cs_l} → {ce_l} local)
 Ingress {i} · Mid {m} · Egress {e} UTC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4745" />
+        <location filename="../main_window.py" line="4776" />
         <source>⚠ The out-of-transit baseline does not fit in your night — the light curve will lack a comparison level</source>
         <translation>⚠ The out-of-transit baseline does not fit in your night — the light curve will lack a comparison level</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4773" />
+        <location filename="../main_window.py" line="4804" />
         <source>Max cadence to resolve the ingress: {cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</source>
         <translation>Max cadence to resolve the ingress: {cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4779" />
+        <location filename="../main_window.py" line="4810" />
         <source>⚠ slower than the ingress — shorten the exposure</source>
         <translation>⚠ slower than the ingress — shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4790" />
-        <location filename="../main_window.py" line="4977" />
+        <location filename="../main_window.py" line="4821" />
+        <location filename="../main_window.py" line="5008" />
         <source>Max altitude: {:.0f}°</source>
         <translation>Max altitude: {:.0f}°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4796" />
-        <location filename="../main_window.py" line="4983" />
+        <location filename="../main_window.py" line="4827" />
+        <location filename="../main_window.py" line="5014" />
         <source>Moon: {:.0f}% at {:.0f}°</source>
         <translation>Moon: {:.0f}% at {:.0f}°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4803" />
-        <location filename="../main_window.py" line="4989" />
+        <location filename="../main_window.py" line="4834" />
+        <location filename="../main_window.py" line="5020" />
         <source>Pre-flight checklist</source>
         <translation>Pre-flight checklist</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4806" />
+        <location filename="../main_window.py" line="4837" />
         <source>Test shot: the star's peak stays below saturation (~50-70% of the detector range)</source>
         <translation>Test shot: the star's peak stays below saturation (~50-70% of the detector range)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4808" />
+        <location filename="../main_window.py" line="4839" />
         <source>Small, constant defocus (spread the light over more pixels; do not refocus mid-run)</source>
         <translation>Small, constant defocus (spread the light over more pixels; do not refocus mid-run)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4810" />
+        <location filename="../main_window.py" line="4841" />
         <source>Comparison star in the FOV: similar brightness and colour, not variable</source>
         <translation>Comparison star in the FOV: similar brightness and colour, not variable</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4812" />
+        <location filename="../main_window.py" line="4843" />
         <source>Session flats with the light filter (+ darks/bias as usual)</source>
         <translation>Session flats with the light filter (+ darks/bias as usual)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4814" />
+        <location filename="../main_window.py" line="4845" />
         <source>Broad-band L/R filter, the same one you will report (ExoClock logs the filter)</source>
         <translation>Broad-band L/R filter, the same one you will report (ExoClock logs the filter)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4871" />
+        <location filename="../main_window.py" line="4902" />
         <source>HADS capture plan</source>
         <translation>HADS capture plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4898" />
+        <location filename="../main_window.py" line="4929" />
         <source>Period {p:.2f} h · amplitude Δ{a:.1f} mag
 Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then fold)</source>
         <translation>Period {p:.2f} h · amplitude Δ{a:.1f} mag
 Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then fold)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4909" />
+        <location filename="../main_window.py" line="4940" />
         <source>Start around {bt} UTC ({bl} local)</source>
         <translation>Start around {bt} UTC ({bl} local)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4912" />
+        <location filename="../main_window.py" line="4943" />
         <source>latest safe start {ls} UTC</source>
         <translation>latest safe start {ls} UTC</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4915" />
+        <location filename="../main_window.py" line="4946" />
         <source>{n:.1f} full cycles fit tonight</source>
         <translation>{n:.1f} full cycles fit tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4924" />
+        <location filename="../main_window.py" line="4955" />
         <source>⚠ Two full cycles don't fit back to back tonight — capture the longest contiguous run you can</source>
         <translation>⚠ Two full cycles don't fit back to back tonight — capture the longest contiguous run you can</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4934" />
-        <location filename="../main_window.py" line="5052" />
+        <location filename="../main_window.py" line="4965" />
+        <location filename="../main_window.py" line="5083" />
         <source>Recommended exposure</source>
         <translation>Recommended exposure</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4936" />
+        <location filename="../main_window.py" line="4967" />
         <source>honest guide — confirm with a test shot at MAXIMUM brightness</source>
         <translation>honest guide — confirm with a test shot at MAXIMUM brightness</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4960" />
+        <location filename="../main_window.py" line="4991" />
         <source>Cadence to resolve the pulsation: one point every ≤{cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</source>
         <translation>Cadence to resolve the pulsation: one point every ≤{cad:.0f} s · {exp:.0f} s + {ov:.0f} s pause → one point every {per:.0f} s</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4966" />
+        <location filename="../main_window.py" line="4997" />
         <source>⚠ slower than P/12 — shorten the exposure</source>
         <translation>⚠ slower than P/12 — shorten the exposure</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4992" />
+        <location filename="../main_window.py" line="5023" />
         <source>Focus locked at imaging temperature</source>
         <translation>Focus locked at imaging temperature</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4993" />
+        <location filename="../main_window.py" line="5024" />
         <source>Comparison stars identified (VSX chart)</source>
         <translation>Comparison stars identified (VSX chart)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4994" />
+        <location filename="../main_window.py" line="5025" />
         <source>Cadence ≤ P/12 set in the capture sequence</source>
         <translation>Cadence ≤ P/12 set in the capture sequence</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4995" />
+        <location filename="../main_window.py" line="5026" />
         <source>Exposure checked at MAXIMUM brightness (no saturation)</source>
         <translation>Exposure checked at MAXIMUM brightness (no saturation)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4996" />
+        <location filename="../main_window.py" line="5027" />
         <source>Continuous run covering 2 periods planned</source>
         <translation>Continuous run covering 2 periods planned</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5017" />
+        <location filename="../main_window.py" line="5048" />
         <source>Variable star plan</source>
         <translation>Variable star plan</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5027" />
+        <location filename="../main_window.py" line="5058" />
         <source>one measurement every %1 night(s) per filter</source>
         <translation>one measurement every %1 night(s) per filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5037" />
+        <location filename="../main_window.py" line="5068" />
         <source>Maximum</source>
         <translation>Maximum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5038" />
+        <location filename="../main_window.py" line="5069" />
         <source>Minimum</source>
         <translation>Minimum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5039" />
+        <location filename="../main_window.py" line="5070" />
         <source>%1 expected in ~%2 days</source>
         <translation>%1 expected in ~%2 days</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5053" />
+        <location filename="../main_window.py" line="5084" />
         <source>guide, not SNR — confirm with a test shot</source>
         <translation>guide, not SNR — confirm with a test shot</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5061" />
+        <location filename="../main_window.py" line="5092" />
         <source>⚠ Bright star: watch the saturation — a slight defocus helps (T CrB lesson)</source>
         <translation>⚠ Bright star: watch the saturation — a slight defocus helps (T CrB lesson)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5089" />
+        <location filename="../main_window.py" line="5120" />
         <source>Gathering planet data for EXOTIC…</source>
         <translation>Gathering planet data for EXOTIC…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5104" />
+        <location filename="../main_window.py" line="5135" />
         <source>No planet data — check the name and retry</source>
         <translation>No planet data — check the name and retry</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5115" />
+        <location filename="../main_window.py" line="5146" />
         <source>Export EXOTIC inits.json</source>
         <translation>Export EXOTIC inits.json</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5126" />
+        <location filename="../main_window.py" line="5157" />
         <source>inits.json written — run EXOTIC in your Python ≤3.10 environment</source>
         <translation>inits.json written — run EXOTIC in your Python ≤3.10 environment</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5161" />
+        <location filename="../main_window.py" line="5192" />
         <source>multiperiodic stars want consecutive nights</source>
         <translation>multiperiodic stars want consecutive nights</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7905" />
+        <location filename="../main_window.py" line="7936" />
         <source>Series saved: {} points</source>
         <translation>Series saved: {} points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7919" />
+        <location filename="../main_window.py" line="7950" />
         <source>ExoClock submission prepared; outcome recorded.</source>
         <translation>ExoClock submission prepared; outcome recorded.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7932" />
+        <location filename="../main_window.py" line="7963" />
         <source>Run undone: {} points removed</source>
         <translation>Run undone: {} points removed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7947" />
+        <location filename="../main_window.py" line="7978" />
         <source>The plate's saved state was cleared.</source>
         <translation>The plate's saved state was cleared.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2482" />
-        <location filename="../main_window.py" line="5024" />
-        <location filename="../main_window.py" line="5187" />
+        <location filename="../main_window.py" line="2513" />
+        <location filename="../main_window.py" line="5055" />
+        <location filename="../main_window.py" line="5218" />
         <source>Campaign: %1</source>
         <translation>Campaign: %1</translation>
     </message>
@@ -2402,18 +2432,18 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5189" />
+        <location filename="../main_window.py" line="5220" />
         <source>cadence every %1 night(s)</source>
         <translation>cadence every %1 night(s)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5030" />
-        <location filename="../main_window.py" line="5192" />
+        <location filename="../main_window.py" line="5061" />
+        <location filename="../main_window.py" line="5223" />
         <source>filters: %1</source>
         <translation>filters: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1342" />
+        <location filename="../main_window.py" line="1373" />
         <source>SN due: %1 (%2 d)</source>
         <translation>SN due: %1 (%2 d)</translation>
     </message>
@@ -2422,17 +2452,17 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Due for a revisit — click to open its Follow-up</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1702" />
+        <location filename="../main_window.py" line="1733" />
         <source>Part of this observing campaign — click to open it</source>
         <translation>Part of this observing campaign — click to open it</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2126" />
+        <location filename="../main_window.py" line="2157" />
         <source>%1 projects · %2 due</source>
         <translation>%1 projects · %2 due</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2131" />
+        <location filename="../main_window.py" line="2162" />
         <source>(finished)</source>
         <translation>(finished)</translation>
     </message>
@@ -2441,82 +2471,82 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Select a campaign.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2333" />
+        <location filename="../main_window.py" line="2364" />
         <source>active</source>
         <translation>active</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2334" />
+        <location filename="../main_window.py" line="2365" />
         <source>finished</source>
         <translation>finished</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2345" />
+        <location filename="../main_window.py" line="2376" />
         <source>One measurement every %1 night(s) per filter</source>
         <translation>One measurement every %1 night(s) per filter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2348" />
+        <location filename="../main_window.py" line="2379" />
         <source>Filters: %1</source>
         <translation>Filters: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2351" />
+        <location filename="../main_window.py" line="2382" />
         <source>Comparison stars: %1</source>
         <translation>Comparison stars: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2360" />
+        <location filename="../main_window.py" line="2391" />
         <source>Report form</source>
         <translation>Report form</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2363" />
+        <location filename="../main_window.py" line="2394" />
         <source>Data</source>
         <translation>Data</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2368" />
+        <location filename="../main_window.py" line="2399" />
         <source>Object</source>
         <translation>Object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2368" />
+        <location filename="../main_window.py" line="2399" />
         <source>Kind</source>
         <translation>Kind</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2368" />
+        <location filename="../main_window.py" line="2399" />
         <source>Last visit</source>
         <translation>Last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2369" />
+        <location filename="../main_window.py" line="2400" />
         <source>Status</source>
         <translation>Status</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2383" />
+        <location filename="../main_window.py" line="2414" />
         <source>%1 d ago</source>
         <translation>%1 d ago</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2386" />
+        <location filename="../main_window.py" line="2417" />
         <source>⚡ brightness event</source>
         <translation>⚡ brightness event</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2388" />
+        <location filename="../main_window.py" line="2419" />
         <source>● never visited</source>
         <translation>● never visited</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2390" />
+        <location filename="../main_window.py" line="2421" />
         <source>⚠ %1 d overdue</source>
         <translation>⚠ %1 d overdue</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2393" />
+        <location filename="../main_window.py" line="2424" />
         <source>✓ up to date</source>
         <translation>✓ up to date</translation>
     </message>
@@ -2529,7 +2559,7 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Select a project or create one from Tonight.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3083" />
+        <location filename="../main_window.py" line="3114" />
         <source>campaign</source>
         <translation>campaign</translation>
     </message>
@@ -2542,37 +2572,37 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Pick a target project in the Observatory tab</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5195" />
+        <location filename="../main_window.py" line="5226" />
         <source>comparison stars: %1</source>
         <translation>comparison stars: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5213" />
+        <location filename="../main_window.py" line="5244" />
         <source>⚠ Possible brightness drop (Δ≈+%1 mag, filter %2): consider raising the cadence tonight</source>
         <translation>⚠ Possible brightness drop (Δ≈+%1 mag, filter %2): consider raising the cadence tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5215" />
+        <location filename="../main_window.py" line="5246" />
         <source>⚠ Possible outburst (Δ≈−%1 mag, filter %2): top priority tonight</source>
         <translation>⚠ Possible outburst (Δ≈−%1 mag, filter %2): top priority tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5284" />
+        <location filename="../main_window.py" line="5315" />
         <source>Export photometry report…</source>
         <translation>Export photometry report…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5286" />
+        <location filename="../main_window.py" line="5317" />
         <source>CSV or AAVSO EFF with heliocentric dates, for the campaign form / WebObs</source>
         <translation>CSV or AAVSO EFF with heliocentric dates, for the campaign form / WebObs</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5291" />
+        <location filename="../main_window.py" line="5322" />
         <source>Download survey photometry…</source>
         <translation>Download survey photometry…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5293" />
+        <location filename="../main_window.py" line="5324" />
         <source>ASAS-SN/ZTF context points, drawn in grey and never mixed with your own measurements</source>
         <translation>ASAS-SN/ZTF context points, drawn in grey and never mixed with your own measurements</translation>
     </message>
@@ -2585,17 +2615,17 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Differential magnitude vs. an automatic comparison ensemble</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5368" />
+        <location filename="../main_window.py" line="5399" />
         <source>Generate animation</source>
         <translation>Generate animation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5370" />
+        <location filename="../main_window.py" line="5401" />
         <source>GIF/MP4 of the photometric evolution across visits</source>
         <translation>GIF/MP4 of the photometric evolution across visits</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5373" />
+        <location filename="../main_window.py" line="5404" />
         <source>Export annotated FITS</source>
         <translation>Export annotated FITS</translation>
     </message>
@@ -2604,12 +2634,12 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Copy of the stacked FITS with annotation keywords (NS_)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5466" />
+        <location filename="../main_window.py" line="5497" />
         <source>No stacked images registered</source>
         <translation>No stacked images registered</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5406" />
+        <location filename="../main_window.py" line="5437" />
         <source>Project has no coordinates</source>
         <translation>Project has no coordinates</translation>
     </message>
@@ -2630,28 +2660,28 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished"> · Δmag from peak: {:.2f}</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5399" />
+        <location filename="../main_window.py" line="5430" />
         <source>Need at least 2 stacked images</source>
         <translation>Need at least 2 stacked images</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5438" />
+        <location filename="../main_window.py" line="5469" />
         <source>Animation written to %1</source>
         <translation>Animation written to %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5442" />
+        <location filename="../main_window.py" line="5473" />
         <source>Animation failed: %1</source>
         <translation>Animation failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5482" />
-        <location filename="../main_window.py" line="5494" />
+        <location filename="../main_window.py" line="5513" />
+        <location filename="../main_window.py" line="5525" />
         <source>SN follow-up</source>
         <translation>SN follow-up</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5512" />
+        <location filename="../main_window.py" line="5543" />
         <source>Annotated FITS written to %1</source>
         <translation>Annotated FITS written to %1</translation>
     </message>
@@ -2696,38 +2726,38 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Delete this visit? Its measurements are kept.  ({} stacked image{})</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5861" />
-        <location filename="../main_window.py" line="5908" />
+        <location filename="../main_window.py" line="5892" />
+        <location filename="../main_window.py" line="5939" />
         <source>Export photometry report</source>
         <translation>Export photometry report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5864" />
+        <location filename="../main_window.py" line="5895" />
         <source>CSV (group format)</source>
         <translation>CSV (group format)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5865" />
+        <location filename="../main_window.py" line="5896" />
         <source>AAVSO EFF (WebObs)</source>
         <translation>AAVSO EFF (WebObs)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5867" />
+        <location filename="../main_window.py" line="5898" />
         <source>Include quick-look (indicative) points</source>
         <translation>Include quick-look (indicative) points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5881" />
+        <location filename="../main_window.py" line="5912" />
         <source>No photometry points to export</source>
         <translation>No photometry points to export</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5936" />
+        <location filename="../main_window.py" line="5967" />
         <source>The project has no coordinates</source>
         <translation>The project has no coordinates</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5967" />
+        <location filename="../main_window.py" line="5998" />
         <source>No survey data for this position</source>
         <translation>No survey data for this position</translation>
     </message>
@@ -2736,8 +2766,8 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Added %1 survey points</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3453" />
-        <location filename="../main_window.py" line="6297" />
+        <location filename="../main_window.py" line="3484" />
+        <location filename="../main_window.py" line="6328" />
         <source>Close project</source>
         <translation>Close project</translation>
     </message>
@@ -2765,114 +2795,114 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
     </message>
     <message>
         <location filename="../main_window.py" line="520" />
-        <location filename="../main_window.py" line="6228" />
+        <location filename="../main_window.py" line="6259" />
         <source>Filters ▾</source>
         <translation>Filters ▾</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="520" />
-        <location filename="../main_window.py" line="6228" />
+        <location filename="../main_window.py" line="6259" />
         <source>Filters ▸</source>
         <translation>Filters ▸</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1419" />
+        <location filename="../main_window.py" line="1450" />
         <source>From the solar-system calendar — click to open the Sky calendar</source>
         <translation>From the solar-system calendar — click to open the Sky calendar</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1431" />
+        <location filename="../main_window.py" line="1462" />
         <source>tonight</source>
         <translation>tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1440" />
+        <location filename="../main_window.py" line="1471" />
         <source>🌘 Lunar eclipse %1</source>
         <translation>🌘 Lunar eclipse %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1442" />
+        <location filename="../main_window.py" line="1473" />
         <source>🌘 Solar eclipse %1</source>
         <translation>🌘 Solar eclipse %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1444" />
+        <location filename="../main_window.py" line="1475" />
         <source>🔭 %1's shadow %2 UT</source>
         <translation>🔭 %1's shadow %2 UT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1447" />
+        <location filename="../main_window.py" line="1478" />
         <source>🔭 %1 transit %2 UT</source>
         <translation>🔭 %1 transit %2 UT</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1450" />
+        <location filename="../main_window.py" line="1481" />
         <source>🔴 %1 at opposition %2</source>
         <translation>🔴 %1 at opposition %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1453" />
+        <location filename="../main_window.py" line="1484" />
         <source>%1 %2 greatest elongation</source>
         <translation>%1 %2 greatest elongation</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1456" />
+        <location filename="../main_window.py" line="1487" />
         <source>✨ %1–%2 %3°</source>
         <translation>✨ %1–%2 %3°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1460" />
+        <location filename="../main_window.py" line="1491" />
         <source>🌙 Moon–%1 %2°</source>
         <translation>🌙 Moon–%1 %2°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1463" />
+        <location filename="../main_window.py" line="1494" />
         <source>☄️ %1 %2</source>
         <translation>☄️ %1 %2</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1467" />
+        <location filename="../main_window.py" line="1498" />
         <source>🌕 Full moon</source>
         <translation>🌕 Full moon</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1468" />
+        <location filename="../main_window.py" line="1499" />
         <source>🌑 New moon</source>
         <translation>🌑 New moon</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1469" />
+        <location filename="../main_window.py" line="1500" />
         <source>🌓 First quarter</source>
         <translation>🌓 First quarter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1470" />
+        <location filename="../main_window.py" line="1501" />
         <source>🌗 Last quarter</source>
         <translation>🌗 Last quarter</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1473" />
+        <location filename="../main_window.py" line="1504" />
         <source>🌕 Perigee Moon %1</source>
         <translation>🌕 Perigee Moon %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2172" />
+        <location filename="../main_window.py" line="2203" />
         <source>measure %1 tonight</source>
         <translation>measure %1 tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2177" />
+        <location filename="../main_window.py" line="2208" />
         <source>measure %1 — %2 d since the last visit</source>
         <translation>measure %1 — %2 d since the last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2182" />
+        <location filename="../main_window.py" line="2213" />
         <source>all up to date ✓</source>
         <translation>all up to date ✓</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2311" />
-        <location filename="../main_window.py" line="6618" />
+        <location filename="../main_window.py" line="2342" />
+        <location filename="../main_window.py" line="6649" />
         <source>What is a campaign?</source>
         <translation>What is a campaign?</translation>
     </message>
@@ -2881,52 +2911,52 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal (e.g. “T CrB 2026 eruption”). A project is one object with its three steps: plan, process, publish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2332" />
+        <location filename="../main_window.py" line="2363" />
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2594" />
+        <location filename="../main_window.py" line="2625" />
         <source>closed %1</source>
         <translation>closed %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2597" />
+        <location filename="../main_window.py" line="2628" />
         <source>archived</source>
         <translation>archived</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2677" />
+        <location filename="../main_window.py" line="2708" />
         <source>⚡ %1 — %2 mag %3 in %4 — measure tonight</source>
         <translation>⚡ %1 — %2 mag %3 in %4 — measure tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2681" />
+        <location filename="../main_window.py" line="2712" />
         <source>⏳ %1 — %2 nights since the last visit</source>
         <translation>⏳ %1 — %2 nights since the last visit</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2684" />
+        <location filename="../main_window.py" line="2715" />
         <source>⏳ %1 — the first measurement opens the series</source>
         <translation>⏳ %1 — the first measurement opens the series</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2690" />
+        <location filename="../main_window.py" line="2721" />
         <source>⏳ %1 — %2 expected in ~%3 d</source>
         <translation>⏳ %1 — %2 expected in ~%3 d</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2724" />
+        <location filename="../main_window.py" line="2755" />
         <source>Measure →</source>
         <translation>Measure →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2725" />
+        <location filename="../main_window.py" line="2756" />
         <source>Go →</source>
         <translation>Go →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2751" />
+        <location filename="../main_window.py" line="2782" />
         <source>Your projects live here</source>
         <translation>Your projects live here</translation>
     </message>
@@ -2935,34 +2965,34 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">A project is one object with its three steps: plan, process, publish. Pick an object in Tonight and it becomes a project that guides you.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2758" />
+        <location filename="../main_window.py" line="2789" />
         <source>No projects yet — tonight's best objects are on the Tonight tab.</source>
         <translation>No projects yet — tonight's best objects are on the Tonight tab.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2763" />
+        <location filename="../main_window.py" line="2794" />
         <source>Go to Tonight →</source>
         <translation>Go to Tonight →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2769" />
-        <location filename="../main_window.py" line="2780" />
+        <location filename="../main_window.py" line="2800" />
+        <location filename="../main_window.py" line="2811" />
         <source>Needs your attention</source>
         <translation>Needs your attention</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2771" />
-        <location filename="../main_window.py" line="2782" />
+        <location filename="../main_window.py" line="2802" />
+        <location filename="../main_window.py" line="2813" />
         <source>Your projects calling for action, most urgent first.</source>
         <translation>Your projects calling for action, most urgent first.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2773" />
+        <location filename="../main_window.py" line="2804" />
         <source>✨ All quiet — nothing needs you tonight. Clear skies!</source>
         <translation>✨ All quiet — nothing needs you tonight. Clear skies!</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3454" />
+        <location filename="../main_window.py" line="3485" />
         <source>All steps are done. Close this project?</source>
         <translation>All steps are done. Close this project?</translation>
     </message>
@@ -2971,17 +3001,17 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">CCDciel connected — live capture in the Observatory tab →</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4174" />
+        <location filename="../main_window.py" line="4205" />
         <source>Save the plan in the project's Plan section first</source>
         <translation>Save the plan in the project's Plan section first</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4248" />
+        <location filename="../main_window.py" line="4279" />
         <source>What you kept from the session</source>
         <translation>What you kept from the session</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5276" />
+        <location filename="../main_window.py" line="5307" />
         <source>⋯ Photometry tools</source>
         <translation>⋯ Photometry tools</translation>
     </message>
@@ -2994,62 +3024,62 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Differential magnitude vs. an automatic comparison ensemble (indicative)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5318" />
+        <location filename="../main_window.py" line="5349" />
         <source>Light curve</source>
         <translation>Light curve</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5320" />
+        <location filename="../main_window.py" line="5351" />
         <source>Show template</source>
         <translation>Show template</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5366" />
+        <location filename="../main_window.py" line="5397" />
         <source>Animation and annotated FITS</source>
         <translation>Animation and annotated FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5553" />
+        <location filename="../main_window.py" line="5584" />
         <source>⚠ date outside 1966–2086 — check</source>
         <translation>⚠ date outside 1966–2086 — check</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5959" />
+        <location filename="../main_window.py" line="5990" />
         <source>Survey download failed</source>
         <translation>Survey download failed</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5973" />
+        <location filename="../main_window.py" line="6004" />
         <source>Cannot store survey points: %1</source>
         <translation>Cannot store survey points: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5978" />
+        <location filename="../main_window.py" line="6009" />
         <source>Survey data (ZTF via ALeRCE): %1 new, %2 updated, %3 unchanged, %4 removed; MJD %5 → %6; bands %7</source>
         <translation>Survey data (ZTF via ALeRCE): %1 new, %2 updated, %3 unchanged, %4 removed; MJD %5 → %6; bands %7</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6109" />
+        <location filename="../main_window.py" line="6140" />
         <source>transit start written as mandatory — validate once against your CCDciel</source>
         <translation>transit start written as mandatory — validate once against your CCDciel</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6116" />
+        <location filename="../main_window.py" line="6147" />
         <source>HADS window is advisory — any contiguous 2-period run inside the safe span works</source>
         <translation>HADS window is advisory — any contiguous 2-period run inside the safe span works</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6140" />
+        <location filename="../main_window.py" line="6171" />
         <source>MPC orbit report</source>
         <translation>MPC orbit report</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6147" />
+        <location filename="../main_window.py" line="6178" />
         <source>Force fresh data (bypass cache)</source>
         <translation>Force fresh data (bypass cache)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6149" />
+        <location filename="../main_window.py" line="6180" />
         <source>Re-query JPL SBDB / NEOfixer now instead of using the cached orbit. Use after the MPC has improved the preliminary orbit.</source>
         <translation>Re-query JPL SBDB / NEOfixer now instead of using the cached orbit. Use after the MPC has improved the preliminary orbit.</translation>
     </message>
@@ -3098,155 +3128,155 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">MPC report ready to email</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6203" />
+        <location filename="../main_window.py" line="6234" />
         <source>Archive project</source>
         <translation>Archive project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6204" />
+        <location filename="../main_window.py" line="6235" />
         <source>Archive this project? You can reopen it later.</source>
         <translation>Archive this project? You can reopen it later.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6250" />
+        <location filename="../main_window.py" line="6281" />
         <source>(no project selected)</source>
         <translation>(no project selected)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6252" />
+        <location filename="../main_window.py" line="6283" />
         <source>Edit tags…</source>
         <translation>Edit tags…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6280" />
+        <location filename="../main_window.py" line="6311" />
         <source>Edit tags</source>
         <translation>Edit tags</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6281" />
+        <location filename="../main_window.py" line="6312" />
         <source>Comma-separated tags:</source>
         <translation>Comma-separated tags:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6299" />
+        <location filename="../main_window.py" line="6330" />
         <source>Final outcome:</source>
         <translation>Final outcome:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6310" />
+        <location filename="../main_window.py" line="6341" />
         <source>Other (free text)</source>
         <translation>Other (free text)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6343" />
+        <location filename="../main_window.py" line="6374" />
         <source>Delete project</source>
         <translation>Delete project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6344" />
+        <location filename="../main_window.py" line="6375" />
         <source>Delete this project permanently?</source>
         <translation>Delete this project permanently?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6360" />
+        <location filename="../main_window.py" line="6391" />
         <source>Cannot create a project for this target</source>
         <translation>Cannot create a project for this target</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6379" />
+        <location filename="../main_window.py" line="6410" />
         <source>Project created: %1</source>
         <translation>Project created: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6446" />
+        <location filename="../main_window.py" line="6477" />
         <source>Delete campaign</source>
         <translation>Delete campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6447" />
+        <location filename="../main_window.py" line="6478" />
         <source>Delete the campaign “%1”? Its projects are kept, only the link is removed.</source>
         <translation>Delete the campaign “%1”? Its projects are kept, only the link is removed.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6490" />
-        <location filename="../main_window.py" line="6495" />
+        <location filename="../main_window.py" line="6521" />
+        <location filename="../main_window.py" line="6526" />
         <source>Attach project</source>
         <translation>Attach project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6491" />
+        <location filename="../main_window.py" line="6522" />
         <source>No active project without a campaign.</source>
         <translation>No active project without a campaign.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6495" />
-        <location filename="../main_window.py" line="6517" />
+        <location filename="../main_window.py" line="6526" />
+        <location filename="../main_window.py" line="6548" />
         <source>Project:</source>
         <translation>Project:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6512" />
-        <location filename="../main_window.py" line="6517" />
+        <location filename="../main_window.py" line="6543" />
+        <location filename="../main_window.py" line="6548" />
         <source>Detach project</source>
         <translation>Detach project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6513" />
+        <location filename="../main_window.py" line="6544" />
         <source>This campaign has no projects yet.</source>
         <translation>This campaign has no projects yet.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6558" />
+        <location filename="../main_window.py" line="6589" />
         <source>Edit…</source>
         <translation>Edit…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7522" />
+        <location filename="../main_window.py" line="7553" />
         <source>{t} UTC  ·  {l} local</source>
         <translation>{t} UTC  ·  {l} local</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7526" />
+        <location filename="../main_window.py" line="7557" />
         <source>Planet</source>
         <translation>Planet</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7526" />
+        <location filename="../main_window.py" line="7557" />
         <source>Mag</source>
         <translation>Mag</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7527" />
+        <location filename="../main_window.py" line="7558" />
         <source>Rise (UTC)</source>
         <translation>Rise (UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7527" />
+        <location filename="../main_window.py" line="7558" />
         <source>Max (alt · UTC)</source>
         <translation>Max (alt · UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7528" />
+        <location filename="../main_window.py" line="7559" />
         <source>Set (UTC)</source>
         <translation>Set (UTC)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7557" />
+        <location filename="../main_window.py" line="7588" />
         <source>Never above the horizon within two days of tonight</source>
         <translation>Never above the horizon within two days of tonight</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7559" />
+        <location filename="../main_window.py" line="7590" />
         <source>Up already two days ago — it never sets from your site</source>
         <translation>Up already two days ago — it never sets from your site</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7561" />
+        <location filename="../main_window.py" line="7592" />
         <source>Still up two days from now — it never sets from your site</source>
         <translation>Still up two days from now — it never sets from your site</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7568" />
+        <location filename="../main_window.py" line="7599" />
         <source>Best {alt}° tonight — below 15°, needs optics or a better season</source>
         <translation>Best {alt}° tonight — below 15°, needs optics or a better season</translation>
     </message>
@@ -3255,17 +3285,17 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">Finish</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2332" />
-        <location filename="../main_window.py" line="2861" />
-        <location filename="../main_window.py" line="6263" />
-        <location filename="../main_window.py" line="6560" />
+        <location filename="../main_window.py" line="2363" />
+        <location filename="../main_window.py" line="2892" />
+        <location filename="../main_window.py" line="6294" />
+        <location filename="../main_window.py" line="6591" />
         <source>Reopen</source>
         <translation>Reopen</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2864" />
-        <location filename="../main_window.py" line="6269" />
-        <location filename="../main_window.py" line="6561" />
+        <location filename="../main_window.py" line="2895" />
+        <location filename="../main_window.py" line="6300" />
+        <location filename="../main_window.py" line="6592" />
         <source>Delete…</source>
         <translation>Delete…</translation>
     </message>
@@ -3274,29 +3304,29 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">New project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6565" />
-        <location filename="../main_window.py" line="6603" />
+        <location filename="../main_window.py" line="6596" />
+        <location filename="../main_window.py" line="6634" />
         <source>Attach project…</source>
         <translation>Attach project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6566" />
-        <location filename="../main_window.py" line="6604" />
+        <location filename="../main_window.py" line="6597" />
+        <location filename="../main_window.py" line="6635" />
         <source>Detach project…</source>
         <translation>Detach project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6598" />
+        <location filename="../main_window.py" line="6629" />
         <source>(no campaign selected)</source>
         <translation>(no campaign selected)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6606" />
+        <location filename="../main_window.py" line="6637" />
         <source>Delete campaign…</source>
         <translation>Delete campaign…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6619" />
+        <location filename="../main_window.py" line="6650" />
         <source>A campaign groups the projects of one shared observation effort — several nights, several observatories, one goal.
 
 Example: “T CrB 2026 eruption” (obsSN group) — every night you measure T CrB with the same protocol and report the results together.
@@ -3309,12 +3339,12 @@ Example: “T CrB 2026 eruption” (obsSN group) — every night you measure T C
 A project is one object with its three steps: plan, process, publish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6633" />
+        <location filename="../main_window.py" line="6664" />
         <source>What do the icons mean?</source>
         <translation>What do the icons mean?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6634" />
+        <location filename="../main_window.py" line="6665" />
         <source>⚡ — something happened in YOUR measurements: an outburst or a brightness drop beyond our threshold.
 
 ⏳ — a predicted extremum is approaching, with a countdown (maximum or minimum).
@@ -3331,112 +3361,112 @@ Double-click a row to open its project. This strip reads the cache of the last T
 Double-click a row to open its project. This strip reads the cache of the last Tonight run — it never touches the network.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6657" />
+        <location filename="../main_window.py" line="6688" />
         <source>Open project</source>
         <translation>Open project</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6658" />
+        <location filename="../main_window.py" line="6689" />
         <source>Detach from campaign</source>
         <translation>Detach from campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6692" />
+        <location filename="../main_window.py" line="6723" />
         <source>Explore object</source>
         <translation>Explore object</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6693" />
+        <location filename="../main_window.py" line="6724" />
         <source>Object:</source>
         <translation>Object:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6719" />
+        <location filename="../main_window.py" line="6750" />
         <source>Explore — %1</source>
         <translation>Explore — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6841" />
+        <location filename="../main_window.py" line="6872" />
         <source>Post — %1</source>
         <translation>Post — %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6875" />
+        <location filename="../main_window.py" line="6906" />
         <source>Choose the folder for the post files</source>
         <translation>Choose the folder for the post files</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7031" />
+        <location filename="../main_window.py" line="7062" />
         <source>Choose FITS</source>
         <translation>Choose FITS</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7063" />
+        <location filename="../main_window.py" line="7094" />
         <source>Manual coordinates invalid</source>
         <translation>Manual coordinates invalid</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7068" />
+        <location filename="../main_window.py" line="7099" />
         <source>Type the supernova name or tick 'Manual coordinates'.</source>
         <translation>Type the supernova name or tick 'Manual coordinates'.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7104" />
+        <location filename="../main_window.py" line="7135" />
         <source>mirrored</source>
         <translation>mirrored</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7193" />
+        <location filename="../main_window.py" line="7224" />
         <source>Export GIF</source>
         <translation>Export GIF</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7197" />
+        <location filename="../main_window.py" line="7228" />
         <source>Export video</source>
         <translation>Export video</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7202" />
+        <location filename="../main_window.py" line="7233" />
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7213" />
+        <location filename="../main_window.py" line="7244" />
         <source>Rendering…</source>
         <translation>Rendering…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7344" />
+        <location filename="../main_window.py" line="7375" />
         <source>(cycle 25)</source>
         <translation>(cycle 25)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7349" />
+        <location filename="../main_window.py" line="7380" />
         <source>Strongest flare this week: </source>
         <translation>Strongest flare this week: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7358" />
+        <location filename="../main_window.py" line="7389" />
         <source>Numbered active regions: </source>
         <translation>Numbered active regions: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7383" />
+        <location filename="../main_window.py" line="7414" />
         <source>Refresh the Sun first</source>
         <translation>Refresh the Sun first</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7395" />
+        <location filename="../main_window.py" line="7426" />
         <source>Saved to: %1</source>
         <translation>Saved to: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7397" />
+        <location filename="../main_window.py" line="7428" />
         <source>Sun today</source>
         <translation>Sun today</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7436" />
+        <location filename="../main_window.py" line="7467" />
         <source>Moon: %1% lit · %2 km · %3 days</source>
         <translation>Moon: %1% lit · %2 km · %3 days</translation>
     </message>
@@ -3449,12 +3479,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">Moon %1% lit — a good night for faint targets</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7449" />
+        <location filename="../main_window.py" line="7480" />
         <source>Kp %1 — mid-latitude auroras possible</source>
         <translation>Kp %1 — mid-latitude auroras possible</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7453" />
+        <location filename="../main_window.py" line="7484" />
         <source>See Tonight →</source>
         <translation>See Tonight →</translation>
     </message>
@@ -3467,115 +3497,115 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">none above 15°</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7055" />
+        <location filename="../main_window.py" line="7086" />
         <source>Choose a FITS image first.</source>
         <translation>Choose a FITS image first.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="7071" />
+        <location filename="../main_window.py" line="7102" />
         <source>Reading the FITS image…</source>
         <translation>Reading the FITS image…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6121" />
-        <location filename="../main_window.py" line="6193" />
-        <location filename="../main_window.py" line="7237" />
+        <location filename="../main_window.py" line="6152" />
+        <location filename="../main_window.py" line="6224" />
+        <location filename="../main_window.py" line="7268" />
         <source>Export failed: %1</source>
         <translation>Export failed: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5923" />
-        <location filename="../main_window.py" line="6103" />
-        <location filename="../main_window.py" line="6190" />
-        <location filename="../main_window.py" line="7236" />
+        <location filename="../main_window.py" line="5954" />
+        <location filename="../main_window.py" line="6134" />
+        <location filename="../main_window.py" line="6221" />
+        <location filename="../main_window.py" line="7267" />
         <source>Written to %1</source>
         <translation>Written to %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6135" />
+        <location filename="../main_window.py" line="6166" />
         <source>MPC elements (MPOrbit)</source>
         <translation>MPC elements (MPOrbit)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6137" />
+        <location filename="../main_window.py" line="6168" />
         <source>One MPOrbit element line per object (the universal MPC elements handover format), importable by any planetarium or orbit reader. Best for orbit handover.</source>
         <translation>One MPOrbit element line per object (the universal MPC elements handover format), importable by any planetarium or orbit reader. Best for orbit handover.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6142" />
+        <location filename="../main_window.py" line="6173" />
         <source>Orbital elements, perihelion, P/Q, state vector, MOIDs, Tisserand, encounter speed, diameter and an MPC element footer. Universal: importable by any planetarium or orbit reader. Best for a readable follow-up report.</source>
         <translation>Orbital elements, perihelion, P/Q, state vector, MOIDs, Tisserand, encounter speed, diameter and an MPC element footer. Universal: importable by any planetarium or orbit reader. Best for a readable follow-up report.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6185" />
+        <location filename="../main_window.py" line="6216" />
         <source>No orbit record for %1</source>
         <translation>No orbit record for %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6559" />
+        <location filename="../main_window.py" line="6590" />
         <source>Close campaign</source>
         <translation>Close campaign</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6563" />
-        <location filename="../main_window.py" line="6601" />
+        <location filename="../main_window.py" line="6594" />
+        <location filename="../main_window.py" line="6632" />
         <source>New project in this campaign…</source>
         <translation>New project in this campaign…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6900" />
+        <location filename="../main_window.py" line="6931" />
         <source>Not found: </source>
         <translation>Not found: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6889" />
+        <location filename="../main_window.py" line="6920" />
         <source>Building drafts…</source>
         <translation>Building drafts…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6962" />
+        <location filename="../main_window.py" line="6993" />
         <source>Saved to: </source>
         <translation>Saved to: </translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="6963" />
+        <location filename="../main_window.py" line="6994" />
         <source>Drafts ready</source>
         <translation>Drafts ready</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="984" />
+        <location filename="../main_window.py" line="1015" />
         <source>Unknown code or offline</source>
         <translation>Unknown code or offline</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="990" />
+        <location filename="../main_window.py" line="1021" />
         <source>Found: %1</source>
         <translation>Found: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2851" />
+        <location filename="../main_window.py" line="2882" />
         <source>Open</source>
         <translation>Open</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2856" />
+        <location filename="../main_window.py" line="2887" />
         <source>Unstar</source>
         <translation>Unstar</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2857" />
+        <location filename="../main_window.py" line="2888" />
         <source>Star as favorite</source>
         <translation>Star as favorite</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2859" />
-        <location filename="../main_window.py" line="6260" />
+        <location filename="../main_window.py" line="2890" />
+        <location filename="../main_window.py" line="6291" />
         <source>Close project…</source>
         <translation>Close project…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2863" />
-        <location filename="../main_window.py" line="6266" />
+        <location filename="../main_window.py" line="2894" />
+        <location filename="../main_window.py" line="6297" />
         <source>Archive…</source>
         <translation>Archive…</translation>
     </message>
@@ -3600,29 +3630,29 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">%1 mag %2 in %3</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2675" />
+        <location filename="../main_window.py" line="2706" />
         <source>down</source>
         <translation>down</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="2676" />
+        <location filename="../main_window.py" line="2707" />
         <source>up</source>
         <translation>up</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1714" />
-        <location filename="../main_window.py" line="2688" />
+        <location filename="../main_window.py" line="1745" />
+        <location filename="../main_window.py" line="2719" />
         <source>maximum</source>
         <translation>maximum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1715" />
-        <location filename="../main_window.py" line="2689" />
+        <location filename="../main_window.py" line="1746" />
+        <location filename="../main_window.py" line="2720" />
         <source>minimum</source>
         <translation>minimum</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="1716" />
+        <location filename="../main_window.py" line="1747" />
         <source>%1 in %2 d</source>
         <translation>%1 in %2 d</translation>
     </message>
@@ -3699,189 +3729,189 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation type="vanished">critical</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="3241" />
+        <location filename="../main_window.py" line="3272" />
         <source>Open the {l} tab</source>
         <translation>Open the {l} tab</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4279" />
+        <location filename="../main_window.py" line="4310" />
         <source>After the reduction, upload EXOTIC's output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story when you publish.</source>
         <translation>After the reduction, upload EXOTIC's output file to ExoClock (exoclock.space) and/or the AAVSO Exoplanet Database — and tell the story when you publish.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4315" />
+        <location filename="../main_window.py" line="4346" />
         <source>Import the FotoDif measurements («JD mag …» text) with «Import file…» in the photometry tools menu above — the light curve and the phase-folded view update themselves.</source>
         <translation>Import the FotoDif measurements («JD mag …» text) with «Import file…» in the photometry tools menu above — the light curve and the phase-folded view update themselves.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4363" />
+        <location filename="../main_window.py" line="4394" />
         <source>This visit has no FITS frames to measure.</source>
         <translation>This visit has no FITS frames to measure.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4385" />
+        <location filename="../main_window.py" line="4416" />
         <source>This measurement no longer exists.</source>
         <translation>This measurement no longer exists.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4389" />
+        <location filename="../main_window.py" line="4420" />
         <source>This point has no plate: it was hand-entered, pasted, or saved before this feature.</source>
         <translation>This point has no plate: it was hand-entered, pasted, or saved before this feature.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4395" />
+        <location filename="../main_window.py" line="4426" />
         <source>The plate this point came from is not a usable image anymore.</source>
         <translation>The plate this point came from is not a usable image anymore.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4401" />
+        <location filename="../main_window.py" line="4432" />
         <source>Enable the unified editor in Settings → Development to open this plate</source>
         <translation>Enable the unified editor in Settings → Development to open this plate</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="4715" />
+        <location filename="../main_window.py" line="4746" />
         <source>Click to open in the chart viewer (zoom, pan, export)</source>
         <translation>Click to open in the chart viewer (zoom, pan, export)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5231" />
+        <location filename="../main_window.py" line="5262" />
         <source>No points saved yet. Open a visit's plate in the editor or add a magnitude by hand: the summary updates after every save.</source>
         <translation>No points saved yet. Open a visit's plate in the editor or add a magnitude by hand: the summary updates after every save.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5267" />
+        <location filename="../main_window.py" line="5298" />
         <source>Comparison chart…</source>
         <translation>Comparison chart…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5269" />
+        <location filename="../main_window.py" line="5300" />
         <source>Pick the reference stars for this target: NightScribe proposes them over the field image (brighter, of similar colour, never a known variable)</source>
         <translation>Pick the reference stars for this target: NightScribe proposes them over the field image (brighter, of similar colour, never a known variable)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5375" />
+        <location filename="../main_window.py" line="5406" />
         <source>Preview the stacked FITS, place the SN marker and save an annotated copy (AIJ readable)</source>
         <translation>Preview the stacked FITS, place the SN marker and save an annotated copy (AIJ readable)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5497" />
+        <location filename="../main_window.py" line="5528" />
         <source>Could not open the FITS for annotation: %1</source>
         <translation>Could not open the FITS for annotation: %1</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5620" />
+        <location filename="../main_window.py" line="5651" />
         <source>No comparison sequence yet — «Comparison chart…» answers the question: with what do I compare?</source>
         <translation>No comparison sequence yet — «Comparison chart…» answers the question: with what do I compare?</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5624" />
+        <location filename="../main_window.py" line="5655" />
         <source>Sequence: %1 comparison stars</source>
         <translation>Sequence: %1 comparison stars</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5627" />
+        <location filename="../main_window.py" line="5658" />
         <source> + check star</source>
         <translation> + check star</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5667" />
+        <location filename="../main_window.py" line="5698" />
         <source>This project has no coordinates: cannot build the chart</source>
         <translation>This project has no coordinates: cannot build the chart</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5676" />
-        <location filename="../main_window.py" line="5760" />
+        <location filename="../main_window.py" line="5707" />
+        <location filename="../main_window.py" line="5791" />
         <source>Comparison chart</source>
         <translation>Comparison chart</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5679" />
+        <location filename="../main_window.py" line="5710" />
         <source>«With what do I compare?» Choose the catalog and NightScribe proposes the reference stars over the field image: brighter than the target, of similar colour when known, and never a known variable.</source>
         <translation>«With what do I compare?» Choose the catalog and NightScribe proposes the reference stars over the field image: brighter than the target, of similar colour when known, and never a known variable.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5688" />
+        <location filename="../main_window.py" line="5719" />
         <source>Catalog:</source>
         <translation>Catalog:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5693" />
+        <location filename="../main_window.py" line="5724" />
         <source>Field of view:</source>
         <translation>Field of view:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5697" />
+        <location filename="../main_window.py" line="5728" />
         <source>Comparison stars:</source>
         <translation>Comparison stars:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5706" />
+        <location filename="../main_window.py" line="5737" />
         <source>Used to propose brighter comparisons; the current best estimate comes pre-filled</source>
         <translation>Used to propose brighter comparisons; the current best estimate comes pre-filled</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5708" />
+        <location filename="../main_window.py" line="5739" />
         <source>Target magnitude:</source>
         <translation>Target magnitude:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5712" />
+        <location filename="../main_window.py" line="5743" />
         <source>Optional: your stacked FITS as the background</source>
         <translation>Optional: your stacked FITS as the background</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5717" />
+        <location filename="../main_window.py" line="5748" />
         <source>Your FITS image</source>
         <translation>Your FITS image</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5718" />
+        <location filename="../main_window.py" line="5749" />
         <source>All files (*)</source>
         <translation>All files (*)</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5725" />
+        <location filename="../main_window.py" line="5756" />
         <source>Background:</source>
         <translation>Background:</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5727" />
+        <location filename="../main_window.py" line="5758" />
         <source>If your FITS has no astrometry we solve it with Astrometry.net (your file is never modified); without it, the background is the DSS2 survey image</source>
         <translation>If your FITS has no astrometry we solve it with Astrometry.net (your file is never modified); without it, the background is the DSS2 survey image</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5736" />
+        <location filename="../main_window.py" line="5767" />
         <source>Also save the sequence to the campaign protocol</source>
         <translation>Also save the sequence to the campaign protocol</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5740" />
+        <location filename="../main_window.py" line="5771" />
         <source>Generate</source>
         <translation>Generate</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5759" />
-        <location filename="../main_window.py" line="5771" />
+        <location filename="../main_window.py" line="5790" />
+        <location filename="../main_window.py" line="5802" />
         <source>Building the comparison chart…</source>
         <translation>Building the comparison chart…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5792" />
+        <location filename="../main_window.py" line="5823" />
         <source>Could not build the chart</source>
         <translation>Could not build the chart</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5801" />
+        <location filename="../main_window.py" line="5832" />
         <source>VSX did not answer: field variables are not flagged</source>
         <translation>VSX did not answer: field variables are not flagged</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5806" />
+        <location filename="../main_window.py" line="5837" />
         <source>the target falls outside your image: DSS2 used instead</source>
         <translation>the target falls outside your image: DSS2 used instead</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5846" />
+        <location filename="../main_window.py" line="5877" />
         <source>Comparison chart ready</source>
         <translation>Comparison chart ready</translation>
     </message>
@@ -5404,12 +5434,12 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Optional; written into the EXOTIC inits.json handoff (transit projects)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="503" />
+        <location filename="../ui/settings_dialog.ui" line="519" />
         <source>AAVSO API token:</source>
         <translation>AAVSO API token:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="507" />
+        <location filename="../ui/settings_dialog.ui" line="523" />
         <source>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</source>
         <translation>Optional; from your AAVSO account. The bright-star vigils (baseline under ~11.5 mag, e.g. T CrB / R CrB) read the community photometry, which requires this token — without it they stay silent</translation>
     </message>
@@ -5565,18 +5595,18 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>CCDciel (JSON-RPC connection)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="487" />
+        <location filename="../ui/settings_dialog.ui" line="503" />
         <source>TNS bot name:</source>
         <translation>TNS bot name:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="492" />
-        <location filename="../ui/settings_dialog.ui" line="500" />
+        <location filename="../ui/settings_dialog.ui" line="508" />
+        <location filename="../ui/settings_dialog.ui" line="516" />
         <source>Optional: TNS bot credentials to fetch discovery images for transients</source>
         <translation>Optional: TNS bot credentials to fetch discovery images for transients</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="495" />
+        <location filename="../ui/settings_dialog.ui" line="511" />
         <source>TNS bot key:</source>
         <translation>TNS bot key:</translation>
     </message>
@@ -5832,27 +5862,62 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="522" />
+        <location filename="../ui/settings_dialog.ui" line="485" />
+        <source>Plate solver</source>
+        <translation>Plate solver</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="488" />
+        <source>Solver:</source>
+        <translation>Solver:</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="493" />
+        <source>ASTAP binary:</source>
+        <translation>ASTAP binary:</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="495" />
+        <source>…</source>
+        <translation>…</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="496" />
+        <source>Test</source>
+        <translation>Test</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="498" />
+        <source>Let ASTAP write the solution into the FITS header</source>
+        <translation>Let ASTAP write the solution into the FITS header</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="499" />
+        <source>Optional: solve plates locally with ASTAP. Auto uses ASTAP first and nova.astrometry.net as fallback; an empty path looks for "astap" on PATH</source>
+        <translation>Optional: solve plates locally with ASTAP. Auto uses ASTAP first and nova.astrometry.net as fallback; an empty path looks for "astap" on PATH</translation>
+    </message>
+    <message>
+        <location filename="../ui/settings_dialog.ui" line="538" />
         <source>Development</source>
         <translation>Development</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="526" />
+        <location filename="../ui/settings_dialog.ui" line="542" />
         <source>FITS editor</source>
         <translation>FITS editor</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="530" />
+        <location filename="../ui/settings_dialog.ui" line="546" />
         <source>Unified editor (UFE) by default:</source>
         <translation>Unified editor (UFE) by default:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="532" />
+        <location filename="../ui/settings_dialog.ui" line="548" />
         <source>Icons-only top bar:</source>
         <translation>Icons-only top bar:</translation>
     </message>
     <message>
-        <location filename="../ui/settings_dialog.ui" line="537" />
+        <location filename="../ui/settings_dialog.ui" line="553" />
         <source>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor's action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them.</source>
         <translation>On: Blink, comparison chart and annotated FITS open in the unified editor (Tools → NightScribe Image Workbench…). Off: the classic dialogs stay the default. Both remain available either way during the review period, so you can compare them; applies at once, no restart needed. Icons-only top bar: the editor's action buttons show compact glyphs instead of their labels (Solve keeps its text); off restores them.</translation>
     </message>

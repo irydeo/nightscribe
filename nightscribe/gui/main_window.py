@@ -700,6 +700,22 @@ class MainWindow(QMainWindow):
 
     # ---------------- menu: settings / help ----------------
 
+    def _pick_astap(self, dlg):
+        # Browse for the ASTAP executable (ADR-051).
+        from PySide6.QtWidgets import QFileDialog
+        path, _sel = QFileDialog.getOpenFileName(
+            dlg, self.tr("Select the ASTAP executable"), "",
+            self.tr("Executables (*)"))
+        if path:
+            dlg.edt_astap_path.setText(path)
+
+    def _test_astap(self, dlg):
+        # Probe the configured binary: does it exist and where (ADR-051).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core.sources import astap
+        rep = astap.probe(dlg.edt_astap_path.text().strip())
+        QMessageBox.information(dlg, self.tr("ASTAP"), rep["message"])
+
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
         # 3-tab layout with per-field help labels BELOW each widget —
@@ -739,6 +755,18 @@ class MainWindow(QMainWindow):
         dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
         dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
+        # plate solver (ADR-051): auto | astap | astrometry
+        dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
+        dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
+        dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
+        _si = dlg.cmb_solver.findData(config.get("solver", "auto"))
+        dlg.cmb_solver.setCurrentIndex(_si if _si >= 0 else 0)
+        dlg.edt_astap_path.setText(config.get("astap_path", ""))
+        dlg.chk_astap_update.setChecked(
+            bool(config.get("astap_update", False)))
+        dlg.btn_astap_browse.clicked.connect(
+            lambda: self._pick_astap(dlg))
+        dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         # Track D (EXOTIC handoff): AAVSO code, camera type and binning
@@ -840,6 +868,9 @@ class MainWindow(QMainWindow):
         config.set("min_alt", dlg.spn_min_alt.value())
         config.set("neofixer_key", dlg.edt_neofixer_key.text().strip())
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
+        config.set("solver", dlg.cmb_solver.currentData() or "auto")
+        config.set("astap_path", dlg.edt_astap_path.text().strip())
+        config.set("astap_update", dlg.chk_astap_update.isChecked())
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
         config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())

@@ -39,6 +39,9 @@ DEFAULTS = {
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
+    "solver": "auto",       # auto | astap | astrometry (ADR-051)
+    "astap_path": "",       # local ASTAP binary; empty = look on PATH
+    "astap_update": False,  # let a local solve rewrite the FITS header
     # Container root for the projects: empty -> platformdirs data dir's
     # projects/ folder (the legacy location, see ADR-032)
     "projects_root": "",

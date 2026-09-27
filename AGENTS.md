@@ -107,6 +107,8 @@ nightscribe/
     exoclock_export.py # envío manual a ExoClock (ADR-049): archivo HOPS de
                       #   3 columnas (JD_UTC de arranque + flujo + error) y
                       #   ExoClock_info.txt con Comments relleno (plan fase 8)
+    solve.py          # dispatcher de resolución de placa: auto|astap|astrometry
+                      #   (auto prueba ASTAP local y cae a nova; ADR-051)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
@@ -133,6 +135,8 @@ nightscribe/
                       #   APASS DR9, VSX B/vsx; TTL 30 d; ADR-042)
                       # + surveys.py: contexto ALeRCE/ZTF en curvas (TTL 30 d; ADR-035)
                       #   y última magnitud para vigilias (claves "vigils:", TTL 12 h)
+                      # + astap.py: solver local de placa (binario del usuario,
+                      #   -wcs en memoria, caché por hash; ADR-051)
                       # + aavso.py: canal editorial AAVSO — alertas del foro (JSON
                       #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
                      #   + fotometría de la comunidad con token (vigilias brillantes)

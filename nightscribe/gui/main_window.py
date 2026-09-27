@@ -7724,12 +7724,15 @@ class MainWindow(QMainWindow):
                 lambda rows, cfg: self._ufe_points_hook(
                     hook_pid, session_id, rows, cfg))
             dlg.set_run_undo_hook(self._ufe_run_undo)
+            dlg.set_exoclock_hook(
+                lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
         else:
             dlg.set_point_hook(None)
             dlg.set_reset_hooks(None, None)
             dlg.set_series_hook(None)
             dlg.set_points_hook(None)
             dlg.set_run_undo_hook(None)
+            dlg.set_exoclock_hook(None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
@@ -7902,6 +7905,20 @@ class MainWindow(QMainWindow):
             self.tr("Series saved: {} points").format(len(rows)), 8000)
         self._project_selected()
         return run_id
+
+    def _ufe_exoclock_hook(self, pid, payload):
+        # ADR-049 (D30): the ExoClock files were written and the browser
+        # opened; the project outcome is recorded as reported_exoclock.
+        # @args: pid - project id, payload - {"planet", "points"}
+        try:
+            project.close(db, pid, "reported_exoclock")
+        except Exception as err:
+            logger.warning("exoclock outcome failed: %s", err)
+            return False
+        self.statusBar().showMessage(
+            self.tr("ExoClock submission prepared; outcome recorded."), 8000)
+        self._project_selected()
+        return True
 
     def _ufe_run_undo(self, run_id):
         # ADR-048 (D6): undo one run's points, keep the run row for the

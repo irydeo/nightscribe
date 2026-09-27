@@ -104,6 +104,9 @@ nightscribe/
     transit_fit.py   # modelo de tránsito con limb darkening cuadrático (numpy,
                       #   paridad <1e-5 vs batman) + ajuste LM con detrend
                       #   conjunto y errores OOT (plan fase 7; compuerta abierta)
+    exoclock_export.py # envío manual a ExoClock (ADR-049): archivo HOPS de
+                      #   3 columnas (JD_UTC de arranque + flujo + error) y
+                      #   ExoClock_info.txt con Comments relleno (plan fase 8)
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)

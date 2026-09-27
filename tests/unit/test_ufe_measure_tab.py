@@ -981,3 +981,39 @@ def test_series_worker_offscreen_measures_a_synthetic_series(qapp, tmp_path):
     QApplication.processEvents()
     assert got["res"].status == "complete"
     assert len(got["res"].points) == 3
+
+
+# ---------------- series plan, phase 8: ExoClock ----------------
+
+def test_exoclock_button_writes_files_and_records_outcome(
+        dlg, qapp, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtGui import QDesktopServices
+    tab = dlg.tab_measure
+    assert not tab.btn_series_exoclock.isEnabled()   # nothing measured yet
+    frames = [_write_plate(tmp_path / f"e{i}.fits", dlg.state.data,
+                           extra=[_card("EXPTIME", "10.0")])
+              for i in range(4)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 9)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert tab.btn_series_exoclock.isEnabled()
+    out = tmp_path / "HATP-32b.txt"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl",
+                        staticmethod(lambda url: opened.append(url.toString())))
+    seen = []
+    dlg.set_exoclock_hook(lambda payload: seen.append(payload))
+    tab._on_series_exoclock()
+    assert out.exists()
+    assert (tmp_path / "HATP-32b_info.txt").exists()
+    assert "JD_UTC" in (tmp_path / "HATP-32b_info.txt").read_text()
+    assert len(out.read_text().strip().splitlines()) == 4   # one per frame
+    assert opened and "exoclock.space/upload" in opened[0]
+    assert seen and seen[0]["points"] == 4

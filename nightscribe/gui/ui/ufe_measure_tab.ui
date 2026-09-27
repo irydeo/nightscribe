@@ -314,6 +314,19 @@
          </widget>
         </item>
         <item>
+         <widget class="QPushButton" name="btn_series_exoclock">
+          <property name="enabled">
+           <bool>false</bool>
+          </property>
+          <property name="toolTip">
+           <string>Prepare the ExoClock submission (three-column JD_UTC/flux file + ExoClock_info.txt), open the upload page and record the reported outcome</string>
+          </property>
+          <property name="text">
+           <string>ExoClock…</string>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="QPushButton" name="btn_series_help">
           <property name="toolTip">
            <string>Open the sequences guide (SEQUENCES) in the documentation browser</string>

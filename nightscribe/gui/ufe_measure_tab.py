@@ -189,6 +189,8 @@ class UfeMeasureTab(QWidget):
         self.btn_series.clicked.connect(self._on_measure_series)
         self.btn_series_undo = self._ui.btn_series_undo
         self.btn_series_undo.clicked.connect(self._on_series_undo)
+        self.btn_series_exoclock = self._ui.btn_series_exoclock
+        self.btn_series_exoclock.clicked.connect(self._on_series_exoclock)
         self.btn_series_help = self._ui.btn_series_help
         self.btn_series_help.clicked.connect(self._open_series_docs)
         self.lbl_series_frames = self._ui.lbl_series_frames
@@ -199,6 +201,7 @@ class UfeMeasureTab(QWidget):
                 self.chart_series)
         self._series_worker = None
         self._series_run_id = None
+        self._series_result = None
         self._series_cfg = None
         self._series_cfg_dict = None
         self._series_attached = False
@@ -827,6 +830,10 @@ class UfeMeasureTab(QWidget):
             except Exception as err:
                 logger.warning("series save failed: %s", err)
         self.btn_series_undo.setEnabled(self._series_run_id is not None)
+        self.btn_series_exoclock.setEnabled(
+            result.status == "complete"
+            and any(p.mag is not None for p in result.points))
+        self._series_result = result
         self._draw_series(result.points)
         self._fill_series_panel(result, context)
 
@@ -904,6 +911,59 @@ class UfeMeasureTab(QWidget):
                for p in points if p.mjd is not None
                and p.mag_detrended is not None]
         self.chart_series.set_data(_decimate(raw) + _decimate(det))
+
+    def _on_series_exoclock(self):
+        # D30/D41: prepare the manual ExoClock submission from the last
+        # run, open the upload page and let the host record the outcome.
+        from ..core import exoclock_export
+        from PySide6.QtGui import QDesktopServices
+        from PySide6.QtCore import QUrl
+        result = self._series_result
+        if result is None or not result.points:
+            self.lbl_status.setText(self.tr("Measure the series first."))
+            return
+        pts = [{"mjd": p.mjd,
+                "mag": p.mag_detrended if p.mag_detrended is not None
+                else p.mag, "err": p.err, "exptime": p.exptime,
+                "flags": list(p.flags)}
+               for p in result.points if p.mjd is not None]
+        check = exoclock_export.checklist(pts)
+        if check["level"] != "ok":
+            lines = [m.get(self._lang, m.get("en", ""))
+                     for m in check["messages"]]
+            self.lbl_status.setText("⚠ " + " · ".join(lines))
+        planet = ""
+        obj = getattr(self.window(), "object", lambda: None)()
+        if obj and obj.get("name"):
+            planet = obj["name"]
+        else:
+            planet = self._state.path and Path(self._state.path).stem or ""
+        default = str(Path(self._state.path).with_suffix(".txt")) \
+            if self._state.path else "exoclock.txt"
+        out, _sel = QFileDialog.getSaveFileName(
+            self, self.tr("ExoClock submission"), default,
+            "Text (*.txt)")
+        if not out:
+            return
+        exptimes = [p["exptime"] for p in pts if p["exptime"]]
+        expt = exptimes[0] if exptimes else None
+        det = result.detrend
+        note = self.tr(
+            "NightScribe series: {0} points, group {1}, detrend {2}").format(
+                len(pts), result.group_n,
+                (det or {}).get("policy", "off"))
+        exoclock_export.write_submission(
+            pts, out, planet or "target",
+            self.cmb_band.currentText() or self._band or "", expt, note)
+        self.lbl_status.setText(
+            self.tr("ExoClock files written. Upload them at exoclock.space"))
+        notify = getattr(self.window(), "notify_saved", None)
+        if callable(notify):
+            notify([out], "report")
+        hook = getattr(self.window(), "notify_exoclock", None)
+        if callable(hook):
+            hook({"planet": planet, "points": len(pts)})
+        QDesktopServices.openUrl(QUrl("https://exoclock.space/upload/"))
 
     def _on_series_undo(self):
         # D6: undo this run only; never the visit.

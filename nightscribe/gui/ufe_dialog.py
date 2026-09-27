@@ -92,6 +92,7 @@ class UfeDialog(QDialog):
         self._series_hook = None
         self._points_hook = None
         self._run_undo_hook = None
+        self._exoclock_hook = None
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("NightScribe Image Workbench"))
@@ -561,6 +562,23 @@ class UfeDialog(QDialog):
         except Exception as err:
             logger.warning("run-undo hook failed: %s", err)
             return 0
+
+    def set_exoclock_hook(self, fn):
+        # @args: fn - callable(payload) or None. Called after the ExoClock
+        #        files are written so the host records the project outcome
+        #        (ADR-049).
+        self._exoclock_hook = fn if callable(fn) else None
+
+    def notify_exoclock(self, payload):
+        # @return: True when the hook ran
+        if self._exoclock_hook is None:
+            return False
+        try:
+            self._exoclock_hook(payload or {})
+            return True
+        except Exception as err:
+            logger.warning("exoclock hook failed: %s", err)
+            return False
 
     # --------------------------------------------------- the object
 

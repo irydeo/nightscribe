@@ -940,7 +940,7 @@ class UfeMeasureTab(QWidget):
         if result is None or not result.points:
             self.lbl_status.setText(self.tr("Measure the series first."))
             return
-        pts = [{"mjd": p.mjd,
+        pts = [{"mjd": p.mjd, "jd_start": p.jd_start,
                 "mag": p.mag_detrended if p.mag_detrended is not None
                 else p.mag, "err": p.err, "exptime": p.exptime,
                 "flags": list(p.flags)}

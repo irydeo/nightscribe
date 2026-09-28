@@ -63,7 +63,9 @@ def build_data(points):
     # The reference flux is the series' median magnitude (out of transit),
     # so flux ~ 1 on the baseline and dips in transit.
     # @args: points - dicts with mjd (mid exposure), mag, err, exptime
-    #        (seconds; the group's total integration when grouped)
+    #        (seconds; the group's total integration when grouped) and,
+    #        when they come from the engine, jd_start (MJD of the start
+    #        of the group's first exposure)
     # @return: (rows, warnings): rows are (jd_start, flux, flux_err) with
     #          None flux/err when the point carries no magnitude
     warnings = []
@@ -79,7 +81,12 @@ def build_data(points):
         if not exp:
             warnings.append("point without EXPTIME")
             continue
-        jd_start = (mjd - float(exp) / 2.0 / 86400.0) + variables.MJD0
+        # the engine sends the true start of the group's first exposure;
+        # the fallback (mid minus half the integration) is for hand-built
+        # points
+        start = p.get("jd_start")
+        jd_start = (start if start is not None
+                    else mjd - float(exp) / 2.0 / 86400.0) + variables.MJD0
         mag = p.get("mag")
         if mag is None or ref is None:
             rows.append((jd_start, None, None))

@@ -344,6 +344,28 @@ def test_grouping_collapses_points(tmp_path):
     assert res.points[0].err >= res.points[0].err_internal
 
 
+def test_grouped_exoclock_start_is_the_first_frame_start(tmp_path):
+    # End to end through the real engine (review #10): with group_n=3 the
+    # ExoClock JD_UTC must be the start of the group's first frame, not
+    # the mid time biased by (span - exptime)/2. Frames here start at
+    # 23:30/23:31/23:32 with 10 s each, so the true start of group 1 is
+    # 2026-09-20T23:30:00 UTC.
+    from nightscribe.core import exoclock_export, fits_meta, variables
+    paths, wcs, comps = _write_frames(tmp_path, 6)
+    res = sm.measure_series(paths, _config(wcs, comps, group_n=3))
+    assert res.status == "complete" and len(res.points) == 2
+    pts = [{"mjd": p.mjd, "jd_start": p.jd_start, "mag": p.mag,
+            "err": p.err, "exptime": p.exptime, "flags": list(p.flags)}
+           for p in res.points]
+    rows, warnings = exoclock_export.build_data(pts)
+    assert warnings == []
+    # independent anchor: DATE-OBS of the first frame IS the start of
+    # the group's first exposure (the engine times at DATE-OBS + exp/2)
+    want = fits_meta.read_meta(paths[0])["mjd"]
+    assert want is not None
+    assert rows[0][0] == pytest.approx(want + variables.MJD0, abs=1e-6)
+
+
 def test_cancellation_leaves_an_incomplete_series(tmp_path):
     paths, wcs, comps = _write_frames(tmp_path, 6)
     state = {"n": 0}

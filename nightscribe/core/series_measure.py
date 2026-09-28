@@ -102,6 +102,7 @@ class SeriesPoint:
     index: int = 0
     path: str = ""
     mjd: float = None               # mid exposure (T6)
+    jd_start: float = None          # start of the group's first exposure (MJD)
     hjd: float = None
     filter: str = None
     exptime: float = None
@@ -564,8 +565,18 @@ def _relative_point(pt, group, cfg):
 def _build_point(group, cfg):
     # Collapse one group of measured frames into a single honest point.
     first = group[0]
+    # exptime is the group's total integration (None when no frame
+    # carries one): the ExoClock start is mjd_mid minus half of it
+    exps = [f.get("exptime") for f in group]
+    tot_exp = sum(e or 0.0 for e in exps) if any(
+        e is not None for e in exps) else None
     pt = SeriesPoint(path=first["path"], filter=first.get("filter"),
-                     exptime=first.get("exptime"))
+                     exptime=tot_exp)
+    # ExoClock wants the start of the first exposure of the group, not
+    # the mid time minus half the sum (cadence gaps would bias it)
+    starts = [f["mjd"] - (f.get("exptime") or 0.0) / 2.0 / 86400.0
+              for f in group if f.get("mjd") is not None]
+    pt.jd_start = min(starts) if starts else None
     pt.members = [f["path"] for f in group]
     fluxes, errs = [], []
     for f in group:

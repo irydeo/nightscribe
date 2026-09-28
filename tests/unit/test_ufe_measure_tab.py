@@ -1303,3 +1303,34 @@ def test_auto_aperture_checkbox_hands_the_radii_to_the_engine(
 
 # ---------------- P2 #22: nothing drops without a word ----------------
 
+def test_series_panel_names_the_frames_that_never_made_it(dlg, qapp, tmp_path):
+    # Regression (P2 #22): frames without DATE-OBS and frames the engine
+    # could not read were discarded in silence. The panel must name them.
+    tab = dlg.tab_measure
+    good = _write_plate(tmp_path / "ok0.fits", dlg.state.data)
+    nodate = _write_plate(tmp_path / "nodate0.fits", dlg.state.data,
+                          instrument=False)
+    broken = tmp_path / "broken0.fits"
+    broken.write_text("this is not a FITS file")
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": [good, nodate, broken]})
+    rows_seen = []
+    dlg.set_points_hook(lambda rows, cfg: (rows_seen.append(rows), 21)[1])
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    panel = tab.lbl_result.toPlainText()
+    assert "1 frame(s) had no DATE-OBS" in panel
+    assert "1 frame(s) could not be read" in panel
+    assert "broken0.fits" in panel
+    # the technical English of the engine is said in plain language
+    assert "truncated" in panel
+    assert "Truncated FITS header block" not in panel
+    # and the undated frame really stayed off the persisted run
+    assert rows_seen and all(r["mjd"] is not None for r in rows_seen[0])
+    assert len(rows_seen[0]) == 1
+
+
+# ---------------- P2 #23b: the ExoClock write is guarded ----------------
+

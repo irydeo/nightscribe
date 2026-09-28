@@ -944,7 +944,45 @@ class UfeMeasureTab(QWidget):
                 "Cadence too short for the transit ingress"))
         for m in guard["messages"] + qc["messages"]:
             lines.append("⚠ " + m.get(self._lang, m.get("en", "")))
+        # P2 #22: the frames that never reached the curve are named, never
+        # dropped in silence (undated points and unreadable files)
+        nodate = [p for p in points if p.mjd is None]
+        if nodate:
+            n_frames = sum(len(p.members or [p.path]) for p in nodate)
+            lines.append("⚠ " + self.tr(
+                "{0} frame(s) had no DATE-OBS and were not timed: they "
+                "are not on the curve").format(n_frames))
+        errors = result.errors or {}
+        if errors:
+            lines.append("⚠ " + self.tr(
+                "{0} frame(s) could not be read: they are not on the "
+                "curve").format(len(errors)))
+            for path, err in sorted(errors.items())[:5]:
+                lines.append("· " + self.tr(
+                    "Frame {0} could not be read: {1}").format(
+                        Path(path).name, self._plain_engine_error(err)))
         self.lbl_result.setText("\n".join(lines))
+
+    def _plain_engine_error(self, err):
+        # The engine reports its read failures in technical English (core
+        # has no tr()): the panel says them in the user's language. The
+        # mapping is deliberately small and anything unknown rides through
+        # as the engine wrote it.
+        # @args: err - the engine's error string
+        # @return: the plain message for the panel
+        low = str(err or "").lower()
+        if "empty" in low:
+            return self.tr("the file is empty")
+        if "truncat" in low:
+            return self.tr("the file is truncated (was it still being "
+                           "written?)")
+        if "no image hdu" in low:
+            return self.tr("the file has no image")
+        if "bitpix" in low:
+            return self.tr("the pixel format is not supported")
+        if "cannot read" in low:
+            return self.tr("the file could not be read")
+        return str(err)
 
     def _on_series_failed(self, message):
         self._series_button_running(False)

@@ -42,6 +42,10 @@ GATE_RPRS_PCT = 0.05        # Rp/Rs within 5 %
 GATE_SIGMA_PCT = 0.20       # parameter sigma within 20 % of the reference
 GATE_DEPTH_PCT = 0.10       # depth within 10 % of the reference (D32)
 
+# A fitted parameter this close to its bound (relative to the bound width)
+# is PINNED there: the number reported is the bound, not a measurement.
+_AT_BOUND_EPS = 1e-9
+
 # Integration resolution for the occultation integral (the model matches
 # batman to ~1e-9 with these).
 _GL_ERROR = 0.0
@@ -197,6 +201,15 @@ def _bounds(cfg):
     return np.asarray(lo), np.asarray(hi)
 
 
+def _at_bound(value, lo, hi):
+    # @args: value - a fitted parameter, lo/hi - the bounds it lived in
+    # @return: True when the fit pinned the value on a bound (the LM
+    #          clipped it there, so the number is the bound, not a
+    #          measurement, and the caller must warn instead of quoting it)
+    tol = _AT_BOUND_EPS * max(float(hi) - float(lo), abs(float(value)), 1.0)
+    return bool(value <= lo + tol or value >= hi - tol)
+
+
 def _residual(p, t, mags, cfg):
     return _full_model(t, p, cfg) - mags
 
@@ -273,8 +286,9 @@ def fit_transit(times, mags, errs, cfg):
     # @args: times - BJD (or any consistent time), mags - differential or
     #        calibrated magnitudes, errs - per-point sigma (may be None),
     #        cfg - TransitFitConfig
-    # @return: dict with tmid, rprs, a_rs (+ sigma), detrend coefficients,
-    #          oot_scatter, chi2_red, duration_d, ok, method
+    # @return: dict with tmid, rprs, a_rs (+ sigma), at_bound (rprs pinned
+    #          to a bound: the bound, not a measurement), detrend
+    #          coefficients, oot_scatter, chi2_red, duration_d, ok, method
     t = np.asarray(times, dtype=np.float64)
     y = np.asarray(mags, dtype=np.float64)
     good = np.isfinite(t) & np.isfinite(y)
@@ -295,6 +309,10 @@ def fit_transit(times, mags, errs, cfg):
     p, r, cov, ok = _lm_fit(res_fn, p0, lo, hi)
     # out-of-transit scatter: in-transit = within the fitted duration
     tmid, rprs, a_rs = p[0], p[1], p[2]
+    # honesty: an rprs the LM pinned to a bound is the bound itself, not a
+    # measurement; the result says so and the report warns instead of
+    # quoting a fake depth
+    rprs_at_bound = _at_bound(rprs, lo[1], hi[1])
     dur = _duration_days(cfg, rprs, a_rs)
     oot = np.abs(t - tmid) > dur
     # For weighted residuals, r is already (model-y)/sigma
@@ -317,6 +335,7 @@ def fit_transit(times, mags, errs, cfg):
         "method": "lm",
         "tmid": float(tmid), "tmid_err": float(sig[0]),
         "rprs": float(rprs), "rprs_err": float(sig[1]),
+        "at_bound": bool(rprs_at_bound),
         "a_rs": float(a_rs), "a_rs_err": float(sig[2]),
         "detrend_a1": float(p[-3]), "detrend_a2": float(p[-2]),
         "baseline": float(p[-1]),

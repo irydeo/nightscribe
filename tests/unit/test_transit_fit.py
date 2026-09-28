@@ -76,6 +76,7 @@ def test_fit_recovers_a_synthetic_transit():
     assert fit["rprs"] == pytest.approx(true["rprs"], abs=0.005)
     assert fit["depth_mag"] == pytest.approx(truth.max(), rel=0.05)
     assert fit["chi2_red"] < 5.0
+    assert fit["at_bound"] is False        # a real measurement, not a bound
 
 
 def test_fit_with_a_joint_airmass_detrend():
@@ -98,6 +99,24 @@ def test_fit_with_a_joint_airmass_detrend():
     fit = tf.fit_transit(t, mags, None, cfg)
     assert fit["ok"]
     assert fit["rprs"] == pytest.approx(true["rprs"], abs=0.006)
+
+
+def test_fit_reports_rprs_pinned_to_a_bound():
+    # P3: a dip far deeper than the prior's bound cannot be measured; the
+    # LM clips rprs onto the bound and the result says so, instead of
+    # handing the bound over as if it were a measurement
+    cfg = tf.TransitFitConfig(
+        period_d=2.1500082, inc_deg=88.98, u1=0.4, u2=0.3,
+        tmid_prior=2458107.71406, tmid_sigma=0.01,
+        rprs_prior=0.05, a_rs_prior=5.344, detrend_policy="off")
+    t = np.linspace(cfg.tmid_prior - 0.18, cfg.tmid_prior + 0.18, 120)
+    z = tf.separation(t, cfg.tmid_prior, cfg.a_rs_prior, cfg.period_d,
+                      cfg.inc_deg)
+    truth = -2.5 * np.log10(tf.transit_flux_ratio(z, 0.30, cfg.u1, cfg.u2))
+    fit = tf.fit_transit(t, truth + 12.5, None, cfg)
+    upper = 1.25 * cfg.rprs_prior           # the bound the fit ran into
+    assert fit["rprs"] == pytest.approx(upper, rel=1e-9)
+    assert fit["at_bound"] is True
 
 
 def test_gate_report_flags_and_never_relaxes():

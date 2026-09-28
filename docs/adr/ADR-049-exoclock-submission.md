@@ -1,6 +1,16 @@
 # ADR-049: ExoClock submission from the app (manual upload, no credentials)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-27
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-27 · **rev. 2026-09-28**
+(revisión series-photometry: el arranque agrupado es el arranque real de la
+primera toma del grupo, `min(mjd_i − exp_i/2)`, no la media de medios menos la
+integración total; la referencia de flujo es la **media de flujo fuera de
+tránsito** (la mediana de magnitudes sesga la línea base cuando el tránsito
+copan los puntos) y los Comments dicen de dónde cuelga; el info se llama
+`ExoClock_info.txt` / the grouped start is the true start of the group's first
+frame, `min(mjd_i − exp_i/2)`, not the mean of mid-times minus half the total
+integration; the flux reference is the **mean out-of-transit flux** (a median
+of magnitudes biases the baseline when in-transit points dominate) and the
+Comments say where it hangs from; the info file is `ExoClock_info.txt`)
 
 ## Español
 

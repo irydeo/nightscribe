@@ -342,6 +342,16 @@ medida; cuando compares el `T_mid` de un tránsito con una efeméride
 publicada en HJD(TT) o BJD_TT, suma tú el desplazamiento (en 2026,
 +0,00080 d).
 
+**Aviso (2026-09-28)**: la revisión en profundidad del track de series
+encontró dos errores en las versiones hasta esa fecha. Las
+transformaciones de color Gaia a Johnson-Cousins se evaluaban con el
+orden de coeficientes al revés (toda magnitud derivada de los colores de
+una secuencia salía sesgada por color), y el signo del HJD estaba
+invertido (un error estacional de hasta ±16,6 min en los tiempos de los
+informes EFF). Las secuencias, magnitudes calibradas e informes
+AAVSO/ExoClock generados antes de esa fecha deben regenerarse desde los
+frames.
+
 ---
 
 ## 5. Exportar las medidas

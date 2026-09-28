@@ -343,6 +343,14 @@ sits far below the measurement's own error; when you compare a transit
 `T_mid` against an ephemeris published in HJD(TT) or BJD_TT, add the
 offset yourself (in 2026, +0.00080 d).
 
+**Notice (2026-09-28)**: the deep review of the series track found two
+bugs in versions up to that date. The Gaia to Johnson-Cousins colour
+transformations were evaluated in the wrong coefficient order (any
+magnitude derived from a sequence's colours was colour-biased), and the
+HJD sign was inverted (a seasonal error of up to ±16.6 min in the times
+of the EFF reports). Sequences, calibrated magnitudes and AAVSO/ExoClock
+files generated before this date should be regenerated from the frames.
+
 ---
 
 ## 5. Exporting the measurements

@@ -1,6 +1,15 @@
 # ADR-048: Photometric series measured frame by frame (T1–T8)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-27
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-27 · **rev. 2026-09-28**
+(revisión en profundidad del track: el error del punto cero nunca baja del
+suelo que marcan la dispersión y los errores de catálogo de las comps; los
+pesos del detrend son 1/σ (antes quedaban 1/σ⁴ efectivos); el FWHM se mide
+por toma y mediana por grupo; el warp marca `align_edge`/`align_failed` y un
+run cancelado persiste `incomplete` de verdad / deep review of the track: the
+zero-point error never beats the floor set by the comps' scatter and
+catalogue errors; the detrend weights are 1/σ (they used to come out 1/σ⁴
+effective); the FWHM is measured per frame, median per group; the warp flags
+`align_edge`/`align_failed` and a cancelled run truly persists `incomplete`)
 
 ## Español
 

@@ -645,25 +645,41 @@ def _fill_neighbour_zp(points, cfg):
     # global fixed value. Catalog mode only.
     if cfg.zp_mode != "catalog":
         return
-    good = [(i, p.zp) for i, p in enumerate(points)
+    good = [(i, p) for i, p in enumerate(points)
             if p.zp is not None and "few_comps" not in p.flags]
     for i, p in enumerate(points):
+        # Skip if already has zp or not flagged as few_comps
         if p.zp is not None or "few_comps" not in p.flags:
             continue
         if not good:
             _add_flag(p, "no_zp")
             continue
-        prev = [(j, z) for j, z in good if j < i]
-        nxt = [(j, z) for j, z in good if j > i]
+        # Find neighbouring good points using mjd for interpolation
+        prev = [(j, pts) for j, pts in good if j < i]
+        nxt = [(j, pts) for j, pts in good if j > i]
         if prev and nxt:
-            j0, z0 = prev[-1]
-            j1, z1 = nxt[0]
-            z = z0 + (z1 - z0) * (i - j0) / float(j1 - j0)
+            j0, pt0 = prev[-1]
+            j1, pt1 = nxt[0]
+            mjd0, mjd1 = pt0.mjd, pt1.mjd
+            mjd_i = points[i].mjd
+            # Linear interpolation in time
+            if mjd1 != mjd0:
+                frac = (mjd_i - mjd0) / float(mjd1 - mjd0)
+            else:
+                frac = 0.5
+            z = pt0.zp + (pt1.zp - pt0.zp) * frac
+            # Error propagation: use larger of neighbour errors
+            err = max(getattr(pt0, "zp_err", 0.0), getattr(pt1, "zp_err", 0.0))
         elif prev:
-            z = prev[-1][1]
+            pt0 = prev[-1][1]
+            z = pt0.zp
+            err = getattr(pt0, "zp_err", 0.0)
         else:
-            z = nxt[0][1]
+            pt1 = nxt[0][1]
+            z = pt1.zp
+            err = getattr(pt1, "zp_err", 0.0)
         p.zp = z
+        p.zp_err = err
         p.n_comps = max(p.n_comps, 1)
         p.mag = p.inst + z if p.inst is not None else None
         _add_flag(p, "neighbour_zp")

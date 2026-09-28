@@ -169,8 +169,10 @@ class BlinkWorker(QThread):
 
 
 class UfeSolveWorker(QThread):
-    # Blind-solves the UFE's current plate with Astrometry.net in the
-    # background (ADR-044: astrometric solving is a common UFE feature).
+    # Blind-solves a plate in the background (ADR-044: astrometric solving
+    # is a common UFE feature; the dialog and the EXOTIC handoff share it).
+    # The solution comes back as cards; the caller merges them in memory
+    # and persists them into the FITS (ADR-051 rev), never the solver.
     finished = Signal(dict)         # solved WCS cards, or {} on failure
     progress = Signal(str)          # stage text for the solve button
 
@@ -179,12 +181,10 @@ class UfeSolveWorker(QThread):
         self._path = path
 
     def run(self):
-        from ..config import config
         from ..core import solve as solve_mod
         try:
             cards = solve_mod.solve(
-                self._path, progress=self.progress.emit,
-                update=bool(config.get("astap_update")))
+                self._path, progress=self.progress.emit)
         except Exception as err:    # never crash the GUI on solve problems
             logger.exception("ufe solve worker failed: %s", err)
             cards = None

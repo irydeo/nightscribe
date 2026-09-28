@@ -132,6 +132,8 @@ def test_tab_is_real_and_enabled(dlg):
 
 
 def test_generate_needs_a_wcs(dlg, tmp_path):
+    # ADR-051 rev: no WCS is no longer a dead end: the plate is solved
+    # automatically and the field follows; nothing else starts yet.
     from test_fits_annotate import _make_fits
     dlg.state.load(_make_fits(tmp_path / "plain.fits"))
     dlg.tab_compare._on_generate()
@@ -621,13 +623,15 @@ def test_repropose_is_covered_by_the_busy_dialog(dlg, monkeypatch):
 
 
 def test_build_sequence_needs_a_wcs(dlg, tmp_path):
+    # ADR-051 rev: the automatic solve is queued and the auto-proposal
+    # stands (it runs when the solution lands); no field worker yet.
     from test_fits_annotate import _make_fits
     dlg.state.load(_make_fits(tmp_path / "plain.fits"))
     tab = dlg.tab_compare
     tab.btn_auto.click()
     assert "WCS" in tab.lbl_status.text()
     assert tab._worker is None
-    assert tab._auto_propose is False
+    assert tab._auto_propose is True
 
 
 def test_manual_tweak_starts_closed(dlg, qapp):

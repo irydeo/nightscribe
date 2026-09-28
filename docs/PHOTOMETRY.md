@@ -319,8 +319,8 @@ With the stacked images of several nights registered in the project,
 the quick-look button runs the whole chain:
 
 1. It loads each stack and locates the SN through its WCS (without a
-   WCS the verdict is `no_wcs`: solve the astrometry first; the FITS
-   editor has the "Solve astrometry…" button for that).
+   WCS the verdict is `no_wcs`; solve it and store the solution with the
+   FITS editor, which also solves by itself with the configured solver).
 2. It builds the ensemble (section 3.1).
 3. It measures the SN in every frame: one point per night with
    `{HJD, Δmag, error}`, where the error is the ensemble's scatter in

@@ -23,7 +23,7 @@ The data comes from `core/followup.list_points`; the template from
 (`viz/lightcurve_view.py`) share the same data model so they can never drift.
 """
 
-from PySide6.QtCore import QPointF, Qt
+from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import (QBrush, QColor, QPen, QFont, QPolygonF)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout,
                                 QGraphicsEllipseItem, QGraphicsLineItem,
@@ -99,6 +99,8 @@ class LightCurveChart(ChartView):
     # inverted magnitude axis, per-filter series, error bars and an
     # optional template overlay. Hover shows date/mag/filter/source.
 
+    enlarge_requested = Signal()   # a double-click asks for a big view
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._points = []
@@ -112,6 +114,15 @@ class LightCurveChart(ChartView):
         self._tpl_visible = True   # template overlay: ON by default
         self._link = True          # series linking lines: ON by default
         self.set_hover_probe(self._probe)
+
+    def mouseDoubleClickEvent(self, event):
+        # A double-click asks the host for a big view (the base has no
+        # fit-on-double-click, so nothing else is lost).
+        if event.button() == Qt.LeftButton:
+            self.enlarge_requested.emit()
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
 
     def filter_label(self, filt):
         # @args: filt - filter name (None/"Clear"/"None" = the generic band)

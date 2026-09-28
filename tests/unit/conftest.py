@@ -27,6 +27,33 @@ import requests
 
 
 @pytest.fixture(autouse=True)
+def _fake_solve_worker(monkeypatch):
+    # ADR-051 rev: any action that needs a WCS now starts a solve worker
+    # by itself. In unit tests the solver is stubbed: no subprocess, no
+    # network, and no thread finishing during the NEXT test (the real one
+    # would fire a QMessageBox and abort an offscreen run). A test that
+    # cares about solving patches it on top.
+    from PySide6.QtCore import QObject, Signal
+    import nightscribe.gui.workers as workers
+
+    class _FakeSolveWorker(QObject):
+        finished = Signal(dict)
+        progress = Signal(str)
+
+        def __init__(self, path):
+            super().__init__()
+            self._path = path
+
+        def start(self):
+            pass
+
+        def isRunning(self):
+            return False
+
+    monkeypatch.setattr(workers, "UfeSolveWorker", _FakeSolveWorker)
+
+
+@pytest.fixture(autouse=True)
 def _chart_style_defaults(monkeypatch):
     # The GUI reads the chart-annotation settings (ADR-046) live from the
     # config singleton, which loads the DEVELOPER'S real config file: a
@@ -40,6 +67,10 @@ def _chart_style_defaults(monkeypatch):
                 "measurer_name", "telescope_desc", "camera_model",
                 "ufe_bar_icons"):
         monkeypatch.setitem(config._data, key, DEFAULTS[key])
+    # ADR-051 rev: solving persists the WCS into the FITS by default. In
+    # unit tests the "plates" are repo fixtures, so keep the write off; a
+    # test that wants it turns it on with a tmp copy.
+    monkeypatch.setitem(config._data, "solve_save", False)
 
 
 @pytest.fixture(autouse=True)

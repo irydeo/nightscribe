@@ -316,8 +316,8 @@ Con las imágenes apiladas de varias noches registradas en el proyecto,
 el botón de análisis rápido ejecuta toda la cadena:
 
 1. Carga cada apilado y localiza la SN por su WCS (sin WCS, el veredicto
-   es `no_wcs`: resuelve la astrometría primero; el Editor FITS tiene el
-   botón «Resolver astrometría…» para eso).
+   es `no_wcs`; resuélvela y guarda la solución con el Editor FITS, que
+   además resuelve solo con el solver configurado).
 2. Construye el ensemble (sección 3.1).
 3. Mide la SN en cada frame: un punto por noche con
    `{HJD, Δmag, error}`, donde el error es la dispersión del ensemble en

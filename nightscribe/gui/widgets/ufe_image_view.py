@@ -144,6 +144,8 @@ class UfeImageView(ChartView):
         self._pix_item = None       # QGraphicsPixmapItem, None when empty
         self._hint = None           # empty-state text item
         self._need_initial_fit = False
+        self._user_zoomed = False   # True once the observer zooms by hand
+                                    # (a window maximize then keeps it)
         self._annotation_items = []  # read-only ANNOTATE layer (survives
                                      # clear_overlays, rebuilt per plate)
         self._annotation_labels = []  # [(label item, ann dict)]
@@ -265,6 +267,7 @@ class UfeImageView(ChartView):
         # clamp panning at the plate edge when zoomed deep into a corner.
         # After fitting, relax the bounds with a 25 % margin all around.
         super().fit_to_scene(pad)
+        self._user_zoomed = False
         if self._state.has_image:
             w, h = self._state.plate_shape
             self.setSceneRect(QRectF(-0.25 * w, -0.25 * h,
@@ -280,6 +283,7 @@ class UfeImageView(ChartView):
         self.resetTransform()
         self.scale(factor, factor)
         self.centerOn(centre)
+        self._user_zoomed = True
         self.zoom_changed.emit(self.current_factor())
 
     def _zoom_by(self, factor):
@@ -288,6 +292,7 @@ class UfeImageView(ChartView):
         super()._zoom_by(factor)
         new = self.transform().m11()
         if new != old:
+            self._user_zoomed = True
             self.zoom_changed.emit(new)
 
     def mouseDoubleClickEvent(self, event):

@@ -48,7 +48,10 @@ Ficha del proyecto : Captura : Análisis (visita) : Publicación
 En la ventana de la visita están sus ficheros (tomas FITS) y la acción
 **«Medir la secuencia…»**, que abre el editor en la primera toma con el bloque
 de serie armado. No hay diálogo de carpeta suelta: sin visita no hay serie, ni
-Undo, ni análisis, ni agregación.
+Undo, ni análisis, ni agregación. El bloque **Serie fotométrica** vive en un
+panel a la izquierda de la imagen (visible solo con la visita armada) y la curva
+se ve en grande con **doble clic**. Si la primera toma no tiene WCS, se resuelve
+sola con el solver configurado antes de empezar.
 
 Para llegar con ficheros desde un listado, usa **«Añadir ficheros a la
 visita»** (selección múltiple) en la propia ventana de la visita.
@@ -182,10 +185,10 @@ secuencia de comparación y el entorno EXOTIC preparado.
    ≤ 3.10** → **«Preparar entorno»** → **«Probar»** (debe responder
    `EXOTIC 4.3.x`). Guarda.
 2. **Visita**: abre la visita del tránsito y adjunta las tomas («Attach
-   files…»). Si la primera toma trae WCS, la app calcula sola los píxeles del
-   objetivo y de las comparaciones; si no (una sesión sin resolver), te pedirá a
-   mano el **píxel del objetivo** (`X,Y`) y los de las **comparaciones**
-   (`X,Y; X,Y; …`, hasta 10).
+   files…»). La app necesita la astrometría de la primera toma: si falta, la
+   resuelve sola con el solver configurado (ASTAP local o nova, ADR-051) y
+   **guarda la WCS en el propio FITS**, así queda resuelta para cualquier
+   programa. Ya no se piden píxeles a mano.
 3. **Secuencia**: confirma las comparaciones del proyecto (en el editor).
 4. **Reducir**: Análisis → **«Reducir y ajustar con EXOTIC…»** y sigue el log.
    Puede tardar; no cierres la app (puedes cancelar).

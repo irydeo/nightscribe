@@ -46,7 +46,10 @@ Project sheet : Capture : Analysis (visit) : Publication
 The visit window holds its files (FITS frames) and the **"Measure the
 sequence..."** action, which opens the editor on the first frame with the series
 block armed. There is no loose-folder dialog: no visit means no series, no
-Undo, no analysis, no aggregation.
+Undo, no analysis, no aggregation. The **Photometric series** block lives in a
+panel at the left of the image (visible only with the visit armed) and the curve
+opens large on a **double-click**. If the first frame has no WCS, it is solved by
+itself with the configured solver before starting.
 
 To get files there from a listing, use **"Attach files to the visit"**
 (multi-select) in the visit window itself.
@@ -179,10 +182,10 @@ sequence and the EXOTIC environment prepared.
    <= 3.10** → **"Prepare environment"** → **"Test"** (it should report
    `EXOTIC 4.3.x`). Save.
 2. **Visit**: open the transit visit and attach the frames ("Attach files...").
-   If the first frame carries a WCS, the app computes the target and comparison
-   pixels by itself; if not (an unsolved session), it will ask you by hand for
-   the **target pixel** (`X,Y`) and the **comparisons** (`X,Y; X,Y; ...`, up to
-   10).
+   The app needs the first frame's astrometry: if it is missing, it solves it
+   with the configured solver (local ASTAP or nova, ADR-051) and **stores the
+   WCS in the FITS itself**, so the frame stays solved for any program. Pixel
+   coordinates are never asked for by hand.
 3. **Sequence**: confirm the project's comparisons (in the editor).
 4. **Reduce**: Analysis → **"Reduce and fit with EXOTIC..."** and follow the log.
    It can take a while; do not close the app (you can cancel).

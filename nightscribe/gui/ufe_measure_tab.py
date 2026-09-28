@@ -207,8 +207,12 @@ class UfeMeasureTab(QWidget):
         self._live_run_ids = []      # the live session's batches: one
                                      # undoable run (ADR-050, P2 #19)
         self.chart_series = LightCurveChart()
+        self.chart_series.setToolTip(
+            self.tr("Double-click: view the curve large"))
+        self.chart_series.enlarge_requested.connect(self._on_series_enlarge)
         drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
                 self.chart_series)
+        self._series_payload = []    # last drawn points, for the big view
         self._series_worker = None
         self._series_run_id = None
         self._series_result = None
@@ -405,13 +409,38 @@ class UfeMeasureTab(QWidget):
 
     # -------------------------------------------------------- measuring
 
+    def _explain_no_wcs_measure(self):
+        # The automatic solve did not land: the click cannot be measured.
+        self.lbl_status.setText(self.tr(
+            "The plate has no WCS and it could not be solved: the "
+            "comparison stars cannot be located."))
+
+    def _explain_no_wcs_subtract(self):
+        # The automatic solve did not land: no aligned reference, so the
+        # checkbox goes back down with the reason on the status line.
+        self.lbl_status.setText(self.tr(
+            "The plate has no WCS and it could not be solved: no aligned "
+            "reference."))
+        self.chk_subtract.blockSignals(True)
+        self.chk_subtract.setChecked(False)
+        self.chk_subtract.blockSignals(False)
+
     def _on_scene_clicked(self, scene_pt):
         if not self._active or not self._state.has_image:
             return
         if self._state.wcs is None:
+            # ADR-051: the plate is solved automatically and the click
+            # lands; never a dead end asking for a manual solve
             self.lbl_status.setText(self.tr(
-                "The plate has no WCS: the comparison stars cannot be "
-                "located. Solve it with «Solve astrometry…»."))
+                "The plate has no WCS: solving it to locate the "
+                "comparison stars…"))
+            dlg = self.window()
+            req = getattr(dlg, "request_wcs", None)
+            if callable(req):
+                req(lambda: self._on_scene_clicked(scene_pt),
+                    on_fail=self._explain_no_wcs_measure)
+                return
+            self._explain_no_wcs_measure()
             return
         entries = self._sequence()
         if not entries:
@@ -829,6 +858,22 @@ class UfeMeasureTab(QWidget):
                 "No comparison sequence yet: build one above with "
                 "«Build the sequence…»."))
             return
+        if self._state.wcs is None:
+            # ADR-051: solve the reference plate and start the series
+            self.lbl_status.setText(self.tr(
+                "The plate has no WCS: solving it to place the series…"))
+            dlg = self.window()
+            req = getattr(dlg, "request_wcs", None)
+            if callable(req):
+                req(self._on_measure_series,
+                    on_fail=lambda: self.lbl_status.setText(self.tr(
+                        "The plate has no WCS and it could not be solved: "
+                        "the series cannot be placed.")))
+                return
+            self.lbl_status.setText(self.tr(
+                "The plate has no WCS and it could not be solved: the "
+                "series cannot be placed."))
+            return
         target = self._series_target()
         if target is None:
             self.lbl_status.setText(self.tr(
@@ -1036,7 +1081,23 @@ class UfeMeasureTab(QWidget):
                 "flags": list(p.flags)}
                for p in points if p.mjd is not None
                and p.mag_detrended is not None]
-        self.chart_series.set_data(_decimate(raw) + _decimate(det))
+        self._series_payload = _decimate(raw) + _decimate(det)
+        self.chart_series.set_data(self._series_payload)
+
+    def _on_series_enlarge(self):
+        # The series curve, large: a fresh chart (the viewer reparents and
+        # owns its payload, so the panel's own curve stays put) with the
+        # same points, in the shared zoom/pan/export viewer.
+        if not self._series_payload:
+            return
+        from .chart_viewer import open_chart_widget
+        big = LightCurveChart()
+        big.set_data(list(self._series_payload))
+        obj = getattr(self.window(), "object", lambda: None)()
+        name = (obj or {}).get("name") or ""
+        open_chart_widget(self, big,
+                          title=self.tr("Photometric series"),
+                          obj_name=name, chart_key="series")
 
     def _on_series_exoclock(self):
         # D30/D41: prepare the manual ExoClock submission from the last
@@ -1134,6 +1195,7 @@ class UfeMeasureTab(QWidget):
         self._live_run_ids = []
         self._live_points = []
         self.btn_series_undo.setEnabled(False)
+        self._series_payload = []
         self.chart_series.set_data([])
 
     def _on_series_live_toggled(self, checked):
@@ -1498,12 +1560,23 @@ class UfeMeasureTab(QWidget):
         if not checked:
             self._drop_subtraction()
             return
-        if not self._state.has_image or self._state.wcs is None:
-            self.lbl_status.setText(self.tr(
-                "The plate needs a WCS for the aligned reference."))
+        if not self._state.has_image:
             self.chk_subtract.blockSignals(True)
             self.chk_subtract.setChecked(False)
             self.chk_subtract.blockSignals(False)
+            return
+        if self._state.wcs is None:
+            # ADR-051: solve the plate, then the subtraction starts
+            self.lbl_status.setText(self.tr(
+                "The plate has no WCS: solving it for the aligned "
+                "reference…"))
+            dlg = self.window()
+            req = getattr(dlg, "request_wcs", None)
+            if callable(req):
+                req(lambda: self._on_subtract_toggled(True),
+                    on_fail=self._explain_no_wcs_subtract)
+                return
+            self._explain_no_wcs_subtract()
             return
         from .workers import BlinkWorker
         ra, dec = self._state.wcs.center()

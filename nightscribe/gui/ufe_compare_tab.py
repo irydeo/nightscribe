@@ -519,6 +519,14 @@ class UfeCompareTab(QWidget):
         self._auto_propose = True
         self._on_generate()
 
+    def _explain_no_wcs(self):
+        # The automatic solve did not land: the field cannot be built and
+        # the observer reads why (the manual button is still there).
+        self._auto_propose = False
+        self.lbl_status.setText(self.tr(
+            "The plate has no WCS and it could not be solved: use «Solve "
+            "astrometry…» or check the solver in Settings."))
+
     def _on_generate(self):
         # Generate field: VizieR catalog + VSX variables around the plate
         # centre, off the GUI thread.
@@ -526,10 +534,18 @@ class UfeCompareTab(QWidget):
             self._auto_propose = False
             return
         if self._state.wcs is None:
-            self._auto_propose = False
+            # ADR-051: solving is automatic now, never a hand-off
             self.lbl_status.setText(self.tr(
-                "The plate has no WCS: solve it with «Solve astrometry…» "
-                "to build the comparison field."))
+                "The plate has no WCS: solving it to build the comparison "
+                "field…"))
+            dlg = self.window()
+            req = getattr(dlg, "request_wcs", None)
+            if callable(req):
+                req(lambda: self._on_generate(),
+                    on_fail=self._explain_no_wcs)
+                return
+            self._auto_propose = False
+            self._explain_no_wcs()
             return
         from .workers import UfeFieldWorker
         ra, dec = self._state.wcs.center()

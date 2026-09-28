@@ -81,7 +81,7 @@ layout revision, 2026-09-24).
 ### Sequence (top half)
 
 Builds the photometric sequence on your plate (a WCS is needed; if it
-is missing, "Solve astrometry..." gets you one):
+is missing, the configured solver gets you one, ASTAP or nova):
 
 * **Target** and **Target mag** pre-fill what the project knows; the
   approximate magnitude guides the proposal.
@@ -111,7 +111,7 @@ is missing, "Solve astrometry..." gets you one):
 Turns one click into a catalog-calibrated magnitude (single-plate
 differential aperture photometry):
 
-* It needs the plate with a WCS (if missing, "Solve astrometry...") and
+* It needs the plate with a WCS (if missing, it solves it by itself) and
   a sequence in the top half (if there is none, a "Go to the sequence"
   button takes you there).
 * **Click** on the star or the SN: sub-pixel centroid, aperture and sky
@@ -156,9 +156,9 @@ carries ANNOTATE cards, written by NightScribe or AstroImageJ, they are
 drawn on load with their plate-pixel sizes and labels readable at any
 zoom), the **north arrow and scale bar** (the "N" and "Scale" buttons
 in the top bar, with a WCS) and **Solve astrometry...** (blind-solves
-with Astrometry.net, your API key from Settings required; the solution
-applies in memory for the session and the file on disk is never
-modified).
+with the configured solver, ASTAP or Astrometry.net; the solution lands
+in memory and is stored into the FITS itself, atomically, so the plate
+stays solved for any other program).
 
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).

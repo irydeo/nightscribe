@@ -41,7 +41,9 @@ DEFAULTS = {
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
     "solver": "auto",       # auto | astap | astrometry (ADR-051)
     "astap_path": "",       # local ASTAP binary; empty = look on PATH
-    "astap_update": False,  # let a local solve rewrite the FITS header
+    # ADR-051 rev: a solved plate is saved solved (the WCS cards go into
+    # the FITS header, atomically). On by default; off keeps it in memory.
+    "solve_save": True,
     # EXOTIC orchestration (series plan option A): the external Python <=3.10
     # used to run EXOTIC and the venv it lives in. Empty = autodetect.
     "exotic_python_path": "",

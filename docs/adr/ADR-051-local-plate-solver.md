@@ -1,6 +1,6 @@
-# ADR-051: Local plate solver with ASTAP (dispatcher, in-memory WCS)
+# ADR-051: Local plate solver with ASTAP (dispatcher, persisted WCS)
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-09-27
+**Estado / Status**: Accepted · revisado / revised 2026-09-28 · **Fecha / Date**: 2026-09-27
 
 ## Español
 
@@ -62,6 +62,29 @@ instalación de ASTAP queda documentada en la guía de usuario (dónde descargar
 programa y **una** base de estrellas); los tests usan un binario simulado, y la
 resolución real queda como verificación funcional opcional.
 
+**Revisión (2026-09-28): la WCS resuelta se guarda**. El WCS solo en memoria dejaba
+la placa «sin resolver» para NINA, PixInsight o un futuro reanálisis, y el flujo de
+tránsitos llegaba a pedir las coordenadas del objetivo a mano, sin sentido. Ahora:
+
+- **Resolver es automático**: cualquier acción que necesite un WCS (campo de
+  comparación, medir, referencia alineada, inicio de una serie, reducción EXOTIC)
+  lanza el solver configurado (`solver = auto|astap|astrometry`) y continúa cuando
+  llega la solución; ya no se pide pulsar «Resolver astrometría…» ni, mucho menos,
+  escribir píxeles.
+- **Persistencia por defecto**: `core/wcs_store.py` escribe las tarjetas WCS en la
+  cabecera del propio FITS, de forma **atómica** (temporal hermano + `os.replace`;
+  los píxeles y las extensiones se copian verbatim). La casilla de Ajustes
+  `solve_save` (por defecto activada) lo desactiva; si el fichero es de solo lectura,
+  se avisa y la solución se mantiene en memoria. Se sigue pasando `-wcs` a ASTAP
+  (nunca `-update`): el mismo escritor sirve para ASTAP y nova.
+- **Un solo camino**: `UfeDialog.request_wcs` encola la acción; al resolver, el
+  diálogo y el handoff EXOTIC persisten las tarjetas con el mismo módulo.
+
+Esto **sustituye** el rechazo original a «escribir siempre con `-update`»: la
+decisión de no mutar el fichero sin pedirlo se mantiene en espíritu (la escritura
+es explícita en Ajustes y atómica), pero el defecto pasa a ser guardar, porque una
+placa resuelta debe quedar resuelta.
+
 ## English
 
 **Context**: today plate solving goes to `nova.astrometry.net`
@@ -120,3 +143,25 @@ lines of code with no value).
 fallback when ASTAP is not installed; ASTAP installation is documented in the user
 guide (where to download the program and **one** star database); tests use a
 simulated binary, with real solving as an optional functional check.
+
+**Revision (2026-09-28): the solved WCS is stored**. Keeping the WCS in memory left
+the plate "unsolved" for NINA, PixInsight or a later reanalysis, and the transit
+flow even asked for the target's pixel coordinates, which makes no sense. Now:
+
+- **Solving is automatic**: any action that needs a WCS (comparison field, measure,
+  aligned reference, starting a series, the EXOTIC reduction) runs the configured
+  solver (`solver = auto|astap|astrometry`) and continues when the solution lands;
+  no more "press Solve astrometry…" and never a pixel prompt.
+- **Persistence by default**: `core/wcs_store.py` writes the WCS cards into the
+  FITS header itself, **atomically** (a sibling temp file plus `os.replace`; the
+  pixels and extensions are copied verbatim). The `solve_save` Settings checkbox
+  (on by default) turns it off; a read-only file reports a warning and the solution
+  stays in memory. ASTAP is still asked for `-wcs` (never `-update`): the same
+  writer serves both ASTAP and nova.
+- **One path**: `UfeDialog.request_wcs` queues the action; on success the dialog and
+  the EXOTIC handoff persist the cards through the same module.
+
+This **supersedes** the original rejection of "always write with `-update`": the
+decision not to mutate the file unasked stands in spirit (the write is explicit in
+Settings and atomic), but the default is now to save, because a solved plate should
+stay solved.

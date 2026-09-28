@@ -94,9 +94,17 @@ class UfeDialog(QDialog):
         self._points_hook = None
         self._run_undo_hook = None
         self._exoclock_hook = None
+        # actions waiting for an automatic solve (request_wcs): they run
+        # the moment the solution lands, or their on_fail on a failure
+        self._wcs_pending = []
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("NightScribe Image Workbench"))
+        # the workbench is meant to fill a big screen: give the window its
+        # maximize/minimize buttons (a plain QDialog lacks them on Windows)
+        self.setWindowFlags(self.windowFlags()
+                            | Qt.WindowMaximizeButtonHint
+                            | Qt.WindowMinimizeButtonHint)
         self._build_ui()
         self._build_shortcuts()
         self.resize(1440, 960)
@@ -117,6 +125,23 @@ class UfeDialog(QDialog):
         self._apply_bar_style()
         super().showEvent(event)
 
+    def changeEvent(self, event):
+        # Maximizing/restoring must use the whole screen: the image is
+        # refitted once the new geometry lands. Only when the observer
+        # has not zoomed by hand, so an inspection zoom is never lost.
+        super().changeEvent(event)
+        from PySide6.QtCore import QEvent, QTimer
+        if event.type() == QEvent.Type.WindowStateChange \
+                and getattr(self, "state", None) is not None:
+            QTimer.singleShot(0, self._refit_on_state_change)
+
+    def _refit_on_state_change(self):
+        # @return: None. Refits the plate to the (new) viewport unless the
+        # observer owns the current zoom.
+        if self.state.has_image and not getattr(self.view, "_user_zoomed",
+                                                False):
+            self.view.fit_to_scene()
+
     # ------------------------------------------------------------- layout
 
     def _build_ui(self):
@@ -134,9 +159,9 @@ class UfeDialog(QDialog):
         # drop_in also hides the placeholder: QLayout.replaceWidget does
         # not, and a visible one eats the top bar's clicks)
         drop_in(self.layout(), self._ui.ph_histogram, self.histogram)
-        self.splitter.setStretchFactor(0, 0)     # series: compact
-        self.splitter.setStretchFactor(1, 1)     # the image dominates
-        self.splitter.setStretchFactor(2, 0)
+        self.splitter.setStretchFactor(0, 1)     # series: grows a bit
+        self.splitter.setStretchFactor(1, 4)     # the image dominates
+        self.splitter.setStretchFactor(2, 2)     # the tab column grows too
         self.tabs = self._ui.tabs
         self.lbl_object = self._ui.lbl_object
         from . import theme
@@ -154,7 +179,6 @@ class UfeDialog(QDialog):
         if grp is not None:
             series_lay.addWidget(grp)
         self.series_pane.setMinimumWidth(300)
-        self.series_pane.setMaximumWidth(420)
         self.splitter.replaceWidget(0, self.series_pane)
         self.series_pane.hide()
 
@@ -868,12 +892,34 @@ class UfeDialog(QDialog):
     # --------------------------------------------------------- solving
 
     def _on_solve(self):
-        # Solve astrometry…: blind-solve the current plate on a worker
-        # through the ADR-051 dispatcher (auto: local ASTAP first, nova
-        # as the fallback; subprocess and network off the GUI thread).
-        # The solution lands in memory only; the file on disk stays
-        # untouched unless the astap_update opt-in is set.
+        # Solve astrometry…: blind-solve the current plate (the button).
         if not self.state.has_image:
+            return
+        self._start_solve()
+
+    def request_wcs(self, after, on_fail=None):
+        # An action needs a WCS before it can run: with a solved plate it
+        # runs now; otherwise the same blind solve as the button starts
+        # and the action is queued for the solution (never a dead end
+        # telling the observer to solve by hand). ADR-051.
+        # @args: after - callable() run on a usable WCS,
+        #        on_fail - optional callable() when the solve fails
+        if self.state.wcs is not None:
+            after()
+            return
+        self._wcs_pending.append((after, on_fail))
+        if self._solve_worker is not None and self._solve_worker.isRunning():
+            return
+        self._start_solve()
+
+    def _start_solve(self):
+        # The one solve path (the button and request_wcs share it) through
+        # the ADR-051 dispatcher (auto: local ASTAP first, nova as the
+        # fallback; subprocess and network off the GUI thread).
+        if self._solve_worker is not None and self._solve_worker.isRunning():
+            return                      # one solve at a time
+        if not self.state.has_image:
+            self._fail_wcs_pending()
             return
         if self._nova_key_needed():
             QMessageBox.information(
@@ -882,6 +928,7 @@ class UfeDialog(QDialog):
                         "solve plates automatically, or solve them with "
                         "ASTAP, NINA, Ekos or PixInsight and save them "
                         "again."))
+            self._fail_wcs_pending()
             return
         from .workers import UfeSolveWorker
         self._solve_worker = UfeSolveWorker(Path(self.state.path))
@@ -890,6 +937,26 @@ class UfeDialog(QDialog):
         self.btn_solve.setEnabled(False)
         self._on_solve_stage("login")
         self._solve_worker.start()
+
+    def _drain_wcs_pending(self):
+        # Runs the queued actions now that the plate has a WCS.
+        pending, self._wcs_pending = self._wcs_pending, []
+        for after, _fail in pending:
+            try:
+                after()
+            except Exception as err:
+                logger.warning("WCS continuation failed: %s", err)
+
+    def _fail_wcs_pending(self):
+        # The solve did not happen (no plate, no key, solver failure):
+        # every queued action gets its own way out.
+        pending, self._wcs_pending = self._wcs_pending, []
+        for _after, fail in pending:
+            if callable(fail):
+                try:
+                    fail()
+                except Exception as err:
+                    logger.warning("WCS failure continuation failed: %s", err)
 
     def _nova_key_needed(self):
         # The API-key guard only fires when the solve would actually go
@@ -937,11 +1004,29 @@ class UfeDialog(QDialog):
                         "in Settings (ASTAP path, Astrometry.net key) or "
                         "solve the plate with NINA, Ekos or PixInsight "
                         "and save it again.").format(self._solver_names()))
+            self._fail_wcs_pending()
             return
         if self.state.set_wcs_cards(cards):
             logger.info("UFE: astrometry solved for %s", self.state.path)
+            self._persist_solution(cards)
+            self._drain_wcs_pending()
         else:
             QMessageBox.warning(
                 self, self.tr("NightScribe Image Workbench"),
                 self.tr("The Astrometry.net solution is not usable "
                         "(non-TAN WCS)."))
+            self._fail_wcs_pending()
+
+    def _persist_solution(self, cards):
+        # ADR-051 rev: a solved plate is stored solved, so it is solved
+        # for every program and next time needs no solve. The write is
+        # atomic; a read-only file only costs a warning, the WCS stays in
+        # memory for the session.
+        from ..core import wcs_store
+        _done, err = wcs_store.persist_solution(self.state.path, cards)
+        if err:
+            QMessageBox.warning(
+                self, self.tr("NightScribe Image Workbench"),
+                self.tr("The solved WCS could not be written into the file "
+                        "({0}); it stays in memory for this session.")
+                .format(err))

@@ -480,3 +480,109 @@ def test_move_marker_is_gone_and_the_object_mark_covers_it(dlg):
     dlg.set_object(None)
     assert not dlg.btn_mark.isEnabled()
     assert dlg.view._object_mark_items == []
+
+
+# ------------------------------------------- auto-solve + persistence (ADR-051 rev.)
+
+def test_request_wcs_runs_now_when_solved(dlg):
+    from test_fits_annotate import _make_fits
+    import tempfile
+    from pathlib import Path as _P
+    # MONO already carries a WCS: the action runs at once, no worker
+    dlg.state.load(MONO)
+    seen = []
+    dlg.request_wcs(lambda: seen.append(True))
+    assert seen == [True] and dlg._wcs_pending == []
+
+
+def test_request_wcs_queues_and_drains_on_solve(dlg, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from test_fits_annotate import _make_fits
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))
+    ran = []
+    dlg.request_wcs(lambda: ran.append("after"),
+                    on_fail=lambda: ran.append("fail"))
+    assert ran == [] and len(dlg._wcs_pending) == 1
+    dlg._on_solved(_FAKE_CARDS)
+    assert ran == ["after"]
+    assert dlg._wcs_pending == []
+
+
+def test_request_wcs_failure_calls_on_fail(dlg, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from test_fits_annotate import _make_fits
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))
+    ran = []
+    dlg.request_wcs(lambda: ran.append("after"),
+                    on_fail=lambda: ran.append("fail"))
+    dlg._on_solved({})                       # the solve failed
+    assert ran == ["fail"]
+    assert dlg._wcs_pending == []
+
+
+def test_solved_cards_are_persisted_into_the_fits(dlg, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe import config
+    from nightscribe.core import fits_io
+    from test_fits_annotate import _make_fits
+    monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    monkeypatch.setitem(config.config._data, "solve_save", True)
+    plate = _make_fits(tmp_path / "plain.fits")
+    dlg.state.load(plate)
+    dlg._on_solved(_FAKE_CARDS)
+    header = fits_io.read_header(plate)
+    assert header["CRVAL1"] == pytest.approx(300.0)   # saved solved
+    assert header["CTYPE1"] == "RA---TAN"
+
+
+def test_persist_failure_keeps_the_wcs_in_memory(dlg, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.core import wcs_store
+    from test_fits_annotate import _make_fits
+    warns = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: warns.append(a))
+    monkeypatch.setattr(wcs_store, "persist_solution",
+                        lambda *a, **k: (False, "read-only file"))
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))
+    dlg._on_solved(_FAKE_CARDS)
+    assert dlg.state.wcs is not None          # the session keeps working
+    assert warns                              # and the observer is told
+
+
+# ---------------------------------------------- maximize / bars (ADR-051 rev.)
+
+def test_workbench_can_be_maximized(dlg):
+    from PySide6.QtCore import Qt
+    flags = dlg.windowFlags()
+    assert flags & Qt.WindowMaximizeButtonHint
+    assert flags & Qt.WindowMinimizeButtonHint
+
+
+def test_bars_grow_with_the_window(dlg):
+    from PySide6.QtWidgets import QApplication
+    dlg.resize(1700, 950)
+    QApplication.processEvents()
+    wide = dlg.tabs.width()
+    dlg.resize(1000, 700)
+    QApplication.processEvents()
+    assert wide > dlg.tabs.width()          # the tab column takes its share
+
+
+def test_series_pane_is_not_capped(dlg):
+    assert dlg.series_pane.maximumWidth() > 1000
+
+
+def test_refit_on_state_change_respects_a_manual_zoom(dlg, monkeypatch):
+    dlg.state.load(MONO)                    # has_image
+    calls = []
+    monkeypatch.setattr(dlg.view, "fit_to_scene",
+                        lambda *a, **k: calls.append(1))
+    dlg.view._user_zoomed = True
+    dlg._refit_on_state_change()
+    assert calls == []                      # an inspection zoom is kept
+    dlg.view._user_zoomed = False
+    dlg._refit_on_state_change()
+    assert calls == [1]

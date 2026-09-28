@@ -113,6 +113,8 @@ nightscribe/
                       #   ExoClock_info.txt con Comments relleno (plan fase 8)
     solve.py          # dispatcher de resolución de placa: auto|astap|astrometry
                       #   (auto prueba ASTAP local y cae a nova; ADR-051)
+    wcs_store.py      # persiste la WCS resuelta en la cabecera del FITS, atómica
+                      #   (solve_save, por defecto sí; ADR-051 rev.)
     live.py           # modo en vivo (ADR-050): sondeo de carpeta, estabilidad
                       #   de tamaño, lotes por N tomas/T s por el mismo motor
                       #   (plan fase 10; opt-in, apagado por defecto)

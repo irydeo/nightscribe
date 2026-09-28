@@ -946,8 +946,8 @@ class MainWindow(QMainWindow):
         _si = dlg.cmb_solver.findData(config.get("solver", "auto"))
         dlg.cmb_solver.setCurrentIndex(_si if _si >= 0 else 0)
         dlg.edt_astap_path.setText(config.get("astap_path", ""))
-        dlg.chk_astap_update.setChecked(
-            bool(config.get("astap_update", False)))
+        dlg.chk_solve_save.setChecked(
+            bool(config.get("solve_save", True)))
         dlg.btn_astap_browse.clicked.connect(
             lambda: self._pick_astap(dlg))
         dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
@@ -1083,7 +1083,7 @@ class MainWindow(QMainWindow):
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
         config.set("solver", dlg.cmb_solver.currentData() or "auto")
         config.set("astap_path", dlg.edt_astap_path.text().strip())
-        config.set("astap_update", dlg.chk_astap_update.isChecked())
+        config.set("solve_save", dlg.chk_solve_save.isChecked())
         config.set("exotic_python_path",
                    dlg.edt_exotic_python.text().strip())
         config.set("exotic_install_dir",
@@ -5391,48 +5391,6 @@ class MainWindow(QMainWindow):
             self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
                     "environment"), 10000)
 
-    def _ask_exotic_pixels(self):
-        # Manual target/comparison pixels for a set without WCS (or without
-        # a project sequence): two small prompts, plain parsing.
-        # @return: {"target": (x, y), "comps": [(x, y), ...]} or None
-        from PySide6.QtWidgets import QInputDialog, QMessageBox
-        tgt, ok = QInputDialog.getText(
-            self, self.tr("EXOTIC"),
-            self.tr("Target pixel, as X,Y (no WCS on the first frame):"))
-        if not ok:
-            return None
-
-        def _xy(text):
-            parts = [p for p in text.replace(";", " ").replace(",",
-                                                              " ").split()]
-            if len(parts) < 2:
-                return None
-            try:
-                return (float(parts[0]), float(parts[1]))
-            except ValueError:
-                return None
-
-        target = _xy(tgt)
-        if target is None:
-            QMessageBox.warning(self, self.tr("EXOTIC"),
-                                self.tr("Enter the target as X,Y."))
-            return None
-        comps_txt, ok2 = QInputDialog.getText(
-            self, self.tr("EXOTIC"), self.tr(
-                "Comparison pixels as X,Y; X,Y; … (up to 10):"))
-        if not ok2:
-            return None
-        comps = []
-        for chunk in comps_txt.split(";"):
-            xy = _xy(chunk)
-            if xy is not None:
-                comps.append(xy)
-        if not comps:
-            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "Enter at least one comparison as X,Y."))
-            return None
-        return {"target": target, "comps": comps}
-
     def _transit_reduce_exotic(self):
         # Gather the planet data (worker), then run the orchestration.
         p = self._current_project
@@ -5525,39 +5483,108 @@ class MainWindow(QMainWindow):
         except Exception:
             header = {}
         wcs = wcs_mod.Wcs.from_header(header)
+        if wcs is None:
+            # ADR-051: the first frame is solved with the configured
+            # solver and the reduction continues with that WCS; never ask
+            # the observer for pixel coordinates
+            self._exotic_solve_first(pid, e, python, frame_paths,
+                                     session_id, header)
+            return
+        self._exotic_launch_final(pid, e, python, frame_paths, session_id,
+                                  wcs)
+
+    def _exotic_solve_first(self, pid, e, python, frame_paths, session_id,
+                            header):
+        # No WCS on the first frame: blind-solve it off the GUI thread
+        # (the ADR-051 dispatcher honours the configured solver), then
+        # continue the reduction with the solved WCS. The solution is
+        # persisted into the FITS (ADR-051 rev).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import blink, wcs as wcs_mod
+        from .workers import UfeSolveWorker
+        self.statusBar().showMessage(
+            self.tr("The first frame has no WCS: solving it…"), 0)
+        worker = UfeSolveWorker(Path(frame_paths[0]))
+        worker.progress.connect(
+            lambda s: self.statusBar().showMessage(
+                self.tr("Solving: {0}…").format(s), 0))
+
+        def done(cards):
+            self.statusBar().clearMessage()
+            if not cards:
+                QMessageBox.warning(
+                    self, self.tr("EXOTIC"),
+                    self.tr("The first frame has no WCS and it could not be "
+                            "solved. Check the solver in Settings: ASTAP "
+                            "path or Astrometry.net key."))
+                return
+            self._persist_solution(frame_paths[0], cards)
+            wcs = wcs_mod.Wcs.from_header(
+                blink.merge_solved_wcs(header, cards))
+            if wcs is None:
+                QMessageBox.warning(
+                    self, self.tr("EXOTIC"),
+                    self.tr("The solution of the first frame is not usable "
+                            "(non-TAN WCS)."))
+                return
+            self._exotic_launch_final(pid, e, python, frame_paths,
+                                      session_id, wcs)
+        worker.finished.connect(done)
+        self._keep(worker)
+        worker.start()
+
+    def _persist_solution(self, path, cards):
+        # ADR-051 rev: store the solved WCS in the FITS so the frame is
+        # solved everywhere; a write problem is reported, never fatal.
+        # @args: path - the solved FITS, cards - solved WCS cards
+        from ..core import wcs_store
+        _done, err = wcs_store.persist_solution(path, cards)
+        if err:
+            self.statusBar().showMessage(
+                self.tr("The solved WCS could not be written into the file "
+                        "({0}); it stays in memory for this session.")
+                .format(err), 8000)
+        return err == ""
+
+    def _exotic_launch_final(self, pid, e, python, frame_paths, session_id,
+                             wcs):
+        # The reference WCS is in hand: target and comparison pixels come
+        # from it (never hand-entered); without a sequence the observer is
+        # sent to build it in the editor.
+        # @args: wcs - the first frame's usable WCS
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic
+        p = project.get(db, pid)
+        if not p:
+            return
         obj = self._ufe_object_from_project(p)
         ctx = p.get("context") or {}
         entries = (ctx.get("sequence") or {}).get("entries") or []
         tx = ty = None
-        if wcs is not None and (obj or {}).get("ra") is not None:
+        if (obj or {}).get("ra") is not None:
             try:
                 tx, ty = wcs.sky_to_pixel(obj["ra"], obj["dec"])
             except Exception:
                 tx = ty = None
         comps = []
-        if wcs is not None:
-            for ent in entries:
-                star = ent.get("star") or {}
-                if star.get("ra") is None:
-                    continue
-                try:
-                    comps.append(wcs.sky_to_pixel(star["ra"], star["dec"]))
-                except Exception:
-                    continue
-        if tx is None or not comps:
-            # no WCS (or no sequence): ask for the pixels by hand, so an
-            # unsolved set (a MicroObservatory run, a live session) still
-            # can be reduced
-            manual = self._ask_exotic_pixels()
-            if manual is None:
-                return
-            if tx is None:
-                tx, ty = manual["target"]
-            if not comps:
-                comps = manual["comps"]
-        if tx is None or not comps:
+        for ent in entries:
+            star = ent.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                comps.append(wcs.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+        if tx is None:
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "The target or the comparison pixels are missing."))
+                "The target position is unknown: attach the object to the "
+                "project or set its coordinates."))
+            return
+        if not comps:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No comparison stars: build the sequence in the editor "
+                "(Photometry, «Build the sequence…») before reducing with "
+                "EXOTIC."))
             return
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})

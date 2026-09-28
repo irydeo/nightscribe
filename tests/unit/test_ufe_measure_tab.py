@@ -1473,3 +1473,47 @@ def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
     assert tab.grp_series.isVisible()
     dlg.set_series_hook(None)
     assert not dlg.series_pane.isVisible()
+
+
+# ------------------------------------------------ series curve, large (ADR-051 rev.)
+
+def test_series_double_click_opens_a_big_view(dlg, monkeypatch):
+    import nightscribe.gui.chart_viewer as cv
+    seen = {}
+    monkeypatch.setattr(cv, "open_chart_widget",
+                        lambda parent, widget, **k: seen.update(widget=widget))
+    tab = dlg.tab_measure
+    tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
+                            "filter": "V", "source": "measure",
+                            "flags": []}]
+    tab.chart_series.enlarge_requested.emit()
+    big = seen.get("widget")
+    assert big is not None and big._points
+    assert big is not tab.chart_series       # the panel's curve stays put
+
+
+def test_series_enlarge_without_data_does_nothing(dlg, monkeypatch):
+    import nightscribe.gui.chart_viewer as cv
+    seen = []
+    monkeypatch.setattr(cv, "open_chart_widget",
+                        lambda *a, **k: seen.append(1))
+    dlg.tab_measure._series_payload = []
+    dlg.tab_measure.chart_series.enlarge_requested.emit()
+    assert seen == []
+
+
+def test_lightcurve_double_click_asks_for_the_big_view(dlg):
+    from PySide6.QtCore import Qt
+    seen = []
+    dlg.tab_measure.chart_series.enlarge_requested.connect(
+        lambda: seen.append(1))
+
+    class _Ev:
+        def button(self):
+            return Qt.LeftButton
+
+        def accept(self):
+            pass
+
+    dlg.tab_measure.chart_series.mouseDoubleClickEvent(_Ev())
+    assert seen == [1]

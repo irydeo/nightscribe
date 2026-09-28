@@ -83,7 +83,7 @@ distribución, 2026-09-24).
 ### Secuencia (mitad superior)
 
 Construye la secuencia fotométrica sobre tu placa (necesita WCS; si
-falta, «Resolver astrometría…» lo consigue):
+falta, la resuelve sola con el solver configurado, ASTAP o nova):
 
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
   sabe; la magnitud aproximada sirve de guía a la propuesta.
@@ -114,7 +114,7 @@ falta, «Resolver astrometría…» lo consigue):
 Convierte un clic en una magnitud calibrada de catálogo (fotometría de
 apertura diferencial de una placa):
 
-* Necesita la placa con WCS (si falta, «Resolver astrometría…») y una
+* Necesita la placa con WCS (si falta, la resuelve sola) y una
   secuencia en la mitad superior (si no la hay, un botón «Ir a la
   secuencia» te lleva).
 * **Clic** sobre la estrella o la SN: centroide sub-píxel, apertura y
@@ -159,9 +159,10 @@ trae tarjetas ANNOTATE, escritas por NightScribe o AstroImageJ, se
 dibujan al cargar con su tamaño en píxeles de placa y rótulos legibles
 en cualquier zoom), la **flecha de norte y barra de escala** (botones
 «N» y «Escala» de la barra superior, con WCS) y **Resolver
-astrometría…** (la resuelve a ciegas con Astrometry.net, requiere tu
-clave de API en Ajustes; la solución se aplica en memoria a la sesión y
-el archivo en disco nunca se modifica).
+astrometría…** (la resuelve a ciegas con el solver configurado, ASTAP o
+Astrometry.net; la solución se aplica en memoria y se guarda en el
+propio FITS de forma atómica, así la placa queda resuelta para cualquier
+programa).
 
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).

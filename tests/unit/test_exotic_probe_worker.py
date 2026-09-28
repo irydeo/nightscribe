@@ -224,3 +224,66 @@ def test_exotic_reduce_probes_off_thread(window, qapp, monkeypatch):
                             "python": "/py/python3.10"})
     assert any("FITS" in w for w in warns)
     assert getattr(window, "_exotic_worker", None) is None
+
+
+_FAKE_WCS = {"CRVAL1": 120.0, "CRVAL2": -20.0, "CRPIX1": 64.0,
+             "CRPIX2": 64.0, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+             "CD1_1": -0.0003, "CD1_2": 0.0, "CD2_1": 0.0, "CD2_2": 0.0003}
+
+
+def _fake_solve_factory(made, cards, qapp):
+    from PySide6.QtCore import QObject, Signal
+
+    class _FakeSolve(QObject):
+        finished = Signal(dict)
+        progress = Signal(str)
+
+        def __init__(self, path):
+            super().__init__()
+            self._path = path
+
+        def start(self):
+            made.append(self)
+            self.finished.emit(cards)
+
+    return _FakeSolve
+
+
+def test_exotic_solves_the_first_frame_not_asks_pixels(window, qapp,
+                                                       monkeypatch, tmp_path):
+    # ADR-051 rev: the first frame without a WCS is solved with the
+    # configured solver and the reduction continues; the pixel prompt is
+    # gone for good.
+    from nightscribe.gui import workers
+    from nightscribe.core import fits_io
+    from test_fits_annotate import _make_fits
+    assert not hasattr(window, "_ask_exotic_pixels")
+    plate = _make_fits(tmp_path / "first.fits")     # no WCS
+    header, _ = fits_io.read_fits(plate)
+    made, reached = [], []
+    monkeypatch.setattr(workers, "UfeSolveWorker",
+                        _fake_solve_factory(made, _FAKE_WCS, qapp))
+    monkeypatch.setattr(window, "_persist_solution", lambda *a, **k: True)
+    monkeypatch.setattr(window, "_exotic_launch_final",
+                        lambda *a, **k: reached.append(a))
+    window._exotic_solve_first(1, {"data": {}}, "/py", [str(plate)], 7,
+                               header)
+    assert made and str(made[0]._path) == str(plate)
+    assert reached and reached[0][5] is not None      # a usable WCS
+
+
+def test_exotic_solve_failure_says_so(window, qapp, monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.gui import workers
+    from test_fits_annotate import _make_fits
+    warns = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: warns.append(a))
+    plate = _make_fits(tmp_path / "first.fits")
+    made, reached = [], []
+    monkeypatch.setattr(workers, "UfeSolveWorker",
+                        _fake_solve_factory(made, {}, qapp))
+    monkeypatch.setattr(window, "_exotic_launch_final",
+                        lambda *a, **k: reached.append(a))
+    window._exotic_solve_first(1, {"data": {}}, "/py", [str(plate)], 7, {})
+    assert warns and not reached

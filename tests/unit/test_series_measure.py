@@ -661,3 +661,41 @@ def test_series_alignment_recovers_a_drifting_field(tmp_path):
     res_off = sm.measure_series(paths, _config(wcs, comps))
     mags_off = [p.mag for p in res_off.points if p.mag is not None]
     assert len(mags_off) < len(moves) or float(np.std(mags_off)) > 0.05
+
+
+def test_warp_edge_fill_is_flagged(tmp_path):
+    # Review #16: the warp zero-fills the off-footprint strip; with a
+    # near-zero sky that inflates the flux. A 40 px shift pushes the
+    # invalid strip over the comp at x=45 (r_ap box reaches x~39), so
+    # the point must carry "align_edge" (flags mark, never delete).
+    from nightscribe.core import register
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    ref = _plate(noise=1.0, seed=70)
+    paths = [_write_plate(tmp_path / "e0.fits", ref,
+                          date_obs="2026-09-20T23:30:00")]
+    shifted = register.apply_transform(ref, 0.0, 40.0, 0.0)
+    paths.append(_write_plate(tmp_path / "e1.fits", shifted,
+                              date_obs="2026-09-20T23:31:00"))
+    res = sm.measure_series(paths, _config(wcs, comps, align="warp"))
+    assert len(res.points) == 2
+    assert "align_edge" in res.points[1].flags
+    assert "align_edge" not in res.points[0].flags
+
+
+def test_low_quality_registration_is_flagged(tmp_path):
+    # Review #16: a frame with no common structure (pure noise) must not
+    # be silently trusted: under the null hypothesis the correlation
+    # peak is ~sqrt(2 ln N) ~ 5-6, far below QUALITY_MIN.
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    ref = _plate(noise=1.0, seed=70)
+    paths = [_write_plate(tmp_path / "n0.fits", ref,
+                          date_obs="2026-09-20T23:30:00")]
+    noise = np.random.default_rng(5).normal(100, 1.0, (H, W))
+    paths.append(_write_plate(tmp_path / "n1.fits", noise,
+                              date_obs="2026-09-20T23:31:00"))
+    res = sm.measure_series(paths, _config(wcs, comps, align="warp"))
+    assert len(res.points) == 2
+    assert "align_failed" in res.points[1].flags
+    assert "align_failed" not in res.points[0].flags

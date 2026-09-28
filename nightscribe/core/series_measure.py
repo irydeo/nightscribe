@@ -372,6 +372,7 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         radii = apertures[night].get("radii")
     if radii is None:
         radii = cfg.radii
+    rap = (radii if radii else cfg.radii or (photometry.R_AP,))[0]
     pcfg = photometry.PlateConfig(
         target_xy=target_ov if target_ov is not None else cfg.target_xy,
         entries=list(cfg.comp_set),
@@ -391,8 +392,30 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
     res = photometry.measure_plate(data, pcfg)
     mjd_mid, exptime = _mid_exposure(meta)
     return {"path": str(path), "data": data, "meta": meta, "res": res,
-            "mjd": mjd_mid, "exptime": exptime,
+            "mjd": mjd_mid, "exptime": exptime, "r_ap": rap,
             "filter": meta.get("filter")}
+
+
+def _aperture_off_footprint(mask, res, r_ap):
+    # True when the target's or any used comp's aperture box touches
+    # warp-filled pixels (flux inflated by the zero fill).
+    # @args: mask - register.warp_mask output, res - the frame's
+    #        PlateResult, r_ap - aperture radius in pixels
+    # @return: bool
+    h, w = mask.shape
+    m = int(math.ceil(r_ap))
+    spots = []
+    if res.col is not None and res.row is not None:
+        spots.append((res.col, res.row))
+    for _e, r in res.used:
+        if r.get("x") is not None and r.get("y") is not None:
+            spots.append((r["x"], r["y"]))
+    for x, y in spots:
+        x0, x1 = max(0, int(x) - m), min(w, int(x) + m + 1)
+        y0, y1 = max(0, int(y) - m), min(h, int(y) + m + 1)
+        if x0 >= x1 or y0 >= y1 or not mask[y0:y1, x0:x1].all():
+            return True
+    return False
 
 
 def _run_one(path, cfg, apertures=None):
@@ -497,6 +520,11 @@ def _flag_gates(pt, group, cfg):
     # verdict arrives precomputed per frame: the images never reach this
     # point, they are released in the measure loop.
     for f in group:
+        # the alignment verdicts stand even when the plate was refused
+        if f.get("align_failed"):
+            _add_flag(pt, "align_failed")
+        if f.get("align_edge"):
+            _add_flag(pt, "align_edge")
         if not f["res"].ok:
             reason = (f["res"].reason or {})
             en = reason.get("en", "")
@@ -942,6 +970,7 @@ def measure_series(paths, cfg, progress=None, cancel=None):
         align_info = None
         wcs_ov = None
         target_ov = None
+        warped_mask = None
         if cfg.align != "off":
             # the first readable frame is the reference grid (target_xy
             # and the comps live in ITS pixels)
@@ -954,6 +983,12 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                     data = register.apply_transform(
                         data, align_info["angle"], align_info["dx"],
                         align_info["dy"])
+                    # the warp fills the off-footprint pixels with
+                    # zeros; with a near-zero sky that inflates the
+                    # flux, so apertures touching them are flagged
+                    warped_mask = register.warp_mask(
+                        data.shape, align_info["angle"],
+                        align_info["dx"], align_info["dy"])
                 elif cfg.align == "coords":
                     # measure on the native grid at the mapped
                     # coordinates: the PSF is never resampled
@@ -965,6 +1000,12 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                                wcs_ov=wcs_ov, target_ov=target_ov)
         if align_info is not None:
             frame["align"] = align_info
+            if align_info.get("quality", 0.0) < register.QUALITY_MIN:
+                frame["align_failed"] = True
+        if warped_mask is not None:
+            frame["align_edge"] = _aperture_off_footprint(
+                warped_mask, frame["res"], frame["r_ap"])
+            warped_mask = None
             if cfg.align == "coords" and frame["res"].col is not None:
                 frame["res"].col, frame["res"].row = \
                     register.src_to_ref_point(align_info,

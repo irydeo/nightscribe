@@ -33,6 +33,13 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+# Below this peak quality the registration is not to be trusted: under
+# the null hypothesis (no common structure) the phase-correlation peak
+# reaches ~sqrt(2 ln N) ~ 5-6 sigma over a frame, while a real
+# registration sits in the tens. The point is flagged "align_failed",
+# never silently trusted.
+QUALITY_MIN = 8.0
+
 
 def _bilinear(data, xs, ys):
     # Bilinear sample of `data` at float coordinates; out-of-frame -> 0.
@@ -227,11 +234,32 @@ def apply_transform(data, angle, dx, dy):
     return _bilinear(data, sx, sy)
 
 
+def warp_mask(shape, angle, dx, dy):
+    # Validity mask of a warp: True where the warped pixel reads a real
+    # source pixel, False where the warp fills with zeros (the aperture
+    # flux there is inflated when the sky is near zero).
+    # @args: shape - (h, w) of the warped frame, angle/dx/dy - the
+    #        apply_transform parameters
+    # @return: boolean numpy array of `shape`
+    h, w = shape
+    cx, cy = w / 2.0, h / 2.0
+    ys, xs = np.mgrid[0:h, 0:w].astype(np.float64)
+    px = xs - cx
+    py = ys - cy
+    ca, sa = math.cos(-angle), math.sin(-angle)
+    sx = ca * px - sa * py + cx + dx
+    sy = sa * px + ca * py + cy + dy
+    return (sx >= 0) & (sx <= w - 1) & (sy >= 0) & (sy <= h - 1)
+
+
 def register_frame(src, ref):
     # Register one frame onto the reference and report the transform.
-    # @return: (warped frame, transform dict)
+    # @return: (warped frame, transform dict) with validity mask and
+    #          "failed" when the peak quality is below QUALITY_MIN
     tr = estimate_transform(ref, src)
     warped = apply_transform(src, tr["angle"], tr["dx"], tr["dy"])
+    tr["mask"] = warp_mask(src.shape, tr["angle"], tr["dx"], tr["dy"])
+    tr["failed"] = tr["quality"] < QUALITY_MIN
     return warped, tr
 
 

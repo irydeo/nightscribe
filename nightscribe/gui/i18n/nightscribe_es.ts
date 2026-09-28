@@ -2902,16 +2902,39 @@ Sesión recomendada: {s:.1f} h en continuo (2 periodos — verlo repetir y plega
         <translation type="vanished">No se encontraron estrellas de comparación: construye la secuencia en el editor primero.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5484" />
+        <location filename="../main_window.py" line="5588" />
+        <location filename="../main_window.py" line="5600" />
         <source>Running EXOTIC (this can take a while)…</source>
         <translation>Ejecutando EXOTIC (esto puede tardar)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5495" />
-        <source>EXOTIC did not finish:
+        <location filename="../main_window.py" line="5601" />
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5636" />
+        <source>Cancelling EXOTIC…</source>
+        <translation>Cancelando EXOTIC…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5662" />
+        <source>EXOTIC cancelled: nothing was imported.</source>
+        <translation>EXOTIC cancelado: no se importó nada.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5668" />
+        <source>EXOTIC did not finish. The last lines of its log:
+
 {0}</source>
-        <translation>EXOTIC no terminó:
+        <translation>EXOTIC no terminó. Las últimas líneas de su registro:
+
 {0}</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5670" />
+        <source>(the log is empty)</source>
+        <translation>(el registro está vacío)</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="5504" />
@@ -8719,6 +8742,81 @@ tocan.</translation>
         <location filename="../ufe_measure_tab.py" line="1494" />
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="914" />
+        <source>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</source>
+        <translation>Noche {0}: apertura k = {1:.1f} (dispersión de la estrella check {2:.4f} mag)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="919" />
+        <source>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</source>
+        <translation>Noche {0}: apertura k = {1:.1f} (seeing {2:.1f} px, dispersión de la estrella check {3:.4f} mag)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="957" />
+        <source>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</source>
+        <translation>{0} toma(s) sin DATE-OBS y sin hora: no están en la curva</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="962" />
+        <source>{0} frame(s) could not be read: they are not on the curve</source>
+        <translation>{0} toma(s) no se pudieron leer: no están en la curva</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="966" />
+        <source>Frame {0} could not be read: {1}</source>
+        <translation>La toma {0} no se pudo leer: {1}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="979" />
+        <source>the file is empty</source>
+        <translation>el archivo está vacío</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="981" />
+        <source>the file is truncated (was it still being written?)</source>
+        <translation>el archivo está truncado (¿se estaba escribiendo todavía?)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="984" />
+        <source>the file has no image</source>
+        <translation>el archivo no tiene imagen</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="986" />
+        <source>the pixel format is not supported</source>
+        <translation>el formato de píxel no está admitido</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="988" />
+        <source>the file could not be read</source>
+        <translation>el archivo no se pudo leer</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1084" />
+        <source>The ExoClock files could not be written: {0}</source>
+        <translation>Los archivos de ExoClock no se pudieron escribir: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1199" />
+        <source>Live: {0} new frame(s) in the folder</source>
+        <translation>En vivo: {0} toma(s) nuevas en la carpeta</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1201" />
+        <source>Live mode stopped.</source>
+        <translation>Modo en vivo detenido.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1210" />
+        <source>Live batch lost: {0} frame(s) were not measured ({1})</source>
+        <translation>Lote en vivo perdido: {0} toma(s) no se midieron ({1})</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1219" />
+        <source>Live mode failed: {0}</source>
+        <translation>El modo en vivo falló: {0}</translation>
     </message>
 </context>
 <context>

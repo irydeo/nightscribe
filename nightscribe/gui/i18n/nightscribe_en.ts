@@ -2536,16 +2536,39 @@ Recommended session: {s:.1f} h continuous (2 periods — watch it repeat, then f
         <translation type="vanished">No comparison stars found: build the sequence in the editor first.</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5484" />
+        <location filename="../main_window.py" line="5588" />
+        <location filename="../main_window.py" line="5600" />
         <source>Running EXOTIC (this can take a while)…</source>
         <translation>Running EXOTIC (this can take a while)…</translation>
     </message>
     <message>
-        <location filename="../main_window.py" line="5495" />
-        <source>EXOTIC did not finish:
+        <location filename="../main_window.py" line="5601" />
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5636" />
+        <source>Cancelling EXOTIC…</source>
+        <translation>Cancelling EXOTIC…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5662" />
+        <source>EXOTIC cancelled: nothing was imported.</source>
+        <translation>EXOTIC cancelled: nothing was imported.</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5668" />
+        <source>EXOTIC did not finish. The last lines of its log:
+
 {0}</source>
-        <translation>EXOTIC did not finish:
+        <translation>EXOTIC did not finish. The last lines of its log:
+
 {0}</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="5670" />
+        <source>(the log is empty)</source>
+        <translation>(the log is empty)</translation>
     </message>
     <message>
         <location filename="../main_window.py" line="5504" />
@@ -8719,6 +8742,81 @@ not touched.</translation>
         <location filename="../ufe_measure_tab.py" line="1494" />
         <source>Written to {0}</source>
         <translation>Written to {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="914" />
+        <source>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</source>
+        <translation>Night {0}: aperture k = {1:.1f} (check-star scatter {2:.4f} mag)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="919" />
+        <source>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</source>
+        <translation>Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, check-star scatter {3:.4f} mag)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="957" />
+        <source>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</source>
+        <translation>{0} frame(s) had no DATE-OBS and were not timed: they are not on the curve</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="962" />
+        <source>{0} frame(s) could not be read: they are not on the curve</source>
+        <translation>{0} frame(s) could not be read: they are not on the curve</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="966" />
+        <source>Frame {0} could not be read: {1}</source>
+        <translation>Frame {0} could not be read: {1}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="979" />
+        <source>the file is empty</source>
+        <translation>the file is empty</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="981" />
+        <source>the file is truncated (was it still being written?)</source>
+        <translation>the file is truncated (was it still being written?)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="984" />
+        <source>the file has no image</source>
+        <translation>the file has no image</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="986" />
+        <source>the pixel format is not supported</source>
+        <translation>the pixel format is not supported</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="988" />
+        <source>the file could not be read</source>
+        <translation>the file could not be read</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1084" />
+        <source>The ExoClock files could not be written: {0}</source>
+        <translation>The ExoClock files could not be written: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1199" />
+        <source>Live: {0} new frame(s) in the folder</source>
+        <translation>Live: {0} new frame(s) in the folder</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1201" />
+        <source>Live mode stopped.</source>
+        <translation>Live mode stopped.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1210" />
+        <source>Live batch lost: {0} frame(s) were not measured ({1})</source>
+        <translation>Live batch lost: {0} frame(s) were not measured ({1})</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="1219" />
+        <source>Live mode failed: {0}</source>
+        <translation>Live mode failed: {0}</translation>
     </message>
 </context>
 <context>

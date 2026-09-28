@@ -60,13 +60,13 @@ visita»** (selección múltiple) en la propia ventana de la visita.
    en cada toma.
 2. **Mide el objetivo** una vez (un clic) para que la serie sepa dónde medir;
    o abre el editor desde la ficha con coordenadas, que se colocan solas.
-3. Pulsa **«Medir la secuencia»**. Se abre una **corrida** (con su `run_id`),
+3. Pulsa **«Medir la secuencia»**. Se abre una **ejecución** (con su `run_id`),
    se ve el progreso por toma y la curva se dibuja al terminar.
 4. Revisa la **curva** (cruda y, si pediste detrend, también detrendada), los
    **puntos marcados** (rombos) y el **panel de resumen** (puntos, flags,
    coeficientes y avisos de cadencia y multinoche).
-5. Si algo salió mal, **«Deshacer esta corrida»** borra solo los puntos de esa
-   corrida, sin tocar el resto de la visita.
+5. Si algo salió mal, **«Deshacer esta ejecución»** borra solo los puntos de esa
+   ejecución, sin tocar el resto de la visita.
 6. Para enviar un tránsito a ExoClock, pulsa **«ExoClock…»** (ver la sección 10).
 
 ## 5. Mandos y defaults
@@ -104,7 +104,7 @@ valores»**.
 
 ## 7. Multinoche
 
-Cada noche es **una corrida** con su `run_id` y su Undo. La curva del proyecto
+Cada noche es **una ejecución** con su `run_id` y su Undo. La curva del proyecto
 las agrega. El detrend se ajusta **por noche** (coeficientes locales), con
 fallback a solo escala en noches cortas o sin rango de aire. Si mezclas
 filtros, la guardia de banda avisa: no se combinan en una sola curva de
@@ -162,8 +162,34 @@ como **previsualización** rápida.
    Exoplanet Database).
 
 Sin entorno EXOTIC, el botón manual **«Exportar a EXOTIC (inits.json)…»** sigue
-disponible para reducir fuera y volver. La primera corrida de EXOTIC necesita
+disponible para reducir fuera y volver. La primera ejecución de EXOTIC necesita
 red (NASA Archive, datos de limb darkening, astrometry.net).
+
+### Prueba real de punta a punta
+
+Requisitos: un proyecto de tránsito, una visita con las tomas de la noche, una
+secuencia de comparación y el entorno EXOTIC preparado.
+
+1. **Entorno**: Ajustes → EXOTIC (reducción de tránsitos) → indica un **Python
+   ≤ 3.10** → **«Preparar entorno»** → **«Probar»** (debe responder
+   `EXOTIC 4.3.x`). Guarda.
+2. **Visita**: abre la visita del tránsito y adjunta las tomas («Attach
+   files…»). Si la primera toma trae WCS, la app calcula sola los píxeles del
+   objetivo y de las comparaciones; si no (una sesión sin resolver), te pedirá a
+   mano el **píxel del objetivo** (`X,Y`) y los de las **comparaciones**
+   (`X,Y; X,Y; …`, hasta 10).
+3. **Secuencia**: confirma las comparaciones del proyecto (en el editor).
+4. **Reducir**: Análisis → **«Reducir y ajustar con EXOTIC…»** y sigue el log.
+   Puede tardar; no cierres la app (puedes cancelar).
+5. **Resultado**: aviso con **T_mid** y **Rp/Rs**; la curva «exotic» aparece en
+   la gráfica; quedan el `inits.json` y el reporte en el proyecto, y la figura
+   `FinalLightCurve_*.png` en la carpeta de trabajo.
+6. **Verificar**: T_mid a 3σ, Rp/Rs al 5 % y profundidad al 10 % frente a la
+   referencia. Después, **«ExoClock…»** para subir el tránsito.
+
+La **primera ejecución** de EXOTIC necesita red (NASA Archive, datos de limb
+darkening, astrometry.net). Sin entorno EXOTIC, el botón manual **«Exportar a
+EXOTIC (inits.json)…»** sigue disponible.
 
 ## 12. Solución de problemas
 
@@ -189,7 +215,7 @@ red (NASA Archive, datos de limb darkening, astrometry.net).
 - **Detrend**: quitar de la curva una tendencia (masa de aire, etc.); su
   modelo es `a1·exp(a2·X)+a3`.
 - **Ingress**: la entrada del tránsito; resolverlo pide varios puntos.
-- **Run / corrida**: una pulsación de «Medir la secuencia», con su Undo.
+- **Run / ejecución**: una pulsación de «Medir la secuencia», con su Undo.
 
 Enlaces: [PHOTOMETRY.es.md](PHOTOMETRY.es.md) (prácticas),
 [PRECISION.es.md](PRECISION.es.md) (calidad y números),

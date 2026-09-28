@@ -31,9 +31,9 @@ es `docs/PLANS/series-photometry.md` (registro D1–D39, trece fases).
   coeficientes en el panel de resumen, en la columna `notes` del CSV y en la meta de
   la serie. Sin columnas nuevas salvo `mag_raw REAL`, `flags TEXT` y `run_id` en
   `photometry_points` (migración v12), más la tabla `measurement_runs` con la configuración y
-  el estado de la corrida.
+  el estado de la ejecución.
 - **Guardado automático por punto con `run_id` persistido** y acción «Deshacer esta
-  corrida» que revive reinicios; la serie cancelada deja el estado «incompleta»
+  ejecución» que revive reinicios; la serie cancelada deja el estado «incompleta»
   visible (`measurement_runs.status`); presupuesto <0,5 s por frame y UI responsive con 142 frames.
 - **Entrada desde la visita**: el botón «Medir la secuencia» solo existe con visita
   de proyecto (nunca diálogo de carpeta, nunca UFE ad-hoc); para llegar con un
@@ -46,7 +46,7 @@ es `docs/PLANS/series-photometry.md` (registro D1–D39, trece fases).
 - **Multinoche**: detrend local por noche con señal global compartida (reparto
   `glc_fitter` de EXOTIC; fallback a `a1` solo en noches cortas, dicho en el panel);
   set de comps fijo desde la noche de referencia; chequeo de ZP por noche vs.
-  catálogo; guardia de banda; cada noche una corrida con su Undo; la agregación por
+  catálogo; guardia de banda; cada noche una ejecución con su Undo; la agregación por
   objetivo la hace Análisis (D33/D36 del plan, sin reimplementar plegado).
 - **Guardia de cadencia** en la capa de análisis: aviso con las reglas por tipo
   (tránsitos ≥3 puntos por ingress, HADS 12 puntos y tope de cadencia, variables

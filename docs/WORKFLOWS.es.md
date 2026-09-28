@@ -741,7 +741,7 @@ plan): leer la salida de EXOTIC (Mid-Transit Time → O-C, marca observed) —
 v2; monitor de flujo en vivo sobre `core/series.py` (horizonte: variables de
 corto periodo, condición *tremendamente simple*); lanzar EXOTIC como
 subproceso; validación del `MandatoryStartTime` y del `inits.json` contra el
-software real del observatorio (pendiente de una corrida del usuario).
+software real del observatorio (pendiente de una ejecución del usuario).
 
 ### 7terdecies. Carpeta contenedora de proyectos (2026-09-10, ADR-032)
 

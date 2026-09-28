@@ -154,6 +154,33 @@ def ids():
     return [k["id"] for k in KINDS]
 
 
+# The enriched object type (core/enrich.py "type") -> project kind. Used
+# when an object is explored ad-hoc (Tools > Explore) and no planner
+# target carries its kind: the enriched panel already knows the class.
+_ENRICHED_KIND = {
+    "exoplanet": "transit",
+    "transient": "sn",
+    "hads": "hads",
+    "variable": "variable",
+    "small_body": "neo",
+    "comet": "comet",
+    "neo": "neo",
+    "pccp": "pccp",
+    "sn": "sn",
+    "transit": "transit",
+}
+
+
+def project_kind(enriched):
+    # @args: enriched - an enrich result dict ({"type": ...}), a planner
+    #        target, or a plain kind string
+    # @return: the project kind, or None when it cannot be told
+    if isinstance(enriched, str):
+        return enriched if enriched in _ENRICHED_KIND else None
+    t = (enriched or {}).get("type") or (enriched or {}).get("kind")
+    return _ENRICHED_KIND.get(t)
+
+
 def by_id(kind_id):
     # @args: kind_id - e.g. "hads"
     # @return: the kind dict, or None when the id is not in the catalogue

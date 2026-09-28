@@ -162,6 +162,32 @@ Without an EXOTIC environment, the manual **"Export to EXOTIC (inits.json)..."**
 button stays available to reduce outside and come back. EXOTIC's first run needs
 network (NASA Archive, limb-darkening data, astrometry.net).
 
+### Real end-to-end test
+
+Requirements: a transit project, a visit with the night's frames, a comparison
+sequence and the EXOTIC environment prepared.
+
+1. **Environment**: Settings → EXOTIC (transit reduction) → point to a **Python
+   <= 3.10** → **"Prepare environment"** → **"Test"** (it should report
+   `EXOTIC 4.3.x`). Save.
+2. **Visit**: open the transit visit and attach the frames ("Attach files...").
+   If the first frame carries a WCS, the app computes the target and comparison
+   pixels by itself; if not (an unsolved session), it will ask you by hand for
+   the **target pixel** (`X,Y`) and the **comparisons** (`X,Y; X,Y; ...`, up to
+   10).
+3. **Sequence**: confirm the project's comparisons (in the editor).
+4. **Reduce**: Analysis → **"Reduce and fit with EXOTIC..."** and follow the log.
+   It can take a while; do not close the app (you can cancel).
+5. **Result**: a message with **T_mid** and **Rp/Rs**; the "exotic" curve shows
+   in the chart; the `inits.json` and the report stay in the project, and the
+   `FinalLightCurve_*.png` figure in the work folder.
+6. **Verify**: T_mid within 3 sigma, Rp/Rs within 5 % and depth within 10 %
+   against the reference. Then **"ExoClock..."** to submit the transit.
+
+EXOTIC's **first run** needs network (NASA Archive, limb-darkening data,
+astrometry.net). Without an EXOTIC environment, the manual **"Export to EXOTIC
+(inits.json)..."** button stays available.
+
 ## 12. Troubleshooting
 
 - **"No visit with frames"**: open the editor from a visit, not from the loose

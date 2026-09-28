@@ -5250,6 +5250,48 @@ class MainWindow(QMainWindow):
             self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
                     "environment"), 10000)
 
+    def _ask_exotic_pixels(self):
+        # Manual target/comparison pixels for a set without WCS (or without
+        # a project sequence): two small prompts, plain parsing.
+        # @return: {"target": (x, y), "comps": [(x, y), ...]} or None
+        from PySide6.QtWidgets import QInputDialog, QMessageBox
+        tgt, ok = QInputDialog.getText(
+            self, self.tr("EXOTIC"),
+            self.tr("Target pixel, as X,Y (no WCS on the first frame):"))
+        if not ok:
+            return None
+
+        def _xy(text):
+            parts = [p for p in text.replace(";", " ").replace(",",
+                                                              " ").split()]
+            if len(parts) < 2:
+                return None
+            try:
+                return (float(parts[0]), float(parts[1]))
+            except ValueError:
+                return None
+
+        target = _xy(tgt)
+        if target is None:
+            QMessageBox.warning(self, self.tr("EXOTIC"),
+                                self.tr("Enter the target as X,Y."))
+            return None
+        comps_txt, ok2 = QInputDialog.getText(
+            self, self.tr("EXOTIC"), self.tr(
+                "Comparison pixels as X,Y; X,Y; … (up to 10):"))
+        if not ok2:
+            return None
+        comps = []
+        for chunk in comps_txt.split(";"):
+            xy = _xy(chunk)
+            if xy is not None:
+                comps.append(xy)
+        if not comps:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "Enter at least one comparison as X,Y."))
+            return None
+        return {"target": target, "comps": comps}
+
     def _transit_reduce_exotic(self):
         # Gather the planet data (worker), then run the orchestration.
         p = self._current_project
@@ -5304,27 +5346,38 @@ class MainWindow(QMainWindow):
             header = {}
         wcs = wcs_mod.Wcs.from_header(header)
         obj = self._ufe_object_from_project(p)
-        if wcs is None or (obj or {}).get("ra") is None:
-            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "The first frame has no WCS: solve the plate (or open it "
-                "in the editor) so the target pixel is known."))
-            return
-        tx, ty = wcs.sky_to_pixel(obj["ra"], obj["dec"])
         ctx = p.get("context") or {}
         entries = (ctx.get("sequence") or {}).get("entries") or []
-        comps = []
-        for ent in entries:
-            star = ent.get("star") or {}
-            if star.get("ra") is None:
-                continue
+        tx = ty = None
+        if wcs is not None and (obj or {}).get("ra") is not None:
             try:
-                comps.append(wcs.sky_to_pixel(star["ra"], star["dec"]))
+                tx, ty = wcs.sky_to_pixel(obj["ra"], obj["dec"])
             except Exception:
-                continue
-        if not comps:
+                tx = ty = None
+        comps = []
+        if wcs is not None:
+            for ent in entries:
+                star = ent.get("star") or {}
+                if star.get("ra") is None:
+                    continue
+                try:
+                    comps.append(wcs.sky_to_pixel(star["ra"], star["dec"]))
+                except Exception:
+                    continue
+        if tx is None or not comps:
+            # no WCS (or no sequence): ask for the pixels by hand, so an
+            # unsolved set (a MicroObservatory run, a live session) still
+            # can be reduced
+            manual = self._ask_exotic_pixels()
+            if manual is None:
+                return
+            if tx is None:
+                tx, ty = manual["target"]
+            if not comps:
+                comps = manual["comps"]
+        if tx is None or not comps:
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "No comparison stars found: build the sequence in the "
-                "editor first."))
+                "The target or the comparison pixels are missing."))
             return
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
@@ -6610,6 +6663,11 @@ class MainWindow(QMainWindow):
         #          Explore dialog uses this to decide whether to close
         kind = target.get("kind")
         name = target.get("name") or target.get("id")
+        if kind not in project.VALID_KINDS:
+            # an ad-hoc Explore (Tools) has no planner target, so no kind:
+            # infer it from the enriched object type (exoplanet -> transit...)
+            from ..core import kinds as kinds_mod
+            kind = kinds_mod.project_kind(target)
         if kind not in project.VALID_KINDS or not name:
             self.statusBar().showMessage(
                 self.tr("Cannot create a project for this target"), 6000)
@@ -7003,6 +7061,18 @@ class MainWindow(QMainWindow):
             # the planner fallback (if any) plus the explored name
             t = dict(fb or {})
             t["name"] = nm
+            # an ad-hoc Explore has no planner target: borrow the kind and
+            # the coordinates the enriched panel already knows, so the
+            # project layer can create it (exoplanet -> transit, ...)
+            e = getattr(panel, "_e", None) or {}
+            if e.get("type") and not t.get("kind"):
+                t["type"] = e["type"]
+            data = e.get("data") or {}
+            for src, dst in (("ra", "ra_deg"), ("ra_deg", "ra_deg"),
+                             ("dec", "dec_deg"), ("dec_deg", "dec_deg"),
+                             ("mag", "mag"), ("vmag", "mag")):
+                if t.get(dst) is None and data.get(src) is not None:
+                    t[dst] = data[src]
             return t
 
         def _on_create(nm, fb):
@@ -7010,9 +7080,16 @@ class MainWindow(QMainWindow):
             # is the planner target (Tonight) or None for an ad-hoc
             # Tools-menu name. PySide6 passes only the declared args.
             # Only close the dialog when the project was really created
-            # (UX, U0.2): otherwise the status-bar error would be lost.
+            # (UX, U0.2); on failure the reason is shown IN the dialog
+            # (the main status bar is hidden behind this modal).
+            from PySide6.QtWidgets import QMessageBox
             if self._create_project(_target(nm, fb)) is not None:
                 dlg.accept()
+            else:
+                QMessageBox.warning(dlg, self.tr("Create project"),
+                                    self.tr("Could not create the project: "
+                                            "the object kind could not be "
+                                            "determined."))
 
         def _on_continue(nm, fb):
             # the CTA said "resume the active project". When nothing

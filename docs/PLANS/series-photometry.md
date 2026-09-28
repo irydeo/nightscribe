@@ -46,14 +46,14 @@ de implementación).
 
 - **D1 · T1/T2 juntas: punto cero y comps por frame.** Cada frame se mide con su ZP propio y sus
   comps propias (ZP por frame, nunca fijo); cuando las comps útiles de un frame son <3, el
-  fallback es un ZP interpolado de los frames vecinos de la propia corrida (T2); nunca un ZP
+  fallback es un ZP interpolado de los frames vecinos de la propia ejecución (T2); nunca un ZP
   global fijado.
 - **D2 · ADR-015 se reabre.** La vía numpy puro de NightScribe pasa a ser la primera de las dos;
   el handoff EXOTIC se conserva como la segunda (experta). El plan se rige por la sección
   «Validación» del apéndice B de `PRECISION` con umbrales fijos antes de codear (D38).
 - **D3 · Medible y comparable.** NightScribe reporta **T_mid y la profundidad** con errores
   honestos: la curva son puntos con error total (D12), la profundidad de un tránsito conocido
-  dentro del 10 % de la referencia, y **T_mid del ajuste de tránsito** (fase 7). La corrida
+  dentro del 10 % de la referencia, y **T_mid del ajuste de tránsito** (fase 7). La ejecución
   EXOTIC real del usuario sigue siendo la referencia de paridad de la fase 7.
 - **D4 · Sin astropy.** `BJD_TDB` de EXOTIC no puede copiarse; NightScribe usa su propia
   `core/coords.py` / `ephem_minor.py` (schlyter) para BJD_TDB/TDB y HJD (D1).
@@ -61,7 +61,7 @@ de implementación).
   HADS: 12 puntos + tope de cadencia; variable: Nyquist + huecos. Un punto suelto sin serie solo
   avisa en la vista de Análisis (jamás calcula una profundidad por tipo: un punto suelto no es
   por sí un tránsito, D11).
-- **D6 · Undo por corrida, no por visita.** «Deshacer esta corrida» borra los puntos de ese
+- **D6 · Undo por ejecución, no por visita.** «Deshacer esta ejecución» borra los puntos de ese
   `run_id` (D9), sin tocar el resto de la visita.
 - **D7 · Flags de calidad visibles y persistidos.** Cada punto guarda sus flags (T7) y la curva
   los pinta (forma/color distinto); en CSV/EFF van a `notes`/`comments` (D13). **Nunca se borra
@@ -69,7 +69,7 @@ de implementación).
 - **D8 · Se trabaja desde la visita.** El flujo es: visita → ficheros de la visita → «Medir la
   secuencia». Sin visita no hay serie (regla D8 de la casa); desde un listado se llega con
   «Añadir ficheros a la visita» (D36), nunca con diálogo de carpeta suelto.
-- **D9 · `run_id` de corrida.** Cada «Medir» es una corrida con su id; los puntos de la serie
+- **D9 · `run_id` de ejecución.** Cada «Medir» es una ejecución con su id; los puntos de la serie
   llevan ese id (junto a `session_id` de la visita) para Undo, auditoría y multinoche (D36).
 - **D10 · Reuso del motor de placa.** T1 reutiliza el bloque `_measure`/`_calibrate_and_fill`
   de `gui/ufe_measure_tab.py` (y su extracción en `measure_plate` de la fase 1) para cada frame;
@@ -110,12 +110,12 @@ de implementación).
   centro + traslación subpíxel, por Fourier, numpy puro; D44).
 - **D18 · Esquema v12 (migración aditiva en `core/db.py`).** En `photometry_points` (la única
   tabla que almacena magnitudes): `mag_raw REAL`, `flags TEXT` y `run_id INTEGER NULL`; el
-  `session_id` existente **sigue siendo la visita** y no se reusa como corrida (es FK a
-  `project_sessions` y `db.py` activa `PRAGMA foreign_keys = ON`: un id de corrida ahí rompería
+  `session_id` existente **sigue siendo la visita** y no se reusa como ejecución (es FK a
+  `project_sessions` y `db.py` activa `PRAGMA foreign_keys = ON`: un id de ejecución ahí rompería
   la FK y el enlace punto→visita que necesita el multinoche, D36). Tabla nueva
   `measurement_runs(id, session_id, created, cfg_json, status)` con la configuración y el estado
-  de la corrida (`complete`/`incomplete`/`undone`); el Undo borra los puntos del `run_id` y marca
-  la corrida `undone` (auditoría, D9). Las filas legacy se conservan intactas; la vía
+  de la ejecución (`complete`/`incomplete`/`undone`); el Undo borra los puntos del `run_id` y marca
+  la ejecución `undone` (auditoría, D9). Las filas legacy se conservan intactas; la vía
   `add_point` (punto suelto del UFE) mantiene el contrato de hoy: escribe con `flags=NULL`,
   `mag_raw=NULL` y `run_id=NULL`; no se toca ninguna otra tabla.
 - **D19 · Agrupación (grouping, `group_n`).** Agrupa N frames para suavizar cadencias típicas
@@ -164,7 +164,7 @@ de implementación).
   es la tabla de puntos (con flags, errores, coeficientes). El punto suelto se usa si el
   proyecto solo lo pide (D23), pero el flujo es serie → curva → export.
 - **D32 · Umbral de profundidad: 10 % de referencia.** La profundidad del tránsito en la
-  serie debe estar dentro del 10 % del valor de referencia (la corrida EXOTIC de HAT-P-32b de
+  serie debe estar dentro del 10 % del valor de referencia (la ejecución EXOTIC de HAT-P-32b de
   la verificación 2; con datos propios, un tránsito conocido como HD 209458 b, sección 6); si
   no, se avisa en el semáforo (D12) y se deja el diagnóstico al usuario.
 
@@ -181,7 +181,7 @@ de implementación).
   referencia (VSX + ventana de brillo), desviaciones **marcadas** y nunca silenciosas; chequeo de
   ZP por noche vs. catálogo (aviso si una noche se desplaza); **guardia de banda**: si mezclan
   filtros, no se combinan en una sola curva de magnitudes, se pintan por noche con su aviso.
-- **D36 · Multinoche: una corrida por noche, agrega Análisis.** Cada noche es una corrida con su
+- **D36 · Multinoche: una ejecución por noche, agrega Análisis.** Cada noche es una ejecución con su
   `run_id` y su Undo independiente; la agregación por objetivo la hace la vista Análisis (ya
   existe vía `fu["points"]`); **binning solo de visualización** (el `time_bin` de EXOTIC, nunca
   altera datos) para series de decenas de miles de puntos; entrada de listados con acción «Añadir
@@ -325,10 +325,10 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
   `run_id INTEGER NULL` en `photometry_points`, más la tabla nueva `measurement_runs(id,
   session_id, created, cfg_json, status)` (D18); helpers `add_points(db, rows)` en lote y
   `delete_points(db, ids)` en `core/followup.py` (junto a `add_point`, `list_points`,
-  `delete_points_for_file`), más `create_run`/`set_run_status` para la tabla de corridas; la
+  `delete_points_for_file`), más `create_run`/`set_run_status` para la tabla de ejecuciones; la
   migración es idempotente y avisa si el esquema viene de otra versión conocida.
 - **Tests**: `tests/unit/test_db_v12.py`: migración desde v11 y desde esquema limpio, idempotencia,
-  escritura en lote + `delete_points` por `run_id` (el «deshacer» de una corrida sin tocar otras)
+  escritura en lote + `delete_points` por `run_id` (el «deshacer» de una ejecución sin tocar otras)
   y puntos legacy con su `session_id` de visita intacto.
 - **Salida limpia**: bases existentes actualizan sin pérdida; los flujos de puntos de hoy no se
   enteran.
@@ -338,14 +338,14 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
 - **Decisiones**: D6, D7, D8, D9, D20 (guardia en la UI), D25, D37 (mitad del documento
   `SEQUENCES`).
 - **Por qué**: sin este punto, el motor no es un producto; el usuario debe poder medir la serie
-  de su visita con progreso, semáforo, flags explicados y «Deshacer esta corrida» a un clic.
+  de su visita con progreso, semáforo, flags explicados y «Deshacer esta ejecución» a un clic.
 - **Implementación**:
   - `gui/workers.py`: `SeriesWorker` (patrón `SequenceWorker`: QThread, señales de progreso,
     cancelación, `notify_points` por lote hacia `ufe_dialog.set_point_hook`/`notify_point`,
     extendidos para aceptar batch y `run_id`).
   - `gui/ui/ufe_measure_tab.ui` (ADR-005): bloque de secuencia (botón «Medir la secuencia»,
     contador de frames, control de agrupación con su texto de cadencia, progreso, botón
-    «Deshacer esta corrida», botón «?»). El botón se oculta si la pestaña no tiene visita (D8).
+    «Deshacer esta ejecución», botón «?»). El botón se oculta si la pestaña no tiene visita (D8).
   - `LightCurveChart` compacto embebido en la pestaña (placeholder `QWidget` +
     `replaceWidget`): cruda + detrendada, puntos con flag en color y forma distintos
     (hay que extender `lightcurve_widget._point_style`: hoy solo distingue
@@ -375,7 +375,7 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
     una medida suelta y no se toca), que arranca la serie de la visita (no de una carpeta), y la
     nueva acción «Añadir ficheros a la visita» (selección múltiple) para
     llegar ahí desde un listado (D36).
-  - Cada noche = una corrida con su `run_id` y su Undo; en la curva, línea/leyenda por noche.
+  - Cada noche = una ejecución con su `run_id` y su Undo; en la curva, línea/leyenda por noche.
   - Análisis (`main_window._analysis_transit_block`, `_fu_science_blocks`,
     `_fu_export_report`): la serie entra en el plegado (variables) y la comparación contra el
     esperado (HADS/SN) vía `lightcurve_data.build_payload`, extendido en esta fase con el
@@ -384,7 +384,7 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
     por ingress; HADS: 12 puntos y tope de cadencia; variable: Nyquist); rojo si se rompe el
     ingress; `group_n=1` por defecto en tránsitos y variables.
   - Multinoche: chequeo de ZP por noche y guardia de banda (D35) en el panel de resumen.
-- **Tests**: serie sintética de dos noches (agregación, undo por corrida sin tocar la otra,
+- **Tests**: serie sintética de dos noches (agregación, undo por ejecución sin tocar la otra,
   aviso de banda mezclada, aviso de ZP desplazado), test de `build_payload(source="measure")`
   con plegado de una variable sintética, test de la guardia de cadencia (aviso y rojo).
 - **Salida limpia**: la curva medida vive en el proyecto, se analiza como las demás y el flujo
@@ -493,7 +493,7 @@ funcionando + suite verde (`.venv/bin/python -m pytest tests/unit`) + i18n sin `
   completa (N tomas o T segundos); entrada y salida por el mismo worker/curva que la fase 5 (un
   solo motor, D33).
 - **Tests**: carpeta sintética que crece (offline), detección de fichero a medias, agrupación en
-  vivo, y cancelación sin dejar corrida colgada.
+  vivo, y cancelación sin dejar ejecución colgada.
 - **Salida limpia**: en vivo apagado por defecto; activarlo es opt-in y no cambia el flujo normal.
 
 ### Fase 11 · API ExoClock (compuerta con permiso)
@@ -611,5 +611,5 @@ de feature desde `main` una vez los ADRs de la fase 0 estén fusionados.
 
 **Criterio de éxito final**: el usuario de un proyecto de tránsito, de una variable HADS o de
 una SN en tres noches puede medir su serie desde la visita, leer una curva honesta (cruda y
-detrendada, con flags y errores totales), deshacer una corrida mala, ajustar o plegar, exportar
+detrendada, con flags y errores totales), deshacer una ejecución mala, ajustar o plegar, exportar
 para ExoClock y entender cada paso por la documentación de usuario, sin salir de NightScribe.

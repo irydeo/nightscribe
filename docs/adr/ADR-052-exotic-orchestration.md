@@ -26,7 +26,7 @@ código:
   parámetros contra el NASA Archive.
 - **Importa** su curva y sus parámetros (T_mid, Rp/Rs, profundidad,
   inclinación, duración) al proyecto (`core/exotic_import.py`): la curva entra
-  como puntos `source="exotic"` en una corrida, y los parámetros en el contexto
+  como puntos `source="exotic"` en una ejecución, y los parámetros en el contexto
   y el reporte.
 - La vía numpy (`core/series_measure.py`, `core/transit_fit.py`) queda como
   **previsualización** y su ajuste se valida **contra la curva reducida por
@@ -41,7 +41,7 @@ dejar solo el handoff manual (insuficiente: no cierra el ciclo).
 la app se mantiene ligera (EXOTIC es externo, opcional); la compuerta de paridad
 mide ya el ajuste y pasa (T_mid 2 s, Rp/Rs 1,2 %, σ 96 %, profundidad 2,3 %);
 sin entorno EXOTIC, la serie y su previsualización siguen funcionando. La
-primera corrida de EXOTIC necesita red (NASA Archive, LDTk, astrometry.net).
+primera ejecución de EXOTIC necesita red (NASA Archive, LDTk, astrometry.net).
 
 ## English
 

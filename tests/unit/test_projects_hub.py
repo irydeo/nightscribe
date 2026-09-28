@@ -1809,6 +1809,20 @@ def _write_simple_fits(path, data):
     return path
 
 
+def test_create_project_infers_kind_from_enriched_type(window):
+    # Ad-hoc Explore (Tools) has no planner target, so no kind: the
+    # enriched type decides it (exoplanet -> transit, transient -> sn).
+    for etype, want in (("exoplanet", "transit"), ("transient", "sn"),
+                        ("hads", "hads"), ("variable", "variable"),
+                        ("small_body", "neo"), ("comet", "comet")):
+        p = window._create_project({"name": f"Obj {etype}", "type": etype})
+        assert p is not None and p["kind"] == want
+
+
+def test_create_project_refuses_an_untyped_sun(window):
+    assert window._create_project({"name": "Sun", "type": "sun"}) is None
+
+
 def test_create_project_keeps_variable_and_campaign_context(window):
     from nightscribe.gui import main_window as mw
     from nightscribe.core import project as proj_mod

@@ -47,7 +47,7 @@ tránsitos y variables; se avisa en vez de bloquear).
 **Consecuencias**: exposiciones de pocos segundos son usables sin cavar el rms;
 la curva en vivo nace ya con flags y errores honestos; el rendimiento depende de
 medir N frames en vez de N, pero el presupuesto de <0,5 s/frame sigue vigente por
-frame; el usuario puede deshacer la corrida igual que en el flujo normal.
+frame; el usuario puede deshacer la ejecución igual que en el flujo normal.
 
 ## English
 

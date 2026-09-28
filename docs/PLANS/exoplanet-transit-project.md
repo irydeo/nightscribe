@@ -302,7 +302,7 @@ en el mismo paso Process; 5 cierra.)
 - Heurística v1 de exposición es «guía honesta», no promesa de SNR: el aviso
   debe dejar claro que cada instrumento es distinto.
 - El esquema de `inits.json` de EXOTIC evoluciona: fijar contra el actual
-  (`docs/inits.json` del repo) y **validar con una corrida real** del usuario
+  (`docs/inits.json` del repo) y **validar con una ejecución real** del usuario
   antes de prometer la compatibilidad.
 - Los campos nuevos del TAP invalidan la caché de `exoplanet_archive`
   (bump de clave de caché / expiración corta la primera vez).

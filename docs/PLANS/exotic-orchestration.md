@@ -93,7 +93,7 @@ curva y sus parámetros.
   HTML y EXOTIC murió con `JSONDecodeError`. `"Plate Solution? (y/n)"` puede
   quedarse en "y". `"Pre-reduced File:"` a `null` en modo `-red`.
 - **Red**: NASA Exoplanet Archive, datos LDTk (se cachean tras la primera
-  corrida) y astrometry.net si se pide solución de placa.
+  ejecución) y astrometry.net si se pide solución de placa.
 - **Salidas** (en `"Directory to Save Plots"`): figura publicable
   `FinalLightCurve_<planeta>_<fecha>.png`/`.pdf` y reporte AAVSO
   `AAVSO_<planeta>_<fecha>.txt` en la raíz; en `temp/`:
@@ -237,7 +237,7 @@ fallo, cancelación y timeout).
     del JSON de EXOTIC si lo hubiera; figuras como rutas.
 - **Persistencia**: los puntos entran al proyecto como curva con
   `source="exotic"` (helpers `followup.add_points`/`create_run` ya existen;
-  una corrida `run` con `cfg_json` apuntando al `inits.json` y al log). Los
+  una ejecución `run` con `cfg_json` apuntando al `inits.json` y al log). Los
   parámetros se guardan en el contexto del proyecto y en un reporte
   (`project.add_file(kind="report")`).
 - **Curva**: `lightcurve_data.build_payload` ya consume los puntos; el widget
@@ -255,7 +255,7 @@ proyecto, listos para ExoClock y para el post.
 `err`/`flux`/`airmass` y `source="exotic"`), `load_params` (JSON con cadenas
 `valor +/- incertidumbre` -> T_mid, Rp/Rs, profundidad en fracción, inclinación
 y duración), `load_result` (localiza curva, parámetros, figura y reporte AAVSO)
-y `persist` (una corrida con `source="exotic"` y sus puntos vía `followup`).
+y `persist` (una ejecución con `source="exotic"` y sus puntos vía `followup`).
 Parser tolerante: sin carpeta o formato raro devuelve vacío y avisa, no revienta.
 Tests en `tests/unit/test_exotic_import.py`.
 
@@ -296,6 +296,11 @@ el log en la barra de estado. Al terminar, importa la curva y los parámetros
 (`exotic_import.load_result` + `persist`), informa de T_mid y Rp/Rs y refresca el
 proyecto. El botón de exportar el `inits.json` se conserva como vía manual. Las
 cadenas nuevas pasan por `tr()` y el i18n queda sin `unfinished`.
+
+**Fallback sin WCS (2026-09-28)**: si la primera toma no tiene WCS (o el proyecto
+no tiene secuencia), la app pide a mano el píxel del objetivo y los de las
+comparaciones en vez de abortar, de modo que un set sin resolver (una ejecución
+de MicroObservatory, una sesión en vivo) también se puede reducir.
 
 ---
 
@@ -364,7 +369,7 @@ la GUI queda sin `unfinished`. El plan de orquestación queda completo
   el usuario produzca a mano».
 - **Peso/dependencias en Windows**: el entorno EXOTIC lo instala el usuario; no
   entra en el instalador. Documentado.
-- **Red en la primera corrida de EXOTIC** (Gaia/astrometry): avisar en la UI;
+- **Red en la primera ejecución de EXOTIC** (Gaia/astrometry): avisar en la UI;
   no hay scraping ni credenciales nuestras.
 - **Licencia**: no se copia código; se ejecuta EXOTIC y se lee su salida.
 - **Formato de salida de EXOTIC cambiante**: parser tolerante + test con fixture

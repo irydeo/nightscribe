@@ -801,7 +801,7 @@ class MainWindow(QMainWindow):
                 "one above."))
             return
         install = dlg.edt_exotic_install.text().strip() or str(
-            paths_mod.data_dir() / "exotic-venv")
+            paths.data_dir() / "exotic-venv")
         self._exotic_worker = PrepareExoticWorker(install, python)
         self._exotic_worker.progress.connect(
             lambda stage: self.statusBar().showMessage(
@@ -814,11 +814,24 @@ class MainWindow(QMainWindow):
 
     def _exotic_prepared(self, dlg, install, ok, log):
         # The environment build finished: report and point the setting at
-        # the new venv interpreter.
+        # the new venv interpreter. The build takes minutes, so the modal
+        # dialog may be long closed and destroyed when this lands: guard
+        # every widget write (writing into a destroyed dialog crashed the
+        # app) and let the status bar carry the report when it is gone.
+        # @args: dlg - the settings dialog (maybe already destroyed),
+        #        install - the venv folder, ok - the build succeeded,
+        #        log - the build log
         from PySide6.QtWidgets import QMessageBox
         from ..core import exotic_env
         self._exotic_worker = None
         self.statusBar().clearMessage()
+        if not Shiboken.isValid(dlg):
+            lines = [ln for ln in (log or "").splitlines() if ln.strip()]
+            self.statusBar().showMessage(
+                self.tr("EXOTIC environment ready.") if ok else
+                self.tr("Could not prepare EXOTIC: {0}").format(
+                    lines[-1] if lines else ""), 10000)
+            return
         if ok:
             dlg.edt_exotic_install.setText(install)
             dlg.edt_exotic_python.setText(str(exotic_env.venv_python(install)))

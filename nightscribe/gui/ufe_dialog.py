@@ -540,7 +540,8 @@ class UfeDialog(QDialog):
     def set_points_hook(self, fn):
         # @args: fn - callable(rows, cfg) -> run_id, or None. The Measure
         #        tab sends a whole series run so the host creates one run
-        #        and writes its points in a batch (ADR-048, D9).
+        #        and writes its points in a batch (ADR-048, D9); cfg is
+        #        the run echo and carries its status (D18).
         self._points_hook = fn if callable(fn) else None
 
     def set_run_undo_hook(self, fn):

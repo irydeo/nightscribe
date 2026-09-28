@@ -870,8 +870,12 @@ class UfeMeasureTab(QWidget):
         notify = getattr(dlg, "notify_points", None)
         self._series_run_id = None
         if callable(notify) and rows:
+            # D18: the run's real status rides in the echo, so the host
+            # stores a cancelled series as "incomplete", never "complete".
+            echo = dict(self._series_cfg_dict or {})
+            echo["status"] = result.status
             try:
-                self._series_run_id = notify(rows, self._series_cfg_dict)
+                self._series_run_id = notify(rows, echo)
             except Exception as err:
                 logger.warning("series save failed: %s", err)
         self.btn_series_undo.setEnabled(self._series_run_id is not None)
@@ -1066,10 +1070,19 @@ class UfeMeasureTab(QWidget):
                 dur_d = float(transit.get("duration_h") or 0.0) / 24.0
         except (TypeError, ValueError):
             t0_mjd, dur_d = None, None
-        exoclock_export.write_submission(
-            pts, out, planet or "target",
-            self.cmb_band.currentText() or self._band or "", expt, note,
-            t0_mjd=t0_mjd, duration_d=dur_d)
+        # P2 #23b: the write can fail (permissions, a full disk, a file
+        # held by another app); the observer reads why and nothing else
+        # happens (no upload page, no run registered as saved)
+        try:
+            exoclock_export.write_submission(
+                pts, out, planet or "target",
+                self.cmb_band.currentText() or self._band or "", expt, note,
+                t0_mjd=t0_mjd, duration_d=dur_d)
+        except Exception as err:
+            logger.warning("exoclock export failed: %s", err)
+            self.lbl_status.setText(self.tr(
+                "The ExoClock files could not be written: {0}").format(err))
+            return
         self.lbl_status.setText(
             self.tr("ExoClock files written. Upload them at exoclock.space"))
         notify = getattr(self.window(), "notify_saved", None)

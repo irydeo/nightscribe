@@ -8468,12 +8468,18 @@ class MainWindow(QMainWindow):
         # ADR-048 (D9): one series run = one measurement_runs row; its
         # points go in a single batch with the run id, so "Undo this run"
         # removes exactly them. A point keeps its plate link when the
-        # frame is registered (ADR-047).
-        # @args: rows - point dicts, cfg - JSON-safe run echo
+        # frame is registered (ADR-047). D18: the run keeps its REAL
+        # status, so a series the user cancelled is stored "incomplete"
+        # and stays visible as such; the Measure tab sends the status in
+        # the run echo and it lands in its own column, not in cfg_json.
+        # @args: rows - point dicts, cfg - JSON-safe run echo (it may
+        #        carry the run's "status")
         # @return: the new run id
         from ..core import followup as fu
+        echo = dict(cfg or {})
+        status = echo.pop("status", None) or "complete"
         run_id = fu.create_run(db, session_id=session_id,
-                               cfg={"series": cfg or {}})
+                               cfg={"series": echo}, status=status)
         by_path = {f["path"]: f["id"]
                    for f in project.list_files(db, pid)
                    if f.get("kind") == "fits"}

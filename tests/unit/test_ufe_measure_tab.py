@@ -1065,9 +1065,11 @@ def test_series_button_cancels_a_running_series(dlg, qapp, tmp_path):
     tab = dlg.tab_measure
     label = tab.btn_series.text()              # the .ui's run label
     rows_seen = []
+    echo_seen = []
 
     def points_hook(rows, cfg):
         rows_seen.append(rows)
+        echo_seen.append(cfg)
         return 91
 
     frames = [_write_plate(tmp_path / f"cn{i}.fits", dlg.state.data)
@@ -1100,6 +1102,10 @@ def test_series_button_cancels_a_running_series(dlg, qapp, tmp_path):
     # the points measured so far are kept: one run, persisted and undoable
     kept = [p for p in result.points if p.mjd is not None]
     assert kept and rows_seen and len(rows_seen[0]) == len(kept)
+    # P2 #23a (D18): the run's real status rides in the echo, so the host
+    # stores the run "incomplete" instead of the column's "complete"
+    assert echo_seen and echo_seen[0]["status"] == "incomplete"
+    assert echo_seen[0]["group_n"] == 1          # the config echo survives
     assert tab._series_run_id == 91
     assert tab.btn_series_undo.isEnabled()
     # and the button is the run button again
@@ -1334,3 +1340,45 @@ def test_series_panel_names_the_frames_that_never_made_it(dlg, qapp, tmp_path):
 
 # ---------------- P2 #23b: the ExoClock write is guarded ----------------
 
+def test_exoclock_write_failure_is_reported(dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #23b): write_submission raises on a locked file, a
+    # full disk or a folder without write permission, and the tab let the
+    # exception escape. It must say why and stop there.
+    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtGui import QDesktopServices
+    from nightscribe.core import exoclock_export
+    tab = dlg.tab_measure
+    frames = [_write_plate(tmp_path / f"xf{i}.fits", dlg.state.data,
+                           extra=[_card("EXPTIME", "10.0")])
+              for i in range(2)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 9)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert tab.btn_series_exoclock.isEnabled()
+    out = tmp_path / "locked.txt"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl",
+                        staticmethod(
+                            lambda url: opened.append(url.toString())))
+    saved = []
+    dlg.set_save_hook(lambda paths, kind, payload: saved.append(paths))
+    exo_seen = []
+    dlg.set_exoclock_hook(lambda payload: exo_seen.append(payload))
+
+    def boom(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(exoclock_export, "write_submission", boom)
+    tab._on_series_exoclock()                  # must not raise
+    text = tab.lbl_status.text()
+    assert "could not be written" in text
+    assert "Permission denied" in text
+    assert opened == []                        # the upload page stays shut
+    assert saved == [] and exo_seen == []      # nothing is registered
+    assert not out.exists()

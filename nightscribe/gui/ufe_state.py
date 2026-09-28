@@ -32,6 +32,7 @@ re-exports.
 """
 
 import logging
+from pathlib import Path
 
 import numpy as np
 from PySide6.QtCore import QObject, Signal
@@ -87,6 +88,23 @@ class UfeImageState(QObject):
         except Exception as err:                    # header may be partial
             logger.warning("WCS unusable, probe shows pixels only: %s", err)
             self.wcs = None
+        if self.wcs is None:
+            # the FITS carries no astrometry, but this app may have solved
+            # it before (solve_save off leaves the file untouched): reuse
+            # the cached cards in memory, or walking the frames would drop
+            # the sequence onto unsolved plates
+            from ..core import solve as solve_mod
+            from ..core import blink
+            cards = solve_mod.cached(path)
+            if cards:
+                header = blink.merge_solved_wcs(header, cards)
+                self.header = header
+                try:
+                    self.wcs = wcs_mod.Wcs.from_header(header)
+                    logger.info("WCS reused from the solve cache: %s",
+                                Path(path).name)
+                except Exception:
+                    self.wcs = None
         finite = self.data[np.isfinite(self.data)]
         if finite.size:
             self.d_min = float(finite.min())

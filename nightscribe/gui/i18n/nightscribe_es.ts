@@ -6631,7 +6631,7 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Ajuste manual…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="950" />
+        <location filename="../ufe_compare_tab.py" line="952" />
         <source>Sequence ({0})…</source>
         <translation>Secuencia ({0})…</translation>
     </message>
@@ -6650,11 +6650,6 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <location filename="../ufe_compare_tab.py" line="324" />
         <source>No plate loaded: load a FITS or fetch the field from the survey.</source>
         <translation>No hay placa cargada: carga un FITS o trae el campo del survey.</translation>
-    </message>
-    <message>
-        <location filename="../ufe_compare_tab.py" line="445" />
-        <source>{0}: sequence restored from the plate ({1} stars, {2} in the sequence)</source>
-        <translation>{0}: secuencia restaurada de la placa ({1} estrellas, {2} en la secuencia)</translation>
     </message>
     <message>
         <location filename="../ufe_compare_tab.py" line="465" />
@@ -6733,42 +6728,47 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Proponiendo la secuencia…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="868" />
+        <location filename="../ufe_compare_tab.py" line="446" />
+        <source>{0}: {1} in the sequence ({2} placed on this frame)</source>
+        <translation>{0}: {1} en la secuencia ({2} situadas en esta toma)</translation>
+    </message>
+    <message>
+        <location filename="../ufe_compare_tab.py" line="870" />
         <source>{0} is a known variable: it can never be a comparison.</source>
         <translation>{0} es una variable conocida: nunca puede ser comparación.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="894" />
+        <location filename="../ufe_compare_tab.py" line="896" />
         <source>VSX variable</source>
         <translation>Variable VSX</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="895" />
+        <location filename="../ufe_compare_tab.py" line="897" />
         <source>variables cannot be comparisons</source>
         <translation>las variables no sirven de comparación</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="897" />
+        <location filename="../ufe_compare_tab.py" line="899" />
         <source>click: add/remove from the sequence</source>
         <translation>clic: añadir/quitar de la secuencia</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="908" />
+        <location filename="../ufe_compare_tab.py" line="910" />
         <source>Generate the field first: I need the plate's catalog stars to propose the sequence.</source>
         <translation>Genera el campo primero: necesito las estrellas del catálogo de la placa para proponer la secuencia.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="918" />
+        <location filename="../ufe_compare_tab.py" line="920" />
         <source>Proposed {0} comparisons (tweak by clicking stars).</source>
         <translation>Propuestas {0} comparaciones (ajusta pulsando estrellas).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1016" />
+        <location filename="../ufe_compare_tab.py" line="1018" />
         <source>Export sequence CSV</source>
         <translation>Exportar la secuencia CSV</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1035" />
+        <location filename="../ufe_compare_tab.py" line="1037" />
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
     </message>

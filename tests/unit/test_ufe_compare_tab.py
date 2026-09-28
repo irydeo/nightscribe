@@ -745,3 +745,42 @@ def test_a_solve_clears_the_stale_no_wcs_line(dlg, tmp_path):
              "CD2_2": 0.0003}
     assert dlg.state.set_wcs_cards(cards)
     assert "no WCS" not in tab.lbl_status.text()
+
+
+def test_apply_state_keeps_unplaced_entries(dlg, tmp_path):
+    # a frame without a WCS cannot place the stars, but the sequence (RA/Dec)
+    # must survive: losing it on a frame switch was the reported bug
+    from test_fits_annotate import _make_fits
+    tab = dlg.tab_compare
+    dlg.state.load(_make_fits(tmp_path / "nowcs.fits"))
+    seq = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+           "fov_arcmin": 36.0, "target_mag": 12.0,
+           "entries": [{"name": "A", "kind": "comp",
+                        "star": {"ra": 31.0, "dec": 46.0, "band": "V",
+                                 "mag": 12.0, "bands": []}}]}
+    tab.apply_state(seq)
+    assert len(tab.entries()) == 1      # kept though nothing placed
+    assert tab._stars == []             # no overlay position
+    assert "1 in the sequence" in tab.lbl_status.text()
+
+
+def test_navigation_keeps_the_sequence(dlg, tmp_path):
+    from test_fits_annotate import _make_fits
+    unsolved = _make_fits(tmp_path / "nowcs.fits")
+    dlg.set_series_hook(lambda: {"paths": [str(MONO), str(unsolved)],
+                                 "kind": "transit"})
+    dlg.open_plate(MONO)
+    cra, cdec = dlg.state.wcs.center()
+    seq = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+           "fov_arcmin": 36.0, "target_mag": 12.0,
+           "entries": [{"name": "A", "kind": "comp",
+                        "star": {"ra": cra, "dec": cdec, "band": "V",
+                                 "mag": 12.0, "bands": []}}]}
+    assert dlg.load_saved_sequence(seq)
+    assert len(dlg.tab_compare.entries()) == 1
+    dlg._frame_next()                    # to the frame without a WCS
+    assert len(dlg.tab_compare.entries()) == 1
+    assert dlg.tab_compare._stars == []
+    dlg._frame_prev()                    # back to the reference
+    assert len(dlg.tab_compare.entries()) == 1
+    assert dlg.tab_compare._stars          # placed again

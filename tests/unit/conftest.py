@@ -74,6 +74,15 @@ def _chart_style_defaults(monkeypatch):
                 "measurer_name", "telescope_desc", "camera_model",
                 "ufe_bar_icons"):
         monkeypatch.setitem(config._data, key, DEFAULTS[key])
+    # the camera profile (ADR-042 follow-up) is also read live from the
+    # real config: a saved preset/linearity silently changed the
+    # saturated/non-linear verdicts in the measure tests (they failed on
+    # the author's machine with his GSENSE400 profile). Pin them too.
+    for key in ("ccd_gain", "ccd_read_noise", "ccd_saturate",
+                "flat_resid_mag", "cam_preset", "cam_full_well_e",
+                "cam_linearity_adu", "cam_dark_current_e_s",
+                "cam_dark_temp_c", "cam_max_exposure_s", "cam_regime"):
+        monkeypatch.setitem(config._data, key, DEFAULTS[key])
     # ADR-051 rev: solving persists the WCS into the FITS by default. In
     # unit tests the "plates" are repo fixtures, so keep the write off; a
     # test that wants it turns it on with a tmp copy.

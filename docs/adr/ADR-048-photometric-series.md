@@ -203,3 +203,26 @@ the reduction uses what is in front of them. The handoff reference is the open
 frame: with dithering, EXOTIC must respect those pixels (the persisted plate
 solution of ADR-051 rev. validates it); otherwise the handoff reference would go
 back to the first frame, while the series would still use the open one.
+
+**Revisión (2026-09-28, la secuencia sobrevive a la navegación)**: al cambiar de
+toma, la pestaña Compare re-proyecta la secuencia en la nueva placa. Antes se
+**descartaban** las estrellas que no se podían situar (una toma sin WCS, o una
+estrella fuera del marco por el dithering), así que moverse entre frames borraba la
+secuencia ("0 stars, 0 in the sequence"). Ahora la secuencia es RA/Dec y se
+**conserva entera**: solo las que se pueden situar reciben píxel y overlay, las
+demás se quedan como entradas sin posición (la serie y el handoff EXOTIC las usan
+igual). El mensaje cuenta "N en la secuencia (M situadas en esta toma)". Además, al
+cargar una toma sin WCS se reutiliza la **solución cacheada** por hash (aunque
+`solve_save` esté apagado y el FITS no se escriba), así que volver a una toma ya
+resuelta la vuelve a situar sin re-resolver.
+
+**Revision (2026-09-28, the sequence survives navigation)**: switching frames makes
+the Compare tab re-project the sequence onto the new plate. It used to **drop** the
+stars it could not place (a frame with no WCS, or a star off-frame from dithering),
+so walking the frames erased the sequence ("0 stars, 0 in the sequence"). The
+sequence is RA/Dec and is now **kept whole**: only the placeable stars get a pixel
+and an overlay, the rest stay as entries without a position (the series and the
+EXOTIC handoff use them all the same). The message reads "N in the sequence (M
+placed on this frame)". A plate loaded without a WCS also reuses the **cached
+solution** by hash (even with `solve_save` off, when the FITS is not written), so
+returning to an already solved frame places the sequence again without re-solving.

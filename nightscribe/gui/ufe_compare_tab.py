@@ -392,8 +392,10 @@ class UfeCompareTab(QWidget):
             # no variable flag rather than a stale one
             "vsx_warning": None,
         }
-        placed = []      # stars that landed on this plate
-        pairs = []       # (star, saved entry), for the entries below
+        placed = []      # stars that landed on this plate (overlays)
+        pairs = []       # (star, saved entry): EVERY entry is kept, the
+                         # sequence is RA/Dec and survives a frame with no
+                         # WCS (only its overlays need one)
         for raw in (st.get("entries") or []):
             rs = raw.get("star") or {}
             star = {
@@ -413,10 +415,9 @@ class UfeCompareTab(QWidget):
             if star.get("mag") is None:
                 continue     # the table formats the magnitude
             pos = self._sky_to_scene(star["ra"], star["dec"])
-            if pos is None:
-                continue
-            star["_sx"], star["_sy"] = pos
-            placed.append(star)
+            if pos is not None:
+                star["_sx"], star["_sy"] = pos
+                placed.append(star)
             pairs.append((star, raw))
         self._stars = placed
         self._entries = []
@@ -442,10 +443,9 @@ class UfeCompareTab(QWidget):
         self._reload_table()
         self._redraw_overlays()     # no-ops off stage (it checks itself)
         self.lbl_status.setText(self.tr(
-            "{0}: sequence restored from the plate ({1} stars, "
-            "{2} in the sequence)").format(
-                self._field["catalog_name"], len(self._stars),
-                len(self._entries)))
+            "{0}: {1} in the sequence ({2} placed on this frame)")
+            .format(self._field["catalog_name"], len(self._entries),
+                    len(self._stars)))
 
     # ------------------------------------------------------------- field
 
@@ -786,6 +786,8 @@ class UfeCompareTab(QWidget):
         r = w * 0.012
         for e in self._entries:
             star = e["star"]
+            if star.get("_sx") is None:
+                continue        # not placeable on this (unsolved) frame
             x, y = star["_sx"], star["_sy"]
             if e["kind"] == "check":
                 item = QGraphicsRectItem(x - r, y - r, 2 * r, 2 * r)

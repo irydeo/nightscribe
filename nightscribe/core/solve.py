@@ -57,6 +57,31 @@ class SolveCancel:
             _terminate(proc)
 
 
+def cached(path):
+    # A WCS this app already solved for the exact file (content hash),
+    # WITHOUT invoking a solver: the cache keeps a plate solved across
+    # frame switches even when the FITS carries none (solve_save off).
+    # @args: path - FITS Path
+    # @return: dict of WCS cards, or None
+    import hashlib
+    import json
+    from pathlib import Path
+    from .db import db
+    try:
+        digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    except OSError:
+        return None
+    for key in (f"astap:wcs:{digest}", f"astrometry:wcs:{digest}"):
+        row = db.cache_get(key)
+        if not row:
+            continue
+        try:
+            return json.loads(row[0].decode("utf-8"))
+        except (ValueError, AttributeError):
+            continue
+    return None
+
+
 def solve(path, progress=None, solver=None, astap_path=None, update=False,
           cancel=None):
     # @args: path - FITS Path, progress - optional callable(stage_text),

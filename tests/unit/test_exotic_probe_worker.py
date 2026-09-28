@@ -350,3 +350,50 @@ def test_exotic_solve_first_forwards_the_sequence(window, qapp, monkeypatch,
     window._exotic_solve_first(1, {"data": {}}, "/py", [str(plate)], 7,
                                header, str(plate), entries)
     assert got and got[0][-1] == entries
+
+
+def test_exotic_handoff_creates_the_work_folder(window, qapp, monkeypatch,
+                                                tmp_path):
+    # regression: the reduce used to crash writing inits.json into a
+    # missing <project>/exotic folder, right after the prep dialog closed
+    # (the 'flash and nothing happens' report)
+    from PySide6.QtCore import QObject, Signal
+    from PySide6.QtWidgets import QMessageBox
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project as proj_mod, exotic as exotic_mod
+    from nightscribe.core import wcs as wcs_mod
+    from nightscribe.gui import workers
+    p = proj_mod.create(mw.db, "transit", "HAT-P-32 b", {"kind": "transit"})
+    work_root = tmp_path / "proj"
+    monkeypatch.setattr(mw.project, "storage_dir", lambda pp: work_root)
+    monkeypatch.setattr(window, "_ufe_object_from_project",
+                        lambda pp: {"name": "HAT-P-32 b", "ra": 120.1,
+                                    "dec": -20.1, "mag": None, "bv": None})
+    monkeypatch.setattr(window, "_populate_project_files", lambda pid: None)
+    monkeypatch.setattr(window, "_exotic_progress_dialog", lambda: None)
+    monkeypatch.setattr(exotic_mod, "make_inits_for_visit",
+                        lambda *a, **k: {"user_info": {}})
+    warns = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: warns.append(a))
+
+    class _FakeRun(QObject):
+        progress = Signal(str)
+        finished = Signal(dict)
+
+        def __init__(self, *a):
+            super().__init__()
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(workers, "ExoticRunWorker", _FakeRun)
+    cards = dict(_FAKE_WCS)
+    cards["NAXIS1"], cards["NAXIS2"] = 650, 500
+    wcs = wcs_mod.Wcs.from_header(cards)
+    entries = [{"name": "A", "kind": "comp",
+                "star": {"ra": 120.5, "dec": -20.5}}]
+    window._exotic_launch_final(p["id"], {"data": {}}, "/py", ["/x/f.fits"],
+                                None, wcs, "/x/f.fits", entries)
+    assert (work_root / "exotic" / "inits.json").is_file(), warns
+    assert warns == []                     # no silent death, no error box

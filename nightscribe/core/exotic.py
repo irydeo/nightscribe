@@ -287,6 +287,7 @@ def export_inits(inits, out):
     # Writes the inits dict as JSON (the handoff file EXOTIC loads).
     # @args: inits - make_inits dict, out - output path (.json)
     # @return: the output path
+    Path(out).parent.mkdir(parents=True, exist_ok=True)
     Path(out).write_text(json.dumps(inits, indent=4, ensure_ascii=False)
                          + "\n", encoding="utf-8")
     logger.info("EXOTIC inits written to %s", out)

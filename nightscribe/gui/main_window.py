@@ -5542,9 +5542,12 @@ class MainWindow(QMainWindow):
             self._close_exotic_prep()
             return
         if not e or not e.get("data"):
+            from PySide6.QtWidgets import QMessageBox
             self._close_exotic_prep()
-            self.statusBar().showMessage(
-                self.tr("No planet data — check the name and retry"), 8000)
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No planet data was found for «{0}»: check the name or "
+                "the connection and retry.").format(
+                    (p or {}).get("object_name") or ""))
             return
         # the interpreter that has EXOTIC: the user's own Python 3.10 (the
         # cleanest on Windows) or the venv the app prepared
@@ -5585,6 +5588,19 @@ class MainWindow(QMainWindow):
         self._exotic_launch(pid, e, python)
 
     def _exotic_launch(self, pid, e, python):
+        # Guarded entry: an exception anywhere in the handoff (a read-only
+        # folder, a bad header) must land in a box, never vanish in the
+        # console while the observer stares at a flashed dialog.
+        try:
+            self._exotic_launch_impl(pid, e, python)
+        except Exception as err:
+            logger.exception("EXOTIC launch failed: %s", err)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "The EXOTIC reduction could not be prepared:\n\n{0}")
+                .format(err))
+
+    def _exotic_launch_impl(self, pid, e, python):
         # Generate the visit's inits.json and run EXOTIC headless; the
         # result is imported on finish (phase E).
         # @args: pid - the project id, e - the enriched planet data,
@@ -5711,6 +5727,20 @@ class MainWindow(QMainWindow):
 
     def _exotic_launch_final(self, pid, e, python, frame_paths, session_id,
                              wcs, ref=None, entries=None):
+        # Guarded: the handoff write runs right after the prep dialog
+        # closes, so any error must be shown, not swallowed.
+        try:
+            self._exotic_launch_final_impl(pid, e, python, frame_paths,
+                                           session_id, wcs, ref, entries)
+        except Exception as err:
+            logger.exception("EXOTIC handoff failed: %s", err)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "The EXOTIC reduction could not be prepared:\n\n{0}")
+                .format(err))
+
+    def _exotic_launch_final_impl(self, pid, e, python, frame_paths,
+                                  session_id, wcs, ref=None, entries=None):
         # The reference WCS is in hand: target and comparison pixels come
         # from it (never hand-entered); without a sequence the observer is
         # sent to build it in the editor.
@@ -5757,6 +5787,7 @@ class MainWindow(QMainWindow):
         plan = {"filter": plan_data.get("filter", "L"),
                 "exp_s": plan_data.get("exp_s")}
         work = Path(project.storage_dir(p)) / "exotic"
+        work.mkdir(parents=True, exist_ok=True)   # EXOTIC writes here too
         inits = exotic.make_inits_for_visit(
             ctx, e["data"], config, frame_paths, (tx, ty), comps,
             plan=plan, out_dir=str(work))

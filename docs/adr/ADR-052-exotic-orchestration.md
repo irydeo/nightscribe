@@ -91,7 +91,11 @@ cargada** en el editor. La pestaña Análisis deja un acceso que abre la visita 
 Toda la cadena de recogida/sondeo muestra un **diálogo de progreso** (con Cancel), y
 la secuencia sobrevive al paso de auto-resolución (antes se perdía cuando la toma de
 referencia no tenía WCS, y la reducción fallaba con "no hay estrellas de
-comparación" aunque estuviera construida).
+comparación" aunque estuviera construida). La carpeta de trabajo
+`<proyecto>/exotic/` se crea antes de escribir el `inits.json` (antes no existía y
+el lanzamiento moría con `FileNotFoundError` justo al cerrarse el diálogo: la
+ventana parpadeaba y "no pasaba nada"), y el lanzamiento va **envuelto para que
+cualquier error salga en un aviso**, nunca en la consola.
 
 **Revision (2026-09-28)**: the reduction starts from the **Unified FITS Editor**,
 next to the sequence it needs (ADR-048 rev.), not from the Analysis tab. The editor
@@ -100,4 +104,8 @@ visit; it uses the **open frame** as the reference and the **sequence loaded** i
 the editor. The Analysis tab keeps a door that opens the visit there. The whole
 gather/probe chain shows a **progress dialog** (Cancel included), and the sequence
 survives the auto-solve step (it used to be dropped when the reference frame had no
-WCS, so the reduce failed with "no comparison stars" although it was built).
+WCS, so the reduce failed with "no comparison stars" although it was built). The
+`<project>/exotic/` work folder is created before writing the `inits.json` (it did
+not exist, so the launch died with `FileNotFoundError` right as the dialog closed:
+the window flashed and "nothing happened"), and the launch is **wrapped so any
+error lands in a message box**, never in the console.

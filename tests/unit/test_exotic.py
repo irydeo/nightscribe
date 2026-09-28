@@ -253,3 +253,13 @@ def test_make_inits_for_visit_out_dir_and_prereduced(tmp_path):
     ui = inits["user_info"]
     assert ui["Directory to Save Plots"] == str(plots)
     assert inits["optional_info"]["Pre-reduced File:"] == "/data/curve.txt"
+
+
+def test_export_inits_creates_its_folder(tmp_path):
+    # regression: the visit handoff writes into a fresh <project>/exotic
+    # folder that does not exist yet; the write used to raise
+    # FileNotFoundError (the reduce dialog flashed and nothing happened)
+    out = tmp_path / "project" / "exotic" / "inits.json"
+    exotic.export_inits({"user_info": {}}, out)
+    assert out.is_file()
+    assert json.loads(out.read_text(encoding="utf-8"))["user_info"] == {}

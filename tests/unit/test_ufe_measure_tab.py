@@ -1143,8 +1143,8 @@ def test_exoclock_button_writes_files_and_records_outcome(
     dlg.set_exoclock_hook(lambda payload: seen.append(payload))
     tab._on_series_exoclock()
     assert out.exists()
-    assert (tmp_path / "HATP-32b_info.txt").exists()
-    assert "JD_UTC" in (tmp_path / "HATP-32b_info.txt").read_text()
+    assert (tmp_path / "ExoClock_info.txt").exists()
+    assert "JD_UTC" in (tmp_path / "ExoClock_info.txt").read_text()
     assert len(out.read_text().strip().splitlines()) == 4   # one per frame
     assert opened and "exoclock.space/upload" in opened[0]
     assert seen and seen[0]["points"] == 4

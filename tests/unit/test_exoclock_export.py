@@ -126,7 +126,8 @@ def test_info_file_fields(tmp_path):
     dpath, ipath = ex.write_submission(_points(), data, "HAT-P-32 b", "V",
                                        60.0, "Transit covered well.")
     assert dpath.exists() and ipath.exists()
-    assert ipath.name == "HATP-32b_info.txt"
+    assert ipath.name == "ExoClock_info.txt"      # the name ExoClock reads
+    assert ipath.parent == dpath.parent           # next to the data file
     info = ipath.read_text()
     assert "Planet: HAT-P-32 b" in info
     assert "Time format: JD_UTC" in info

@@ -201,16 +201,17 @@ def checklist(points, duration_h=None, baseline_h=1.0):
 
 def write_submission(points, base_path, planet, filter_name, exptime_s,
                      comments, extra=None, t0_mjd=None, duration_d=None):
-    # Writes <base>.txt (data) and <base>_info.txt (metadata).
-    # @args: base_path - the data file path; its stem names the info
-    #        file; t0_mjd / duration_d - transit window for the OOT
-    #        reference flux
+    # Writes the data file and, next to it, ExoClock_info.txt: the exact
+    # name ExoClock expects beside the data (ADR-049), never a name of our
+    # own invention.
+    # @args: base_path - the data file path; t0_mjd / duration_d - transit
+    #        window for the OOT reference flux
     # @return: (data_path, info_path)
     rows, warnings, ref_mode = build_data(points, t0_mjd=t0_mjd,
                                           duration_d=duration_d)
     data_path = Path(base_path)
     data_path.write_text(format_data(rows), encoding="utf-8")
-    info_path = data_path.with_name(data_path.stem + "_info.txt")
+    info_path = data_path.with_name("ExoClock_info.txt")
     # the Comments say where the baseline hangs from (C4: never silent)
     ref_note = {"oot": "reference flux: mean of the out-of-transit "
                        "points",

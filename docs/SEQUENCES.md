@@ -73,8 +73,9 @@ To get files there from a listing, use **"Attach files to the visit"**
 
 ## 5. Controls and defaults
 
-The day-to-day controls are on the tab: **band** and **apertures**. The rest
-live in **Advanced...** (a small, non-modal window):
+The day-to-day controls are on the tab: **band**, **apertures** and, in the
+series block, **group frames** (`group_n`). The rest live in **Advanced...**
+(a small, non-modal window):
 
 | Control | Default | What it does |
 |---|---|---|
@@ -83,7 +84,7 @@ live in **Advanced...** (a small, non-modal window):
 | Aperture follows the seeing | on | `r = 1.35 · FWHM` measured on the comps |
 | Colour term | on | fits the ZP and its slope with the comps' B-V |
 | Subtract host galaxy | off | aligned PS1 reference, scaled by the comps |
-| **Group frames** (`group_n`) | 1 | combines N frames per point in the measurement domain; never pixel stacking |
+| **Group frames** (`group_n`) | 1 | combines N frames per point in the measurement domain; never pixel stacking; also a quick knob in the series block |
 | **Detrend** | off | `airmass` removes the minimum; `auto` adds FWHM/sky/x-y only if it improves |
 | **Aperture sweep per night (T3)** | off | picks the k in [1.0, 2.0]·FWHM with the smallest check scatter |
 | **Saturation ceiling** | 0 = auto | absolute ADU value; 0 uses the SATURATE card or Settings |

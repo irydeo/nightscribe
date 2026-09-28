@@ -675,3 +675,12 @@ def test_cancelled_solve_shows_no_failure_box(dlg, monkeypatch):
     dlg._wcs_pending = [(lambda: None, lambda: fail.append(1))]
     dlg._on_solved({})
     assert warns == [] and fail == [1]
+
+
+def test_notify_sequence_ignores_empty_unless_forced(dlg):
+    seen = []
+    dlg.set_sequence_hook(lambda st: seen.append(st))
+    assert dlg.notify_sequence({"entries": []}) is False
+    assert dlg.notify_sequence({"entries": []}, force=True) is True
+    assert dlg.notify_sequence({"entries": [{"name": "A"}]}) is True
+    assert len(seen) == 2

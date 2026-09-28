@@ -289,6 +289,46 @@
        </widget>
       </item>
        <item>
+        <layout class="QHBoxLayout" name="row_series_group">
+         <item>
+          <widget class="QLabel" name="lbl_series_group">
+           <property name="text">
+            <string>Group frames:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="spn_group_n_quick">
+           <property name="toolTip">
+            <string>Combine N frames per point in the measurement domain (fluxes with 1/σ² weights), never pixel stacking. 1 = one point per frame (the default for transits and variables). The same knob as Advanced… → Group frames</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>1</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="hsp_series_group">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
         <layout class="QVBoxLayout" name="vbox_series_actions">
          <item>
           <layout class="QHBoxLayout" name="row_series_run">

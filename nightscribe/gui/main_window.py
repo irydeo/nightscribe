@@ -4602,17 +4602,33 @@ class MainWindow(QMainWindow):
 
     def _load_editor_sequence(self, dlg, pid, path):
         # ADR-047/048: restore a plate's saved working state when it has
-        # one; otherwise fill the Compare tab with the project's saved
+        # one; whatever it leaves empty is filled with the project's saved
         # sequence (so a series or an EXOTIC reduction finds the comps
-        # already built, never the bare "no comparison stars").
+        # already built, never the bare "no comparison stars"). A plate
+        # state saved without a sequence no longer blocks the project one.
         # @args: dlg - the UfeDialog, pid - project id, path - open plate
         row = project.find_file(db, pid, path) if path else None
         meta = (row or {}).get("meta") or {}
         if meta.get("ufe"):
             dlg.apply_plate_state(meta["ufe"])
-            return
         p = project.get(db, pid) or {}
         dlg.load_saved_sequence((p.get("context") or {}).get("sequence"))
+
+    def _ufe_sequence_hook(self, pid, state):
+        # The editor's sequence changed by the observer: keep it in the
+        # project context (and its target magnitude), so reopening the
+        # visit brings the comparison stars back instead of rebuilding them.
+        # @args: pid - project id, state - the Compare tab's sequence dict
+        entries = (state or {}).get("entries") or []
+        ctx_update = {"sequence": {
+            "catalog": state.get("catalog"),
+            "catalog_name": state.get("catalog_name"),
+            "fov_arcmin": state.get("fov_arcmin"),
+            "target_mag": state.get("target_mag"),
+            "entries": entries}}
+        if state.get("target_mag") is not None:
+            ctx_update["mag"] = state["target_mag"]
+        project.update_context(db, pid, ctx_update)
 
     def _visit_open_in_editor(self, pid, path, sid):
         # A visit's plate opens in the UFE with everything attached: the
@@ -8536,6 +8552,10 @@ class MainWindow(QMainWindow):
             dlg.set_run_undo_hook(self._ufe_run_undo)
             dlg.set_exoclock_hook(
                 lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
+            # the sequence is kept in the project: reopening the visit
+            # must not mean rebuilding the comparison stars
+            dlg.set_sequence_hook(
+                lambda state: self._ufe_sequence_hook(hook_pid, state))
             # ADR-048 follow-up: a transit project's reduce/export live in
             # the editor, next to the sequence they need
             proj = project.get(db, hook_pid) or {}
@@ -8553,6 +8573,7 @@ class MainWindow(QMainWindow):
             dlg.set_run_undo_hook(None)
             dlg.set_exoclock_hook(None)
             dlg.set_exotic_hooks(None, None)
+            dlg.set_sequence_hook(None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])

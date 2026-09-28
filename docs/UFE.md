@@ -103,7 +103,9 @@ sequence loads by itself when the visit opens.
   matched to the target's brightness.
 * **Sequence (N)...** opens the *table* in a small non-modal window (N
   is the current number of stars, and it updates itself): you can
-  rename, retype and remove rows, and leave it open while you keep
+  rename, retype, **edit the band and the magnitude by hand** (a doubtful
+  catalog value is fixed there: the measurement uses the manual value) and
+  remove rows, and leave it open while you keep
   picking stars on the plate. Hovering tells you each star's catalog,
   magnitude and colour, with the window open too.
 * **Remove all** empties the sequence and **Export CSV...** writes it

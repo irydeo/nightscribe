@@ -105,7 +105,9 @@ La secuencia ya guardada del proyecto se carga sola al abrir la visita.
   variables de brillo parecido al objetivo.
 * **Secuencia (N)…** abre la *tabla* en una ventana pequeña y no modal
   (N son las estrellas que hay ahora mismo, y se actualiza sola):
-  renombra, cambia el tipo y quita filas, y se puede dejar abierta
+  renombra, cambia el tipo, **edita la banda y la magnitud a mano** (un
+  valor de catálogo dudoso se corrige ahí: la medida usa el valor
+  manual) y quita filas, y se puede dejar abierta
   mientras sigues eligiendo estrellas en la placa. La sonda al pasar el
   cursor cuenta catálogo, magnitud y color de cada estrella, también con
   la ventana abierta.

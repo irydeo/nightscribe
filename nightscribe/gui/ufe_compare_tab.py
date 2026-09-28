@@ -35,12 +35,13 @@ from pathlib import Path
 
 from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QProgressDialog,
-                               QPushButton, QTableWidgetItem, QWidget,
-                               QGraphicsEllipseItem, QGraphicsLineItem,
-                               QGraphicsRectItem, QGraphicsSimpleTextItem)
+from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog,
+                               QProgressDialog, QPushButton, QTableWidgetItem,
+                               QWidget, QGraphicsEllipseItem,
+                               QGraphicsLineItem, QGraphicsRectItem,
+                               QGraphicsSimpleTextItem)
 
-from ..core import compstars
+from ..core import compstars, photometry
 from ..core.sources import vizier
 from ..viz import palette
 from .ufe_manual_dialog import UfeManualDialog
@@ -877,6 +878,7 @@ class UfeCompareTab(QWidget):
                 "why": {"es": "elegida a mano", "en": "picked by hand"}})
         self._redraw_entries()
         self._reload_table()
+        self._commit()
 
     def _probe(self, sx, sy):
         # Hover probe while on stage: the star under the cursor, else the
@@ -919,11 +921,16 @@ class UfeCompareTab(QWidget):
         self.lbl_status.setText(
             self.tr("Proposed {0} comparisons (tweak by clicking stars).")
             .format(len(self._entries)))
+        self._commit()
 
     # ------------------------------------------------------------- table
 
     def _reload_table(self):
-        # Rebuilds the table from the entries (after chart picks).
+        # Rebuilds the table from the entries (after chart picks). Band and
+        # magnitude are editable: the observer can override what the
+        # catalog gave (a comp with a bad catalogue value, a band the
+        # catalog lacks); the manual value feeds the calibration.
+        self._table_building = True
         self.table.blockSignals(True)
         self.table.setRowCount(len(self._entries))
         for i, e in enumerate(self._entries):
@@ -936,20 +943,79 @@ class UfeCompareTab(QWidget):
                 lambda _ix, row=i: self._type_changed(row))
             self.table.setCellWidget(i, 1, combo)
             star = e["star"]
-            mag = QTableWidgetItem(f"{star['band']} {star['mag']:.2f}")
-            mag.setFlags(Qt.ItemIsEnabled)
-            self.table.setItem(i, 2, mag)
+            # band: the star's own bands first, then the usual labels; it
+            # is editable so an odd label can be typed
+            band = QComboBox()
+            band.setEditable(True)
+            labels = [b.get("label") for b in (star.get("bands") or [])
+                      if b.get("label")]
+            for lab in (star.get("band"), *labels, "V", "B", "R", "I", "G"):
+                if lab and band.findText(str(lab)) < 0:
+                    band.addItem(str(lab))
+            band.setCurrentText(str(star.get("band") or
+                                    (labels[0] if labels else "V")))
+            band.currentTextChanged.connect(
+                lambda text, row=i: self._band_edited(row, text))
+            self.table.setCellWidget(i, 2, band)
+            mag = QDoubleSpinBox()
+            mag.setDecimals(3)
+            mag.setRange(-5.0, 30.0)
+            mag.setSingleStep(0.01)
+            mag.setValue(float(star.get("mag") or 0.0))
+            mag.valueChanged.connect(
+                lambda value, row=i: self._mag_edited(row, value))
+            self.table.setCellWidget(i, 3, mag)
             btn = QPushButton("×")
             btn.setFixedWidth(28)
             btn.setProperty("compact", True)   # the global padding would
                                                # clip the glyph away
             btn.clicked.connect(lambda _c=False, row=i: self._remove(row))
-            self.table.setCellWidget(i, 3, btn)
+            self.table.setCellWidget(i, 4, btn)
         self.table.blockSignals(False)
+        self._table_building = False
         self.table.resizeColumnsToContents()
         # the button wears the live count, so the observer sees growth
         self.btn_seq_open.setText(
             self.tr("Sequence ({0})…").format(len(self._entries)))
+
+    def _upsert_band(self, star, label, value):
+        # The star's magnitude in one band, edited by hand: it replaces the
+        # catalog value for that band (derived=False, solid) so band_of()
+        # and the calibration pick it up.
+        # @args: star - the sequence star dict, label - band, value - mag
+        for item in star.setdefault("bands", []):
+            if item.get("label") == label:
+                item["value"] = float(value)
+                item["derived"] = False
+                item["origin"] = "manual"
+                return
+        star["bands"].append({"label": label, "value": float(value),
+                              "err": None, "derived": False,
+                              "origin": "manual"})
+
+    def _band_edited(self, row, label):
+        if getattr(self, "_table_building", False) or not label:
+            return
+        star = self._entries[row]["star"]
+        star["band"] = label
+        value, _derived = photometry.band_of(star, label)
+        if value is not None:
+            star["mag"] = float(value)
+            spin = self.table.cellWidget(row, 3)
+            if spin is not None:
+                spin.blockSignals(True)
+                spin.setValue(float(value))
+                spin.blockSignals(False)
+        self._commit()
+
+    def _mag_edited(self, row, value):
+        if getattr(self, "_table_building", False):
+            return
+        star = self._entries[row]["star"]
+        band = star.get("band") or "V"
+        self._upsert_band(star, band, value)
+        star["mag"] = float(value)
+        self._commit()
 
     def _flush_table(self):
         # Names edited in the table land in the entries (and the overlay).
@@ -965,16 +1031,19 @@ class UfeCompareTab(QWidget):
             return
         self._entries[row]["kind"] = combo.currentData()
         self._redraw_entries()
+        self._commit()
 
     def _remove(self, row):
         del self._entries[row]
         self._redraw_entries()
         self._reload_table()
+        self._commit()
 
     def _on_clear(self):
         self._entries = []
         self._redraw_entries()
         self._reload_table()
+        self._commit(force=True)
 
     def entries(self):
         # The sequence, for the Measure tab (phase G2; the only public
@@ -1005,6 +1074,37 @@ class UfeCompareTab(QWidget):
         notify = getattr(dlg, "notify_saved", None)
         if callable(notify):
             notify(paths, "sequence", payload or {})
+
+    def _sequence_payload(self):
+        # The sequence in the shape the host stores (project context): the
+        # field dict when there is one, else a minimal one so a hand-picked
+        # sequence is not lost.
+        # @return: {"catalog", "catalog_name", "fov_arcmin", "target_mag",
+        #          "entries"}
+        st = self.capture_state()
+        if st is None:
+            st = {"catalog": "manual", "catalog_name": "Manual",
+                  "fov_arcmin": 0.0,
+                  "target_mag": float(self.spn_mag.value())}
+        if not st.get("entries"):
+            st = dict(st)
+            st["entries"] = [
+                {"name": e["name"], "kind": e["kind"],
+                 "star": {k: e["star"].get(k) for k in
+                          ("id", "ra", "dec", "band", "mag", "bv",
+                           "color_origin", "catalog", "bands")}}
+                for e in self._entries]
+        return st
+
+    def _commit(self, force=False):
+        # The sequence changed by the observer (not by a restore): tell
+        # the host, so the project keeps it and reopening does not mean
+        # rebuilding the comparison stars every time.
+        # @args: force - persist even when empty (an explicit clear)
+        dlg = self.window()
+        notify = getattr(dlg, "notify_sequence", None)
+        if callable(notify):
+            notify(self._sequence_payload(), force)
 
     # ------------------------------------------------------------- export
 

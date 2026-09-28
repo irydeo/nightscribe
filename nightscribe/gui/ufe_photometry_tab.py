@@ -78,6 +78,10 @@ class UfePhotometryTab(QWidget):
         # closed: measure); re-arm on every visibility change
         self.tab_compare.manual.openStateChanged.connect(
             self._on_manual_toggled)
+        # a manual band/mag edit in the sequence must be selectable in the
+        # Measure band combo without waiting for a first measurement
+        self.tab_compare.sequence_changed.connect(
+            self.tab_measure.refresh_bands)
 
     # -------------------------------------------------------- activation
 

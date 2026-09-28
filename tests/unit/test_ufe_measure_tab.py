@@ -1517,3 +1517,13 @@ def test_lightcurve_double_click_asks_for_the_big_view(dlg):
 
     dlg.tab_measure.chart_series.mouseDoubleClickEvent(_Ev())
     assert seen == [1]
+
+
+def test_group_frames_quick_mirrors_advanced(dlg):
+    # the series block's quick knob and the Advanced… one are the same
+    # value in two places
+    tab = dlg.tab_measure
+    tab.spn_group_quick.setValue(5)
+    assert tab._advanced.spn_group_n.value() == 5
+    tab._advanced.spn_group_n.setValue(3)
+    assert tab.spn_group_quick.value() == 3

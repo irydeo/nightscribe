@@ -426,6 +426,9 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
         def set_exoclock_hook(self, fn):
             pass
 
+        def set_sequence_hook(self, fn):
+            pass
+
         def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
             pass
 
@@ -561,3 +564,48 @@ def test_files_window_opens_ufe_for_a_project_plate(window):
                    for f in files)
     finally:
         proj.delete(dbmod.db, p["id"])
+
+
+def test_ufe_sequence_hook_stores_the_sequence(window, monkeypatch):
+    # the editor's sequence lands in the project context (plus the target
+    # magnitude), ready for the next open
+    import nightscribe.gui.main_window as mw
+    seen = {}
+    monkeypatch.setattr(mw.project, "update_context",
+                        lambda db_, pid, ctx: seen.update(pid=pid, ctx=ctx))
+    entries = [{"name": "A", "kind": "comp",
+                "star": {"ra": 1.0, "dec": 2.0, "mag": 12.0}}]
+    window._ufe_sequence_hook(7, {"catalog": "gaia",
+                                  "catalog_name": "Gaia EDR3",
+                                  "fov_arcmin": 36.0, "target_mag": 12.0,
+                                  "entries": entries})
+    assert seen["pid"] == 7
+    assert seen["ctx"]["sequence"]["entries"] == entries
+    assert seen["ctx"]["sequence"]["catalog"] == "gaia"
+    assert seen["ctx"]["mag"] == 12.0
+
+
+def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
+    # a plate state saved without a sequence must not block the project's
+    # saved sequence from filling the Compare tab
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(
+        mw.project, "find_file",
+        lambda db_, pid, path: {"meta": {"ufe": {"stretch": {}}}})
+    seq = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+           "entries": [{"name": "A", "kind": "comp",
+                        "star": {"ra": 1.0, "dec": 2.0}}]}
+    monkeypatch.setattr(mw.project, "get",
+                        lambda db_, pid: {"context": {"sequence": seq}})
+    calls = {"applied": 0, "loaded": []}
+
+    class _D:
+        def apply_plate_state(self, st):
+            calls["applied"] += 1
+
+        def load_saved_sequence(self, s):
+            calls["loaded"].append(s)
+
+    window._load_editor_sequence(_D(), 1, "/x.fits")
+    assert calls["applied"] == 1
+    assert calls["loaded"] == [seq]

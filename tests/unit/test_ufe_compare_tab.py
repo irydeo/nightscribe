@@ -784,3 +784,68 @@ def test_navigation_keeps_the_sequence(dlg, tmp_path):
     dlg._frame_prev()                    # back to the reference
     assert len(dlg.tab_compare.entries()) == 1
     assert dlg.tab_compare._stars          # placed again
+
+
+def test_proposed_sequence_is_committed_to_the_host(dlg):
+    # building/tweaking the sequence tells the host to store it, so
+    # reopening the visit does not mean rebuilding the comparison stars
+    tab = dlg.tab_compare
+    seen = []
+    dlg.notify_sequence = lambda state, force=False: seen.append(
+        (state, force))
+    tab._field = _field(dlg)
+    tab._stars = list(tab._field["stars"])
+    tab.spn_mag.setValue(12.0)
+    tab._on_propose()
+    assert seen and seen[-1][0]["entries"]
+    assert seen[-1][1] is False
+
+
+def test_clearing_the_sequence_is_committed_forcefully(dlg):
+    tab = dlg.tab_compare
+    seen = []
+    dlg.notify_sequence = lambda state, force=False: seen.append(force)
+    tab._entries = []
+    tab._on_clear()
+    assert seen == [True]
+
+
+def test_sequence_mag_and_band_are_editable(dlg):
+    # the catalog value can be overridden by hand: the manual magnitude and
+    # band feed the calibration (band_of reads star["bands"])
+    from nightscribe.core import photometry
+    tab = dlg.tab_compare
+    tab._field = _field(dlg)
+    tab._stars = list(tab._field["stars"])
+    tab.spn_mag.setValue(12.0)
+    tab._on_propose()
+    assert tab._entries
+    star = tab._entries[0]["star"]
+    star["band"] = "V"
+    star["mag"] = 12.5
+    star["bands"] = [{"label": "V", "value": 12.5, "derived": False}]
+    tab._reload_table()
+    spin = tab.table.cellWidget(0, 3)
+    band = tab.table.cellWidget(0, 2)
+    assert spin is not None and band is not None
+    spin.setValue(13.25)                       # edit by hand
+    assert star["mag"] == 13.25
+    assert photometry.band_of(star, "V")[0] == 13.25
+    band.setCurrentText("R")                   # change the band
+    assert star["band"] == "R"
+
+
+def test_manual_band_reaches_the_measure_combo(dlg):
+    tab = dlg.tab_compare
+    measure = dlg.tab_measure
+    tab._entries = [{"name": "A", "kind": "comp",
+                     "star": {"ra": 1.0, "dec": 2.0, "mag": 12.0,
+                              "band": "V",
+                              "bands": [{"label": "V", "value": 12.0,
+                                         "derived": False}]}}]
+    measure.refresh_bands()
+    assert measure.cmb_band.findText("V") >= 0
+    tab._entries[0]["star"]["bands"].append(
+        {"label": "R", "value": 11.5, "derived": False, "origin": "manual"})
+    measure.refresh_bands()
+    assert measure.cmb_band.findText("R") >= 0

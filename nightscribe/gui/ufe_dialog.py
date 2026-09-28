@@ -99,6 +99,9 @@ class UfeDialog(QDialog):
         # visit): the host arms both callables, ADR-048 follow-up
         self._exotic_reduce_hook = None
         self._exotic_export_hook = None
+        # the host keeps the comparison sequence in the project so
+        # reopening does not rebuild it
+        self._sequence_hook = None
         # actions waiting for an automatic solve (request_wcs): they run
         # the moment the solution lands, or their on_fail on a failure
         self._wcs_pending = []
@@ -465,6 +468,30 @@ class UfeDialog(QDialog):
         # @return: the point hook callable, or None when the editor was
         #          opened ad-hoc (Measure tab hides its save button)
         return self._point_hook
+
+    def set_sequence_hook(self, fn):
+        # @args: fn - callable(state) receiving the Compare tab's sequence
+        #        (project context shape) whenever the observer changes it,
+        #        or None. The host stores it so reopening the visit brings
+        #        the comparison stars back.
+        self._sequence_hook = fn if callable(fn) else None
+
+    def notify_sequence(self, state, force=False):
+        # The Compare tab reports its sequence here; without a hook it is a
+        # no-op. An empty sequence is only stored when forced (an explicit
+        # clear), never on a plate reset/restore.
+        # @args: state - {"catalog", "catalog_name", "fov_arcmin",
+        #        "target_mag", "entries"}, force - store even when empty
+        if self._sequence_hook is None:
+            return False
+        if not state or (not force and not state.get("entries")):
+            return False
+        try:
+            self._sequence_hook(state)
+            return True
+        except Exception as err:
+            logger.warning("sequence hook failed: %s", err)
+            return False
 
     def notify_point(self, payload):
         # The Measure tab reports a calibrated point here; without a hook

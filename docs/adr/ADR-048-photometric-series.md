@@ -226,3 +226,32 @@ EXOTIC handoff use them all the same). The message reads "N in the sequence (M
 placed on this frame)". A plate loaded without a WCS also reuses the **cached
 solution** by hash (even with `solve_save` off, when the FITS is not written), so
 returning to an already solved frame places the sequence again without re-solving.
+
+**Revisión (2026-09-28, la secuencia se guarda sola)**: antes la secuencia solo se
+persistía al exportar el CSV o al guardar una medida, así que cerrar y volver a
+abrir la visita obligaba a reconstruir las comparsas. Ahora, cuando el observador
+la construye o la cambia (proponer, añadir/quitar, cambiar tipo, vaciar) se guarda
+en el **contexto del proyecto** (con la magnitud del objetivo), y al abrir la visita
+se restaura. El estado propio de la placa sigue ganando (ADR-047), pero si no trae
+secuencia ya no bloquea la del proyecto.
+
+**Revision (2026-09-28, the sequence saves itself)**: the sequence used to be stored
+only on CSV export or when saving a measurement, so closing and reopening the visit
+meant rebuilding the comps. Now, when the observer builds or tweaks it (propose,
+add/remove, change kind, clear) it is stored in the **project context** (with the
+target magnitude), and restored when the visit opens. A plate's own state still
+wins (ADR-047), but a saved state without a sequence no longer blocks the project's.
+
+**Revisión (2026-09-28, comparsas editables a mano)**: la comunidad pedía poder
+corregir una comparación. La tabla de la secuencia ahora trae columnas **Banda**
+(combo editable) y **Magnitud** (spinbox): al cambiarlas se reescribe el valor de
+esa banda en `star["bands"]` (`derived=False`, origen «manual»), así que
+`photometry.band_of` y la calibración usan el valor manual; el combo de banda de
+Medir se refresca al instante. El resto de bandas del catálogo se conservan.
+
+**Revision (2026-09-28, hand-editable comps)**: the community asked to correct a
+comparison. The sequence table now has **Band** (editable combo) and **Magnitude**
+(spinbox) columns: editing them rewrites that band's value in `star["bands"]`
+(`derived=False`, origin "manual"), so `photometry.band_of` and the calibration use
+the manual value; the Measure band combo refreshes at once. The star's other
+catalog bands are kept.

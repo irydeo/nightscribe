@@ -76,8 +76,9 @@ visita»** (selección múltiple) en la propia ventana de la visita.
 
 ## 5. Mandos y defaults
 
-Los mandos del día a día están en la pestaña: **banda** y **aperturas**. El
-resto vive en **Avanzado…** (una ventana pequeña, no modal):
+Los mandos del día a día están en la pestaña: **banda**, **aperturas** y, en el
+bloque de la serie, **agrupar tomas** (`group_n`). El resto vive en
+**Avanzado…** (una ventana pequeña, no modal):
 
 | Mando | Default | Qué hace |
 |---|---|---|
@@ -86,7 +87,7 @@ resto vive en **Avanzado…** (una ventana pequeña, no modal):
 | Apertura por seeing | sí | `r = 1,35 · FWHM` medida en las comparaciones |
 | Término de color | sí | ajusta ZP y pendiente con el B−V de las comps |
 | Restar galaxia huésped | no | referencia PS1 alineada, escalada por las comps |
-| **Agrupar tomas** (`group_n`) | 1 | combina N tomas por punto en el dominio de la medida; nunca apila píxeles |
+| **Agrupar tomas** (`group_n`) | 1 | combina N tomas por punto en el dominio de la medida; nunca apila píxeles; también hay un control rápido en el bloque de serie |
 | **Detrend** | apagado | `airmass` quita el mínimo; `auto` añade FWHM/cielo/x-y solo si mejora |
 | **Barrido de apertura por noche (T3)** | no | elige la k en [1,0, 2,0]·FWHM con menos dispersión de la check |
 | **Techo de saturación** | 0 = auto | valor absoluto en ADU; 0 usa la tarjeta SATURATE o Ajustes |

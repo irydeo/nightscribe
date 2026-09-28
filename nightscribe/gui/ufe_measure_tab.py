@@ -200,6 +200,13 @@ class UfeMeasureTab(QWidget):
         self.lbl_series_frames = self._ui.lbl_series_frames
         self.lbl_series_cadence = self._ui.lbl_series_cadence
         self.prg_series = self._ui.prg_series
+        # the quick "Group frames" in the series block mirrors the
+        # Advanced… knob (one value, two views; ADR-048 follow-up)
+        self.spn_group_quick = self._ui.spn_group_n_quick
+        self.spn_group_quick.setValue(self._advanced.spn_group_n.value())
+        self.spn_group_quick.valueChanged.connect(self._on_group_quick)
+        self._advanced.spn_group_n.valueChanged.connect(
+            self._on_group_advanced)
         self.chk_series_live = self._ui.chk_series_live
         self.chk_series_live.toggled.connect(self._on_series_live_toggled)
         self._live_worker = None
@@ -238,6 +245,20 @@ class UfeMeasureTab(QWidget):
         self._advanced.show()
         self._advanced.raise_()
         self._advanced.activateWindow()
+
+    def _on_group_quick(self, value):
+        # the series block's Group frames drives the Advanced… one
+        if self._advanced.spn_group_n.value() != value:
+            self._advanced.spn_group_n.blockSignals(True)
+            self._advanced.spn_group_n.setValue(value)
+            self._advanced.spn_group_n.blockSignals(False)
+
+    def _on_group_advanced(self, value):
+        # and the other way round (restore defaults, saved recipes)
+        if self.spn_group_quick.value() != value:
+            self.spn_group_quick.blockSignals(True)
+            self.spn_group_quick.setValue(value)
+            self.spn_group_quick.blockSignals(False)
 
     # ------------------------------------------------------- activation
 
@@ -498,6 +519,22 @@ class UfeMeasureTab(QWidget):
             return self._compare.entries()
         except Exception:
             return []
+
+    def refresh_bands(self):
+        # The sequence changed (a manual band was typed in): keep the band
+        # combo in step so the observer can pick it before measuring.
+        entries = self._sequence()
+        bands = photometry.available_bands(entries)
+        if not bands:
+            return
+        current = self.cmb_band.currentText()
+        self.cmb_band.blockSignals(True)
+        self.cmb_band.clear()
+        self.cmb_band.addItems(bands)
+        self.cmb_band.setCurrentText(current if current in bands
+                                     else bands[0])
+        self.cmb_band.blockSignals(False)
+        self._band = self.cmb_band.currentText() or self._band
 
     def prefill(self, bv=None):
         # The host object carries data the Measure tab uses: for now the

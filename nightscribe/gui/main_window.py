@@ -183,6 +183,37 @@ def _settings_two_columns(dlg):
         old.addLayout(cols)
 
 
+# How much of an EXOTIC run log is read to report a failure (P2 #21): the
+# tail is where the error is, and a two-hour log can be big.
+_LOG_TAIL_BYTES = 64 * 1024
+
+
+def _exotic_log_tail(path, lines=8, chars=1200):
+    # What EXOTIC actually said when a run failed (P2 #21). The log is
+    # written line by line while the run streams, so its last lines are
+    # the error; reporting the file's PATH instead left the user with
+    # nothing to act on.
+    # @args: path - the run log (None or missing is tolerated), lines -
+    #        trailing non-empty lines to keep, chars - cap for the box
+    # @return: the tail as one string, "" when there is nothing to read
+    if not path:
+        return ""
+    try:
+        p = Path(path)
+        size = p.stat().st_size
+        with p.open("rb") as fh:
+            if size > _LOG_TAIL_BYTES:
+                fh.seek(size - _LOG_TAIL_BYTES)
+            raw = fh.read()
+    except OSError:
+        return ""
+    tail = [ln.rstrip() for ln in raw.decode("utf-8", "replace").splitlines()]
+    if size > _LOG_TAIL_BYTES and tail:
+        tail = tail[1:]              # the chunk cut its first line in half
+    tail = [ln for ln in tail if ln.strip()][-lines:]
+    return "\n".join(tail)[-chars:]
+
+
 # Per-kind table columns for the full (collapsed) table
 TABLE_COLS = {
     "neo": [("Object", "name"), ("Score", "score"), ("Mag", "mag"),
@@ -5548,25 +5579,95 @@ class MainWindow(QMainWindow):
         from .workers import ExoticRunWorker
         self._exotic_worker = ExoticRunWorker(python, str(work),
                                               str(inits_path))
-        self._exotic_worker.progress.connect(
-            lambda line: self.statusBar().showMessage(line[-120:], 0))
+        self._exotic_progress_dialog()
+        self._exotic_worker.progress.connect(self._exotic_progress_line)
         self._exotic_worker.finished.connect(
             lambda res: self._exotic_done(res))
         self._exotic_worker.start()
         self.statusBar().showMessage(
             self.tr("Running EXOTIC (this can take a while)…"), 0)
 
+    def _exotic_progress_dialog(self):
+        # P2 #21: a run takes up to hours, so it gets a progress dialog
+        # with a Cancel that really stops it (the worker kills EXOTIC's
+        # whole process tree). Non-modal, unlike the house's WindowModal
+        # busy dialogs: those cover seconds of network work, and freezing
+        # the window for two hours is not an option. Indeterminate:
+        # EXOTIC's log gives no percentage, only the line it is on.
+        # @args: none
+        # @return: the shown dialog, kept on self._exotic_wait
+        wait = QProgressDialog(
+            self.tr("Running EXOTIC (this can take a while)…"),
+            self.tr("Cancel"), 0, 0, self)
+        wait.setWindowTitle(self.tr("EXOTIC"))
+        wait.setWindowModality(Qt.NonModal)
+        wait.setMinimumDuration(0)
+        # only _exotic_reap_wait closes it: the run's end is the report,
+        # not a value the bar ever reaches
+        wait.setAutoClose(False)
+        wait.setAutoReset(False)
+        wait.canceled.connect(self._exotic_cancel)
+        wait.show()
+        self._exotic_wait = wait
+        return wait
+
+    def _exotic_progress_line(self, line):
+        # A log line from the worker: the dialog's label and the status
+        # bar both say where EXOTIC is (a silent two-hour run reads as a
+        # hung app).
+        # @args: line - one log line, already stripped
+        # @return: nothing
+        wait = getattr(self, "_exotic_wait", None)
+        if wait is not None and Shiboken.isValid(wait):
+            wait.setLabelText(line[-120:])
+        self.statusBar().showMessage(line[-120:], 0)
+
+    def _exotic_cancel(self):
+        # The dialog's Cancel: ask the worker to stop (it takes EXOTIC's
+        # process tree down and reports "cancelled" when it lands) and
+        # say so where the user is looking; the dialog goes on the report.
+        # @args: none
+        # @return: nothing
+        worker = getattr(self, "_exotic_worker", None)
+        if worker is not None:
+            worker.cancel()
+        wait = getattr(self, "_exotic_wait", None)
+        if wait is not None and Shiboken.isValid(wait):
+            wait.setLabelText(self.tr("Cancelling EXOTIC…"))
+        self.statusBar().showMessage(self.tr("Cancelling EXOTIC…"), 0)
+
+    def _exotic_reap_wait(self):
+        # The run ended (finished, failed or cancelled): the dialog is
+        # closed and reaped BEFORE anything else runs, so no box lands on
+        # top of it (close() + deleteLater(), the discipline of e31f394).
+        # @args: none
+        # @return: nothing
+        wait = getattr(self, "_exotic_wait", None)
+        self._exotic_wait = None
+        if wait is not None and Shiboken.isValid(wait):
+            wait.close()
+            wait.deleteLater()
+
     def _exotic_done(self, res):
         # EXOTIC finished: import its curve and parameters into the project.
         from PySide6.QtWidgets import QMessageBox
         from ..core import exotic_import
         self._exotic_worker = None
+        self._exotic_reap_wait()
         self.statusBar().clearMessage()
         pid = getattr(self, "_exotic_pid", None)
+        if res.get("cancelled"):
+            # the user stopped it: no error box, just the plain outcome
+            self.statusBar().showMessage(
+                self.tr("EXOTIC cancelled: nothing was imported."), 8000)
+            return
         if not res.get("ok") or pid is None:
+            # P2 #21: the user reads what EXOTIC said, not where its log
+            # lives: the last lines of the log, in plain language.
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "EXOTIC did not finish:\n{0}").format(
-                    (res.get("log_path") or "")[-600:]))
+                "EXOTIC did not finish. The last lines of its log:\n\n{0}"
+            ).format(_exotic_log_tail(res.get("log_path"))
+                     or self.tr("(the log is empty)")))
             return
         result = exotic_import.load_result(res["out_dir"])
         _run_id, n = exotic_import.persist(

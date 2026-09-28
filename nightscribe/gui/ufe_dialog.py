@@ -848,13 +848,14 @@ class UfeDialog(QDialog):
     # --------------------------------------------------------- solving
 
     def _on_solve(self):
-        # Solve astrometry…: blind-solve the current plate with
-        # Astrometry.net on a worker (network off the GUI thread). The
-        # solution lands in memory only; the file on disk stays untouched.
+        # Solve astrometry…: blind-solve the current plate on a worker
+        # through the ADR-051 dispatcher (auto: local ASTAP first, nova
+        # as the fallback; subprocess and network off the GUI thread).
+        # The solution lands in memory only; the file on disk stays
+        # untouched unless the astap_update opt-in is set.
         if not self.state.has_image:
             return
-        from ..config import config
-        if not (config.get("astrometry_key") or "").strip():
+        if self._nova_key_needed():
             QMessageBox.information(
                 self, self.tr("NightScribe Image Workbench"),
                 self.tr("Set your Astrometry.net API key in Settings to "
@@ -870,6 +871,36 @@ class UfeDialog(QDialog):
         self._on_solve_stage("login")
         self._solve_worker.start()
 
+    def _nova_key_needed(self):
+        # The API-key guard only fires when the solve would actually go
+        # to nova.astrometry.net (ADR-051): the solver is forced to
+        # "astrometry", or "auto" finds no ASTAP binary to try first.
+        # @return: True when the solve needs a nova key and none is set
+        from ..config import config
+        if (config.get("astrometry_key") or "").strip():
+            return False
+        solver = (config.get("solver") or "auto").lower()
+        if solver == "astap":
+            return False          # never touches nova
+        if solver == "astrometry":
+            return True
+        # auto (also the dispatcher's default for unknown values): nova
+        # is only reached when no ASTAP binary resolves
+        from ..core.sources import astap
+        return astap.resolve_binary(config.get("astap_path") or None) is None
+
+    def _solver_names(self):
+        # The backend(s) the dispatcher runs, named for the failure
+        # message; the names themselves are product names, not translated.
+        # @return: "ASTAP", "Astrometry.net" or both, for "auto"
+        from ..config import config
+        solver = (config.get("solver") or "auto").lower()
+        if solver == "astap":
+            return "ASTAP"
+        if solver == "astrometry":
+            return "Astrometry.net"
+        return self.tr("ASTAP and Astrometry.net")
+
     def _on_solve_stage(self, stage):
         # @args: stage - the worker's stage text, mirrored on the button
         self.btn_solve.setText(self.tr("Solving: {0}…").format(stage))
@@ -882,9 +913,10 @@ class UfeDialog(QDialog):
         if not cards:
             QMessageBox.warning(
                 self, self.tr("NightScribe Image Workbench"),
-                self.tr("Astrometry.net could not solve the plate (or is "
-                        "offline). Check the key in Settings or solve it "
-                        "with ASTAP/NINA/Ekos/PixInsight."))
+                self.tr("{0} could not solve the plate. Check the solver "
+                        "in Settings (ASTAP path, Astrometry.net key) or "
+                        "solve the plate with NINA, Ekos or PixInsight "
+                        "and save it again.").format(self._solver_names()))
             return
         if self.state.set_wcs_cards(cards):
             logger.info("UFE: astrometry solved for %s", self.state.path)

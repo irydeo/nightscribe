@@ -218,16 +218,79 @@ def test_hud_buttons_follow_the_wcs(dlg, tmp_path):
 
 
 def test_solve_without_api_key_explains(dlg, monkeypatch):
+    # No key and no ASTAP binary: the solve would go to nova, so the
+    # guard explains (the resolver is pinned: a real ASTAP on PATH must
+    # not change what this test sees).
     from nightscribe import config
+    from nightscribe.core.sources import astap
     from PySide6.QtWidgets import QMessageBox
     seen = []
     monkeypatch.setattr(config.config, "get",
                         lambda *a, **k: "")
+    monkeypatch.setattr(astap, "resolve_binary", lambda *a, **k: None)
     monkeypatch.setattr(QMessageBox, "information",
                         lambda *a, **k: seen.append(a))
     dlg.state.load(MONO)
     dlg._on_solve()
     assert seen                                     # pointed at Settings
+    assert dlg._solve_worker is None
+
+
+def test_solve_auto_with_astap_skips_the_nova_key(dlg, monkeypatch):
+    # P1 #11 / ADR-051: with solver=auto and a resolvable ASTAP binary
+    # the solve never demands a nova key; the worker starts straight
+    # away (auto tries ASTAP first and only falls back to nova).
+    from nightscribe import config
+    from nightscribe.core.sources import astap
+    from nightscribe.gui import workers
+    from PySide6.QtWidgets import QMessageBox
+    asked, started = [], []
+    monkeypatch.setitem(config.config._data, "astrometry_key", "")
+    monkeypatch.setitem(config.config._data, "solver", "auto")
+    monkeypatch.setitem(config.config._data, "astap_path", "")
+    monkeypatch.setattr(astap, "resolve_binary",
+                        lambda *a, **k: "/fake/astap")
+    monkeypatch.setattr(QMessageBox, "information",
+                        lambda *a, **k: asked.append(a))
+
+    class _Sig:
+        def connect(self, *a):
+            pass
+
+    class _FakeWorker:                      # stands in for the QThread
+        progress = _Sig()
+        finished = _Sig()
+
+        def __init__(self, path):
+            pass
+
+        def start(self):
+            started.append(True)
+
+    monkeypatch.setattr(workers, "UfeSolveWorker", _FakeWorker)
+    dlg.state.load(MONO)
+    dlg._on_solve()
+    assert not asked                            # no API-key guard fired
+    assert started and dlg._solve_worker is not None
+
+
+def test_solve_nova_without_key_still_guards(dlg, monkeypatch):
+    # The other half of P1 #11: solver forced to nova with no key, the
+    # guard still fires even when an ASTAP binary exists (it is not
+    # used), and no worker starts.
+    from nightscribe import config
+    from nightscribe.core.sources import astap
+    from PySide6.QtWidgets import QMessageBox
+    seen = []
+    monkeypatch.setitem(config.config._data, "astrometry_key", "")
+    monkeypatch.setitem(config.config._data, "solver", "astrometry")
+    monkeypatch.setattr(astap, "resolve_binary",
+                        lambda *a, **k: "/fake/astap")
+    monkeypatch.setattr(QMessageBox, "information",
+                        lambda *a, **k: seen.append(a))
+    dlg.state.load(MONO)
+    dlg._on_solve()
+    assert seen
     assert dlg._solve_worker is None
 
 
@@ -244,13 +307,18 @@ def test_solved_cards_land_in_memory(dlg, monkeypatch):
 
 
 def test_solve_failure_warns(dlg, monkeypatch):
+    # The failure message names the solver(s) that ran (P1 #11): with
+    # "auto" that is ASTAP first and nova as the fallback.
+    from nightscribe import config
     from PySide6.QtWidgets import QMessageBox
     seen = []
+    monkeypatch.setitem(config.config._data, "solver", "auto")
     monkeypatch.setattr(QMessageBox, "warning",
                         lambda *a, **k: seen.append(a))
     dlg.state.load(MONO)
     dlg._on_solved({})
     assert seen
+    assert "ASTAP" in seen[0][2] and "Astrometry.net" in seen[0][2]
 
 
 # ------------------------------------------------- chart boxes (ADR-046)

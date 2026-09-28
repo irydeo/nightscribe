@@ -94,6 +94,8 @@ def jd_to_hjd(jd, ra_deg, dec_deg):
     # needs. Convention (Eastman et al. 2010, PASP 122, 935): a star in
     # the Sun's direction is seen LATER from Earth (the light passes the
     # Sun first and travels 1 AU more), so HJD = JD - (n . s) * r * tau.
+    # Timescale: UTC in, UTC out; the ~69 s that separate UTC from TT
+    # (leap seconds + 32.184 s) are NOT added (docs/PHOTOMETRY.md).
     # @args: jd - Julian date (UTC), ra_deg/dec_deg - target (degrees)
     # @return: HJD (float)
     from . import ephem_minor

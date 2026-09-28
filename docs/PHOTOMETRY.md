@@ -335,6 +335,14 @@ corrected to the Sun's position, so month-long curves do not carry the
 ±8-minute swing of the Earth's orbit. The points are saved into the
 project and feed the light curve and the post.
 
+**Timescale**: the HJD is computed on **UTC**, the timescale your frames'
+`DATE-OBS` carries, not on TT: NightScribe does not add the leap seconds
+(37 in 2026) plus the 32.184 s fixed offset, about **69 s** (0.00080 d).
+For differential photometry, an AAVSO report or a supernova curve this
+sits far below the measurement's own error; when you compare a transit
+`T_mid` against an ephemeris published in HJD(TT) or BJD_TT, add the
+offset yourself (in 2026, +0.00080 d).
+
 ---
 
 ## 5. Exporting the measurements

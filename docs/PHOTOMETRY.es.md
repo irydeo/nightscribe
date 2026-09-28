@@ -333,6 +333,15 @@ tiempo corregido a la posición del Sol, para que curvas de meses no
 lleven el vaivén de ±8 minutos de la órbita terrestre. Los puntos se
 guardan en el proyecto y alimentan la curva de luz y el post.
 
+**Escala de tiempo**: el HJD se calcula en **UTC**, la escala que lleva
+el `DATE-OBS` de tus frames, no en TT: NightScribe no suma los segundos
+intercalares (37 en 2026) más el desplazamiento fijo de 32,184 s, unos
+**69 s** (0,00080 d). Para fotometría diferencial, un informe de AAVSO o
+una curva de supernova esto queda muy por debajo del error propio de la
+medida; cuando compares el `T_mid` de un tránsito con una efeméride
+publicada en HJD(TT) o BJD_TT, suma tú el desplazamiento (en 2026,
++0,00080 d).
+
 ---
 
 ## 5. Exportar las medidas

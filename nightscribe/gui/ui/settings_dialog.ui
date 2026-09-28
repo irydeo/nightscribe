@@ -506,7 +506,7 @@
              <item><widget class="QPushButton" name="btn_exotic_py_browse"><property name="text"><string>…</string></property></widget></item>
             </layout></item>
             <item><layout class="QHBoxLayout" name="row_exotic_dir">
-             <item><widget class="QLabel" name="lbl_exotic_dir"><property name="text"><string>EXOTIC environment:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLabel" name="lbl_exotic_dir"><property name="text"><string>EXOTIC environment (optional):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
              <item><widget class="QLineEdit" name="edt_exotic_install"/></item>
              <item><widget class="QPushButton" name="btn_exotic_dir_browse"><property name="text"><string>…</string></property></widget></item>
             </layout></item>
@@ -514,7 +514,7 @@
              <item><widget class="QPushButton" name="btn_exotic_prepare"><property name="text"><string>Prepare environment</string></property><property name="toolTip"><string>Create a private Python 3.10 environment and install EXOTIC in it (needs network the first time; a few minutes)</string></property></widget></item>
              <item><widget class="QPushButton" name="btn_exotic_test"><property name="text"><string>Test</string></property><property name="toolTip"><string>Check that the interpreter can import EXOTIC and report its version</string></property></widget></item>
             </layout></item>
-            <item><widget class="QLabel" name="lblH_exotic"><property name="text"><string>Optional: NightScribe runs EXOTIC as an external tool for transit projects (it does not embed it). Prepare the environment once, then use "Reduce with EXOTIC" in the transit project</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+            <item><widget class="QLabel" name="lblH_exotic"><property name="text"><string>Optional. Simplest on Windows: install Python 3.10 from python.org (tick the "py launcher") and run "pip install exotic" in it, then point the field above to that interpreter. "Prepare environment" builds a private environment for you instead (needs network the first time)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
            </layout></widget></item>
           <item>
            <layout class="QHBoxLayout" name="row_tnsbot">

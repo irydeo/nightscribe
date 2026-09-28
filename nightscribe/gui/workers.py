@@ -609,10 +609,10 @@ class ExoticRunWorker(QThread):
     progress = Signal(str)          # a log line
     finished = Signal(dict)         # exotic_run.run result
 
-    def __init__(self, exotic_bin, work_dir, inits_path, mode="red",
+    def __init__(self, python_path, work_dir, inits_path, mode="red",
                  timeout_s=None):
         super().__init__()
-        self._bin = exotic_bin
+        self._python = python_path
         self._dir = work_dir
         self._inits = inits_path
         self._mode = mode
@@ -629,7 +629,7 @@ class ExoticRunWorker(QThread):
             kwargs["timeout_s"] = self._timeout
         try:
             res = exotic_run.run(
-                self._bin, self._dir, self._inits, mode=self._mode,
+                self._python, self._dir, self._inits, mode=self._mode,
                 progress=self.progress.emit,
                 cancel=lambda: self._cancel, **kwargs)
         except Exception as err:      # never crash the GUI thread

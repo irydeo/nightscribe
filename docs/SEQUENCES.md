@@ -188,6 +188,14 @@ EXOTIC's **first run** needs network (NASA Archive, limb-darkening data,
 astrometry.net). Without an EXOTIC environment, the manual **"Export to EXOTIC
 (inits.json)..."** button stays available.
 
+**On Windows (the cleanest)**: install **Python 3.10** from python.org (tick the
+*py launcher*) and run `pip install exotic` in it; then point the app to that
+interpreter (Settings → EXOTIC; the app also detects it with the `py -3.10`
+launcher). The **"Prepare environment"** button is optional and builds a private
+environment for you if you prefer. Some EXOTIC dependencies may lack a Windows
+wheel; if `pip install` fails, the app shows the error and the numpy series keeps
+working.
+
 ## 12. Troubleshooting
 
 - **"No visit with frames"**: open the editor from a visit, not from the loose

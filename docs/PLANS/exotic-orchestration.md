@@ -148,11 +148,13 @@ se sabe si EXOTIC está listo, sin bloquear la UI.
 `core/exotic_env.py` (`detect_python`, `probe`, `prepare`, `venv_python`),
 `gui/workers.PrepareExoticWorker` y el grupo «EXOTIC (transit reduction)» en
 Ajustes (intérprete, carpeta del entorno, «Preparar entorno», «Probar»), con
-las claves `exotic_python_path`/`exotic_install_dir`. `prepare` crea el venv
-con `--without-pip` y arranca pip por el intérprete base (`pip --python`),
-cubriendo el `ensurepip` roto; en Windows usa `Scripts/python.exe`. Tests en
-`tests/unit/test_exotic_env.py` (detección, probe, secuencia de pip, fallo y
-cancelación) e i18n sin `unfinished`.
+las claves `exotic_python_path`/`exotic_install_dir`. `detect_python` es
+consciente de Windows (lanza el **lanzador `py -3.10`** y **valida la versión**
+≤3.10 en todos los candidatos, descartando el stub de Microsoft Store); `prepare`
+intenta **primero un venv normal** y solo si falta pip (el `ensurepip` roto de
+Linux) rehace el venv con `--without-pip` y arranca pip por el intérprete base
+(`pip --python`). Tests en `tests/unit/test_exotic_env.py` (detección, versión,
+lanzador `py`, secuencia de pip, fallo y cancelación) e i18n sin `unfinished`.
 
 ---
 
@@ -222,9 +224,10 @@ corre `exotic -red <inits.json> -ov` con `stdin` cerrado (un prompt falla en
 seco, no cuelga), fusiona stdout/stderr en `exotic_run.log`, y comprueba
 cancelación y timeout con un hilo lector (una EXOTIC muda no congela la app);
 `find_outputs` localiza `FinalLightCurve_*.csv`, `FinalParams_*.json`,
-`NormalizedFlux_*.txt`, `FinalLightCurve_*.png` y `AAVSO_*.txt`. `exotic_env`
-gana `exotic_bin`. Tests en `tests/unit/test_exotic_run.py` (éxito y salidas,
-fallo, cancelación y timeout).
+`NormalizedFlux_*.txt`, `FinalLightCurve_*.png` y `AAVSO_*.txt`. La ejecución usa
+el **intérprete del usuario** (`python -c "…main()…" -red inits.json -ov`), no el
+script de consola, para que valga cualquier instalación de EXOTIC. Tests en
+`tests/unit/test_exotic_run.py` (éxito y salidas, fallo, cancelación y timeout).
 
 ---
 

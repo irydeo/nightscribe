@@ -31,21 +31,26 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT_S = 7200.0     # a full EXOTIC run can take a while
 LOG_NAME = "exotic_run.log"
+# Run EXOTIC through the USER's interpreter (their own install or the venv
+# the app prepared), not the console script: that script's path depends on
+# the install layout, while `-c` works for any interpreter that has EXOTIC.
+_MAIN = ("import sys; sys.argv[0] = 'exotic'; "
+         "from exotic.exotic import main; sys.exit(main())")
 
 
-def run(exotic_bin, work_dir, inits_path, mode="red", override=True,
+def run(python, work_dir, inits_path, mode="red", override=True,
         progress=None, cancel=None, timeout_s=DEFAULT_TIMEOUT_S):
-    # @args: exotic_bin - the `exotic` console script, work_dir - cwd (its
-    #        plots land here per the inits), inits_path - the inits.json,
-    #        mode - red|phot|pre|rt, override - pass -ov (adopt our params,
-    #        skips the interactive parameter prompt),
-    #        progress - callable(line), cancel - callable() -> bool,
-    #        timeout_s - hard cap
+    # @args: python - the Python <=3.10 interpreter that has EXOTIC installed,
+    #        work_dir - cwd (its plots land here per the inits),
+    #        inits_path - the inits.json, mode - red|phot|pre|rt,
+    #        override - pass -ov (adopt our params, skips the interactive
+    #        parameter prompt), progress - callable(line),
+    #        cancel - callable() -> bool, timeout_s - hard cap
     # @return: {"ok", "returncode", "log_path", "out_dir", "cancelled"}
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     log_path = work_dir / LOG_NAME
-    cmd = [str(exotic_bin), f"-{mode}", str(inits_path)]
+    cmd = [str(python), "-c", _MAIN, f"-{mode}", str(inits_path)]
     if override:
         cmd.append("-ov")
     logger.info("running EXOTIC: %s (cwd=%s)", " ".join(cmd), work_dir)
@@ -56,8 +61,8 @@ def run(exotic_bin, work_dir, inits_path, mode="red", override=True,
         with open(log_path, "w", encoding="utf-8", errors="replace") as lf:
             proc = subprocess.Popen(
                 cmd, cwd=str(work_dir), stdin=subprocess.DEVNULL,
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                bufsize=1)
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace", bufsize=1)
             lines = queue.Queue()
 
             def _reader(pipe):

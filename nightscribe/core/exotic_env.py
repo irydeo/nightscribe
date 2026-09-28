@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 # EXOTIC only supports Python <= 3.10.
 _CANDIDATES = ("python3.10", "python3.9", "python3.8")
+_PY_VERSIONS = ("3.10", "3.9", "3.8")
 _TIMEOUT_S = 1800.0
 
 
@@ -54,10 +55,52 @@ def venv_python(install_dir):
     return bin_dir(install_dir) / exe
 
 
-def exotic_bin(install_dir):
-    # @return: the EXOTIC console script inside the venv (may not exist)
-    exe = "exotic.exe" if os.name == "nt" else "exotic"
-    return bin_dir(install_dir) / exe
+def _version_of(python):
+    # @args: python - an interpreter path
+    # @return: (major, minor) or None when it cannot be run
+    try:
+        out = subprocess.run(
+            [str(python), "-c",
+             "import sys; print('%d.%d' % sys.version_info[:2])"],
+            capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    try:
+        major, minor = out.stdout.strip().split(".")[:2]
+        return int(major), int(minor)
+    except ValueError:
+        return None
+
+
+def version_ok(python):
+    # @return: True when the interpreter is Python <= 3.10
+    v = _version_of(python)
+    return v is not None and v <= (3, 10)
+
+
+def _py_launcher(version):
+    # The Windows launcher (`py -3.10`) resolves to a real interpreter;
+    # a plain `python.exe` on PATH may be the wrong version or the
+    # Microsoft Store stub.
+    # @return: the interpreter path it points at, or None
+    launcher = shutil.which("py")
+    if not launcher:
+        return None
+    try:
+        out = subprocess.run(
+            [launcher, f"-{version}", "-c",
+             "import sys; print(sys.executable)"],
+            capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    exe = out.stdout.strip()
+    if exe and Path(exe).is_file() and version_ok(exe):
+        return exe
+    return None
 
 
 def detect_python(preferred=None):
@@ -65,11 +108,23 @@ def detect_python(preferred=None):
     # @return: the path of a Python <= 3.10 interpreter, or None
     if preferred:
         p = Path(preferred)
-        if p.is_file():
+        # a venv python the app prepared, or the user's own with EXOTIC
+        if p.is_file() and version_ok(p):
             return str(p)
+        return None
+    if os.name == "nt":       # the py launcher first (Windows)
+        for v in _PY_VERSIONS:
+            exe = _py_launcher(v)
+            if exe:
+                return exe
     for name in _CANDIDATES:
         found = shutil.which(name)
-        if found:
+        if found and version_ok(found):
+            return found
+    # a generic python/python3, validated; skip the Store stub
+    for name in ("python", "python3"):
+        found = shutil.which(name)
+        if found and "WindowsApps" not in found and version_ok(found):
             return found
     return None
 
@@ -118,17 +173,26 @@ def prepare(install_dir, base_python, progress=None, cancel=None):
     try:
         if progress:
             progress("venv")
-        rc = _run([base_python, "-m", "venv", "--without-pip",
-                   str(install_dir)], log, cancel)
-        if rc != 0:
-            return False, "\n".join(log)
+        # a normal venv first (Windows ships pip with it); only if pip is
+        # missing (the Linux ensurepip quirk) redo without pip and
+        # bootstrap it through the base interpreter
+        rc = _run([base_python, "-m", "venv", str(install_dir)], log, cancel)
         py = venv_python(install_dir)
-        if progress:
-            progress("pip")
-        rc = _run([base_python, "-m", "pip", "--python", str(py),
-                   "install", "--upgrade", "pip", "wheel"], log, cancel)
-        if rc != 0:
-            return False, "\n".join(log)
+        pip = bin_dir(install_dir) / ("pip.exe" if os.name == "nt" else "pip")
+        if rc != 0 or not pip.is_file():
+            shutil.rmtree(install_dir, ignore_errors=True)
+            if progress:
+                progress("venv")
+            rc = _run([base_python, "-m", "venv", "--without-pip",
+                       str(install_dir)], log, cancel)
+            if rc != 0:
+                return False, "\n".join(log)
+            if progress:
+                progress("pip")
+            rc = _run([base_python, "-m", "pip", "--python", str(py),
+                       "install", "--upgrade", "pip", "wheel"], log, cancel)
+            if rc != 0:
+                return False, "\n".join(log)
         if progress:
             progress("exotic")
         rc = _run([str(py), "-m", "pip", "install", "exotic"], log, cancel)

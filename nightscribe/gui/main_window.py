@@ -5318,14 +5318,21 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(
                 self.tr("No planet data — check the name and retry"), 8000)
             return
-        # the environment prepared in Settings
-        install = config.get("exotic_install_dir") or str(
-            paths.data_dir() / "exotic-venv")
-        exe = exotic_env.exotic_bin(install)
-        if not Path(exe).is_file():
+        # the interpreter that has EXOTIC: the user's own Python 3.10 (the
+        # cleanest on Windows) or the venv the app prepared
+        python = exotic_env.detect_python(
+            config.get("exotic_python_path") or None)
+        if not python:
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
-                "No EXOTIC environment yet: prepare it in Settings → "
-                "EXOTIC (transit reduction)."))
+                "No Python 3.10 found. Install it (python.org, ticking the "
+                "py launcher) and run «pip install exotic» in it, or use "
+                "«Prepare environment» in Settings → EXOTIC."))
+            return
+        if not exotic_env.probe(python)["ok"]:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "This Python has no EXOTIC installed: run «pip install "
+                "exotic» in it, or use «Prepare environment» in Settings → "
+                "EXOTIC."))
             return
         # the visit's frames (the latest visit that has FITS)
         from ..core import followup as fu
@@ -5397,7 +5404,8 @@ class MainWindow(QMainWindow):
         basis = plan.get("filter") or "V"
         self._exotic_filter = "V" if basis in ("L", "CV", None) else basis
         from .workers import ExoticRunWorker
-        self._exotic_worker = ExoticRunWorker(exe, str(work), str(inits_path))
+        self._exotic_worker = ExoticRunWorker(python, str(work),
+                                              str(inits_path))
         self._exotic_worker.progress.connect(
             lambda line: self.statusBar().showMessage(line[-120:], 0))
         self._exotic_worker.finished.connect(

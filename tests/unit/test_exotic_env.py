@@ -28,22 +28,56 @@ def _completed(cmd, rc=0, out="", err=""):
     return subprocess.CompletedProcess(cmd, rc, stdout=out, stderr=err)
 
 
-def test_detect_python_prefers_the_configured_path(tmp_path):
+def test_detect_python_prefers_the_configured_path(tmp_path, monkeypatch):
     exe = tmp_path / "python3.10"
     exe.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(exotic_env, "version_ok", lambda p: True)
     assert exotic_env.detect_python(str(exe)) == str(exe)
+
+
+def test_detect_python_rejects_a_wrong_version(tmp_path, monkeypatch):
+    # a configured interpreter older than 3.10 (or newer) is not accepted
+    exe = tmp_path / "python3.13"
+    exe.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(exotic_env, "version_ok", lambda p: False)
+    assert exotic_env.detect_python(str(exe)) is None
 
 
 def test_detect_python_falls_back_to_which(monkeypatch):
     monkeypatch.setattr(exotic_env.shutil, "which",
                         lambda n: "/usr/bin/python3.10" if n == "python3.10"
                         else None)
+    monkeypatch.setattr(exotic_env, "version_ok", lambda p: True)
     assert exotic_env.detect_python("") == "/usr/bin/python3.10"
 
 
 def test_detect_python_none(monkeypatch):
     monkeypatch.setattr(exotic_env.shutil, "which", lambda n: None)
     assert exotic_env.detect_python("") is None
+
+
+def test_detect_python_uses_the_py_launcher_on_windows(tmp_path,
+                                                       monkeypatch):
+    # on Windows the launcher `py -3.10` resolves to a real interpreter.
+    # A fake os module: mutating the real os.name would make pathlib build
+    # WindowsPath on POSIX (and is_file would lie).
+    import types
+    exe = tmp_path / "python3.10"
+    exe.write_text("#!/bin/sh\n")
+    monkeypatch.setattr(exotic_env, "os", types.SimpleNamespace(name="nt"))
+    monkeypatch.setattr(exotic_env.shutil, "which",
+                        lambda n: "/usr/bin/py" if n == "py" else None)
+
+    def fake_run(cmd, **k):
+        joined = " ".join(str(c) for c in cmd)
+        if "print(sys.executable)" in joined:
+            return subprocess.CompletedProcess(cmd, 0, stdout=str(exe) + "\n")
+        if "version_info" in joined:
+            return subprocess.CompletedProcess(cmd, 0, stdout="3.10\n")
+        return subprocess.CompletedProcess(cmd, 0, stdout="")
+
+    monkeypatch.setattr(exotic_env.subprocess, "run", fake_run)
+    assert exotic_env.detect_python("") == str(exe)
 
 
 def test_probe_ok_and_fail(monkeypatch):
@@ -102,3 +136,15 @@ def test_venv_python_layout(tmp_path):
     p = exotic_env.venv_python(tmp_path / "v")
     assert p.name in ("python", "python.exe")
     assert p.parent.name in ("bin", "Scripts")
+
+
+def test_version_ok_reads_the_interpreter(monkeypatch):
+    monkeypatch.setattr(exotic_env.subprocess, "run",
+                        lambda *a, **k: _completed(a, 0, "3.10\n"))
+    assert exotic_env.version_ok("/x/python")
+    monkeypatch.setattr(exotic_env.subprocess, "run",
+                        lambda *a, **k: _completed(a, 0, "3.12\n"))
+    assert not exotic_env.version_ok("/x/python")
+    monkeypatch.setattr(exotic_env.subprocess, "run",
+                        lambda *a, **k: _completed(a, 1, "", "boom"))
+    assert not exotic_env.version_ok("/x/python")

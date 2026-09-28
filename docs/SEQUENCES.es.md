@@ -191,6 +191,14 @@ La **primera ejecución** de EXOTIC necesita red (NASA Archive, datos de limb
 darkening, astrometry.net). Sin entorno EXOTIC, el botón manual **«Exportar a
 EXOTIC (inits.json)…»** sigue disponible.
 
+**En Windows (lo más limpio)**: instala **Python 3.10** desde python.org (marca
+el *py launcher*) y ejecuta `pip install exotic` en él; luego apunta la app a
+ese intérprete (Ajustes → EXOTIC; la app también lo detecta con el lanzador `py
+-3.10`). El botón **«Preparar entorno»** es opcional y crea un entorno privado
+por ti si lo prefieres. Algunas dependencias de EXOTIC podrían no traer rueda
+para Windows; si el `pip install` falla, la app muestra el error y la serie
+numpy sigue funcionando.
+
 ## 12. Solución de problemas
 
 - **«No hay visita con tomas»**: abre el editor desde una visita; no desde el

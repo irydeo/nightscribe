@@ -193,6 +193,27 @@ def test_ccd_flux_error_equation():
         == pytest.approx(full, rel=1e-12)
 
 
+def test_ccd_flux_error_prices_the_sky_annulus():
+    # Merline & Howell (Handbook of CCD Astronomy): the sky/read/dark
+    # terms carry (1 + n_pix/n_sky). With n_pix = n_sky the sky term
+    # doubles; without n_sky the equation degrades to the classic form.
+    g, ron, n, sky = 2.0, 5.0, 100, 10.0
+    flux = 5000.0
+    classic = phot.ccd_flux_error(flux, sky, n, gain=g, ron=ron)
+    with_sky = phot.ccd_flux_error(flux, sky, n, gain=g, ron=ron,
+                                   n_sky=n)
+    expected = math.sqrt(flux / g + 2.0 * (n * sky / g
+                                           + n * ron ** 2 / g ** 2))
+    assert with_sky == pytest.approx(expected, rel=1e-9)
+    assert with_sky > classic
+    # a measure_point result carries the annulus size for the caller
+    data = np.full((60, 60), 100.0)
+    yy, xx = np.ogrid[:60, :60]
+    data += 5000.0 * np.exp(-((xx - 30) ** 2 + (yy - 30) ** 2) / 8.0)
+    r = phot.measure_point(data, 30, 30)
+    assert r["ok"] and r["n_sky"] > r["n_pix"]
+
+
 def test_mag_error():
     flux, ferr = 1000.0, 10.0
     assert phot.mag_error(flux, ferr) == pytest.approx(0.01086, rel=1e-9)

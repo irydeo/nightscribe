@@ -192,6 +192,7 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     else:
         sky_pp = 0.0
     flux = total - sky_pp * n_pix
+    n_sky = int(ann_pixels.size)
     frame_max = float(np.nanmax(data))
     # A star that clipped the detector leaves a plateau: many pixels
     # stuck at exactly the frame maximum (a gaussian core has one
@@ -218,11 +219,11 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                          f"clipped: the peak reaches the plate ceiling "
                          f"(~{ceiling:.0f} ADU)") | {
                 "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-                "n_pix": n_pix, "saturated": True}
+                "n_pix": n_pix, "n_sky": n_sky, "saturated": True}
     if saturated:
         return _fail("saturada", "saturated") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-            "n_pix": n_pix, "saturated": True}
+            "n_pix": n_pix, "n_sky": n_sky, "saturated": True}
     if linear_adu is not None and frame_max > 0.0 \
             and peak >= SAT_FRAC * float(linear_adu):
         # over the camera's linearity limit: the flux is no longer
@@ -233,38 +234,47 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                      "nonlinear: the peak is above your camera's linearity "
                      "limit") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-            "n_pix": n_pix, "saturated": False, "nonlinear": True}
+            "n_pix": n_pix, "n_sky": n_sky, "saturated": False, "nonlinear": True}
     if flux is None or not math.isfinite(flux) or flux <= 0.0:
         return _fail("sin señal medible", "no measurable signal") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-            "n_pix": n_pix}
+            "n_pix": n_pix, "n_sky": n_sky}
     return {"x": cx, "y": cy, "flux": flux, "sky_pp": sky_pp,
-            "peak": peak, "n_pix": n_pix, "saturated": False,
+            "peak": peak, "n_pix": n_pix, "n_sky": n_sky, "saturated": False,
             "ok": True, "reason": None, "cen_ok": cen_ok}
 
 
 def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
-                   dark_e_s=None):
-    # Honest CCD equation for the net flux, everything anchored in gain:
-    #   sigma^2 (ADU^2) = flux/g + n*sky/g + n*ron^2/g^2 + n*dark*t/g^2
-    # (source and sky shot noise counted in electrons, RON per pixel; the
-    # dark current term needs the exposure and the sensor's e-/pixel/s).
+                   dark_e_s=None, n_sky=None):
+    # Honest CCD equation for the net flux (Merline & Howell, Handbook of
+    # CCD Astronomy), everything anchored in gain:
+    #   sigma^2 (ADU^2) = flux/g + n*(1 + n/n_sky)*(sky/g + ron^2/g^2
+    #                     + dark*t/g^2)
+    # The (1 + n/n_sky) factor prices the noise of the sky annulus
+    # itself: with a small annulus the sky estimate is noisy and the
+    # subtraction adds variance. Without n_sky the factor degrades to 1
+    # (the annulus is assumed infinitely fine), never below the truth.
     # @args: flux - net flux in ADU, sky_pp - sky in ADU per pixel,
-    #        n_pix - aperture pixels, gain - e-/ADU, ron - read noise in e-,
-    #        exptime - exposure in s (for the dark), dark_e_s - dark
-    #        current in e-/pixel/s (camera profile), both optional
+    #        n_pix - aperture pixels, gain - e-/ADU, ron - read noise in
+    #        e-, exptime - exposure in s (for the dark), dark_e_s - dark
+    #        current in e-/pixel/s (camera profile), n_sky - annulus
+    #        pixels (all optional but the first three)
     # @return: sigma of the flux in ADU, or None when there is no usable
     #          gain: the caller then falls back to the comps' scatter
     if gain is None or gain <= 0.0 or flux is None or flux < 0.0:
         return None
     var = flux / gain
     n = int(n_pix or 0)
+    sky_factor = 1.0
+    if n_sky is not None and n_sky > 0 and n > 0:
+        sky_factor = 1.0 + n / float(n_sky)
     if sky_pp is not None and sky_pp >= 0.0:
-        var += n * sky_pp / gain
+        var += sky_factor * n * sky_pp / gain
     if ron is not None and ron >= 0.0 and n > 0:
-        var += n * (ron ** 2) / (gain ** 2)
+        var += sky_factor * n * (ron ** 2) / (gain ** 2)
     if dark_e_s is not None and dark_e_s >= 0.0 and exptime and n > 0:
-        var += n * float(dark_e_s) * float(exptime) / (gain ** 2)
+        var += sky_factor * n * float(dark_e_s) * float(exptime) \
+            / (gain ** 2)
     return math.sqrt(var)
 
 
@@ -1315,7 +1325,8 @@ def measure_plate(image, cfg):
     flux_err = ccd_flux_error(target["flux"], target["sky_pp"],
                               target["n_pix"], gain=gain, ron=ron,
                               exptime=inst_header["exptime"],
-                              dark_e_s=cfg.site_dark)
+                              dark_e_s=cfg.site_dark,
+                              n_sky=target.get("n_sky"))
     ccd_mag_err = mag_error(target["flux"], flux_err)
     res.err_internal = ccd_mag_err
     scint = _plate_scintillation(cfg, mx, my, inst_header["exptime"])

@@ -439,7 +439,7 @@ def _frame_flux(frame, cfg):
     err = photometry.ccd_flux_error(
         target.get("flux"), target.get("sky_pp"), target.get("n_pix"),
         gain=res.gain, ron=cfg.site_ron, exptime=frame.get("exptime"),
-        dark_e_s=cfg.site_dark)
+        dark_e_s=cfg.site_dark, n_sky=target.get("n_sky"))
     return target.get("flux"), err
 
 
@@ -456,7 +456,8 @@ def _group_comp(group, star, cfg):
                     errs.append(photometry.ccd_flux_error(
                         r["flux"], r.get("sky_pp"), r.get("n_pix"),
                         gain=f["res"].gain, ron=cfg.site_ron,
-                        exptime=f.get("exptime"), dark_e_s=cfg.site_dark))
+                        exptime=f.get("exptime"), dark_e_s=cfg.site_dark,
+                        n_sky=r.get("n_sky")))
                 value = photometry.band_of(star, cfg.band
                                            or cfg.fallback_band)[0]
                 if value is not None:

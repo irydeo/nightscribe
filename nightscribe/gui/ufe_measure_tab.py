@@ -742,12 +742,17 @@ class UfeMeasureTab(QWidget):
         # Builds the engine config from the tab's widgets and Ajustes.
         from ..config import config
         sat = self._advanced.spn_saturate.value()
+        # T3 (P2 #20): the per-night aperture sweep only runs when the
+        # engine owns the radii, so the checkbox hands them over (radii
+        # None) instead of pinning the spins on every night.
+        auto = self._advanced.chk_auto_aperture.isChecked()
         return series_measure.SeriesConfig(
             wcs=self._state.wcs, target_xy=tuple(target_xy),
             comp_set=tuple(entries),
             band=self.cmb_band.currentText() or self._band,
-            radii=(self.spn_rap.value(), self.spn_rin.value(),
-                   self.spn_rout.value()),
+            radii=None if auto else (self.spn_rap.value(),
+                                     self.spn_rin.value(),
+                                     self.spn_rout.value()),
             sigmaclip=self.chk_sigmaclip.isChecked(),
             sky_mode=self.cmb_sky.currentData() or "median",
             color=self.chk_color.isChecked(),
@@ -764,7 +769,7 @@ class UfeMeasureTab(QWidget):
             site_linear=config.get("cam_linearity_adu"),
             site_dark=config.get("cam_dark_current_e_s"),
             group_n=int(self._advanced.spn_group_n.value()),
-            auto_aperture=self._advanced.chk_auto_aperture.isChecked(),
+            auto_aperture=auto,
             detrend_policy=self._advanced.cmb_detrend.currentData()
             or "off")
 
@@ -879,8 +884,10 @@ class UfeMeasureTab(QWidget):
 
     def _fill_series_panel(self, result, context):
         # Plain-language summary (D13/D25/D35/D20): points and frames,
-        # the flags, the detrend coefficients per night, the cadence
-        # guard and the multi-night zero-point / band warnings.
+        # the flags, the aperture the sweep chose per night (T3), the
+        # detrend coefficients per night, the cadence guard, the
+        # multi-night zero-point / band warnings and the frames that
+        # never made it onto the curve (P2 #22: nothing drops silently).
         points = result.points
         lines = [self.tr("Series: {0} points from {1} frames").format(
             len(points), len((context or {}).get("paths", [])))]
@@ -893,6 +900,22 @@ class UfeMeasureTab(QWidget):
             lines.append(self.tr("Flagged points: {0} ({1})").format(
                 nflag, ", ".join(f"{k} × {v}"
                                  for k, v in sorted(counts.items()))))
+        # T3 (P2 #20): the sweep's answer, one line per night, so the
+        # observer sees the aperture the curve was actually measured with
+        apertures = result.apertures or {}
+        for night in sorted(apertures, key=lambda n: (n is None, n)):
+            ap = apertures[night]
+            if ap.get("fwhm") is None:
+                lines.append(self.tr(
+                    "Night {0}: aperture k = {1:.1f} (check-star scatter "
+                    "{2:.4f} mag)").format(night, ap.get("k") or 0.0,
+                                           ap.get("rms") or 0.0))
+            else:
+                lines.append(self.tr(
+                    "Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, "
+                    "check-star scatter {3:.4f} mag)").format(
+                        night, ap.get("k") or 0.0, ap["fwhm"],
+                        ap.get("rms") or 0.0))
         det = result.detrend
         if det:
             for n in det.get("nights", []):

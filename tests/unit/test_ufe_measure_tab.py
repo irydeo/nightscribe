@@ -1256,3 +1256,50 @@ def test_live_session_is_one_undoable_run(dlg, qapp, tmp_path, monkeypatch):
 
 # ---------------- P2 #20: the aperture sweep is reachable ----------------
 
+def test_auto_aperture_checkbox_hands_the_radii_to_the_engine(
+        dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #20): the tab always passed its spins as radii, so
+    # the engine's auto path (radii None) never ran even with the box
+    # checked. Checked, the engine owns the apertures and its chosen k per
+    # night reaches the panel; unchecked, the spins still rule.
+    from nightscribe.core import series_measure as sm
+    tab = dlg.tab_measure
+    seen = []
+
+    def fake(paths, cfg, progress=None, cancel=None):
+        seen.append(cfg)
+        return sm.SeriesResult(
+            points=[sm.SeriesPoint(index=0, path=str(paths[0]),
+                                   mjd=60900.5, mag=15.0, err=0.01,
+                                   inst=14.0, filter="V")],
+            apertures={"2026-09-20": {"k": 1.4, "rms": 0.0123,
+                                      "radii": (5.4, 9.0, 13.0),
+                                      "fwhm": 3.2}})
+
+    monkeypatch.setattr(sm, "measure_series", fake)
+    frames = [_write_plate(tmp_path / f"ap{i}.fits", dlg.state.data)
+              for i in range(2)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 31)
+    tab._advanced.chk_auto_aperture.setChecked(True)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert seen and seen[0].radii is None       # the sweep can run now
+    assert seen[0].auto_aperture is True
+    panel = tab.lbl_result.toPlainText()
+    assert "Night 2026-09-20: aperture k = 1.4" in panel
+    assert "seeing 3.2 px" in panel and "0.0123" in panel
+    # unchecked: the observer's spins are never stomped
+    tab._advanced.chk_auto_aperture.setChecked(False)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert seen[-1].auto_aperture is False
+    assert seen[-1].radii == (tab.spn_rap.value(), tab.spn_rin.value(),
+                              tab.spn_rout.value())
+
+
+# ---------------- P2 #22: nothing drops without a word ----------------
+

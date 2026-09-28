@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The visit strip of the editor's left panel (ADR-048 follow-up): the
+  frame navigator over the series block, plus the EXOTIC reduction block
+  for transit projects. Loaded by gui/ufe_dialog.py through
+  gui/ui_loader.py; the series group lands in ph_series (a placeholder,
+  ADR-005) and the class tag is UfeDialog so the i18n context carries
+  over. The count, the file name and the status line are data, set in
+  code.
+-->
+<ui version="4.0">
+ <class>UfeDialog</class>
+ <widget class="QWidget" name="UfeVisitPanel">
+  <layout class="QVBoxLayout" name="vbox_visit">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_frame">
+     <property name="toolTip"><string>The frame open in the editor is the reference: the target and the comparison stars are measured in its pixels</string></property>
+     <property name="text"><string>Frame</string></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_frame_nav">
+     <item><widget class="QPushButton" name="btn_frame_prev"><property name="text"><string>‹</string></property><property name="toolTip"><string>Previous frame (PageUp)</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_frame_next"><property name="text"><string>›</string></property><property name="toolTip"><string>Next frame (PageDown)</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_frame_first"><property name="text"><string>First</string></property><property name="toolTip"><string>Back to the first frame of the visit, the reference by default</string></property></widget></item>
+     <item><spacer name="hsp_frame"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>10</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_frame_file"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QWidget" name="ph_series"/></item>
+   <item>
+    <widget class="QGroupBox" name="grp_exotic">
+     <property name="title"><string>Transit reduction (EXOTIC)</string></property>
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QVBoxLayout" name="vbox_exotic">
+      <item><widget class="QPushButton" name="btn_exotic_reduce"><property name="text"><string>Reduce and fit with EXOTIC…</string></property><property name="toolTip"><string>Generate the visit's inits.json, run EXOTIC headless and import its light curve and fitted parameters. Uses the open frame as the reference and the sequence built above</string></property></widget></item>
+      <item><widget class="QPushButton" name="btn_exotic_export"><property name="text"><string>Export to EXOTIC (inits.json)…</string></property><property name="toolTip"><string>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter</string></property></widget></item>
+      <item><widget class="QLabel" name="lbl_exotic_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+     </layout>
+    </widget>
+   </item>
+   <item><spacer name="vsp_visit"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>10</height></size></property></spacer></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

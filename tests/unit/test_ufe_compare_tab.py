@@ -712,3 +712,21 @@ def test_manual_window_cannot_squish_its_buttons(dlg):
     w.btn_seq_open.setText(bare)
     assert w.minimumWidth() >= max(actions, seq)
     assert w.minimumHeight() >= w.minimumSizeHint().height()
+
+
+def test_saved_project_sequence_fills_the_tab(dlg):
+    # ADR-047/048 follow-up: a project sequence already built comes back
+    # into the Compare tab when the plate has none of its own, so a
+    # series or an EXOTIC reduction finds the comps.
+    tab = dlg.tab_compare
+    cra, cdec = dlg.state.wcs.center()
+    seq = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+           "fov_arcmin": 36.0, "target_mag": 12.0,
+           "entries": [{"name": "A", "kind": "comp",
+                        "star": {"ra": cra, "dec": cdec, "band": "V",
+                                 "mag": 12.0, "bands": []}}]}
+    assert dlg.load_saved_sequence(seq) is True
+    assert len(tab.entries()) == 1
+    assert tab.entries()[0]["name"] == "A"
+    # the tab already has entries: a second restore is a no-op
+    assert dlg.load_saved_sequence(seq) is False

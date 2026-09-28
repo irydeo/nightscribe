@@ -172,6 +172,9 @@ def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
 
         def open_plate(self, path):
             return True
+
+        def load_saved_sequence(self, seq):
+            return False
     monkeypatch.setattr(window, "_ufe_open",
                         lambda tab, hook_pid=None, obj=None,
                         session_id=None: (
@@ -422,6 +425,12 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
 
         def set_exoclock_hook(self, fn):
             pass
+
+        def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
+            pass
+
+        def load_saved_sequence(self, seq):
+            return False
 
         def show_tab(self, tab):
             pass

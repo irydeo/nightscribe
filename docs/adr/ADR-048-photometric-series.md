@@ -141,3 +141,65 @@ by ADR-004); a separate series recipe (rejected: two recipes mean two precisions
 flagged points stay honest, exportable data; migration v12 is minimal and
 idempotent; SN, variables and HADS enter through parameters with no type-specific
 code; series performance becomes a measurable budget.
+
+## Revisión (2026-09-28): navegación de tomas y reducción desde el editor
+
+**Contexto**: la serie y la reducción EXOTIC necesitaban la astrometría y la
+secuencia de comparación, pero el editor abría siempre la **primera** toma, sin
+forma de recorrer la visita, y los botones de EXOTIC vivían en la pestaña Análisis,
+lejos de la secuencia que necesitan: si no la habías construido, la reducción
+fallaba con «no hay estrellas de comparación». Además, al abrir el editor desde una
+visita no se cargaba la secuencia ya guardada del proyecto.
+
+**Decisión**:
+
+- **Navegador de tomas** en el panel izquierdo del editor (visible con la visita
+  armada): anterior/siguiente, `toma i/N`, nombre del fichero y «primera toma»
+  (Av/Re Pág). Cargar una toma la deja como placa abierta, y **la toma abierta es
+  la referencia** de la serie y del handoff EXOTIC (objetivo y comparsas en sus
+  píxeles). Al cambiar de toma se conserva el estado de la pestaña Compare
+  (campo y secuencia: las estrellas son RA/Dec y se recolocan por WCS).
+- **Bloque EXOTIC en el editor**, solo en proyectos de tránsito con visita:
+  «Reduce and fit with EXOTIC…» y «Export to EXOTIC (inits.json)…», con la
+  secuencia a mano. Se desactiva y explica qué falta hasta que hay comparsas.
+  La pestaña Análisis deja un acceso que abre la visita en el editor.
+- **Cargar la secuencia guardada**: al abrir desde una visita/proyecto, si la
+  placa no trae estado propio, se restaura `ctx["sequence"]` en la pestaña Compare
+  (el estado de la placa siempre gana, ADR-047).
+
+**Consecuencias**: el flujo serie/tránsito ya no manda al usuario a ciegas; la
+reducción usa lo que tiene delante. La referencia del handoff es la toma abierta:
+con dithering, EXOTIC debe respetar esos píxeles (valida la placa resuelta que ya
+guardamos, ADR-051 rev.); si no, la referencia del handoff volvería a la primera
+toma, aunque la serie sí usaría la abierta.
+
+## Revision (2026-09-28): frame navigation and reduction from the editor
+
+**Context**: the series and the EXOTIC reduction needed the astrometry and the
+comparison sequence, but the editor always opened the **first** frame, with no way
+to walk the visit, and the EXOTIC buttons lived in the Analysis tab, far from the
+sequence they need: without it built, the reduction failed with "no comparison
+stars". Worse, opening the editor from a visit did not load the sequence already
+saved in the project.
+
+**Decision**:
+
+- **Frame navigator** in the editor's left panel (visible with the visit armed):
+  previous/next, `frame i/N`, the file name and "first frame" (PageUp/PageDown).
+  Loading a frame makes it the open plate, and **the open frame is the reference**
+  of the series and the EXOTIC handoff (target and comps in its pixels). Changing
+  frames preserves the Compare tab's state (field and sequence: the stars are
+  RA/Dec and are re-placed through the WCS).
+- **EXOTIC block in the editor**, only for transit projects opened from a visit:
+  "Reduce and fit with EXOTIC…" and "Export to EXOTIC (inits.json)…", with the
+  sequence at hand. It disables itself and says what is missing until there are
+  comps. The Analysis tab keeps a door that opens the visit in the editor.
+- **Load the saved sequence**: opening from a visit/project, when the plate
+  carries no state of its own, restores `ctx["sequence"]` into the Compare tab
+  (the plate's own state always wins, ADR-047).
+
+**Consequences**: the series/transit flow no longer sends the observer in blind;
+the reduction uses what is in front of them. The handoff reference is the open
+frame: with dithering, EXOTIC must respect those pixels (the persisted plate
+solution of ADR-051 rev. validates it); otherwise the handoff reference would go
+back to the first frame, while the series would still use the open one.

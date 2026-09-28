@@ -83,6 +83,11 @@ layout revision, 2026-09-24).
 Builds the photometric sequence on your plate (a WCS is needed; if it
 is missing, the configured solver gets you one, ASTAP or nova):
 
+With the visit open, the left panel also carries the **frame navigator**
+(previous/next, `frame i/N`, "first frame": the open frame is the reference) and,
+in transit projects, the **EXOTIC** reduction buttons. The project's saved
+sequence loads by itself when the visit opens.
+
 * **Target** and **Target mag** pre-fill what the project knows; the
   approximate magnitude guides the proposal.
 * **Generate field** queries the catalog (Gaia EDR3 or APASS DR9) and

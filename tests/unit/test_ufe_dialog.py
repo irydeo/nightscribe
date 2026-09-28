@@ -586,3 +586,73 @@ def test_refit_on_state_change_respects_a_manual_zoom(dlg, monkeypatch):
     dlg.view._user_zoomed = False
     dlg._refit_on_state_change()
     assert calls == [1]
+
+
+# ------------------------------------- visit frames + EXOTIC block (ADR-048 follow-up)
+
+def test_frame_navigator_steps_through_the_visit(dlg, tmp_path):
+    from test_fits_annotate import _make_fits
+    a = _make_fits(tmp_path / "a.fits")
+    b = _make_fits(tmp_path / "b.fits")
+    c = _make_fits(tmp_path / "c.fits")
+    dlg.set_series_hook(lambda: {"paths": [str(a), str(b), str(c)],
+                                 "kind": "transit"})
+    dlg.open_plate(a)
+    assert dlg.visit_panel.lbl_frame.text() == "Frame 1/3"
+    assert not dlg.visit_panel.btn_frame_prev.isEnabled()
+    assert dlg.visit_panel.btn_frame_next.isEnabled()
+    dlg._frame_next()
+    assert dlg.visit_panel.lbl_frame.text() == "Frame 2/3"
+    assert dlg.visit_panel.lbl_frame_file.text() == "b.fits"
+    dlg._frame_next()
+    assert dlg.visit_panel.lbl_frame.text() == "Frame 3/3"
+    assert not dlg.visit_panel.btn_frame_next.isEnabled()
+    dlg._frame_prev()
+    dlg._frame_first()
+    assert dlg.visit_panel.lbl_frame.text() == "Frame 1/3"
+
+
+def test_frame_navigator_keeps_the_compare_state(dlg, tmp_path, monkeypatch):
+    from test_fits_annotate import _make_fits
+    a = _make_fits(tmp_path / "a.fits")
+    b = _make_fits(tmp_path / "b.fits")
+    dlg.set_series_hook(lambda: {"paths": [str(a), str(b)], "kind": "transit"})
+    seen = {}
+    monkeypatch.setattr(dlg.tab_photometry, "capture_state",
+                        lambda: seen.setdefault("captured", {"sequence": {}}))
+    monkeypatch.setattr(dlg.tab_photometry, "apply_state",
+                        lambda st: seen.setdefault("applied", st))
+    dlg.open_plate(a)
+    dlg._frame_next()
+    assert "captured" in seen and "applied" in seen
+    assert dlg.visit_panel.lbl_frame.text() == "Frame 2/2"
+
+
+def test_exotic_block_only_for_transit_with_a_sequence(dlg, tmp_path,
+                                                       monkeypatch):
+    from test_fits_annotate import _make_fits
+    a = _make_fits(tmp_path / "a.fits")
+    calls = []
+    dlg.set_exotic_hooks(lambda: calls.append("r"), lambda: calls.append("e"))
+    assert not dlg.visit_panel.grp_exotic.isVisible()      # no visit yet
+    dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "transit"})
+    assert dlg.visit_panel.grp_exotic.isVisible()
+    # no sequence yet: the buttons wait and the line says why
+    assert not dlg.visit_panel.btn_exotic_reduce.isEnabled()
+    assert "sequence" in dlg.visit_panel.lbl_exotic_status.text().lower()
+    # a sequence lands: the block enables and the hooks fire
+    monkeypatch.setattr(dlg.tab_compare, "entries",
+                        lambda: [{"name": "A", "kind": "comp", "star": {}}])
+    dlg.tab_compare.sequence_changed.emit()
+    assert dlg.visit_panel.btn_exotic_reduce.isEnabled()
+    dlg.visit_panel.btn_exotic_reduce.click()
+    dlg.visit_panel.btn_exotic_export.click()
+    assert calls == ["r", "e"]
+
+
+def test_exotic_block_hidden_off_transit(dlg, tmp_path):
+    from test_fits_annotate import _make_fits
+    a = _make_fits(tmp_path / "a.fits")
+    dlg.set_exotic_hooks(lambda: None, lambda: None)
+    dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "variable"})
+    assert not dlg.visit_panel.grp_exotic.isVisible()

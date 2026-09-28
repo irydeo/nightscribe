@@ -33,7 +33,7 @@ dialog's top bar). The object itself wears the dialog's global red mark
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import QEvent, QObject, Qt, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QProgressDialog,
                                QPushButton, QTableWidgetItem, QWidget,
@@ -115,6 +115,9 @@ def _reap_wait(wait):
 class UfeCompareTab(QWidget):
     pick_clicks = True   # clicks mark things: the dialog hands us
                            # the pick cursor + snapping reticle on stage
+
+    sequence_changed = Signal()   # the entries grew/shrank (the UFE's
+                                  # EXOTIC block enables itself from this)
     # @args: state - the shared UfeImageState, lang - "es" | "en",
     #        view - the UfeImageView the field overlays and picks live on
 
@@ -742,6 +745,7 @@ class UfeCompareTab(QWidget):
     def _redraw_entries(self):
         # Sequence rings (comp cyan circles, check pink squares) plus
         # names; stars in the sequence lose their catalog label.
+        self.sequence_changed.emit()
         if self._view is None:
             return
         for it in getattr(self, "_entry_items", []):

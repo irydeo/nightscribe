@@ -287,3 +287,37 @@ def test_exotic_solve_failure_says_so(window, qapp, monkeypatch, tmp_path):
                         lambda *a, **k: reached.append(a))
     window._exotic_solve_first(1, {"data": {}}, "/py", [str(plate)], 7, {})
     assert warns and not reached
+
+
+def test_ufe_exotic_reduce_uses_the_open_frame_and_sequence(window, qapp,
+                                                            monkeypatch):
+    # The editor's reduce hook (ADR-048 follow-up): the open frame and
+    # the loaded sequence travel to the launch, not a re-derived first
+    # frame and the project's possibly empty context.
+    seen = {}
+    monkeypatch.setattr(window, "_transit_reduce_exotic",
+                        lambda pid=None: seen.update(pid=pid))
+
+    class _State:
+        has_image = True
+        path = "/data/frame_042.fits"
+
+    class _Compare:
+        @staticmethod
+        def entries():
+            return [{"name": "A", "kind": "comp", "star": {"ra": 1.0}}]
+
+    class _Dlg:
+        state = _State()
+        tab_compare = _Compare()
+
+    window._ufe = _Dlg()
+    try:
+        window._ufe_exotic_reduce(7, 9)
+    finally:
+        window._ufe = None
+    assert seen["pid"] == 7
+    over = window._exotic_overrides
+    assert over["ref"] == "/data/frame_042.fits"
+    assert over["session_id"] == 9
+    assert over["entries"][0]["name"] == "A"

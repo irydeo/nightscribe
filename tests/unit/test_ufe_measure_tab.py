@@ -1467,7 +1467,7 @@ def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
     assert hasattr(dlg, "series_pane")
     assert not dlg.series_pane.isVisible()
     # the group is reparented into the pane
-    assert tab.grp_series.parent() is dlg.series_pane
+    assert tab.grp_series.parent() is dlg.visit_panel
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
     assert dlg.series_pane.isVisible()
     assert tab.grp_series.isVisible()

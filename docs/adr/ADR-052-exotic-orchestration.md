@@ -82,3 +82,15 @@ app stays light (EXOTIC is external, optional); the parity gate now measures the
 fit and passes (T_mid 2 s, Rp/Rs 1.2 %, sigma 96 %, depth 2.3 %); without an
 EXOTIC environment, the series and its preview keep working. EXOTIC's first run
 needs network (NASA Archive, LDTk, astrometry.net).
+
+**Revisión (2026-09-28)**: la reducción arranca desde el **Editor FITS unificado**,
+junto a la secuencia que necesita (ADR-048 rev.), no desde la pestaña Análisis. El
+editor expone un bloque «Reducción de tránsito (EXOTIC)» para proyectos de tránsito
+abiertos desde una visita; usa la **toma abierta** como referencia y la **secuencia
+cargada** en el editor. La pestaña Análisis deja un acceso que abre la visita ahí.
+
+**Revision (2026-09-28)**: the reduction starts from the **Unified FITS Editor**,
+next to the sequence it needs (ADR-048 rev.), not from the Analysis tab. The editor
+carries a "Transit reduction (EXOTIC)" block for transit projects opened from a
+visit; it uses the **open frame** as the reference and the **sequence loaded** in
+the editor. The Analysis tab keeps a door that opens the visit there.

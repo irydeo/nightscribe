@@ -4497,7 +4497,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(panel, 1)
         self._project_widgets["visits_panel"] = panel
         if kind == "transit":
-            self._analysis_transit_block(layout)
+            self._analysis_transit_block(layout, pid)
         elif kind == "hads":
             self._analysis_hads_block(layout)
         if kind in ("neo", "pccp", "comet"):
@@ -4518,27 +4518,28 @@ class MainWindow(QMainWindow):
     # good: a visit's plate opens in the editor, which owns blink,
     # measure and annotate) -------------
 
-    def _analysis_transit_block(self, layout):
+    def _analysis_transit_block(self, layout, pid):
         # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
-        # NASA/JPL); NightScribe hands over a pre-filled inits.json and
-        # then guides the closing of the scientific loop.
+        # NASA/JPL). The reduce itself lives in the editor next to the
+        # sequence it needs (ADR-048 follow-up), so here is the door in.
+        # @args: layout - the Analysis column, pid - the project id
         layout.addWidget(QLabel(self.tr(
             "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
             "Python ≤3.10 environment.")))
         btn_reduce = QPushButton(
-            self.tr("Reduce and fit with EXOTIC…"))
+            self.tr("Open the visit in the editor (reduce with EXOTIC)…"))
         btn_reduce.setToolTip(self.tr(
-            "Generate the visit's inits.json, run EXOTIC headless in the "
-            "environment prepared in Settings and import its light curve "
-            "and fitted parameters"))
-        btn_reduce.clicked.connect(self._transit_reduce_exotic)
+            "Open this project's visit in the editor: build the comparison "
+            "sequence there and run «Reduce and fit with EXOTIC…» next to it"))
+        btn_reduce.clicked.connect(
+            lambda: self._open_transit_visit_editor(pid))
         layout.addWidget(btn_reduce)
         btn_exotic = QPushButton(
             self.tr("Export to EXOTIC (inits.json)…"))
         btn_exotic.setToolTip(self.tr(
             "Pre-filled EXOTIC initialization file: planet, observatory, "
             "camera and filter — EXOTIC skips its wizard where it can"))
-        btn_exotic.clicked.connect(self._transit_export_exotic)
+        btn_exotic.clicked.connect(lambda: self._transit_export_exotic(pid))
         layout.addWidget(btn_exotic)
         lbl_exotic = QLabel(self.tr(
             "After the reduction, upload EXOTIC's output file to "
@@ -4546,6 +4547,22 @@ class MainWindow(QMainWindow):
             "Database — and tell the story when you publish."))
         lbl_exotic.setWordWrap(True)
         layout.addWidget(lbl_exotic)
+
+    def _open_transit_visit_editor(self, pid):
+        # The selected visit (or the newest) opens in the editor with the
+        # series and the EXOTIC block armed.
+        # @args: pid - the project id
+        sid = self._selected_visit_id()
+        if sid is None:
+            from ..core import followup as fu
+            sessions = fu.list_sessions(db, pid)
+            sid = sessions[0]["id"] if sessions else None
+        if sid is None:
+            self.statusBar().showMessage(self.tr(
+                "This project has no visit yet: attach the frames first."),
+                8000)
+            return
+        self._visit_measure_series(pid, sid)
 
     def _analysis_hads_block(self, layout):
         # ADR-034 (D.3): publication photometry is external — FotoDif
@@ -4583,6 +4600,20 @@ class MainWindow(QMainWindow):
         lbl_imp.setWordWrap(True)
         layout.addWidget(lbl_imp)
 
+    def _load_editor_sequence(self, dlg, pid, path):
+        # ADR-047/048: restore a plate's saved working state when it has
+        # one; otherwise fill the Compare tab with the project's saved
+        # sequence (so a series or an EXOTIC reduction finds the comps
+        # already built, never the bare "no comparison stars").
+        # @args: dlg - the UfeDialog, pid - project id, path - open plate
+        row = project.find_file(db, pid, path) if path else None
+        meta = (row or {}).get("meta") or {}
+        if meta.get("ufe"):
+            dlg.apply_plate_state(meta["ufe"])
+            return
+        p = project.get(db, pid) or {}
+        dlg.load_saved_sequence((p.get("context") or {}).get("sequence"))
+
     def _visit_open_in_editor(self, pid, path, sid):
         # A visit's plate opens in the UFE with everything attached: the
         # object context, and both hooks land on THIS visit (ADR-045:
@@ -4604,11 +4635,9 @@ class MainWindow(QMainWindow):
         dlg.set_object(obj)
         # ADR-047: the plate's saved working state comes back with it:
         # stretch, the measure recipe, the sequence field, when there
-        # is one (nothing was saved, or the plate predates it, and the
-        # fresh defaults stand)
-        row = project.find_file(db, pid, path)
-        if row is not None and (row.get("meta") or {}).get("ufe"):
-            dlg.apply_plate_state(row["meta"]["ufe"])
+        # is one; without it, the project's saved sequence fills the
+        # Compare tab (ADR-048 follow-up: EXOTIC finds the comps)
+        self._load_editor_sequence(dlg, pid, path)
 
     def _visit_measure_series(self, pid, session_id):
         # ADR-048 (D8/D36): the visit's frames become a series. The
@@ -4635,6 +4664,9 @@ class MainWindow(QMainWindow):
                              session_id=session_id)
         dlg.open_plate(paths[0])
         dlg.set_object(obj)
+        # ADR-048 follow-up: the series/EXOTIC flow starts from the
+        # sequence already built (plate state first, project second)
+        self._load_editor_sequence(dlg, pid, paths[0])
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -4675,9 +4707,9 @@ class MainWindow(QMainWindow):
         if not dlg.open_plate(row["path"]):
             return
         dlg.set_object(obj)
-        # the same restore as "restore in the editor"
-        if (row.get("meta") or {}).get("ufe"):
-            dlg.apply_plate_state(row["meta"]["ufe"])
+        # the same restore as "restore in the editor" (and, without a
+        # saved plate state, the project's sequence: ADR-048 follow-up)
+        self._load_editor_sequence(dlg, pid, row["path"])
 
     def _visit_data_changed(self, pid):
         # A visit or its contents changed (the panel owns the edit): the
@@ -5342,11 +5374,15 @@ class MainWindow(QMainWindow):
                 db, pid, "plan",
                 {"checklist": [bool(cb.isChecked()) for cb in cbs]})
 
-    def _transit_export_exotic(self):
+    def _transit_export_exotic(self, pid=None):
         # 4d: enrich the planet (worker — the GUI never blocks on the
         # network; the Archive row is cached from the Details tab anyway),
         # then write the pre-filled inits.json next to a user-chosen path.
-        p = self._current_project
+        # @args: pid - the project id (None: the project in the main tab)
+        pid = pid or (self._current_project or {}).get("id")
+        if pid is None:
+            return
+        p = project.get(db, pid)
         if not p:
             return
         from .workers import ExploreWorker
@@ -5354,9 +5390,52 @@ class MainWindow(QMainWindow):
             self.tr("Gathering planet data for EXOTIC…"), 4000)
         worker = ExploreWorker(config, p["object_name"],
                                fallback_target=p.get("context") or {})
-        worker.finished.connect(lambda e: self._exotic_write(p["id"], e))
+        worker.finished.connect(lambda e: self._exotic_write(pid, e))
         self._keep(worker)
         worker.start()
+
+    # -------------------- the UFE's EXOTIC block (ADR-048 follow-up)
+
+    def _ufe_exotic_reduce(self, pid, session_id):
+        # The reduce button in the editor: the open frame is the reference
+        # and the loaded sequence the comparison stars, so the reduction
+        # never fails for a sequence the project has not saved yet.
+        dlg = getattr(self, "_ufe", None)
+        ref = None
+        entries = []
+        if dlg is not None and getattr(dlg, "state", None) is not None:
+            ref = dlg.state.path if dlg.state.has_image else None
+            entries = list(dlg.tab_compare.entries())
+        self._exotic_overrides = {"ref": ref, "entries": entries,
+                                  "session_id": session_id}
+        self._transit_reduce_exotic(pid)
+
+    def _ufe_exotic_export(self, pid, session_id):
+        # The handoff file (the wizard-style inits.json); the loaded
+        # sequence is registered first so the project carries it.
+        dlg = getattr(self, "_ufe", None)
+        if dlg is not None and getattr(dlg, "state", None) is not None \
+                and dlg.state.has_image:
+            self._register_editor_sequence(pid, session_id, dlg)
+        self._transit_export_exotic(pid)
+
+    def _register_editor_sequence(self, pid, session_id, dlg):
+        # Persists the editor's current sequence into the project context
+        # (and the open plate's saved state), so the export/handoff never
+        # works from an unsaved one.
+        entries = dlg.tab_compare.entries()
+        if not entries:
+            return
+        state = dlg.tab_compare.capture_state() or {}
+        ctx_update = {"sequence": {
+            "catalog": state.get("catalog"),
+            "catalog_name": state.get("catalog_name"),
+            "fov_arcmin": state.get("fov_arcmin"),
+            "target_mag": state.get("target_mag"),
+            "entries": state.get("entries") or []}}
+        if state.get("target_mag") is not None:
+            ctx_update["mag"] = state["target_mag"]
+        project.update_context(db, pid, ctx_update)
 
     def _exotic_write(self, pid, e):
         # @args: pid - project id, e - enrich result ({} on failure)
@@ -5391,9 +5470,13 @@ class MainWindow(QMainWindow):
             self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
                     "environment"), 10000)
 
-    def _transit_reduce_exotic(self):
+    def _transit_reduce_exotic(self, pid=None):
         # Gather the planet data (worker), then run the orchestration.
-        p = self._current_project
+        # @args: pid - the project id (None: the project in the main tab)
+        pid = pid or (self._current_project or {}).get("id")
+        if pid is None:
+            return
+        p = project.get(db, pid)
         if not p:
             return
         from .workers import ExploreWorker
@@ -5401,7 +5484,7 @@ class MainWindow(QMainWindow):
             self.tr("Gathering planet data for EXOTIC…"), 4000)
         worker = ExploreWorker(config, p["object_name"],
                                fallback_target=p.get("context") or {})
-        worker.finished.connect(lambda e: self._exotic_reduce(p["id"], e))
+        worker.finished.connect(lambda e: self._exotic_reduce(pid, e))
         self._keep(worker)
         worker.start()
 
@@ -5465,10 +5548,16 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if not p:
             return
-        # the visit's frames (the latest visit that has FITS)
+        # the visit's frames: the UFE hook names its session (ADR-048
+        # follow-up); the Analysis route takes the latest visit with FITS
         from ..core import followup as fu
+        over = getattr(self, "_exotic_overrides", None) or {}
+        want_sid = over.get("session_id")
+        sessions = fu.list_sessions(db, pid)
+        if want_sid is not None:
+            sessions = [s for s in sessions if s["id"] == want_sid] or sessions
         session_id, frame_paths = None, []
-        for s in fu.list_sessions(db, pid):
+        for s in sessions:
             fs = [f["path"] for f in project.files_for_session(db, s["id"])
                   if f.get("kind") == "fits"]
             if fs:
@@ -5478,33 +5567,42 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
                 "This project has no FITS frames in a visit yet."))
             return
+        # the UFE hook selects the open frame as the reference and passes
+        # the sequence it has loaded; the Analysis route falls back to the
+        # first frame and the project's saved sequence
+        ref = over.get("ref")
+        if ref not in frame_paths:
+            ref = frame_paths[0]
+        entries = over.get("entries") or None
+        self._exotic_overrides = None
         try:
-            header, _data = fits_io.read_fits(frame_paths[0])
+            header, _data = fits_io.read_fits(ref)
         except Exception:
             header = {}
         wcs = wcs_mod.Wcs.from_header(header)
         if wcs is None:
-            # ADR-051: the first frame is solved with the configured
+            # ADR-051: the reference frame is solved with the configured
             # solver and the reduction continues with that WCS; never ask
             # the observer for pixel coordinates
             self._exotic_solve_first(pid, e, python, frame_paths,
-                                     session_id, header)
+                                     session_id, header, ref)
             return
         self._exotic_launch_final(pid, e, python, frame_paths, session_id,
-                                  wcs)
+                                  wcs, ref, entries)
 
     def _exotic_solve_first(self, pid, e, python, frame_paths, session_id,
-                            header):
-        # No WCS on the first frame: blind-solve it off the GUI thread
+                            header, ref=None):
+        # No WCS on the reference frame: blind-solve it off the GUI thread
         # (the ADR-051 dispatcher honours the configured solver), then
         # continue the reduction with the solved WCS. The solution is
         # persisted into the FITS (ADR-051 rev).
         from PySide6.QtWidgets import QMessageBox
         from ..core import blink, wcs as wcs_mod
         from .workers import UfeSolveWorker
+        ref = ref or frame_paths[0]
         self.statusBar().showMessage(
             self.tr("The first frame has no WCS: solving it…"), 0)
-        worker = UfeSolveWorker(Path(frame_paths[0]))
+        worker = UfeSolveWorker(Path(ref))
         worker.progress.connect(
             lambda s: self.statusBar().showMessage(
                 self.tr("Solving: {0}…").format(s), 0))
@@ -5518,7 +5616,7 @@ class MainWindow(QMainWindow):
                             "solved. Check the solver in Settings: ASTAP "
                             "path or Astrometry.net key."))
                 return
-            self._persist_solution(frame_paths[0], cards)
+            self._persist_solution(ref, cards)
             wcs = wcs_mod.Wcs.from_header(
                 blink.merge_solved_wcs(header, cards))
             if wcs is None:
@@ -5528,7 +5626,7 @@ class MainWindow(QMainWindow):
                             "(non-TAN WCS)."))
                 return
             self._exotic_launch_final(pid, e, python, frame_paths,
-                                      session_id, wcs)
+                                      session_id, wcs, ref)
         worker.finished.connect(done)
         self._keep(worker)
         worker.start()
@@ -5547,11 +5645,13 @@ class MainWindow(QMainWindow):
         return err == ""
 
     def _exotic_launch_final(self, pid, e, python, frame_paths, session_id,
-                             wcs):
+                             wcs, ref=None, entries=None):
         # The reference WCS is in hand: target and comparison pixels come
         # from it (never hand-entered); without a sequence the observer is
         # sent to build it in the editor.
-        # @args: wcs - the first frame's usable WCS
+        # @args: wcs - the reference frame's usable WCS, ref - the
+        #        reference frame (defaults to the first), entries - the
+        #        sequence from the UFE (None: the project's saved one)
         from PySide6.QtWidgets import QMessageBox
         from ..core import exotic
         p = project.get(db, pid)
@@ -5559,7 +5659,8 @@ class MainWindow(QMainWindow):
             return
         obj = self._ufe_object_from_project(p)
         ctx = p.get("context") or {}
-        entries = (ctx.get("sequence") or {}).get("entries") or []
+        if entries is None:
+            entries = (ctx.get("sequence") or {}).get("entries") or []
         tx = ty = None
         if (obj or {}).get("ra") is not None:
             try:
@@ -6235,6 +6336,9 @@ class MainWindow(QMainWindow):
         if fits_path and not dlg.open_plate(fits_path):
             return
         dlg.set_object(obj)              # re-apply on the fresh plate
+        # ADR-048 follow-up: the sequence already built comes back (plate
+        # state first, project second), so the Compare tab is not empty
+        self._load_editor_sequence(dlg, pid, fits_path)
 
     def _fu_sequence_dialog(self, pid):
         if self._use_ufe():
@@ -8336,6 +8440,15 @@ class MainWindow(QMainWindow):
             dlg.set_run_undo_hook(self._ufe_run_undo)
             dlg.set_exoclock_hook(
                 lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
+            # ADR-048 follow-up: a transit project's reduce/export live in
+            # the editor, next to the sequence they need
+            proj = project.get(db, hook_pid) or {}
+            if proj.get("kind") == "transit":
+                dlg.set_exotic_hooks(
+                    lambda: self._ufe_exotic_reduce(hook_pid, session_id),
+                    lambda: self._ufe_exotic_export(hook_pid, session_id))
+            else:
+                dlg.set_exotic_hooks(None, None)
         else:
             dlg.set_point_hook(None)
             dlg.set_reset_hooks(None, None)
@@ -8343,6 +8456,7 @@ class MainWindow(QMainWindow):
             dlg.set_points_hook(None)
             dlg.set_run_undo_hook(None)
             dlg.set_exoclock_hook(None)
+            dlg.set_exotic_hooks(None, None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])

@@ -85,6 +85,11 @@ distribución, 2026-09-24).
 Construye la secuencia fotométrica sobre tu placa (necesita WCS; si
 falta, la resuelve sola con el solver configurado, ASTAP o nova):
 
+Con la visita abierta, el panel izquierdo lleva además el **navegador de
+tomas** (anterior/siguiente, `toma i/N`, «primera toma»: la toma abierta es la
+referencia) y, en proyectos de tránsito, los botones de **reducción EXOTIC**.
+La secuencia ya guardada del proyecto se carga sola al abrir la visita.
+
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
   sabe; la magnitud aproximada sirve de guía a la propuesta.
 * **Generar campo** consulta el catálogo (Gaia EDR3 o APASS DR9) y las

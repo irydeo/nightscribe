@@ -46,10 +46,12 @@ Project sheet : Capture : Analysis (visit) : Publication
 The visit window holds its files (FITS frames) and the **"Measure the
 sequence..."** action, which opens the editor on the first frame with the series
 block armed. There is no loose-folder dialog: no visit means no series, no
-Undo, no analysis, no aggregation. The **Photometric series** block lives in a
-panel at the left of the image (visible only with the visit armed) and the curve
-opens large on a **double-click**. If the first frame has no WCS, it is solved by
-itself with the configured solver before starting.
+Undo, no analysis, no aggregation. The panel **at the left of the image**
+(visible only with the visit armed) carries the **frame navigator** (previous /
+next, `frame i/N`, "first frame": the open frame is the reference), the
+**Photometric series** block (the curve opens large on a **double-click**) and,
+in transit projects, the **EXOTIC** block. If the first frame has no WCS, it is
+solved by itself with the configured solver before starting.
 
 To get files there from a listing, use **"Attach files to the visit"**
 (multi-select) in the visit window itself.
@@ -186,8 +188,11 @@ sequence and the EXOTIC environment prepared.
    with the configured solver (local ASTAP or nova, ADR-051) and **stores the
    WCS in the FITS itself**, so the frame stays solved for any program. Pixel
    coordinates are never asked for by hand.
-3. **Sequence**: confirm the project's comparisons (in the editor).
-4. **Reduce**: Analysis → **"Reduce and fit with EXOTIC..."** and follow the log.
+3. **Sequence**: open it in the editor (the Analysis door opens the visit
+   there) and confirm the comparisons; the frame navigator in the left panel
+   walks the visit, and **the open frame is the reference**.
+4. **Reduce**: in the editor, **"Reduce and fit with EXOTIC..."** in the left
+   panel (or Analysis → "Open the visit in the editor..."), and follow the log.
    It can take a while; do not close the app (you can cancel).
 5. **Result**: a message with **T_mid** and **Rp/Rs**; the "exotic" curve shows
    in the chart; the `inits.json` and the report stay in the project, and the

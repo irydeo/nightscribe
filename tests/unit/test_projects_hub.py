@@ -1665,6 +1665,12 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
         def set_object(self, obj):
             opened.append(obj)
 
+        def load_saved_sequence(self, seq):
+            return False
+
+        def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
+            pass
+
     def _ufe_open(tab_, hook_pid=None, obj=None, session_id=None, **_kw):
         opened.append((tab_, hook_pid, obj, session_id))
         return _D()

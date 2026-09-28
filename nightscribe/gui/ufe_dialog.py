@@ -36,7 +36,7 @@ from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, \
 
 from ..core import fits_io
 from .ufe_state import UfeImageState
-from .ui_loader import adopt_ui, drop_in
+from .ui_loader import adopt_ui, drop_in, load_ui
 from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
 
@@ -94,6 +94,10 @@ class UfeDialog(QDialog):
         self._points_hook = None
         self._run_undo_hook = None
         self._exoclock_hook = None
+        # the EXOTIC reduction block (transit projects opened from a
+        # visit): the host arms both callables, ADR-048 follow-up
+        self._exotic_reduce_hook = None
+        self._exotic_export_hook = None
         # actions waiting for an automatic solve (request_wcs): they run
         # the moment the solution lands, or their on_fail on a failure
         self._wcs_pending = []
@@ -170,17 +174,23 @@ class UfeDialog(QDialog):
         self._wire_topbar()
         self._build_feature_tabs()
         # the series block lives at the left of the image (its own pane,
-        # hidden unless a visit arms it): move the measure tab's series
-        # group there once; the group keeps its visibility toggle (D8)
+        # hidden unless a visit arms it): the visit strip (frame navigator
+        # + the EXOTIC reduction for transit projects) carries it in its
+        # ph_series placeholder (ADR-005)
         self.series_pane = QWidget(self)
         series_lay = QVBoxLayout(self.series_pane)
         series_lay.setContentsMargins(0, 0, 0, 0)
+        self.visit_panel = load_ui("ufe_visit_panel", self)
         grp = getattr(self.tab_measure, "grp_series", None)
         if grp is not None:
-            series_lay.addWidget(grp)
+            drop_in(self.visit_panel.layout(), self.visit_panel.ph_series,
+                    grp)
+        series_lay.addWidget(self.visit_panel)
         self.series_pane.setMinimumWidth(300)
         self.splitter.replaceWidget(0, self.series_pane)
         self.series_pane.hide()
+        self._frame_index = 0
+        self._wire_frame_nav()
 
     def _wire_topbar(self):
         # Aliases and signal wiring for the Designer top bar (ADR-005).
@@ -401,6 +411,7 @@ class UfeDialog(QDialog):
                 self.tr("Could not read the FITS file:") + f"\n{err}")
             return False
         self._last_dir = str(Path(path).parent)
+        self._sync_frame_nav()
         return True
 
     def show_tab(self, tab):
@@ -499,6 +510,21 @@ class UfeDialog(QDialog):
             self.state.toggle_invert()
         self.tab_photometry.apply_state(st)
 
+    def load_saved_sequence(self, seq):
+        # ADR-047/048: when the open plate carries no sequence of its own,
+        # the project's saved sequence fills the Compare tab, so measuring
+        # or reducing with EXOTIC starts from what was already built
+        # instead of asking for it again. The plate's own state always
+        # wins (load_saved_sequence is only reached when it had none).
+        # @args: seq - the project context's "sequence" dict, or None
+        # @return: True when a sequence was restored
+        if not seq or not seq.get("entries"):
+            return False
+        if self.tab_compare.entries():
+            return False
+        self.tab_photometry.apply_state({"sequence": seq})
+        return True
+
     def reset_state_local(self):
         # ADR-047: the in-editor half of the state reset: the recipe back
         # to the editor's defaults, the stretch back to auto, the
@@ -569,6 +595,8 @@ class UfeDialog(QDialog):
             self.tab_measure.set_series_attached(self._series_hook is not None)
         if hasattr(self, "series_pane"):
             self.series_pane.setVisible(self._series_hook is not None)
+        self._sync_frame_nav()
+        self._sync_exotic_block()
 
     def series_context(self):
         # @return: the visit context the host hooked, or None
@@ -579,6 +607,142 @@ class UfeDialog(QDialog):
         except Exception as err:
             logger.warning("series hook failed: %s", err)
             return None
+
+    # ----------------------------------------------------- visit frames
+
+    def _wire_frame_nav(self):
+        # The frame navigator over the series block (ADR-048 follow-up):
+        # the open frame is the reference the series and EXOTIC measure
+        # in, so stepping frames is stepping the reference.
+        vp = self.visit_panel
+        vp.btn_frame_prev.clicked.connect(
+            lambda: self._goto_frame(self._frame_index - 1))
+        vp.btn_frame_next.clicked.connect(
+            lambda: self._goto_frame(self._frame_index + 1))
+        vp.btn_frame_first.clicked.connect(self._frame_first)
+        vp.btn_exotic_reduce.clicked.connect(self._notify_exotic_reduce)
+        vp.btn_exotic_export.clicked.connect(self._notify_exotic_export)
+        self.tab_compare.sequence_changed.connect(self._sync_exotic_block)
+        self._sync_frame_nav()
+
+    def _visit_paths(self):
+        # @return: the visit's sorted frame paths, or [] (no visit armed)
+        ctx = self.series_context() or {}
+        return list(ctx.get("paths") or [])
+
+    def _sync_frame_nav(self):
+        # The strip mirrors the open frame among the visit's frames.
+        if not hasattr(self, "visit_panel"):
+            return
+        paths = self._visit_paths()
+        n = len(paths)
+        if n and self.state.path:
+            try:
+                self._frame_index = paths.index(str(self.state.path))
+            except ValueError:
+                self._frame_index = min(self._frame_index, n - 1)
+        elif n:
+            self._frame_index = min(self._frame_index, n - 1)
+        else:
+            self._frame_index = 0
+        vp = self.visit_panel
+        vp.lbl_frame.setText(
+            self.tr("Frame {0}/{1}").format(self._frame_index + 1, n)
+            if n else self.tr("Frame"))
+        vp.lbl_frame_file.setText(self.tr("No visit frames")
+                                  if not n else (
+                                      Path(self.state.path).name
+                                      if self.state.path else ""))
+        vp.btn_frame_prev.setEnabled(n > 0 and self._frame_index > 0)
+        vp.btn_frame_next.setEnabled(n > 0 and self._frame_index < n - 1)
+        vp.btn_frame_first.setEnabled(n > 0 and self._frame_index > 0)
+
+    def _goto_frame(self, index):
+        # Loads another frame of the visit as the open plate. The Compare
+        # tab's state (field + sequence) rides along: the stars are RA/Dec
+        # and land again through the new plate's WCS.
+        # @args: index - frame index in the visit's sorted paths
+        paths = self._visit_paths()
+        if not paths:
+            return
+        index = max(0, min(int(index), len(paths) - 1))
+        path = paths[index]
+        if str(path) != str(self.state.path):
+            st = self.tab_photometry.capture_state() \
+                if self.state.has_image else None
+            if not self.open_plate(path):
+                return
+            if st:
+                self.tab_photometry.apply_state(st)
+        self._frame_index = index
+        self._sync_frame_nav()
+
+    def _frame_prev(self):
+        self._goto_frame(self._frame_index - 1)
+
+    def _frame_next(self):
+        self._goto_frame(self._frame_index + 1)
+
+    def _frame_first(self):
+        self._goto_frame(0)
+
+    # ------------------------------------------------ transit (EXOTIC)
+
+    def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
+        # @args: reduce_fn - callable() that starts the host's EXOTIC
+        #        reduction on the open frame and the loaded sequence, or
+        #        None; export_fn - callable() for the inits.json handoff.
+        #        Armed only for a transit project opened from a visit.
+        self._exotic_reduce_hook = reduce_fn if callable(reduce_fn) else None
+        self._exotic_export_hook = export_fn if callable(export_fn) else None
+        self._sync_exotic_block()
+
+    def sequence_entries(self):
+        # @return: the sequence built in the Compare tab (for the host)
+        if not hasattr(self, "tab_compare"):
+            return []
+        return list(self.tab_compare.entries())
+
+    def current_frame_path(self):
+        # @return: the open plate path, or None
+        return self.state.path if self.state.has_image else None
+
+    def _sync_exotic_block(self):
+        # The EXOTIC block lives only in a transit visit; the reduction
+        # waits for a comparison sequence and says why when it is missing.
+        if not hasattr(self, "visit_panel"):
+            return
+        ctx = self.series_context() or {}
+        armed = self._exotic_reduce_hook is not None \
+            and ctx.get("kind") == "transit" and bool(ctx.get("paths"))
+        grp = self.visit_panel.grp_exotic
+        grp.setVisible(bool(armed))
+        if not armed:
+            return
+        n = len(self.sequence_entries())
+        self.visit_panel.btn_exotic_reduce.setEnabled(n > 0)
+        self.visit_panel.btn_exotic_export.setEnabled(n > 0)
+        self.visit_panel.lbl_exotic_status.setText(
+            self.tr("Uses the open frame and the sequence above.")
+            if n else self.tr(
+                "Build the comparison sequence first (Photometry, "
+                "«Build the sequence…»)."))
+
+    def _notify_exotic_reduce(self):
+        if self._exotic_reduce_hook is None:
+            return
+        try:
+            self._exotic_reduce_hook()
+        except Exception as err:
+            logger.warning("exotic reduce hook failed: %s", err)
+
+    def _notify_exotic_export(self):
+        if self._exotic_export_hook is None:
+            return
+        try:
+            self._exotic_export_hook()
+        except Exception as err:
+            logger.warning("exotic export hook failed: %s", err)
 
     def set_points_hook(self, fn):
         # @args: fn - callable(rows, cfg) -> run_id, or None. The Measure
@@ -849,6 +1013,12 @@ class UfeDialog(QDialog):
                     lambda: self._pan_step(0, -1))),
                 (Qt.Key_Down, lambda: self._key(
                     lambda: self._pan_step(0, 1)))):
+            sc = QShortcut(QKeySequence(key), self)
+            sc.setContext(ctx)
+            sc.activated.connect(fn)
+        # the visit's frame navigator (a no-op without a visit)
+        for key, fn in ((Qt.Key_PageUp, self._frame_prev),
+                        (Qt.Key_PageDown, self._frame_next)):
             sc = QShortcut(QKeySequence(key), self)
             sc.setContext(ctx)
             sc.activated.connect(fn)

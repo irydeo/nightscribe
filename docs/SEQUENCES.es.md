@@ -48,10 +48,12 @@ Ficha del proyecto : Captura : Análisis (visita) : Publicación
 En la ventana de la visita están sus ficheros (tomas FITS) y la acción
 **«Medir la secuencia…»**, que abre el editor en la primera toma con el bloque
 de serie armado. No hay diálogo de carpeta suelta: sin visita no hay serie, ni
-Undo, ni análisis, ni agregación. El bloque **Serie fotométrica** vive en un
-panel a la izquierda de la imagen (visible solo con la visita armada) y la curva
-se ve en grande con **doble clic**. Si la primera toma no tiene WCS, se resuelve
-sola con el solver configurado antes de empezar.
+Undo, ni análisis, ni agregación. El panel **a la izquierda de la imagen**
+(visible solo con la visita armada) lleva el **navegador de tomas** (anterior /
+siguiente, `toma i/N`, «primera toma»: la toma abierta es la referencia), el
+bloque **Serie fotométrica** (la curva se ve en grande con **doble clic**) y, en
+proyectos de tránsito, el bloque **EXOTIC**. Si la primera toma no tiene WCS, se
+resuelve sola con el solver configurado antes de empezar.
 
 Para llegar con ficheros desde un listado, usa **«Añadir ficheros a la
 visita»** (selección múltiple) en la propia ventana de la visita.
@@ -189,8 +191,11 @@ secuencia de comparación y el entorno EXOTIC preparado.
    resuelve sola con el solver configurado (ASTAP local o nova, ADR-051) y
    **guarda la WCS en el propio FITS**, así queda resuelta para cualquier
    programa. Ya no se piden píxeles a mano.
-3. **Secuencia**: confirma las comparaciones del proyecto (en el editor).
-4. **Reducir**: Análisis → **«Reducir y ajustar con EXOTIC…»** y sigue el log.
+3. **Secuencia**: ábrela en el editor (el acceso de Análisis abre la visita
+   ahí) y confirma las comparaciones; con el navegador de tomas del panel
+   izquierdo puedes recorrer la visita, y **la toma abierta es la referencia**.
+4. **Reducir**: en el editor, **«Reduce and fit with EXOTIC…»** del panel
+   izquierdo (o Análisis → «Abrir la visita en el editor…»), y sigue el log.
    Puede tardar; no cierres la app (puedes cancelar).
 5. **Resultado**: aviso con **T_mid** y **Rp/Rs**; la curva «exotic» aparece en
    la gráfica; quedan el `inits.json` y el reporte en el proyecto, y la figura

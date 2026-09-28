@@ -43,12 +43,19 @@ def _fake_solve_worker(monkeypatch):
         def __init__(self, path):
             super().__init__()
             self._path = path
+            self._cancelled = False
 
         def start(self):
             pass
 
         def isRunning(self):
             return False
+
+        def cancel(self):
+            self._cancelled = True
+
+        def cancelled(self):
+            return self._cancelled
 
     monkeypatch.setattr(workers, "UfeSolveWorker", _FakeSolveWorker)
 

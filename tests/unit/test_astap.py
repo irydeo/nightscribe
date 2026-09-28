@@ -18,6 +18,8 @@ binary stands in for the real one. No network."""
 
 import ast
 import os
+import threading
+import time
 from pathlib import Path
 
 import numpy as np
@@ -141,6 +143,7 @@ def test_resolve_binary_probes_the_windows_install_folders(tmp_path,
     monkeypatch.delenv("LOCALAPPDATA", raising=False)
     monkeypatch.delenv("SystemDrive", raising=False)
     monkeypatch.setattr(astap.shutil, "which", lambda _n: None)
+    monkeypatch.setattr(astap, "_POSIX_ROOTS", ())   # no dev install here
     assert astap.resolve_binary(None) == str(exe)
     assert astap.probe(None)["ok"]
     # a configured path still wins over the install folders
@@ -211,3 +214,61 @@ def test_dispatcher_auto_prefers_astap(tmp_path, monkeypatch):
                         lambda path, progress=None: {"CRVAL1": 1.0})
     assert solve_mod.solve(tmp_path / "p.fits", solver="auto") \
         == {"CRVAL1": 9.0}
+
+
+# ---------------- the speed fix: -ra in hours, -d, -progress, cancel ----
+
+def test_solve_passes_database_and_progress_but_no_ra_hint(tmp_path,
+                                                           monkeypatch):
+    # the header's RA units are ambiguous; a wrong -ra hint loops ASTAP
+    # ("Found 0 references"), so only the reliable -fov is passed
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True)
+    monkeypatch.setattr(astap, "_database_path", lambda *a, **k: "/db")
+    astap.solve(fits, astap_path=str(script))
+    argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
+    assert "-ra" not in argv and "-spd" not in argv
+    assert "-fov" in argv
+    assert argv[argv.index("-d") + 1] == "/db"
+    assert "-progress" in argv
+
+
+def test_resolve_binary_prefers_the_cli(tmp_path, monkeypatch):
+    d = tmp_path / "astapdir"
+    d.mkdir()
+    (d / "astap").write_bytes(b"x")
+    (d / "astap_cli").write_bytes(b"x")
+    monkeypatch.setattr(astap.shutil, "which", lambda _n: None)
+    monkeypatch.setattr(astap, "_POSIX_ROOTS", ())
+    monkeypatch.setenv("PROGRAMFILES", str(tmp_path / "nope"))
+    # a configured GUI path resolves to its CLI sibling (headless)
+    assert astap.resolve_binary(str(d / "astap")) == str(d / "astap_cli")
+
+
+def test_cancel_kills_the_running_solver(tmp_path, monkeypatch):
+    from nightscribe.core.solve import SolveCancel
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = tmp_path / "slow_astap.py"
+    script.write_text(
+        "#!/usr/bin/env python3\nimport sys, time\n"
+        "open(sys.argv[sys.argv.index('-f')+1] + '.pid', 'w').write('x')\n"
+        "time.sleep(30)\n")
+    os.chmod(script, 0o755)
+    cancel = SolveCancel()
+    out = {}
+    t = threading.Thread(
+        target=lambda: out.update(cards=astap.solve(
+            fits, astap_path=str(script), cancel=cancel)), daemon=True)
+    t.start()
+    for _ in range(200):
+        if Path(str(fits) + ".pid").exists():
+            break
+        time.sleep(0.05)
+    t0 = time.monotonic()
+    cancel.set()
+    t.join(timeout=10)
+    assert not t.is_alive()
+    assert out.get("cards") is None
+    assert time.monotonic() - t0 < 8

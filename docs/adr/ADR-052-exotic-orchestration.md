@@ -88,9 +88,16 @@ junto a la secuencia que necesita (ADR-048 rev.), no desde la pestaña Análisis
 editor expone un bloque «Reducción de tránsito (EXOTIC)» para proyectos de tránsito
 abiertos desde una visita; usa la **toma abierta** como referencia y la **secuencia
 cargada** en el editor. La pestaña Análisis deja un acceso que abre la visita ahí.
+Toda la cadena de recogida/sondeo muestra un **diálogo de progreso** (con Cancel), y
+la secuencia sobrevive al paso de auto-resolución (antes se perdía cuando la toma de
+referencia no tenía WCS, y la reducción fallaba con "no hay estrellas de
+comparación" aunque estuviera construida).
 
 **Revision (2026-09-28)**: the reduction starts from the **Unified FITS Editor**,
 next to the sequence it needs (ADR-048 rev.), not from the Analysis tab. The editor
 carries a "Transit reduction (EXOTIC)" block for transit projects opened from a
 visit; it uses the **open frame** as the reference and the **sequence loaded** in
-the editor. The Analysis tab keeps a door that opens the visit there.
+the editor. The Analysis tab keeps a door that opens the visit there. The whole
+gather/probe chain shows a **progress dialog** (Cancel included), and the sequence
+survives the auto-solve step (it used to be dropped when the reference frame had no
+WCS, so the reduce failed with "no comparison stars" although it was built).

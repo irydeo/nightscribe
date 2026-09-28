@@ -165,9 +165,9 @@ dibujan al cargar con su tamaño en píxeles de placa y rótulos legibles
 en cualquier zoom), la **flecha de norte y barra de escala** (botones
 «N» y «Escala» de la barra superior, con WCS) y **Resolver
 astrometría…** (la resuelve a ciegas con el solver configurado, ASTAP o
-Astrometry.net; la solución se aplica en memoria y se guarda en el
-propio FITS de forma atómica, así la placa queda resuelta para cualquier
-programa).
+Astrometry.net; con un diálogo de progreso y Cancel que corta el solver;
+la solución se aplica en memoria y se guarda en el propio FITS de forma
+atómica, así la placa queda resuelta para cualquier programa).
 
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).

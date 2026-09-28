@@ -32,7 +32,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, \
-    QVBoxLayout, QWidget
+    QProgressDialog, QVBoxLayout, QWidget
 
 from ..core import fits_io
 from .ufe_state import UfeImageState
@@ -73,6 +73,7 @@ class UfeDialog(QDialog):
         self._lang = lang
         self._last_dir = ""
         self._solve_worker = None   # UfeSolveWorker while a solve runs
+        self._solve_wait = None     # the busy dialog shown while it runs
         self._save_hook = None      # fn(paths, kind, payload) when the
                                     # editor was opened from a project:
                                     # files written get registered there
@@ -1106,7 +1107,41 @@ class UfeDialog(QDialog):
         self._solve_worker.finished.connect(self._on_solved)
         self.btn_solve.setEnabled(False)
         self._on_solve_stage("login")
+        self._show_solve_wait()
         self._solve_worker.start()
+
+    def _show_solve_wait(self):
+        # Blind solving takes seconds (ASTAP) to minutes (nova): show it,
+        # never a dead button. Indeterminate bar, non-modal, Cancel kills
+        # the running solver (ADR-051 rev.).
+        wait = QProgressDialog(self.tr("Solving the plate…"),
+                               self.tr("Cancel"), 0, 0, self)
+        wait.setWindowTitle(self.tr("NightScribe Image Workbench"))
+        wait.setWindowModality(Qt.NonModal)
+        wait.setMinimumDuration(0)
+        wait.setAutoClose(False)
+        wait.setAutoReset(False)
+        wait.canceled.connect(self._cancel_solve)
+        wait.show()
+        self._solve_wait = wait
+
+    def _close_solve_wait(self):
+        wait = getattr(self, "_solve_wait", None)
+        if wait is not None:
+            # closing a QProgressDialog emits canceled(): block it, this
+            # close is the solve landing, not the observer cancelling
+            wait.blockSignals(True)
+            wait.close()
+            wait.deleteLater()
+            self._solve_wait = None
+
+    def _cancel_solve(self):
+        # The observer cancelled: kill ASTAP (or let nova's worker land).
+        if self._solve_worker is not None:
+            self._solve_worker.cancel()
+        self._close_solve_wait()
+        self.btn_solve.setText(self.tr("Solve astrometry…"))
+        self.btn_solve.setEnabled(self.state.has_image)
 
     def _drain_wcs_pending(self):
         # Runs the queued actions now that the plate has a WCS.
@@ -1160,13 +1195,29 @@ class UfeDialog(QDialog):
 
     def _on_solve_stage(self, stage):
         # @args: stage - the worker's stage text, mirrored on the button
-        self.btn_solve.setText(self.tr("Solving: {0}…").format(stage))
+        #        and on the busy dialog (astap -progress lines are long:
+        #        cap them so the label stays readable)
+        stage = (stage or "").strip()
+        text = self.tr("Solving: {0}…").format(stage[:70]) if stage \
+            else self.tr("Solving the plate…")
+        self.btn_solve.setText(text)
+        wait = getattr(self, "_solve_wait", None)
+        if wait is not None:
+            wait.setLabelText(text)
 
     def _on_solved(self, cards):
         # @args: cards - solved WCS cards, or {} when the solve failed
+        cancelled = self._solve_worker is not None \
+            and self._solve_worker.cancelled()
+        self._close_solve_wait()
         self.btn_solve.setText(self.tr("Solve astrometry…"))
         self.btn_solve.setEnabled(self.state.has_image)
         self._solve_worker = None
+        if cancelled:
+            # the observer cancelled: the queued actions get their way out,
+            # never the "could not solve" box
+            self._fail_wcs_pending()
+            return
         if not cards:
             QMessageBox.warning(
                 self, self.tr("NightScribe Image Workbench"),

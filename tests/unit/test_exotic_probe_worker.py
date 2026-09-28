@@ -241,10 +241,17 @@ def _fake_solve_factory(made, cards, qapp):
         def __init__(self, path):
             super().__init__()
             self._path = path
+            self._cancelled = False
 
         def start(self):
             made.append(self)
             self.finished.emit(cards)
+
+        def cancel(self):
+            self._cancelled = True
+
+        def cancelled(self):
+            return self._cancelled
 
     return _FakeSolve
 
@@ -321,3 +328,25 @@ def test_ufe_exotic_reduce_uses_the_open_frame_and_sequence(window, qapp,
     assert over["ref"] == "/data/frame_042.fits"
     assert over["session_id"] == 9
     assert over["entries"][0]["name"] == "A"
+
+
+def test_exotic_solve_first_forwards_the_sequence(window, qapp, monkeypatch,
+                                                  tmp_path):
+    # Regression: when the reference frame had no WCS, the solve path used
+    # to continue WITHOUT the sequence the UFE had loaded, so the reduce
+    # failed with "no comparison stars" though it was built.
+    from nightscribe.gui import workers
+    from nightscribe.core import fits_io
+    from test_fits_annotate import _make_fits
+    plate = _make_fits(tmp_path / "first.fits")
+    header, _ = fits_io.read_fits(plate)
+    made, got = [], []
+    monkeypatch.setattr(workers, "UfeSolveWorker",
+                        _fake_solve_factory(made, _FAKE_WCS, qapp))
+    monkeypatch.setattr(window, "_persist_solution", lambda *a, **k: True)
+    monkeypatch.setattr(window, "_exotic_launch_final",
+                        lambda *a, **k: got.append(a))
+    entries = [{"name": "A", "kind": "comp", "star": {"ra": 1.0}}]
+    window._exotic_solve_first(1, {"data": {}}, "/py", [str(plate)], 7,
+                               header, str(plate), entries)
+    assert got and got[0][-1] == entries

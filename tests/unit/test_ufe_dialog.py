@@ -656,3 +656,22 @@ def test_exotic_block_hidden_off_transit(dlg, tmp_path):
     dlg.set_exotic_hooks(lambda: None, lambda: None)
     dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "variable"})
     assert not dlg.visit_panel.grp_exotic.isVisible()
+
+
+def test_cancelled_solve_shows_no_failure_box(dlg, monkeypatch):
+    # the busy dialog's Cancel: the queued action gets its way out, never
+    # the misleading "could not solve the plate"
+    from PySide6.QtWidgets import QMessageBox
+    warns = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: warns.append(a))
+
+    class _W:
+        def cancelled(self):
+            return True
+
+    dlg._solve_worker = _W()
+    fail = []
+    dlg._wcs_pending = [(lambda: None, lambda: fail.append(1))]
+    dlg._on_solved({})
+    assert warns == [] and fail == [1]

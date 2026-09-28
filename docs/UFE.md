@@ -161,9 +161,10 @@ carries ANNOTATE cards, written by NightScribe or AstroImageJ, they are
 drawn on load with their plate-pixel sizes and labels readable at any
 zoom), the **north arrow and scale bar** (the "N" and "Scale" buttons
 in the top bar, with a WCS) and **Solve astrometry...** (blind-solves
-with the configured solver, ASTAP or Astrometry.net; the solution lands
-in memory and is stored into the FITS itself, atomically, so the plate
-stays solved for any other program).
+with the configured solver, ASTAP or Astrometry.net; a progress dialog with
+a Cancel that stops the solver; the solution lands in memory and is stored
+into the FITS itself, atomically, so the plate stays solved for any other
+program).
 
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).

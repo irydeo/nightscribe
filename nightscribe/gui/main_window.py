@@ -5482,11 +5482,51 @@ class MainWindow(QMainWindow):
         from .workers import ExploreWorker
         self.statusBar().showMessage(
             self.tr("Gathering planet data for EXOTIC…"), 4000)
+        self._show_exotic_prep(self.tr("Gathering planet data for EXOTIC…"))
         worker = ExploreWorker(config, p["object_name"],
                                fallback_target=p.get("context") or {})
+        self._exotic_gather_worker = worker
         worker.finished.connect(lambda e: self._exotic_reduce(pid, e))
         self._keep(worker)
         worker.start()
+
+    def _show_exotic_prep(self, text):
+        # One visible dialog across the gather / probe / inits steps, so
+        # «Reduce and fit with EXOTIC…» is never a silent wait (ADR-052).
+        if getattr(self, "_exotic_prep", None) is None:
+            wait = QProgressDialog(text, self.tr("Cancel"), 0, 0, self)
+            wait.setWindowTitle(self.tr("EXOTIC"))
+            wait.setWindowModality(Qt.NonModal)
+            wait.setMinimumDuration(0)
+            wait.setAutoClose(False)
+            wait.setAutoReset(False)
+            wait.canceled.connect(self._cancel_exotic_prep)
+            wait.show()
+            self._exotic_prep = wait
+        else:
+            self._exotic_prep.setLabelText(text)
+        return self._exotic_prep
+
+    def _close_exotic_prep(self):
+        wait = getattr(self, "_exotic_prep", None)
+        if wait is not None:
+            wait.blockSignals(True)     # close() emits canceled()
+            wait.close()
+            wait.deleteLater()
+            self._exotic_prep = None
+
+    def _cancel_exotic_prep(self):
+        # The dialog's Cancel: stop whichever worker is in flight.
+        for name in ("_exotic_gather_worker", "_exotic_probe_worker",
+                     "_solve_worker"):
+            w = getattr(self, name, None)
+            if w is not None and hasattr(w, "cancel"):
+                try:
+                    w.cancel()
+                except Exception:
+                    pass
+        self._close_exotic_prep()
+        self.statusBar().showMessage(self.tr("EXOTIC cancelled"), 4000)
 
     def _exotic_reduce(self, pid, e):
         # Gather the planet data (worker), check the environment and run
@@ -5494,13 +5534,15 @@ class MainWindow(QMainWindow):
         # The interpreter check runs off the GUI thread: detect_python
         # spawns subprocesses and the cold import of exotic can take
         # minutes, which used to freeze the app for the whole probe. The
-        # wait cursor covers the check; the flow resumes on the report.
+        # visible dialog covers the check; the flow resumes on the report.
         # @args: pid - the project id, e - the ExploreWorker's enriched
         #        dict
         p = project.get(db, pid)
         if not p:
+            self._close_exotic_prep()
             return
         if not e or not e.get("data"):
+            self._close_exotic_prep()
             self.statusBar().showMessage(
                 self.tr("No planet data — check the name and retry"), 8000)
             return
@@ -5510,7 +5552,9 @@ class MainWindow(QMainWindow):
         QApplication.setOverrideCursor(Qt.WaitCursor)
         self.statusBar().showMessage(
             self.tr("Checking the EXOTIC environment…"), 0)
+        self._show_exotic_prep(self.tr("Checking the EXOTIC environment…"))
         worker = ProbeExoticWorker(config.get("exotic_python_path") or None)
+        self._exotic_probe_worker = worker
         worker.finished.connect(
             lambda rep: self._exotic_reduce_go(pid, e, rep))
         self._keep(worker)
@@ -5523,6 +5567,8 @@ class MainWindow(QMainWindow):
         #        rep - the probe report {"ok","version","message","python"}
         QApplication.restoreOverrideCursor()
         self.statusBar().clearMessage()
+        self._close_exotic_prep()
+        self._exotic_probe_worker = None
         python = rep.get("python") or ""
         if not python:
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
@@ -5585,30 +5631,49 @@ class MainWindow(QMainWindow):
             # solver and the reduction continues with that WCS; never ask
             # the observer for pixel coordinates
             self._exotic_solve_first(pid, e, python, frame_paths,
-                                     session_id, header, ref)
+                                     session_id, header, ref, entries)
             return
         self._exotic_launch_final(pid, e, python, frame_paths, session_id,
                                   wcs, ref, entries)
 
     def _exotic_solve_first(self, pid, e, python, frame_paths, session_id,
-                            header, ref=None):
+                            header, ref=None, entries=None):
         # No WCS on the reference frame: blind-solve it off the GUI thread
         # (the ADR-051 dispatcher honours the configured solver), then
         # continue the reduction with the solved WCS. The solution is
         # persisted into the FITS (ADR-051 rev).
-        from PySide6.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox, QProgressDialog
         from ..core import blink, wcs as wcs_mod
         from .workers import UfeSolveWorker
         ref = ref or frame_paths[0]
         self.statusBar().showMessage(
             self.tr("The first frame has no WCS: solving it…"), 0)
         worker = UfeSolveWorker(Path(ref))
+        # the same feedback as the editor (ADR-051 rev.): an indeterminate
+        # dialog with a Cancel that kills the solver
+        wait = QProgressDialog(
+            self.tr("The first frame has no WCS: solving it…"),
+            self.tr("Cancel"), 0, 0, self)
+        wait.setWindowTitle(self.tr("EXOTIC"))
+        wait.setWindowModality(Qt.NonModal)
+        wait.setMinimumDuration(0)
+        wait.setAutoClose(False)
+        wait.setAutoReset(False)
+        wait.canceled.connect(worker.cancel)
+        wait.show()
         worker.progress.connect(
-            lambda s: self.statusBar().showMessage(
-                self.tr("Solving: {0}…").format(s), 0))
+            lambda s: wait.setLabelText(
+                self.tr("Solving: {0}…").format((s or "")[:70])))
 
         def done(cards):
+            # closing a QProgressDialog emits canceled(): block it, this is
+            # the solve landing, not the observer cancelling
+            wait.blockSignals(True)
+            wait.close()
+            wait.deleteLater()
             self.statusBar().clearMessage()
+            if worker.cancelled():
+                return
             if not cards:
                 QMessageBox.warning(
                     self, self.tr("EXOTIC"),
@@ -5626,7 +5691,7 @@ class MainWindow(QMainWindow):
                             "(non-TAN WCS)."))
                 return
             self._exotic_launch_final(pid, e, python, frame_paths,
-                                      session_id, wcs, ref)
+                                      session_id, wcs, ref, entries)
         worker.finished.connect(done)
         self._keep(worker)
         worker.start()

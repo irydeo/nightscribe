@@ -165,3 +165,28 @@ This **supersedes** the original rejection of "always write with `-update`": the
 decision not to mutate the file unasked stands in spirit (the write is explicit in
 Settings and atomic), but the default is now to save, because a solved plate should
 stay solved.
+
+**Corrección (2026-09-28, velocidad y aviso)**: el cliente pasaba la cabecera `RA`
+(en grados) directamente a `-ra`, que ASTAP interpreta en **horas**: buscaba 15x
+fuera y tardaba 19,1 s. Al intentar arreglarlo por unidades se vio que la unidad de
+`RA` en la cabecera es ambigua (grados vs horas) y una pista de posición equivocada
+deja a ASTAP en bucle ("Found 0 references"); por eso **no se pasa `-ra`/`-spd`**:
+`-fov` (de la cámara) es la única pista fiable y ASTAP lee la posición de la
+cabecera como sabe. Medido con `tests/fixtures/AT2026acka.fit` sin WCS (copia en
+/tmp): 0,4 s solo con `-fov`. Además ahora se prefiere `astap_cli` (resolviendo el
+symlink), se pasa `-d` cuando la base se descubre y `-progress` alimenta un
+**diálogo de progreso** (barra indeterminada, no modal) con Cancel que mata ASTAP
+de verdad (`subprocess.Popen` + `terminate`, `SolveCancel` compartido). Verificado:
+0,47 s por el código.
+
+**Correction (2026-09-28, speed and feedback)**: the client passed the header `RA`
+(in degrees) straight to `-ra`, which ASTAP reads as **hours**: it searched 15x
+away and took 19.1 s. Trying to fix it by units showed that the header's `RA` unit
+is ambiguous (degrees vs hours) and a wrong position hint leaves ASTAP looping
+("Found 0 references"); so **no `-ra`/`-spd` is passed**: `-fov` (from the camera)
+is the only reliable hint and ASTAP reads the header position its own way.
+Measured with `tests/fixtures/AT2026acka.fit` stripped of WCS (copied to /tmp):
+0.4 s with `-fov` alone. Now it also prefers `astap_cli` (resolving the symlink),
+passes `-d` when the database is found and `-progress` feeds a **progress dialog**
+(indeterminate bar, non-modal) whose Cancel really kills ASTAP (`subprocess.Popen`
++ `terminate`, a shared `SolveCancel`). Verified: 0.47 s through the code.

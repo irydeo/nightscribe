@@ -173,18 +173,31 @@ class UfeSolveWorker(QThread):
     # is a common UFE feature; the dialog and the EXOTIC handoff share it).
     # The solution comes back as cards; the caller merges them in memory
     # and persists them into the FITS (ADR-051 rev), never the solver.
+    # cancel() kills the running solver (the busy dialog's Cancel).
     finished = Signal(dict)         # solved WCS cards, or {} on failure
     progress = Signal(str)          # stage text for the solve button
 
     def __init__(self, path):
         super().__init__()
         self._path = path
+        self._cancel = None
+
+    def cancel(self):
+        # @return: None. Kills ASTAP now and stops the run.
+        if self._cancel is not None:
+            self._cancel.set()
+
+    def cancelled(self):
+        # @return: True when the dialog's Cancel was pressed
+        return self._cancel is not None and self._cancel.is_set()
 
     def run(self):
         from ..core import solve as solve_mod
+        self._cancel = solve_mod.SolveCancel()
         try:
             cards = solve_mod.solve(
-                self._path, progress=self.progress.emit)
+                self._path, progress=self.progress.emit,
+                cancel=self._cancel)
         except Exception as err:    # never crash the GUI on solve problems
             logger.exception("ufe solve worker failed: %s", err)
             cards = None

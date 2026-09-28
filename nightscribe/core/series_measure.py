@@ -800,7 +800,7 @@ def detrend_series(points, policy="airmass", auto_improve=_AUTO_IMPROVE):
                              key=lambda kv: (kv[0] is None, kv[0])):
         xs = [points[i].airmass for i in ids]
         ys = [points[i].mag for i in ids]
-        ws = [1.0 / (points[i].err ** 2) if points[i].err else 1.0
+        ws = [1.0 / points[i].err if points[i].err else 1.0
               for i in ids]
         short = len(ids) < _MIN_NIGHT_POINTS \
             or (max(xs) - min(xs)) < _MIN_AIRMASS_RANGE

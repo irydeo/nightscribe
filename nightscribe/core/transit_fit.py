@@ -283,11 +283,21 @@ def fit_transit(times, mags, errs, cfg):
         return {"ok": False, "reason": "too few points"}
     p0 = _init_params(y, cfg)
     lo, hi = _bounds(cfg)
-    p, r, cov, ok = _lm_fit(lambda q: _residual(q, t, y, cfg), p0, lo, hi)
+    # Use weighted residuals if per-point errors are provided
+    weighted = errs is not None
+    if weighted:
+        sigma = np.asarray(errs, dtype=np.float64)[good]
+        # Avoid zero or non‑finite weights
+        sigma = np.where(np.isfinite(sigma) & (sigma > 0), sigma, 1.0)
+        res_fn = lambda q: (_residual(q, t, y, cfg) / sigma)
+    else:
+        res_fn = lambda q: _residual(q, t, y, cfg)
+    p, r, cov, ok = _lm_fit(res_fn, p0, lo, hi)
     # out-of-transit scatter: in-transit = within the fitted duration
     tmid, rprs, a_rs = p[0], p[1], p[2]
     dur = _duration_days(cfg, rprs, a_rs)
     oot = np.abs(t - tmid) > dur
+    # For weighted residuals, r is already (model-y)/sigma
     oot_scatter = float(np.std(r[oot])) if int(oot.sum()) >= 3 \
         else float(np.std(r))
     oot_scatter = max(oot_scatter, 1e-6)
@@ -296,7 +306,11 @@ def fit_transit(times, mags, errs, cfg):
         sig = np.sqrt(np.clip(np.diag(cov), 0.0, None)) * oot_scatter
     else:
         sig = np.full(p.size, np.nan)
-    chi2_red = float(np.mean((r / oot_scatter) ** 2)) if oot_scatter else None
+    # chi2_red: weighted residuals are already normalized by sigma
+    if weighted:
+        chi2_red = float(np.mean(r ** 2)) if oot_scatter else None
+    else:
+        chi2_red = float(np.mean((r / oot_scatter) ** 2)) if oot_scatter else None
     depth = float(np.max(model_mag(t, p, cfg))) if t.size else None
     return {
         "ok": bool(ok),

@@ -31,7 +31,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, \
+    QVBoxLayout, QWidget
 
 from ..core import fits_io
 from .ufe_state import UfeImageState
@@ -126,13 +127,16 @@ class UfeDialog(QDialog):
         self._ui = adopt_ui(self, "ufe_dialog")
                                             # over: no wrapper margins
         self.splitter = self._ui.splitter
-        self.splitter.replaceWidget(0, self.view)
+        # ph_series (0) | ph_view (1) | tabs (2): the series panel sits at
+        # the left of the image; hidden unless a visit arms the series
+        self.splitter.replaceWidget(1, self.view)
         # (after the adoption the layout answers to self, not the husk;
         # drop_in also hides the placeholder: QLayout.replaceWidget does
         # not, and a visible one eats the top bar's clicks)
         drop_in(self.layout(), self._ui.ph_histogram, self.histogram)
-        self.splitter.setStretchFactor(0, 1)     # the image dominates
-        self.splitter.setStretchFactor(1, 0)
+        self.splitter.setStretchFactor(0, 0)     # series: compact
+        self.splitter.setStretchFactor(1, 1)     # the image dominates
+        self.splitter.setStretchFactor(2, 0)
         self.tabs = self._ui.tabs
         self.lbl_object = self._ui.lbl_object
         from . import theme
@@ -140,6 +144,19 @@ class UfeDialog(QDialog):
             f"color: {theme.C_TEXT_DIM}; padding: 0 4px;")
         self._wire_topbar()
         self._build_feature_tabs()
+        # the series block lives at the left of the image (its own pane,
+        # hidden unless a visit arms it): move the measure tab's series
+        # group there once; the group keeps its visibility toggle (D8)
+        self.series_pane = QWidget(self)
+        series_lay = QVBoxLayout(self.series_pane)
+        series_lay.setContentsMargins(0, 0, 0, 0)
+        grp = getattr(self.tab_measure, "grp_series", None)
+        if grp is not None:
+            series_lay.addWidget(grp)
+        self.series_pane.setMinimumWidth(300)
+        self.series_pane.setMaximumWidth(420)
+        self.splitter.replaceWidget(0, self.series_pane)
+        self.series_pane.hide()
 
     def _wire_topbar(self):
         # Aliases and signal wiring for the Designer top bar (ADR-005).
@@ -526,6 +543,8 @@ class UfeDialog(QDialog):
         self._series_hook = fn if callable(fn) else None
         if hasattr(self, "tab_measure"):
             self.tab_measure.set_series_attached(self._series_hook is not None)
+        if hasattr(self, "series_pane"):
+            self.series_pane.setVisible(self._series_hook is not None)
 
     def series_context(self):
         # @return: the visit context the host hooked, or None

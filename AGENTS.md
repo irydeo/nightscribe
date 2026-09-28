@@ -177,8 +177,9 @@ nightscribe/
                        # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
                        # widgets/ufe_image_view.py + widgets/histogram_widget.py +
                        # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py +
-                       # ufe_measure_tab.py, ADR-044; la pestaña Medir lleva
-                       # además el bloque de serie fotométrica, ADR-048) viven en
+                       # ufe_measure_tab.py, ADR-044; el bloque de serie
+                       # fotométrica (ADR-048) vive en su propio panel a la
+                       # izquierda de la imagen, visible solo con visita) viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,

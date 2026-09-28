@@ -1396,8 +1396,10 @@ def test_series_actions_wrap_into_two_rows_and_stay_narrow(dlg, qapp):
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
     assert tab.grp_series.isVisible()          # the block is armed
     # the theme pins the font size in px through a stylesheet, so the
-    # 1.5x simulation goes through the same channel: 13px -> 20px
-    tab.setStyleSheet("* { font-size: 20px; }")
+    # 1.5x simulation goes through the same channel: 13px -> 20px. The
+    # series block lives in its own left pane now (it is reparented there),
+    # so the style is set on the group that hosts the buttons.
+    tab.grp_series.setStyleSheet("* { font-size: 20px; }")
     qapp.processEvents()
     buttons = (tab.btn_series, tab.btn_series_undo,
                tab.btn_series_exoclock, tab.btn_series_help)
@@ -1456,3 +1458,18 @@ def test_series_panel_names_nights_by_their_civil_date(
     assert "Night 2026-09-20: aperture k = 1.4" in panel
     assert "Night 2026-09-20: a1=1.000, a2=+0.100, a3=0.000" in panel
     assert "Night 61303" not in panel           # the raw MJD is gone
+
+
+def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
+    # The series block sits in its own pane at the left of the image
+    # (hidden unless a visit arms it), not cramped in the Measure tab.
+    tab = dlg.tab_measure
+    assert hasattr(dlg, "series_pane")
+    assert not dlg.series_pane.isVisible()
+    # the group is reparented into the pane
+    assert tab.grp_series.parent() is dlg.series_pane
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+    assert dlg.series_pane.isVisible()
+    assert tab.grp_series.isVisible()
+    dlg.set_series_hook(None)
+    assert not dlg.series_pane.isVisible()

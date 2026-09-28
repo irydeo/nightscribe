@@ -41,7 +41,8 @@
    <item>
     <widget class="QSplitter" name="splitter">
      <property name="orientation"><enum>Qt::Horizontal</enum></property>
-     <widget class="QWidget" name="ph_view"/>
+     <widget class="QWidget" name="ph_series"/>
+      <widget class="QWidget" name="ph_view"/>
      <widget class="QTabWidget" name="tabs">
       <property name="minimumSize"><size><width>280</width><height>0</height></size></property>
      </widget>

@@ -109,8 +109,11 @@ def export_eff(points, out, name, ra_deg=None, dec_deg=None, obscode="",
             continue
         merr = f"{p['err']:.3f}" if p.get("err") is not None else "0.000"
         filt = p.get("filter") or "Clear"
+        # TRANS is WebObs' YES/NO transformation flag (anything else can be
+        # rejected on import): NightScribe never transforms to the standard
+        # system, so the honest value is "NO"
         lines.append(f"{name.upper()},{hjd:.5f},{p['mag']:.3f},{merr},"
-                     f"{filt},NA,STD,{cname},{cmag},{kname},{kmag},"
+                     f"{filt},NO,STD,{cname},{cmag},{kname},{kmag},"
                      "na,na,na,")
         n += 1
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -366,7 +366,8 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 
 * `DATE` is HJD (`#DATE=HJD` in the header); points without a full HJD
   are skipped: the format has no empty-date concept.
-* `TRANS` is honestly written `NA`: NightScribe does not transform your
+* `TRANS` is honestly written `NO` (WebObs expects `YES`/`NO`: any other
+  value can be rejected on import): NightScribe does not transform your
   measurement to the standard photometric system (that would require
   knowing your equipment's colour and extinction coefficients).
 * `CNAME`/`CMAG` and `KNAME`/`KMAG` are filled from the comparison
@@ -378,7 +379,7 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 **What MAG means here**: for quick-look points it is the differential
 instrumental magnitude (Δmag against the ensemble), not a
 catalog-calibrated magnitude. In the Photometry tab's measurement it IS a
-catalog-calibrated magnitude via the zero point (TRANS stays `NA`, in
+catalog-calibrated magnitude via the zero point (TRANS stays `NO`, in
 all honesty: there is no colour transformation to the standard system).
 Imported points (measured with another tool) keep the magnitude they
 arrived with. Always read it with the point's filter and origin in

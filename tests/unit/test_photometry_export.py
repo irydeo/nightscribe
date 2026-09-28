@@ -97,7 +97,7 @@ def test_eff_header_and_rows(db, tmp_path):
     row = lines[7].split(",")
     assert row[0] == "WESB 1"                    # upper-cased
     assert row[2] == "15.100" and row[3] == "0.020" and row[4] == "V"
-    assert row[5] == "NA" and row[6] == "STD"
+    assert row[5] == "NO" and row[6] == "STD"    # TRANS: WebObs wants NO
     assert len(row) == 15
     assert len(lines) == 10                       # 7 header + 3 rows
 

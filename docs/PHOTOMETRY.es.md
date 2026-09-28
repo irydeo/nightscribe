@@ -365,9 +365,10 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 
 * `DATE` es HJD (`#DATE=HJD` en la cabecera); los puntos sin HJD
   completo se omiten: el formato no tiene fecha vacía.
-* `TRANS` se escribe `NA` con honestidad: NightScribe no transforma tu
-  medida al sistema fotométrico estándar (eso requeriría conocer los
-  coeficientes de color y extinción de tu equipo).
+* `TRANS` se escribe `NO` con honestidad (WebObs espera `YES`/`NO`:
+  cualquier otro valor puede rechazarse al importar): NightScribe no
+  transforma tu medida al sistema fotométrico estándar (eso requeriría
+  conocer los coeficientes de color y extinción de tu equipo).
 * `CNAME`/`CMAG` y `KNAME`/`KMAG` se rellenan desde la secuencia de
   comparación guardada en el proyecto (pestaña Fotometría / carta);
   `na` cuando no la hay.
@@ -378,7 +379,7 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 diferencial instrumental (Δmag contra el ensemble), no una magnitud
 calibrada de catálogo. En la medida de la pestaña Fotometría sí es una
 magnitud calibrada al catálogo vía el punto cero (TRANS sigue siendo
-`NA` con honestidad: no hay transformación de color al sistema
+`NO` con honestidad: no hay transformación de color al sistema
 estándar). Los puntos importados de fuera (medidos con otra
 herramienta) conservan la magnitud con la que vinieron. Léelo siempre
 con el filtro y el origen del punto a la vista.

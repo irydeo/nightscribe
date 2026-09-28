@@ -49,7 +49,7 @@ block armed. There is no loose-folder dialog: no visit means no series, no
 Undo, no analysis, no aggregation. The panel **at the left of the image**
 (visible only with the visit armed) carries the **frame navigator** (previous /
 next, `frame i/N`, "first frame": the open frame is the reference), the
-**Photometric series** block (the curve opens large on a **double-click**) and,
+**Photometric series** block (the curve opens large on a **click**) and,
 in transit projects, the **EXOTIC** block. If the first frame has no WCS, it is
 solved by itself with the configured solver before starting.
 

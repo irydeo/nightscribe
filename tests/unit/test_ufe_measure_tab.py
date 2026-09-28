@@ -1527,3 +1527,19 @@ def test_group_frames_quick_mirrors_advanced(dlg):
     assert tab._advanced.spn_group_n.value() == 5
     tab._advanced.spn_group_n.setValue(3)
     assert tab.spn_group_quick.value() == 3
+
+
+def test_series_single_click_opens_the_big_view(dlg, monkeypatch):
+    # a plain click on the series curve opens the zoom/export viewer, like
+    # every other chart in the app (the double-click still works too)
+    import nightscribe.gui.chart_viewer as cv
+    from PySide6.QtCore import QPointF
+    seen = {}
+    monkeypatch.setattr(cv, "open_chart_widget",
+                        lambda parent, widget, **k: seen.update(widget=widget))
+    tab = dlg.tab_measure
+    tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
+                            "filter": "V", "source": "measure",
+                            "flags": []}]
+    tab.chart_series.scene_clicked.emit(QPointF(0.0, 0.0))
+    assert seen.get("widget") is not None

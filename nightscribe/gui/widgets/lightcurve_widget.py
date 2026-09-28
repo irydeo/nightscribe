@@ -99,7 +99,7 @@ class LightCurveChart(ChartView):
     # inverted magnitude axis, per-filter series, error bars and an
     # optional template overlay. Hover shows date/mag/filter/source.
 
-    enlarge_requested = Signal()   # a double-click asks for a big view
+    enlarge_requested = Signal()   # a click (or double-click) wants a big view
 
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -215,7 +215,11 @@ class UfeMeasureTab(QWidget):
                                      # undoable run (ADR-050, P2 #19)
         self.chart_series = LightCurveChart()
         self.chart_series.setToolTip(
-            self.tr("Double-click: view the curve large"))
+            self.tr("Click: view the curve large"))
+        # one click (a left release without drag) opens the big view, as
+        # everywhere else in the app; the double-click keeps working too
+        self.chart_series.scene_clicked.connect(
+            lambda _pt: self._on_series_enlarge())
         self.chart_series.enlarge_requested.connect(self._on_series_enlarge)
         drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
                 self.chart_series)

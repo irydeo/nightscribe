@@ -51,7 +51,7 @@ de serie armado. No hay diálogo de carpeta suelta: sin visita no hay serie, ni
 Undo, ni análisis, ni agregación. El panel **a la izquierda de la imagen**
 (visible solo con la visita armada) lleva el **navegador de tomas** (anterior /
 siguiente, `toma i/N`, «primera toma»: la toma abierta es la referencia), el
-bloque **Serie fotométrica** (la curva se ve en grande con **doble clic**) y, en
+bloque **Serie fotométrica** (la curva se ve en grande con **un clic**) y, en
 proyectos de tránsito, el bloque **EXOTIC**. Si la primera toma no tiene WCS, se
 resuelve sola con el solver configurado antes de empezar.
 

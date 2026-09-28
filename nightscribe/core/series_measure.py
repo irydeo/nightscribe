@@ -208,7 +208,22 @@ def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA):
     wts = [1.0 / (e ** 2) if (e is not None and e > 0) else 1.0
            for _r, e in kept]
     zp = _weighted_mean([r for r, _e in kept], wts)
-    zp_err = math.sqrt(1.0 / sum(wts)) if sum(wts) > 0 else None
+    formal_err = math.sqrt(1.0 / sum(wts)) if sum(wts) > 0 else None
+    # robust scatter term (MAD) divided by sqrt(N) ensures honest error
+    n_kept = len(kept)
+    if n_kept > 0:
+        arr_kept = np.asarray([r for r, _e in kept], dtype=np.float64)
+        med_kept = float(np.median(arr_kept))
+        mad_kept = float(np.median(np.abs(arr_kept - med_kept)))
+        scatter_err = 1.4826 * mad_kept / math.sqrt(n_kept)
+    else:
+        scatter_err = None
+    if formal_err is None:
+        zp_err = scatter_err
+    elif scatter_err is None:
+        zp_err = formal_err
+    else:
+        zp_err = max(formal_err, scatter_err)
     return zp, zp_err, len(kept), rejected
 
 
@@ -505,6 +520,17 @@ def _catalog_point(pt, group, cfg):
         inst_c, cat_c, err_c = _group_comp(group, e["star"], cfg)
         if inst_c is None or cat_c is None:
             continue
+        # the catalogue error of the comp counts too (C4: the ZP error
+        # can never be better than the catalogues it hangs from)
+        cat_err = None
+        for item in e["star"].get("bands", []):
+            if item.get("label") == (cfg.band or cfg.fallback_band):
+                cat_err = item.get("err")
+                break
+        if err_c is not None and cat_err:
+            err_c = math.sqrt(err_c ** 2 + float(cat_err) ** 2)
+        elif cat_err:
+            err_c = float(cat_err)
         residuals.append(cat_c - inst_c)
         errors.append(err_c)
     zp, zp_err, kept, _rej = _ensemble_zp(residuals, errors)

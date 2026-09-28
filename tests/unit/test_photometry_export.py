@@ -64,10 +64,12 @@ def test_csv_columns_and_hjd(db, tmp_path):
     row = lines[3].split(",")
     assert row[0] == "WeSb 1"
     # frozen reference: MJD 59650.94800 -> JD 2459651.448 -> HJD corr known
-    # within 30 s of +250.09 s at JD 2459653.448 (same geometry, 2 d apart)
+    # within 30 s of -250.09 s at JD 2459653.448 (same geometry, 2 d apart;
+    # negative: WeSb 1 sits roughly towards the Sun on that date, so the
+    # event is seen later from Earth, Eastman et al. 2010)
     hjd = float(row[1])
     corr_s = (hjd - (59650.94800 + 2400000.5)) * 86400
-    assert corr_s == pytest.approx(250.09, abs=30.0)
+    assert corr_s == pytest.approx(-250.09, abs=30.0)
     assert row[2] == "15.100" and row[3] == "0.020" and row[4] == "V"
     assert row[5] == "C1+C2" and row[6] == "ZABC"
 

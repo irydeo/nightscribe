@@ -101,9 +101,14 @@ heliocéntrica (HJD) vía formulario del grupo.
 8. **Reporte fotométrico**: por proyecto, CSV documentado
    (`name,hjd,mag,err,filter,comp_stars,observer,notes`) y **AAVSO Extended
    File Format**, con **HJD calculado en la app**
-   (`jd_to_hjd`: `HJD = JD + (n̂·ŝ)·r·τ`, Sol de Schlyter de `ephem_minor`,
-   τ = 499.004784 s/UA; referencias congeladas en los tests: WeSb 1 +250.09 s,
-   T CrB −196.45 s). Los puntos quick-look solo exportan con checkbox
+   (`jd_to_hjd`: `HJD = JD − (n̂·ŝ)·r·τ`, Sol de Schlyter de `ephem_minor`,
+   τ = 499.004784 s/UA; convención de Eastman et al. 2010, PASP 122, 935:
+   una estrella en la dirección del Sol se ve más TARDE desde la Tierra.
+   Referencias congeladas en los tests ancladas a un Sol de Meeus
+   independiente: WeSb 1 −250.09 s, T CrB +196.45 s. **Corregido
+   2026-09-28**: la implementación original sumaba; los reportes EFF
+   emitidos antes del fix arrastran un error estacional de hasta
+   ±16,6 min). Los puntos quick-look solo exportan con checkbox
    explícito (T6).
 9. **[Superseded 2026-09, Track UX]** ~~Gestor de campañas = diálogo
    modal~~ → **pestaña «Campaigns»** (5ª pestaña, maestro-detalle como el
@@ -216,8 +221,13 @@ heliocentric Julian dates via the group's form.
   explicit «Cannot store survey points: <reason>» (the project-kind
   `ValueError`, no stack trace).
 8. **Photometric report**: per-project CSV + AAVSO EFF with **in-app HJD**
-   (Schlyter Sun; frozen reference values in tests). Quick-look points only
-   with an explicit checkbox.
+   (Schlyter Sun; `HJD = JD − (n̂·ŝ)·r·τ`, Eastman et al. 2010, PASP 122,
+   935: a star in the Sun's direction is seen LATER from Earth; frozen
+   test references anchored to an independent Meeus Sun: WeSb 1 −250.09 s,
+   T CrB +196.45 s. **Fixed 2026-09-28**: the original implementation
+   added the term; EFF reports emitted before the fix carry a seasonal
+   error of up to ±16.6 min). Quick-look points only with an explicit
+   checkbox.
 9. **[Superseded 2026-09, Track UX]** ~~Campaign manager = modal
    dialog~~ → **the "Campaigns" tab** (5th tab, master-detail like the
    hub): the usability audit showed the dialog was a selector with no

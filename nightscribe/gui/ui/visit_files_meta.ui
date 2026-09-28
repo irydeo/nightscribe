@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The visit's FITS metadata confirmation for a whole batch (ADR-045):
+  one dialog per ATTACH, not one per file: pre-filled with the batch
+  consensus, and a list of the files whose header differs or is missing
+  so a wrong filter shows up at a glance. Loaded by gui/widgets/
+  visits_panel.py (_ask_batch_meta) through gui/ui_loader.py. The class
+  tag is VisitWindow so the i18n context carries over; the count, the
+  field contents and the exceptions list are data, set in code.
+-->
+<ui version="4.0">
+ <class>VisitWindow</class>
+ <widget class="QWidget" name="VisitFilesMeta">
+  <layout class="QFormLayout" name="form_meta"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item row="0" column="0" colspan="2"><widget class="QLabel" name="lbl_count"><property name="text"><string>FITS files:</string></property></widget></item>
+   <item row="1" column="0"><widget class="QLabel" name="lbl_filter"><property name="text"><string>Filter:</string></property></widget></item>
+   <item row="1" column="1"><widget class="QComboBox" name="vp_img_filter"><property name="editable"><bool>true</bool></property></widget></item>
+   <item row="2" column="0"><widget class="QLabel" name="lbl_date"><property name="text"><string>Date:</string></property></widget></item>
+   <item row="2" column="1"><widget class="QLineEdit" name="vp_img_date"/></item>
+   <item row="3" column="0"><widget class="QLabel" name="lbl_exptime"><property name="text"><string>Exptime:</string></property></widget></item>
+   <item row="3" column="1"><widget class="QLineEdit" name="vp_img_exptime"/></item>
+   <item row="4" column="0" colspan="2"><widget class="QLabel" name="lbl_except_hint"><property name="text"><string>These apply to every file. The files below differ or lack a header value (double-click one to edit it alone).</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item row="5" column="0" colspan="2"><widget class="QListWidget" name="lst_except"><property name="maximumSize"><size><width>16777215</width><height>120</height></size></property></widget></item>
+   <item row="6" column="0" colspan="2"><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

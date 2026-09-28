@@ -456,27 +456,99 @@ class VisitWindow(QDialog):
             self._measure_series(self._sid)
 
     def _on_attach(self):
-        # File picker (multi) -> per-FITS editable metadata confirmation
-        # -> registered to THIS visit. The rule of the redesign: nothing
-        # attaches without a visit, and this action only exists inside
-        # one.
+        # File picker (multi) -> ONE metadata confirmation for the whole
+        # batch (consensus from the headers; exceptions listed), never one
+        # dialog per file. The rule of the redesign: nothing attaches
+        # without a visit, and this action only exists inside one.
         from ...core import fits_meta, project as proj_mod
         paths, _sel = QFileDialog.getOpenFileNames(
             self, self.tr("Attach files to the visit"), "",
             self.tr("All files (*)"))
         if not paths:
             return
+        fits = [p for p in paths if _kind_for(p) == "fits"]
+        metas = {}
+        if fits:
+            metas = self._ask_batch_meta(fits)
+            if metas is None:
+                return        # the observer cancelled the whole batch
         for path in paths:
             kind = _kind_for(path)
-            meta = {}
-            if kind == "fits":
-                meta = self._ask_fits_meta(path)
-                if meta is None:
-                    continue        # the observer cancelled this one
+            meta = metas.get(path, {}) if kind == "fits" else {}
             proj_mod.add_file(self._db, self._pid, path, kind,
                               session_id=self._sid, meta=meta)
         self._populate_resources()
         self._emit_change()
+
+    def _ask_batch_meta(self, paths):
+        # One confirmation for a whole batch of FITS: the form carries the
+        # batch consensus (most common filter/date/exptime) and a list of
+        # the files whose header differs, each editable alone (double-click).
+        # @args: paths - the FITS paths just picked
+        # @return: {path: meta} or None when cancelled
+        from collections import Counter
+        from ...core import fits_meta
+        raw = []
+        for p in paths:
+            try:
+                meta = fits_meta.read_meta(p)
+            except Exception:
+                meta = {}
+            raw.append((p, meta))
+        keys = [((m.get("filter") or "Clear").strip() or "Clear",
+                 str(m.get("date_obs") or ""), m.get("exptime_s"))
+                for _p, m in raw]
+        consensus = Counter(keys).most_common(1)[0][0] if keys \
+            else ("Clear", "", None)
+        cfilter, cdate, cexp = consensus
+        excepts = [p for (p, _m), k in zip(raw, keys) if k != consensus]
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("FITS details"))
+        ui = adopt_ui(dlg, "visit_files_meta")
+        ui.lbl_count.setText(self.tr("FITS files: {0}").format(len(paths)))
+        ui.vp_img_filter.addItems(_FILTERS)
+        ui.vp_img_filter.setCurrentText(cfilter)
+        ui.vp_img_date.setText(cdate)
+        ui.vp_img_exptime.setText("" if cexp in (None, "") else str(cexp))
+        ui.lbl_except_hint.setVisible(bool(excepts))
+        overrides = {}
+        meta_by_path = {p: m for p, m in raw}
+        for p in excepts:
+            m = meta_by_path[p]
+            item = QListWidgetItem(self.tr("{0}  ·  {1} · {2} · {3}s")
+                                   .format(Path(p).name,
+                                           m.get("filter") or "?",
+                                           m.get("date_obs") or "?",
+                                           m.get("exptime_s") or "?"))
+            item.setData(Qt.UserRole, p)
+            ui.lst_except.addItem(item)
+        ui.buttonBox.accepted.connect(dlg.accept)
+        ui.buttonBox.rejected.connect(dlg.reject)
+        ui.lst_except.itemDoubleClicked.connect(
+            lambda it: self._edit_batch_exception(dlg, ui, it, overrides))
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        exp_txt = ui.vp_img_exptime.text().strip()
+        try:
+            exp = float(exp_txt) if exp_txt else None
+        except ValueError:
+            exp = None
+        cons = {"filter": ui.vp_img_filter.currentText().strip() or "Clear",
+                "date_obs": ui.vp_img_date.text().strip() or None,
+                "exptime_s": exp}
+        return {p: overrides.get(p, cons) for p in paths}
+
+    def _edit_batch_exception(self, dlg, ui, item, overrides):
+        # Edit one exception's meta alone (the batch consensus stands for
+        # the rest); the row's text then shows the new values.
+        path = item.data(Qt.UserRole)
+        meta = self._ask_fits_meta(path)
+        if meta is None:
+            return
+        overrides[path] = meta
+        item.setText(self.tr("{0}  ·  {1} · {2} · {3}s").format(
+            Path(path).name, meta.get("filter") or "?",
+            meta.get("date_obs") or "?", meta.get("exptime_s") or "?"))
 
     def _ask_fits_meta(self, path):
         # The FITS confirmation dialog, pre-filled from the header (a

@@ -459,9 +459,27 @@ def _guide_jump(pt, cfg):
                       pt.y - cfg.target_xy[1]) > cfg.guide_jump_px
 
 
+def _cosmic_flag(frame, cfg):
+    # T7's cosmic verdict for one frame, computed while its image is
+    # still alive: the measure loop releases the array right after, so
+    # the gates downstream read this flag instead of the pixels.
+    # @args: frame - measured frame dict still holding "data"
+    # @return: True when the target aperture holds an isolated spike
+    res = frame["res"]
+    if not res.ok or res.col is None or res.target is None:
+        return False
+    sky_pp = res.target.get("sky_pp")
+    r_ap = (cfg.radii or (photometry.R_AP,))[0]
+    sigma = _sky_sigma(frame["data"], res.col, res.row, r_ap)
+    return _cosmic_hit(frame["data"], res.col, res.row, r_ap, sky_pp,
+                       sigma, cfg.cosmic_sigma)
+
+
 def _flag_gates(pt, group, cfg):
     # T7: saturation (the plate recipe refused the target), a cosmic ray
-    # in the aperture and a guide jump. Marked, never deleted.
+    # in the aperture and a guide jump. Marked, never deleted. The cosmic
+    # verdict arrives precomputed per frame: the images never reach this
+    # point, they are released in the measure loop.
     for f in group:
         if not f["res"].ok:
             reason = (f["res"].reason or {})
@@ -473,14 +491,7 @@ def _flag_gates(pt, group, cfg):
             else:
                 _add_flag(pt, "unusable")
             continue
-        res = f["res"]
-        if res.col is None or res.target is None:
-            continue
-        sky_pp = res.target.get("sky_pp")
-        r_ap = (cfg.radii or (photometry.R_AP,))[0]
-        sigma = _sky_sigma(f["data"], res.col, res.row, r_ap)
-        if _cosmic_hit(f["data"], res.col, res.row, r_ap, sky_pp, sigma,
-                       cfg.cosmic_sigma):
+        if f.get("cosmic"):
             _add_flag(pt, "cosmic")
     if _guide_jump(pt, cfg):
         _add_flag(pt, "guide_jump")
@@ -811,7 +822,8 @@ def _check_star(cfg):
 def sweep_aperture(paths, cfg, ks=None):
     # T3: per night, pick the k in [1.0, 2.0] whose check-star scatter is
     # smallest (FWHM measured per frame, so guide defences cannot break
-    # the curve).
+    # the curve). Each frame is read once and released: the sweep keeps
+    # per-frame magnitudes and FWHM, never the images.
     # @args: paths - FITS paths, cfg - SeriesConfig with comp_set and wcs,
     #        ks - the multipliers to try (default: 1.0 .. 2.0 step 0.1)
     # @return: {night: {"k", "rms", "radii", "fwhm"}}
@@ -823,30 +835,31 @@ def sweep_aperture(paths, cfg, ks=None):
         cx, cy = cfg.wcs.sky_to_pixel(star["ra"], star["dec"])
     except Exception:
         return {}
-    by_night = {}
+    positions = [(cx, cy)]
+    by_night = {}       # {night: {k: (mags, fwhms)}}
     for path in paths:
         try:
             header, data = fits_io.read_fits(path)
         except fits_io.FitsError:
             continue
         night = _night_of(fits_meta.meta_from_header(header).get("mjd"))
-        by_night.setdefault(night, []).append(data)
+        fwhm = photometry.estimate_fwhm(data, positions)
+        slots = by_night.setdefault(night, {k: ([], []) for k in ks})
+        for k in ks:
+            r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm, k=k)
+            r = photometry.measure_point(data, cx, cy, r_ap=r_ap,
+                                         r_ann_in=r_in, r_ann_out=r_out)
+            if not r["ok"] or r["flux"] is None or r["flux"] <= 0:
+                continue
+            mags, fwhms = slots[k]
+            mags.append(-2.5 * math.log10(r["flux"]))
+            if fwhm is not None:
+                fwhms.append(fwhm)
     out = {}
-    for night, frames in by_night.items():
-        positions = [(cx, cy)]
+    for night, slots in by_night.items():
         best = None
         for k in ks:
-            mags, fwhms = [], []
-            for data in frames:
-                fwhm = photometry.estimate_fwhm(data, positions)
-                r_ap, r_in, r_out = photometry.aperture_for_fwhm(fwhm, k=k)
-                r = photometry.measure_point(data, cx, cy, r_ap=r_ap,
-                                             r_ann_in=r_in, r_ann_out=r_out)
-                if not r["ok"] or r["flux"] is None or r["flux"] <= 0:
-                    continue
-                mags.append(-2.5 * math.log10(r["flux"]))
-                if fwhm is not None:
-                    fwhms.append(fwhm)
+            mags, fwhms = slots[k]
             if len(mags) < 3:
                 continue
             spread = _robust_std(mags)
@@ -921,9 +934,15 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                                               (frame["res"].col,
                                                frame["res"].row),
                                               data.shape)
+        # the cosmic gate runs here, while the image is alive; the full
+        # array is released right away, so the series holds points and
+        # flags, never pixels (one frame in RAM at a time)
+        frame["cosmic"] = _cosmic_flag(frame, cfg)
+        frame.pop("data", None)
         frames.append(frame)
         if progress is not None:
             progress(i + 1, total)
+    ref_data = None       # the alignment grid is no longer needed
     frames.sort(key=lambda f: (f["mjd"] if f["mjd"] is not None
                                else float("inf")))
     n = result.group_n

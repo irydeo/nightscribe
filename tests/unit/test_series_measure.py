@@ -21,6 +21,7 @@ reference. No network.
 
 import math
 import time
+import weakref
 from pathlib import Path
 
 import numpy as np
@@ -384,6 +385,58 @@ def test_performance_reference(tmp_path):
     elapsed = time.perf_counter() - t0
     assert len(res.points) == 142
     assert elapsed / 142 < 0.5, f"{elapsed:.2f}s for 142 frames"
+
+
+# ---------------- memory: frames are never accumulated ----------------
+
+def _watch_reads(monkeypatch):
+    # Spy on fits_io.read_fits that counts how many of the returned frame
+    # arrays are alive at once (weakrefs, no strong reference kept).
+    # @args: monkeypatch - the pytest fixture
+    # @return: (live id set, peak holder list with the maximum count)
+    live = set()
+    peak = [0]
+    real_read = sm.fits_io.read_fits
+
+    def spy(path):
+        header, data = real_read(path)
+        wid = id(data)
+        live.add(wid)
+        weakref.finalize(data, live.discard, wid)
+        peak[0] = max(peak[0], len(live))
+        return header, data
+
+    monkeypatch.setattr(sm.fits_io, "read_fits", spy)
+    return live, peak
+
+
+def test_measure_series_releases_frame_arrays(tmp_path, monkeypatch):
+    # P0: a 300-frame series must never hold 300 images in RAM. Each
+    # frame is measured and flagged (cosmic gate included) inside the
+    # loop and its array released there: at most the frame being read
+    # and the one being measured are alive at any time.
+    paths, wcs, comps = _write_frames(tmp_path, 50, noise=0.5)
+    _live, peak = _watch_reads(monkeypatch)
+    res = sm.measure_series(paths, _config(wcs, comps))
+    assert len(res.points) == 50               # the series is complete
+    assert peak[0] <= 2, f"{peak[0]} frame arrays alive at once"
+
+
+def test_sweep_aperture_keeps_fluxes_not_images(tmp_path, monkeypatch):
+    # T3: the k sweep accumulates per-frame magnitudes and FWHM, never
+    # the images; at most the frame being read and the one being swept
+    # are alive at any time.
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    paths = []
+    for i in range(8):
+        data = _plate(noise=0.5, seed=200 + i)
+        paths.append(_write_plate(tmp_path / f"m{i}.fits", data,
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    _live, peak = _watch_reads(monkeypatch)
+    swept = sm.sweep_aperture(paths, _config(wcs, comps))
+    assert swept                               # the sweep really measured
+    assert peak[0] <= 2, f"{peak[0]} frame arrays alive at once"
 
 
 # ---------------- phase 3: T3 aperture + T5 detrend ----------------

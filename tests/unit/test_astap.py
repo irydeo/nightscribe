@@ -54,11 +54,12 @@ def _write_fits(path):
     return path
 
 
-def _fake_astap(tmp_path, to_stdout=False, honor_o=False):
+def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False):
     # a simulated ASTAP: writes <file>.wcs with fixed cards (or prints
     # them), records each run so the cache can be proven, and leaves its
     # command line in <file>.argv; honor_o writes the sidecar at the `-o`
-    # base, exactly like the real binary
+    # base, exactly like the real binary; fail_first exits with no
+    # solution the first time (to exercise the auto-field fallback)
     script = tmp_path / ("fake_astap_stdout.py" if to_stdout
                          else "fake_astap.py")
     lines = [
@@ -71,6 +72,13 @@ def _fake_astap(tmp_path, to_stdout=False, honor_o=False):
         "Path(f + '.runs').write_text(Path(f + '.runs').read_text() + 'x')"
         " if Path(f + '.runs').exists() else Path(f + '.runs').write_text('x')",
     ]
+    if fail_first:
+        lines += [
+            "if not Path(f + '.failfirst').exists():",
+            "    Path(f + '.failfirst').write_text('1')",
+            "    print('Found 0 references')",
+            "    sys.exit(0)",
+        ]
     wcs = ("CRVAL1  = 31.3121", "CRVAL2  = 46.7691",
            "CRPIX1  = 32.0", "CRPIX2  = 32.0",
            "CTYPE1  = 'RA---TAN'", "CTYPE2  = 'DEC--TAN'",
@@ -272,3 +280,57 @@ def test_cancel_kills_the_running_solver(tmp_path, monkeypatch):
     assert not t.is_alive()
     assert out.get("cards") is None
     assert time.monotonic() - t0 < 8
+
+
+# ---------------- the FOV hint (the real cause of the ASTAP loop) --------
+
+class _Cfg:
+    def __init__(self, **kw):
+        self._d = kw
+
+    def get(self, key, default=None):
+        return self._d.get(key, default)
+
+
+def test_fov_hint_prefers_the_header_scale():
+    # the EXOTIC sample: IM_SCALE 5.21"/px, 500 px high -> 0.724 deg
+    assert astap._fov_hint({"IM_SCALE": 5.21, "NAXIS2": 500},
+                           _Cfg(pixel_um=11.0, focal_mm=2200.0)) \
+        == pytest.approx(0.724, abs=1e-3)
+    # XPIXSZ + FOCALLEN when there is no scale keyword
+    assert astap._fov_hint({"XPIXSZ": 3.76, "FOCALLEN": 2000.0,
+                            "NAXIS2": 2048}, _Cfg()) \
+        == pytest.approx(0.221, abs=1e-3)
+    # CDELT1 in degrees/pixel
+    assert astap._fov_hint({"CDELT1": 0.001, "NAXIS2": 500}, _Cfg()) \
+        == pytest.approx(0.5, abs=1e-3)
+
+
+def test_fov_hint_falls_back_to_settings_then_auto():
+    cfg = _Cfg(pixel_um=3.76, focal_mm=2000.0)
+    assert astap._fov_hint({"NAXIS2": 2048}, cfg) \
+        == pytest.approx(0.221, abs=1e-3)          # the Settings scale
+    assert astap._fov_hint({"NAXIS2": 2048}, _Cfg()) is None   # nothing
+    assert astap._fov_hint({"IM_SCALE": 5.21}, cfg) is None    # no NAXIS2
+
+
+def test_fov_hint_on_the_hatp32_sample():
+    # the repo fixture (MicroObservatory frame): its own IM_SCALE wins
+    from nightscribe.core import fits_io
+    p = Path(__file__).parents[1] / "fixtures" / "hatp32_sample.fits"
+    h, _ = fits_io.read_fits(p)
+    assert astap._fov_hint(h, _Cfg(pixel_um=11.0, focal_mm=2200.0)) \
+        == pytest.approx(0.724, abs=1e-3)
+
+
+def test_solve_falls_back_to_the_auto_field(tmp_path, monkeypatch):
+    # a wrong/missing hint must not loop: the first attempt is bounded and
+    # a second, auto-field one (-fov 0) catches what it misses
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, fail_first=True)
+    cards = astap.solve(fits, astap_path=str(script))
+    assert cards and cards["CRVAL1"] == 31.3121
+    argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
+    assert argv[argv.index("-fov") + 1] == "0"     # the auto retry ran
+    assert Path(str(fits) + ".runs").read_text() == "xx"

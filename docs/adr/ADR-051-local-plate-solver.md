@@ -166,27 +166,36 @@ decision not to mutate the file unasked stands in spirit (the write is explicit 
 Settings and atomic), but the default is now to save, because a solved plate should
 stay solved.
 
-**Corrección (2026-09-28, velocidad y aviso)**: el cliente pasaba la cabecera `RA`
-(en grados) directamente a `-ra`, que ASTAP interpreta en **horas**: buscaba 15x
-fuera y tardaba 19,1 s. Al intentar arreglarlo por unidades se vio que la unidad de
-`RA` en la cabecera es ambigua (grados vs horas) y una pista de posición equivocada
-deja a ASTAP en bucle ("Found 0 references"); por eso **no se pasa `-ra`/`-spd`**:
-`-fov` (de la cámara) es la única pista fiable y ASTAP lee la posición de la
-cabecera como sabe. Medido con `tests/fixtures/AT2026acka.fit` sin WCS (copia en
-/tmp): 0,4 s solo con `-fov`. Además ahora se prefiere `astap_cli` (resolviendo el
-symlink), se pasa `-d` cuando la base se descubre y `-progress` alimenta un
-**diálogo de progreso** (barra indeterminada, no modal) con Cancel que mata ASTAP
-de verdad (`subprocess.Popen` + `terminate`, `SolveCancel` compartido). Verificado:
-0,47 s por el código.
+**Corrección (2026-09-28, velocidad y aviso)**: la causa real del bucle
+"Found 0 references" era la **FOV**, no la posición. El cliente calculaba `-fov`
+como `max(NAXIS1, NAXIS2) × escala de Ajustes`; con los recortes de MicroObservatory
+(650x500, `IM_SCALE = 5.21`"/px, otra cámara) daba 0,186° cuando el campo es ~0,72°,
+y ASTAP barría el cielo entero. Ahora:
 
-**Correction (2026-09-28, speed and feedback)**: the client passed the header `RA`
-(in degrees) straight to `-ra`, which ASTAP reads as **hours**: it searched 15x
-away and took 19.1 s. Trying to fix it by units showed that the header's `RA` unit
-is ambiguous (degrees vs hours) and a wrong position hint leaves ASTAP looping
-("Found 0 references"); so **no `-ra`/`-spd` is passed**: `-fov` (from the camera)
-is the only reliable hint and ASTAP reads the header position its own way.
-Measured with `tests/fixtures/AT2026acka.fit` stripped of WCS (copied to /tmp):
-0.4 s with `-fov` alone. Now it also prefers `astap_cli` (resolving the symlink),
-passes `-d` when the database is found and `-progress` feeds a **progress dialog**
-(indeterminate bar, non-modal) whose Cancel really kills ASTAP (`subprocess.Popen`
-+ `terminate`, a shared `SolveCancel`). Verified: 0.47 s through the code.
+- La escala es por imagen: **cabecera** (`IM_SCALE`, `PIXSCALE`, `SECPIX`/`SECPIX1`,
+  `CDELT1`, o `XPIXSZ`+`FOCALLEN`) y, si no, los Ajustes (`pixel_um`+`focal_mm`).
+- `fov = escala_arcsec × NAXIS2 (altura) / 3600`; el `max()` sobreestimaba placas
+  apaisadas. Sin escala: `-fov 0` (auto de ASTAP) explícito.
+- **Intento acotado** (30 s) con la FOV derivada y **auto de reserva** (`-fov 0`):
+  una pista mala ya no puede colgar el proceso.
+- Sigue sin pasar `-ra`/`-spd` (unidad ambigua) y prefiere `astap_cli`, con `-d`,
+  `-progress` y Cancel real. Medido: `HATP-32171220013343.FITS` pasa de bucle a
+  **0,31 s** (FOV 0,724° de `IM_SCALE`); `-fov 0.186` no resuelve, sin `-fov` tarda
+  66 s.
+
+**Correction (2026-09-28, speed and feedback)**: the real cause of the "Found 0
+references" loop was the **FOV**, not the position. The client computed `-fov` as
+`max(NAXIS1, NAXIS2) × the Settings scale`; on the MicroObservatory crops
+(650x500, `IM_SCALE = 5.21`"/px, a different camera) that gave 0.186° where the
+field is ~0.72°, so ASTAP swept the whole sky. Now:
+
+- The scale is per image: the **header** (`IM_SCALE`, `PIXSCALE`, `SECPIX`/`SECPIX1`,
+  `CDELT1`, or `XPIXSZ`+`FOCALLEN`), else the Settings (`pixel_um`+`focal_mm`).
+- `fov = scale_arcsec × NAXIS2 (height) / 3600`; the `max()` over-estimated landscape
+  plates. Without a scale: an explicit `-fov 0` (ASTAP auto).
+- A **bounded attempt** (30 s) at the derived FOV and an **auto fallback** (`-fov 0`):
+  a bad hint can no longer hang the run.
+- `-ra`/`-spd` stay out (ambiguous unit); `astap_cli` is still preferred, with `-d`,
+  `-progress` and a real Cancel. Measured: `HATP-32171220013343.FITS` goes from a
+  loop to **0.31 s** (FOV 0.724° from `IM_SCALE`); `-fov 0.186` never solves, no
+  `-fov` takes 66 s.

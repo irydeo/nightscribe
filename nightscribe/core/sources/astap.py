@@ -16,15 +16,18 @@
 Same contract as the Astrometry.net client: `solve(path, progress) ->
 cards|None`, with the WCS read into memory from the `-wcs` output, and the
 `astap_cli` barebone preferred so no window or modal hangs the call. No
-`-ra`/`-spd` hint is passed (the header's RA units are ambiguous and a
-wrong hint loops ASTAP); `-fov` is the reliable speed-up, `-d` points at
-the star database when found and `-progress` feeds the busy dialog; the
-run can be killed through a `core.solve.SolveCancel`. ASTAP's own outputs
-are named with `-o` into our per-user folder, so the solver never leaves
-its .ini/.wcs next to the observer's images. Results are cached by content
-hash and backend, so the same plate is never solved twice. The solution is
-returned as cards; the caller merges them in memory and writes them into
-the FITS (ADR-051 rev.), never `-update`. No network.
+`-ra`/`-spd` hint is passed (the header's RA units are ambiguous); the
+`-fov` is the image HEIGHT in degrees from the header's own scale
+(IM_SCALE/SECPIX/CDELT/XPIXSZ+FOCALLEN) or the Settings, and the hinted
+attempt is bounded before a fallback to the auto field (`-fov 0`), so a
+wrong hint can never loop ASTAP. `-d` points at the star database when
+found and `-progress` feeds the busy dialog; the run can be killed through
+a `core.solve.SolveCancel`. ASTAP's own outputs are named with `-o` into
+our per-user folder, so the solver never leaves its .ini/.wcs next to the
+observer's images. Results are cached by content hash and backend, so the
+same plate is never solved twice. The solution is returned as cards; the
+caller merges them in memory and writes them into the FITS (ADR-051 rev.),
+never `-update`. No network.
 """
 
 import hashlib
@@ -47,6 +50,10 @@ logger = logging.getLogger(__name__)
 # output file, -progress for the busy dialog and the optional -update of
 # the FITS header.
 TIMEOUT_S = 180.0
+# the hinted attempt must not loop: a wrong/missing -fov can make ASTAP
+# sweep the whole sky, so give it a short budget before falling back to
+# the auto field (-fov 0)
+ATTEMPT_S = 30.0
 
 
 def _install_candidates():
@@ -259,23 +266,51 @@ def _terminate(proc):
             pass
 
 
-def _fov_hint(header, config):
-    # The field of view in degrees, from the camera pixel size and the
-    # telescope focal length (a strong hint that makes ASTAP much faster).
-    # @return: fov in degrees, or None
+def _num(value):
     try:
-        from ...config import config as _cfg
-        cfg = config or _cfg
-        pix_um = float(cfg.get("pixel_um") or 0.0)
-        focal_mm = float(cfg.get("focal_mm") or 0.0)
-        nx = float(header.get("NAXIS1") or 0.0)
-        ny = float(header.get("NAXIS2") or 0.0)
-        if pix_um <= 0 or focal_mm <= 0 or nx <= 0 or ny <= 0:
-            return None
-        scale_deg = (pix_um / 1000.0) / focal_mm * 57.2957795
-        return round(max(nx, ny) * scale_deg, 3)
-    except Exception:
+        return float(value)
+    except (TypeError, ValueError):
         return None
+
+
+def _scale_arcsec(header, config):
+    # Arcseconds per pixel. The image's own scale beats the observer's
+    # Settings (a foreign plate, e.g. a MicroObservatory frame, carries
+    # IM_SCALE and a very different setup).
+    # @return: arcsec/pixel, or None when nothing gives a scale
+    for key in ("IM_SCALE", "PIXSCALE", "SECPIX", "SECPIX1"):
+        v = _num(header.get(key))
+        if v and v > 0:
+            return v
+    cd = _num(header.get("CDELT1"))
+    if cd:
+        return abs(cd) * 3600.0
+    px = _num(header.get("XPIXSZ")) or _num(header.get("PIXSIZE"))
+    fl = _num(header.get("FOCALLEN"))
+    if px and fl and fl > 0:
+        return (px / 1000.0) / fl * 206264.806
+    from ...config import config as _cfg
+    cfg = config or _cfg
+    ux = _num(cfg.get("pixel_um"))
+    fl = _num(cfg.get("focal_mm"))
+    if ux and fl and fl > 0:
+        return (ux / 1000.0) / fl * 206264.806
+    return None
+
+
+def _fov_hint(header, config):
+    # ASTAP's -fov is the field diameter, taken as the image HEIGHT in
+    # degrees (the ADR fixes it so). The old max(nx,ny) over-estimated
+    # landscape plates and sent ASTAP to the wrong star database: the
+    # "Found 0 references" loop (~19 s+ instead of 0.3 s).
+    # @return: fov in degrees, or None (the caller passes -fov 0 = auto)
+    ny = _num(header.get("NAXIS2"))
+    if not ny or ny <= 0:
+        return None
+    scale = _scale_arcsec(header, config)
+    if not scale:
+        return None
+    return round(ny * scale / 3600.0, 3)
 
 
 def solve(path, progress=None, astap_path=None, update=False, config=None,
@@ -302,35 +337,76 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
         header, _data = fits_io.read_fits(path)
     except fits_io.FitsError:
         header = {}
-    out_base = _out_base(digest)
-    # -progress streams stage lines for the busy dialog. No -ra/-spd hint:
-    # the header's RA units are ambiguous (degrees vs hours) and a wrong
-    # hint sends ASTAP to the wrong sky and loops ("Found 0 references");
-    # -fov is the reliable speed-up and ASTAP reads the header's own
-    # position safely.
-    cmd = [binary, "-f", str(path), "-wcs", "-progress",
-           "-o", str(out_base)]
+    base = _out_base(digest)
+
+    # The hint (image height in degrees, from the header's own scale;
+    # no -ra/-spd: the RA unit is ambiguous and ASTAP reads the header's
+    # position itself). A wrong or missing hint can make ASTAP sweep the
+    # whole sky ("Found 0 references"), so the hinted attempt is bounded
+    # and a second, auto-field attempt (-fov 0) catches what it misses.
+    fov = _fov_hint(header, config)
+    extra = []
     db_path = _database_path(binary, config)
     if db_path:
-        cmd += ["-d", db_path]
-    fov = _fov_hint(header, config)
-    if fov:
-        cmd += ["-fov", str(fov)]
+        extra += ["-d", db_path]
     if update:
-        cmd.append("-update")
-    if progress:
-        progress("astap: solving locally")
-    logger.info("ASTAP: %s", " ".join(cmd))
+        extra.append("-update")
+    targets = [fov, None] if fov else [None]
+    overall = time.monotonic() + TIMEOUT_S
+    cards = None
+    for i, target in enumerate(targets):
+        tail = max(overall - time.monotonic(), 1.0)
+        budget = min(ATTEMPT_S, tail) if i < len(targets) - 1 else tail
+        out_base = Path(f"{base}-a{i}")
+        cmd = [binary, "-f", str(path), "-wcs", "-progress",
+               "-o", str(out_base)] + extra \
+            + ["-fov", str(target) if target else "0"]
+        if progress:
+            progress("astap: solving locally" if target
+                     else "astap: solving (auto field)")
+        logger.info("ASTAP: %s", " ".join(cmd))
+        lines, cancelled, _timed_out, rc = _run_astap(
+            cmd, progress, cancel, budget)
+        if cancelled:
+            logger.info("ASTAP cancelled for %s", path.name)
+            return None
+        cards = _take_wcs(str(out_base) + ".wcs")
+        if cards is None:
+            # an ASTAP that ignores -o still writes the sidecar next to
+            # the image, which is where the older versions looked for it
+            cards = _take_wcs(str(path) + ".wcs")
+        _drop_outputs(out_base)
+        if cards is None:
+            cards = _cards_from_stdout("".join(lines))
+        if cards:
+            break
+        if time.monotonic() >= overall:
+            logger.warning("ASTAP timed out after %ss", TIMEOUT_S)
+            break
+        logger.info("ASTAP attempt %s failed (rc=%s); retrying auto field",
+                    i + 1, rc)
+    if not cards:
+        logger.info("ASTAP returned no usable WCS")
+        return None
+    db.cache_put(key, "astap", json.dumps(cards).encode("utf-8"),
+                 "application/json")
+    return cards
+
+
+def _run_astap(cmd, progress, cancel, budget):
+    # One ASTAP attempt: streams stdout to progress, honours the Cancel
+    # flag and the time budget (a kill on either).
+    # @return: (lines, cancelled, timed_out, returncode)
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True)
     except OSError as err:
         logger.warning("ASTAP run failed: %s", err)
-        return None
+        return [], False, False, None
     if cancel is not None:
         cancel.attach(proc)
     lines = []
-    deadline = time.monotonic() + TIMEOUT_S
+    deadline = time.monotonic() + max(budget, 1.0)
 
     def _pump():
         # Reading off-thread keeps the Cancel responsive while ASTAP runs.
@@ -352,23 +428,5 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
             break
         time.sleep(0.05)
     reader.join(timeout=2.0)
-    if cancel is not None and cancel.is_set():
-        logger.info("ASTAP cancelled for %s", path.name)
-        return None
-    if timed_out:
-        logger.warning("ASTAP timed out after %ss", TIMEOUT_S)
-        return None
-    cards = _take_wcs(str(out_base) + ".wcs")
-    if cards is None:
-        # an ASTAP that ignores -o still writes the sidecar next to the
-        # image, which is where the previous versions looked for it
-        cards = _take_wcs(str(path) + ".wcs")
-    _drop_outputs(out_base)
-    if cards is None:
-        cards = _cards_from_stdout("".join(lines))
-    if not cards:
-        logger.info("ASTAP returned no usable WCS (rc=%s)", proc.returncode)
-        return None
-    db.cache_put(key, "astap", json.dumps(cards).encode("utf-8"),
-                 "application/json")
-    return cards
+    return lines, bool(cancel is not None and cancel.is_set()), \
+        timed_out, proc.returncode

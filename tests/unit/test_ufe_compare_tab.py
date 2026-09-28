@@ -730,3 +730,18 @@ def test_saved_project_sequence_fills_the_tab(dlg):
     assert tab.entries()[0]["name"] == "A"
     # the tab already has entries: a second restore is a no-op
     assert dlg.load_saved_sequence(seq) is False
+
+
+def test_a_solve_clears_the_stale_no_wcs_line(dlg, tmp_path):
+    # the plate loaded without WCS said so; a solve landing on the open
+    # plate must drop that line (it used to sit there even after solving)
+    from test_fits_annotate import _make_fits
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))
+    tab = dlg.tab_compare
+    assert "no WCS" in tab.lbl_status.text()
+    cards = {"CRVAL1": 300.0, "CRVAL2": 60.0, "CRPIX1": 32.0,
+             "CRPIX2": 32.0, "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+             "CD1_1": -0.0003, "CD1_2": 0.0, "CD2_1": 0.0,
+             "CD2_2": 0.0003}
+    assert dlg.state.set_wcs_cards(cards)
+    assert "no WCS" not in tab.lbl_status.text()

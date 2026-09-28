@@ -144,6 +144,9 @@ class UfeCompareTab(QWidget):
         self._prefill_sky = None     # (ra, dec) from the host, for DSS2
         self._build_ui()
         state.image_loaded.connect(self._on_image_loaded)
+        # a solve can land on the open plate: the stale "no WCS" line must
+        # go without touching the (untouched) field
+        state.wcs_changed.connect(self._on_wcs_changed)
         if view is not None:
             view.scene_clicked.connect(self._on_scene_clicked)
         self._on_image_loaded()
@@ -281,9 +284,25 @@ class UfeCompareTab(QWidget):
         if self._state.has_image:
             self.edt_target.setText(Path(self._state.path).stem)
             if self._state.wcs is None:
-                self.lbl_status.setText(self.tr(
-                    "The plate has no WCS: solve it with «Solve "
-                    "astrometry…» to build the comparison field."))
+                self.lbl_status.setText(self._no_wcs_hint())
+
+    def _no_wcs_hint(self):
+        # @return: the "solve it first" line, shared by the load and the
+        #          stale-message clear (same source, same translation)
+        return self.tr(
+            "The plate has no WCS: solve it with «Solve astrometry…» to "
+            "build the comparison field.")
+
+    def _on_wcs_changed(self):
+        # A solve landed on the open plate: the "no WCS" line is stale.
+        # Re-state the neutral field line (the solve never touched the
+        # sequence, so the field is not reset here).
+        if not (self._state.has_image and self._state.wcs is not None):
+            return
+        if self._field is None and self.lbl_status.text() == self._no_wcs_hint():
+            self.lbl_status.setText(self.tr(
+                "The sequence field is empty: build it with «Generate "
+                "field…», or restore the one saved with the plate."))
 
     def reset_state(self):
         # ADR-047: the sequence field's zero point: no catalog, no

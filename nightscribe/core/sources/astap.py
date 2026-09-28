@@ -16,19 +16,23 @@
 Same contract as the Astrometry.net client: `solve(path, progress) ->
 cards|None`, with the WCS read into memory from the `-wcs` output (the
 user's FITS is only rewritten with `-update`, which is opt-in and driven
-from the editor's Solve button). Results are cached by content hash and
-backend, so the same plate is never solved twice. No network.
+from the editor's Solve button). ASTAP's own outputs are named with `-o`
+into our per-user folder, so the solver never leaves its .ini/.wcs next
+to the observer's images. Results are cached by content hash and backend,
+so the same plate is never solved twice. No network.
 """
 
 import hashlib
 import json
 import logging
+import os
 import subprocess
 import shutil
 import time
 from pathlib import Path
 
 from ..db import db
+from ... import paths
 from .astrometry import _WCS_KEYS
 
 logger = logging.getLogger(__name__)
@@ -36,6 +40,26 @@ logger = logging.getLogger(__name__)
 # The ASTAP command-line switch set we use: hints (fov/ra/spd), the -wcs
 # output file and the optional -update of the FITS header.
 TIMEOUT_S = 180.0
+
+
+def _install_candidates():
+    # The install folders PATH usually misses: the Windows installer drops
+    # astap.exe under Program Files (or in the user's LOCALAPPDATA for a
+    # per-user install) and never touches PATH; a portable zip often lives
+    # in <drive>:\astap. Where those environment folders do not exist
+    # (Linux, macOS) the list is empty: there the package manager puts the
+    # binary in PATH and shutil.which finds it.
+    # @return: list of candidate Paths (they may not exist)
+    out = []
+    env = os.environ
+    for key in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
+        root = env.get(key)
+        if root:
+            out.append(Path(root) / "astap" / "astap.exe")
+    drive = env.get("SystemDrive")
+    if drive:
+        out.append(Path(drive + "\\") / "astap" / "astap.exe")
+    return out
 
 
 def resolve_binary(astap_path=None):
@@ -46,7 +70,12 @@ def resolve_binary(astap_path=None):
         if p.is_file():
             return str(p)
     found = shutil.which("astap") or shutil.which("astap.exe")
-    return found
+    if found:
+        return found
+    for cand in _install_candidates():
+        if cand.is_file():
+            return str(cand)
+    return None
 
 
 def probe(astap_path=None):
@@ -72,6 +101,45 @@ def _cards_from_wcs_file(wcs_path):
         return None
     cards = {k: header[k] for k in _WCS_KEYS if k in header}
     return cards or None
+
+
+def _take_wcs(wcs_path):
+    # Reads one .wcs sidecar ASTAP wrote and removes it right away.
+    # @args: wcs_path - the candidate sidecar
+    # @return: dict of WCS cards, or None when there is no such file
+    p = Path(wcs_path)
+    if not p.is_file():
+        return None
+    cards = _cards_from_wcs_file(p)
+    try:
+        p.unlink()
+    except OSError:
+        pass
+    return cards
+
+
+def _out_base(digest):
+    # ASTAP names its outputs from `-o` (base path and file name) and,
+    # without it, writes them next to the image: the .ini report always,
+    # the .wcs on a solution. Pointing the base at our own per-user folder
+    # keeps the solver out of the observer's image folders; the digest
+    # keeps two concurrent solves (live mode plus a manual Solve) apart.
+    # @args: digest - the plate's content hash (the cache key)
+    # @return: Path base for this plate's ASTAP outputs
+    return paths.astap_dir() / f"solve-{digest[:16]}"
+
+
+def _drop_outputs(base):
+    # @args: base - the `-o` base inside our own folder
+    # @return: None; removes what ASTAP left there (.ini always, .log with
+    #          -log), so the app folder does not fill up with scratch
+    for ext in (".ini", ".log"):
+        p = Path(str(base) + ext)
+        try:
+            if p.is_file():
+                p.unlink()
+        except OSError:
+            pass
 
 
 def _cards_from_stdout(text):
@@ -134,7 +202,8 @@ def solve(path, progress=None, astap_path=None, update=False, config=None):
         header, _data = fits_io.read_fits(path)
     except fits_io.FitsError:
         header = {}
-    cmd = [binary, "-f", str(path), "-wcs", "-o", str(path) + ".ini"]
+    out_base = _out_base(digest)
+    cmd = [binary, "-f", str(path), "-wcs", "-o", str(out_base)]
     fov = _fov_hint(header, config)
     if fov:
         cmd += ["-fov", str(fov)]
@@ -156,14 +225,12 @@ def solve(path, progress=None, astap_path=None, update=False, config=None):
     except (OSError, subprocess.SubprocessError) as err:
         logger.warning("ASTAP run failed: %s", err)
         return None
-    wcs_path = Path(str(path) + ".wcs")
-    cards = None
-    if wcs_path.is_file():
-        cards = _cards_from_wcs_file(wcs_path)
-        try:
-            wcs_path.unlink()
-        except OSError:
-            pass
+    cards = _take_wcs(str(out_base) + ".wcs")
+    if cards is None:
+        # an ASTAP that ignores -o still writes the sidecar next to the
+        # image, which is where the previous versions looked for it
+        cards = _take_wcs(str(path) + ".wcs")
+    _drop_outputs(out_base)
     if cards is None:
         cards = _cards_from_stdout(proc.stdout)
     if not cards:

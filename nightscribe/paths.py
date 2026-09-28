@@ -57,6 +57,15 @@ def image_cache_dir():
     return p
 
 
+def astap_dir():
+    # @return: the folder of the local ASTAP solver's outputs (the `-o`
+    #          base: the solver's .ini/.wcs/.log land here instead of next
+    #          to the observer's images, ADR-051)
+    p = data_dir() / "astap"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
 def docs_dir():
     # @return: Path to the documentation folder (docs/ bundled by the
     # PyInstaller spec, or the repository one when running from source)

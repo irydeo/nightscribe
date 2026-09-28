@@ -16,6 +16,7 @@ output or stdout), the cache (a second call runs nothing), the missing
 binary path and the auto dispatcher's fallback to nova. A simulated
 binary stands in for the real one. No network."""
 
+import ast
 import os
 from pathlib import Path
 
@@ -51,9 +52,11 @@ def _write_fits(path):
     return path
 
 
-def _fake_astap(tmp_path, to_stdout=False):
+def _fake_astap(tmp_path, to_stdout=False, honor_o=False):
     # a simulated ASTAP: writes <file>.wcs with fixed cards (or prints
-    # them), and records each run so the cache can be proven
+    # them), records each run so the cache can be proven, and leaves its
+    # command line in <file>.argv; honor_o writes the sidecar at the `-o`
+    # base, exactly like the real binary
     script = tmp_path / ("fake_astap_stdout.py" if to_stdout
                          else "fake_astap.py")
     lines = [
@@ -62,6 +65,7 @@ def _fake_astap(tmp_path, to_stdout=False):
         "from pathlib import Path",
         "args = sys.argv[1:]",
         "f = args[args.index('-f') + 1]",
+        "Path(f + '.argv').write_text(repr(args))",
         "Path(f + '.runs').write_text(Path(f + '.runs').read_text() + 'x')"
         " if Path(f + '.runs').exists() else Path(f + '.runs').write_text('x')",
     ]
@@ -76,7 +80,11 @@ def _fake_astap(tmp_path, to_stdout=False):
     else:
         lines.append("data = " + repr(body))
         lines.append("data += ' ' * ((2880 - len(data) % 2880) % 2880)")
-        lines.append("Path(f + '.wcs').write_text(data)")
+        if honor_o:
+            lines.append("Path(args[args.index('-o') + 1] + '.wcs')"
+                         ".write_text(data)")
+        else:
+            lines.append("Path(f + '.wcs').write_text(data)")
     script.write_text("\n".join(lines) + "\n")
     os.chmod(script, 0o755)
     return script
@@ -114,9 +122,49 @@ def test_cache_runs_nothing_twice(tmp_path, monkeypatch):
 def test_missing_binary_returns_none(tmp_path, monkeypatch):
     monkeypatch.setattr(astap, "db", _FakeCache())
     monkeypatch.setattr(astap.shutil, "which", lambda _n: None)
+    monkeypatch.setattr(astap, "_install_candidates", lambda: [])
     fits = _write_fits(tmp_path / "p.fits")
     assert astap.resolve_binary("") is None
     assert astap.solve(fits, astap_path="") is None
+
+
+def test_resolve_binary_probes_the_windows_install_folders(tmp_path,
+                                                           monkeypatch):
+    # P3: the Windows installer drops astap.exe in Program Files (or in
+    # LOCALAPPDATA) and never touches PATH; those folders are probed
+    root = tmp_path / "Program Files"
+    (root / "astap").mkdir(parents=True)
+    exe = root / "astap" / "astap.exe"
+    exe.write_bytes(b"MZ")
+    monkeypatch.setenv("PROGRAMFILES", str(root))
+    monkeypatch.delenv("PROGRAMFILES(X86)", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.delenv("SystemDrive", raising=False)
+    monkeypatch.setattr(astap.shutil, "which", lambda _n: None)
+    assert astap.resolve_binary(None) == str(exe)
+    assert astap.probe(None)["ok"]
+    # a configured path still wins over the install folders
+    script = _fake_astap(tmp_path)
+    assert astap.resolve_binary(str(script)) == str(script)
+
+
+def test_solve_writes_its_outputs_in_the_app_folder(tmp_path, monkeypatch):
+    # P3: `-o` names ASTAP's outputs (the .ini always, the .wcs on a
+    # solution) into our per-user folder, so nothing is left next to the
+    # observer's image and our own folder is cleaned afterwards
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    appdata = tmp_path / "appdata"
+    monkeypatch.setattr(astap.paths, "data_dir", lambda: appdata)
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True)
+    cards = astap.solve(fits, astap_path=str(script))
+    assert cards and cards["CRVAL1"] == 31.3121    # read from the -o base
+    argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
+    base = argv[argv.index("-o") + 1]
+    assert base.startswith(str(appdata / "astap" / "solve-"))
+    assert not Path(str(fits) + ".ini").exists()
+    assert not Path(str(fits) + ".wcs").exists()
+    assert list((appdata / "astap").iterdir()) == []
 
 
 def test_probe_reports_the_binary(tmp_path):

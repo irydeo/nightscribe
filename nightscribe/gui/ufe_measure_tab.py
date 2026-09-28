@@ -186,6 +186,10 @@ class UfeMeasureTab(QWidget):
         self.grp_series = self._ui.grp_series
         self.lbl_series_hint = self._ui.lbl_series_hint
         self.btn_series = self._ui.btn_series
+        # P1 #12: the run button doubles as the Cancel while a series is
+        # measuring; the .ui ships the run label (ADR-047: no mirror of it
+        # in Python) and it comes back to it when the run ends.
+        self._btn_series_label = self.btn_series.text()
         self.btn_series.clicked.connect(self._on_measure_series)
         self.btn_series_undo = self._ui.btn_series_undo
         self.btn_series_undo.clicked.connect(self._on_series_undo)
@@ -784,17 +788,33 @@ class UfeMeasureTab(QWidget):
         self.lbl_series_cadence.setText(
             self.tr("group {0} · cadence from the frames").format(grp))
 
+    def _series_button_running(self, running):
+        # P1 #12: while the worker measures, the run button IS the Cancel
+        # (a long series must have a way out); it comes back to the .ui's
+        # label when the run ends, cancelled or not.
+        # @args: running - True while the series worker runs
+        self.btn_series.setText(self.tr("Cancel") if running
+                                else self._btn_series_label)
+        self.btn_series.setEnabled(True)
+
     def _on_measure_series(self):
         # D8: from the visit's files; with no visit (or no sequence, or no
-        # target) the status line says exactly what is missing.
+        # target) the status line says exactly what is missing. While the
+        # worker runs this same button is the Cancel (P1 #12): the engine
+        # stops between frames and answers "incomplete" with the points
+        # measured so far (D18).
+        if self._series_worker is not None \
+                and self._series_worker.isRunning():
+            self._series_worker.cancel()
+            self.lbl_status.setText(self.tr(
+                "Cancelling the series: it stops after the frame it is "
+                "measuring; the points measured so far are kept."))
+            return
         ctx = self._series_context()
         if not ctx or not ctx.get("paths"):
             self.lbl_status.setText(self.tr(
                 "No visit with frames: open the editor from a visit to "
                 "measure a series."))
-            return
-        if self._series_worker is not None \
-                and self._series_worker.isRunning():
             return
         entries = self._sequence()
         if not entries:
@@ -813,7 +833,7 @@ class UfeMeasureTab(QWidget):
         self._update_series_counter(ctx)
         self.prg_series.setRange(0, len(ctx["paths"]))
         self.prg_series.setValue(0)
-        self.btn_series.setEnabled(False)
+        self._series_button_running(True)
         self.btn_series_undo.setEnabled(False)
         from .workers import SeriesWorker
         self._series_worker = SeriesWorker(ctx["paths"], self._series_cfg)
@@ -828,7 +848,7 @@ class UfeMeasureTab(QWidget):
         self.prg_series.setValue(done)
 
     def _on_series_finished(self, result):
-        self.btn_series.setEnabled(True)
+        self._series_button_running(False)
         self._series_worker = None
         context = self._series_context() or {}
         self._update_series_counter(context, result.points)
@@ -901,7 +921,7 @@ class UfeMeasureTab(QWidget):
         self.lbl_result.setText("\n".join(lines))
 
     def _on_series_failed(self, message):
-        self.btn_series.setEnabled(True)
+        self._series_button_running(False)
         self._series_worker = None
         self.lbl_status.setText(self.tr("The series failed: {0}")
                                 .format(message))

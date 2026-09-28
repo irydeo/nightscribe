@@ -1053,6 +1053,61 @@ def test_dialog_close_cancels_a_running_live_watch(dlg, qapp, tmp_path):
     assert tab._live_worker is None        # the reference is dropped
 
 
+# ---------------- the run button doubles as Cancel (P1 #12) ----------------
+
+def test_series_button_cancels_a_running_series(dlg, qapp, tmp_path):
+    # Regression (P1 #12): a long series had no way out, the button was
+    # disabled while the worker ran. The same button must become the
+    # Cancel: one click mid-run asks the worker to stop, the engine
+    # answers "incomplete" with the points measured so far (D18: they are
+    # kept as one undoable run) and the button comes back to its label.
+    import time
+    tab = dlg.tab_measure
+    label = tab.btn_series.text()              # the .ui's run label
+    rows_seen = []
+
+    def points_hook(rows, cfg):
+        rows_seen.append(rows)
+        return 91
+
+    frames = [_write_plate(tmp_path / f"cn{i}.fits", dlg.state.data)
+              for i in range(60)]          # still running at click time
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(points_hook)
+    tab._on_measure_series()
+    worker = tab._series_worker
+    assert worker is not None and worker.isRunning()
+    assert tab.btn_series.text() == tab.tr("Cancel")   # it IS the Cancel
+    assert tab.btn_series.isEnabled()                  # ... and clickable
+    # mid-run: a few frames are already measured when the click lands
+    t0 = time.time()
+    while tab.prg_series.value() < 3 and time.time() - t0 < 30.0:
+        qapp.processEvents()
+        time.sleep(0.01)
+    assert tab.prg_series.value() >= 3
+    calls = _spy_cancel(worker)
+    tab.btn_series.click()                     # one click, mid-run
+    assert calls                               # the worker was asked to stop
+    assert "Cancelling" in tab.lbl_status.text()
+    _wait_series(tab, qapp)
+    assert tab._series_worker is None
+    result = tab._series_result
+    assert result.status == "incomplete"       # cancelled, not lost (D18)
+    assert 0 < len(result.points) < len(frames)
+    # the points measured so far are kept: one run, persisted and undoable
+    kept = [p for p in result.points if p.mjd is not None]
+    assert kept and rows_seen and len(rows_seen[0]) == len(kept)
+    assert tab._series_run_id == 91
+    assert tab.btn_series_undo.isEnabled()
+    # and the button is the run button again
+    assert tab.btn_series.text() == label
+    assert tab.btn_series.isEnabled()
+    assert "Series cancelled" in tab.lbl_status.text()
+
+
 # ---------------- series plan, phase 8: ExoClock ----------------
 
 def test_exoclock_button_writes_files_and_records_outcome(

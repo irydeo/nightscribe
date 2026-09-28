@@ -724,6 +724,21 @@ def _night_of(mjd):
     return int(math.floor(mjd - 0.5))
 
 
+def _night_label(night):
+    # The night key as the evening's civil date (the key is the MJD of
+    # the following noon, so noon of key+1 is the night that ends it).
+    # @return: "YYYY-MM-DD", or the key itself when it is not numeric
+    if night is None:
+        return ""
+    try:
+        from . import coords, variables
+        dt = coords.datetime_from_jd(float(night) + 0.5
+                                     + variables.MJD0)
+        return dt.strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        return str(night)
+
+
 def _rms(values):
     # @return: the plain rms, or None
     vals = [v for v in values if v is not None]
@@ -1181,9 +1196,11 @@ def night_qc(points, zp_sigma=3.0):
                     level = "warn"
                     msgs.append(_msg(
                         "la noche {} tiene el punto cero desplazado "
-                        "({:+.3f} mag)".format(night, m - gm),
+                        "({:+.3f} mag)".format(_night_label(night),
+                                              m - gm),
                         "night {} has a shifted zero point "
-                        "({:+.3f} mag)".format(night, m - gm)))
+                        "({:+.3f} mag)".format(_night_label(night),
+                                               m - gm)))
     return {"level": level,
             "nights": {str(n): m for n, m in meds.items()},
             "filters": filters, "messages": msgs}

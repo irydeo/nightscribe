@@ -886,12 +886,30 @@ class UfeMeasureTab(QWidget):
         self._draw_series(result.points)
         self._fill_series_panel(result, context)
 
+    def _night_label(self, night):
+        # The engine keys its per-night blocks by the observing night
+        # (ADR-048: the boundary sits at noon), and that key is a raw MJD;
+        # the observer reads the evening's civil date instead. Anything
+        # that is not an MJD (a date the engine already wrote, None) rides
+        # through as it came.
+        # @args: night - the engine's night key (an MJD, a string or None)
+        # @return: the panel's label, e.g. "2026-09-20"
+        try:
+            mjd = float(night)
+        except (TypeError, ValueError):
+            return str(night)
+        from ..core import variables
+        # noon UTC of that night: the civil date the evening started on
+        return coords.datetime_from_jd(
+            mjd + 0.5 + variables.MJD0).strftime("%Y-%m-%d")
+
     def _fill_series_panel(self, result, context):
         # Plain-language summary (D13/D25/D35/D20): points and frames,
         # the flags, the aperture the sweep chose per night (T3), the
         # detrend coefficients per night, the cadence guard, the
         # multi-night zero-point / band warnings and the frames that
         # never made it onto the curve (P2 #22: nothing drops silently).
+        # Nights are named by their civil date (P3), never by raw MJD.
         points = result.points
         lines = [self.tr("Series: {0} points from {1} frames").format(
             len(points), len((context or {}).get("paths", [])))]
@@ -912,14 +930,15 @@ class UfeMeasureTab(QWidget):
             if ap.get("fwhm") is None:
                 lines.append(self.tr(
                     "Night {0}: aperture k = {1:.1f} (check-star scatter "
-                    "{2:.4f} mag)").format(night, ap.get("k") or 0.0,
+                    "{2:.4f} mag)").format(self._night_label(night),
+                                           ap.get("k") or 0.0,
                                            ap.get("rms") or 0.0))
             else:
                 lines.append(self.tr(
                     "Night {0}: aperture k = {1:.1f} (seeing {2:.1f} px, "
                     "check-star scatter {3:.4f} mag)").format(
-                        night, ap.get("k") or 0.0, ap["fwhm"],
-                        ap.get("rms") or 0.0))
+                        self._night_label(night), ap.get("k") or 0.0,
+                        ap["fwhm"], ap.get("rms") or 0.0))
         det = result.detrend
         if det:
             for n in det.get("nights", []):
@@ -927,13 +946,14 @@ class UfeMeasureTab(QWidget):
                     lines.append(self.tr(
                         "Night {0}: no airmass range, offset only "
                         "({1} points); its level against the other "
-                        "nights is lost").format(n["night"], n["n"]))
+                        "nights is lost").format(
+                            self._night_label(n["night"]), n["n"]))
                 else:
                     lines.append(self.tr(
                         "Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} "
                         "(rms {4:.4f} → {5:.4f})").format(
-                            n["night"], n["a1"], n["a2"], n["a3"],
-                            n["rms_before"] or 0.0,
+                            self._night_label(n["night"]), n["a1"], n["a2"],
+                            n["a3"], n["rms_before"] or 0.0,
                             n["rms_after"] or 0.0))
         ctxd = (context or {}).get("context") or {}
         transit = ctxd.get("transit") or {}

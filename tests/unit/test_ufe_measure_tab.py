@@ -1419,3 +1419,40 @@ def test_series_actions_wrap_into_two_rows_and_stay_narrow(dlg, qapp):
     assert hint <= 560
 
 
+# ---------------- P3: nights are named by their civil date ----------------
+
+def test_series_panel_names_nights_by_their_civil_date(
+        dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P3): the per-night lines printed the engine's raw MJD
+    # night key ("Night 61303"), which no observer reads. The night
+    # boundary sits at noon (ADR-048), so the panel says the civil date
+    # of the evening, in the aperture-sweep and the detrend lines alike.
+    from nightscribe.core import series_measure as sm
+    tab = dlg.tab_measure
+
+    def fake(paths, cfg, progress=None, cancel=None):
+        return sm.SeriesResult(
+            points=[sm.SeriesPoint(index=0, path=str(paths[0]),
+                                   mjd=61303.98, mag=15.0, err=0.01,
+                                   inst=14.0, filter="V", airmass=1.2)],
+            apertures={61303: {"k": 1.4, "rms": 0.0123,
+                               "radii": (5.4, 9.0, 13.0), "fwhm": 3.2}},
+            detrend={"policy": "airmass",
+                     "nights": [{"night": 61303, "a1": 1.0, "a2": 0.1,
+                                 "a3": 0.0, "n": 1, "fallback": None,
+                                 "rms_before": 0.02, "rms_after": 0.01}]})
+
+    monkeypatch.setattr(sm, "measure_series", fake)
+    frames = [_write_plate(tmp_path / f"nd{i}.fits", dlg.state.data)
+              for i in range(2)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 41)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    panel = tab.lbl_result.toPlainText()
+    assert "Night 2026-09-20: aperture k = 1.4" in panel
+    assert "Night 2026-09-20: a1=1.000, a2=+0.100, a3=0.000" in panel
+    assert "Night 61303" not in panel           # the raw MJD is gone

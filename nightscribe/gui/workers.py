@@ -602,6 +602,32 @@ class PrepareExoticWorker(QThread):
         self.finished.emit(bool(ok), log or "")
 
 
+class ProbeExoticWorker(QThread):
+    # Detects and probes the EXOTIC interpreter off the GUI thread:
+    # detect_python spawns subprocesses and the cold import of exotic
+    # can take minutes, which used to freeze the app for the whole
+    # probe. Not cancellable (each subprocess carries its own timeout);
+    # one report out, like its siblings.
+
+    finished = Signal(dict)         # {"ok", "version", "message", "python"}
+
+    def __init__(self, preferred=None):
+        super().__init__()
+        self._preferred = preferred
+
+    def run(self):
+        from ..core import exotic_env
+        python = None
+        try:
+            python = exotic_env.detect_python(self._preferred)
+            rep = exotic_env.probe(python)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("exotic probe worker failed: %s", err)
+            rep = {"ok": False, "version": None, "message": str(err)}
+        rep["python"] = python or ""
+        self.finished.emit(rep)
+
+
 class ExoticRunWorker(QThread):
     # Runs EXOTIC headless off the GUI thread (orchestration phase C):
     # merged log streamed as progress, cancellable, killed on timeout.

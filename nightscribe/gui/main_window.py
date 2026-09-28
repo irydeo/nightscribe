@@ -782,17 +782,45 @@ class MainWindow(QMainWindow):
             dlg.edt_exotic_python.text().strip())
 
     def _test_exotic(self, dlg):
-        # Probe the interpreter for a working EXOTIC import.
+        # Probes the interpreter for a working EXOTIC import off the GUI
+        # thread: detect_python spawns subprocesses and the cold import
+        # of exotic can take minutes, which used to freeze the app for
+        # the whole probe. The button stays disabled while it runs.
+        # @args: dlg - the settings dialog
+        if getattr(self, "_exotic_probe", None) is not None:
+            return
+        from .workers import ProbeExoticWorker
+        dlg.btn_exotic_test.setEnabled(False)
+        self.statusBar().showMessage(
+            self.tr("Checking the EXOTIC environment…"), 0)
+        worker = ProbeExoticWorker(dlg.edt_exotic_python.text().strip())
+        worker.finished.connect(
+            lambda rep: self._exotic_test_done(dlg, rep))
+        self._exotic_probe = worker
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_test_done(self, dlg, rep):
+        # The probe landed: re-arm the button and report. The probe
+        # takes minutes, so the dialog may be closed and destroyed by
+        # now: never touch a destroyed dialog's widgets; the status bar
+        # carries the report when it is gone.
+        # @args: dlg - the settings dialog (maybe already destroyed),
+        #        rep - the probe report {"ok","version","message","python"}
         from PySide6.QtWidgets import QMessageBox
-        from ..core import exotic_env
-        python = self._exotic_python(dlg)
-        rep = exotic_env.probe(python)
-        QMessageBox.information(dlg, self.tr("EXOTIC"), rep["message"])
+        self._exotic_probe = None
+        self.statusBar().clearMessage()
+        if not Shiboken.isValid(dlg):
+            self.statusBar().showMessage(rep.get("message", ""), 8000)
+            return
+        dlg.btn_exotic_test.setEnabled(True)
+        QMessageBox.information(dlg, self.tr("EXOTIC"),
+                                rep.get("message", ""))
 
     def _prepare_exotic(self, dlg):
         # Build the external EXOTIC environment in the background.
         from PySide6.QtWidgets import QMessageBox
-        from ..core import exotic_env, paths as paths_mod
+        from ..core import exotic_env
         from .workers import PrepareExoticWorker
         python = self._exotic_python(dlg)
         if not python:
@@ -5389,10 +5417,14 @@ class MainWindow(QMainWindow):
         worker.start()
 
     def _exotic_reduce(self, pid, e):
-        # Generate the visit's inits.json, check the environment and run
+        # Gather the planet data (worker), check the environment and run
         # EXOTIC headless; the result is imported on finish (phase E).
-        from PySide6.QtWidgets import QMessageBox
-        from ..core import exotic, exotic_env, fits_io, wcs as wcs_mod
+        # The interpreter check runs off the GUI thread: detect_python
+        # spawns subprocesses and the cold import of exotic can take
+        # minutes, which used to freeze the app for the whole probe. The
+        # wait cursor covers the check; the flow resumes on the report.
+        # @args: pid - the project id, e - the ExploreWorker's enriched
+        #        dict
         p = project.get(db, pid)
         if not p:
             return
@@ -5402,19 +5434,47 @@ class MainWindow(QMainWindow):
             return
         # the interpreter that has EXOTIC: the user's own Python 3.10 (the
         # cleanest on Windows) or the venv the app prepared
-        python = exotic_env.detect_python(
-            config.get("exotic_python_path") or None)
+        from .workers import ProbeExoticWorker
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self.statusBar().showMessage(
+            self.tr("Checking the EXOTIC environment…"), 0)
+        worker = ProbeExoticWorker(config.get("exotic_python_path") or None)
+        worker.finished.connect(
+            lambda rep: self._exotic_reduce_go(pid, e, rep))
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_reduce_go(self, pid, e, rep):
+        # The environment check landed: warn and stop, or run the
+        # orchestration on the interpreter the probe validated.
+        # @args: pid - the project id, e - the enriched planet data,
+        #        rep - the probe report {"ok","version","message","python"}
+        QApplication.restoreOverrideCursor()
+        self.statusBar().clearMessage()
+        python = rep.get("python") or ""
         if not python:
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
                 "No Python 3.10 found. Install it (python.org, ticking the "
                 "py launcher) and run «pip install exotic» in it, or use "
                 "«Prepare environment» in Settings → EXOTIC."))
             return
-        if not exotic_env.probe(python)["ok"]:
+        if not rep.get("ok"):
             QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
                 "This Python has no EXOTIC installed: run «pip install "
                 "exotic» in it, or use «Prepare environment» in Settings → "
                 "EXOTIC."))
+            return
+        self._exotic_launch(pid, e, python)
+
+    def _exotic_launch(self, pid, e, python):
+        # Generate the visit's inits.json and run EXOTIC headless; the
+        # result is imported on finish (phase E).
+        # @args: pid - the project id, e - the enriched planet data,
+        #        python - the interpreter the probe validated
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic, fits_io, wcs as wcs_mod
+        p = project.get(db, pid)
+        if not p:
             return
         # the visit's frames (the latest visit that has FITS)
         from ..core import followup as fu

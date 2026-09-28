@@ -29,8 +29,14 @@ def test_presets_have_the_expected_shape():
         assert p["key"] and p["sensor"] and p["cameras"]
         assert p["pixel_um"] > 0
         assert p["regime"] in ("short", "normal")
-        # every preset offers a suggested linearity (to be measured)
-        assert p.get("linearity_adu")
+        # every preset offers a suggested linearity (to be measured);
+        # 14/12-bit sensors (IMX294/IMX183) have no datasheet ceiling
+        # inside their ADU range: None disables the guard until measured
+        lin = p.get("linearity_adu")
+        if p["key"] in ("imx294", "imx183"):
+            assert lin is None
+        else:
+            assert lin
 
 
 def test_short_regime_only_for_the_scmos():

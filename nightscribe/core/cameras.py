@@ -106,7 +106,7 @@ PRESETS = [
         "dark_temp_c": None,
         "exp_min_s": 32e-6, "exp_max_s": 2000.0,
         "regime": "normal",
-        "linearity_adu": 50000.0,
+        "linearity_adu": None,
         "linearity_note": "suggested starting point; measure yours",
         "source": "QHYCCD / ZWO product pages",
     },
@@ -121,7 +121,7 @@ PRESETS = [
         "dark_temp_c": None,
         "exp_min_s": 32e-6, "exp_max_s": 2000.0,
         "regime": "normal",
-        "linearity_adu": 50000.0,      # small full well: measure, likely lower
+        "linearity_adu": None,      # small full well: measure, likely lower
         "linearity_note": "small full well: the linear limit may be lower; "
                           "measure yours",
         "source": "QHYCCD / ZWO product pages",

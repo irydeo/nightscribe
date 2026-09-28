@@ -92,14 +92,15 @@ def _stars(target_amp=7000.0):
             + [(CHECK_XY[0], CHECK_XY[1], 9000.0)])
 
 
-def _plate(target_amp=7000.0, sky=100.0, noise=0.0, seed=1, gradient=0.0):
+def _plate(target_amp=7000.0, sky=100.0, noise=0.0, seed=1, gradient=0.0,
+           sigma=SIGMA):
     data = np.full((H, W), sky, dtype=np.float64)
     yy, xx = np.ogrid[:H, :W]
     if gradient:
         data += gradient * (xx - TARGET_XY[0])
     for sx, sy, amp in _stars(target_amp):
         data += amp * np.exp(-((xx - sx) ** 2 + (yy - sy) ** 2)
-                             / (2 * SIGMA ** 2))
+                             / (2 * sigma ** 2))
     if noise > 0.0:
         data += np.random.default_rng(seed).normal(0.0, noise, (H, W))
     return data
@@ -187,6 +188,33 @@ def test_series_time_is_mid_exposure(tmp_path):
     start = fits_meta.read_meta(paths[0])["mjd"]
     assert res.points[0].mjd == pytest.approx(start + 5.0 / 86400.0,
                                               abs=1e-9)
+
+
+def test_fwhm_is_measured_on_every_frame(tmp_path):
+    # P3: each point carries its OWN frame's seeing (measured on the target
+    # and the comps it used), so the detrend's "auto" FWHM column is real
+    # and a defocused frame is visible in the point's metadata. The seeing
+    # varies inside estimate_fwhm's range (a 19x19 cutout truncates a very
+    # broad disc).
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    paths = []
+    for i, sigma in enumerate((1.5, 1.5, SIGMA)):
+        data = _plate(sigma=sigma)
+        paths.append(_write_plate(tmp_path / f"w{i}.fits", data,
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    res = sm.measure_series(paths, _config(wcs, comps))
+    fwhms = [p.fwhm for p in res.points]
+    assert all(f is not None for f in fwhms)
+    assert fwhms[0] == pytest.approx(2.3548 * 1.5, rel=0.05)
+    assert fwhms[1] == pytest.approx(fwhms[0], rel=0.05)
+    assert fwhms[2] > 1.5 * fwhms[0]              # the defocused frame
+    # a group collapses to the median of its members' own seeing, never to
+    # the first member's
+    grouped = sm.measure_series([paths[0], paths[2]],
+                                _config(wcs, comps, group_n=2))
+    assert len(grouped.points) == 1
+    assert fwhms[0] < grouped.points[0].fwhm < fwhms[2]
 
 
 # ---------------- D12 anchor (c): corrupted comp ----------------

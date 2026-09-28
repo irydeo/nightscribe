@@ -108,7 +108,8 @@ class SeriesPoint:
     exptime: float = None
     x: float = None
     y: float = None
-    fwhm: float = None
+    fwhm: float = None              # seeing in px, measured on the frame
+                                    # (median of the group's frames)
     sky: float = None
     airmass: float = None
     flux: float = None
@@ -359,6 +360,23 @@ def _read_frame(path):
     return (header, data), None
 
 
+def _frame_fwhm(data, res):
+    # The frame's own seeing, so every point carries a real FWHM (the T5
+    # detrend's "auto" regressor and the report's seeing column). The plate
+    # recipe only carries a FWHM when the caller measured one, so the
+    # engine measures it here: second moments on the target and on the
+    # comps it just used (cheap 19x19 cutouts, one median per frame).
+    # @args: data - the frame the recipe ran on, res - its PlateResult
+    # @return: the FWHM in px (the recipe's own when it carried one), or
+    #          None when nothing is measurable
+    if res.fwhm is not None or not res.ok or res.col is None:
+        return res.fwhm
+    spots = [(res.col, res.row)]
+    spots += [(r["x"], r["y"]) for _e, r in res.used
+              if r.get("x") is not None and r.get("y") is not None]
+    return photometry.estimate_fwhm(data, spots)
+
+
 def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
                    target_ov=None):
     # One (already loaded) frame through the shared plate recipe. With
@@ -390,6 +408,9 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         site_dark=cfg.site_dark,
         require_catalog=(cfg.zp_mode == "catalog"))
     res = photometry.measure_plate(data, pcfg)
+    # the seeing is measured here, on the very frame the recipe ran on
+    # (native pixels under registration), so each point carries its own
+    res.fwhm = _frame_fwhm(data, res)
     mjd_mid, exptime = _mid_exposure(meta)
     return {"path": str(path), "data": data, "meta": meta, "res": res,
             "mjd": mjd_mid, "exptime": exptime, "r_ap": rap,
@@ -615,7 +636,10 @@ def _build_point(group, cfg):
     comb, comb_err, _used, _rej = _combine_fluxes(fluxes, errs)
     pt.flux, pt.flux_err = comb, comb_err
     pt.x, pt.y = _group_centroid(group)
-    pt.fwhm = first["res"].fwhm
+    # the group's seeing is the median of its frames' OWN measurements
+    # (never the first frame's: a defocused member would go unnoticed)
+    fwhms = [f["res"].fwhm for f in group if f["res"].fwhm is not None]
+    pt.fwhm = float(np.median(fwhms)) if fwhms else None
     _tgt = first["res"].target or {}
     pt.sky = _tgt.get("sky_pp")
     weights = [1.0 / (e ** 2) if (e and e > 0) else 1.0 for e in errs]

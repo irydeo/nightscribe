@@ -1142,3 +1142,117 @@ def test_exoclock_button_writes_files_and_records_outcome(
     assert len(out.read_text().strip().splitlines()) == 4   # one per frame
     assert opened and "exoclock.space/upload" in opened[0]
     assert seen and seen[0]["points"] == 4
+
+
+# ------- P2 #19: live batches say their failures, and undo -------
+
+def _fast_live(monkeypatch):
+    # The tab builds its live worker with the watch's real 2 s poll; an
+    # offscreen test cannot wait for it, so the class it imports polls
+    # fast instead (same worker, same signals).
+    # @return: the replacement class (also patched into gui.workers)
+    from nightscribe.gui import workers
+
+    class _FastLive(workers.LiveSeriesWorker):
+        def __init__(self, folder, cfg, batch_n=5, batch_s=10.0):
+            super().__init__(folder, cfg, poll_s=0.05, batch_n=batch_n,
+                             batch_s=batch_s)
+
+    monkeypatch.setattr(workers, "LiveSeriesWorker", _FastLive)
+    return _FastLive
+
+
+def _stop_live(tab):
+    # The fixture never closes the dialog, so the test itself must not
+    # hand a running thread to the teardown.
+    # @return: the live worker, cancelled and waited on
+    worker = tab._live_worker
+    tab.chk_series_live.setChecked(False)
+    if worker is not None:
+        worker.cancel()
+        assert worker.wait(20000)
+    return worker
+
+
+def _wait_live_runs(tab, qapp, n, timeout=30.0):
+    import time
+    t0 = time.time()
+    while len(tab._live_run_ids) < n and time.time() - t0 < timeout:
+        qapp.processEvents()
+        time.sleep(0.02)
+    qapp.processEvents()
+
+
+def _arm_live(dlg, tmp_path, prefix, n=3):
+    # A visit with frames in tmp_path, a sequence and a measured target:
+    # everything Live mode asks for before it starts watching.
+    # @return: the visit's frame paths
+    frames = [_write_plate(tmp_path / f"{prefix}{i}.fits", dlg.state.data)
+              for i in range(n)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    return frames
+
+
+def test_live_batch_failure_reaches_the_status_line(
+        dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #19): a batch whose measure raised was logged and
+    # dropped, and the tab said nothing at all. The observer must read
+    # that those frames were not measured, in their own language.
+    import time
+    from nightscribe.core import series_measure as sm
+    tab = dlg.tab_measure
+    _arm_live(dlg, tmp_path, "lf")
+    dlg.set_points_hook(lambda rows, cfg: 78)
+
+    def boom(paths, cfg, progress=None, cancel=None):
+        raise RuntimeError("engine down")
+
+    monkeypatch.setattr(sm, "measure_series", boom)
+    _fast_live(monkeypatch)
+    tab.chk_series_live.setChecked(True)
+    t0 = time.time()
+    while "engine down" not in tab.lbl_status.text() \
+            and time.time() - t0 < 20.0:
+        qapp.processEvents()
+        time.sleep(0.02)
+    text = tab.lbl_status.text()
+    _stop_live(tab)
+    assert "engine down" in text
+    assert "were not measured" in text          # the tab's own wording
+    assert tab._live_run_ids == []              # nothing was persisted
+
+
+def test_live_session_is_one_undoable_run(dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #19 / ADR-050): the live batches were written and
+    # their run ids thrown away, so a live session could never be undone.
+    # Its batches pile up behind the same Undo button as a normal series.
+    tab = dlg.tab_measure
+    undone = []
+    _arm_live(dlg, tmp_path, "lu")
+    dlg.set_points_hook(lambda rows, cfg: 79)
+    dlg.set_run_undo_hook(lambda run_id: (undone.append(run_id), 2)[1])
+    _fast_live(monkeypatch)
+    tab.chk_series_live.setChecked(True)
+    _wait_live_runs(tab, qapp, 1)
+    # a second wave: the session keeps piling its batches into one run
+    for i in (3, 4):
+        _write_plate(tmp_path / f"lu{i}.fits", dlg.state.data)
+    _wait_live_runs(tab, qapp, 2)
+    _stop_live(tab)
+    ids = list(tab._live_run_ids)
+    assert len(ids) >= 2 and set(ids) == {79}
+    assert tab.btn_series_undo.isEnabled()
+    assert tab._live_points                    # the curve grew live
+    tab._on_series_undo()
+    assert undone == ids                       # every batch, one click
+    assert "Run undone" in tab.lbl_status.text()
+    assert not tab.btn_series_undo.isEnabled()
+    assert tab._live_run_ids == [] and tab._live_points == []
+    assert tab.chart_series._points == []
+
+
+# ---------------- P2 #20: the aperture sweep is reachable ----------------
+

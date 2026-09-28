@@ -204,6 +204,8 @@ class UfeMeasureTab(QWidget):
         self.chk_series_live.toggled.connect(self._on_series_live_toggled)
         self._live_worker = None
         self._live_points = []
+        self._live_run_ids = []      # the live session's batches: one
+                                     # undoable run (ADR-050, P2 #19)
         self.chart_series = LightCurveChart()
         drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
                 self.chart_series)
@@ -1018,15 +1020,25 @@ class UfeMeasureTab(QWidget):
         QDesktopServices.openUrl(QUrl("https://exoclock.space/upload/"))
 
     def _on_series_undo(self):
-        # D6: undo this run only; never the visit.
-        if self._series_run_id is None:
+        # D6: undo this run only; never the visit. A live session is one
+        # run too (ADR-050, P2 #19): its batches are undone together.
+        # @return: None; the outcome shows in the status line.
+        run_ids = ([self._series_run_id]
+                   if self._series_run_id is not None else [])
+        run_ids += list(self._live_run_ids)
+        if not run_ids:
             return
         dlg = self.window()
         undo = getattr(dlg, "undo_run", None)
-        count = undo(self._series_run_id) if callable(undo) else 0
+        count = 0
+        if callable(undo):
+            for run_id in run_ids:
+                count += int(undo(run_id) or 0)
         self.lbl_status.setText(
             self.tr("Run undone: {0} points removed.").format(count))
         self._series_run_id = None
+        self._live_run_ids = []
+        self._live_points = []
         self.btn_series_undo.setEnabled(False)
         self.chart_series.set_data([])
 
@@ -1054,6 +1066,9 @@ class UfeMeasureTab(QWidget):
         self._series_cfg = self._series_config(entries, target)
         self._series_cfg_dict = self._series_config_dict(self._series_cfg)
         self._live_points = []
+        # a new session is a new undoable run (P2 #19)
+        self._live_run_ids = []
+        self.btn_series_undo.setEnabled(self._series_run_id is not None)
         from .workers import LiveSeriesWorker
         # the live batch is the group: N frames (or the same time with the
         # real exposure), so a few-second sCMOS cadence still groups
@@ -1067,29 +1082,67 @@ class UfeMeasureTab(QWidget):
             pass
         self._live_worker = LiveSeriesWorker(
             folder, self._series_cfg, batch_n=grp, batch_s=grp * exp_s)
-        self._live_worker.progress.connect(
-            lambda m: self.lbl_status.setText(m))
+        # every line the observer reads is translated here (the driver
+        # reports stage keys and its errors, never wording: P2 #19)
+        self._live_worker.progress.connect(self._on_live_progress)
         self._live_worker.batch.connect(self._on_live_batch)
-        self._live_worker.failed.connect(
-            lambda m: self.lbl_status.setText(m))
+        self._live_worker.batch_failed.connect(self._on_live_batch_failed)
+        self._live_worker.failed.connect(self._on_live_failed)
         self._live_worker.start()
         self.lbl_status.setText(self.tr(
             "Live mode on: watching the visit folder…"))
 
     def _on_live_batch(self, result):
-        # A committed batch: persist it as a run and grow the curve.
+        # A committed batch: persist it as a run and grow the curve. The
+        # run ids pile up: the whole live session is undone as one run
+        # (ADR-050, P2 #19), exactly like a normal series.
+        # @args: result - the batch's SeriesResult
+        # @return: None; the curve and the counter follow.
         rows = self._series_rows(result.points)
         dlg = self.window()
         notify = getattr(dlg, "notify_points", None)
         if callable(notify) and rows:
             try:
-                notify(rows, self._series_cfg_dict or {})
+                run_id = notify(rows, self._series_cfg_dict or {})
             except Exception as err:
                 logger.warning("live save failed: %s", err)
+                run_id = None
+            if run_id is not None:
+                self._live_run_ids.append(run_id)
+                self.btn_series_undo.setEnabled(True)
         self._live_points.extend(result.points)
         self._draw_series(self._live_points)
         self._update_series_counter(self._series_context() or {},
                                     self._live_points)
+
+    def _on_live_progress(self, key, frames):
+        # The driver reports stage keys (core has no tr()): the panel owns
+        # the wording, so every line the observer reads goes through tr().
+        # @args: key - "added" | "stopped", frames - frames of the stage
+        # @return: None; the outcome shows in the status line.
+        if key == "added":
+            self.lbl_status.setText(self.tr(
+                "Live: {0} new frame(s) in the folder").format(frames))
+        elif key == "stopped":
+            self.lbl_status.setText(self.tr("Live mode stopped."))
+
+    def _on_live_batch_failed(self, message, frames):
+        # A batch the engine refused is lost: it is said out loud (P2 #19)
+        # while the watch goes on with the next frames.
+        # @args: message - the engine's error, frames - frames lost
+        # @return: None; the outcome shows in the status line.
+        logger.warning("live batch lost (%s frame(s)): %s", frames, message)
+        self.lbl_status.setText(self.tr(
+            "Live batch lost: {0} frame(s) were not measured ({1})").format(
+                frames, message))
+
+    def _on_live_failed(self, message):
+        # The watch itself died (the folder went away, the engine could
+        # not be imported): the observer reads it, never a silent stop.
+        # @args: message - the worker's error text
+        # @return: None; the outcome shows in the status line.
+        self.lbl_status.setText(
+            self.tr("Live mode failed: {0}").format(message))
 
     def _open_series_docs(self):
         # D37: the "?" opens the sequences guide in the docs browser.

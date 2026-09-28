@@ -83,6 +83,56 @@ def test_batch_commits_on_time(tmp_path):
     assert measure.calls[0][1] == 1
 
 
+class _Boom:
+    # A measure callable that always raises: the batch is lost (P2 #19).
+    def __init__(self, message="engine down"):
+        self.message = message
+        self.calls = []
+
+    def __call__(self, paths, cfg):
+        self.calls.append(list(paths))
+        raise RuntimeError(self.message)
+
+
+def test_failed_batch_is_reported_not_swallowed(tmp_path):
+    # P2 #19: a batch whose measure raised used to vanish in silence (the
+    # frames were already marked processed and nothing was said). It must
+    # be recorded on the driver, handed to on_error, and the watch goes on.
+    lost = []
+    measure = _Boom()
+    d = live.LiveDriver(tmp_path, _cfg(), measure=measure, batch_n=2,
+                        on_error=lambda msg, n: lost.append((msg, n)))
+    for i in range(2):
+        (tmp_path / f"b{i}.fits").write_text("data")
+    d.tick()                       # record sizes
+    d.tick()                       # stable -> commit -> the engine raises
+    assert len(measure.calls) == 1
+    assert lost == [("engine down", 2)]      # the UI can say it now
+    assert d.last_error == "engine down"
+    assert d.failed_frames == 2
+    # the watch is not broken by it: the next frames are still tried
+    for i in (2, 3):
+        (tmp_path / f"b{i}.fits").write_text("data")
+    d.tick()
+    d.tick()
+    assert len(measure.calls) == 2
+    assert d.failed_frames == 4
+    assert lost[-1] == ("engine down", 2)
+
+
+def test_progress_reports_stage_keys_not_sentences(tmp_path):
+    # P2 #19: core has no tr(), so the driver reports stage keys and the
+    # GUI owns the wording of what the observer reads.
+    seen = []
+    measure = _Measure()
+    d = live.LiveDriver(tmp_path, _cfg(), measure=measure, batch_n=1,
+                        progress=lambda key, n: seen.append((key, n)))
+    (tmp_path / "a.fits").write_text("data")
+    d.tick()                       # record
+    d.tick()                       # stable -> one frame added, one commit
+    assert seen == [("added", 1)]
+
+
 def test_cancelled_run_leaves_nothing_hanging(tmp_path):
     measure = _Measure()
     state = {"n": 0}

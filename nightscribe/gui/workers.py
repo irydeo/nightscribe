@@ -543,8 +543,11 @@ class LiveSeriesWorker(QThread):
     # the session folder and measures each new stable batch through the
     # same core engine. Signals a SeriesResult per committed batch.
 
-    progress = Signal(str)
+    progress = Signal(str, int)     # (stage key, frames): added | stopped
     batch = Signal(object)          # SeriesResult of a committed batch
+    batch_failed = Signal(str, int)  # (error, frames) of a batch the engine
+                                     # refused: the frames are lost and the
+                                     # watch goes on (P2 #19)
     failed = Signal(str)
 
     def __init__(self, folder, cfg, poll_s=2.0, batch_n=5, batch_s=10.0):
@@ -565,8 +568,8 @@ class LiveSeriesWorker(QThread):
             driver = live.LiveDriver(
                 self._folder, self._cfg, poll_s=self._poll_s,
                 batch_n=self._batch_n, batch_s=self._batch_s,
-                on_points=self.batch.emit, progress=self.progress.emit,
-                cancel=lambda: self._cancel)
+                on_points=self.batch.emit, on_error=self.batch_failed.emit,
+                progress=self.progress.emit, cancel=lambda: self._cancel)
             driver.run()
         except Exception as err:      # never crash the GUI thread
             logger.exception("live worker failed: %s", err)

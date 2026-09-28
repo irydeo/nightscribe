@@ -40,12 +40,18 @@ class LiveDriver:
     #        batch_n - frames per commit, batch_s - seconds per commit,
     #        measure - the engine callable (defaults to measure_series),
     #        on_points - callable(SeriesResult) per committed batch,
-    #        progress - callable(text), cancel - callable() -> bool,
+    #        on_error - callable(message, frames) per LOST batch (the
+    #           engine raised: the batch is reported, never dropped in
+    #           silence, and the watch goes on),
+    #        progress - callable(key, frames) with the stage keys
+    #           "added" | "stopped" (core has no tr(): the GUI owns the
+    #           wording of what the user reads),
+    #        cancel - callable() -> bool,
     #        clock - monotonic clock (injectable for tests)
 
     def __init__(self, folder, cfg, poll_s=2.0, batch_n=5, batch_s=10.0,
-                 measure=None, on_points=None, progress=None, cancel=None,
-                 clock=time.monotonic):
+                 measure=None, on_points=None, on_error=None, progress=None,
+                 cancel=None, clock=time.monotonic):
         self._folder = Path(folder)
         self._cfg = cfg
         self.poll_s = float(poll_s)
@@ -53,6 +59,7 @@ class LiveDriver:
         self.batch_s = float(batch_s)
         self._measure = measure
         self.on_points = on_points
+        self.on_error = on_error
         self.progress = progress
         self.cancel = cancel
         self._clock = clock
@@ -62,6 +69,8 @@ class LiveDriver:
         self._pending = []          # stable, not yet committed
         self._last_add = None
         self.status = "idle"        # idle | running | cancelled
+        self.last_error = None      # the last batch error (P2 #19)
+        self.failed_frames = 0      # frames lost to a failed batch
 
     # ---------------------------------------------------------------- scan
 
@@ -106,7 +115,7 @@ class LiveDriver:
             self._queued.update(str(p) for p in new)
             self._last_add = self._clock()
             if self.progress:
-                self.progress(f"live: +{len(new)} frame(s)")
+                self.progress("added", len(new))
         due_n = len(self._pending) >= self.batch_n
         due_t = (self._pending and self._last_add is not None
                  and self._clock() - self._last_add >= self.batch_s)
@@ -132,6 +141,13 @@ class LiveDriver:
             result = measure([str(p) for p in paths], cfg)
         except Exception as err:      # never break the watch loop
             logger.exception("live commit failed: %s", err)
+            # the batch is lost: record it and hand it over so the UI can
+            # say it out loud (P2 #19); the watch goes on with the next
+            # frames, and a silent drop is never an option
+            self.last_error = str(err)
+            self.failed_frames += len(paths)
+            if self.on_error:
+                self.on_error(str(err), len(paths))
             return None
         if self.on_points:
             self.on_points(result)
@@ -152,5 +168,5 @@ class LiveDriver:
                 logger.warning("live tick failed: %s", err)
             time.sleep(self.poll_s)
         if self.progress:
-            self.progress("live: stopped")
+            self.progress("stopped", 0)
         return self.status

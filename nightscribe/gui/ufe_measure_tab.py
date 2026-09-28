@@ -897,7 +897,8 @@ class UfeMeasureTab(QWidget):
                 if n.get("fallback"):
                     lines.append(self.tr(
                         "Night {0}: no airmass range, offset only "
-                        "({1} points)").format(n["night"], n["n"]))
+                        "({1} points); its level against the other "
+                        "nights is lost").format(n["night"], n["n"]))
                 else:
                     lines.append(self.tr(
                         "Night {0}: a1={1:.3f}, a2={2:+.3f}, a3={3:.3f} "
@@ -990,9 +991,22 @@ class UfeMeasureTab(QWidget):
             "NightScribe series: {0} points, group {1}, detrend {2}").format(
                 len(pts), result.group_n,
                 (det or {}).get("policy", "off"))
+        # the transit window (when the project carries one) selects the
+        # out-of-transit points for the reference flux
+        t0_mjd, dur_d = None, None
+        ctxd = (self._series_context() or {}).get("context") or {}
+        transit = ctxd.get("transit") or {}
+        try:
+            if transit.get("t0") is not None:
+                from ..core import variables as _vars
+                t0_mjd = float(transit["t0"]) - _vars.MJD0
+                dur_d = float(transit.get("duration_h") or 0.0) / 24.0
+        except (TypeError, ValueError):
+            t0_mjd, dur_d = None, None
         exoclock_export.write_submission(
             pts, out, planet or "target",
-            self.cmb_band.currentText() or self._band or "", expt, note)
+            self.cmb_band.currentText() or self._band or "", expt, note,
+            t0_mjd=t0_mjd, duration_d=dur_d)
         self.lbl_status.setText(
             self.tr("ExoClock files written. Upload them at exoclock.space"))
         notify = getattr(self.window(), "notify_saved", None)

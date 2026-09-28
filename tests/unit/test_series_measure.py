@@ -357,7 +357,7 @@ def test_grouped_exoclock_start_is_the_first_frame_start(tmp_path):
     pts = [{"mjd": p.mjd, "jd_start": p.jd_start, "mag": p.mag,
             "err": p.err, "exptime": p.exptime, "flags": list(p.flags)}
            for p in res.points]
-    rows, warnings = exoclock_export.build_data(pts)
+    rows, warnings, _mode = exoclock_export.build_data(pts)
     assert warnings == []
     # independent anchor: DATE-OBS of the first frame IS the start of
     # the group's first exposure (the engine times at DATE-OBS + exp/2)

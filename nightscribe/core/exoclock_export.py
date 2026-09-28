@@ -50,27 +50,48 @@ def _flux_err(flux, mag_err):
     return flux * mag_err / 1.0857
 
 
-def _ref_mag(mags):
-    # The out-of-transit reference: the median magnitude of the series.
-    vals = [m for m in mags if m is not None]
+def _ref_flux(points, t0_mjd=None, duration_d=None):
+    # The out-of-transit reference: the MEAN FLUX of the OOT points
+    # (never the median of magnitudes: with more in-transit than OOT
+    # points the median mag lands inside the dip and the baseline comes
+    # out biased). Without a transit window, or with fewer than three
+    # OOT points, the fallback is the mean flux of the whole series,
+    # said in the returned mode.
+    # @return: (reference flux, mode "oot"|"series") or (None, None)
+    def flux_of(p):
+        mag = p.get("mag")
+        return 10.0 ** (-0.4 * mag) if mag is not None else None
+
+    oot = []
+    if t0_mjd is not None and duration_d:
+        half = float(duration_d) / 2.0
+        oot = [p for p in points
+               if p.get("mjd") is not None
+               and abs(p["mjd"] - t0_mjd) > half]
+    pool = oot if len(oot) >= 3 else list(points)
+    vals = [f for f in (flux_of(p) for p in pool) if f is not None]
     if not vals:
-        return None
-    return float(sorted(vals)[len(vals) // 2])
+        return None, None
+    return sum(vals) / len(vals), ("oot" if len(oot) >= 3
+                                   else "series")
 
 
-def build_data(points):
+def build_data(points, t0_mjd=None, duration_d=None):
     # Build the three-column rows (JD_UTC start, relative flux, error).
-    # The reference flux is the series' median magnitude (out of transit),
-    # so flux ~ 1 on the baseline and dips in transit.
+    # The reference flux is the mean OOT flux (the series' mean flux
+    # when the transit window is unknown), so flux ~ 1 on the baseline
+    # and dips in transit.
     # @args: points - dicts with mjd (mid exposure), mag, err, exptime
     #        (seconds; the group's total integration when grouped) and,
     #        when they come from the engine, jd_start (MJD of the start
-    #        of the group's first exposure)
-    # @return: (rows, warnings): rows are (jd_start, flux, flux_err) with
-    #          None flux/err when the point carries no magnitude
+    #        of the group's first exposure); t0_mjd / duration_d - the
+    #        transit mid-time and duration for the OOT selection
+    # @return: (rows, warnings, ref_mode): rows are (jd_start, flux,
+    #          flux_err) with None flux/err when the point carries no
+    #          magnitude; ref_mode is "oot" or "series"
     warnings = []
-    mags = [p.get("mag") for p in points]
-    ref = _ref_mag(mags)
+    ref, ref_mode = _ref_flux(points, t0_mjd=t0_mjd,
+                              duration_d=duration_d)
     rows = []
     for p in points:
         mjd = p.get("mjd")
@@ -91,9 +112,9 @@ def build_data(points):
         if mag is None or ref is None:
             rows.append((jd_start, None, None))
             continue
-        flux = 10.0 ** (-0.4 * (mag - ref))
+        flux = 10.0 ** (-0.4 * mag) / ref
         rows.append((jd_start, flux, _flux_err(flux, p.get("err"))))
-    return rows, warnings
+    return rows, warnings, ref_mode
 
 
 def format_data(rows):
@@ -179,14 +200,24 @@ def checklist(points, duration_h=None, baseline_h=1.0):
 
 
 def write_submission(points, base_path, planet, filter_name, exptime_s,
-                     comments, extra=None):
+                     comments, extra=None, t0_mjd=None, duration_d=None):
     # Writes <base>.txt (data) and <base>_info.txt (metadata).
-    # @args: base_path - the data file path; its stem names the info file
+    # @args: base_path - the data file path; its stem names the info
+    #        file; t0_mjd / duration_d - transit window for the OOT
+    #        reference flux
     # @return: (data_path, info_path)
-    rows, warnings = build_data(points)
+    rows, warnings, ref_mode = build_data(points, t0_mjd=t0_mjd,
+                                          duration_d=duration_d)
     data_path = Path(base_path)
     data_path.write_text(format_data(rows), encoding="utf-8")
     info_path = data_path.with_name(data_path.stem + "_info.txt")
+    # the Comments say where the baseline hangs from (C4: never silent)
+    ref_note = {"oot": "reference flux: mean of the out-of-transit "
+                       "points",
+                "series": "reference flux: mean of the whole series "
+                          "(no transit window given)"}.get(ref_mode)
+    if ref_note:
+        comments = (comments + "; " + ref_note) if comments else ref_note
     info_path.write_text(build_info(planet, filter_name, exptime_s,
                                     comments, extra=extra),
                          encoding="utf-8")

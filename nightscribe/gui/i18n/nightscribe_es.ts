@@ -8496,8 +8496,8 @@ tocan.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="879" />
-        <source>Night {0}: no airmass range, offset only ({1} points)</source>
-        <translation>Noche {0}: sin rango de masa de aire, solo escala ({1} puntos)</translation>
+        <source>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</source>
+        <translation>Noche {0}: sin rango de masa de aire, solo escala ({1} puntos); su nivel frente a las demás noches se pierde</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="883" />

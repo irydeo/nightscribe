@@ -8496,8 +8496,8 @@ not touched.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="879" />
-        <source>Night {0}: no airmass range, offset only ({1} points)</source>
-        <translation>Night {0}: no airmass range, offset only ({1} points)</translation>
+        <source>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</source>
+        <translation>Night {0}: no airmass range, offset only ({1} points); its level against the other nights is lost</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="883" />

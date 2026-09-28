@@ -288,56 +288,64 @@
         </property>
        </widget>
       </item>
-      <item>
-       <layout class="QHBoxLayout" name="row_series_actions">
-        <item>
-         <widget class="QPushButton" name="btn_series">
-          <property name="toolTip">
-           <string>Measure the frames of this visit as a series: per-frame zero point, quality flags, honest errors. A new run starts; "Undo this run" removes only its points</string>
-          </property>
-          <property name="text">
-           <string>Measure the sequence</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btn_series_undo">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="toolTip">
-           <string>Delete the points of the last series run of this visit, without touching any other run</string>
-          </property>
-          <property name="text">
-           <string>Undo this run</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btn_series_exoclock">
-          <property name="enabled">
-           <bool>false</bool>
-          </property>
-          <property name="toolTip">
-           <string>Prepare the ExoClock submission (three-column JD_UTC/flux file + ExoClock_info.txt), open the upload page and record the reported outcome</string>
-          </property>
-          <property name="text">
-           <string>ExoClock…</string>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="QPushButton" name="btn_series_help">
-          <property name="toolTip">
-           <string>Open the sequences guide (SEQUENCES) in the documentation browser</string>
-          </property>
-          <property name="text">
-           <string>?</string>
-          </property>
-         </widget>
-        </item>
-       </layout>
-      </item>
+       <item>
+        <layout class="QVBoxLayout" name="vbox_series_actions">
+         <item>
+          <layout class="QHBoxLayout" name="row_series_run">
+           <item>
+            <widget class="QPushButton" name="btn_series">
+             <property name="toolTip">
+              <string>Measure the frames of this visit as a series: per-frame zero point, quality flags, honest errors. A new run starts; "Undo this run" removes only its points</string>
+             </property>
+             <property name="text">
+              <string>Measure the sequence</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_undo">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="toolTip">
+              <string>Delete the points of the last series run of this visit, without touching any other run</string>
+             </property>
+             <property name="text">
+              <string>Undo this run</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="row_series_out">
+           <item>
+            <widget class="QPushButton" name="btn_series_exoclock">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="toolTip">
+              <string>Prepare the ExoClock submission (three-column JD_UTC/flux file + ExoClock_info.txt), open the upload page and record the reported outcome</string>
+             </property>
+             <property name="text">
+              <string>ExoClock…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_help">
+             <property name="toolTip">
+              <string>Open the sequences guide (SEQUENCES) in the documentation browser</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
       <item>
        <widget class="QCheckBox" name="chk_series_live">
         <property name="toolTip">

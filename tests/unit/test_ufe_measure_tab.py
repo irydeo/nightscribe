@@ -1382,3 +1382,40 @@ def test_exoclock_write_failure_is_reported(dlg, qapp, tmp_path, monkeypatch):
     assert opened == []                        # the upload page stays shut
     assert saved == [] and exo_seen == []      # nothing is registered
     assert not out.exists()
+
+
+# ---------------- P3: the series buttons on wide fonts ----------------
+
+def test_series_actions_wrap_into_two_rows_and_stay_narrow(dlg, qapp):
+    # Regression (P3): the four series buttons on one row escaped the
+    # dialog on Windows, where the fonts are wide: their minimum widths
+    # added up and dragged the whole tab (and the editor's side pane)
+    # with them. The .ui wraps them into two rows (ADR-005), so with a
+    # 1.5x font the tab's minimum size hint stays inside a sane width.
+    tab = dlg.tab_measure
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+    assert tab.grp_series.isVisible()          # the block is armed
+    # the theme pins the font size in px through a stylesheet, so the
+    # 1.5x simulation goes through the same channel: 13px -> 20px
+    tab.setStyleSheet("* { font-size: 20px; }")
+    qapp.processEvents()
+    buttons = (tab.btn_series, tab.btn_series_undo,
+               tab.btn_series_exoclock, tab.btn_series_help)
+    assert all(b.font().pixelSize() == 20 for b in buttons)
+    # they wrap: no single row carries the four of them (the walker
+    # starts at the series block: the buttons live in ITS layout)
+    rows = {}
+    for b in buttons:
+        row = _innermost_row_of(tab.grp_series, b)
+        assert row is not None
+        rows.setdefault(row, []).append(b)
+    assert len(rows) >= 2
+    assert all(len(v) <= 2 for v in rows.values())
+    # and the tab's minimum width stays sane: below the four side by side
+    # (what a single row would force) and inside the editor's side pane
+    one_row = sum(b.minimumSizeHint().width() for b in buttons)
+    hint = tab.minimumSizeHint().width()
+    assert hint < one_row
+    assert hint <= 560
+
+

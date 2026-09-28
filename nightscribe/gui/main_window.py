@@ -8400,3 +8400,30 @@ class MainWindow(QMainWindow):
     def _drop(self, worker):
         if worker in self._workers:
             self._workers.remove(worker)
+
+    def closeEvent(self, event):
+        # Quitting with live threads must not end in «QThread destroyed
+        # while running», nor cut a SQLite write mid-way: cancel every
+        # worker the window tracks (the _keep list plus the EXOTIC
+        # prepare/run attribute) and give each a bounded wait. The
+        # series/live workers of the Measure tab belong to the non-modal
+        # UFE dialog: closing it first runs its own closeEvent, which
+        # shuts them down.
+        # @args: event - the QCloseEvent
+        from PySide6.QtCore import QThread
+        ufe = getattr(self, "_ufe", None)
+        if ufe is not None and Shiboken.isValid(ufe):
+            ufe.close()
+        tracked = list(self._workers)
+        exotic = getattr(self, "_exotic_worker", None)
+        if exotic is not None:
+            tracked.append(exotic)
+        threads = [w for w in tracked
+                   if isinstance(w, QThread) and Shiboken.isValid(w)]
+        for w in threads:
+            if callable(getattr(w, "cancel", None)):
+                w.cancel()
+        for w in threads:
+            if w.isRunning():
+                w.wait(3000)
+        super().closeEvent(event)

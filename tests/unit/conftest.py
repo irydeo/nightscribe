@@ -25,6 +25,22 @@ at the function level (test_followup_sequence.py shows the pattern).
 import pytest
 import requests
 
+# Before any nightscribe module imports the `db`/`config` singletons, point
+# the per-OS paths at a throwaway tree: Config.save() and every Database
+# write used to land on the developer's real files during a test run (his
+# camera profile and solve_save reverted, and the 190 MB db grew). The
+# conftest is imported before the test modules, so this wins.
+import tempfile as _tempfile
+from pathlib import Path as _Path
+
+from nightscribe import paths as _paths
+
+_TEST_ROOT = _Path(_tempfile.mkdtemp(prefix="nightscribe-tests-"))
+(_TEST_ROOT / "data").mkdir(parents=True, exist_ok=True)
+(_TEST_ROOT / "config").mkdir(parents=True, exist_ok=True)
+_paths.data_dir = lambda: _TEST_ROOT / "data"
+_paths.config_dir = lambda: _TEST_ROOT / "config"
+
 
 @pytest.fixture(autouse=True)
 def _fake_solve_worker(monkeypatch):
@@ -58,6 +74,17 @@ def _fake_solve_worker(monkeypatch):
             return self._cancelled
 
     monkeypatch.setattr(workers, "UfeSolveWorker", _FakeSolveWorker)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_config_file(tmp_path, monkeypatch):
+    # Config.save() writes the WHOLE in-memory _data to the real file. The
+    # pins below plus any config.set() during a test (closing a chart
+    # viewer writes chart_viewer_sizes) used to clobber the developer's
+    # real config: his camera profile and solve_save reverted after a test
+    # run. Point the singleton at a throwaway file for every test.
+    from nightscribe.config import config
+    monkeypatch.setattr(config, "_file", tmp_path / "nightscribe.json")
 
 
 @pytest.fixture(autouse=True)

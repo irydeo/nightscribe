@@ -71,8 +71,9 @@ def test_build_stars_gaia():
     assert first["id"] == "2100000000000004"
     assert first["mag"] == pytest.approx(11.05)
     # B-V estimated from BP-RP (0.55 for star 4: BP 11.30 - RP 10.75;
-    # hand-computed through the Riello 2021 polynomials)
-    assert first["bv"] == pytest.approx(0.0867, abs=1e-3)
+    # hand-computed through the Riello 2021 polynomials: G-B = -0.461989,
+    # G-V = -0.082054, so B-V = 0.379935; mid-F star, physically sound)
+    assert first["bv"] == pytest.approx(0.379935, abs=1e-3)
     assert first["color_origin"] == "estimated"
     labels = [b["label"] for b in first["bands"]]
     assert labels[:4] == ["G", "BP", "RP", "BP-RP"]

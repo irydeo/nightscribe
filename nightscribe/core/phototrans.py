@@ -44,6 +44,8 @@ def poly(coefficients, x):
 
 
 def gaia_to_johnson(g, bp_rp):
+    # tuple order: highest-degree first (Horner); paper lists constant first
+
     # Gaia DR3 -> Johnson-Cousins (Riello et al. 2021; Gaia DR3 doc 5.5.1).
     # @args: g - G magnitude, bp_rp - BP-RP colour
     # @return: {"B", "V", "R", "I"} magnitudes (R/I only when BP-RP <= 2.75,
@@ -52,13 +54,12 @@ def gaia_to_johnson(g, bp_rp):
     if not (-0.5 <= bp_rp <= 4.0):
         return None
     out = {
-        "B": g - poly((0.01448, -0.6874, -0.3604, 0.06718, -0.006061),
+        "B": g - poly((-0.006061, 0.06718, -0.3604, -0.6874, 0.01448),
                       bp_rp),
-        "V": g - poly((-0.02704, 0.01424, -0.2156, 0.01426), bp_rp),
+        "V": g - poly((0.01426, -0.2156, 0.01424, -0.02704), bp_rp),
     }
     if bp_rp <= 2.75:
-        out["R"] = g - poly((-0.02275, 0.3961, -0.1243, -0.01396,
-                             0.003775), bp_rp)
+        out["R"] = g - poly((0.003775, -0.01396, -0.1243, 0.3961, -0.02275), bp_rp)
         out["I"] = g - poly((0.01753, 0.76, -0.0991), bp_rp)
     return out
 

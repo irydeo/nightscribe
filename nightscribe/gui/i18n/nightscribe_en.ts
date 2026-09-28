@@ -1269,6 +1269,16 @@
         <translation>Preparing the EXOTIC environment…</translation>
     </message>
     <message>
+        <location filename="../main_window.py" line="793" />
+        <source>Checking the EXOTIC environment…</source>
+        <translation>Checking the EXOTIC environment…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="860" />
+        <source>Could not prepare EXOTIC: {0}</source>
+        <translation>Could not prepare EXOTIC: {0}</translation>
+    </message>
+    <message>
         <location filename="../main_window.py" line="826" />
         <source>EXOTIC environment ready.</source>
         <translation>EXOTIC environment ready.</translation>
@@ -7855,9 +7865,18 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="878" />
+        <location filename="../ufe_dialog.py" line="916" />
+        <source>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</source>
+        <translation>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="902" />
+        <source>ASTAP and Astrometry.net</source>
+        <translation>ASTAP and Astrometry.net</translation>
+    </message>
+    <message>
         <source>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</source>
-        <translation>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</translation>
+        <translation type="vanished">Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="887" />
@@ -8434,6 +8453,16 @@ not touched.</translation>
         <location filename="../ufe_measure_tab.py" line="785" />
         <source>group {0} · cadence from the frames</source>
         <translation>group {0} · cadence from the frames</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="796" />
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="810" />
+        <source>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</source>
+        <translation>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="793" />

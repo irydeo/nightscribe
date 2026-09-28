@@ -1303,6 +1303,16 @@
         <translation>Preparando el entorno EXOTIC…</translation>
     </message>
     <message>
+        <location filename="../main_window.py" line="793" />
+        <source>Checking the EXOTIC environment…</source>
+        <translation>Comprobando el entorno EXOTIC…</translation>
+    </message>
+    <message>
+        <location filename="../main_window.py" line="860" />
+        <source>Could not prepare EXOTIC: {0}</source>
+        <translation>No se pudo preparar EXOTIC: {0}</translation>
+    </message>
+    <message>
         <location filename="../main_window.py" line="826" />
         <source>EXOTIC environment ready.</source>
         <translation>Entorno EXOTIC listo.</translation>
@@ -7855,9 +7865,18 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Resolviendo: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="878" />
+        <location filename="../ufe_dialog.py" line="916" />
+        <source>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</source>
+        <translation>{0} no pudo resolver la placa. Revisa el solver en Ajustes (ruta de ASTAP, clave de Astrometry.net) o resuélvela con NINA, Ekos o PixInsight y guárdala de nuevo.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="902" />
+        <source>ASTAP and Astrometry.net</source>
+        <translation>ASTAP y Astrometry.net</translation>
+    </message>
+    <message>
         <source>Astrometry.net could not solve the plate (or is offline). Check the key in Settings or solve it with ASTAP/NINA/Ekos/PixInsight.</source>
-        <translation>Astrometry.net no pudo resolver la placa (o está sin conexión). Revisa la clave en Ajustes o resuélvela con ASTAP/NINA/Ekos/PixInsight.</translation>
+        <translation type="vanished">Astrometry.net no pudo resolver la placa (o está sin conexión). Revisa la clave en Ajustes o resuélvela con ASTAP/NINA/Ekos/PixInsight.</translation>
     </message>
     <message>
         <location filename="../ufe_dialog.py" line="887" />
@@ -8434,6 +8453,16 @@ tocan.</translation>
         <location filename="../ufe_measure_tab.py" line="785" />
         <source>group {0} · cadence from the frames</source>
         <translation>grupo {0} · cadencia según las tomas</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="796" />
+        <source>Cancel</source>
+        <translation>Cancelar</translation>
+    </message>
+    <message>
+        <location filename="../ufe_measure_tab.py" line="810" />
+        <source>Cancelling the series: it stops after the frame it is measuring; the points measured so far are kept.</source>
+        <translation>Cancelando la serie: se detiene tras la toma que está midiendo; los puntos ya medidos se conservan.</translation>
     </message>
     <message>
         <location filename="../ufe_measure_tab.py" line="793" />

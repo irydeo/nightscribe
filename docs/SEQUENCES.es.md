@@ -89,6 +89,14 @@ resto vive en **Avanzado…** (una ventana pequeña, no modal):
 Cada control tiene su tooltip con unidades y razón, y hay **«Restaurar
 valores»**.
 
+El **perfil de cámara** (Ajustes → Perfil de cámara fotométrica) fija el
+**full well, la corriente de oscuridad y el límite de linealidad / tope de
+exposición por ganancia** (mídelos; hay un valor sugerido). En un sCMOS muy
+sensible (QHY42Pro/GSENSE400) la receta es **exposiciones de 5–10 s y agrupar**
+(`group_n`) para bajar el centelleo sin saturar ni ahogar en fondo; los IMX
+modernos y los CCD admiten exposiciones largas. El **límite de linealidad** es
+lo que decide qué estrellas valen como comp/check.
+
 ## 6. Cuándo fiarse
 
 - **La cruda siempre está visible** junto a la detrendada: el detrend puede

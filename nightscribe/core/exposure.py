@@ -85,17 +85,24 @@ _SN_EXP_TABLE = [
 ]
 
 
-def recommended_sn_exposure(mag):
-    # @args: mag - apparent magnitude of the SN (float)
+def recommended_sn_exposure(mag, max_exposure_s=None):
+    # @args: mag - apparent magnitude of the SN (float),
+    #        max_exposure_s - the camera profile's working maximum (None =
+    #        no cap). For an extremely sensitive sCMOS the cap can be a few
+    #        seconds; the extra integration comes from grouping frames.
     # @return: recommended single-frame exposure in seconds (int), or None
     #         when the magnitude is unknown
     if mag is None:
         return None
     mag = float(mag)
-    for threshold, exp in _SN_EXP_TABLE:
+    exp = _SN_EXP_TABLE[-1][1]
+    for threshold, e in _SN_EXP_TABLE:
         if mag <= threshold:
-            return exp
-    return _SN_EXP_TABLE[-1][1]   # fainter than the last entry: cap
+            exp = e
+            break
+    if max_exposure_s:
+        exp = min(exp, float(max_exposure_s))
+    return max(int(round(exp)), 1)
 
 
 # ---------------- Transit exposure by star brightness (Track D) ----------
@@ -124,10 +131,13 @@ _TRANSIT_EXP_TABLE = [
 _TRANSIT_REF_SCALE = 1.0
 
 
-def recommended_transit_exposure(v_mag, plate_scale_arcsec_px=None):
+def recommended_transit_exposure(v_mag, plate_scale_arcsec_px=None,
+                                 max_exposure_s=None):
     # @args: v_mag - host star V magnitude (float),
     #        plate_scale_arcsec_px - camera/telescope plate scale (None or 0
-    #        means "unknown": the reference-scale value is returned)
+    #        means "unknown": the reference-scale value is returned),
+    #        max_exposure_s - the camera profile's working maximum (None =
+    #        no cap; the sCMOS needs few-second frames)
     # @return: recommended single-frame exposure in seconds (int, 5..300),
     #         or None when the magnitude is unknown
     if v_mag is None:
@@ -142,4 +152,25 @@ def recommended_transit_exposure(v_mag, plate_scale_arcsec_px=None):
         factor = (_TRANSIT_REF_SCALE / float(plate_scale_arcsec_px)) ** 2
         factor = min(max(factor, 0.25), 4.0)
         exp = int(round(exp * factor))
-    return min(max(exp, 5), 300)
+    exp = min(max(exp, 5), 300)
+    if max_exposure_s:
+        exp = min(exp, max(1, int(round(float(max_exposure_s)))))
+    return exp
+
+
+def group_n_for_span(target_span_s, exposure_s):
+    # Frames to group so one point spans roughly the target time: the
+    # sCMOS recipe (short exposures + grouping to beat scintillation and
+    # keep the sky background down) without ever changing the cadence
+    # recipe. It never replaces the ingress cadence.
+    # @args: target_span_s - the wanted effective integration per point (s),
+    #        exposure_s - the single-frame exposure (s)
+    # @return: the group size (int >= 1)
+    try:
+        span = float(target_span_s)
+        exp = float(exposure_s)
+    except (TypeError, ValueError):
+        return 1
+    if exp <= 0 or span <= 0:
+        return 1
+    return max(1, int(round(span / exp)))

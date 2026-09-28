@@ -93,6 +93,10 @@ nightscribe/
                       #   campo: saturan), CSV (ADR-042)
     field_math.py     # proyección TAN de la carta, ticks de borde, escala,
                       #   anti-colisión de rótulos (compartido viz/widget, ADR-042)
+    cameras.py        # presets de cámaras (perfil fotométrico): píxel, full well,
+                      #   RON, oscuridad, régimen short/normal y linealidad
+                      #   sugerida (datasheet; linealidad y tope de exposición
+                      #   se miden por ganancia)
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
                       #   frame y ensemble con veto MAD, puertas que marcan y
                       #   nunca borran, tiempo a media exposición (MJD/HJD),

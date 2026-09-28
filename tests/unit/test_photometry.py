@@ -823,3 +823,66 @@ def test_band_helpers():
     assert phot.pick_band(entries, "G") == ("G", ["V", "G"])
     assert phot.pick_band(entries, "R") == ("V", ["V", "G"])
     assert phot.pick_band([], None) == ("V", [])
+
+
+# ---------------- camera profile: linearity ceiling ----------------
+
+def test_effective_ceiling_takes_the_minimum():
+    # the profile's linearity (usually stricter) wins over SATURATE
+    hdr = {"SATURATE": 60000.0}
+    cfg = {"cam_linearity_adu": 50000.0, "ccd_saturate": None}
+    assert phot.effective_ceiling(hdr, cfg) == 50000.0
+    # only a SATURATE card
+    assert phot.effective_ceiling(hdr, {}) == 60000.0
+    # only the profile
+    assert phot.effective_ceiling({}, cfg) == 50000.0
+    # nothing known
+    assert phot.effective_ceiling({}, {}) is None
+    # an explicit override wins the minimum too
+    assert phot.effective_ceiling(hdr, cfg, linear_adu=45000.0) == 45000.0
+
+
+def test_measure_point_flags_nonlinear_not_saturated():
+    # a peak above the camera's linearity limit (but below any SATURATE)
+    plate = _plate(200, 200, [(100.0, 100.0, 8000.0)], noise=0.0)
+    r = phot.measure_point(plate, 100.0, 100.0, linear_adu=1000.0)
+    assert not r["ok"] and r.get("nonlinear") is True
+    assert r["saturated"] is False
+    assert r["reason"]["en"].startswith("nonlinear")
+    # a hard saturation still reads as saturated
+    r2 = phot.measure_point(plate, 100.0, 100.0, sat_adu=1000.0)
+    assert r2["reason"] == {"es": "saturada", "en": "saturated"}
+
+
+def test_flux_error_includes_the_dark_current():
+    base = phot.ccd_flux_error(1000.0, 100.0, 50, gain=2.0, ron=5.0,
+                               exptime=60.0)
+    dark = phot.ccd_flux_error(1000.0, 100.0, 50, gain=2.0, ron=5.0,
+                               exptime=60.0, dark_e_s=2.2)
+    assert dark > base
+    # the dark term needs both exposure and current
+    assert phot.ccd_flux_error(1000.0, 100.0, 50, gain=2.0, ron=5.0,
+                               dark_e_s=2.2) == base
+
+
+def test_measure_plate_skips_a_nonlinear_comp():
+    # a comp far above the linearity limit is excluded, named explicitly
+    data = _plate(200, 200, [(100.0, 100.0, 8000.0),
+                             (40.0, 40.0, 30000.0),   # too bright
+                             (160.0, 40.0, 8000.0),
+                             (40.0, 160.0, 8000.0)], noise=0.0)
+    entries = []
+    for j, (x, y) in enumerate([(40, 40), (160, 40), (40, 160)]):
+        r = phot.measure_point(data, x, y)
+        inst = -2.5 * math.log10(r["flux"])
+        entries.append({"name": f"C{j}", "kind": "comp",
+                        "star": {"ra": x, "dec": y, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": inst + 22.0,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    res = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=(100.0, 100.0), entries=entries, wcs=_FlatWcs(),
+        band="V", radii=(6.0, 10.0, 15.0), linear_adu=20000.0))
+    assert res.skipped.get("nonlinear") == 1
+    assert res.zp["n"] == 2                # only the linear comps calibrate

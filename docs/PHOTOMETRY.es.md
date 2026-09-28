@@ -480,6 +480,25 @@ Para una serie de tránsitos que baje al nivel de mmag, la receta de campo:
 * **Nada saturado**: ni el objetivo ni las comparaciones; una comp comprimida
   miente el punto cero (y la check no lo ve).
 
+### 8.2 Perfil de cámara y límite de linealidad
+
+En **Ajustes → Perfil de cámara fotométrica** eliges un preset (IMX455, IMX571,
+IMX533, IMX294, IMX183, GSENSE400/QHY42Pro, KAF-8300/16803/09000) que rellena el
+tamaño de píxel, el full well, la corriente de oscuridad y un **valor sugerido de
+linealidad**. La **linealidad y el tope de exposición son por ganancia**: mídelos
+tú; el sugerido es solo un punto de partida.
+
+El límite de linealidad es el techo que de verdad manda: el techo efectivo toma
+el **mínimo** entre tu linealidad, la tarjeta SATURATE, el ajuste y el recorte
+inferido. Por encima de él una estrella **no calibra nada** aunque no esté
+saturada, así que la app **excluye esas comps/check** con el motivo explícito
+(«por encima del límite de linealidad de tu cámara») y lo cuenta en el panel y
+en el CSV. En sensores muy sensibles (GSENSE400) es lo que impide usar las
+estrellas más brillantes del campo.
+
+Referencia rápida: `full well / ganancia` da la saturación en ADU, y la
+linealidad suele quedar por debajo. **Si cambias de ganancia, remide.**
+
 ---
 
 ## 9. Glosario mínimo

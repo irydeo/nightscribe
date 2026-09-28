@@ -648,6 +648,8 @@ class UfeMeasureTab(QWidget):
             site_aperture_m=float(config.get("aperture_inches", 10.0))
             * 0.0254,
             site_height_m=float(config.get("height", 0) or 0.0),
+            linear_adu=config.get("cam_linearity_adu"),
+            site_dark=config.get("cam_dark_current_e_s"),
             comp_image=comp_image, comp_scale=comp_scale)
         res = photometry.measure_plate(image, cfg)
         if not res.ok:
@@ -753,6 +755,8 @@ class UfeMeasureTab(QWidget):
             site_aperture_m=float(config.get("aperture_inches", 10.0))
             * 0.0254,
             site_height_m=float(config.get("height", 0) or 0.0),
+            site_linear=config.get("cam_linearity_adu"),
+            site_dark=config.get("cam_dark_current_e_s"),
             group_n=int(self._advanced.spn_group_n.value()),
             auto_aperture=self._advanced.chk_auto_aperture.isChecked(),
             detrend_policy=self._advanced.cmb_detrend.currentData()
@@ -1017,7 +1021,18 @@ class UfeMeasureTab(QWidget):
         self._series_cfg_dict = self._series_config_dict(self._series_cfg)
         self._live_points = []
         from .workers import LiveSeriesWorker
-        self._live_worker = LiveSeriesWorker(folder, self._series_cfg)
+        # the live batch is the group: N frames (or the same time with the
+        # real exposure), so a few-second sCMOS cadence still groups
+        grp = max(1, int(self._advanced.spn_group_n.value()))
+        exp_s = 10.0
+        try:
+            from ..core import fits_meta
+            _m = fits_meta.read_meta(ctx["paths"][0])
+            exp_s = float(_m.get("exptime_s") or 10.0)
+        except Exception:
+            pass
+        self._live_worker = LiveSeriesWorker(
+            folder, self._series_cfg, batch_n=grp, batch_s=grp * exp_s)
         self._live_worker.progress.connect(
             lambda m: self.lbl_status.setText(m))
         self._live_worker.batch.connect(self._on_live_batch)
@@ -1082,6 +1097,9 @@ class UfeMeasureTab(QWidget):
             if skipped.get("sat"):
                 parts.append(self.tr("{0} saturated/clipped")
                              .format(skipped["sat"]))
+            if skipped.get("nonlinear"):
+                parts.append(self.tr("{0} above your camera's linearity limit")
+                             .format(skipped["nonlinear"]))
             if skipped.get("off"):
                 parts.append(self.tr("{0} off the plate")
                              .format(skipped["off"]))
@@ -1177,6 +1195,15 @@ class UfeMeasureTab(QWidget):
                     "built on compressed cores lies LOW (faint targets "
                     "read too bright). Propose fainter comps or shorten "
                     "the exposure"))
+            if skipped.get("nonlinear"):
+                from ..config import config as _cfg
+                _lin = _cfg.get("cam_linearity_adu")
+                notes.append(self.tr(
+                    "⚠ comps above your camera's linearity limit "
+                    "(≈{0:.0f} ADU, per gain): their flux is not "
+                    "proportional, so they calibrate nothing. Propose "
+                    "fainter comps or shorten the exposure").format(
+                        float(_lin or 0)))
         if zp["n"] and zp["n"] < 3:
             notes.append(self.tr(
                 "Few comparisons: the scatter dominates the error"))

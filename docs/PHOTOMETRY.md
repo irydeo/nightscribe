@@ -482,6 +482,25 @@ For a transit series that reaches the mmag level, the field recipe:
 * **Nothing saturated**: neither the target nor the comparisons; a compressed
   comp lies about the zero point (and the check does not see it).
 
+### 8.2 Camera profile and linearity limit
+
+In **Settings → Photometric camera profile** you pick a preset (IMX455, IMX571,
+IMX533, IMX294, IMX183, GSENSE400/QHY42Pro, KAF-8300/16803/09000) that fills the
+pixel size, the full well, the dark current and a **suggested linearity**. The
+**linearity and the working max exposure are per gain**: measure yours; the
+suggestion is only a starting point.
+
+The linearity limit is the ceiling that really rules: the effective ceiling is
+the **minimum** of your linearity, the SATURATE card, the setting and the
+inferred clip. Above it a star **calibrates nothing** even if it is not
+saturated, so the app **excludes those comps/check** with the explicit reason
+("above your camera's linearity limit") and reports it in the panel and the CSV.
+On very sensitive sensors (GSENSE400) this is what keeps the brightest stars of
+the field out.
+
+Quick reference: `full well / gain` gives the saturation in ADU, and linearity
+usually sits below it. **If you change gain, measure it again.**
+
 ---
 
 ## 9. The minimal glossary

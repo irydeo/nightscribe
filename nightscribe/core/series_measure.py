@@ -82,6 +82,8 @@ class SeriesConfig:
     site_lat: float = None
     site_aperture_m: float = 0.254
     site_height_m: float = 0.0
+    site_linear: float = None       # camera profile linearity limit (ADU)
+    site_dark: float = None         # camera profile dark current (e-/px/s)
     group_n: int = 1
     auto_aperture: bool = False     # T3: per-night k sweep (phase 3)
     align: str = "off"              # "off" | "warp"|"similarity" | "coords"
@@ -367,6 +369,8 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         site_lon=cfg.site_lon, site_lat=cfg.site_lat,
         site_aperture_m=cfg.site_aperture_m,
         site_height_m=cfg.site_height_m,
+        linear_adu=cfg.site_linear,
+        site_dark=cfg.site_dark,
         require_catalog=(cfg.zp_mode == "catalog"))
     res = photometry.measure_plate(data, pcfg)
     mjd_mid, exptime = _mid_exposure(meta)
@@ -395,7 +399,8 @@ def _frame_flux(frame, cfg):
         return None, None
     err = photometry.ccd_flux_error(
         target.get("flux"), target.get("sky_pp"), target.get("n_pix"),
-        gain=res.gain, ron=cfg.site_ron, exptime=frame.get("exptime"))
+        gain=res.gain, ron=cfg.site_ron, exptime=frame.get("exptime"),
+        dark_e_s=cfg.site_dark)
     return target.get("flux"), err
 
 
@@ -412,7 +417,7 @@ def _group_comp(group, star, cfg):
                     errs.append(photometry.ccd_flux_error(
                         r["flux"], r.get("sky_pp"), r.get("n_pix"),
                         gain=f["res"].gain, ron=cfg.site_ron,
-                        exptime=f.get("exptime")))
+                        exptime=f.get("exptime"), dark_e_s=cfg.site_dark))
                 value = photometry.band_of(star, cfg.band
                                            or cfg.fallback_band)[0]
                 if value is not None:
@@ -460,8 +465,13 @@ def _flag_gates(pt, group, cfg):
     for f in group:
         if not f["res"].ok:
             reason = (f["res"].reason or {})
-            _add_flag(pt, "saturated" if reason.get("en") == "saturated"
-                      else "unusable")
+            en = reason.get("en", "")
+            if en == "saturated":
+                _add_flag(pt, "saturated")
+            elif en.startswith("nonlinear"):
+                _add_flag(pt, "nonlinear")
+            else:
+                _add_flag(pt, "unusable")
             continue
         res = f["res"]
         if res.col is None or res.target is None:

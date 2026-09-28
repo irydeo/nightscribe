@@ -101,6 +101,17 @@ DEFAULTS = {
     "ccd_read_noise": None,     # e-
     "ccd_saturate": None,       # ADU ceiling
     "flat_resid_mag": 0.007,    # flat-field residual floor in the error
+    # Camera profile (core/cameras.py presets): the sensor template and the
+    # photometric limits the preset fills (all editable; the linearity and
+    # the working max exposure are per gain and must be measured/set by the
+    # user). regime: "short" (sCMOS, group many short frames) | "normal".
+    "cam_preset": "",
+    "cam_full_well_e": None,    # e-
+    "cam_linearity_adu": None,  # ADU where linearity is lost (per gain)
+    "cam_dark_current_e_s": None,   # e-/pixel/s at cam_dark_temp_c
+    "cam_dark_temp_c": None,
+    "cam_max_exposure_s": None,     # working max exposure (per gain)
+    "cam_regime": "normal",
     # UFE (ADR-044): open Blink / comparison chart / annotated FITS in the
     # unified editor by default; the classic dialogs stay reachable for
     # the review period (Settings → Development)

@@ -124,8 +124,8 @@ def _sigma_clipped_median(values, level=SIG_LEVEL, iters=SIG_ITERS):
 
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
-                  sky_mode="median", centroid_mode="gaussian",
-                  fwhm=None):
+                  linear_adu=None, sky_mode="median",
+                  centroid_mode="gaussian", fwhm=None):
     # One click on one plate (decision D4): sub-pixel centroid, aperture
     # net flux, sky per pixel, peak, and honest guards. Never raises for
     # a bad star: the reason is the bilingual pair, the panel decides.
@@ -205,12 +205,12 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         plateau = int(np.count_nonzero(
             (r2 <= r_ann_in ** 2) & (data > frame_max - eps)))
         saturated = plateau >= _CLIP_MIN_PIXELS
-    if not saturated and sat_adu is None:
-        # No ceiling anywhere (no SATURATE card, no setting): infer it
-        # from the plate itself. A soft CMOS roll-off compresses cores
-        # that never form a 25-px plateau, and those "almost saturated"
-        # stars poison a zero point just the same (the plateau test above
-        # stays blind to them).
+    if not saturated and sat_adu is None and linear_adu is None:
+        # No ceiling anywhere (no SATURATE card, no setting, no camera
+        # profile): infer it from the plate itself. A soft CMOS roll-off
+        # compresses cores that never form a 25-px plateau, and those
+        # "almost saturated" stars poison a zero point just the same (the
+        # plateau test above stays blind to them).
         ceiling = frame_ceiling(data, frame_max)
         if ceiling is not None and peak >= _INFERRED_CEILING_FRAC * ceiling:
             return _fail(f"comprimida: el pico llega al recorte de la "
@@ -223,6 +223,17 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         return _fail("saturada", "saturated") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
             "n_pix": n_pix, "saturated": True}
+    if linear_adu is not None and frame_max > 0.0 \
+            and peak >= SAT_FRAC * float(linear_adu):
+        # over the camera's linearity limit: the flux is no longer
+        # proportional (the star calibrates nothing), named distinctly from
+        # a hard saturation so the panel can say which limit was hit
+        return _fail("no lineal: el pico supera el límite de linealidad "
+                     "de tu cámara",
+                     "nonlinear: the peak is above your camera's linearity "
+                     "limit") | {
+            "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
+            "n_pix": n_pix, "saturated": False, "nonlinear": True}
     if flux is None or not math.isfinite(flux) or flux <= 0.0:
         return _fail("sin señal medible", "no measurable signal") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
@@ -232,14 +243,16 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
             "ok": True, "reason": None, "cen_ok": cen_ok}
 
 
-def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None):
+def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
+                   dark_e_s=None):
     # Honest CCD equation for the net flux, everything anchored in gain:
-    #   sigma^2 (ADU^2) = flux/g + n*sky/g + n*ron^2/g^2
-    # (source and sky shot noise counted in electrons, RON per pixel;
-    # exptime stays for the dark current, not modelled yet).
+    #   sigma^2 (ADU^2) = flux/g + n*sky/g + n*ron^2/g^2 + n*dark*t/g^2
+    # (source and sky shot noise counted in electrons, RON per pixel; the
+    # dark current term needs the exposure and the sensor's e-/pixel/s).
     # @args: flux - net flux in ADU, sky_pp - sky in ADU per pixel,
     #        n_pix - aperture pixels, gain - e-/ADU, ron - read noise in e-,
-    #        exptime - reserved for the dark (unused for now)
+    #        exptime - exposure in s (for the dark), dark_e_s - dark
+    #        current in e-/pixel/s (camera profile), both optional
     # @return: sigma of the flux in ADU, or None when there is no usable
     #          gain: the caller then falls back to the comps' scatter
     if gain is None or gain <= 0.0 or flux is None or flux < 0.0:
@@ -250,6 +263,8 @@ def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None):
         var += n * sky_pp / gain
     if ron is not None and ron >= 0.0 and n > 0:
         var += n * (ron ** 2) / (gain ** 2)
+    if dark_e_s is not None and dark_e_s >= 0.0 and exptime and n > 0:
+        var += n * float(dark_e_s) * float(exptime) / (gain ** 2)
     return math.sqrt(var)
 
 
@@ -483,6 +498,43 @@ def saturation_ceiling(header, cfg=None):
         except (TypeError, ValueError, AttributeError):
             pass
     return None
+
+
+def linearity_ceiling(cfg):
+    # The camera profile's linearity limit in ADU (per the working gain),
+    # or None when the user has not set one.
+    # @args: cfg - a config-like object with .get (or None)
+    # @return: ADU (float) or None
+    if cfg is None:
+        return None
+    try:
+        v = cfg.get("cam_linearity_adu")
+        if v is not None and str(v).strip() != "":
+            return float(v)
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def effective_ceiling(header, cfg=None, linear_adu=None):
+    # The single, honest ceiling the photometry obeys: the MINIMUM of the
+    # known limits. The camera profile's linearity is usually the strictest
+    # (a star above it calibrates nothing even if it is not clipped yet),
+    # then the detector saturation (SATURATE card / ccd_saturate); None
+    # when nobody knows (measure_point then infers it from the plate).
+    # @args: header - the plate's header, cfg - config-like or None,
+    #        linear_adu - an explicit linearity limit (overrides cfg)
+    # @return: the effective ceiling in ADU, or None
+    limits = []
+    lin = linear_adu
+    if lin is None:
+        lin = linearity_ceiling(cfg)
+    if lin is not None:
+        limits.append(float(lin))
+    sat = saturation_ceiling(header, cfg)
+    if sat is not None:
+        limits.append(float(sat))
+    return min(limits) if limits else None
 
 
 def calibrate_with_color(inst_mags, cat_mags, bvs, target_bv=None):
@@ -1064,6 +1116,8 @@ class PlateConfig:
     target_bv: float = 0.0
     require_catalog: bool = True    # False = relative mode: comps count
                                     # even without a catalog value
+    linear_adu: float = None        # the camera profile's linearity limit
+                                    # (per gain), or None when unset
     # site (Ajustes, ADR-028): the same values the panel has always used
     site_gain: float = None
     site_ron: float = None
@@ -1073,6 +1127,7 @@ class PlateConfig:
     site_lat: float = None
     site_aperture_m: float = 0.254
     site_height_m: float = 0.0
+    site_dark: float = None         # dark current e-/pixel/s (profile)
     # host subtraction (H2b): the comps read on another frame, in the
     # plate orientation, at comp_scale plate px per comp-image px
     comp_image: object = None
@@ -1164,6 +1219,9 @@ def measure_plate(image, cfg):
     fwhm = cfg.fwhm
     sat = saturation_ceiling(cfg.header,
                              {"ccd_saturate": cfg.site_saturate})
+    # the camera profile's linearity limit is in plate ADU; it does not
+    # apply to a resampled/downsampled work frame (host subtraction)
+    lin = cfg.linear_adu if scale == 1.0 else None
     res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
                       sigma_clip=cfg.sigmaclip)
     tx, ty = cfg.target_xy
@@ -1179,7 +1237,7 @@ def measure_plate(image, cfg):
         target = measure_point(
             image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
             r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
-            sky_mode=cfg.sky_mode, fwhm=fwhm)
+            linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm)
     res.target = target
     if not target["ok"]:
         res.reason = target.get("reason")
@@ -1215,10 +1273,16 @@ def measure_plate(image, cfg):
             r = measure_point(image, ccol, crow, r_ap=radii[0],
                               r_ann_in=radii[1], r_ann_out=radii[2],
                               sigma_clip=cfg.sigmaclip, sat_adu=sat,
-                              sky_mode=cfg.sky_mode, fwhm=fwhm)
+                              linear_adu=lin, sky_mode=cfg.sky_mode,
+                              fwhm=fwhm)
         value, derived = band_of(star, band)
         if not r["ok"]:
-            key = "sat" if r.get("saturated") else "other"
+            if r.get("saturated"):
+                key = "sat"
+            elif r.get("nonlinear"):
+                key = "nonlinear"
+            else:
+                key = "other"
             skipped[key] = skipped.get(key, 0) + 1
             continue
         if value is None and cfg.require_catalog:
@@ -1250,7 +1314,8 @@ def measure_plate(image, cfg):
     res.gain = gain
     flux_err = ccd_flux_error(target["flux"], target["sky_pp"],
                               target["n_pix"], gain=gain, ron=ron,
-                              exptime=inst_header["exptime"])
+                              exptime=inst_header["exptime"],
+                              dark_e_s=cfg.site_dark)
     ccd_mag_err = mag_error(target["flux"], flux_err)
     res.err_internal = ccd_mag_err
     scint = _plate_scintillation(cfg, mx, my, inst_header["exptime"])

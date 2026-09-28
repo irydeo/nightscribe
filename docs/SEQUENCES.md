@@ -86,6 +86,14 @@ live in **Advanced...** (a small, non-modal window):
 Every control has its tooltip with units and reason, and there is a **"Restore
 defaults"**.
 
+The **camera profile** (Settings → Photometric camera profile) fixes the
+**full well, the dark current and the linearity limit / working max exposure per
+gain** (measure them; a suggested value is offered). On a very sensitive sCMOS
+(QHY42Pro/GSENSE400) the recipe is **5–10 s exposures and grouping** (`group_n`)
+to beat scintillation without saturating or drowning in sky background; modern
+IMX and CCDs take long exposures. The **linearity limit** is what decides which
+stars are good enough as comp/check.
+
 ## 6. When to trust it
 
 - **The raw curve is always visible** next to the detrended one: detrending can

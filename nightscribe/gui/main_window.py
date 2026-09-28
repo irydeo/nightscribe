@@ -733,6 +733,48 @@ class MainWindow(QMainWindow):
         if path:
             dlg.edt_exotic_install.setText(path)
 
+    def _cam_preset_selected(self, dlg):
+        # Fill the datasheet template from the chosen camera preset,
+        # without stomping a value the user set by hand.
+        from ..core import cameras
+        p = cameras.preset(dlg.cmb_cam_preset.currentData())
+        if p is not None:
+            dlg.spn_pixel_um.setValue(float(p["pixel_um"]))
+            if dlg.spn_cam_full_well.value() == 0 and p.get("full_well_e"):
+                dlg.spn_cam_full_well.setValue(float(p["full_well_e"]))
+            if dlg.spn_cam_linearity.value() == 0 and p.get("linearity_adu"):
+                dlg.spn_cam_linearity.setValue(float(p["linearity_adu"]))
+            if dlg.spn_cam_dark.value() == 0 and p.get("dark_current_e_s"):
+                dlg.spn_cam_dark.setValue(float(p["dark_current_e_s"]))
+            if dlg.spn_cam_max_exp.value() == 0 and p.get("regime") == "short" \
+                    and p.get("exp_max_s"):
+                dlg.spn_cam_max_exp.setValue(round(float(p["exp_max_s"])))
+        self._cam_ref_update(dlg)
+
+    def _cam_ref_update(self, dlg):
+        # The full-well-in-ADU cross-check plus the sensor facts, so the
+        # linearity suggestion can be sanity-checked at a glance.
+        from ..core import cameras
+        p = cameras.preset(dlg.cmb_cam_preset.currentData())
+        bits = []
+        if p is not None:
+            bits.append(self.tr("Sensor: {0}").replace("{0}", p["sensor"]))
+            if p.get("dark_current_e_s") is not None \
+                    and p.get("dark_temp_c") is not None:
+                bits.append(self.tr("dark {0} e-/pix/s @ {1} °C")
+                            .replace("{0}", f"{p['dark_current_e_s']:g}")
+                            .replace("{1}", f"{p['dark_temp_c']:g}"))
+            bits.append(self.tr("regime: {0}").replace(
+                "{0}", self.tr("short (group frames)")
+                if p["regime"] == "short" else self.tr("normal")))
+            fw = cameras.full_well_adu(p, config.get("ccd_gain"))
+            if fw:
+                bits.append(self.tr("full well ≈ {0:.0f} ADU at your gain")
+                            .replace("{0}", f"{fw:.0f}"))
+            if p.get("linearity_note"):
+                bits.append(p["linearity_note"])
+        dlg.lbl_cam_ref.setText(" · ".join(bits))
+
     def _exotic_python(self, dlg):
         # @return: the interpreter to use (configured, else detected)
         from ..core import exotic_env
@@ -848,6 +890,24 @@ class MainWindow(QMainWindow):
         dlg.btn_exotic_prepare.clicked.connect(
             lambda: self._prepare_exotic(dlg))
         dlg.btn_exotic_test.clicked.connect(lambda: self._test_exotic(dlg))
+        # photometric camera profile (core/cameras.py presets)
+        from ..core import cameras
+        dlg.cmb_cam_preset.addItem(self.tr("None"), "")
+        for _p in cameras.PRESETS:
+            dlg.cmb_cam_preset.addItem(cameras.label(_p), _p["key"])
+        _ci = dlg.cmb_cam_preset.findData(config.get("cam_preset", ""))
+        dlg.cmb_cam_preset.setCurrentIndex(_ci if _ci >= 0 else 0)
+        dlg.spn_cam_full_well.setValue(
+            float(config.get("cam_full_well_e") or 0))
+        dlg.spn_cam_linearity.setValue(
+            float(config.get("cam_linearity_adu") or 0))
+        dlg.spn_cam_dark.setValue(
+            float(config.get("cam_dark_current_e_s") or 0))
+        dlg.spn_cam_max_exp.setValue(
+            float(config.get("cam_max_exposure_s") or 0))
+        dlg.cmb_cam_preset.currentIndexChanged.connect(
+            lambda _i: self._cam_preset_selected(dlg))
+        self._cam_ref_update(dlg)
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         # Track D (EXOTIC handoff): AAVSO code, camera type and binning
@@ -956,6 +1016,15 @@ class MainWindow(QMainWindow):
                    dlg.edt_exotic_python.text().strip())
         config.set("exotic_install_dir",
                    dlg.edt_exotic_install.text().strip())
+        config.set("cam_preset", dlg.cmb_cam_preset.currentData() or "")
+        config.set("cam_full_well_e", dlg.spn_cam_full_well.value() or None)
+        config.set("cam_linearity_adu",
+                   dlg.spn_cam_linearity.value() or None)
+        config.set("cam_dark_current_e_s", dlg.spn_cam_dark.value() or None)
+        config.set("cam_max_exposure_s",
+                   dlg.spn_cam_max_exp.value() or None)
+        _cp = cameras.preset(dlg.cmb_cam_preset.currentData())
+        config.set("cam_regime", _cp["regime"] if _cp else "normal")
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
         config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())

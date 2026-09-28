@@ -17,11 +17,15 @@ The verified invocation (2026-09-27) is the console script inside the
 external venv: `exotic -red <inits.json> -ov`, from a work directory, with
 stdin closed so any prompt fails fast instead of hanging the app. stdout
 and stderr are merged into one log file; the process can be cancelled and
-is killed on timeout.
+is killed on timeout. EXOTIC uses multiprocessing, so it is spawned as the
+leader of its own process group and the kill reaches the whole group:
+signalling only the parent leaves children eating CPU and holding files.
 """
 
 import logging
+import os
 import queue
+import signal
 import subprocess
 import threading
 import time
@@ -36,6 +40,38 @@ LOG_NAME = "exotic_run.log"
 # the install layout, while `-c` works for any interpreter that has EXOTIC.
 _MAIN = ("import sys; sys.argv[0] = 'exotic'; "
          "from exotic.exotic import main; sys.exit(main())")
+
+
+def _group_kwargs():
+    # Popen extras so EXOTIC leads a brand-new process group (session on
+    # POSIX) and its multiprocessing children join it: _kill_tree can then
+    # take the whole tree down instead of orphaning the children.
+    # @args: none
+    # @return: dict of Popen keyword arguments for this platform
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+    return {"start_new_session": True}
+
+
+def _kill_tree(proc, hard=False):
+    # Signal EXOTIC's whole process group, not just the parent.
+    # @args: proc - Popen of the EXOTIC parent (leader of its own group,
+    #        see _group_kwargs), hard - SIGKILL the group instead of
+    #        SIGTERM (POSIX; taskkill /F is a hard kill already)
+    # @return: nothing
+    fallback = proc.kill if hard else proc.terminate
+    if os.name == "nt":
+        try:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)],
+                           capture_output=True, timeout=10)
+            return
+        except (OSError, subprocess.SubprocessError):
+            fallback()          # no taskkill: at least stop the parent
+            return
+    try:
+        os.killpg(proc.pid, signal.SIGKILL if hard else signal.SIGTERM)
+    except OSError:
+        fallback()              # group already gone: parent-only signal
 
 
 def run(python, work_dir, inits_path, mode="red", override=True,
@@ -62,7 +98,8 @@ def run(python, work_dir, inits_path, mode="red", override=True,
             proc = subprocess.Popen(
                 cmd, cwd=str(work_dir), stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                text=True, encoding="utf-8", errors="replace", bufsize=1)
+                text=True, encoding="utf-8", errors="replace", bufsize=1,
+                **_group_kwargs())
             lines = queue.Queue()
 
             def _reader(pipe):
@@ -87,16 +124,16 @@ def run(python, work_dir, inits_path, mode="red", override=True,
                         progress(line.rstrip())
                 if cancel is not None and cancel():
                     cancelled = True
-                    proc.terminate()
+                    _kill_tree(proc)
                     break
                 if timeout_s and time.monotonic() - start > timeout_s:
                     logger.warning("EXOTIC timed out after %ss", timeout_s)
-                    proc.terminate()
+                    _kill_tree(proc)
                     break
             try:
                 proc.wait(timeout=30)
             except subprocess.TimeoutExpired:
-                proc.kill()
+                _kill_tree(proc, hard=True)
     except (OSError, subprocess.SubprocessError) as err:
         logger.warning("EXOTIC run failed: %s", err)
         return {"ok": False, "returncode": None, "log_path": str(log_path),

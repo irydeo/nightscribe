@@ -16,6 +16,8 @@ kill it on timeout, and locate its outputs. A fake `exotic` script stands
 in for the real one. No network."""
 
 import os
+import signal
+import time
 from pathlib import Path
 
 import pytest
@@ -93,3 +95,61 @@ time.sleep(30)
     res = exotic_run.run(script, tmp_path / "w", tmp_path / "inits.json",
                          timeout_s=0.6)
     assert not res["ok"]
+
+
+def _pid_alive(pid):
+    # @args: pid - process id to probe
+    # @return: True only if the pid still exists and is not a zombie
+    #          (an unreaped zombie is already dead for our purposes)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    stat = Path("/proc") / str(pid) / "stat"
+    if stat.exists():                       # Linux: zombies count as dead
+        try:
+            return not stat.read_text().rsplit(") ", 1)[1].startswith("Z")
+        except OSError:
+            pass
+    return True
+
+
+@pytest.mark.skipif(os.name != "posix",
+                    reason="group kill is verified on POSIX; Windows goes "
+                           "through taskkill /T /F")
+def test_cancel_kills_the_whole_process_tree(tmp_path):
+    # EXOTIC uses multiprocessing: cancelling the parent alone left its
+    # children running (P1 #8). The fake parent spawns a real child and
+    # prints its pid; after the cancel both must be gone.
+    script = _fake(tmp_path, "exotic_tree.py", """
+import subprocess, sys, time
+child = subprocess.Popen([sys.executable, "-c",
+                          "import time; time.sleep(60)"],
+                         stdin=subprocess.DEVNULL)
+print(child.pid, flush=True)
+time.sleep(60)
+""")
+    state = {"n": 0, "child": None}
+
+    def progress(line):
+        if line.strip().isdigit():
+            state["child"] = int(line.strip())
+
+    def cancel():
+        state["n"] += 1
+        return state["n"] > 1
+
+    res = exotic_run.run(script, tmp_path / "w", tmp_path / "inits.json",
+                         progress=progress, cancel=cancel)
+    try:
+        assert res["cancelled"] and not res["ok"]
+        assert state["child"] is not None
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and _pid_alive(state["child"]):
+            time.sleep(0.05)
+        assert not _pid_alive(state["child"])
+    finally:
+        if state["child"] is not None and _pid_alive(state["child"]):
+            os.kill(state["child"], signal.SIGKILL)   # never leak the child

@@ -72,40 +72,6 @@ def _bilinear(data, xs, ys):
     return out
 
 
-def angular_profile(data, ntheta=360, nr=48, rmin=12, rmax=None):
-    # The image's angular profile: the mean intensity along rays from the
-    # centre, as a function of the position angle. A rotation of the image
-    # is a circular shift of this profile (Fourier-Mellin, rotation only).
-    # @args: data - 2D array, ntheta - angle bins, nr - radial samples,
-    #        rmin/rmax - radial range (px)
-    # @return: the ntheta-long profile
-    h, w = data.shape
-    cx, cy = w / 2.0, h / 2.0
-    rmax = rmax if rmax is not None else (min(h, w) / 2.0 - 2.0)
-    r = np.linspace(rmin, rmax, nr)
-    th = np.arange(ntheta) * (2.0 * math.pi / ntheta)
-    ct, st = np.cos(th), np.sin(th)
-    prof = np.zeros(ntheta, dtype=np.float64)
-    for j in range(ntheta):
-        xs = cx + r * ct[j]
-        ys = cy + r * st[j]
-        prof[j] = float(np.mean(_bilinear(data, xs, ys)))
-    return prof
-
-
-def rotation_between(prof_ref, prof_src):
-    # @return: the rotation (radians) that, applied to the source image
-    #          about its centre, aligns its angular profile with the ref
-    a = prof_ref - np.mean(prof_ref)
-    b = prof_src - np.mean(prof_src)
-    c = np.fft.ifft(np.fft.fft(a) * np.conj(np.fft.fft(b))).real
-    shift = int(np.argmax(c))
-    n = len(a)
-    if shift > n // 2:
-        shift -= n
-    return shift * (2.0 * math.pi / n)
-
-
 def phase_shift(ref, src):
     # 2D phase correlation: the integer (dx, dy) that best aligns `src`
     # onto `ref` (src shifted by (dx, dy) -> ref), plus the peak quality.

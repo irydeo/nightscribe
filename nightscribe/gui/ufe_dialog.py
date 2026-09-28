@@ -324,8 +324,15 @@ class UfeDialog(QDialog):
             bool(getattr(incoming, "pick_clicks", False)))
 
     def closeEvent(self, event):
-        # The blink timer must not fire into a closing dialog.
+        # The blink timer must not fire into a closing dialog, and the
+        # Measure tab's workers must not outlive it either: a series run
+        # or a Live watch left behind keeps measuring and writing runs
+        # into the DB forever (shutdown cancels both and waits).
         self.tab_blink.shutdown()
+        try:
+            self.tab_measure.shutdown()
+        except Exception as err:      # a failed cleanup never blocks close
+            logger.warning("measure tab shutdown failed: %s", err)
         super().closeEvent(event)
 
     # -------------------------------------------------------- extension

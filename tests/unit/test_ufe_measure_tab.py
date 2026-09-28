@@ -983,6 +983,76 @@ def test_series_worker_offscreen_measures_a_synthetic_series(qapp, tmp_path):
     assert len(got["res"].points) == 3
 
 
+# ---------------- worker lifecycle on close (P0 stability) ----------------
+
+def _spy_cancel(worker):
+    # @return: a list the worker's cancel() appends to; the real cancel
+    #          still runs, so the engine really stops
+    calls = []
+    real = worker.cancel
+    worker.cancel = lambda: (calls.append(True), real())[1]
+    return calls
+
+
+def test_dialog_close_cancels_a_running_series(dlg, qapp, tmp_path):
+    # Regression (P0): the tab's shutdown() was dead code, nothing called
+    # it; closing the editor mid-series cancelled nothing and the worker
+    # kept measuring. The closeEvent must shut the Measure tab down:
+    # cancel asked, thread waited on and finished, reference dropped.
+    tab = dlg.tab_measure
+    frames = [_write_plate(tmp_path / f"cl{i}.fits", dlg.state.data)
+              for i in range(60)]          # still running at close time
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 77)
+    tab._on_measure_series()
+    worker = tab._series_worker
+    assert worker is not None and worker.isRunning()
+    calls = _spy_cancel(worker)
+    dlg.close()
+    qapp.processEvents()
+    cancelled_by_close = bool(calls)
+    running_after_close = worker.isRunning()
+    # safety net: never hand a live thread to the teardown, whatever the
+    # close did or did not do
+    worker.cancel()
+    finished = worker.wait(10000)
+    assert cancelled_by_close              # the close asked it to stop
+    assert not running_after_close         # ... and waited for the thread
+    assert finished and not worker.isRunning()
+    assert tab._series_worker is None      # the reference is dropped
+
+
+def test_dialog_close_cancels_a_running_live_watch(dlg, qapp, tmp_path):
+    # Same regression, Live mode (the reported symptom: a Live watch left
+    # behind keeps writing runs into the DB forever). The closeEvent must
+    # cancel the live worker too and wait for its thread.
+    tab = dlg.tab_measure
+    frames = [_write_plate(tmp_path / f"lv{i}.fits", dlg.state.data)
+              for i in range(4)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 78)
+    tab.chk_series_live.setChecked(True)   # starts the folder watch
+    worker = tab._live_worker
+    assert worker is not None and worker.isRunning()
+    calls = _spy_cancel(worker)
+    dlg.close()
+    qapp.processEvents()
+    cancelled_by_close = bool(calls)
+    # safety net: the watch loop polls every 2 s, so give the thread a
+    # generous window; the teardown must never see it running
+    worker.cancel()
+    finished = worker.wait(10000)
+    assert cancelled_by_close              # the close asked it to stop
+    assert finished and not worker.isRunning()
+    assert tab._live_worker is None        # the reference is dropped
+
+
 # ---------------- series plan, phase 8: ExoClock ----------------
 
 def test_exoclock_button_writes_files_and_records_outcome(

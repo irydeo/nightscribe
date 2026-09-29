@@ -993,3 +993,87 @@ def test_a_hot_pixel_does_not_move_the_radial_fwhm():
     m_clean = phot.estimate_fwhm(data, [(30.0, 30.0)], method="moments")
     m_dirty = phot.estimate_fwhm(dirty, [(30.0, 30.0)], method="moments")
     assert abs(m_dirty - m_clean) > abs(hurt - clean)
+
+
+# ---------------- phase A: the centroid's two defences ----------------
+
+def _field(neighbour_px=9.0, hot_pixel=False, sigma=2.0, n=80):
+    # A star at (40, 40) with a brighter neighbour to its right (the
+    # classic pull) and, optionally, a hot pixel.
+    #
+    # The separation matters and it is physics, not a knob: at 6 px on a
+    # 4.7 px seeing disc the two stars form ONE local maximum and no
+    # finder can tell them apart; at 9 px each keeps its own peak with a
+    # dip between them, which is the case deblending is for.
+    yy, xx = np.ogrid[0:n, 0:n]
+    rng = np.random.default_rng(11)
+    data = 100.0 + rng.normal(0, 1.5, (n, n))
+    data += 4000.0 * np.exp(-((xx - 40.0) ** 2 + (yy - 40.0) ** 2)
+                            / (2 * sigma ** 2))
+    data += 30000.0 * np.exp(-((xx - (40.0 + neighbour_px)) ** 2
+                               + (yy - 40.0) ** 2) / (2 * sigma ** 2))
+    if hot_pixel:
+        data[40, 44] += 25000.0
+    return data
+
+
+def test_the_deblending_keeps_the_centroid_on_its_own_star():
+    # A neighbour 6 px away, four times brighter: without the masked
+    # pixels and the shrunken window the matched filter integrates part of
+    # the neighbour and the star lands to the right of where it is.
+    data = _field(neighbour_px=9.0)
+    plain = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7, robust=False)
+    robust = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7, robust=True)
+    assert plain["ok"] and robust["ok"]
+    err_plain = abs(plain["x"] - 40.0)
+    err_robust = abs(robust["x"] - 40.0)
+    # measured: 0.384 px without the defences, 0.187 with them. The
+    # remaining pull is the neighbour's WING, which no mask removes (you
+    # would have to model the neighbour); what the defence stops is its
+    # CORE swallowing our star, which is the difference between a halved
+    # error and a centroid that walks off.
+    assert err_robust < 0.5 * err_plain
+    assert err_robust < 0.25
+    # the y axis is not disturbed by the horizontal neighbour
+    assert abs(robust["y"] - 40.0) < 0.1
+
+
+def test_the_core_cap_ignores_a_hot_pixel():
+    # A cosmic ray two pixels away, brighter than the star's core: no real
+    # point spread function carries more light than its centre.
+    data = _field(neighbour_px=30.0, hot_pixel=True)
+    plain = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                   robust=False)
+    robust = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                    robust=True)
+    # measured: 1.094 px away without the cap, 0.047 with it. One hot
+    # pixel two pixels from the core is worth a whole pixel of centroid,
+    # and a whole pixel of centroid is a wrong magnitude.
+    assert abs(plain["x"] - 40.0) > 1.0
+    assert abs(robust["x"] - 40.0) < 0.1
+
+
+def test_the_neighbours_are_reported_for_the_centroid():
+    data = _field(neighbour_px=9.0)
+    seed = phot.lock_local_peak(data, 40.0, 40.0)
+    assert seed is not None
+    neigh = phot.local_neighbours(data, 40.0, 40.0, seed)
+    assert neigh
+    # the nearest one is the bright neighbour, at about 9 px
+    assert neigh[0][2] == pytest.approx(9.0, abs=0.5)
+
+
+def test_a_lonely_star_is_untouched_by_the_defences():
+    # No neighbour and no hot pixel: the two defences must change nothing,
+    # or they would be a different estimator rather than a safer one.
+    yy, xx = np.ogrid[0:80, 0:80]
+    rng = np.random.default_rng(3)
+    data = 100.0 + rng.normal(0, 1.5, (80, 80))
+    data += 4000.0 * np.exp(-((xx - 40.3) ** 2 + (yy - 39.7) ** 2)
+                            / (2 * 2.0 ** 2))
+    plain = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                   robust=False)
+    robust = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                    robust=True)
+    assert robust["x"] == pytest.approx(plain["x"], abs=0.02)
+    assert robust["y"] == pytest.approx(plain["y"], abs=0.02)

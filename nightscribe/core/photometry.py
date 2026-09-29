@@ -167,7 +167,7 @@ def pixel_coverage(shape, cx, cy, r, subsample=8):
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
                   linear_adu=None, sky_mode="median",
-                  centroid_mode="gaussian", fwhm=None):
+                  centroid_mode="gaussian", fwhm=None, robust=True):
     # One click on one plate (decision D4): sub-pixel centroid, aperture
     # net flux, sky per pixel, peak, and honest guards. Never raises for
     # a bad star: the reason is the bilingual pair, the panel decides.
@@ -205,7 +205,8 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
         cen_ok = cen["ok"]
     else:
-        cen = gaussian_centroid(data, x, y, fwhm=fwhm)
+        cen = gaussian_centroid(data, x, y, fwhm=fwhm, sky_pp=None,
+                                robust=robust)
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
         cen_ok = cen["ok"]
     yy, xx = np.ogrid[:h, :w]
@@ -913,6 +914,13 @@ def lock_local_peak(data, x, y, max_dist=4.0, k=4.0):
     # wing inside its window (a neighbour star, a galaxy core); the matched
     # filter can only refine around its seed, so the seed must be the
     # source the observer MEANT, not the brightest thing nearby.
+    #
+    # The source finder runs with a small separation here (3 px) on
+    # purpose: this is not building a catalogue, it is answering "which
+    # source is under the cursor", and a star 6 px from a brighter one used
+    # to disappear under the catalogue rule (min_sep 6), leaving the
+    # centroid to work from the raw click and, worse, blind to the
+    # neighbour it should be protecting itself from.
     # @args: data - 2D array, x, y - the clicked pixel,
     #        max_dist - how far a peak may be to count as "under the click"
     # @return: (px, py) of the nearest local source, or None
@@ -923,14 +931,116 @@ def lock_local_peak(data, x, y, max_dist=4.0, k=4.0):
     y0, y1 = max(0, int(round(y)) - half), min(h, int(round(y)) + half + 1)
     x0, x1 = max(0, int(round(x)) - half), min(w, int(round(x)) + half + 1)
     best, best_d = None, max_dist ** 2
-    for px, py, _pk in local_sources(data[y0:y1, x0:x1], k=k):
+    for px, py, _pk in local_sources(data[y0:y1, x0:x1], k=k, min_sep=3):
         d = (px + x0 - x) ** 2 + (py + y0 - y) ** 2
         if d < best_d:
             best, best_d = (px + x0, py + y0), d
     return best
 
 
-def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
+def local_neighbours(data, x, y, seed, reach=12.0, k=4.0,
+                     psf_frac=0.15):
+    # The OTHER significant sources that share the window of a star, with
+    # the distance to the star's own seed.
+    #
+    # The centroid needs them for two different reasons, and both come
+    # from the Photometrica tool of our group:
+    #
+    #   * a bright neighbour inside the correlation window borrows light
+    #     from the star and pulls the fit towards itself, so the WINDOW is
+    #     clamped by how close the neighbour is;
+    #   * and the pixels that sit closer to the neighbour than to the star
+    #     belong to the neighbour: they are masked out, the plain Voronoi
+    #     split between two stars.
+    #
+    # Only what LOOKS LIKE A STAR counts as a neighbour, and that detail
+    # is theirs too: a hot pixel or a cosmic ray is a spike, not a source,
+    # and treating it as a neighbour would cut the window in half for
+    # nothing (measured on the real V0526 Per series: the defence with
+    # spikes counted as neighbours cost 0.0026 of correlation for no gain;
+    # with the test below it costs nothing and still saves the two cases
+    # it is for). A real point spread function spreads: its neighbours
+    # hold a fair share of its light, a spike's neighbours do not.
+    #
+    # @args: data - 2D array, x, y - the clicked pixel, seed - the locked
+    #        peak (px, py), reach - how far to look for neighbours,
+    #        k - significance for the source finder, psf_frac - share of
+    #        the peak that its neighbours must hold for it to be a star
+    # @return: [(nx, ny, distance), ...] sorted by distance (nearest first)
+    if data is None or seed is None:
+        return []
+    h, w = data.shape
+    sx, sy = seed
+    half = int(reach) + 7
+    y0, y1 = max(0, int(round(sy)) - half), min(h, int(round(sy)) + half + 1)
+    x0, x1 = max(0, int(round(sx)) - half), min(w, int(round(sx)) + half + 1)
+    sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
+    if sub.size == 0:
+        return []
+    background = float(np.median(sub))
+    out = []
+    for px, py, pk in local_sources(sub, k=k, min_sep=3):
+        ax, ay = px + x0, py + y0
+        d = math.hypot(ax - sx, ay - sy)
+        if d <= 0.5 or d > reach:
+            continue
+        if not _looks_like_a_star(sub, ax - x0, ay - y0, background,
+                                  psf_frac):
+            continue
+        out.append((float(ax), float(ay), float(d)))
+    out.sort(key=lambda item: item[2])
+    return out
+
+
+def _looks_like_a_star(sub, px, py, background, psf_frac):
+    # Is the pixel (px, py) the centre of a star, or an isolated spike?
+    #
+    # A star's core has neighbours carrying a good share of its light (the
+    # wings); a hot pixel or a cosmic ray stands alone over the sky. The
+    # seed's own finder uses the same test, so the two agree on what a
+    # source is.
+    # @args: sub - the cutout, px/py - the candidate (integer, in sub),
+    #        background - the level it stands on, psf_frac - the share
+    # @return: True when it has wings
+    h, w = sub.shape
+    ix, iy = int(round(px)), int(round(py))
+    peak = float(sub[iy, ix]) - float(background)
+    if peak <= 0.0:
+        return False
+    total, count = 0.0, 0
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            ny, nx = iy + dy, ix + dx
+            if not (0 <= ny < h and 0 <= nx < w):
+                continue
+            total += float(sub[ny, nx]) - float(background)
+            count += 1
+    if count == 0:
+        return False
+    return (total / count) >= psf_frac * peak
+
+
+def _core_cap(resid, sx, sy, x0, y0):
+    # The brightest value of the 3x3 around the star's centre: no pixel of
+    # a real point spread function can carry more light than its own core,
+    # so anything above it is a hot pixel or a cosmic ray, and letting it
+    # through would drag the centroid (the Gaussian template has weight
+    # out there, the spike does not).
+    # @args: resid - the sky-subtracted cutout, sx/sy - the seed (float
+    #        pixels), x0/y0 - the cutout's origin
+    # @return: the cap in ADU (>= 0)
+    h, w = resid.shape
+    cx = int(round(sx)) - x0
+    cy = int(round(sy)) - y0
+    box = resid[max(0, cy - 1):cy + 2, max(0, cx - 1):cx + 2]
+    if box.size == 0:
+        return float(np.nanmax(resid))
+    return max(0.0, float(np.nanmax(box)))
+
+
+def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None, robust=True):
     # The precision centroid: matched-filter correlation of the
     # sky-subtracted cutout with a gaussian template of the measured
     # seeing, on a 0.1 px grid, with parabolic refinement of the
@@ -939,9 +1049,22 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     # on faint sources. The observer's point is kept (with the bilingual
     # reason) when the fit is too weak to trust: below SNR ~4 there is
     # no centroid worth the name, and pretending otherwise is worse.
+    #
+    # Two defences are ported from our group's Photometrica tool, because
+    # an optimal estimator is only optimal when the data is what it
+    # thinks it is:
+    #
+    #   * DEBLENDING: if another significant source shares the window, the
+    #     window shrinks so its core stays out, and the pixels closer to
+    #     it than to us are masked out;
+    #   * the CORE CAP: a hot pixel or a cosmic ray inside the aperture is
+    #     clipped at the star's own core value, because no real point
+    #     spread function carries more light than its centre.
+    #
     # @args: data - 2D array, x, y - starting pixel, fwhm - seeing in px
     #        (estimated from the cutout when None), sky_pp - local sky
-    #        (cutout edge median when None)
+    #        (cutout edge median when None), robust - apply the two
+    #        defences above (False reproduces the historical behaviour)
     # @return: {"x", "y", "ok", "moved", "reason", "snr"} - ok=False
     #          keeps the start position
     if data is None or data.size == 0:
@@ -967,10 +1090,23 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     # and let the SNR gate below judge whatever is there.
     seed = lock_local_peak(data, x, y)
     sx, sy = seed if seed is not None else (float(x), float(y))
-    y0 = max(0, int(round(sy)) - half)
-    y1 = min(h, int(round(sy)) + half + 1)
-    x0 = max(0, int(round(sx)) - half)
-    x1 = min(w, int(round(sx)) + half + 1)
+    # the neighbours whose light could reach our window (photometry,
+    # phase A): they shrink it, and they take their own pixels back below.
+    # The reach is generous on purpose (two and a half windows): a
+    # neighbour can pull a centroid from well outside the aperture through
+    # its wing, which is the very case being defended against.
+    neighbours = local_neighbours(data, x, y, seed,
+                                  reach=max(6.0, 2.5 * half)) \
+        if robust and seed is not None else []
+    window = half
+    if neighbours:
+        # keep the neighbour's core and its bright wing out of the window:
+        # half of the distance is inside our own star for any sane PSF
+        window = int(max(3, min(half, math.floor(0.5 * neighbours[0][2]))))
+    y0 = max(0, int(round(sy)) - window)
+    y1 = min(h, int(round(sy)) + window + 1)
+    x0 = max(0, int(round(sx)) - window)
+    x1 = min(w, int(round(sx)) + window + 1)
     sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
     if sub.size == 0 or not np.any(np.isfinite(sub)):
         return {"x": float(x), "y": float(y), "ok": False,
@@ -985,9 +1121,23 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     else:
         sky = float(sky_pp)
     resid = np.nan_to_num(sub - sky)
+    if robust:
+        # the core cap: nothing inside a real point spread function is
+        # brighter than its centre, so a spike above it is not starlight
+        cap = _core_cap(resid, sx, sy, x0, y0)
+        if cap > 0.0:
+            resid = np.minimum(resid, cap)
     mad = float(np.median(np.abs(resid - np.median(resid))))
     noise = max(1.4826 * mad, 1e-9)
     ys, xs = np.mgrid[y0:y1, x0:x1]
+    # the deblending mask: a pixel closer to the neighbour than to us is
+    # the neighbour's, and our template has no business integrating it
+    weights = np.ones_like(resid)
+    for nx, ny, _d in neighbours:
+        closer = ((xs - nx) ** 2 + (ys - ny) ** 2) < \
+            ((xs - sx) ** 2 + (ys - sy) ** 2)
+        weights = np.where(closer, 0.0, weights)
+    resid = resid * weights
     # matched-filter grid: correlate the residual with the seeing
     # gaussian on a 0.1 px lattice around the moment seed
     best = (None, -np.inf)
@@ -1312,6 +1462,10 @@ class PlateConfig:
     fallback_band: str = "V"
     radii: tuple = None             # (rap, rin, rout) or None for defaults
     fwhm: float = None              # measured seeing (px), for the centroid
+    robust_centroid: bool = True    # the centroid's two defences against a
+                                    # hot pixel and a close neighbour (see
+                                    # gaussian_centroid); off reproduces the
+                                    # historical behaviour
     sigmaclip: bool = True
     sky_mode: str = "median"
     color: bool = False
@@ -1439,7 +1593,8 @@ def measure_plate(image, cfg):
         target = measure_point(
             image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
             r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
-            linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm)
+            linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm,
+            robust=cfg.robust_centroid)
     res.target = target
     if not target["ok"]:
         res.reason = target.get("reason")
@@ -1476,7 +1631,8 @@ def measure_plate(image, cfg):
                               r_ann_in=radii[1], r_ann_out=radii[2],
                               sigma_clip=cfg.sigmaclip, sat_adu=sat,
                               linear_adu=lin, sky_mode=cfg.sky_mode,
-                              fwhm=fwhm)
+                              fwhm=fwhm,
+                              robust=cfg.robust_centroid)
         value, derived = band_of(star, band)
         if not r["ok"]:
             if r.get("saturated"):

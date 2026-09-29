@@ -84,10 +84,14 @@ class CampaignEditDialog(QDialog):
                 self, self.windowTitle(),
                 self.tr("The campaign needs a name."))
             return
-        prot = {"cadence_nights": self.spn_cadence.value(),
-                "filters": self._csv(self.edt_filters.text()),
-                "comp_stars": self._csv(self.edt_comps.text()),
-                "notes": self.edt_notes.toPlainText().strip()}
+        # merge into the campaign's own protocol, never replace it: the
+        # shared sequence of a pass (E5b) lives there too, and losing it
+        # because someone edited the notes would be a silent loss
+        prot = dict((self._camp or {}).get("protocol") or {})
+        prot.update({"cadence_nights": self.spn_cadence.value(),
+                     "filters": self._csv(self.edt_filters.text()),
+                     "comp_stars": self._csv(self.edt_comps.text()),
+                     "notes": self.edt_notes.toPlainText().strip()})
         if self._camp is None:
             campaign.create(
                 self._db, name,

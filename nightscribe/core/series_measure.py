@@ -1852,6 +1852,26 @@ def _series_result(frames, cfg, target, shared, status="complete",
     return result
 
 
+def series_rows(points):
+    # The curve as the rows a host persists: one run, one batch.
+    #
+    # It lives in the engine and not in the GUI on purpose: a single series
+    # and a campaign pass write the same shape, and two copies of this
+    # would drift the moment one of them gains a column.
+    # @args: points - measured SeriesPoints
+    # @return: [{"mjd", "filter", "mag", "err", "err_internal", "mag_raw",
+    #           "path", "flags", "source"}, ...]
+    rows = []
+    for p in points:
+        if p.mjd is None:
+            continue
+        rows.append({"mjd": p.mjd, "filter": p.filter, "mag": p.mag,
+                     "err": p.err, "err_internal": p.err_internal,
+                     "mag_raw": p.inst, "path": p.path,
+                     "flags": list(p.flags), "source": "measure"})
+    return rows
+
+
 def measure_series(paths, cfg, progress=None, cancel=None):
     # Measure a whole series frame by frame (T1-T7), grouping when asked
     # (D19). Never raises for a bad frame: unreadable files are recorded

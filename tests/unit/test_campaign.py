@@ -321,3 +321,79 @@ def test_signals_report_excludes_archived_project(db):
     project.set_status(db, pid, "archived")
     rep = campaign.signals_report(db)
     assert rep["members"] == 0 and rep["signals"] == []
+
+
+# ---------------- the shared sequence of a campaign (E5b) --------------
+
+def _sequence(n=3):
+    # The shape a project's context stores: the FULL entries, with the
+    # star's RA/Dec and bands, not just a list of names.
+    entries = []
+    for j in range(n):
+        entries.append({"name": f"C{j + 1}", "kind": "comp",
+                        "star": {"ra": 40.0 + j, "dec": 20.0 + j,
+                                 "mag": 12.0 + 0.1 * j, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": 12.0 + 0.1 * j,
+                                            "err": 0.02,
+                                            "derived": False}]}})
+    return {"catalog": "APASS DR9", "entries": entries,
+            "csv": "/tmp/seq.csv", "png": "/tmp/seq.png"}
+
+
+def test_a_campaign_can_carry_a_shared_sequence(tmp_path):
+    from nightscribe.core.db import Database
+    from nightscribe.core import campaign as camp_mod
+    db = Database(tmp_path / "t.sqlite")
+    cid = camp_mod.create(db, "PCCP watch")
+    assert camp_mod.sequence_of(camp_mod.get(db, cid)) is None
+    assert camp_mod.set_sequence(db, cid, _sequence(4)) is True
+    seq = camp_mod.sequence_of(camp_mod.get(db, cid))
+    assert seq is not None
+    assert len(seq["entries"]) == 4
+    assert seq["catalog"] == "APASS DR9"
+    # and it can be cleared without touching the rest of the protocol
+    camp_mod.update(db, cid, protocol={"cadence_nights": 3, "notes": "x"})
+    assert camp_mod.sequence_of(camp_mod.get(db, cid)) is None
+    assert camp_mod.protocol_get(camp_mod.get(db, cid),
+                                 "cadence_nights") == 3
+
+
+def test_the_project_sequence_wins_and_the_panel_knows_which_one(tmp_path):
+    # Precedence: a project that built its own sequence measures with it
+    # (it was made for that object and that field); the campaign's is the
+    # fallback, and the caller is TOLD which one it got.
+    from nightscribe.core import campaign as camp_mod
+    camp = {"protocol": {"sequence": _sequence(5)}}
+    own = {"sequence": _sequence(2)}
+    got, source = camp_mod.sequence_for_project(own, camp)
+    assert source == "project" and len(got["entries"]) == 2
+    got, source = camp_mod.sequence_for_project({}, camp)
+    assert source == "campaign" and len(got["entries"]) == 5
+    got, source = camp_mod.sequence_for_project({}, {})
+    assert got is None and source is None
+    # a project context with a sequence dict but no entries is not a
+    # sequence: it must not shadow the campaign's
+    got, source = camp_mod.sequence_for_project({"sequence": {"entries": []}},
+                                                camp)
+    assert source == "campaign"
+
+
+def test_editing_a_campaign_does_not_lose_its_shared_sequence(tmp_path):
+    # The editor writes its own protocol keys; the sequence lives in the
+    # same dict and must survive the round trip (this is a real loss that
+    # was there before E5b: the editor replaced the whole protocol).
+    from nightscribe.core.db import Database
+    from nightscribe.core import campaign as camp_mod
+    db = Database(tmp_path / "t.sqlite")
+    cid = camp_mod.create(db, "Watch")
+    camp_mod.set_sequence(db, cid, _sequence(3))
+    # what the editor does now: merge
+    prot = dict((camp_mod.get(db, cid).get("protocol") or {}))
+    prot.update({"cadence_nights": 7, "filters": ["V"],
+                 "comp_stars": ["C1"], "notes": "edited"})
+    camp_mod.update(db, cid, protocol=prot)
+    after = camp_mod.get(db, cid)
+    assert camp_mod.sequence_of(after) is not None
+    assert len(camp_mod.sequence_of(after)["entries"]) == 3
+    assert camp_mod.protocol_get(after, "cadence_nights") == 7

@@ -151,9 +151,71 @@ def delete(db, campaign_id):
 
 def protocol_get(camp, key, default=None):
     # @args: camp - campaign dict, key - cadence_nights | filters |
-    #        comp_stars | notes, default - when absent
+    #        comp_stars | notes | sequence, default - when absent
     # @return: the protocol value
     return (camp.get("protocol") or {}).get(key, default)
+
+
+# ---------------- the shared photometric sequence (E5b) ----------------
+#
+# A campaign is several projects observed together, and the projects of the
+# same field share the comparison stars: measuring them one by one would
+# measure the SAME stars once per project. The campaign therefore keeps one
+# full sequence (the entries with RA/Dec and bands, exactly the shape a
+# project's context holds) that its projects can measure with.
+#
+# What it is NOT: a position. Two projects of one campaign may live in
+# different fields; the sequence says WHICH stars to compare against, not
+# where the objects are. Grouping the projects by field is the pass's job
+# (E5c), and the panel always says which sequence it used.
+
+
+def sequence_of(camp):
+    # The campaign's shared sequence, or None when it has none.
+    # @args: camp - campaign dict
+    # @return: {"catalog", "entries", ...} or None
+    seq = protocol_get(camp or {}, "sequence")
+    if not isinstance(seq, dict) or not seq.get("entries"):
+        return None
+    return seq
+
+
+def set_sequence(db, campaign_id, sequence):
+    # Stores (or clears, with None) the campaign's shared sequence. The
+    # rest of the protocol is preserved: the campaign editor keeps its own
+    # keys, and losing the sequence because someone edited the notes would
+    # be exactly the kind of silent loss this project refuses.
+    # @args: sequence - a project-context sequence dict, or None
+    # @return: True when the campaign was found
+    camp = get(db, campaign_id)
+    if camp is None:
+        return False
+    prot = dict(camp.get("protocol") or {})
+    if sequence:
+        prot["sequence"] = sequence
+    else:
+        prot.pop("sequence", None)
+    return update(db, campaign_id, protocol=prot)
+
+
+def sequence_for_project(project_ctx, camp):
+    # Which sequence a project measures with, and where it came from.
+    #
+    # The PROJECT's own sequence wins: it was built for that object, on
+    # that field, with that brightness window. The campaign's is the shared
+    # fallback for a project that never built one (a NEO project planned
+    # from the ephemeris, a campaign run by a colleague). The caller is
+    # told which one it got, because the panel must say it: an observer
+    # measuring with someone else's comparison stars has the right to know.
+    # @args: project_ctx - the project's context dict, camp - campaign dict
+    # @return: (sequence or None, "project" | "campaign" | None)
+    own = (project_ctx or {}).get("sequence")
+    if isinstance(own, dict) and own.get("entries"):
+        return own, "project"
+    shared = sequence_of(camp)
+    if shared:
+        return shared, "campaign"
+    return None, None
 
 
 def projects_of(db, campaign_id, status="active"):

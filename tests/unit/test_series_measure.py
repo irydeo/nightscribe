@@ -1023,3 +1023,21 @@ def test_a_lost_target_does_not_take_the_other_with_it(tmp_path):
     assert all(p.mag is None for p in lost.points)
     assert all("unusable" in p.flags for p in lost.points)
     assert passed.status == "complete"
+
+
+def test_the_engine_builds_the_rows_a_host_persists(tmp_path):
+    # One shape for a single series and for a campaign pass: the GUI and
+    # the pass both persist this, and two copies of it would drift the
+    # moment one of them gains a column.
+    paths = _write_pass_frames(tmp_path, n=3)
+    wcs = _reference_wcs()
+    res = sm.measure_series(paths, _config(wcs, _comp_set(wcs)))
+    rows = sm.series_rows(res.points)
+    assert len(rows) == len(paths)
+    assert set(rows[0]) == {"mjd", "filter", "mag", "err", "err_internal",
+                            "mag_raw", "path", "flags", "source"}
+    assert rows[0]["source"] == "measure"
+    assert rows[0]["path"] in [str(p) for p in paths]
+    # a point without a time cannot be placed on a curve: it is not a row
+    res.points[1].mjd = None
+    assert len(sm.series_rows(res.points)) == len(paths) - 1

@@ -2644,6 +2644,14 @@ class MainWindow(QMainWindow):
         if prot.get("comp_stars"):
             lines.append(self.tr("Comparison stars: %1").replace(
                 "%1", ", ".join(prot["comp_stars"])))
+        seq = _camp.sequence_of(c)
+        if seq:
+            # the shared sequence of a pass (E5b): saying it here is the
+            # point, because a project measuring with the campaign's stars
+            # instead of its own must be able to see it
+            lines.append(self.tr("Shared sequence: %1 comparison stars"
+                                 ).replace("%1",
+                                           str(len(seq.get("entries") or []))))
         if prot.get("notes"):
             lines.append(prot["notes"])
         w.lbl_protocol.setText("\n".join(lines))

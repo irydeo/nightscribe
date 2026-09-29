@@ -1445,16 +1445,9 @@ class UfeMeasureTab(QWidget):
                                 .format(message))
 
     def _series_rows(self, points):
-        # @return: the rows the host persists (one run, one batch)
-        rows = []
-        for p in points:
-            if p.mjd is None:
-                continue
-            rows.append({"mjd": p.mjd, "filter": p.filter, "mag": p.mag,
-                         "err": p.err, "err_internal": p.err_internal,
-                         "mag_raw": p.inst, "path": p.path,
-                         "flags": list(p.flags), "source": "measure"})
-        return rows
+        # @return: the rows the host persists (one run, one batch). The
+        # shape belongs to the engine: a pass writes the same one.
+        return series_measure.series_rows(points)
 
     def _draw_series(self, points):
         # Raw + detrended, flagged points as hollow diamonds (D13/T7).

@@ -802,7 +802,47 @@
         <source>{0}: see the Δ magnitude view</source>
         <translation>{0}: se ve en la vista de Δ magnitud</translation>
     </message>
-</context>
+
+    <message>
+        <source>{0} UTC · MJD {1:.2f}–{2:.2f}</source>
+        <translation>{0} UTC · MJD {1:.2f}–{2:.2f}</translation>
+    </message>
+    <message>
+        <source>UTC · MJD {0:.1f}–{1:.1f}</source>
+        <translation>UTC · MJD {0:.1f}–{1:.1f}</translation>
+    </message>
+    <message>
+        <source>flagged points are drawn as hollow diamonds (quality gate)</source>
+        <translation>los puntos marcados se dibujan como rombos huecos (compuerta de calidad)</translation>
+    </message>
+    <message>
+        <source>some points lean on few comparison stars</source>
+        <translation>algunos puntos se apoyan en pocas comparsas</translation>
+    </message>
+    <message>
+        <source>flagged points are hidden</source>
+        <translation>los puntos marcados están ocultos</translation>
+    </message>
+    <message>
+        <source>the mean curve is a guide for the eye</source>
+        <translation>la curva media es una guía para el ojo</translation>
+    </message>
+    <message>
+        <source>calibration systematic ±{0:.3f}: wider than this window, so it is not drawn</source>
+        <translation>sistemático de calibración ±{0:.3f}: más ancho que esta ventana, así que no se dibuja</translation>
+    </message>
+    <message>
+        <source>calibration systematic ±{0:.3f} (the band)</source>
+        <translation>sistemático de calibración ±{0:.3f} (la banda)</translation>
+    </message>
+    <message>
+        <source>{0} error bars clipped: they are wider than this scale</source>
+        <translation>{0} barras de error recortadas: son más anchas que esta escala</translation>
+    </message>
+    <message>
+        <source>{0} points fall outside this window and are anchored to the edge</source>
+        <translation>{0} puntos caen fuera de esta ventana y van anclados al borde</translation>
+    </message></context>
 <context>
     <name>MainWindow</name>
     <message>

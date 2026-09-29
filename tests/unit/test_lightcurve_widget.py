@@ -532,16 +532,41 @@ def test_the_axis_says_which_magnitude_it_shows():
 
 def test_the_legend_does_not_promise_a_series_that_is_not_drawn():
     # In calibrated mode the detrended curve is not on the axis: the legend
-    # must not list it as if it were, and it must say where to find it.
+    # must not list it as if it were, and the chart must SAY where to find
+    # it (in the notes the panel shows now, not over the curve).
     _app()
     chart = LightCurveChart()
     chart.set_data(_series_payload())
     texts = _scene_texts(chart)
-    assert not any("detrended" in t.lower() and "Δ" not in t for t in texts)
-    assert any("Δ magnitude view" in t for t in texts)
+    assert not any("detrended" in t.lower() for t in texts)
+    assert any("Δ magnitude view" in n for n in chart.notes())
     chart.set_mag_mode("differential")
+    assert not any("Δ magnitude view" in n for n in chart.notes())
+    assert any("detrended" in t.lower() for t in _scene_texts(chart))
+
+
+def test_the_legend_is_a_footnote_and_the_caveats_go_to_the_notes():
+    # The observer asked twice: the legend shouted and ate a corner of the
+    # plot. It now carries one line per series (plus the template, which
+    # must not be mistaken for data) and everything else is information
+    # that belongs beside the other warnings, not over the science.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
     texts = _scene_texts(chart)
-    assert not any("Δ magnitude view" in t for t in texts)
+    # the series are still named on the chart...
+    assert any("measured" in t for t in texts)
+    # ...and nothing else is written over the curve
+    for noise in ("flagged", "clipped", "off scale", "calibration",
+                  "mean curve", "hidden"):
+        assert not any(noise in t for t in texts)
+    # the little font and the muted colour are the point, not decoration
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    from nightscribe.gui.widgets.lightcurve_widget import _FONT_LEGEND
+    legend = [it for it in chart.scene().items()
+              if isinstance(it, QGraphicsSimpleTextItem)
+              and "measured" in it.text()]
+    assert legend and legend[0].font().pointSize() == _FONT_LEGEND
 
 
 # ---------------- V3: the window, the wheel and the export ----------------
@@ -689,3 +714,146 @@ def test_the_export_carries_the_window_you_framed(tmp_path):
     assert plan["labels"]
     for lbl in plan["labels"]:
         assert lbl in labels
+
+
+def test_the_magnitude_axis_is_the_astronomical_way_up():
+    # The faintest at the BOTTOM, the brightest at the top: the convention
+    # of every published light curve and of the group's own tool. The sign
+    # of _map_y is the whole direction of the chart, and it was backwards
+    # (a curve of a variable star read upside down).
+    _app()
+    chart = LightCurveChart()
+    bright, faint = 12.50, 12.63
+    chart.set_data([
+        {"mjd": 60600.0, "mag": bright, "err": 0.01, "filter": "V",
+         "source": "measure", "flags": []},
+        {"mjd": 60600.5, "mag": faint, "err": 0.01, "filter": "V",
+         "source": "measure", "flags": []}])
+    y_bright = chart._map_y(bright)
+    y_faint = chart._map_y(faint)
+    assert y_bright < y_faint          # smaller scene y is higher up
+    # and the axis' own ticks follow the same rule: the brightest value of
+    # the window is labelled at the top
+    labels = _scene_texts(chart)
+    from nightscribe.core import ticks as ticks_mod
+    plan = ticks_mod.axis_plan(*chart._bounds[2:], target=5)
+    assert plan["labels"]
+    # the first label of the plan is the smallest magnitude: it must sit
+    # above the last one on screen
+    first = plan["labels"][0]
+    last = plan["labels"][-1]
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    pos = {}
+    for it in chart.scene().items():
+        if isinstance(it, QGraphicsSimpleTextItem) and it.text() in (first,
+                                                                    last):
+            pos[it.text()] = it.pos().y()
+    assert pos[first] < pos[last]
+    assert labels                     # the labels are there at all
+
+
+def test_the_wheel_zooms_around_the_cursor_the_same_way_up_or_down():
+    # The inverse mapping must follow the axis: a wheel over the top of the
+    # plot narrows towards the bright end, and over the bottom towards the
+    # faint end. Getting this wrong zooms somewhere else entirely.
+    from PySide6.QtCore import QEvent, QPointF, QPoint, Qt
+    from PySide6.QtGui import QWheelEvent
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    chart.fit_to_scene()
+    vp = chart.viewport().rect()
+    # a point near the top of the plot and one near the bottom
+    top = chart.mapFromScene(QPointF(0.0, -_scene_half()))
+    bottom = chart.mapFromScene(QPointF(0.0, _scene_half()))
+    before = chart._bounds
+    wheel = QWheelEvent(QPointF(float(top.x()), float(top.y())),
+                        QPointF(0.0, 0.0), QPoint(0, 0), QPoint(0, 120),
+                        Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+    chart.wheelEvent(wheel)
+    after_top = chart._bounds
+    # the window got narrower towards the TOP of the screen, which on this
+    # axis is the bright end (smaller magnitudes)
+    assert after_top[3] - after_top[2] < before[3] - before[2]
+    chart.reset_view()
+    wheel2 = QWheelEvent(QPointF(float(bottom.x()), float(bottom.y())),
+                         QPointF(0.0, 0.0), QPoint(0, 0), QPoint(0, 120),
+                         Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+    chart.wheelEvent(wheel2)
+    after_bottom = chart._bounds
+    # zooming at the bottom keeps more of the bright end than zooming at
+    # the top does: the two windows are genuinely different pieces
+    assert abs(after_top[2] - after_bottom[2]) > 1e-4
+    assert vp.width() > 0
+
+
+def _scene_half():
+    from nightscribe.gui.widgets.lightcurve_widget import _HALF
+    return _HALF * 0.6
+
+
+# ---------------- A3: the axis in the observer's units, and the look ----
+
+def test_the_x_axis_speaks_in_civil_time_for_one_night():
+    # A night is read in hours and a campaign's curve in dates: the span
+    # decides the shape, the same way the tick's step decides its decimals.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data([{"mjd": 60297.63 + 0.004 * i, "mag": 12.35,
+                     "err": 0.01, "filter": "V", "source": "measure",
+                     "flags": []} for i in range(20)])
+    texts = _scene_texts(chart)
+    ticks_txt = [t for t in texts if len(t) == 5 and t[2] == ":"]
+    assert len(ticks_txt) >= 2                 # HH:MM on the axis
+    note = [t for t in texts if "MJD" in t]
+    assert note and "UTC" in note[0]
+    # the note carries the civil date AND the Julian number a report wants
+    assert "60297.6" in note[0]
+
+
+def test_the_x_axis_speaks_in_dates_when_the_curve_spans_months():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data([{"mjd": 60297.6 + 40.0 * i, "mag": 12.35,
+                     "err": 0.01, "filter": "V", "source": "measure",
+                     "flags": []} for i in range(20)])
+    texts = _scene_texts(chart)
+    # months and years, never a bare Julian number
+    assert any(t.endswith("2024") or t.endswith("2025") for t in texts)
+    assert not any(len(t) == 5 and t[2] == ":" for t in texts)
+
+
+def test_the_month_name_follows_the_application_language(monkeypatch):
+    # strftime follows the SYSTEM locale: a Spanish machine would print
+    # "dic" inside an English interface, and a figure that mixes languages
+    # is a figure nobody trusts.
+    _app()
+    import nightscribe.gui.pretty as pretty
+    for lang, expected in (("es", "dic"), ("en", "Dec")):
+        monkeypatch.setattr(pretty, "ui_lang", lambda lang=lang: lang)
+        chart = LightCurveChart()
+        chart.set_data([{"mjd": 60297.63, "mag": 12.35, "err": 0.01,
+                         "filter": "V", "source": "measure",
+                         "flags": []}])
+        assert any(expected in t for t in _scene_texts(chart))
+
+
+def test_the_plot_has_a_frame_and_not_just_a_floating_grid():
+    # A measured figure says where its scale starts: two axis lines with
+    # their short marks, over a fainter grid.
+    _app()
+    from PySide6.QtWidgets import QGraphicsLineItem
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    lines = [it for it in chart.scene().items()
+             if isinstance(it, QGraphicsLineItem)]
+    # the two axes run the whole frame, and there are mark strokes
+    long_h = [l for l in lines
+              if abs(l.line().x2() - l.line().x1()) > 900]
+    long_v = [l for l in lines
+              if abs(l.line().y2() - l.line().y1()) > 900]
+    short = [l for l in lines
+             if 5.0 <= max(abs(l.line().x2() - l.line().x1()),
+                           abs(l.line().y2() - l.line().y1())) <= 8.0]
+    assert long_h and long_v and len(short) >= 3

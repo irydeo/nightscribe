@@ -51,6 +51,21 @@ _Z_LABEL = 4.0
 # Font sizes in scene units
 _FONT_TICK = 18
 _FONT_LABEL = 22
+# The legend is a footnote, not a title: it used to be as loud as the axis
+# and it ate a corner of the plot (the observer asked for it twice).
+_FONT_LEGEND = 12
+_LEGEND_SWATCH = 24.0     # the colour line that stands for a series
+_LEGEND_PITCH = 20.0      # vertical distance between legend rows
+
+# Short month names, because strftime follows the SYSTEM locale: a chart in
+# an English interface would print "dic" for December on a Spanish machine,
+# and a figure that mixes languages is a figure nobody trusts.
+_MONTHS = {
+    "es": ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep",
+           "oct", "nov", "dic"),
+    "en": ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+           "Oct", "Nov", "Dec"),
+}
 
 # Scene half-extent: the data area is always this wide/tall, independent of
 # the data's actual span. The mapping scales the data into this box.
@@ -178,6 +193,7 @@ class LightCurveChart(ChartView):
         # piece of the curve.
         self._window = None
         self._pan_from = None    # viewport point where the current drag began
+        self._notes = []         # what the legend no longer says (see notes())
         # the window IS the pan: the base's hand-drag would also scroll the
         # view, and two pans fighting over one drag is a bug
         self.setDragMode(QGraphicsView.NoDrag)
@@ -237,10 +253,11 @@ class LightCurveChart(ChartView):
             return
         pos = self.mapToScene(event.position().toPoint())
         x0, x1, y0, y1 = self._bounds
+        # the fraction of the window under the cursor, the exact inverse of
+        # _map_x/_map_y: keeping them in step is the difference between
+        # zooming where the cursor is and zooming somewhere else
         fx = (pos.x() + _HALF) / (2 * _HALF) if x1 > x0 else 0.5
-        # the magnitude axis is inverted on screen, so the fraction counts
-        # from the top (the window's y0) downwards
-        fy = (_HALF - pos.y()) / (2 * _HALF) if y1 > y0 else 0.5
+        fy = (pos.y() + _HALF) / (2 * _HALF) if y1 > y0 else 0.5
         axes = "both"
         if event.modifiers() & Qt.ShiftModifier:
             axes = "x"
@@ -829,12 +846,72 @@ class LightCurveChart(ChartView):
         return -_HALF + (mjd - lo) / (hi - lo) * 2 * _HALF
 
     def _map_y(self, mag):
-        # @args: mag - float
-        # @return: scene y coordinate (inverted: brighter = lower y)
+        # The magnitude axis, the astronomical way: the FAINTEST (the big
+        # number) at the bottom and the brightest at the top.
+        #
+        # The sign of this formula is the whole direction of the chart, and
+        # it was the other way round: a variable star's curve read upside
+        # down against every published light curve and against the group's
+        # own tool, whose plotY(m) puts the bright end on top. The grid
+        # used to carry its own copy of the formula, which is exactly how
+        # the ticks and the points can end up disagreeing; now there is one
+        # rule and everything comes through here.
+        # @args: mag - the magnitude on the current axis (see _plot_mag)
+        # @return: scene y coordinate
         _, _, lo, hi = self._bounds
         if hi == lo:
             return 0.0
-        return _HALF - (mag - lo) / (hi - lo) * 2 * _HALF
+        return -_HALF + (mag - lo) / (hi - lo) * 2 * _HALF
+
+    def _x_tick_label(self, mjd):
+        # An X tick in the units the observer lives in: the civil date and
+        # time the frame was taken (UTC), not the Julian number.
+        #
+        # The SPAN decides the shape the same way the tick's step decides
+        # its decimals: a night is read in hours, a run of nights in dates
+        # and a project's curve in months. Folded charts are phases and
+        # keep their plain numbers (there is no date in a phase).
+        # @args: mjd - the tick's value
+        # @return: the label text
+        if self._fold_p:
+            return "%.2f" % float(mjd)
+        from ...core import coords, variables
+        dt = coords.datetime_from_jd(float(mjd) + variables.MJD0)
+        span = self._bounds[1] - self._bounds[0]
+        if span <= 1.2:                    # one night, with slack
+            return dt.strftime("%H:%M")
+        if span <= 40.0:                   # a few nights
+            return "{} {}".format(dt.day, self._month(dt))
+        return "{} {}".format(self._month(dt), dt.year)
+
+    def _month(self, dt):
+        # @args: dt - a datetime
+        # @return: its short month name in the app's language (never the
+        #          system's, see _MONTHS)
+        from ..pretty import ui_lang
+        return _MONTHS[ui_lang()][dt.month - 1]
+
+    def _x_axis_note(self):
+        # What the X axis means, in one line under it: the civil date the
+        # observation happened on and the MJD a report asks for, so nobody
+        # has to convert by hand (folded charts carry no date).
+        # @return: the note, or "" when there is nothing to say
+        if self._fold_p or not self._points:
+            return ""
+        from ...core import coords, variables
+        x0, x1 = float(self._bounds[0]), float(self._bounds[1])
+        d0 = coords.datetime_from_jd(x0 + variables.MJD0)
+        d1 = coords.datetime_from_jd(x1 + variables.MJD0)
+        if (x1 - x0) <= 1.2:
+            if d0.date() == d1.date():
+                days = "{} {} {}".format(d0.day, self._month(d0), d0.year)
+            else:
+                # a night that crosses midnight says both days
+                days = "{} → {} {} {}".format(d0.day, d1.day,
+                                              self._month(d1), d1.year)
+            return self.tr("{0} UTC · MJD {1:.2f}–{2:.2f}").format(
+                days, x0, x1)
+        return self.tr("UTC · MJD {0:.1f}–{1:.1f}").format(x0, x1)
 
     def _build_scene(self):
         self.clear()
@@ -890,9 +967,11 @@ class LightCurveChart(ChartView):
         # flagged ones as hollow diamonds, the bars clipped and the
         # calibration systematic as a band (quality plan, phase A)
         flagged_seen, caveat_seen, syst, syst_all = self._draw_points()
-        # legend: one entry per (filter, source) series the data has
-        self._add_legend(has_overlay, flagged_seen, syst, caveat_seen,
-                         syst_all)
+        # legend: one entry per (filter, source) series the data has; the
+        # rest of what it used to say becomes the panel's notes
+        self._add_legend(has_overlay)
+        self._notes = self._build_notes(flagged_seen, caveat_seen, syst,
+                                        syst_all, has_overlay)
 
     def _systematic(self, p):
         # The part of a point's error that is NOT its own photons: the
@@ -957,7 +1036,7 @@ class LightCurveChart(ChartView):
             rect = QGraphicsRectItem(-_HALF, top - half, 2 * _HALF,
                                       (bottom - top) + 2 * half)
             fill = QColor(palette.MUTED)
-            fill.setAlpha(46)
+            fill.setAlpha(26)
             rect.setBrush(QBrush(fill))
             rect.setPen(QPen(Qt.NoPen))
             rect.setZValue(_Z_SYSTEM)
@@ -1051,7 +1130,11 @@ class LightCurveChart(ChartView):
         item = QGraphicsEllipseItem(x - radius, y - radius,
                                     radius * 2, radius * 2)
         item.setBrush(QBrush(colour if filled else QColor(palette.BG)))
-        item.setPen(pen or QPen(colour, width))
+        # a filled point gets a thin dark edge: it separates it from the
+        # background and from its neighbours in a dense cloud, which is
+        # what makes a scatter read as measurements instead of smudges
+        item.setPen(pen or QPen(QColor(palette.BG) if filled else colour,
+                                width))
         item.setZValue(z)
         self.add_item(item)
         return item
@@ -1105,7 +1188,7 @@ class LightCurveChart(ChartView):
                     if off:
                         self._over_note += 1
                     colour, filled = _point_style(p)
-                    radius = 6.0
+                    radius = 4.6
                     if excluded:
                         # out of the curve but ON the chart: a grey cross,
                         # never a silent deletion
@@ -1125,7 +1208,7 @@ class LightCurveChart(ChartView):
                             caveat_seen = True
                         if selected:
                             pen = QPen(QColor(palette.FG), 2.0)
-                            radius = 8.0
+                            radius = 6.4
                         self._dot(x, y_draw, radius, colour,
                                   filled=filled and not selected, pen=pen,
                                   width=1.5, z=_Z_DATA)
@@ -1136,7 +1219,9 @@ class LightCurveChart(ChartView):
                                 x - radius - 2, y_draw - radius - 2,
                                 (radius + 2) * 2, (radius + 2) * 2)
                             ring.setBrush(QBrush(Qt.NoBrush))
-                            ring.setPen(QPen(QColor(palette.FG), 1.2))
+                            halo = QColor(palette.ACCENT)
+                            halo.setAlpha(210)
+                            ring.setPen(QPen(halo, 1.4))
                             ring.setZValue(_Z_DATA + 0.1)
                             self.add_item(ring)
                     err = self._bar_error(p) if self._show_errors else None
@@ -1149,7 +1234,7 @@ class LightCurveChart(ChartView):
                 y_draw, _off = self._clipped_y(self._map_y(q["mag"]))
                 colour = _point_style({"filter": _band,
                                        "source": _src})[0]
-                self._dot(x, y_draw, 4.6, colour, filled=True, width=0.8,
+                self._dot(x, y_draw, 3.8, colour, filled=True, width=0.8,
                           z=_Z_DATA + 0.5)
                 if self._show_errors and q["err"] and span > 0.0:
                     self._draw_error_bar(x, y_draw, q["err"], span, colour,
@@ -1215,7 +1300,7 @@ class LightCurveChart(ChartView):
         if ey > clip:
             ey = clip
             self._clip_note += 1
-        pen = QPen(colour, 1.0)
+        pen = QPen(colour, 0.8)
         pen.setColor(QColor(colour.red(), colour.green(), colour.blue(),
                             int(255 * alpha)))
         bar = QGraphicsLineItem(x, y - ey, x, y + ey)
@@ -1225,7 +1310,7 @@ class LightCurveChart(ChartView):
         # caps: the small horizontal strokes that make an error bar a
         # measurement instead of a line
         for yy in (y - ey, y + ey):
-            cap = QGraphicsLineItem(x - 3.0, yy, x + 3.0, yy)
+            cap = QGraphicsLineItem(x - 2.2, yy, x + 2.2, yy)
             cap.setPen(pen)
             cap.setZValue(_Z_ERROR)
             self.add_item(cap)
@@ -1239,8 +1324,8 @@ class LightCurveChart(ChartView):
             return
         colour, _filled = _point_style({"filter": band, "source": src})
         pts = [(self._map_x(mjd), self._map_y(mag)) for mjd, mag in smooth]
-        for width, pen_colour in ((4.2, QColor(palette.BG)),
-                                  (2.0, colour)):
+        for width, pen_colour in ((3.2, QColor(palette.BG)),
+                                  (1.6, colour)):
             pen = QPen(pen_colour, width)
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)
@@ -1258,7 +1343,7 @@ class LightCurveChart(ChartView):
         #          dashed for quick-look and survey (mirrors the PNG)
         colour, _filled = _point_style(
             {"filter": band, "source": source, "mjd": 0, "mag": 0})
-        pen = QPen(colour, 1.4)
+        pen = QPen(colour, 1.1)
         if (source or "manual").startswith("survey") or source == "quicklook":
             pen.setStyle(Qt.DashLine)
         return pen
@@ -1292,65 +1377,32 @@ class LightCurveChart(ChartView):
                     line.setZValue(_Z_LINK)
                     self.add_item(line)
 
-    def _add_legend(self, has_template, flagged=False, systematic=None,
-                    caveat=False, systematic_all=None):
-        # @args: has_template - whether the schematic overlay is drawn,
-        #        flagged - whether any point carries a DATA flag,
-        #        systematic - the tallest calibration band drawn (mag),
-        #        caveat - whether any point leans on few comps,
-        #        systematic_all - the largest systematic seen, band or not
-        # Draws a compact legend in the bottom-right of the data area
-        # (same corner as sky_widget); entries mirror the PNG export so
-        # the two renderers cannot disagree (B4).
+    def _add_legend(self, has_template):
+        # The chart's legend, kept to the MINIMUM: one short line per
+        # series drawn, plus the template when one is on screen (a dashed
+        # reference curve with no label would be a curve the reader might
+        # take for data).
+        #
+        # Everything else it used to carry (flagged counts, caveats,
+        # clipped bars, points off scale, the calibration band, the hidden
+        # detrended curve) is information, not a label: `notes()` hands it
+        # to the panel, where a reader meets it next to the other warnings
+        # instead of over the science. It is smaller and muted on purpose:
+        # the curve is the subject, the legend is a footnote.
+        # @args: has_template - whether a reference curve is drawn
+        # @return: None
         from PySide6.QtGui import QFontMetricsF
         entries = []
         if has_template:
             entries.append(
                 (self.tr("schematic (sawtooth)") if self._fold_p
                  else self.tr("Typical template"), QColor(palette.MUTED)))
-        if flagged:
-            entries.append((self.tr("flagged (quality gate)"),
-                            QColor(FLAG_COLOUR)))
-        if caveat:
-            entries.append((self.tr("few comps (calibration leans on few)"),
-                            QColor(FLAG_COLOUR)))
-        if self._hide_flagged:
-            entries.append((self.tr("flagged points hidden"),
-                            QColor(palette.MUTED)))
-        if systematic_all and not systematic:
-            # the systematic is wider than the window: draw nothing (it
-            # would fill the panel) and SAY it
-            entries.append((self.tr("calibration ±{0:.3f} (wider than this "
-                                    "window)").format(systematic_all),
-                            QColor(palette.MUTED)))
-        elif systematic:
-            entries.append((self.tr("calibration systematic ±{0:.3f}")
-                            .format(systematic), QColor(palette.MUTED)))
-        if self._has_mean:
-            entries.append((self.tr("mean curve (guide for the eye)"),
-                            QColor(palette.MUTED)))
-        if self._clip_note:
-            entries.append((self.tr("{0} bars clipped (error ≫ scale)")
-                            .format(self._clip_note),
-                            QColor(palette.MUTED)))
-        if self._over_note:
-            entries.append((self.tr("{0} points off scale").format(
-                self._over_note), QColor(palette.DANGER)))
-        # one entry per (band, source) series: human labels, so the
-        # observer sees "Pasted data", "From file", "Survey · ALeRCE/ZTF"
         seen = set()
-        hidden = []
         for p in self._points:
             src = p.get("source") or "manual"
             key = (p.get("filter"), src)
             if self._plot_mag(p) is None:
-                # not on THIS axis: an entry would promise the reader a
-                # series that is not there. It is named below, with where
-                # to see it, because a curve that disappears without a word
-                # is worse than a curve that is not drawn.
-                if key not in seen and src not in hidden:
-                    hidden.append(src)
-                continue
+                continue          # not on this axis: not in the legend
             if key in seen:
                 continue
             seen.add(key)
@@ -1358,49 +1410,102 @@ class LightCurveChart(ChartView):
                     + " · " + self.source_label(src))
             colour, _filled = _point_style(p)
             entries.append((text, colour))
-        if hidden:
-            entries.append((self.tr("{0}: see the Δ magnitude view").format(
-                ", ".join(self.source_label(src) for src in hidden)),
-                QColor(palette.MUTED)))
         if not entries:
             return
-        fmt = QFont(self._label_font) if hasattr(self, "_label_font") else QFont()
-        if not hasattr(self, "_label_font"):
-            fmt.setPointSize(_FONT_TICK)
+        fmt = QFont(self._label_font) if hasattr(self, "_label_font") \
+            else QFont()
+        fmt.setPointSize(_FONT_LEGEND)
         fm = QFontMetricsF(fmt)
         rows = [(text, color, fm.horizontalAdvance(text))
                 for text, color in entries]
         text_w = max(row[2] for row in rows)
-        sw = 60            # swatch length
-        gap = 16           # swatch -> text gap
-        pad = 16           # backdrop padding
-        row_h = 44         # vertical pitch between rows
-        right = _HALF - 12
+        sw = _LEGEND_SWATCH          # swatch length
+        gap = 8                      # swatch -> text gap
+        pad = 8                      # backdrop padding
+        row_h = _LEGEND_PITCH        # vertical pitch between rows
+        right = _HALF - 10
         text_x = right - text_w
         sw_x = text_x - gap - sw
-        top = _HALF - 12 - row_h * len(entries)
-        for i, (text, color, _w) in enumerate(rows):
-            cy = top + i * row_h + row_h / 2.0
-            line = QGraphicsLineItem(sw_x, cy, sw_x + sw, cy)
-            line.setPen(QPen(color, 1.8))
-            line.setZValue(_Z_LABEL)
-            self.add_item(line)
-            lb = QGraphicsSimpleTextItem(text)
-            lb.setBrush(QBrush(QColor(palette.FG)))
-            lb.setFont(fmt)
-            lb.setPos(text_x, cy - fm.height() / 2.0)
-            lb.setZValue(_Z_LABEL)
-            self.add_item(lb)
-        # soft dark backdrop above the grid/data, below the swatches
-        x0 = sw_x - pad
-        y0 = top - pad
-        w = (right - sw_x) + 2 * pad
-        h = row_h * len(entries) + 2 * pad
-        bg = QGraphicsRectItem(x0, y0, w, h)
-        bg.setBrush(QBrush(QColor(11, 13, 23, 210)))
+        top = _HALF - 10 - row_h * len(entries)
+        # a very faint backdrop, only as much as keeps the text readable
+        # over a dense cloud of points
+        bg = QGraphicsRectItem(sw_x - pad, top - pad,
+                               (right - sw_x) + 2 * pad,
+                               row_h * len(entries) + 2 * pad)
+        bg.setBrush(QBrush(QColor(11, 13, 23, 110)))
         bg.setPen(Qt.NoPen)
         bg.setZValue(_Z_LABEL - 0.5)
         self.add_item(bg)
+        for i, (text, color, _w) in enumerate(rows):
+            cy = top + i * row_h + row_h / 2.0
+            line = QGraphicsLineItem(sw_x, cy, sw_x + sw, cy)
+            line.setPen(QPen(color, 1.3))
+            line.setZValue(_Z_LABEL)
+            self.add_item(line)
+            lb = QGraphicsSimpleTextItem(text)
+            # muted, not foreground: the legend is a footnote to the curve
+            lb.setBrush(QBrush(QColor(palette.MUTED)))
+            lb.setFont(fmt)
+            lb.setPos(text_x, cy - row_h * 0.42)
+            lb.setZValue(_Z_LABEL)
+            self.add_item(lb)
+
+    def _build_notes(self, flagged, caveat, systematic, systematic_all,
+                     has_template):
+        # The chart's own caveats, in plain language, for somebody else to
+        # show: everything the scene used to spell out in its corner.
+        #
+        # They live in the chart and not in the panel because only the
+        # chart knows what it actually drew (how many bars it had to clip,
+        # how many points fell outside its window, which series the axis
+        # left out), and the panel should not have to re-derive it.
+        # @args: what _draw_points and _build_scene counted
+        # @return: [str, ...]
+        out = []
+        if flagged:
+            out.append(self.tr("flagged points are drawn as hollow "
+                               "diamonds (quality gate)"))
+        if caveat:
+            out.append(self.tr("some points lean on few comparison stars"))
+        if self._hide_flagged:
+            out.append(self.tr("flagged points are hidden"))
+        if self._has_mean:
+            out.append(self.tr("the mean curve is a guide for the eye"))
+        if systematic_all and not systematic:
+            out.append(self.tr("calibration systematic ±{0:.3f}: wider than "
+                               "this window, so it is not drawn"
+                               ).format(systematic_all))
+        elif systematic:
+            out.append(self.tr("calibration systematic ±{0:.3f} (the band)"
+                               ).format(systematic))
+        if self._clip_note:
+            out.append(self.tr("{0} error bars clipped: they are wider than "
+                               "this scale").format(self._clip_note))
+        if self._over_note:
+            out.append(self.tr("{0} points fall outside this window and are "
+                               "anchored to the edge").format(
+                                   self._over_note))
+        hidden = []
+        for p in self._points:
+            if self._plot_mag(p) is None:
+                src = p.get("source") or "manual"
+                label = self.source_label(src)
+                if label not in hidden:
+                    hidden.append(label)
+        if hidden:
+            out.append(self.tr("{0}: see the Δ magnitude view").format(
+                ", ".join(hidden)))
+        return out
+
+    def notes(self):
+        # What the chart no longer writes over the science: the counts and
+        # caveats a reader needs, in the chart's own language, for the
+        # caller to show wherever a reader meets them (the panel's summary,
+        # a report). They are rebuilt with the scene, so they always
+        # describe what is on screen.
+        # @return: [str, ...], possibly empty
+        return list(self._notes)
+
 
     def _draw_grid(self):
         # The grid and its labels (quality plan, A1).
@@ -1415,10 +1520,23 @@ class LightCurveChart(ChartView):
         b = self._bounds
         x_span = b[1] - b[0]
         y_span = b[3] - b[2]
-        pen = QPen(QColor(palette.MUTED), 0.8)
-        pen.setStyle(Qt.DotLine)
+        grid_pen = QPen(QColor(palette.MUTED), 0.8)
+        grid_pen.setStyle(Qt.DotLine)
+        faint = QColor(palette.MUTED)
+        faint.setAlpha(70)
+        grid_pen.setColor(faint)
+        axis_pen = QPen(QColor(palette.MUTED), 1.4)
         x_plan = ticks.axis_plan(b[0], b[1], target=6)
         y_plan = ticks.axis_plan(b[2], b[3], target=5)
+        # the frame: two axes and their short marks, the way a measured
+        # figure is drawn. A floating dotted grid alone made the plot read
+        # as a draft: the eye needs to know where the scale starts.
+        for x0, y0, x1, y1 in ((-_HALF, -_HALF, -_HALF, _HALF),
+                               (-_HALF, _HALF, _HALF, _HALF)):
+            line = QGraphicsLineItem(x0, y0, x1, y1)
+            line.setPen(axis_pen)
+            line.setZValue(_Z_GRID + 0.1)
+            self.add_item(line)
         # X grid lines: the tick's own x, not an even division
         for tv, label in zip(x_plan["ticks"] + [x_plan["offset"]],
                              x_plan["labels"] + [""]):
@@ -1426,25 +1544,39 @@ class LightCurveChart(ChartView):
                 break
             x = -_HALF + (tv - b[0]) / x_span * 2 * _HALF
             line = QGraphicsLineItem(x, -_HALF, x, _HALF)
-            line.setPen(pen)
+            line.setPen(grid_pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            if label:
-                self._tick_label(label, x - 20, _HALF + 10)
+            mark = QGraphicsLineItem(x, _HALF, x, _HALF + 7)
+            mark.setPen(axis_pen)
+            mark.setZValue(_Z_GRID + 0.1)
+            self.add_item(mark)
+            text = self._x_tick_label(tv) if not self._fold_p else label
+            if text:
+                self._tick_label(text, x - 22, _HALF + 14)
         # Y grid lines (inverted axis: brighter on top)
         for tv, label in zip(y_plan["ticks"], y_plan["labels"]):
             if y_span <= 0.0:
                 break
-            y = _HALF - (tv - b[2]) / y_span * 2 * _HALF
+            y = self._map_y(tv)          # one rule, never a copy
             line = QGraphicsLineItem(-_HALF, y, _HALF, y)
-            line.setPen(pen)
+            line.setPen(grid_pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            self._tick_label(label, -_HALF - 60, y - 8)
+            mark = QGraphicsLineItem(-_HALF - 7, y, -_HALF, y)
+            mark.setPen(axis_pen)
+            mark.setZValue(_Z_GRID + 0.1)
+            self.add_item(mark)
+            self._tick_label(label, -_HALF - 62, y - 8)
         # the factored-out constant, said once (never hidden)
         if y_plan["offset_label"]:
             self._tick_label(y_plan["offset_label"], -_HALF - 60, -_HALF - 26)
-        if x_plan["offset_label"]:
+        note_x = self._x_axis_note()
+        if note_x:
+            # the corner note: the civil date the night happened on and the
+            # MJD a report would ask for. Nobody should convert by hand.
+            self._tick_label(note_x, -_HALF, _HALF + 34)
+        elif x_plan["offset_label"]:
             self._tick_label(x_plan["offset_label"], _HALF - 40, _HALF + 30)
         # WHAT the numbers are: the mode, and on a differential axis the
         # level they count from. A reader must never have to guess whether

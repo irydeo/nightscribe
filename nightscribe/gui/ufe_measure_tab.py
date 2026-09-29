@@ -1428,6 +1428,11 @@ class UfeMeasureTab(QWidget):
             lines.append("⚠ " + self.tr(
                 "{0} frame(s) had no DATE-OBS and were not timed: they "
                 "are not on the curve").format(n_frames))
+        # what the chart used to write over the curve (the legend's
+        # caveats) is shown here instead: the chart says it, the panel
+        # shows it, and neither invents it (see LightCurveChart.notes)
+        for note in self.chart_series.notes():
+            lines.append("· " + note)
         errors = result.errors or {}
         if errors:
             lines.append("⚠ " + self.tr(

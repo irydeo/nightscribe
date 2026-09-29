@@ -802,7 +802,47 @@
         <source>{0}: see the Δ magnitude view</source>
         <translation>{0}: see the Δ magnitude view</translation>
     </message>
-</context>
+
+    <message>
+        <source>{0} UTC · MJD {1:.2f}–{2:.2f}</source>
+        <translation>{0} UTC · MJD {1:.2f}–{2:.2f}</translation>
+    </message>
+    <message>
+        <source>UTC · MJD {0:.1f}–{1:.1f}</source>
+        <translation>UTC · MJD {0:.1f}–{1:.1f}</translation>
+    </message>
+    <message>
+        <source>flagged points are drawn as hollow diamonds (quality gate)</source>
+        <translation>flagged points are drawn as hollow diamonds (quality gate)</translation>
+    </message>
+    <message>
+        <source>some points lean on few comparison stars</source>
+        <translation>some points lean on few comparison stars</translation>
+    </message>
+    <message>
+        <source>flagged points are hidden</source>
+        <translation>flagged points are hidden</translation>
+    </message>
+    <message>
+        <source>the mean curve is a guide for the eye</source>
+        <translation>the mean curve is a guide for the eye</translation>
+    </message>
+    <message>
+        <source>calibration systematic ±{0:.3f}: wider than this window, so it is not drawn</source>
+        <translation>calibration systematic ±{0:.3f}: wider than this window, so it is not drawn</translation>
+    </message>
+    <message>
+        <source>calibration systematic ±{0:.3f} (the band)</source>
+        <translation>calibration systematic ±{0:.3f} (the band)</translation>
+    </message>
+    <message>
+        <source>{0} error bars clipped: they are wider than this scale</source>
+        <translation>{0} error bars clipped: they are wider than this scale</translation>
+    </message>
+    <message>
+        <source>{0} points fall outside this window and are anchored to the edge</source>
+        <translation>{0} points fall outside this window and are anchored to the edge</translation>
+    </message></context>
 <context>
     <name>MainWindow</name>
     <message>

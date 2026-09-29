@@ -77,10 +77,22 @@ def _settle(d, turns=16):
 
 
 def _chrome(d):
-    # @return: (top bar, work area, bottom strip) heights in pixels
+    # The four heights the window spends on chrome, found by IDENTITY and
+    # not by index: this layout has already changed twice (the object's row
+    # went, the status line arrived) and an index-based measurement would
+    # have been measuring the wrong widget both times.
+    # @return: (top bar, work area, histogram strip, status line) in px
     lay = d.layout()
-    return (lay.itemAt(0).geometry().height(), d.splitter.height(),
-            lay.itemAt(lay.count() - 1).geometry().height())
+    bar = strip = status = 0
+    for i in range(lay.count()):
+        item = lay.itemAt(i)
+        if item.layout() is not None:
+            bar = item.geometry().height()
+        elif item.widget() is d.hist_section:
+            strip = item.geometry().height()
+        elif item.widget() is d._ui.lbl_status_bar:
+            status = item.geometry().height()
+    return bar, d.splitter.height(), strip, status
 
 
 def test_the_work_area_owns_the_extra_height():
@@ -99,14 +111,26 @@ def test_the_work_area_owns_the_extra_height():
     # halfway through that is measuring the platform, not the layout.
     _app()
     d = _dialog(1500, 1000, _OBJECT)
-    bar, work, strip = _chrome(d)
+    bar, work, strip, status = _chrome(d)
     assert bar <= 40                    # the bar's own size, not a share
     assert strip <= 130                 # the strip with its fold header
+    assert status <= 30                 # one line, and it stays one line
     # the work area is what remains, within the window's own margins
-    slack = d.height() - (bar + work + strip)
-    assert 0 <= slack <= 40, (work, d.height(), bar, strip, slack)
+    slack = d.height() - (bar + work + strip + status)
+    assert 0 <= slack <= 40, (work, d.height(), bar, strip, status, slack)
     if d.height() >= 990:
-        assert work >= 0.80 * d.height()
+        # The history of this number, so it is not a goalpost moved in
+        # silence: 697 px (70 %) before U1; 820 (82 %) once the bar stopped
+        # growing and the strip got compact; 794-803 (79.4-80.3 %) now that
+        # the status line has arrived, 23 px spent on purpose (U4: one
+        # place for the messages instead of four).
+        #
+        # The floor is 78 % and not 80: the exact figure moves a point with
+        # the FONT METRICS the environment happens to have (this test
+        # measured 80.3 % alone and 79.4 % in a full run, with everything
+        # else identical). The invariant above is the real acceptance: the
+        # work area owns everything the chrome does not need.
+        assert work >= 0.78 * d.height()
     d.close()
 
 
@@ -150,16 +174,16 @@ def test_the_histogram_strip_folds_and_remembers_it():
     for _ in range(2):
         QApplication.processEvents()
     assert d.hist_section.isCollapsed()
-    bar, work, strip = _chrome(d)
+    bar, work, strip, status = _chrome(d)
     assert strip <= 30                        # a header, nothing else
-    assert work >= 0.90 * 1000
+    assert work >= 0.89 * d.height()          # 89 % with the strip folded
     # the choice is written down...
     assert bool(config.get("ufe_histogram_folded", 0)) is True
     d.close()
     # ...and the next window comes as it was left
     again = _dialog(1500, 1000, _OBJECT)
     assert again.hist_section.isCollapsed()
-    assert _chrome(again)[1] >= 0.90 * 1000
+    assert _chrome(again)[1] >= 0.89 * d.height()
     again.close()
 
 
@@ -168,7 +192,9 @@ def test_the_object_is_painted_over_the_plate_not_a_row_of_the_window():
     # of the picture: the object belongs to the image.
     _app()
     d = _dialog(1500, 1000)
-    assert d.layout().count() == 3            # bar, work area, strip: no row
+    # the top bar, the work area, the histogram's section and the status
+    # line: four items, and NOT one of them is an object row
+    assert d.layout().count() == 4
     assert d.view.title_line() == ""          # nothing attached, no line
     d.set_object(_OBJECT)
     line = d.view.title_line()
@@ -250,4 +276,79 @@ def test_the_panel_keeps_only_what_is_touched_while_measuring():
     # and every knob is still there, one click away
     assert all(getattr(d.tab_measure, n, None) is not None
                for n in _CHART_KNOBS)
+    d.close()
+
+
+# ---------------- U4: one place for the messages ----------------------
+
+def test_a_tab_message_lands_in_the_window_s_own_line():
+    # The tabs said things in labels of their own (four windows, four
+    # places, none of them where an observer looks). They still keep their
+    # own record — fifty-odd tests read it — but the reader reads the line
+    # at the bottom.
+    _app()
+    d = _dialog(1400, 900, _OBJECT)
+    tab = d.tab_measure
+    tab._say("Serie medida: 142 puntos")
+    QApplication.processEvents()
+    bar = d._ui.lbl_status_bar
+    assert "Serie medida: 142 puntos" in bar.text()
+    assert bar.text().startswith("ⓘ")
+    assert d.status_text() == "Serie medida: 142 puntos"
+    # the tab's own label is still the record (and takes no room)
+    assert tab.lbl_status.text() == "Serie medida: 142 puntos"
+    assert not tab.lbl_status.isVisible()
+    d.close()
+
+
+def test_a_warning_looks_like_a_warning():
+    # A message that already carries the ⚠ keeps it, and an explicit level
+    # is obeyed: the glyph is read before the text is.
+    _app()
+    d = _dialog(1400, 900, _OBJECT)
+    d.tab_measure._say("⚠ 4 frames heredaron la alineación")
+    QApplication.processEvents()
+    assert d._ui.lbl_status_bar.text().startswith("⚠")
+    d.set_status("La serie falló: negative dimensions", "error")
+    assert d._ui.lbl_status_bar.text().startswith("✕")
+    d.close()
+
+
+def test_a_long_message_is_elided_and_never_eats_the_plate():
+    # A message that wraps grows the window and costs the plate its height:
+    # the line is ONE line, elided, with the whole text in the tooltip, and
+    # the work area does not move.
+    _app()
+    d = _dialog(1200, 900, _OBJECT)
+    work_before = d.splitter.height()
+    long_text = ("Serie: 142 puntos de 142 tomas · " + "muy largo " * 40)
+    d.set_status(long_text)
+    for _ in range(3):
+        QApplication.processEvents()
+    bar = d._ui.lbl_status_bar
+    assert bar.height() <= 22
+    assert d.status_text() == long_text          # kept whole for the reader
+    assert bar.toolTip() == long_text            # and reachable
+    assert len(bar.text()) < len(long_text)      # elided, not wrapped
+    # the plate did not move: a re-elide can reflow the layout by a pixel,
+    # and one pixel is not "eating the plate" (a wrapping message would
+    # move it by tens)
+    assert abs(d.splitter.height() - work_before) <= 2
+    d.close()
+
+
+def test_the_status_line_re_elides_on_resize_without_looping():
+    # The elide depends on the width, so a resize must redo it; an
+    # unguarded version of that looped until the process was killed by
+    # memory (a label that changes its text re-lays the window out). This
+    # test is a loop on purpose: if the guard goes, it hangs or dies here.
+    _app()
+    d = _dialog(1400, 900, _OBJECT)
+    d.set_status("Serie: 142 puntos de 142 tomas, 4 heredadas")
+    for width in (600, 1500, 800, 1200):
+        d.resize(width, 900)
+        for _ in range(2):
+            QApplication.processEvents()
+        assert "Serie" in d._ui.lbl_status_bar.text()
+    assert d.status_text() == "Serie: 142 puntos de 142 tomas, 4 heredadas"
     d.close()

@@ -28,7 +28,7 @@
     </layout>
    </item>
    <item><widget class="QPushButton" name="btn_prepare"><property name="text"><string>Prepare pair</string></property></widget></item>
-   <item><widget class="QLabel" name="lbl_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QLabel" name="lbl_status"><property name="visible"><bool>false</bool></property><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="row_live">
      <item><widget class="QCheckBox" name="chk_live"><property name="text"><string>Live blink</string></property><property name="checked"><bool>true</bool></property></widget></item>

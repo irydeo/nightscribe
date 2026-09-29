@@ -94,8 +94,29 @@ class UfeAnnotateTab(QWidget):
         self.btn_save = self._ui.btn_save
         self.btn_save.clicked.connect(self._save)
         self.lbl_status = self._ui.lbl_status
+        self._status_hook = None     # the window's single status line (U4)
 
     # ------------------------------------------------------- activation
+
+    def set_status_hook(self, fn):
+        # The window takes the messages (U4): its bottom line is where a
+        # reader looks. The tab's own label stays as a record (hidden), so
+        # everything that reads it keeps working.
+        # @args: fn - callable(text, level) or None
+        # @return: None
+        self._status_hook = fn
+
+    def _say(self, text, level=None):
+        # Says one thing: to this tab's record AND to the window.
+        # @args: text - the message, level - "info" | "warn" | "error"
+        #        (None: inferred from the ⚠ the message already carries)
+        # @return: None
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
+        self.lbl_status.setText(text)      # the tab's own record (hidden)
+        if self._status_hook is not None:
+            self._status_hook(text, level)
 
     def set_active(self, flag):
         # The dialog calls this on tab switches: only the visible tab owns
@@ -154,7 +175,7 @@ class UfeAnnotateTab(QWidget):
         if has:
             w, h = self._state.plate_shape
             self._marker = [w / 2.0, h / 2.0]     # data coords
-            self.lbl_status.setText("")
+            self._say("")
         else:
             self._marker = None
         self._refresh_marker()
@@ -369,6 +390,6 @@ class UfeAnnotateTab(QWidget):
             return
         logger.info("annotated FITS written: %s", written)
         self._notify_saved(written)
-        self.lbl_status.setText(
+        self._say(
             self.tr("Saved {0} annotated copy(ies). Last: {1}")
             .format(len(written), written[-1]))

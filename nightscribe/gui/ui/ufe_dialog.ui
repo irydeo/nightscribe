@@ -68,6 +68,7 @@
     </widget>
    </item>
    <item><widget class="QWidget" name="ph_histogram"/></item>
+   <item><widget class="QLabel" name="lbl_status_bar"><property name="text"><string/></property><property name="toolTip"><string>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</string></property></widget></item>
   </layout>
  </widget>
  <resources/>

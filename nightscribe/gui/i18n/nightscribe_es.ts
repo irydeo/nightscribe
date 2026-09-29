@@ -7727,6 +7727,10 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>Histogram</source>
         <translation>Histograma</translation>
+    </message>
+    <message>
+        <source>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</source>
+        <translation>Lo que acaba de pasar, en una línea. El resultado de una medida se queda en su propia caja, junto a la acción que lo produjo</translation>
     </message></context>
 <context>
     <name>UfeImageView</name>

@@ -92,6 +92,7 @@ class UfeBlinkTab(QWidget):
         self.btn_prepare = self._ui.btn_prepare
         self.btn_prepare.clicked.connect(self._on_prepare)
         self.lbl_status = self._ui.lbl_status
+        self._status_hook = None     # the window's single status line (U4)
 
         self.chk_live = self._ui.chk_live
         self.chk_live.toggled.connect(self._on_live_toggled)
@@ -139,6 +140,26 @@ class UfeBlinkTab(QWidget):
 
     # ------------------------------------------------------- activation
 
+    def set_status_hook(self, fn):
+        # The window takes the messages (U4): its bottom line is where a
+        # reader looks. The tab's own label stays as a record (hidden), so
+        # everything that reads it keeps working.
+        # @args: fn - callable(text, level) or None
+        # @return: None
+        self._status_hook = fn
+
+    def _say(self, text, level=None):
+        # Says one thing: to this tab's record AND to the window.
+        # @args: text - the message, level - "info" | "warn" | "error"
+        #        (None: inferred from the ⚠ the message already carries)
+        # @return: None
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
+        self.lbl_status.setText(text)      # the tab's own record (hidden)
+        if self._status_hook is not None:
+            self._status_hook(text, level)
+
     def set_active(self, flag):
         # Only the visible tab owns the view's frame and its overlays.
         self._active = bool(flag)
@@ -172,7 +193,7 @@ class UfeBlinkTab(QWidget):
             self._drop_marker_items()
         has = self._state.has_image
         self.setEnabled(has)
-        self.lbl_status.setText(
+        self._say(
             "" if has else self.tr("Load a FITS plate first."))
 
     def _on_stretch_changed(self):
@@ -223,27 +244,27 @@ class UfeBlinkTab(QWidget):
         # Prepare pair: resolve the target and fetch the aligned PS1-g
         # reference on a worker (network stays off the GUI thread).
         if not self._state.has_image:
-            self.lbl_status.setText(self.tr("Load a FITS plate first."))
+            self._say(self.tr("Load a FITS plate first."))
             return
         name = self.edt_name.text().strip()
         ra = dec = None
         if self.chk_manual.isChecked():
             manual = self._manual_coords()
             if manual is None:
-                self.lbl_status.setText(self.tr("Manual coordinates invalid"))
+                self._say(self.tr("Manual coordinates invalid"))
                 return
             ra, dec = manual
         elif not name:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Type the supernova name or tick 'Manual coordinates'."))
             return
         from .workers import BlinkWorker
         self.btn_prepare.setEnabled(False)
-        self.lbl_status.setText(self.tr("Preparing the blink pair…"))
+        self._say(self.tr("Preparing the blink pair…"))
         self._worker = BlinkWorker(self._state.path,
                                    sn_name=name or None, ra=ra, dec=dec)
         self._worker.progress.connect(
-            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+            lambda msg: self._say(msg.get(self._lang, "")))
         self._worker.finished.connect(self._on_pair_ready)
         self._worker.start()
 
@@ -251,7 +272,7 @@ class UfeBlinkTab(QWidget):
         # @args: pair - prepare_pair dict, errors - bilingual messages
         self.btn_prepare.setEnabled(True)
         if errors:
-            self.lbl_status.setText("⚠ " + errors.get(self._lang, ""))
+            self._say("⚠ " + errors.get(self._lang, ""))
             return
         self._pair = pair
         self._nudge = [0.0, 0.0]
@@ -261,7 +282,7 @@ class UfeBlinkTab(QWidget):
         self.sld_balance.setValue(100)
         self.sld_balance.blockSignals(False)
         h, w = pair["obs"].shape
-        self.lbl_status.setText(
+        self._say(
             f"{pair['name']} @ ({pair['ra']:.5f}, {pair['dec']:+.5f}) · "
             f"{pair['ref_label']} · {w}×{h} px")
         self._render_frames()
@@ -494,7 +515,7 @@ class UfeBlinkTab(QWidget):
         sn = self._export_sn_xy() if self.chk_marker.isChecked() else None
         effect = "blink" if self.rdo_blink.isChecked() else "fade"
         from ..config import config
-        self.lbl_status.setText(self.tr("Rendering…"))
+        self._say(self.tr("Rendering…"))
         # ADR-046: corner boxes, marker look and the N/E compass follow
         # the settings; PSc reads the loaded plate's own solution
         boxes = compass = None
@@ -525,10 +546,10 @@ class UfeBlinkTab(QWidget):
     def _on_exported(self, out, err):
         # @args: out - written path ("" on failure), err - error text
         if out:
-            self.lbl_status.setText(self.tr("Written to {0}").format(out))
+            self._say(self.tr("Written to {0}").format(out))
             self._notify_saved([out])
         else:
-            self.lbl_status.setText(
+            self._say(
                 self.tr("Export failed: {0}").format(err))
         # prune finished workers (they hold big frames)
         self._export_workers = [w for w in self._export_workers

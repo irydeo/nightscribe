@@ -148,6 +148,7 @@ class UfeMeasureTab(QWidget):
         self._ui = adopt_ui(self, "ufe_measure_tab")
                                             # over: no wrapper margins
         self.lbl_status = self._ui.lbl_status
+        self._status_hook = None     # the window's single status line (U4)
         self.cmb_band = self._ui.cmb_band
 
         # The recipe knobs live one click open (ADR-044 rev): the daily
@@ -373,6 +374,26 @@ class UfeMeasureTab(QWidget):
         self._advanced.btn_restore.clicked.connect(
             self._restore_advanced_defaults)
 
+    def set_status_hook(self, fn):
+        # The window takes the messages (U4): its bottom line is where a
+        # reader looks. The tab's own label stays as a record (hidden), so
+        # everything that reads it keeps working.
+        # @args: fn - callable(text, level) or None
+        # @return: None
+        self._status_hook = fn
+
+    def _say(self, text, level=None):
+        # Says one thing: to this tab's record AND to the window.
+        # @args: text - the message, level - "info" | "warn" | "error"
+        #        (None: inferred from the ⚠ the message already carries)
+        # @return: None
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
+        self.lbl_status.setText(text)      # the tab's own record (hidden)
+        if self._status_hook is not None:
+            self._status_hook(text, level)
+
     def _spin(self, sb, value, lo, hi):
         # Sizes one aperture spin (px, half-pixel steps) from
         # core/photometry's defaults: the widget itself is the .ui's.
@@ -467,13 +488,13 @@ class UfeMeasureTab(QWidget):
         dlg = self.window()
         f = getattr(dlg, "reset_state_local", None)
         if not callable(f) or not f():
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Load a plate first: there is no state to reset."))
             return
         if dlg.notify_reset_state():
-            self.lbl_status.setText(self.tr("Plate state reset."))
+            self._say(self.tr("Plate state reset."))
         else:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Plate state reset locally: this plate is not "
                 "registered in the project, so there was no saved "
                 "state to clear."))
@@ -484,7 +505,7 @@ class UfeMeasureTab(QWidget):
         # confirmation here, and the hook fires only after a yes.
         dlg = self.window()
         if not dlg.state.has_image:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Load a plate first: there are no plate points to reset."))
             return
         box = QMessageBox.question(
@@ -497,10 +518,10 @@ class UfeMeasureTab(QWidget):
         if box != QMessageBox.Yes:
             return
         if dlg.notify_reset_points():
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The plate's measurement points were deleted."))
         else:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "No measurement points saved on this plate."))
 
     def _on_save_project(self):
@@ -509,13 +530,13 @@ class UfeMeasureTab(QWidget):
         # (source “measure”, the visit attached) and refreshes the curve.
         # @return: None; the outcome shows in the status line.
         if self._last is None or self._last.get("mag") is None:
-            self.lbl_status.setText(
+            self._say(
                 self.tr("Nothing to save yet: measure a point first."))
             return
         meta = fits_meta.meta_from_header(self._state.header or {})
         mjd = meta.get("mjd")
         if mjd is None:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "This plate has no observation date in its header: the "
                 "point cannot be dated, so it cannot be saved."))
             return
@@ -532,10 +553,10 @@ class UfeMeasureTab(QWidget):
         }
         dlg = self.window()
         if not dlg or not dlg.notify_point(payload):
-            self.lbl_status.setText(
+            self._say(
                 self.tr("Could not save the point in the project."))
             return
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Point saved in the project: it is on the light curve and "
             "counts for the campaign summary."))
 
@@ -568,20 +589,20 @@ class UfeMeasureTab(QWidget):
         self.btn_eff.setEnabled(False)
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
-        self.lbl_status.setText("")
+        self._say("")
 
     # -------------------------------------------------------- measuring
 
     def _explain_no_wcs_measure(self):
         # The automatic solve did not land: the click cannot be measured.
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "The plate has no WCS and it could not be solved: the "
             "comparison stars cannot be located."))
 
     def _explain_no_wcs_subtract(self):
         # The automatic solve did not land: no aligned reference, so the
         # checkbox goes back down with the reason on the status line.
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "The plate has no WCS and it could not be solved: no aligned "
             "reference."))
         self.chk_subtract.blockSignals(True)
@@ -594,7 +615,7 @@ class UfeMeasureTab(QWidget):
         if self._state.wcs is None:
             # ADR-051: the plate is solved automatically and the click
             # lands; never a dead end asking for a manual solve
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The plate has no WCS: solving it to locate the "
                 "comparison stars…"))
             dlg = self.window()
@@ -607,7 +628,7 @@ class UfeMeasureTab(QWidget):
             return
         entries = self._sequence()
         if not entries:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "No comparison sequence yet: build one above with "
                 "«Build the sequence…»."))
             return
@@ -775,7 +796,7 @@ class UfeMeasureTab(QWidget):
         # click IS the observer's consent, so a manual setup yields), and
         # explains the reasons in the panel.
         if self._last is None or not self._state.has_image:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Measure the target first (a click on it)."))
             return
         data = self._state.data
@@ -868,14 +889,14 @@ class UfeMeasureTab(QWidget):
         res = photometry.measure_plate(image, cfg)
         if not res.ok:
             reason = (res.reason or {}).get(self._lang, "?")
-            self.lbl_status.setText(reason)
+            self._say(reason)
             self._last = None
             self._drop_items()
             self.btn_csv.setEnabled(False)
             self.btn_eff.setEnabled(False)
             self.btn_save_project.setEnabled(False)
             return
-        self.lbl_status.setText("")
+        self._say("")
         # keep the band combo in step with what the sequence carries
         if res.bands_avail:
             self.cmb_band.blockSignals(True)
@@ -1039,41 +1060,41 @@ class UfeMeasureTab(QWidget):
         if self._series_worker is not None \
                 and self._series_worker.isRunning():
             self._series_worker.cancel()
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Cancelling the series: it stops after the frame it is "
                 "measuring; the points measured so far are kept."))
             return
         ctx = self._series_context()
         if not ctx or not ctx.get("paths"):
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "No visit with frames: open the editor from a visit to "
                 "measure a series."))
             return
         entries = self._sequence()
         if not entries:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "No comparison sequence yet: build one above with "
                 "«Build the sequence…»."))
             return
         if self._state.wcs is None:
             # ADR-051: solve the reference plate and start the series
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The plate has no WCS: solving it to place the series…"))
             dlg = self.window()
             req = getattr(dlg, "request_wcs", None)
             if callable(req):
                 req(self._on_measure_series,
-                    on_fail=lambda: self.lbl_status.setText(self.tr(
+                    on_fail=lambda: self._say(self.tr(
                         "The plate has no WCS and it could not be solved: "
                         "the series cannot be placed.")))
                 return
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The plate has no WCS and it could not be solved: the "
                 "series cannot be placed."))
             return
         target = self._series_target()
         if target is None:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Measure the target once (a click on it) so the series "
                 "knows where to measure."))
             return
@@ -1091,7 +1112,7 @@ class UfeMeasureTab(QWidget):
         self._series_worker.finished.connect(self._on_series_finished)
         self._series_worker.failed.connect(self._on_series_failed)
         self._series_worker.start()
-        self.lbl_status.setText(self.tr("Measuring the series…"))
+        self._say(self.tr("Measuring the series…"))
 
     def _on_series_sci(self):
         # Save the curve AS YOU SEE IT (V3).
@@ -1108,7 +1129,7 @@ class UfeMeasureTab(QWidget):
         from PySide6.QtWidgets import QFileDialog
         from .. import paths as paths_mod
         if self._series_result is None or not self._series_payload:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Measure the series first: the figure is the curve."))
             return
         name = ""
@@ -1128,10 +1149,10 @@ class UfeMeasureTab(QWidget):
             out = self.chart_series.export_png(target)
         except Exception as err:                  # never a dead window
             logger.warning("chart export failed: %s", err)
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Could not write the chart: {0}").format(err))
             return
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Chart written as you see it: {0}").format(out))
         # ADR-045: the scene export registers like the other tabs' files
         dlg = self.window()
@@ -1167,7 +1188,7 @@ class UfeMeasureTab(QWidget):
         # project and opened in the chart viewer, because a diagnosis the
         # observer cannot see is not a diagnosis.
         if self._series_result is None or not self._series_result.points:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Measure the series first: the figures are its night."))
             return
         from ..viz import night_view
@@ -1197,10 +1218,10 @@ class UfeMeasureTab(QWidget):
                 subtitle=sub, lang=self._lang))
         except Exception as err:                     # never a dead window
             logger.warning("night figures failed: %s", err)
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Could not write the night figures: {0}").format(err))
             return
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Night figures written: {0}").format(", ".join(written)))
         from .chart_viewer import open_chart
         for path in written:
@@ -1218,7 +1239,7 @@ class UfeMeasureTab(QWidget):
         if pid and callable(hook):
             hook(pid)
             return
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "The period search works on a project's curve: open the "
             "editor from a project to reach it."))
 
@@ -1338,11 +1359,11 @@ class UfeMeasureTab(QWidget):
         context = self._series_context() or {}
         self._update_series_counter(context, result.points)
         if result.status == "incomplete":
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Series cancelled: it stays “incomplete”; the points "
                 "measured so far are kept."))
         else:
-            self.lbl_status.setText("")
+            self._say("")
         rows = self._series_rows(result.points)
         dlg = self.window()
         notify = getattr(dlg, "notify_points", None)
@@ -1527,7 +1548,7 @@ class UfeMeasureTab(QWidget):
         self._series_button_running(False)
         self._series_worker = None
         self.prg_series.setValue(0)
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "The series failed and stopped: {0}").format(message))
 
     def _series_rows(self, points):
@@ -1568,7 +1589,7 @@ class UfeMeasureTab(QWidget):
             return
         if had_range:
             self.btn_series_fixaxis.setChecked(False)
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Fixed magnitude range cleared: the axis changed what it "
                 "measures."))
 
@@ -1616,7 +1637,7 @@ class UfeMeasureTab(QWidget):
         from PySide6.QtCore import QUrl
         result = self._series_result
         if result is None or not result.points:
-            self.lbl_status.setText(self.tr("Measure the series first."))
+            self._say(self.tr("Measure the series first."))
             return
         pts = [{"mjd": p.mjd, "jd_start": p.jd_start,
                 "mag": p.mag_detrended if p.mag_detrended is not None
@@ -1627,7 +1648,7 @@ class UfeMeasureTab(QWidget):
         if check["level"] != "ok":
             lines = [m.get(self._lang, m.get("en", ""))
                      for m in check["messages"]]
-            self.lbl_status.setText("⚠ " + " · ".join(lines))
+            self._say("⚠ " + " · ".join(lines))
         planet = ""
         obj = getattr(self.window(), "object", lambda: None)()
         if obj and obj.get("name"):
@@ -1670,10 +1691,10 @@ class UfeMeasureTab(QWidget):
                 t0_mjd=t0_mjd, duration_d=dur_d)
         except Exception as err:
             logger.warning("exoclock export failed: %s", err)
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The ExoClock files could not be written: {0}").format(err))
             return
-        self.lbl_status.setText(
+        self._say(
             self.tr("ExoClock files written. Upload them at exoclock.space"))
         notify = getattr(self.window(), "notify_saved", None)
         if callable(notify):
@@ -1698,7 +1719,7 @@ class UfeMeasureTab(QWidget):
         if callable(undo):
             for run_id in run_ids:
                 count += int(undo(run_id) or 0)
-        self.lbl_status.setText(
+        self._say(
             self.tr("Run undone: {0} points removed.").format(count))
         self._series_run_id = None
         self._live_run_ids = []
@@ -1714,13 +1735,13 @@ class UfeMeasureTab(QWidget):
             if self._live_worker is not None:
                 self._live_worker.cancel()
                 self._live_worker = None
-            self.lbl_status.setText(self.tr("Live mode off."))
+            self._say(self.tr("Live mode off."))
             return
         ctx = self._series_context()
         entries = self._sequence()
         target = self._series_target()
         if not ctx or not ctx.get("paths") or not entries or target is None:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Live mode needs a visit with frames, a sequence and a "
                 "measured target."))
             self.chk_series_live.blockSignals(True)
@@ -1754,7 +1775,7 @@ class UfeMeasureTab(QWidget):
         self._live_worker.batch_failed.connect(self._on_live_batch_failed)
         self._live_worker.failed.connect(self._on_live_failed)
         self._live_worker.start()
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Live mode on: watching the visit folder…"))
 
     def _on_live_batch(self, result):
@@ -1788,10 +1809,10 @@ class UfeMeasureTab(QWidget):
         # @args: key - "added" | "stopped", frames - frames of the stage
         # @return: None; the outcome shows in the status line.
         if key == "added":
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Live: {0} new frame(s) in the folder").format(frames))
         elif key == "stopped":
-            self.lbl_status.setText(self.tr("Live mode stopped."))
+            self._say(self.tr("Live mode stopped."))
 
     def _on_live_batch_failed(self, message, frames):
         # A batch the engine refused is lost: it is said out loud (P2 #19)
@@ -1799,7 +1820,7 @@ class UfeMeasureTab(QWidget):
         # @args: message - the engine's error, frames - frames lost
         # @return: None; the outcome shows in the status line.
         logger.warning("live batch lost (%s frame(s)): %s", frames, message)
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Live batch lost: {0} frame(s) were not measured ({1})").format(
                 frames, message))
 
@@ -1816,7 +1837,7 @@ class UfeMeasureTab(QWidget):
         self.chk_series_live.setChecked(False)
         self.chk_series_live.blockSignals(False)
         self.prg_series.setValue(0)
-        self.lbl_status.setText(
+        self._say(
             self.tr("Live mode failed and stopped: {0}").format(message))
 
     def _open_series_docs(self):
@@ -1841,7 +1862,7 @@ class UfeMeasureTab(QWidget):
         self._advanced.cmb_detrend.setCurrentIndex(0)
         self._advanced.chk_auto_aperture.setChecked(False)
         self._advanced.spn_saturate.setValue(0.0)
-        self.lbl_status.setText(self.tr("Advanced defaults restored."))
+        self._say(self.tr("Advanced defaults restored."))
 
     # ------------------------------------------------------------- panel
 
@@ -2087,7 +2108,7 @@ class UfeMeasureTab(QWidget):
             return
         if self._state.wcs is None:
             # ADR-051: solve the plate, then the subtraction starts
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The plate has no WCS: solving it for the aligned "
                 "reference…"))
             dlg = self.window()
@@ -2100,14 +2121,14 @@ class UfeMeasureTab(QWidget):
             return
         from .workers import BlinkWorker
         ra, dec = self._state.wcs.center()
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Fetching the reference and subtracting…"))
         self.chk_subtract.setEnabled(False)
         self._sub_worker = BlinkWorker(self._state.path, ra=ra, dec=dec)
         # the pipeline stages (survey reference download) reach the status
         # line, as the Blink tab's prepare does (ADR-018 progress)
         self._sub_worker.progress.connect(
-            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+            lambda msg: self._say(msg.get(self._lang, "")))
         self._sub_worker.finished.connect(self._on_pair_for_subtraction)
         self._sub_worker.start()
 
@@ -2119,7 +2140,7 @@ class UfeMeasureTab(QWidget):
         if not self.chk_subtract.isChecked():
             return
         if errors:
-            self.lbl_status.setText("⚠ " + errors.get(self._lang, ""))
+            self._say("⚠ " + errors.get(self._lang, ""))
             self.chk_subtract.blockSignals(True)
             self.chk_subtract.setChecked(False)
             self.chk_subtract.blockSignals(False)
@@ -2127,7 +2148,7 @@ class UfeMeasureTab(QWidget):
         entries = self._sequence()
         diff = self._build_difference(pair, entries)
         if diff is None:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The subtraction found no usable comparison star to "
                 "scale the reference."))
             self.chk_subtract.blockSignals(True)
@@ -2143,7 +2164,7 @@ class UfeMeasureTab(QWidget):
         self._diff_scale = plate_w / pair["obs"].shape[1]
         if self._active and self._view is not None:
             self._view.set_frame_override(self._display_diff)
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "Host subtracted. The target now reads on the difference "
             "image; comps calibrate on the original plate."))
 
@@ -2265,7 +2286,7 @@ class UfeMeasureTab(QWidget):
                 obscode=config.get("aavso_code", ""),
                 comp=_nc(comp), check=_nc(check))
         logger.info("measurement exported (%s): %s", kind, out)
-        self.lbl_status.setText(self.tr("Written to {0}").format(out))
+        self._say(self.tr("Written to {0}").format(out))
         # ADR-045: the one-row report registers in the watching project
         # (the visit it was measured from), like every other UFE file
         dlg = self.window()

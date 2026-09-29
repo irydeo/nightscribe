@@ -174,6 +174,7 @@ class UfeCompareTab(QWidget):
         self.btn_dss = self._ui.btn_dss
         self.btn_dss.clicked.connect(self._on_load_survey)
         self.lbl_status = self._ui.lbl_status
+        self._status_hook = None     # the window's single status line (U4)
 
         # the manual tweak: its controls are translatable, so they live
         # in their own window (ui/ufe_manual_dialog.ui). The toggle
@@ -212,6 +213,26 @@ class UfeCompareTab(QWidget):
         self.table = self._seqdlg.table
         self.btn_clear = self._seqdlg.btn_clear
         self.btn_csv = self._seqdlg.btn_export
+
+    def set_status_hook(self, fn):
+        # The window takes the messages (U4): its bottom line is where a
+        # reader looks. The tab's own label stays as a record (hidden), so
+        # everything that reads it keeps working.
+        # @args: fn - callable(text, level) or None
+        # @return: None
+        self._status_hook = fn
+
+    def _say(self, text, level=None):
+        # Says one thing: to this tab's record AND to the window.
+        # @args: text - the message, level - "info" | "warn" | "error"
+        #        (None: inferred from the ⚠ the message already carries)
+        # @return: None
+        text = str(text)
+        if level is None:
+            level = "warn" if text.startswith("⚠") else "info"
+        self.lbl_status.setText(text)      # the tab's own record (hidden)
+        if self._status_hook is not None:
+            self._status_hook(text, level)
 
     def _open_sequence(self):
         # @return: the sequence window rises, non-modal, so picking stars
@@ -285,7 +306,7 @@ class UfeCompareTab(QWidget):
         if self._state.has_image:
             self.edt_target.setText(Path(self._state.path).stem)
             if self._state.wcs is None:
-                self.lbl_status.setText(self._no_wcs_hint())
+                self._say(self._no_wcs_hint())
 
     def _no_wcs_hint(self):
         # @return: the "solve it first" line, shared by the load and the
@@ -301,7 +322,7 @@ class UfeCompareTab(QWidget):
         if not (self._state.has_image and self._state.wcs is not None):
             return
         if self._field is None and self.lbl_status.text() == self._no_wcs_hint():
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The sequence field is empty: build it with «Generate "
                 "field…», or restore the one saved with the plate."))
 
@@ -317,11 +338,11 @@ class UfeCompareTab(QWidget):
         self._stars = []
         self._drop_items()
         if self._state.has_image:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The sequence field is empty: build it with «Generate "
                 "field…», or restore the one saved with the plate."))
         else:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "No plate loaded: load a FITS or fetch the field from "
                 "the survey."))
         self._reload_table()
@@ -443,7 +464,7 @@ class UfeCompareTab(QWidget):
                                      # re-proposed under the observer's feet
         self._reload_table()
         self._redraw_overlays()     # no-ops off stage (it checks itself)
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "{0}: {1} in the sequence ({2} placed on this frame)")
             .format(self._field["catalog_name"], len(self._entries),
                     len(self._stars)))
@@ -471,7 +492,7 @@ class UfeCompareTab(QWidget):
             try:
                 target = _blink.resolve_sn(name.strip())
             except _blink.BlinkError as err:
-                self.lbl_status.setText(
+                self._say(
                     "⚠ " + err.messages.get(self._lang, ""))
                 return
             ra, dec = target["ra"], target["dec"]
@@ -479,14 +500,14 @@ class UfeCompareTab(QWidget):
             self._prefill_sky = (ra, dec)
         from .workers import UfeCutoutWorker
         self.btn_dss.setEnabled(False)
-        self.lbl_status.setText(self.tr("Downloading the survey field…"))
+        self._say(self.tr("Downloading the survey field…"))
         wait = _busy_wait(self, self.tr("Downloading the survey field…"),
                           self.tr("Comparison field"))
         self._cutout_worker = UfeCutoutWorker(ra, dec)
         self._cutout_worker.progress.connect(
             lambda msg: wait.setLabelText(msg.get(self._lang, "")))
         self._cutout_worker.progress.connect(
-            lambda msg: self.lbl_status.setText(msg.get(self._lang, "")))
+            lambda msg: self._say(msg.get(self._lang, "")))
 
         def survey_landed(result):
             # same rule as the field chain: the modal dialog is always
@@ -495,7 +516,7 @@ class UfeCompareTab(QWidget):
                 self._on_survey_landed(result)
             except Exception as err:
                 logger.exception("survey landing failed: %s", err)
-                self.lbl_status.setText(str(err))
+                self._say(str(err))
             finally:
                 _reap_wait(wait)
         self._cutout_worker.finished.connect(survey_landed)
@@ -507,16 +528,16 @@ class UfeCompareTab(QWidget):
         self._cutout_worker = None
         path, label = result
         if not path:
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The survey download failed (offline?). Try again later."))
             return
         try:
             self._state.load(path)
         except Exception as err:
             logger.warning("survey cutout unreadable: %s", err)
-            self.lbl_status.setText(str(err))
+            self._say(str(err))
             return
-        self.lbl_status.setText(self.tr("Field loaded: {0}").format(label))
+        self._say(self.tr("Field loaded: {0}").format(label))
 
     def _on_auto(self):
         # The one-click path (ADR-044 rev 2026-09-25): with a field
@@ -546,7 +567,7 @@ class UfeCompareTab(QWidget):
         # The automatic solve did not land: the field cannot be built and
         # the observer reads why (the manual button is still there).
         self._auto_propose = False
-        self.lbl_status.setText(self.tr(
+        self._say(self.tr(
             "The plate has no WCS and it could not be solved: use «Solve "
             "astrometry…» or check the solver in Settings."))
 
@@ -558,7 +579,7 @@ class UfeCompareTab(QWidget):
             return
         if self._state.wcs is None:
             # ADR-051: solving is automatic now, never a hand-off
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The plate has no WCS: solving it to build the comparison "
                 "field…"))
             dlg = self.window()
@@ -575,7 +596,7 @@ class UfeCompareTab(QWidget):
         w, h = self._state.plate_shape
         fov_arcmin = max(w, h) * self._state.wcs.pixel_scale() / 60.0
         self.btn_field.setEnabled(False)
-        self.lbl_status.setText(self.tr("Querying the catalog…"))
+        self._say(self.tr("Querying the catalog…"))
         # The queries take seconds: cover them with the busy dialog the
         # legacy flow had (a status line alone reads as "nothing
         # happens"). The bar walks the real stages (catalog → VSX →
@@ -597,7 +618,7 @@ class UfeCompareTab(QWidget):
         def _stage(msg):
             # @args: msg - the worker's {"es", "en"} stage text
             wait.setLabelText(msg.get(self._lang, ""))
-            self.lbl_status.setText(msg.get(self._lang, ""))
+            self._say(msg.get(self._lang, ""))
             stage["n"] = min(stage["n"] + 1, 1)
             wait.setValue(stage["n"])
         self._worker.progress.connect(_stage)
@@ -614,7 +635,7 @@ class UfeCompareTab(QWidget):
             except Exception as err:
                 logger.exception("field handling failed: %s", err)
                 self._auto_propose = False
-                self.lbl_status.setText(self.tr(
+                self._say(self.tr(
                     "The field landed but its handling failed: {0}")
                     .format(err))
             finally:
@@ -629,7 +650,7 @@ class UfeCompareTab(QWidget):
         self._worker = None
         if not field:
             self._auto_propose = False
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "The catalog query failed (offline?). Try again later."))
             return
         self._field = field
@@ -644,7 +665,7 @@ class UfeCompareTab(QWidget):
         wcs_note = ""
         if field.get("vsx_warning"):
             wcs_note = " · " + self.tr("VSX check failed")
-        self.lbl_status.setText(
+        self._say(
             self.tr("{0} · field {1}′ · {2} catalog stars on the plate · "
                     "{3} known variables").format(
                         field.get("catalog_name", ""),
@@ -661,7 +682,7 @@ class UfeCompareTab(QWidget):
         # but it gets its own beat in the status line so the chain reads)
         if self._auto_propose:
             self._auto_propose = False
-            self.lbl_status.setText(self.tr("Proposing the sequence…"))
+            self._say(self.tr("Proposing the sequence…"))
             self._on_propose()
 
     def _sky_to_scene(self, ra, dec):
@@ -872,7 +893,7 @@ class UfeCompareTab(QWidget):
             del self._entries[existing]
         else:
             if star.get("vsx"):
-                self.lbl_status.setText(self.tr(
+                self._say(self.tr(
                     "{0} is a known variable: it can never be a "
                     "comparison.").format(star["vsx"].get("name", "?")))
                 return
@@ -948,7 +969,7 @@ class UfeCompareTab(QWidget):
         # or too faint candidates are dropped with their reason said.
         if self._field is None:
             # no silent no-op: say what to do first, in both languages
-            self.lbl_status.setText(self.tr(
+            self._say(self.tr(
                 "Generate the field first: I need the plate's catalog "
                 "stars to propose the sequence."))
             return
@@ -972,7 +993,7 @@ class UfeCompareTab(QWidget):
             text += " " + self.tr("Left out {0} on your own plate: {1}").format(
                 len(rejected),
                 ", ".join(f"{k} × {v}" for k, v in sorted(counts.items())))
-        self.lbl_status.setText(text)
+        self._say(text)
         self._commit()
 
     # ------------------------------------------------------------- table
@@ -1186,4 +1207,4 @@ class UfeCompareTab(QWidget):
                                    "fov_arcmin": (self._field or {}).get(
                                        "fov_arcmin"),
                                    "target_mag": self.spn_mag.value()})
-        self.lbl_status.setText(self.tr("Written to {0}").format(out))
+        self._say(self.tr("Written to {0}").format(out))

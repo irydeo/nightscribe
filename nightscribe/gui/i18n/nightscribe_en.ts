@@ -7727,6 +7727,10 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <source>Histogram</source>
         <translation>Histogram</translation>
+    </message>
+    <message>
+        <source>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</source>
+        <translation>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</translation>
     </message></context>
 <context>
     <name>UfeImageView</name>

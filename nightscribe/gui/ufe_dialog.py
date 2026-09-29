@@ -30,12 +30,13 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QIcon, QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, \
+from PySide6.QtGui import QFontMetrics, QIcon, QKeySequence, QShortcut
+from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, QSizePolicy, \
     QProgressDialog, QVBoxLayout, QWidget
 
 from ..config import config
 from ..core import fits_io
+from . import theme
 from .ufe_state import UfeImageState
 from .ui_loader import adopt_ui, drop_in, load_ui
 from .widgets.collapsible_section import CollapsibleSection
@@ -43,6 +44,10 @@ from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
 
 logger = logging.getLogger("nightscribe.gui.ufe_dialog")
+
+# one glyph per level of the status line (U4), so a warning reads as a
+# warning before it is read
+_STATUS_GLYPH = {"info": "ⓘ", "warn": "⚠", "error": "✕"}
 
 _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
                  (2.0, "200"), (4.0, "400"))
@@ -212,9 +217,15 @@ class UfeDialog(QDialog):
                 root.setStretch(i, 1)    # the work area: image + tabs
                 break
         # and nothing above or below the work area may grow on its own
-        from PySide6.QtWidgets import QSizePolicy
-        for w in (self._ui.lbl_zoom, self._ui.lbl_zoom_hint):
-            w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        for w in (self._ui.lbl_zoom, self._ui.lbl_zoom_hint,
+                  self._ui.lbl_status_bar):
+            w.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        self._status_text = ""
+        self._status_level = "info"
+        # the four bands of the window sit 4 px apart: the gaps between the
+        # bar, the work area, the strip and the status line are not a place
+        # to spend the plate's height
+        root.setSpacing(4)
         self.splitter.setStretchFactor(0, 1)     # series: grows a bit
         self.splitter.setStretchFactor(1, 4)     # the centre dominates
         self.splitter.setStretchFactor(2, 2)     # the tab column grows too
@@ -223,6 +234,7 @@ class UfeDialog(QDialog):
         self._wire_topbar()
         self._build_feature_tabs()
         self._place_light_curve()
+        self._wire_status()
         # the series block lives at the left of the image (its own pane,
         # hidden unless a visit arms it): the visit strip (frame navigator
         # + the EXOTIC reduction for transit projects) carries it in its
@@ -255,6 +267,19 @@ class UfeDialog(QDialog):
             lay = QVBoxLayout(page)
             lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(widget)
+
+    def _wire_status(self):
+        # Every tab reports to the window's single line (U4). The tabs keep
+        # their own label (hidden) as a record, so nothing that read it had
+        # to change.
+        # @return: None
+        for tab in (getattr(self, "tab_measure", None),
+                    getattr(self, "tab_compare", None),
+                    getattr(self, "tab_annotate", None),
+                    getattr(self, "tab_blink", None)):
+            hook = getattr(tab, "set_status_hook", None)
+            if callable(hook):
+                hook(self._on_status_hook)
 
     def _place_light_curve(self):
         # The light curve, in the centre's second page. The Measure tab
@@ -1021,6 +1046,86 @@ class UfeDialog(QDialog):
             name=name, meta=meta, wcs_info=wcs_info,
             site=chart_annotate.site_from_config(config),
             measured=measured)
+
+    def set_status(self, text, level="info"):
+        # The window's ONE line of status (U4).
+        #
+        # The messages used to live in each tab, in labels of their own
+        # that wrapped and grew: the same kind of news in four places, and
+        # none of them where an observer looks. There is one line now, at
+        # the bottom, fixed in height, with a glyph for the level and the
+        # whole text in the tooltip (it is ELIDED, never wrapped: a message
+        # that eats the plate's height costs more than it says).
+        # @args: text - the message, level - "info" | "warn" | "error"
+        # @return: None
+        from ..viz import palette as viz_palette
+        self._status_text = str(text or "")
+        self._status_level = level if level in ("info", "warn", "error") \
+            else "info"
+        glyph = _STATUS_GLYPH[self._status_level]
+        self._status_glyph = glyph
+        bar = self._ui.lbl_status_bar
+        bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        if getattr(self, "_status_shown", None) != self._status_level:
+            # a stylesheet forces a full re-layout: set it when the LEVEL
+            # changes, never on every message
+            # a compact line on purpose: at the window's own font size the
+            # status bar measured 25 px and took them from the plate, which
+            # is the whole point of U1. 12 px is the same size the chart's
+            # ticks use, and it is a footnote, not a headline.
+            colour = {"info": theme.C_TEXT_DIM, "warn": "#e0c060",
+                      "error": viz_palette.DANGER}[self._status_level]
+            bar.setStyleSheet(f"color: {colour}; font-size: 12px;")
+            self._status_shown = self._status_level
+        self._elide_status()
+
+    def _elide_status(self):
+        # Fits the message to the line, never to the layout: the elided
+        # text is written only when it CHANGES, and the whole routine is
+        # guarded against re-entrance, because a label that changes its
+        # text re-lays the window out and can call us back from the resize
+        # (an unguarded version of this looped until the process was
+        # killed by memory).
+        # @return: None
+        if getattr(self, "_status_eliding", False):
+            return
+        bar = self._ui.lbl_status_bar
+        text = getattr(self, "_status_text", "")
+        if not text:
+            if bar.text():
+                bar.setText("")
+            bar.setToolTip("")
+            return
+        self._status_eliding = True
+        try:
+            fm = QFontMetrics(bar.font())
+            room = max(120, bar.width() - 12)
+            elided = fm.elidedText(
+                f"{getattr(self, '_status_glyph', 'ⓘ')} {text}",
+                Qt.ElideRight, room)
+            if bar.text() != elided:
+                bar.setText(elided)
+            bar.setToolTip(text)
+        finally:
+            self._status_eliding = False
+
+    def status_text(self):
+        # @return: the status line's whole text ("" when silent)
+        return getattr(self, "_status_text", "")
+
+    def _on_status_hook(self, text, level="info"):
+        # What a tab says lands here (U4): the tabs keep their own label as
+        # a record (the tests and the old code read it) but they are hidden,
+        # and the observer reads this line.
+        # @return: None
+        self.set_status(text, level)
+
+    def resizeEvent(self, event):
+        # The status line is elided to the window: a resize must re-elide
+        # it or the message stays cut where the old width was. It is a
+        # cheap, guarded, idempotent call (see _elide_status).
+        super().resizeEvent(event)
+        self._elide_status()
 
     def _on_histogram_fold(self, expanded):
         # The observer's choice is remembered: the strip comes back as it

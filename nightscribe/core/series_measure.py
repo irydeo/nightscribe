@@ -137,6 +137,14 @@ class SeriesConfig:
                                     # PSF), "translation" pins it to a
                                     # shift, "similarity"/"warp"
                                     # resample onto the reference grid
+    target_motion: object = None    # a callable (jd) -> (ra_deg, dec_deg)
+                                    # for a MOVING object (a NEO, a comet):
+                                    # each frame's target sits where the
+                                    # ephemeris says, not where the
+                                    # reference plate saw it (see
+                                    # ephemeris.motion_interpolator). Needs
+                                    # the per-frame pointing, so it is used
+                                    # with align != "off"
     guide_jump_px: float = 2.0      # centroid off the reference (T7)
     cosmic_sigma: float = 8.0       # single-pixel spike over the noise
     zp_outlier_sigma: float = 3.0   # cloud / zero-point outlier (T7)
@@ -1316,6 +1324,20 @@ def _aperture_report(aper):
     return out
 
 
+def _motion_jd(meta):
+    # The instant to ask the ephemeris about: the MIDDLE of the exposure,
+    # the same instant the point is timed at (T6/D15). An ephemeris
+    # evaluated at the start of a 300 s frame would put a fast NEO's
+    # aperture half an arcsecond behind the object.
+    # @args: meta - fits_meta.meta_from_header dict
+    # @return: the Julian date, or None
+    mjd = meta.get("mjd")
+    if mjd is None:
+        return None
+    exptime = meta.get("exptime_s") or 0.0
+    return mjd + variables.MJD0 + float(exptime) / 2.0 / 86400.0
+
+
 def _align_report(report, cfg):
     # The alignment block that travels with the run (D44): how many
     # frames were aligned, how far the field really moved, how well the
@@ -1566,6 +1588,22 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                     prev_align = {"dx": used["dx"], "dy": used["dy"],
                                   "angle": used["angle"],
                                   "n": used.get("n") or 0}
+        # a MOVING target (a NEO, a comet): the frame's own pointing says
+        # where the ephemeris position lands on it. Without the per-frame
+        # WCS this cannot be answered, and that is honest: a fixed frame
+        # carries a fixed answer, which is the reference plate's.
+        if cfg.target_motion is not None:
+            here = wcs_ov if wcs_ov is not None else cfg.wcs
+            meta = fits_meta.meta_from_header(header)
+            jd = _motion_jd(meta)
+            if here is not None and jd is not None:
+                where = cfg.target_motion(jd)
+                if where is not None:
+                    try:
+                        target_ov = here.sky_to_pixel(float(where[0]),
+                                                      float(where[1]))
+                    except Exception:
+                        target_ov = None
         frame = _measure_frame(path, header, data, cfg, apertures,
                                wcs_ov=wcs_ov, target_ov=target_ov,
                                fwhm_ref=fwhm_ref)

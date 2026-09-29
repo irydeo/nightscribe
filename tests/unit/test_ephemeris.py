@@ -13,6 +13,8 @@
 
 import csv
 
+import pytest
+
 from nightscribe.core import ephemeris
 
 
@@ -115,3 +117,64 @@ def test_preliminary_rows_and_banner(tmp_path):
     assert "PRELIMINARY" in first and "PRELIMINAR" in first
     # and without the flag there is no banner
     assert ephemeris._preliminary_banner(_mock_rows()) is None
+
+
+# ---------------- moving targets in a series (phase E4) ----------------
+
+def test_a_table_can_be_asked_where_the_object_is():
+    # The interpolator a series uses: an already-parsed table, answered
+    # offline for as many instants as the series has frames (asking the
+    # network 244 times is not an option).
+    from nightscribe.core import ephemeris
+    rows = [{"jd": 2460298.0, "ra_deg": 49.0, "dec_deg": 10.0},
+            {"jd": 2460298.02, "ra_deg": 49.2, "dec_deg": 10.0}]
+    where = ephemeris.motion_interpolator(rows)
+    assert where is not None
+    # the midpoint of a linear table. The tolerance is a millionth of a
+    # degree (3.6 milliarcsec) and not tighter on purpose: a Julian date
+    # around 2460298 has a resolution of about half a microsecond, and the
+    # interpolation inherits it. No telescope can see that, and pretending
+    # otherwise would be testing float arithmetic, not astronomy.
+    ra, dec = where(2460298.01)
+    assert ra == pytest.approx(49.1, abs=1e-6)
+    assert dec == pytest.approx(10.0, abs=1e-6)
+    # and the ends are held, not extrapolated away
+    assert where(2460298.0)[0] == pytest.approx(49.0)
+    assert where(2460298.02)[0] == pytest.approx(49.2)
+
+
+def test_a_frame_outside_the_table_is_refused_not_invented():
+    # Extrapolating a NEO would move the aperture to a star that is not the
+    # object: the honest answer is "I cannot say", and the caller flags the
+    # frame instead of measuring somewhere else.
+    from nightscribe.core import ephemeris
+    rows = [{"jd": 2460298.0, "ra_deg": 49.0, "dec_deg": 10.0},
+            {"jd": 2460298.02, "ra_deg": 49.2, "dec_deg": 10.0}]
+    where = ephemeris.motion_interpolator(rows)
+    assert where(2460300.0) is None
+    assert where(2460297.0) is None
+    # but a frame just past the ends (a table written slightly short) is
+    # still answered with the nearest sample
+    assert where(2460298.021)[0] == pytest.approx(49.2)
+
+
+def test_the_interpolator_reads_the_text_a_table_carries():
+    # The same table as the project writes it (time/ra/dec text), so a
+    # series can use the CSV the export produced.
+    from nightscribe.core import ephemeris
+    rows = [{"time": "2026-Sep-20 23:30", "ra": "03 16 00",
+             "dec": "+49 50 00"},
+            {"time": "2026-Sep-20 23:32", "ra": "03 16 30",
+             "dec": "+49 50 00"}]
+    where = ephemeris.motion_interpolator(rows)
+    assert where is not None
+    ra, dec = where(ephemeris._row_jd(rows[0]))
+    assert ra == pytest.approx(49.0, abs=0.01)
+    assert dec == pytest.approx(49.8333, abs=0.01)
+
+
+def test_one_row_is_not_a_table():
+    from nightscribe.core import ephemeris
+    assert ephemeris.motion_interpolator(
+        [{"jd": 2460298.0, "ra_deg": 49.0, "dec_deg": 10.0}]) is None
+    assert ephemeris.motion_interpolator([]) is None

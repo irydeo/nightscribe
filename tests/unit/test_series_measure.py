@@ -822,3 +822,69 @@ def test_low_quality_registration_is_flagged(tmp_path):
     assert len(res.points) == 2
     assert "align_failed" in res.points[1].flags
     assert "align_failed" not in res.points[0].flags
+
+
+# ---------------- moving targets (a NEO, a comet) ----------------------
+
+def _moving_plate(offset_px, sigma=SIGMA):
+    # The same field, with the TARGET drawn at a different place: the comps
+    # and the check stay put (the field is fixed), only the object walks.
+    data = _plate(sigma=sigma, sky=100.0, noise=0.0)
+    yy, xx = np.ogrid[:H, :W]
+    data -= 7000.0 * np.exp(-((xx - TARGET_XY[0]) ** 2
+                              + (yy - TARGET_XY[1]) ** 2)
+                            / (2 * sigma ** 2))
+    data += 7000.0 * np.exp(-((xx - (TARGET_XY[0] + offset_px)) ** 2
+                              + (yy - TARGET_XY[1]) ** 2)
+                            / (2 * sigma ** 2))
+    return data
+
+
+def _motion_from_offsets(offsets):
+    # The ephemeris that goes with _moving_plate: it answers "where is the
+    # object" with the sky position of the star that was drawn for that
+    # frame. The frames are one minute apart (the test writes them so), and
+    # the engine asks with the MIDDLE of the exposure, so the sample is
+    # picked from the fraction of a day.
+    import datetime
+    from nightscribe.core import coords
+    wcs = _reference_wcs()
+    # the first frame's instant, built the same way the engine does it:
+    # never a hardcoded Julian date in a test
+    base = coords.jd_from_datetime(
+        datetime.datetime(2026, 9, 20, 23, 30,
+                          tzinfo=datetime.timezone.utc))
+
+    def motion(jd):
+        # the frames are one minute apart, and the engine asks with the
+        # MIDDLE of the exposure, so the sample is the minute of the frame
+        idx = int(round((jd - base) * 1440.0))
+        idx = max(0, min(len(offsets) - 1, idx))
+        return wcs.pixel_to_sky(TARGET_XY[0] + offsets[idx], TARGET_XY[1])
+    return motion
+
+
+def test_a_moving_target_is_measured_where_the_ephemeris_says(tmp_path):
+    # A NEO walks 3 px per frame across a fixed field (232 px in 8 frames:
+    # it leaves any sane aperture). With the ephemeris the engine measures
+    # it where it is and the curve stays flat; without it, the aperture
+    # watches the empty sky behind.
+    offsets = [3.0 * i for i in range(8)]
+    paths = []
+    for i, off in enumerate(offsets):
+        paths.append(_write_plate(tmp_path / f"m{i}.fits",
+                                  _moving_plate(off),
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+
+    fixed = sm.measure_series(paths, _config(wcs, comps))
+    mags_fixed = [p.mag for p in fixed.points if p.mag is not None]
+    # the moving target ruins the fixed-coordinate curve
+    assert max(mags_fixed) - min(mags_fixed) > 0.5
+
+    moved = sm.measure_series(paths, _config(
+        wcs, comps, target_motion=_motion_from_offsets(offsets)))
+    mags = [p.mag for p in moved.points if p.mag is not None]
+    assert len(mags) == len(paths)
+    assert max(mags) - min(mags) < 0.05

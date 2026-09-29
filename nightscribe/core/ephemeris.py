@@ -753,6 +753,118 @@ def _iso(when):
     return when.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def motion_interpolator(rows, max_gap_days=0.5, warn=None):
+    # A small function that answers "where is the object at this instant?",
+    # built from an ephemeris table. This is what lets a SEQUENCE measure a
+    # moving object: each frame's target is at a different place, and the
+    # place comes from the ephemeris, not from guessing.
+    #
+    # Linear interpolation between samples is enough here and it is worth
+    # saying why: a Horizons ephemeris for a NEO is stepped every 30
+    # minutes, the object moves smoothly over a night, and the second
+    # derivative of its apparent path over half an hour is far below the
+    # pixel size of any amateur telescope. A series spans hours, so two
+    # neighbouring samples always bracket it.
+    #
+    # What this function does NOT do is extrapolate far: a frame outside
+    # the table is answered with None, because inventing a position would
+    # move the aperture to a star that is not the object. The caller then
+    # measures the frame at the last known place and flags it, which is the
+    # honest thing to do.
+    #
+    # @args: rows - the ephemeris rows: either the numeric ones a table
+    #        carries (jd/ra_deg/dec_deg), or the Horizons text the network
+    #        returns (time/ra/dec), max_gap_days - how far outside the table
+    #        a position is still trusted (a frame just past the ends),
+    #        warn - optional callable (str) for the caller's log
+    # @return: a callable (jd) -> (ra_deg, dec_deg) or None
+    samples = []
+    for row in rows or []:
+        jd = row.get("jd")
+        if jd is None:
+            jd = _row_jd(row) if "time" in row else None
+        ra = _maybe_deg(row.get("ra_deg"), coords.ra_hms_to_deg)
+        dec = _maybe_deg(row.get("dec_deg"), coords.dec_dms_to_deg)
+        if ra is None:
+            ra = _maybe_deg(row.get("ra"), coords.ra_hms_to_deg)
+        if dec is None:
+            dec = _maybe_deg(row.get("dec"), coords.dec_dms_to_deg)
+        try:
+            jd = float(jd)
+            ra = float(ra)
+            dec = float(dec)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(jd) and math.isfinite(ra) and math.isfinite(dec):
+            samples.append({"jd": jd, "ra_deg": ra, "dec_deg": dec})
+    samples.sort(key=lambda s: s["jd"])
+    if len(samples) < 2:
+        return None
+
+    def position(jd):
+        # @args: jd - the instant (Julian date, UTC)
+        # @return: (ra_deg, dec_deg) or None when the table cannot say
+        try:
+            jd = float(jd)
+        except (TypeError, ValueError):
+            return None
+        if jd < samples[0]["jd"] - max_gap_days \
+                or jd > samples[-1]["jd"] + max_gap_days:
+            if warn:
+                warn("the frame falls outside the ephemeris table")
+            return None
+        # the arithmetic is the project's own interpolator: one place for
+        # the RA seam, the rate and the bracketing, so the goto flow and a
+        # series can never disagree about where an object is
+        out = _interpolate(samples, jd)
+        if not out:
+            return None
+        return out["ra_deg"], out["dec_deg"]
+
+    return position
+
+
+def _maybe_deg(value, parser):
+    # @args: value - a number or an "hh mm ss" / "dd mm ss" string,
+    #        parser - coords.ra_hms_to_deg or coords.dec_dms_to_deg
+    # @return: the degrees as float, or the value unchanged when it is
+    #          already a number, or None
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return parser(str(value))
+    except (ValueError, KeyError):
+        return None
+
+
+def rows_from_csv(path):
+    # Reads back a CSV ephemeris written by export_csv, so a series can use
+    # the table the project already exported instead of asking Horizons
+    # again (the point of caching: the night being measured is not
+    # necessarily the night being planned).
+    # @args: path - the CSV path
+    # @return: the rows (list of dicts with ra_deg/dec_deg and jd)
+    out = []
+    try:
+        with open(path, newline="", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                if not row:
+                    continue
+                jd = _row_jd(row)
+                ra = _maybe_deg(row.get("ra_deg"), coords.ra_hms_to_deg)
+                dec = _maybe_deg(row.get("dec_deg"), coords.dec_dms_to_deg)
+                out.append({"jd": jd, "ra_deg": ra, "dec_deg": dec,
+                            "time": row.get("time")})
+    except OSError as err:
+        logger.warning("could not read the ephemeris CSV: %s", err)
+        return []
+    return out
+
+
 def _row_jd(row):
     # @args: row - Horizons-style row with "time" "YYYY-Mon-DD HH:MM"
     # @return: Julian date (float) or None on parse error
@@ -784,17 +896,32 @@ def _interpolate(rows, jd):
     # Linear interpolation of (ra_deg, dec_deg) to jd between the two
     # bracketing rows (RA unwrapped at the 0h/24h seam); the apparent rate
     # and PA come from the same pair.
-    # @args: rows - Horizons rows (time/ra/dec), jd - target instant
+    #
+    # Accepts both flavours of row: the Horizons text the network returns
+    # ("time"/"ra"/"dec") and the numeric one an already-parsed table
+    # carries ("jd"/"ra_deg"/"dec_deg"), so a series can reuse the
+    # ephemeris it already has without going back to the network.
+    # @args: rows - ephemeris rows, jd - target instant
     # @return: {ra_deg, dec_deg, rate_arcsec_min, pa_deg} or None
     pts = []
     for r in rows:
-        j = _row_jd(r)
+        j = r.get("jd")
+        if j is None:
+            j = _row_jd(r)
         if j is None:
             continue
+        ra = _maybe_deg(r.get("ra_deg"), coords.ra_hms_to_deg)
+        dec = _maybe_deg(r.get("dec_deg"), coords.dec_dms_to_deg)
+        # the Horizons text flavour, when the numeric one is not there
+        if ra is None:
+            ra = _maybe_deg(r.get("ra"), coords.ra_hms_to_deg)
+        if dec is None:
+            dec = _maybe_deg(r.get("dec"), coords.dec_dms_to_deg)
         try:
-            ra = coords.ra_hms_to_deg(r["ra"])
-            dec = coords.dec_dms_to_deg(r["dec"])
-        except (ValueError, KeyError):
+            j = float(j)
+            ra = float(ra)
+            dec = float(dec)
+        except (TypeError, ValueError):
             continue
         pts.append((j, ra, dec))
     if not pts:

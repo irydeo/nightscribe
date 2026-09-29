@@ -8580,6 +8580,20 @@ class MainWindow(QMainWindow):
         self._ufe = UfeDialog(lang=self._lang(), parent=self)
         return self._ufe
 
+    def _ufe_project_badge_payload(self, pid):
+        # The badge's payload, built by the SAME function the project list
+        # rows use (G): same kind chip, same hue, same words.
+        # @args: pid - the project this window is open for
+        # @return: the kwargs of ProjectRow.set_project, or None
+        from ..core import campaign as _camp
+        row = project.get(db, pid)
+        if not row:
+            return None
+        camp_names = {c["id"]: c["name"] for c in _camp.list_campaigns(db)}
+        payload = self._project_row_payload(row, None, camp_names)
+        payload.pop("_urgency", None)
+        return payload
+
     def _tools_ufe(self):
         # Menu Tools → FITS editor… (ADR-044)
         dlg = self._ufe_build()
@@ -8678,6 +8692,12 @@ class MainWindow(QMainWindow):
                 curve_hooks(
                     lambda: self._ufe_visit_curve(hook_pid, session_id),
                     lambda: self._ufe_discard_curve(hook_pid, session_id))
+            # G: the project, in the list's OWN language: the badge is fed
+            # by the same builder the project rows use, so the two cannot
+            # drift (a badge with its own words would be a second truth).
+            badge = getattr(dlg, "set_project_badge", None)
+            if callable(badge):
+                badge(self._ufe_project_badge_payload(hook_pid))
             # ADR-048 follow-up: a transit project's reduce/export live in
             # the editor, next to the sequence they need
             proj = project.get(db, hook_pid) or {}
@@ -8699,6 +8719,9 @@ class MainWindow(QMainWindow):
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(None, None)
+            badge = getattr(dlg, "set_project_badge", None)
+            if callable(badge):
+                badge(None)              # ad-hoc: no project behind it
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])

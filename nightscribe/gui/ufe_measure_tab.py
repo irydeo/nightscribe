@@ -342,18 +342,38 @@ class UfeMeasureTab(QWidget):
             panel = QWidget(self)
             box = QVBoxLayout(panel)
             box.setContentsMargins(6, 6, 6, 6)
-            # the buttons are MOVED one by one, not the layout: a layout
+            # EVERY widget the row holds is moved, not a list of names:
+            # a hardcoded list forgot the button added later (the "discard
+            # the visit's curve" one), which then stayed inside the row
+            # while the row itself was removed from the panel: a widget with
+            # no layout to place it, floating over the rest of the form
+            # (reported: "the delete button comes out broken and totally out
+            # of place"). Reading the row means a new button in the Designer
+            # file can never be orphaned again.
+            #
+            # The widgets are moved one by one, not the layout: a layout
             # removed from its parent is deleted by the binding, and the
-            # widgets' texts keep living in the Designer file where they
-            # belong (ADR-005)
-            for name in ("btn_series_undo", "btn_series_exoclock",
-                         "btn_series_night", "btn_series_sci",
-                         "btn_series_phase", "btn_series_help"):
-                btn = getattr(self._ui, name, None)
-                if btn is None:
+            # texts keep living in the Designer file where they belong
+            # (ADR-005).
+            moved = []
+            for i in range(row_out.count()):
+                item = row_out.itemAt(i)
+                widget = item.widget() if item is not None else None
+                if widget is None:
                     continue
-                btn.setParent(panel)
-                box.addWidget(btn)
+                moved.append(widget)
+            for widget in moved:
+                widget.setParent(panel)
+                box.addWidget(widget)
+            # and one that lives in the RUN row, not in this one: "undo the
+            # last run" sits beside "Measure the sequence" in the Designer
+            # file but belongs with the other occasional actions (it is not
+            # what you press every night). It is named here, on purpose: it
+            # is the only exception, and the test pins it.
+            undo = getattr(self._ui, "btn_series_undo", None)
+            if undo is not None:
+                undo.setParent(panel)
+                box.addWidget(undo)
             action = QWidgetAction(self.btn_series_more)
             action.setDefaultWidget(panel)
             menu = QMenu(self.btn_series_more)
@@ -1478,6 +1498,34 @@ class UfeMeasureTab(QWidget):
         self.btn_series_exoclock.setEnabled(False)
         self._update_selection_label()
 
+    def _apply_chart_presentation(self):
+        # What the CONTROLS say, the chart does, as soon as there is
+        # something to draw.
+        #
+        # Each control is wired to its slot, but a slot only fires when the
+        # control CHANGES: their initial state (the trend on by default, the
+        # error bars, the flagged points, the binning) was never pushed, and
+        # a freshly measured series came out with none of it (reported: "the
+        # mean is ticked but it is not painted when the curve is
+        # generated"). Pushing the whole state after every set_data makes
+        # the chart and its controls say the same thing, always.
+        # @return: None
+        self.chart_series.set_robust(self.btn_series_robust.isChecked())
+        self.chart_series.set_errors_visible(
+            self.btn_series_errors.isChecked())
+        self.chart_series.set_hide_flagged(
+            self.btn_series_hideflags.isChecked())
+        self.chart_series.set_bin_mode(
+            self.cmb_series_bin.currentData() or "off",
+            self.spn_series_binn.value())
+        self.chart_series.set_mean_curve(
+            self.spn_series_meanwin.value()
+            if self.chk_series_mean.isChecked() else 0)
+        if self.btn_series_fixaxis.isChecked():
+            self._on_fix_axis()
+        if self.chk_series_outliers.isChecked():
+            self._on_detect_outliers()
+
     def _render_panel(self):
         # The panel's text, in one place: the run's summary and the chart's
         # OWN notes, rebuilt together.
@@ -1739,6 +1787,7 @@ class UfeMeasureTab(QWidget):
                 else "calibrated")
         self._sync_series_scale(mode)
         self.chart_series.set_data(self._series_payload, mag_mode=mode)
+        self._apply_chart_presentation()
 
     def _on_series_scale_changed(self, _index):
         # The observer changed what the axis measures. The chart rebuilds

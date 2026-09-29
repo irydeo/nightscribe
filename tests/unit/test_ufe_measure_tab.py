@@ -1699,3 +1699,58 @@ def test_the_trend_is_on_by_default(dlg):
     tab = dlg.tab_measure
     assert tab.chk_series_mean.isChecked()
     assert tab.spn_series_meanwin.value() == 5
+
+
+# ---------------- the series doors, and the trend that was ticked ------
+
+def test_every_button_of_the_row_lands_in_the_series_menu(dlg, qapp):
+    # Reported: the "discard the visit's curve" button came out broken and
+    # totally out of place. The panel moves the row's buttons into the
+    # "Series" menu from a list of NAMES, and the new button was not on the
+    # list: it stayed inside the row while the row itself was removed from
+    # the panel, so it had no layout to place it. The row is read now, not
+    # guessed, so a button added to the Designer file cannot be orphaned:
+    # this test reads the .ui itself, which is where the row is defined.
+    import re
+    import xml.etree.ElementTree as ET
+    from pathlib import Path
+    from PySide6.QtWidgets import QPushButton
+    ui = Path(__file__).parents[2] / "nightscribe" / "gui" / "ui" \
+        / "ufe_measure_tab.ui"
+    text = ui.read_text(encoding="utf-8")
+    row = re.search(r'<layout class="QHBoxLayout" name="row_series_out">'
+                    r'(.*?)</layout>', text, re.S)
+    from_row = re.findall(r'name="(btn_[\w]+)"', row.group(1))
+    assert from_row, "la fila del Designer tenía botones"
+    tab = dlg.tab_measure
+    panel = tab.btn_series_more.menu().actions()[0].defaultWidget()
+    in_menu = {w.objectName() for w in panel.findChildren(QPushButton)}
+    for name in from_row:
+        assert name in in_menu, name
+    assert "btn_series_discard" in in_menu          # the one that was lost
+    assert "btn_series_undo" in in_menu             # the one from the run row
+    # and the panel keeps only the doors and the action (the invariant is
+    # about where each button LIVES, not about whether it is on screen)
+    outside = {w.objectName() for w in tab.grp_series.findChildren(QPushButton)
+               if w.parentWidget() is not panel}
+    assert outside == {"btn_series_chart", "btn_series"}
+
+
+def test_the_trend_is_painted_when_the_curve_is_generated(dlg, qapp):
+    # Reported: "the mean is ticked but it is not painted when the curve is
+    # generated". The controls are wired to their slots, but a slot only
+    # fires when the control CHANGES: their initial state was never pushed,
+    # so a fresh series came out with no trend, no errors and no binning.
+    tab = dlg.tab_measure
+    assert tab.chk_series_mean.isChecked()           # on by default
+    tab._series_result = None
+    tab._series_payload = list(_visit_points(12))
+    tab._draw_series(tab._series_result.points if tab._series_result else
+                     [])
+    # with a payload, drawing it must leave the chart saying what the
+    # controls say
+    tab._series_payload = list(_visit_points(12))
+    tab.chart_series.set_data(tab._series_payload)
+    tab._apply_chart_presentation()
+    assert tab.chart_series._mean_window == tab.spn_series_meanwin.value()
+    assert tab.chart_series._mean_window >= 2

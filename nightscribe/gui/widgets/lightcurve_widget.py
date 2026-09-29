@@ -102,7 +102,7 @@ _PAD = 0.10                 # 10 % of the window as air
 
 # How opaque a filled marker is: enough to read the band's colour, a hair
 # short of solid so a dense cloud keeps its texture
-_POINT_ALPHA = 0.92
+_POINT_ALPHA = 0.85
 
 # How opaque the line between measurements is: a guide for the eye
 _LINK_ALPHA = 0.55
@@ -212,7 +212,11 @@ def _point_style(p):
 
 # Quality-gate colour: a flagged point keeps its place on the curve but is
 # drawn as a hollow diamond, never hidden (ADR-048, T7).
-FLAG_COLOUR = "#e0a030"
+#
+# Calmer than it was (#e0a030): a night with a thin comparison set flags
+# dozens of points, and a chart covered in bright amber reads as an alarm
+# instead of as a note. The flag still says what it says, at a lower voice.
+FLAG_COLOUR = "#c49a4a"
 
 # Not every flag means the same thing. A DATA flag says the point itself is
 # suspect (the star saturated, a cosmic ray, the focus blew up, the frame
@@ -1324,7 +1328,7 @@ class LightCurveChart(ChartView):
                     if off:
                         self._over_note += 1
                     colour, filled = _point_style(p)
-                    radius = 4.2
+                    radius = 3.8
                     if excluded:
                         # out of the curve but ON the chart: a grey cross,
                         # never a silent deletion
@@ -1338,7 +1342,7 @@ class LightCurveChart(ChartView):
                     elif off:
                         self._draw_caret(x, y_draw, off)
                     else:
-                        pen = QPen(QColor(FLAG_COLOUR), 1.0) if caveat \
+                        pen = QPen(QColor(FLAG_COLOUR), 0.9) if caveat \
                             else None
                         if caveat:
                             caveat_seen = True
@@ -1478,8 +1482,10 @@ class LightCurveChart(ChartView):
             return
         pts = [(self._map_x(mjd), self._map_y(mag)) for mjd, mag in smooth]
         path = _monotone_points(pts)
-        for width, pen_colour in ((4.0, QColor(palette.BG)),
-                                  (2.4, QColor(palette.FG))):
+        # thicker than the data on purpose: it is the line the eye must
+        # follow, and the halo under it keeps it apart from a dense cloud
+        for width, pen_colour in ((5.0, QColor(palette.BG)),
+                                  (3.0, QColor(palette.FG))):
             pen = QPen(pen_colour, width)
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)

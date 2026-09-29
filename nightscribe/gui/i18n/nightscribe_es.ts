@@ -7427,6 +7427,18 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</source>
         <translation>Esta placa no tiene posición resuelta, así que el campo de comparación no se puede construir del catálogo. Tu secuencia ({0} estrellas) está cargada y se medirá con la placa; sus anillos necesitan una placa resuelta: usa «Resolver astrometría…» o el resolutor de Ajustes.</translation>
+    </message>
+    <message>
+        <source>The catalogue returned no stars inside this plate (is the pointing right?).</source>
+        <translation>El catálogo no ha devuelto ninguna estrella dentro de esta placa (¿apunta bien la resolución?).</translation>
+    </message>
+    <message>
+        <source>The proposal found no usable comparison star.</source>
+        <translation>La propuesta no encontró ninguna comparsa válida.</translation>
+    </message>
+    <message>
+        <source>{0} Your sequence of {1} stars is kept; nothing was lost.</source>
+        <translation>{0} Tu secuencia de {1} estrellas se mantiene; no se ha perdido nada.</translation>
     </message></context>
 <context>
     <name>UfeDialog</name>

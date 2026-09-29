@@ -406,6 +406,16 @@ class ChartView(QGraphicsView):
         # @return: (x, y) scene coordinates
         scale = max(self.transform().m11(), 1e-3)
         cursor = self.mapToScene(viewport_pos.toPoint())
+        if getattr(self, "_tooltip_anchor", "cursor") == "bottom_left":
+            # A CALM READOUT (the UFE's plate): the bubble used to chase the
+            # cursor, covering the very pixels being inspected and moving
+            # under the eye (reported). Anchored to the bottom-left corner
+            # of the viewport it reads like a status line and never hides
+            # the plate.
+            vp_h = self.viewport().height()
+            corner = self.mapToScene(0, vp_h - 4)
+            return corner.x() + 8.0 / scale, corner.y() - br.height()
+
         # approximate the visible scene width to decide the flip
         edge = self.mapToScene(self.viewport().width(), 0).x()
         gap = 14.0 / scale

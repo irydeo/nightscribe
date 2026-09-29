@@ -171,6 +171,43 @@ def test_generate_failure_is_honest(dlg, monkeypatch):
     assert "failed" in dlg.tab_compare.lbl_status.text()
 
 
+def test_a_failed_query_keeps_the_sequence_the_observer_had(dlg, monkeypatch):
+    # Reported: "Build the sequence builds nothing". A query that fails (or
+    # that answers with nothing ON THIS PLATE) used to leave the observer
+    # with an empty table, because the field landing wiped the sequence
+    # before knowing whether it could replace it. What was there is kept,
+    # and the message says so.
+    tab = dlg.tab_compare
+    tab._entries = [{"name": "Comp1", "kind": "comp",
+                     "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}},
+                    {"name": "Comp2", "kind": "comp",
+                     "star": {"ra": 30.1, "dec": 45.1, "mag": 12.4}}]
+    tab._build_backup = list(tab._entries)
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
+                        lambda *a, **kw: _FakeFieldWorker(*a, **kw, field=None))
+    tab._on_generate()
+    assert len(tab._entries) == 2                 # nothing was lost
+    assert "kept" in tab.lbl_status.text() or "2" in tab.lbl_status.text()
+
+
+def test_a_field_with_no_stars_on_the_plate_keeps_the_sequence(dlg,
+                                                              monkeypatch):
+    # The catalogue answered, but nothing lands on this plate (a wrong
+    # pointing, a crop, a tiny field): there is nothing to propose, and the
+    # observer's own sequence is worth more than an empty table.
+    tab = dlg.tab_compare
+    tab._entries = [{"name": "Comp1", "kind": "comp",
+                     "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}}]
+    tab._build_backup = list(tab._entries)
+    empty_place = _field(dlg, n=6)
+    for star in empty_place["stars"]:
+        star["ra"], star["dec"] = 359.0, -89.0     # far off this plate
+    tab._on_field_ready(empty_place)
+    assert len(tab._entries) == 1                 # kept
+    assert "kept" in tab.lbl_status.text()
+    assert tab._worker is None
+
+
 def test_generate_reports_the_pipeline_stages(dlg, monkeypatch):
     # The catalog queries take a while; their stages must reach the
     # status line in the observer's language. Regression: the UFE

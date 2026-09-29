@@ -598,6 +598,11 @@ class UfeCompareTab(QWidget):
         # plate (reported: "I have a comparison star fixed by hand, I press
         # Build the sequence and it builds nothing"). Without this the click
         # started a blind solve and the observer saw a dialog come and go.
+        # What the observer has right now, kept while the catalogue
+        # answers: a query that fails, or that returns nothing ON THIS
+        # PLATE, must not leave them with an empty sequence (reported as
+        # "it builds nothing" when what it did was erase what was there).
+        self._build_backup = list(self._entries)
         if self._state.wcs is None and self._entries:
             self._say(self.tr(
                 "This plate has no solved position, so the comparison field "
@@ -690,13 +695,40 @@ class UfeCompareTab(QWidget):
         self._worker.finished.connect(field_landed)
         self._worker.start()
 
+    def _restore_sequence(self, message):
+        # Says why the build could not deliver, and puts back what the
+        # observer had. Nothing is deleted: a rebuild that cannot deliver
+        # keeps the sequence it was going to replace.
+        #
+        # The reason is said ALWAYS (even with nothing to restore: a failure
+        # the observer cannot read is a failure nobody can fix); the "it is
+        # kept" half is added when there was a sequence to keep. The text
+        # arrives already through self.tr, like every other visible string
+        # of this widget.
+        # @args: message - the reason, translated
+        # @return: True when something was restored
+        backup = list(getattr(self, "_build_backup", None) or [])
+        self._build_backup = []
+        text = message
+        if not backup:
+            self._say(text)
+            return False
+        self._entries = backup
+        self._redraw_entries()
+        self._reload_table()
+        self._commit()
+        self._say(self.tr(
+            "{0} Your sequence of {1} stars is kept; nothing was lost."
+        ).format(text, len(backup)))
+        return True
+
     def _on_field_ready(self, field):
         # @args: field - compstars.load_field result, or {} on failure
         self.btn_field.setEnabled(True)
         self._worker = None
         if not field:
             self._auto_propose = False
-            self._say(self.tr(
+            self._restore_sequence(self.tr(
                 "The catalog query failed (offline?). Try again later."))
             return
         self._field = field
@@ -708,6 +740,16 @@ class UfeCompareTab(QWidget):
                 continue
             star["_sx"], star["_sy"] = pos
             self._stars.append(star)
+        if not self._stars:
+            # the catalogue answered but NOTHING lands on this plate: the
+            # pointing is wrong, the field is too small, or the plate is a
+            # crop. Either way there is nothing to propose, and the
+            # observer's own sequence is worth more than an empty table.
+            self._auto_propose = False
+            self._restore_sequence(self.tr(
+                "The catalogue returned no stars inside this plate (is the "
+                "pointing right?)."))
+            return
         wcs_note = ""
         if field.get("vsx_warning"):
             wcs_note = " · " + self.tr("VSX check failed")
@@ -1050,6 +1092,13 @@ class UfeCompareTab(QWidget):
             text += " " + self.tr("Left out {0} on your own plate: {1}").format(
                 len(rejected),
                 ", ".join(f"{k} × {v}" for k, v in sorted(counts.items())))
+        if not self._entries:
+            # the proposal has nothing usable: say it and keep what was
+            # there (the reasons are already counted in the message below)
+            if self._restore_sequence(self.tr(
+                    "The proposal found no usable comparison star.")):
+                return
+        self._build_backup = []
         if before == [e.get("name") for e in self._entries]:
             # the same proposal is not a failure, but it LOOKS like one
             # (nothing on screen changes): say it instead of letting the

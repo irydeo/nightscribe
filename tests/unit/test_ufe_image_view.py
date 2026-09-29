@@ -242,24 +242,22 @@ def test_pick_cursor_survives_a_pan_drag(view, qapp):
     assert view.viewport().cursor().shape() == Qt.OpenHandCursor
 
 
-def test_pick_mode_pins_the_probe_panel_to_the_corner(view):
-    # While picking, the probe panel sits at the viewport's top-left
-    # corner (≈12 device px in) instead of hovering next to the cursor;
-    # out of pick mode it keeps following the cursor
+def test_the_probe_readout_is_anchored_to_the_corner(view):
+    # Reported: the readout chased the cursor and covered the coordinates /
+    # the pixels being looked at. It is a status line now: anchored to the
+    # bottom-left, in picking mode and out of it, and it never follows the
+    # mouse.
     from PySide6.QtCore import QPointF
     factor = view.current_factor()
-    view.set_pick_cursor(True)
-    view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
-    pos = view._tooltip.pos()
-    tl = view.mapToScene(0, 0)
-    assert 0 < (pos.x() - tl.x()) * factor < 20
-    assert 0 < (pos.y() - tl.y()) * factor < 20
-    view.set_pick_cursor(False)
-    view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
-    pos = view._tooltip.pos()
-    cursor = view.mapToScene(400, 300)
-    assert (pos.x() - cursor.x()) * factor == pytest.approx(14.0, abs=2.0)
-    assert pos.y() < cursor.y()          # above the cursor, as always
+    for picking in (True, False):
+        view.set_pick_cursor(picking)
+        view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
+        pos = view._tooltip.pos()
+        bl = view.mapToScene(0, view.viewport().height() - 6)
+        assert (pos.x() - bl.x()) * factor == pytest.approx(10.0, abs=2.0)
+        assert pos.y() < bl.y()              # its bottom sits at the corner
+        assert (pos.y() + view._tooltip.boundingRect().height()) * factor == \
+            pytest.approx(bl.y() * factor, abs=4.0)
     view._hide_tooltip()
 
 
@@ -378,7 +376,12 @@ def test_boxes_provider_hiccup_never_breaks_the_paint(view, tmp_path):
     view.viewport().repaint()                 # the screen paint survives
 
 
-def test_boxes_duck_the_probe_anchor(view, tmp_path):
+def test_the_readout_sits_low_and_the_scale_bar_steps_aside(view, tmp_path):
+    # The readout is anchored to the bottom-left (see
+    # test_the_probe_readout_is_anchored_to_the_corner), so the corner the
+    # metadata boxes need is free and the boxes no longer have to duck
+    # anything. What lives down there now is the scale bar, and IT steps up
+    # while the readout is showing: the two must never overlap.
     from PySide6.QtCore import QPointF, QRectF
     view._state.load(MONO)
     view.set_pick_cursor(True)
@@ -386,12 +389,39 @@ def test_boxes_duck_the_probe_anchor(view, tmp_path):
                                            QRectF(0, 0, 50, 20))
     view.set_boxes_provider(_boxes_sample)
     view.set_hud(boxes=True)
-    # the export runs the HUD paint (offscreen repaints are not a thing)
     view.export_png(tmp_path / "boxes.png")
     assert view._boxes_tl_h > 0
     _x, y_boxed = view._tooltip_anchor_pos(QPointF(3, 3),
                                            QRectF(0, 0, 50, 20))
-    assert y_boxed > y_plain                  # the probe ducks the box
+    assert y_boxed == pytest.approx(y_plain)      # the boxes do not move it
+    # the scale bar, though, steps up by the readout's own height
+    class _Spy:
+        def __init__(self):
+            self.lines = []
+
+        def setPen(self, *_a):
+            pass
+
+        def setFont(self, *_a):
+            pass
+
+        def drawLine(self, a, b):
+            self.lines.append((a.y(), b.y()))
+
+        def drawText(self, *_a):
+            pass
+
+    spy = _Spy()
+    view._tooltip = type("T", (), {"boundingRect": lambda self: QRectF(
+        0, 0, 80, 24)})()
+    view._paint_scale(spy, 600, 400, 1.0, right=False)
+    ducked = min(y for line in spy.lines for y in line)
+    spy2 = _Spy()
+    view._tooltip = None
+    view._paint_scale(spy2, 600, 400, 1.0, right=False)
+    plain = min(y for line in spy2.lines for y in line)
+    assert ducked < plain                         # the bar moved UP
+    assert plain - ducked >= 24                   # by the readout's height
     view.set_pick_cursor(False)
 
 

@@ -7427,6 +7427,18 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <source>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</source>
         <translation>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</translation>
+    </message>
+    <message>
+        <source>The catalogue returned no stars inside this plate (is the pointing right?).</source>
+        <translation>The catalogue returned no stars inside this plate (is the pointing right?).</translation>
+    </message>
+    <message>
+        <source>The proposal found no usable comparison star.</source>
+        <translation>The proposal found no usable comparison star.</translation>
+    </message>
+    <message>
+        <source>{0} Your sequence of {1} stars is kept; nothing was lost.</source>
+        <translation>{0} Your sequence of {1} stars is kept; nothing was lost.</translation>
     </message></context>
 <context>
     <name>UfeDialog</name>

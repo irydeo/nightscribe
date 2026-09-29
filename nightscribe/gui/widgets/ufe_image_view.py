@@ -158,6 +158,10 @@ class UfeImageView(ChartView):
         # the object's line, painted OVER the plate (UFE layout v2: it used
         # to be a row of the window under the top bar, 31 px of height for
         # one line of text and a distraction from the picture)
+        # the hover readout is anchored to the bottom-left corner: on a
+        # plate the bubble must not chase the cursor (it covered the pixels
+        # being inspected, and it jumped under the eye)
+        self._tooltip_anchor = "bottom_left"
         self._title_line = ""
         self._show_object_mark = True    # the top bar toggle; on by default
         self._frame_override = None  # Blink tab: fn() -> uint8 display
@@ -582,18 +586,19 @@ class UfeImageView(ChartView):
         super().enterEvent(event)
 
     def _tooltip_anchor_pos(self, viewport_pos, br):
-        # While picking, the probe panel never chases the cursor (it would
-        # cover the very star being marked): it pins to the viewport's
-        # top-left corner, the one free of HUD pieces (north arrow
-        # top-right, scale bar bottom-left, watermark bottom-right).
-        if self._pick_mode:
-            scale = max(self.current_factor(), 1e-3)
-            margin = 12.0 / scale
-            tl = self.mapToScene(0, 0)
-            # the metadata top-left box would sit under the panel: duck
-            extra = self._boxes_tl_h / scale if self.show_boxes else 0.0
-            return tl.x() + margin, tl.y() + margin + extra
-        return super()._tooltip_anchor_pos(viewport_pos, br)
+        # The probe readout is a STATUS LINE, not a bubble: it is anchored
+        # to the bottom-left corner of the viewport and it does not follow
+        # the cursor. Chasing the mouse covered the very pixels being
+        # inspected and moved under the eye (reported twice: "it covers the
+        # coordinates as we move the mouse" / "lower it").
+        #
+        # The readout publishes its height through the tooltip item itself,
+        # so the HUD piece that lives in that corner (the scale bar) can
+        # duck it while it is showing (see _paint_scale).
+        scale = max(self.current_factor(), 1e-3)
+        vp_h = self.viewport().height()
+        corner = self.mapToScene(0, vp_h - 6)
+        return corner.x() + 10.0 / scale, corner.y() - br.height()
 
     def mouseMoveEvent(self, event):
         # The probe stays as always; in pick mode the cursor position is
@@ -877,6 +882,12 @@ class UfeImageView(ChartView):
         bar = min(max(arcsec / per_px, 12.0 * k), w * 0.35)
         x0 = (w - 16 * k - bar) if right else 16 * k
         y0 = h - 26 * k
+        if not right and self._tooltip is not None:
+            # the probe's readout is anchored down here: the bar steps up
+            # while it is showing (the same trick the corner boxes use for
+            # the pick reticle)
+            y0 -= self._tooltip.boundingRect().height() + 10.0
+
         for color, width in ((QColor(0, 0, 0, 160), 3.6 * k),
                              (QColor(palette.FG), 2.0 * k)):
             painter.setPen(QPen(color, width))

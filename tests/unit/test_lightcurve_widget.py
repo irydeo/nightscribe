@@ -1049,8 +1049,9 @@ def test_the_trend_is_the_one_bright_line():
     # the ink and its dark halo, and nothing else in the band's colour
     assert palette.FG.lower() in pales
     assert pales <= {palette.FG.lower(), palette.BG.lower()}
+    # thick on purpose: it is the line the eye must follow
     assert any(it.pen().color().name() == palette.FG.lower()
-               and it.pen().widthF() >= 2.0 for it in trend)
+               and it.pen().widthF() >= 3.0 for it in trend)
 
 
 def test_the_error_bars_are_quiet_and_behind_the_points():
@@ -1099,3 +1100,26 @@ def test_the_smoothed_trend_never_invents_a_peak():
     # and a two-point trend is left alone (nothing to smooth)
     assert _monotone_points([(0.0, 1.0), (1.0, 2.0)]) == [(0.0, 1.0),
                                                           (1.0, 2.0)]
+
+
+def test_the_points_are_subtle_not_shrill():
+    # Reported: "make the points more subtle (less shrill yellow)". The
+    # marker is a touch smaller and a hair transparent, so a dense night
+    # keeps its texture, and the amber that flags a thin comparison set is
+    # calmer: a flagged night reads as a note, not as an alarm.
+    from PySide6.QtWidgets import QGraphicsEllipseItem
+    from nightscribe.gui.widgets.lightcurve_widget import (FLAG_COLOUR,
+                                                           _POINT_ALPHA)
+    _app()
+    assert FLAG_COLOUR != "#e0a030"          # not the old shrill amber
+    chart = LightCurveChart()
+    chart.set_data(_curve(6))
+    dots = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsEllipseItem)]
+    assert dots
+    radius = max(it.rect().width() for it in dots) / 2.0
+    assert radius <= 4.0
+    alphas = {it.brush().color().alpha() for it in dots
+              if it.brush().color().alpha() > 0}
+    assert alphas
+    assert max(alphas) <= int(255 * _POINT_ALPHA) + 1

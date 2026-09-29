@@ -8806,6 +8806,14 @@ tocan.</translation>
     <message>
         <source>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</source>
         <translation>Guarda la curva exactamente como la ves: la ventana a la que has hecho zoom, los puntos que has seleccionado o excluido, el rango fijo si lo has puesto. Lo que hay en pantalla es lo que va al fichero</translation>
+    </message>
+    <message>
+        <source>The series failed and stopped: {0}</source>
+        <translation>La serie falló y se detuvo: {0}</translation>
+    </message>
+    <message>
+        <source>Live mode failed and stopped: {0}</source>
+        <translation>El modo en vivo falló y se detuvo: {0}</translation>
     </message></context>
 <context>
     <name>UfeSequenceDialog</name>

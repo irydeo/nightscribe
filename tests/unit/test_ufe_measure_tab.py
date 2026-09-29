@@ -1562,3 +1562,18 @@ def test_a_plain_click_on_the_curve_does_not_hide_the_image(dlg):
     dlg.show_curve()
     tab.chart_series.scene_clicked.emit(QPointF(0.0, 0.0))
     assert dlg.stack_centre.currentIndex() == 1
+
+
+def test_a_failed_series_does_not_leave_the_tab_looking_hung(dlg):
+    # What the observer actually saw: a 142-frame run died at frame ~18 and
+    # the tab kept the progress bar frozen there, which reads as a hang.
+    # The failure was real and had a reason (a comparison star off the
+    # frame); the UI must say so and put itself back.
+    tab = dlg.tab_measure
+    tab.prg_series.setRange(0, 142)
+    tab.prg_series.setValue(18)
+    tab._on_series_failed("negative dimensions are not allowed")
+    assert tab.prg_series.value() == 0            # not frozen at 13 %
+    assert tab.btn_series.text() == tab._btn_series_label   # not "Cancel"
+    assert tab._series_worker is None
+    assert "negative dimensions" in tab.lbl_status.text()

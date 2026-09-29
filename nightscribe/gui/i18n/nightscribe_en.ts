@@ -8806,6 +8806,14 @@ not touched.</translation>
     <message>
         <source>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</source>
         <translation>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</translation>
+    </message>
+    <message>
+        <source>The series failed and stopped: {0}</source>
+        <translation>The series failed and stopped: {0}</translation>
+    </message>
+    <message>
+        <source>Live mode failed and stopped: {0}</source>
+        <translation>Live mode failed and stopped: {0}</translation>
     </message></context>
 <context>
     <name>UfeSequenceDialog</name>

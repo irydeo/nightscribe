@@ -74,10 +74,16 @@ MIN_N = 3
 def _centroid(data, x, y, half=5):
     # @args: data - 2D numpy array, x, y - float pixel, half - box half-size
     # @return: (cx, cy) refined to sub-pixel (intensity-weighted centroid)
-    y0, y1 = max(0, int(y) - half), min(data.shape[0], int(y) + half + 1)
-    x0, x1 = max(0, int(x) - half), min(data.shape[1], int(x) + half + 1)
+    # the same window rule as everywhere else (photometry.cutout_window,
+    # imported here to keep the module graph acyclic): a star off the frame
+    # gets its click back instead of a crash
+    from .photometry import cutout_window
+    win = cutout_window(data, x, y, half)
+    if win is None:
+        return float(x), float(y)
+    y0, y1, x0, x1 = win
     sub = data[y0:y1, x0:x1]
-    if sub.size == 0 or not np.any(np.isfinite(sub)):
+    if not np.any(np.isfinite(sub)):
         return float(x), float(y)
     total = float(np.nansum(sub))
     if total <= 0:

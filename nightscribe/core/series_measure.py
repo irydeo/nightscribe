@@ -471,13 +471,12 @@ def _cosmic_hit(data, x, y, r_ap, sky_pp, sigma_sky, k):
     if data is None or sky_pp is None or sigma_sky is None \
             or sigma_sky <= 0:
         return False
-    h, w = data.shape
-    x0 = max(0, int(math.floor(x - r_ap)))
-    x1 = min(w, int(math.ceil(x + r_ap)) + 1)
-    y0 = max(0, int(math.floor(y - r_ap)))
-    y1 = min(h, int(math.ceil(y + r_ap)) + 1)
-    if x1 <= x0 or y1 <= y0:
+    # one window rule for the whole app (see photometry.cutout_window):
+    # a frame edge is a place where a star is not, never a crash
+    win = photometry.cutout_window(data, x, y, r_ap)
+    if win is None:
         return False
+    y0, y1, x0, x1 = win
     sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
     yy, xx = np.mgrid[y0:y1, x0:x1]
     inside = (xx - x) ** 2 + (yy - y) ** 2 <= r_ap ** 2
@@ -1696,7 +1695,13 @@ def _measure_frames(paths, cfg, targets, progress=None, cancel=None):
                         used = None
                 if used is not None:
                     report["aligned"] += 1
-                    report["shifts_px"].append(float(used["shift_px"]))
+                    # the report is DIAGNOSTIC: it must never be able to
+                    # stop a measurement. An inherited transform carries
+                    # the previous frame's numbers (it is the same one),
+                    # and reading them with done=False in mind is what
+                    # crashed a real 142-frame run with KeyError: 'shift_px'
+                    if used.get("shift_px") is not None:
+                        report["shifts_px"].append(float(used["shift_px"]))
                     if used.get("rms_px") is not None:
                         report["rms_px"].append(float(used["rms_px"]))
                     report["angle_deg"].append(
@@ -1718,8 +1723,15 @@ def _measure_frames(paths, cfg, targets, progress=None, cancel=None):
                              *register.ref_to_src_point(
                                  used, (t[1], t[2]), data.shape),
                              t[3]) for t in targets]
+                    # every field a reader may ask for travels with the
+                    # inherited transform: it IS the previous frame's
+                    # solution, and the report says so by counting it as
+                    # inherited
                     prev_align = {"dx": used["dx"], "dy": used["dy"],
                                   "angle": used["angle"],
+                                  "shift_px": used.get("shift_px"),
+                                  "rms_px": used.get("rms_px"),
+                                  "angle_deg": used.get("angle_deg"),
                                   "n": used.get("n") or 0}
         if targets_ov is None:
             targets_ov = [(t[0], t[1], t[2], t[3]) for t in targets]

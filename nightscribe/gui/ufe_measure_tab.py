@@ -1466,10 +1466,20 @@ class UfeMeasureTab(QWidget):
         return str(err)
 
     def _on_series_failed(self, message):
+        # A failed run is OVER: the button comes back, the progress bar goes
+        # back to zero and the reason goes to the status line. Leaving the
+        # bar frozen where the engine died (13 % of a real run) is what made
+        # a plain failure look like a hang: the observer sees a stuck bar
+        # and a log they do not read, and concludes the app died.
+        # @args: message - the worker's own error text (technical on
+        #        purpose: a crash is a bug report, and hiding it helps
+        #        nobody)
+        # @return: None
         self._series_button_running(False)
         self._series_worker = None
-        self.lbl_status.setText(self.tr("The series failed: {0}")
-                                .format(message))
+        self.prg_series.setValue(0)
+        self.lbl_status.setText(self.tr(
+            "The series failed and stopped: {0}").format(message))
 
     def _series_rows(self, points):
         # @return: the rows the host persists (one run, one batch). The
@@ -1740,11 +1750,19 @@ class UfeMeasureTab(QWidget):
 
     def _on_live_failed(self, message):
         # The watch itself died (the folder went away, the engine could
-        # not be imported): the observer reads it, never a silent stop.
+        # not be imported): the observer reads it, never a silent stop, and
+        # the progress bar stops pretending the watch is still running.
         # @args: message - the worker's error text
         # @return: None; the outcome shows in the status line.
+        self._live_worker = None
+        # the checkbox goes back off, without re-firing its handler (the
+        # watch is already dead; toggling it would try to stop it again)
+        self.chk_series_live.blockSignals(True)
+        self.chk_series_live.setChecked(False)
+        self.chk_series_live.blockSignals(False)
+        self.prg_series.setValue(0)
         self.lbl_status.setText(
-            self.tr("Live mode failed: {0}").format(message))
+            self.tr("Live mode failed and stopped: {0}").format(message))
 
     def _open_series_docs(self):
         # D37: the "?" opens the sequences guide in the docs browser.

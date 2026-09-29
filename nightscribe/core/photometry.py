@@ -478,6 +478,38 @@ def _sky_plane_at(ann_x, ann_y, ann_v, x0, y0, iters=SIG_ITERS):
     return fit[0] if fit is not None else None
 
 
+def cutout_window(data, x, y, half):
+    # The pixel window around a star: clamped to the frame, and a real
+    # window or None.
+    #
+    # This looks like a one-liner with max/min and it is not. A star twenty
+    # pixels above the top edge gives `y1 = min(h, y + half + 1) = -19`, and
+    # `data[0:-19]` is a VALID, non-empty slice in numpy (a negative index
+    # counts from the end, so it silently reads the BOTTOM of the frame)
+    # while `np.mgrid[0:-19]` reads that same -19 as a negative SIZE and
+    # raises "negative dimensions are not allowed". That is not theory: it
+    # killed a real run (HAT-P-32 b, 142 frames, dead at frame ~18) because
+    # a comparison star of the sequence fell off the top of the frame.
+    #
+    # Clipping BOTH ends is the only honest way, and having one function do
+    # it means no reader of this module has to remember the trap.
+    #
+    # @args: data - 2D array, x/y - the star's centre in pixels (float),
+    #        half - the window's half-size
+    # @return: (y0, y1, x0, x1) with y1 > y0 and x1 > x0, or None when the
+    #          window has no pixels at all
+    if data is None or getattr(data, "size", 0) == 0:
+        return None
+    h, w = int(data.shape[0]), int(data.shape[1])
+    x0 = int(min(max(math.floor(x - half), 0), w))
+    x1 = int(min(max(math.ceil(x + half + 1), 0), w))
+    y0 = int(min(max(math.floor(y - half), 0), h))
+    y1 = int(min(max(math.ceil(y + half + 1), 0), h))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return y0, y1, x0, x1
+
+
 def fwhm_radial(data, x, y, rmax=None, level=None, bin_width=0.5):
     # The seeing, measured as the radius of the HALF MAXIMUM.
     #
@@ -501,15 +533,12 @@ def fwhm_radial(data, x, y, rmax=None, level=None, bin_width=0.5):
     #        bin_width - radial step in pixels
     # @return: the FWHM in pixels, or None when no crossing is found
     arr = np.asarray(data, dtype=np.float64)
-    h, w = arr.shape
     rmax = float(rmax if rmax else 12.0)
-    x0 = max(0, int(math.floor(x - rmax - 1)))
-    x1 = min(w, int(math.ceil(x + rmax + 2)))
-    y0 = max(0, int(math.floor(y - rmax - 1)))
-    y1 = min(h, int(math.ceil(y + rmax + 2)))
-    sub = arr[y0:y1, x0:x1]
-    if sub.size == 0:
+    win = cutout_window(arr, x, y, rmax + 1)
+    if win is None:
         return None
+    y0, y1, x0, x1 = win
+    sub = arr[y0:y1, x0:x1]
     yy, xx = np.mgrid[y0:y1, x0:x1]
     dist = np.hypot(xx - x, yy - y)
     inside = dist < rmax
@@ -616,11 +645,13 @@ def estimate_fwhm(data, positions, sat_adu=None, method="moments",
     fwhms = []
     for x, y in positions:
         half = 9   # a 19x19 cutout: enough for any sane seeing disc
-        y0, y1 = max(0, int(y) - half), min(data.shape[0], int(y) + half + 1)
-        x0, x1 = max(0, int(x) - half), min(data.shape[1], int(x) + half + 1)
-        sub = data[y0:y1, x0:x1]
-        if sub.size == 0:
+        win = cutout_window(data, x, y, half)
+        if win is None:
+            # the star is off the frame (a comparison star of the sequence
+            # can be): it has no seeing to measure and it is not an error
             continue
+        y0, y1, x0, x1 = win
+        sub = data[y0:y1, x0:x1]
         peak = float(np.nanmax(sub))
         if sat_adu is not None and peak >= SAT_FRAC * float(sat_adu):
             continue
@@ -926,10 +957,11 @@ def lock_local_peak(data, x, y, max_dist=4.0, k=4.0):
     # @return: (px, py) of the nearest local source, or None
     if data is None or data.size == 0:
         return None
-    h, w = data.shape
     half = int(max_dist) + 7
-    y0, y1 = max(0, int(round(y)) - half), min(h, int(round(y)) + half + 1)
-    x0, x1 = max(0, int(round(x)) - half), min(w, int(round(x)) + half + 1)
+    win = cutout_window(data, x, y, half)
+    if win is None:
+        return None
+    y0, y1, x0, x1 = win
     best, best_d = None, max_dist ** 2
     for px, py, _pk in local_sources(data[y0:y1, x0:x1], k=k, min_sep=3):
         d = (px + x0 - x) ** 2 + (py + y0 - y) ** 2
@@ -969,14 +1001,13 @@ def local_neighbours(data, x, y, seed, reach=12.0, k=4.0,
     # @return: [(nx, ny, distance), ...] sorted by distance (nearest first)
     if data is None or seed is None:
         return []
-    h, w = data.shape
     sx, sy = seed
     half = int(reach) + 7
-    y0, y1 = max(0, int(round(sy)) - half), min(h, int(round(sy)) + half + 1)
-    x0, x1 = max(0, int(round(sx)) - half), min(w, int(round(sx)) + half + 1)
-    sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
-    if sub.size == 0:
+    win = cutout_window(data, sx, sy, half)
+    if win is None:
         return []
+    y0, y1, x0, x1 = win
+    sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
     background = float(np.median(sub))
     out = []
     for px, py, pk in local_sources(sub, k=k, min_sep=3):
@@ -1103,12 +1134,15 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None, robust=True):
         # keep the neighbour's core and its bright wing out of the window:
         # half of the distance is inside our own star for any sane PSF
         window = int(max(3, min(half, math.floor(0.5 * neighbours[0][2]))))
-    y0 = max(0, int(round(sy)) - window)
-    y1 = min(h, int(round(sy)) + window + 1)
-    x0 = max(0, int(round(sx)) - window)
-    x1 = min(w, int(round(sx)) + window + 1)
+    win = cutout_window(data, sx, sy, window)
+    if win is None:
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": None,
+                "reason": {"es": "sin píxeles utilizables",
+                           "en": "no usable pixels"}}
+    y0, y1, x0, x1 = win
     sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
-    if sub.size == 0 or not np.any(np.isfinite(sub)):
+    if not np.any(np.isfinite(sub)):
         return {"x": float(x), "y": float(y), "ok": False,
                 "moved": False, "snr": None,
                 "reason": {"es": "sin píxeles utilizables",
@@ -1327,10 +1361,12 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
     peak_snr = snr_peak[2]
     # environment: nearest detected neighbour around the target
     cut = max(32, int(4 * R_ANN_OUT))
-    y0, y1 = max(0, int(cy) - cut), min(h, int(cy) + cut)
-    x0, x1 = max(0, int(cx) - cut), min(w, int(cx) + cut)
-    sub = np.ascontiguousarray(data[y0:y1, x0:x1])
-    sources = series.detect_sources(sub, k=5.0) if sub.size else []
+    win = cutout_window(data, cx, cy, cut)
+    sources = []
+    if win is not None:
+        y0, y1, x0, x1 = win
+        sub = np.ascontiguousarray(data[y0:y1, x0:x1])
+        sources = series.detect_sources(sub, k=5.0)
     nearest = None
     for sx, sy, _pk in sources:
         d = math.hypot(sx + x0 - cx, sy + y0 - cy)

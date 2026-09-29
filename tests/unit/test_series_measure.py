@@ -1041,3 +1041,75 @@ def test_the_engine_builds_the_rows_a_host_persists(tmp_path):
     # a point without a time cannot be placed on a curve: it is not a row
     res.points[1].mjd = None
     assert len(sm.series_rows(res.points)) == len(paths) - 1
+
+
+def test_a_comparison_star_off_the_frame_does_not_kill_the_run(tmp_path):
+    # The real failure: a HAT-P-32 b sequence of 142 frames died at frame
+    # ~18 with "negative dimensions are not allowed" because one comparison
+    # star of the sequence fell off the top of the frame and the seeing
+    # estimation sliced a negative window. A star that is not there is not
+    # an error, and it must not cost the observer the whole night.
+    paths, wcs, comps = _write_frames(tmp_path, 4)
+    off = wcs.pixel_to_sky(4000.0, -4000.0)          # far outside 160x160
+    broken = list(comps)
+    broken[-1] = dict(comps[-1],
+                      star=dict(comps[-1]["star"], ra=off[0], dec=off[1]))
+    cfg = _config(wcs, broken, seeing_aperture=True)
+    res = sm.measure_series(paths, cfg)
+    assert res.status == "complete"
+    pts = [p for p in res.points if p.mag is not None]
+    assert len(pts) == len(paths)          # the target is measured
+    assert all(p.err is not None for p in pts)
+    # the star that was not there is skipped, never silently "measured"
+    assert all(p.n_comps < len(broken) for p in pts)
+
+
+def test_with_every_spot_off_frame_there_is_still_no_crash(tmp_path):
+    # The extreme of the same case: EVERY comparison star off the frame.
+    # There is no zero point to be had, so there are no magnitudes; what
+    # must never happen is the run dying with an exception instead of
+    # saying it plainly.
+    paths, wcs, comps = _write_frames(tmp_path, 3)
+    far = []
+    for e in comps:
+        ra, dec = wcs.pixel_to_sky(9000.0, 9000.0)
+        far.append(dict(e, star=dict(e["star"], ra=ra, dec=dec)))
+    cfg = _config(wcs, far, seeing_aperture=True)
+    res = sm.measure_series(paths, cfg)
+    assert res.status == "complete"                  # never a crash
+    assert all(p.mag is None for p in res.points)    # no comps, no zero point
+    assert any("few_comps" in p.flags for p in res.points)
+
+
+def test_an_inherited_alignment_does_not_crash_the_report(tmp_path,
+                                                          monkeypatch):
+    # The second failure of the same real run (HAT-P-32 b, 142 frames): a
+    # frame whose alignment cannot be verified INHERITS the previous
+    # transform, and the report then read used["shift_px"] off that
+    # inherited dict, which never carried it: KeyError, dead run.
+    #
+    # A report is diagnostic. It must never be able to stop a measurement,
+    # so the inherited transform now travels complete AND the report reads
+    # every field defensively.
+    paths, wcs, comps = _write_frames(tmp_path, 5)
+    from nightscribe.core import register
+    calls = {"n": 0}
+    real = register.trusted
+
+    def sometimes(info, *a, **k):
+        calls["n"] += 1
+        return calls["n"] not in (2, 4)      # the 2nd and 4th are refused
+
+    monkeypatch.setattr(register, "trusted", sometimes)
+    res = sm.measure_series(paths, _config(wcs, comps, align="coords"))
+    assert res.status == "complete"
+    rep = res.align_report
+    assert rep["inherited"] == 2
+    assert rep["n_failed"] == 2
+    # the first frame IS the reference (nothing to align it to), so the
+    # rest are all aligned, the two refused ones through inheritance
+    assert rep["aligned"] == len(paths) - 1
+    # and the report still carries the numbers, inherited frames included
+    # (the previous transform's own shift, which is the honest value)
+    assert "shift_median_px" in rep and "shift_max_px" in rep
+    monkeypatch.setattr(register, "trusted", real)

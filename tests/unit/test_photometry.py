@@ -1172,3 +1172,51 @@ def test_a_refused_target_does_not_refuse_the_others():
     assert not both.targets[1]["ok"]
     assert both.targets[1]["mag"] is None
     assert both.targets[1]["reason"]
+
+
+# ---------------- a star off the frame is not a crash (HAT-P-32 b) ------
+
+def test_a_cutout_outside_the_frame_is_refused_never_a_negative_size():
+    # The bug that killed a real run: a star ABOVE the top edge gives
+    # y1 = min(h, y + half + 1) < 0, and `data[0:-19]` is a valid, non-empty
+    # slice in numpy (a negative index counts from the end) while
+    # np.mgrid[0:-19] reads that -19 as a negative SIZE and raises
+    # "negative dimensions are not allowed". Clipping both ends is the only
+    # honest answer: the window is inside the frame or it does not exist.
+    data = np.full((100, 100), 100.0)
+    for spot in ((-20.0, -20.0), (5.0, -20.0), (150.0, 50.0),
+                 (50.0, -11.0), (50.0, 120.0)):
+        assert phot.cutout_window(data, *spot, 9) is None
+    # a star just past the edge is a REAL window, clamped: its light leaks
+    # into the frame and that is worth measuring
+    for spot in ((-1.0, 50.0), (-5.0, 50.0), (102.0, 50.0)):
+        assert phot.cutout_window(data, *spot, 9) is not None
+    win = phot.cutout_window(data, -5.0, 50.0, 9)
+    assert win is not None
+    y0, y1, x0, x1 = win
+    assert x0 == 0 and x1 > x0 and y1 > y0      # clipped, and usable
+
+
+def test_the_seeing_is_measured_on_the_stars_that_are_there():
+    # One comparison star of the sequence fell off the top of the frame:
+    # that is not an error, it is a star that is not there, and the seeing
+    # of the frame must come from the ones that are.
+    data = _plate(120, 120, [(60.0, 60.0, 8000.0)], noise=1.0)
+    off = (-30.0, 60.0)
+    assert phot.estimate_fwhm(data, [off]) is None
+    assert phot.fwhm_radial(data, *off) is None
+    # with a real star in the list, the frame still gets its seeing
+    got = phot.estimate_fwhm(data, [off, (60.0, 60.0)])
+    assert got is not None and 1.0 < got < 10.0
+
+
+def test_the_crash_that_killed_the_run_does_not_come_back():
+    # The exact call from the traceback, with the exact shape of the bug:
+    # a spot twenty pixels above the top edge of a 160x160 frame. Before
+    # the fix this raised ValueError from np.mgrid.
+    data = np.full((160, 160), 100.0)
+    assert phot.estimate_fwhm(data, [(-20.0, -20.0)]) is None
+    # and the same frame with a star 20 px above the top edge: no star, no
+    # seeing, and above all no exception
+    assert phot.estimate_fwhm(data, [(80.0, -20.0)]) is None
+    assert phot.estimate_fwhm(data, [(80.0, 80.0), (80.0, -20.0)]) is None

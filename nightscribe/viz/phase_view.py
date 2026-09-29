@@ -38,15 +38,19 @@ _NIGHT_COLOURS = (style.ACCENT, style.ACCENT2, "#6a9fd8", "#d8a06a",
                   "#d86a9f", "#8fd86a", "#c86ad8", "#6ad8c8")
 
 
-def _fap_levels(t, y, dy, frequencies, power_max, shuffles=60, seed=7):
+def _fap_levels(t, y, dy, frequencies, power_max, shuffles=30, seed=7):
     # The power level reached by the best peak of a shuffled light curve,
     # for a few probabilities: the dashed lines of the classic plots.
+    # The grid is decimated (only the highest peak matters here) or a
+    # decade-long baseline would make this take a minute.
     # @return: [{"p": 0.1, "level": w}] sorted by probability (descending)
     from ..core import periodogram as pg
     t = np.asarray(t, dtype=float)
     y = np.asarray(y, dtype=float)
     if t.size < 8 or not shuffles:
         return []
+    frequencies = pg.fap_grid(np.asarray(frequencies, dtype=float),
+                              t.size, shuffles)
     rng = np.random.default_rng(seed)
     peaks = []
     for _i in range(int(shuffles)):
@@ -150,17 +154,23 @@ def draw_phase(mags, found=None, out=None, fmt="instagram",
         draw_err = err_ok and float(np.nanmedian(folded["err"])) <= 0.1
         for j, key in enumerate(keys):
             sel = np.asarray([k == key for k in nights], dtype=bool)
-            colour = _NIGHT_COLOURS[j % len(_NIGHT_COLOURS)]
-            err = None if not draw_err else folded["err"][sel]
+            community = str(key) == "AAVSO"
+            colour = style.MUTED if community \
+                else _NIGHT_COLOURS[j % len(_NIGHT_COLOURS)]
+            err = None if (not draw_err or community) else folded["err"][sel]
+            marker = dict(fmt="o", ms=2.8 if not community else 2.2,
+                          mew=0.0, color=colour, ecolor=colour,
+                          elinewidth=0.5,
+                          alpha=0.35 if community
+                          else (0.75 if j == 0 else 0.45))
+            if community:
+                marker.update({"markerfacecolor": "none"})
             ax2.errorbar(folded["phase"][sel], folded["mag"][sel],
-                         yerr=err, fmt="o", ms=2.8, mew=0.0,
-                         color=colour, ecolor=colour, elinewidth=0.5,
-                         alpha=0.75 if j == 0 else 0.45,
-                         label=str(key))
+                         yerr=err, label=str(key) if not community
+                         else style.pick(lang, "comunidad AAVSO",
+                                         "AAVSO community"), **marker)
             ax2.errorbar(folded["phase2"][sel], folded["mag"][sel],
-                         yerr=err, fmt="o", ms=2.8, mew=0.0,
-                         color=colour, ecolor=colour, elinewidth=0.5,
-                         alpha=0.75 if j == 0 else 0.45)
+                         yerr=err, **marker)
         binned = pg.binned_curve(folded["phase"], folded["mag"],
                                  bins=25, phase_max=1.0)
         ax2.plot(binned["phase"], binned["mag"], color=style.FG, lw=1.6,

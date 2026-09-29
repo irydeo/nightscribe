@@ -51,6 +51,7 @@ class PhaseDialog(QDialog):
                  parent=None):
         super().__init__(parent)
         self._points = [dict(p) for p in (points or [])]
+        self._community = []        # the AAVSO curve, never mixed with ours
         self._db = db
         self._pid = project_id
         self._lang = lang or "es"
@@ -64,6 +65,7 @@ class PhaseDialog(QDialog):
         self._ui.cmb_method.addItem(self.tr("PDM (phase dispersion)"), "pdm")
         self._ui.cmb_method.addItem(self.tr("Both"), "both")
         self._ui.btn_search.clicked.connect(self._on_search)
+        self._ui.btn_community.clicked.connect(self._on_community)
         self._ui.btn_export.clicked.connect(self._on_export)
         self._ui.btn_close.clicked.connect(self.accept)
         self._ui.spn_minp.setSpecialValueText(self.tr("automatic"))
@@ -74,7 +76,7 @@ class PhaseDialog(QDialog):
         self._ui.txt_result.setPlainText(self.tr(
             "Press «Search»: the periodogram and the folded curve are "
             "drawn here, with what the data can and cannot say."))
-        self.resize(1180, 760)
+        self.resize(1180, 800)
 
     # ------------------------------------------------------------ helpers
 
@@ -86,7 +88,9 @@ class PhaseDialog(QDialog):
 
     def _curve(self):
         # @return: (t, y, err) float arrays of the usable points, with the
-        #          flagged ones and the robust clip applied when asked
+        #          flagged ones and the robust clip applied when asked, and
+        #          the community's curve folded in at the end (its own
+        #          points carry their own weight)
         import numpy as np
         from ..core import periodogram as pg
         from ..core.series_measure import has_data_flag
@@ -98,14 +102,68 @@ class PhaseDialog(QDialog):
             skipped = len(pts) - len(kept)
             pts = kept
         self._skipped = skipped
-        t = np.asarray([p["mjd"] for p in pts], dtype=float)
-        y = np.asarray([p["mag"] for p in pts], dtype=float)
+        allpts = pts + list(self._community or [])
+        self._all_pts = allpts
+        t = np.asarray([p["mjd"] for p in allpts], dtype=float)
+        y = np.asarray([p["mag"] for p in allpts], dtype=float)
         dy = None
-        if any(p.get("err") or p.get("err_internal") for p in pts):
+        if any(p.get("err") or p.get("err_internal") for p in allpts):
             dy = np.asarray([p.get("err_internal") or p.get("err") or 0.0
-                             for p in pts], dtype=float)
+                             for p in allpts], dtype=float)
             dy = np.where(dy > 0.0, dy, np.nan)
         return t, y, dy
+
+    def _on_community(self):
+        # The AAVSO community curve (quality plan, D1): one night cannot
+        # fix a period, and this is how the reference report of this very
+        # series did it. Nothing is fetched without the observer's token.
+        import numpy as np
+        from ..config import config
+        from ..core.sources import aavso
+        token = (config.get("aavso_api_token") or "").strip()
+        name = (self._ui.lbl_title.text() or "").strip()
+        if not token:
+            self._ui.txt_result.setPlainText(self.tr(
+                "The community curve needs your AAVSO API token: set it in "
+                "Settings → the AAVSO channel. It is the same token the "
+                "bright-vigil check uses."))
+            return
+        if not name:
+            return
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        try:
+            res = aavso.fetch_lightcurve(name, token, days=3650)
+        except Exception as err:                    # never a dead window
+            logger.warning("AAVSO curve failed: %s", err)
+            res = None
+        finally:
+            QApplication.restoreOverrideCursor()
+        if not res or not res.get("n"):
+            self._ui.txt_result.setPlainText(self.tr(
+                "AAVSO answered nothing for «{0}»: check the name (it must "
+                "be the one AAVSO uses) and the token.").format(name))
+            return
+        bands = ", ".join("{0} {1}".format(v, k)
+                          for k, v in sorted(res["bands"].items()))
+        self._community = [dict(p, community=True) for p in res["points"]]
+        # the community points carry a conservative weight: a visual
+        # estimate is not a CCD measurement, and a CCD one without an
+        # error must not outvote our own
+        for p in self._community:
+            if p.get("err") is None:
+                p["err_internal"] = 0.2 if p.get("kind") == "visual" \
+                    else 0.05
+        t = np.asarray([p["mjd"] for p in self._community])
+        self._ui.txt_result.setPlainText(self.tr(
+            "Added {0} community points ({1}) from {2} to {3} (MJD). They "
+            "are drawn in grey and fold with your own curve.").format(
+                res["n"], bands, "{:.1f}".format(float(t.min())),
+                "{:.1f}".format(float(t.max()))))
+        self._ui.lbl_subtitle.setText(self.tr(
+            "{0} points of your own from {1} nights + {2} from the "
+            "community").format(len(self._points), self._n_nights(),
+                                res["n"]))
+        self._on_search()
 
     # ------------------------------------------------------------ actions
 
@@ -132,6 +190,11 @@ class PhaseDialog(QDialog):
                 notes.append(self.tr(
                     "{0} flagged point(s) left out of the search").format(
                         self._skipped))
+            if self._community:
+                notes.append(self.tr(
+                    "The community curve is folded in ({0} points): the "
+                    "period in the title is not yours alone").format(
+                        len(self._community)))
             text = phase_view.fold_summary(self._found, self._lang)
             if notes:
                 text = "\n".join(notes) + "\n" + text
@@ -145,19 +208,27 @@ class PhaseDialog(QDialog):
             QApplication.restoreOverrideCursor()
 
     def _render(self, t, y, dy):
-        from .. import paths as paths_mod
         from ..viz import phase_view
+        from ..core import periodogram as pg
         import numpy as np
+        src = getattr(self, "_all_pts", None) or []
         pts = [{"mjd": float(t[i]), "mag": float(y[i]),
                 "err": None if dy is None else float(dy[i])}
                for i in range(t.size)]
+        # the community's points are their own group: grey, and never mixed
+        # with the observer's own nights (quality plan, D1)
+        nights = []
+        for i in range(t.size):
+            if src and i < len(src) and src[i].get("community"):
+                nights.append("AAVSO")
+            else:
+                nights.append(pg.phase_of_night(float(t[i])))
         if self._tmp is None:
             self._tmp = tempfile.mkdtemp(prefix="nightscribe-phase-")
         out = os.path.join(self._tmp, "phase.png")
         phase_view.draw_phase(pts, self._found, out=out, fmt="panel",
-                              lang=self._lang,
-                              watermark="NightScribe",
-                              png_dpi=110)
+                              lang=self._lang, nights=nights,
+                              watermark="NightScribe", png_dpi=110)
         self._png = out
         pix = QPixmap(out)
         if pix.width() > 1:

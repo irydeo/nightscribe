@@ -49,6 +49,34 @@ FAP_SHUFFLES = 120
 # Below this power the folded robust clip is not attempted: folding a
 # curve by a peak that is not there would make the rejection arbitrary.
 _ROBUST_MIN_POWER = 0.2
+# The frequency grid is capped: a long baseline (a decade of community
+# observations added to one night) would otherwise ask for hundreds of
+# thousands of frequencies, and the bootstrap would multiply that by 120.
+# When the cap bites, the oversampling is relaxed (a peak can be missed
+# between two grid points) and the search SAYS so.
+GRID_MAX = 20000
+# The bootstrap and the PDM get their own, coarser cap: the FAP only
+# needs the highest peak of the search range, and both are cross-checks.
+FAP_MAX_FREQ = 3000
+# The bootstrap's work budget in point-frequency evaluations: the grid and
+# the number of shuffles are chosen to stay inside it, so a decade-long
+# baseline plus 500 points cannot freeze the window. The peak compared is
+# measured on the very grid the shuffles use, so a coarse grid stays fair.
+_FAP_WORK = 6.0e6
+_FAP_MIN_FREQ = 400
+PDM_MAX_PERIODS = 8000
+
+
+def fap_grid(frequencies, n_points, shuffles=FAP_SHUFFLES):
+    # The grid the bootstrap (and the plot's FAP levels) can afford.
+    # @args: frequencies - the search grid, n_points - the curve's length,
+    #        shuffles - how many
+    # @return: the (decimated) grid
+    n = max(1, int(n_points))
+    s = max(1, int(shuffles))
+    cap = int(_FAP_WORK / (n * s))
+    cap = max(_FAP_MIN_FREQ, min(FAP_MAX_FREQ, cap))
+    return coarse_grid(frequencies, cap)
 
 
 def _as_arrays(t, y, dy=None):
@@ -83,13 +111,15 @@ def median_cadence_days(t):
 
 
 def frequency_grid(t, min_period_d=None, max_period_d=None,
-                   samples_per_peak=SAMPLES_PER_PEAK):
+                   samples_per_peak=SAMPLES_PER_PEAK, max_points=GRID_MAX):
     # The frequency grid of the search: from the shortest period the
     # cadence can resolve to the longest the baseline can hold, with
     # enough samples per peak that no peak falls between two grid points.
+    # The size is CAPPED (see GRID_MAX): a long baseline relaxes the
+    # oversampling instead of asking for an impossible grid.
     # @args: t - times (days), min_period_d - shortest period to try
     #        (default: twice the median cadence), max_period_d - longest
-    #        (default: the baseline itself, one cycle)
+    #        (default: the baseline itself, one cycle), max_points - cap
     # @return: (frequencies, min_period_d, max_period_d)
     span = baseline_days(t)
     cad = median_cadence_days(t)
@@ -101,9 +131,23 @@ def frequency_grid(t, min_period_d=None, max_period_d=None,
     f_min = 1.0 / max_period_d
     f_max = 1.0 / min_period_d
     df = 1.0 / (max(span, 1e-6) * max(1, int(samples_per_peak)))
+    if (f_max - f_min) / df > max_points:
+        df = (f_max - f_min) / float(max(1, max_points - 1))
     n = int(math.ceil((f_max - f_min) / df)) + 1
     n = max(n, 8)
     return np.linspace(f_min, f_max, n), min_period_d, max_period_d
+
+
+def coarse_grid(values, cap):
+    # Every k-th value so the array fits the cap: used for the cross-checks
+    # (the bootstrap, the PDM), never for the search itself.
+    # @args: values - an array, cap - the maximum length
+    # @return: the (possibly decimated) array
+    values = np.asarray(values)
+    if values.size <= cap or cap <= 0:
+        return values
+    step = int(math.ceil(values.size / float(cap)))
+    return values[::step]
 
 
 def lomb_scargle(t, y, dy=None, frequencies=None, min_period_d=None,
@@ -194,22 +238,28 @@ def phase_dispersion(t, y, dy=None, periods=None, bins=10,
             "min_period_d": min_period_d, "max_period_d": max_period_d}
 
 
-def spectral_window(t, frequencies=None, samples_per_peak=SAMPLES_PER_PEAK):
+def spectral_window(t, frequencies=None, samples_per_peak=SAMPLES_PER_PEAK,
+                    max_points=4000, chunk=512):
     # The window function |sum exp(-2 pi i f t)|^2 / N^2: it says which
     # periods the OBSERVING PATTERN itself puts peaks at (the 1-day alias
     # of a single-site run is the classic one). A real period that sits
     # on a window peak cannot be told from the alias by this data alone.
-    # @args: t - times (days), frequencies - the grid (or None)
+    # @args: t - times (days), frequencies - the grid (or None),
+    #        max_points - cap (only the shape matters here, not the
+    #        resolution: it is read at the peaks)
     # @return: {"frequencies", "power"}
     t = np.asarray(t, dtype=np.float64)
     if frequencies is None:
         frequencies, _a, _b = frequency_grid(t, samples_per_peak=samples_per_peak)
-    frequencies = np.asarray(frequencies, dtype=np.float64)
-    power = np.empty(frequencies.size, dtype=np.float64)
+    frequencies = coarse_grid(np.asarray(frequencies, dtype=np.float64),
+                              max_points)
     n = max(t.size, 1)
-    for i, f in enumerate(frequencies):
-        z = np.exp(-2.0j * math.pi * f * t)
-        power[i] = float(np.abs(np.sum(z)) ** 2) / (n * n)
+    power = np.empty(frequencies.size, dtype=np.float64)
+    for start in range(0, frequencies.size, chunk):
+        block = frequencies[start:start + chunk]
+        z = np.exp(-2.0j * math.pi * block[:, None] * t[None, :])
+        power[start:start + block.size] = \
+            np.abs(np.sum(z, axis=1)) ** 2 / (n * n)
     return {"frequencies": frequencies, "power": power}
 
 
@@ -245,19 +295,30 @@ def _refine(periods, power, index):
     return float(1.0 / f_ref) if f_ref > 0 else float(periods[index])
 
 
-def false_alarm(power_max, t, y, dy=None, frequencies=None,
+def false_alarm(t, y, dy=None, frequencies=None,
                 shuffles=FAP_SHUFFLES, seed=7, chunk=512):
     # The false-alarm probability of a peak: the share of shuffled
     # versions of the SAME data whose best peak is at least as strong. It
     # only shuffles the magnitudes, so the observing pattern (and with it
     # the aliases) stays exactly as it was.
-    # @args: power_max - the observed peak, the rest as lomb_scargle
+    #
+    # The observed peak is measured ON THE SAME GRID the shuffles use:
+    # comparing a peak found on a fine grid against shuffles run on a
+    # coarse one would flatter the answer (fewer candidates, fewer
+    # accidents). The caller may hand a decimated grid to keep it cheap.
+    #
+    # @args: t/y/dy - the curve, frequencies - the grid (decimated by the
+    #        caller when it is huge), shuffles - how many, seed - the RNG
     # @return: {"fap": float or None, "shuffles": n, "power_max": float}
     t, y, w = _as_arrays(t, y, dy)
-    if t.size < 8 or power_max <= 0.0:
-        return {"fap": None, "shuffles": 0, "power_max": float(power_max)}
+    if t.size < 8:
+        return {"fap": None, "shuffles": 0, "power_max": 0.0}
     if frequencies is None:
         frequencies, _a, _b = frequency_grid(t)
+    obs = lomb_scargle(t, y, dy, frequencies=frequencies, chunk=chunk)
+    power_max = float(np.max(obs["power"])) if obs["power"].size else 0.0
+    if power_max <= 0.0:
+        return {"fap": None, "shuffles": 0, "power_max": 0.0}
     rng = np.random.default_rng(seed)
     hits = 0
     for _i in range(max(1, int(shuffles))):
@@ -267,7 +328,7 @@ def false_alarm(power_max, t, y, dy=None, frequencies=None,
         if res["power"].size and float(np.max(res["power"])) >= power_max:
             hits += 1
     return {"fap": (hits + 1.0) / (shuffles + 1.0), "shuffles": shuffles,
-            "power_max": float(power_max)}
+            "power_max": power_max}
 
 
 def reject_folded(t, y, dy=None, period_d=None, bins=25, k=4.0, rounds=2):
@@ -359,7 +420,8 @@ def find_period(t, y, dy=None, min_period_d=None, max_period_d=None,
     grid, p_min, p_max = frequency_grid(t, min_period_d, max_period_d,
                                         samples_per_peak)
     ls = lomb_scargle(t, y, dy, frequencies=grid)
-    pdm = phase_dispersion(t, y, dy, periods=1.0 / grid, bins=10)
+    pdm_periods = 1.0 / coarse_grid(grid, PDM_MAX_PERIODS)
+    pdm = phase_dispersion(t, y, dy, periods=pdm_periods, bins=10)
     out["periodogram"] = {"frequencies": ls["frequencies"],
                           "power": ls["power"],
                           "min_period_d": p_min, "max_period_d": p_max}
@@ -419,19 +481,30 @@ def find_period(t, y, dy=None, min_period_d=None, max_period_d=None,
             "en": "The first peak is too weak to fold by: no outlier "
                   "rejection was attempted (it would be arbitrary)"})
     # the false-alarm probability of the Lomb-Scargle peak (the PDM has
-    # no closed form; it is reported as a cross-check instead)
+    # no closed form; it is reported as a cross-check instead). On a grid
+    # too big to shuffle, a decimated one is used, and the peak is
+    # re-measured on it so the comparison stays fair
     if fap_shuffles:
-        ls_index = int(np.argmax(ls["power"]))
-        fa = false_alarm(float(ls["power"][ls_index]), t, y, dy,
-                         frequencies=grid, shuffles=fap_shuffles)
+        fa = false_alarm(t, y, dy,
+                         frequencies=fap_grid(grid, t.size, fap_shuffles),
+                         shuffles=fap_shuffles)
         out["fap"] = fa["fap"]
+    if grid.size >= GRID_MAX:
+        out["notes"].append({
+            "es": "La búsqueda ha usado {} frecuencias (el tope): con una "
+                  "línea base tan larga el muestreo se ha relajado y un "
+                  "pico estrecho podría caer entre dos puntos".format(
+                      grid.size),
+            "en": "The search used {} frequencies (the cap): with such a "
+                  "long baseline the sampling was relaxed and a narrow "
+                  "peak could fall between two grid points".format(
+                      grid.size)})
     # the observing window and the aliases it creates
     win = spectral_window(t, frequencies=grid)
     out["window"] = win
     out["aliases"] = _window_peaks(t, win["frequencies"], win["power"])
     out["notes"].extend(_notes(t, y, out, pdm, ls, use_pdm))
     return out
-
 
 def _notes(t, y, out, pdm, ls, use_pdm):
     # Plain-language notes about what the search can and cannot say. The

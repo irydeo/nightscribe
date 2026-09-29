@@ -173,3 +173,37 @@ def test_the_robust_clip_keeps_the_curve_itself():
                          method="ls", fap_shuffles=0, clip_outliers=True)
     assert res["clipped"]["n_dropped"] == 0
     assert res["period_d"] == pytest.approx(0.3, rel=0.02)
+
+
+def test_a_huge_grid_is_capped_and_said():
+    # Ten years of community observations plus one night: the baseline
+    # asks for hundreds of thousands of frequencies and the bootstrap
+    # would never finish. The grid is capped and the search SAYS so
+    # (quality plan, D1).
+    rng = np.random.default_rng(4)
+    mine_t = 60000.0 + np.sort(rng.uniform(0.0, 0.12, 200))
+    mine_y = 0.2 * np.sin(2 * math.pi * mine_t / 0.3)
+    old_t = 56000.0 + np.sort(rng.uniform(0.0, 3600.0, 300))
+    old_y = 12.5 + 0.2 * np.sin(2 * math.pi * old_t / 0.3) \
+        + rng.normal(0, 0.1, 300)
+    t = np.concatenate([mine_t, old_t])
+    y = np.concatenate([mine_y, old_y])
+    grid, p_min, p_max = pg.frequency_grid(t, 0.05, 1.0)
+    assert grid.size <= pg.GRID_MAX
+    res = pg.find_period(t, y, min_period_d=0.05, max_period_d=1.0,
+                         method="ls", fap_shuffles=8)
+    assert res["period_d"] is not None
+    assert any("tope" in n["es"] for n in res["notes"])
+
+
+def test_the_fap_is_measured_on_the_grid_it_shuffles():
+    # The observed peak and the shuffled peaks must live on the SAME
+    # grid: comparing a fine-grid peak against coarse shuffles would
+    # flatter the answer.
+    t, y = _sine(period_d=0.3, noise=0.02)
+    grid, _a, _b = pg.frequency_grid(t, 0.1, 1.0)
+    coarse = pg.coarse_grid(grid, 50)
+    assert coarse.size <= 50
+    fa = pg.false_alarm(t, y, None, frequencies=coarse, shuffles=20)
+    assert fa["fap"] is not None
+    assert 0.0 < fa["fap"] <= 1.0

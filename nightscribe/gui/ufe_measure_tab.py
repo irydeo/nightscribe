@@ -253,6 +253,16 @@ class UfeMeasureTab(QWidget):
         # the chart's own controls (quality plan, phase A): the magnitude
         # scale is robust by default, the error bars are the point's own
         # photons and the flagged points stay visible unless asked
+        # what the vertical axis MEASURES (V1): a measured magnitude and a
+        # differential one are different quantities, and drawing both on
+        # one axis is what gave a curve of hundredths an axis from 2 to 14
+        self.cmb_series_scale = self._ui.cmb_series_scale
+        self.cmb_series_scale.addItem(self.tr("Calibrated magnitude"),
+                                      "calibrated")
+        self.cmb_series_scale.addItem(self.tr("Δ magnitude (differential)"),
+                                      "differential")
+        self.cmb_series_scale.currentIndexChanged.connect(
+            self._on_series_scale_changed)
         self.btn_series_robust = self._ui.btn_series_robust
         self.btn_series_robust.toggled.connect(
             self.chart_series.set_robust)
@@ -1041,7 +1051,11 @@ class UfeMeasureTab(QWidget):
             self.lbl_status.setText(self.tr(
                 "Measure the series first: the figure is the curve."))
             return
-        pts = [dict(p) for p in self._series_payload]
+        # the figure is drawn from what the AXIS is showing (V1): handing
+        # it the raw payload would put the detrended curve on an absolute
+        # axis again and the exported chart would lie exactly like the
+        # screen used to
+        pts = self.chart_series.axis_points()
         mags = [p["mag"] for p in pts if p.get("mag") is not None]
         if not mags:
             return
@@ -1062,10 +1076,6 @@ class UfeMeasureTab(QWidget):
             self.tr("PNG image (*.png)"))
         if not target:
             return
-        lo = hi = None
-        fixed = self.chart_series.is_y_range_fixed()
-        if fixed:
-            lo, hi = fixed
         out = sci_style.draw_scientific(
             pts, out=target, title=name or self.tr("Photometric series"),
             subtitle=self._series_subtitle(scene), lang=self._lang,
@@ -1461,7 +1471,39 @@ class UfeMeasureTab(QWidget):
                for p in points if p.mjd is not None
                and p.mag_detrended is not None]
         self._series_payload = _decimate(raw) + _decimate(det)
-        self.chart_series.set_data(self._series_payload)
+        # which axis the measurement calls for: a calibrated run gives
+        # absolute magnitudes, a relative one already gives differences
+        result = self._series_result
+        mode = ("differential" if result is not None
+                and getattr(result, "zp_mode", "catalog") == "relative"
+                else "calibrated")
+        self._sync_series_scale(mode)
+        self.chart_series.set_data(self._series_payload, mag_mode=mode)
+
+    def _on_series_scale_changed(self, _index):
+        # The observer changed what the axis measures. The chart rebuilds
+        # itself; the only thing said out loud is a fixed range being
+        # dropped, because a range written in magnitudes means nothing on a
+        # differential axis and silently reinterpreting it would rescale
+        # the chart into nonsense.
+        mode = self.cmb_series_scale.currentData() or "calibrated"
+        had_range = self.chart_series.is_y_range_fixed() is not None
+        if not self.chart_series.set_mag_mode(mode):
+            return
+        if had_range:
+            self.btn_series_fixaxis.setChecked(False)
+            self.lbl_status.setText(self.tr(
+                "Fixed magnitude range cleared: the axis changed what it "
+                "measures."))
+
+    def _sync_series_scale(self, mode):
+        # Mirrors the mode the measurement implies into the control,
+        # without re-firing the handler.
+        self.cmb_series_scale.blockSignals(True)
+        idx = self.cmb_series_scale.findData(mode)
+        if idx >= 0:
+            self.cmb_series_scale.setCurrentIndex(idx)
+        self.cmb_series_scale.blockSignals(False)
 
     def _on_series_enlarge(self):
         # The series curve, large: a fresh chart (the viewer reparents and

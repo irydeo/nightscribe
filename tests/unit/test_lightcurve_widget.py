@@ -425,3 +425,120 @@ def test_the_hit_test_respects_the_exclusion():
     assert c.point_at(x, y) == 7
     c.set_excluded([7])
     assert c.point_at(x, y) is None
+
+
+# ---------------- V1: one axis, one kind of magnitude ----------------
+
+def _series_payload():
+    # What a measured series hands the chart: the calibrated magnitudes of
+    # the night plus the detrended curve, which is "mag - trend" and
+    # therefore lives around ZERO. That mix is exactly what gave a curve of
+    # hundredths an axis from 2 to 14.
+    raw = [{"mjd": 60600.0 + 0.01 * i, "mag": 12.34 + 0.004 * i,
+            "err": 0.01, "err_internal": 0.008, "filter": "V",
+            "source": "measure", "flags": []} for i in range(6)]
+    det = [{"mjd": 60600.0 + 0.01 * i, "mag": 0.002 * i,
+            "err": 0.01, "err_internal": 0.008, "filter": "V",
+            "source": "detrend", "flags": []} for i in range(6)]
+    return raw + det
+
+
+def test_a_measured_curve_and_a_detrended_one_never_share_the_axis():
+    # The bug this fixes, as a test: absolute magnitudes (12.3x) and
+    # differences (around 0) on one axis made the window 12 magnitudes
+    # wide, the ticks read 2, 4, 6 ... 14, and a variation of hundredths
+    # was a straight line. The calibrated axis must ignore the curve that
+    # belongs to another level.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    lo, hi = chart._bounds[2], chart._bounds[3]
+    assert hi - lo < 0.2          # a curve of hundredths, not of 12 mag
+    assert 12.3 < lo and hi < 12.4
+    # and the detrended points are simply not on this axis
+    assert all(p["source"] != "detrend" for p in chart.axis_points())
+    assert len(chart.axis_points()) == 6
+
+
+def test_the_differential_axis_counts_from_the_measured_level():
+    # The other view: everything referred to a level that is SAID, so a
+    # tenth of a magnitude fills the chart and both curves travel
+    # together, because both are differences now.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert chart.set_mag_mode("differential") is True
+    assert chart.mag_mode() == "differential"
+    lo, hi = chart._bounds[2], chart._bounds[3]
+    assert hi - lo < 0.2
+    assert lo < 0 < hi            # a difference axis straddles zero
+    # the reference is the MEASURED series' level, never zero: a median of
+    # everything would be dragged to zero by the differences themselves
+    ref = chart.mag_reference()
+    assert ref == pytest.approx(12.35, abs=0.01)
+    # and both series are drawn now
+    got = chart.axis_points()
+    assert len(got) == 12
+    raws = [p["mag"] for p in got if p["source"] == "measure"]
+    assert max(raws) < 0.02       # a measured 12.35 shows as ~0.00
+
+
+def test_the_scale_can_be_switched_both_ways():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert chart.mag_mode() == "calibrated"
+    chart.set_mag_mode("differential")
+    assert chart.mag_mode() == "differential"
+    chart.set_mag_mode("calibrated")
+    assert chart.mag_mode() == "calibrated"
+    # a mode the chart does not know is refused, never silently obeyed
+    assert chart.set_mag_mode("absolute-ish") is False
+    assert chart.mag_mode() == "calibrated"
+
+
+def test_switching_the_scale_drops_a_range_written_in_the_old_units():
+    # "12.3 to 12.4" means nothing on a difference axis: keeping it would
+    # rescale the chart into nonsense, so it is dropped rather than
+    # silently reinterpreted.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert chart.set_y_range(12.33, 12.37) is True
+    assert chart.is_y_range_fixed() is not None
+    chart.set_mag_mode("differential")
+    assert chart.is_y_range_fixed() is None
+
+
+def _scene_texts(chart):
+    # @return: every text drawn on the scene (the axis' own words included)
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    return [it.text() for it in chart.scene().items()
+            if isinstance(it, QGraphicsSimpleTextItem)]
+
+
+def test_the_axis_says_which_magnitude_it_shows():
+    # A reader must never have to guess whether 12.34 is a star's
+    # magnitude or a difference.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert any("Calibrated" in t for t in _scene_texts(chart))
+    chart.set_mag_mode("differential")
+    texts = _scene_texts(chart)
+    assert any("magnitude from" in t for t in texts)
+    assert any("12.35" in t for t in texts)      # the level, in the figure
+
+
+def test_the_legend_does_not_promise_a_series_that_is_not_drawn():
+    # In calibrated mode the detrended curve is not on the axis: the legend
+    # must not list it as if it were, and it must say where to find it.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    texts = _scene_texts(chart)
+    assert not any("detrended" in t.lower() and "Δ" not in t for t in texts)
+    assert any("Δ magnitude view" in t for t in texts)
+    chart.set_mag_mode("differential")
+    texts = _scene_texts(chart)
+    assert not any("Δ magnitude view" in t for t in texts)

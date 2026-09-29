@@ -69,6 +69,23 @@ _PAD = 0.10                 # 10 % of the window as air
 # painting over everything) and is clipped.
 _BAR_CLIP = 0.12
 
+# The axis shows ONE kind of magnitude at a time, and that is not a matter
+# of taste: an absolute magnitude (12.34) and a differential one (the
+# detrended curve, which is "mag - trend", around 0) are DIFFERENT
+# quantities. Drawing both on one axis is what produced a window of twelve
+# magnitudes for a curve of tenths, with ticks reading 2, 4, 6 ... 14: the
+# variation vanished into a straight line and the numbers meant nothing.
+# Our group's own tool splits the two for exactly this reason.
+#
+#   * "calibrated": the magnitudes the calibration produced. The detrended
+#     curve does NOT belong here, because it counts from another level
+#     (the night's own trend), and drawing it would force the axis open;
+#   * "differential": everything referred to a STATED level, so a tenth of
+#     a magnitude fills the chart. Raw (mag - median) and detrended (mag -
+#     trend) travel together because both are differences now.
+MAG_CALIBRATED = "calibrated"
+MAG_DIFFERENTIAL = "differential"
+
 
 def _series_style(src_class):
     # @args: src_class - "manual" | "quicklook" | "survey" | "detrend"
@@ -151,6 +168,10 @@ class LightCurveChart(ChartView):
         self._peak_mag = None
         self._fold_p = None      # fold period in days (None = date axis)
         self._epoch = None
+        self._mag_mode = MAG_CALIBRATED   # which quantity the axis shows
+        self._mag_ref = None     # the level a differential axis counts
+                                 # from (the measured series' robust median),
+                                 # fixed when the data lands
         self._schematic = None
         self._bounds = None   # (x_min, x_max, mag_min, mag_max)
         self._tpl_visible = True   # template overlay: ON by default
@@ -347,11 +368,12 @@ class LightCurveChart(ChartView):
         # @return: the point's index, or None
         best, best_dist = None, radius * radius
         for idx, p in enumerate(self._points):
-            if p.get("mag") is None or idx in self._excluded:
+            value = self._plot_mag(p)
+            if value is None or idx in self._excluded:
                 continue
             for xv in self._xs(p):
                 dx = self._map_x(xv) - scene_x
-                dy = self._map_y(p["mag"]) - scene_y
+                dy = self._map_y(value) - scene_y
                 dist = dx * dx + dy * dy
                 if dist <= best_dist:
                     best, best_dist = idx, dist
@@ -376,7 +398,8 @@ class LightCurveChart(ChartView):
         return data, caveat
 
     def set_data(self, points, sn_type=None, peak_mjd=None, peak_mag=None,
-                 fold_period_d=None, epoch_mjd=None, schematic=None):
+                 fold_period_d=None, epoch_mjd=None, schematic=None,
+                 mag_mode=None):
         # @args: points - list of {mjd, mag, err, filter, source} dicts,
         #        sn_type - for the template overlay, peak_mjd/mag - to align
         #        it, fold_period_d - pulsation period in days: folds the x
@@ -384,7 +407,9 @@ class LightCurveChart(ChartView):
         #        future long-period variables reuse it, H-n), epoch_mjd -
         #        phase-0 reference (default: the first point), schematic -
         #        [(phase, mag)] reference curve drawn dashed (e.g. the
-        #        hads.sawtooth_template — never real data)
+        #        hads.sawtooth_template — never real data), mag_mode -
+        #        "calibrated" | "differential" (None keeps the current one):
+        #        which quantity the axis shows, see MAG_CALIBRATED above
         # Replaces the current data and rebuilds the scene.
         self._points = sorted(points, key=lambda p: p["mjd"])
         self._sn_type = sn_type
@@ -393,6 +418,8 @@ class LightCurveChart(ChartView):
         self._fold_p = fold_period_d
         self._epoch = epoch_mjd
         self._schematic = schematic
+        if mag_mode in (MAG_CALIBRATED, MAG_DIFFERENTIAL):
+            self._mag_mode = mag_mode
         if fold_period_d and self._points and self._epoch is None:
             self._epoch = self._points[0]["mjd"]
         self._compute_bounds()
@@ -421,10 +448,16 @@ class LightCurveChart(ChartView):
         if not self._points:
             self._bounds = (0, 1, 10, 20)
             return
-        mags = [p["mag"] for p in self._points if p["mag"] is not None]
+        # the level first: a differential axis is drawn FROM it, so it has
+        # to exist before any value is mapped
+        self._mag_ref = self._measure_level()
+        mags = [v for v in (self._plot_mag(p) for p in self._points)
+                if v is not None]
         if self._schematic:
-            mags += [m for _ph, m in self._schematic]
+            mags += [self._axis_mag(m) for _ph, m in self._schematic]
         if not mags:
+            # nothing belongs to this axis (e.g. a differential view of a
+            # series that has no measured magnitudes): say it plainly
             self._bounds = (0, 1, 10, 20)
             return
         lo, hi = self._mag_window(mags)
@@ -474,6 +507,109 @@ class LightCurveChart(ChartView):
             lo, hi = centre - _MIN_WINDOW / 2.0, centre + _MIN_WINDOW / 2.0
         pad = (hi - lo) * _PAD
         return lo - pad, hi + pad
+
+    def set_mag_mode(self, mode):
+        # Switches what the axis shows. It is a real change of QUANTITY, so
+        # the whole chart is rebuilt: the window, the ticks and the points
+        # move together and the axis says which one you are reading.
+        #
+        # A manual range written in the old units is dropped, not silently
+        # reinterpreted: "12.3 to 12.4" means nothing on a differential
+        # axis, and keeping it would rescale the chart into nonsense.
+        # @args: mode - "calibrated" | "differential"
+        # @return: True when the mode is (now) in force
+        if mode not in (MAG_CALIBRATED, MAG_DIFFERENTIAL):
+            return False
+        if mode == self._mag_mode:
+            return True
+        self._mag_mode = mode
+        self._y_range = None
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
+        return True
+
+    def mag_mode(self):
+        # @return: "calibrated" | "differential", which the axis shows now
+        return self._mag_mode
+
+    def mag_reference(self):
+        # The level a differential axis counts from, so a caller (a figure,
+        # a report, a label) can SAY it instead of guessing.
+        # @return: the reference magnitude, or None without measurements
+        return self._mag_ref
+
+    def axis_points(self):
+        # The points as THIS axis draws them, for whoever has to render the
+        # same curve somewhere else (the exported figure): a copy of every
+        # point with "mag" already carrying the mode's value, and without
+        # the ones that do not belong to this axis.
+        #
+        # It exists so the exported figure cannot disagree with the screen:
+        # two renderers picking their own window is exactly how a curve of
+        # hundredths came out with a 2 to 14 axis.
+        # @return: [dict, ...]
+        out = []
+        for p in self._points:
+            value = self._plot_mag(p)
+            if value is None:
+                continue
+            q = dict(p)
+            q["mag"] = value
+            out.append(q)
+        return out
+
+    def _is_differential(self, p):
+        # @args: p - a photometry point dict
+        # @return: True when its magnitude is a difference, not a measure
+        return (p.get("source") or "") == "detrend"
+
+    def _plot_mag(self, p):
+        # The magnitude a point is DRAWN at, which is what the axis' mode
+        # decides (see MAG_CALIBRATED above).
+        #
+        # Returning None is as important as returning a number: a point
+        # that does not belong to this axis must not be drawn AND must not
+        # drag the window with it. That single omission is the difference
+        # between a curve of tenths and a twelve-magnitude line.
+        # @args: p - a photometry point dict
+        # @return: the value for this axis, or None when it does not belong
+        if p.get("mag") is None:
+            return None
+        if self._mag_mode == MAG_DIFFERENTIAL:
+            if self._is_differential(p):
+                return float(p["mag"])        # already "mag - trend"
+            if self._mag_ref is None:
+                return None
+            return float(p["mag"]) - self._mag_ref
+        if self._is_differential(p):
+            return None                       # another level: not this axis
+        return float(p["mag"])
+
+    def _axis_mag(self, absolute_mag):
+        # An ABSOLUTE magnitude (the SN template, the HADS schematic) as
+        # this axis shows it: on a differential axis the overlays move with
+        # the data, or they would float over a curve they no longer
+        # describe.
+        # @return: the value for this axis
+        if self._mag_mode == MAG_DIFFERENTIAL and self._mag_ref is not None:
+            return float(absolute_mag) - self._mag_ref
+        return float(absolute_mag)
+
+    def _measure_level(self):
+        # The level a differential axis counts from: the robust median of
+        # the MEASURED series.
+        #
+        # Never the median of everything: the differences have a median of
+        # zero by construction, so including them would drag the reference
+        # to zero and turn it into a lie (that is the bug's shape: a
+        # reference of zero is what made the axis read 2 to 14).
+        # @return: the reference magnitude, or None without measurements
+        vals = [float(p["mag"]) for p in self._points
+                if p.get("mag") is not None and not self._is_differential(p)]
+        if not vals:
+            return None
+        return float(np.median(vals))
 
     def set_y_range(self, lo, hi):
         # The observer fixes the magnitude axis (quality plan, A1). A range
@@ -539,7 +675,8 @@ class LightCurveChart(ChartView):
         if self._tpl_visible and self._fold_p and self._schematic:
             pen = QPen(QColor(palette.MUTED), 1.0, Qt.DashLine)
             for shift in (0.0, 1.0):
-                path_pts = [(self._map_x(ph + shift), self._map_y(m))
+                path_pts = [(self._map_x(ph + shift),
+                             self._map_y(self._axis_mag(m)))
                             for ph, m in self._schematic]
                 for i in range(len(path_pts) - 1):
                     line = QGraphicsLineItem(path_pts[i][0], path_pts[i][1],
@@ -560,7 +697,7 @@ class LightCurveChart(ChartView):
             path_pts = []
             for d, dm in tpl:
                 x = self._map_x(self._peak_mjd + d)
-                y = self._map_y(self._peak_mag + dm)
+                y = self._map_y(self._axis_mag(self._peak_mag + dm))
                 path_pts.append((x, y))
             for i in range(len(path_pts) - 1):
                 line = QGraphicsLineItem(path_pts[i][0], path_pts[i][1],
@@ -617,8 +754,8 @@ class LightCurveChart(ChartView):
             return None, None
         by_series = {}
         for p in self._points:
-            if p.get("mag") is None:
-                continue
+            if self._plot_mag(p) is None:
+                continue          # another quantity: not on this axis
             by_series.setdefault(
                 (p.get("filter"), p.get("source") or "manual"), []).append(p)
         tallest, largest = None, None
@@ -634,7 +771,7 @@ class LightCurveChart(ChartView):
             if sys > span / 2.0:
                 continue
             tallest = sys if tallest is None else max(tallest, sys)
-            ys = [self._map_y(p["mag"]) for p in pts]
+            ys = [self._map_y(self._plot_mag(p)) for p in pts]
             top, bottom = min(ys), max(ys)
             half = sys / span * 2 * _HALF
             rect = QGraphicsRectItem(-_HALF, top - half, 2 * _HALF,
@@ -655,7 +792,7 @@ class LightCurveChart(ChartView):
         # @return: {(band, source): [point, ...]} in time order
         groups = {}
         for idx, p in enumerate(self._points):
-            if p.get("mag") is None:
+            if self._plot_mag(p) is None:
                 continue
             key = (p.get("filter"), p.get("source") or "manual")
             groups.setdefault(key, []).append((idx, p))
@@ -694,7 +831,7 @@ class LightCurveChart(ChartView):
             return []
         out = []
         for group in groups:
-            mags = [p["mag"] for _i, p in group]
+            mags = [self._plot_mag(p) for _i, p in group]
             mag = float(np.mean(mags))
             errs = [p.get("err_internal") or p.get("err") for _i, p in group]
             errs = [e for e in errs if e]
@@ -783,7 +920,7 @@ class LightCurveChart(ChartView):
                 outlier = idx in self._outlier_idx
                 for xv in self._xs(p):
                     x = self._map_x(xv)
-                    y = self._map_y(p["mag"])
+                    y = self._map_y(self._plot_mag(p))
                     y_draw, off = self._clipped_y(y)
                     if off:
                         self._over_note += 1
@@ -952,6 +1089,8 @@ class LightCurveChart(ChartView):
         # seam-crossing artefacts.
         by_series = {}
         for p in self._points:
+            if self._plot_mag(p) is None:
+                continue          # another quantity: not on this axis
             by_series.setdefault(
                 (p.get("filter") or "Clear", p.get("source") or "manual"),
                 []).append(p)
@@ -963,7 +1102,7 @@ class LightCurveChart(ChartView):
             for p in pts:
                 for k, xv in enumerate(self._xs(p)):
                     copies.setdefault(k, []).append(
-                        (self._map_x(xv), self._map_y(p["mag"])))
+                        (self._map_x(xv), self._map_y(self._plot_mag(p))))
             for seq in copies.values():
                 seq.sort(key=lambda xy: xy[0])
                 for i in range(len(seq) - 1):
@@ -1020,9 +1159,18 @@ class LightCurveChart(ChartView):
         # one entry per (band, source) series: human labels, so the
         # observer sees "Pasted data", "From file", "Survey · ALeRCE/ZTF"
         seen = set()
+        hidden = []
         for p in self._points:
             src = p.get("source") or "manual"
             key = (p.get("filter"), src)
+            if self._plot_mag(p) is None:
+                # not on THIS axis: an entry would promise the reader a
+                # series that is not there. It is named below, with where
+                # to see it, because a curve that disappears without a word
+                # is worse than a curve that is not drawn.
+                if key not in seen and src not in hidden:
+                    hidden.append(src)
+                continue
             if key in seen:
                 continue
             seen.add(key)
@@ -1030,6 +1178,10 @@ class LightCurveChart(ChartView):
                     + " · " + self.source_label(src))
             colour, _filled = _point_style(p)
             entries.append((text, colour))
+        if hidden:
+            entries.append((self.tr("{0}: see the Δ magnitude view").format(
+                ", ".join(self.source_label(src) for src in hidden)),
+                QColor(palette.MUTED)))
         if not entries:
             return
         fmt = QFont(self._label_font) if hasattr(self, "_label_font") else QFont()
@@ -1114,6 +1266,17 @@ class LightCurveChart(ChartView):
             self._tick_label(y_plan["offset_label"], -_HALF - 60, -_HALF - 26)
         if x_plan["offset_label"]:
             self._tick_label(x_plan["offset_label"], _HALF - 40, _HALF + 30)
+        # WHAT the numbers are: the mode, and on a differential axis the
+        # level they count from. A reader must never have to guess whether
+        # 12.34 is a star's magnitude or a difference, and an axis that
+        # does not say it is an axis that lies by omission.
+        if self._mag_mode == MAG_DIFFERENTIAL:
+            note = (self.tr("Δ magnitude from {0:.3f}").format(self._mag_ref)
+                    if self._mag_ref is not None
+                    else self.tr("Δ magnitude"))
+        else:
+            note = self.tr("Calibrated magnitude")
+        self._tick_label(note, -_HALF, -_HALF - 18)
 
     def _tick_label(self, text, x, y):
         # One small grey tick label at a scene position.
@@ -1135,11 +1298,12 @@ class LightCurveChart(ChartView):
         best = None
         best_dist = 1e9
         for p in self._points:
-            if p.get("mag") is None:
+            value = self._plot_mag(p)
+            if value is None:
                 continue
             for xv in self._xs(p):
                 dx = self._map_x(xv) - sx
-                dy = self._map_y(p["mag"]) - sy
+                dy = self._map_y(value) - sy
                 dist = dx * dx + dy * dy
                 if dist < best_dist:
                     best_dist = dist

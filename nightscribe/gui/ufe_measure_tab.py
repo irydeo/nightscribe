@@ -1024,6 +1024,7 @@ class UfeMeasureTab(QWidget):
             # reference grid and what the comparison stars really did
             echo["alignment"] = _echo_report(result.align_report, 8)
             echo["comparisons"] = _echo_report(result.comp_report)
+            echo["gain"] = _echo_report(result.gain_report)
             try:
                 self._series_run_id = notify(rows, echo)
             except Exception as err:

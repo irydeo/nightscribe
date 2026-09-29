@@ -341,7 +341,9 @@ def calibrated_mag(inst_target, zp, zp_err=None, target_err=None):
 def header_instrument(header):
     # Instrument parameters straight out of the FITS header, numbers only
     # (decision D2): a card written as a string with units degrades to
-    # None instead of guessing. Keywords are matched case-insensitively.
+    # None instead of guessing. Keywords are matched case-insensitively,
+    # and the gain/read noise accept the names real cameras write (GAIN,
+    # EGAIN, CCDGAIN, GAIN1; RDNOISE, READNOIS, RON, ENF? no).
     # @args: header - the header dict from core/fits_io (or None)
     # @return: {"gain", "ron", "exptime"} with None for every absent or
     #          non-numeric key
@@ -350,22 +352,25 @@ def header_instrument(header):
         return out
     by_key = {str(k).upper(): v for k, v in header.items()}
 
-    def _num(key):
-        # @return: the value as float, or None (including non-numeric and
-        #          boolean cards, which are not instrument numbers)
-        v = by_key.get(key)
-        if v is None or isinstance(v, bool):
-            return None
-        if isinstance(v, (int, float)):
-            return float(v)
-        try:
-            return float(str(v).strip())
-        except ValueError:
-            return None
+    def _num(*keys):
+        # @args: keys - the card names to try, in order
+        # @return: the first present value as float, or None (including
+        #          non-numeric and boolean cards, which are not numbers)
+        for key in keys:
+            v = by_key.get(key)
+            if v is None or isinstance(v, bool):
+                continue
+            if isinstance(v, (int, float)):
+                return float(v)
+            try:
+                return float(str(v).strip())
+            except ValueError:
+                continue
+        return None
 
-    out["gain"] = _num("GAIN")
-    out["ron"] = _num("RDNOISE")
-    out["exptime"] = _num("EXPTIME")
+    out["gain"] = _num("GAIN", "EGAIN", "CCDGAIN", "GAIN1", "GAINX")
+    out["ron"] = _num("RDNOISE", "READNOIS", "RON", "READNOISE")
+    out["exptime"] = _num("EXPTIME", "EXP0TIME")
     return out
 
 

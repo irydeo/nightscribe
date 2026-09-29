@@ -177,6 +177,14 @@
             </layout>
            </item>
            <item>
+            <layout class="QHBoxLayout" name="row_camgain">
+             <item><widget class="QLabel" name="lbl_camgain"><property name="text"><string>System gain (e-/ADU):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_gain"><property name="toolTip"><string>Electrons per ADU of YOUR camera at YOUR gain setting. It is what turns the error bar into an honest CCD equation instead of the scatter of the comparison stars, and it is per unit: measure it (0 = unknown)</string></property><property name="maximum"><double>100.000000000000000</double></property><property name="decimals"><number>3</number></property><property name="singleStep"><double>0.010000000000000</double></property></widget></item>
+             <item><widget class="QLabel" name="lbl_camron"><property name="text"><string>Read noise (e-):</string></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_ron"><property name="toolTip"><string>Read noise in electrons at the same gain. Usually a datasheet value (the preset fills it); 0 = unknown</string></property><property name="maximum"><double>200.000000000000000</double></property><property name="decimals"><number>2</number></property></widget></item>
+            </layout>
+           </item>
+           <item>
             <layout class="QHBoxLayout" name="row_camprofile2">
              <item><widget class="QLabel" name="lbl_camdark"><property name="text"><string>Dark (e-/pix/s):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
              <item><widget class="QDoubleSpinBox" name="spn_cam_dark"><property name="maximum"><double>1000.000000000000000</double></property><property name="decimals"><number>4</number></property></widget></item>
@@ -185,6 +193,7 @@
             </layout>
            </item>
            <item><widget class="QLabel" name="lbl_cam_ref"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+           <item><widget class="QLabel" name="lbl_cam_gain_note"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
           </layout>
          </widget>
         </item>

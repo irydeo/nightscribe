@@ -775,6 +775,11 @@ class MainWindow(QMainWindow):
                 dlg.spn_cam_full_well.setValue(float(p["full_well_e"]))
             if dlg.spn_cam_linearity.value() == 0 and p.get("linearity_adu"):
                 dlg.spn_cam_linearity.setValue(float(p["linearity_adu"]))
+            # the read noise is a datasheet fact, so the preset may fill it
+            # (the GAIN never: it is per unit and per gain setting, and the
+            # preset itself says so)
+            if dlg.spn_cam_ron.value() == 0 and p.get("read_noise_e"):
+                dlg.spn_cam_ron.setValue(float(p["read_noise_e"]))
             if dlg.spn_cam_dark.value() == 0 and p.get("dark_current_e_s"):
                 dlg.spn_cam_dark.setValue(float(p["dark_current_e_s"]))
             if dlg.spn_cam_max_exp.value() == 0 and p.get("regime") == "short" \
@@ -805,6 +810,29 @@ class MainWindow(QMainWindow):
             if p.get("linearity_note"):
                 bits.append(p["linearity_note"])
         dlg.lbl_cam_ref.setText(" · ".join(bits))
+        self._cam_gain_note(dlg)
+
+    def _cam_gain_note(self, dlg):
+        # The consequence of the gain, live (quality plan, phase G): with
+        # one, the error bar is the CCD equation; without one it is only
+        # the scatter of the comparison stars, and the observer must know
+        # before wondering why a 0.06 mag curve has 0.2 mag error bars.
+        gain = dlg.spn_cam_gain.value() or None
+        ron = dlg.spn_cam_ron.value() or None
+        if gain:
+            bits = [self.tr("gain {0:.3g} e-/ADU").replace(
+                "{0}", f"{gain:.3g}")]
+            if ron:
+                bits.append(self.tr("read noise {0:.3g} e-").replace(
+                    "{0}", f"{ron:.3g}"))
+            bits.append(self.tr(
+                "the error bar is the CCD equation"))
+            dlg.lbl_cam_gain_note.setText(" · ".join(bits))
+        else:
+            dlg.lbl_cam_gain_note.setText(self.tr(
+                "No gain: the error bar of every point is the scatter of "
+                "the comparison stars, not the CCD equation. Measure it on "
+                "your own frames, or set it here."))
 
     def _exotic_python(self, dlg):
         # @return: the interpreter to use (configured, else detected)
@@ -973,6 +1001,15 @@ class MainWindow(QMainWindow):
             float(config.get("cam_full_well_e") or 0))
         dlg.spn_cam_linearity.setValue(
             float(config.get("cam_linearity_adu") or 0))
+        # the system gain and the read noise: the two numbers the CCD
+        # equation needs and that nothing used to be able to set (quality
+        # plan, phase G). 0 in the spins means "unknown".
+        dlg.spn_cam_gain.setValue(float(config.get("ccd_gain") or 0))
+        dlg.spn_cam_ron.setValue(float(config.get("ccd_read_noise") or 0))
+        dlg.spn_cam_gain.valueChanged.connect(
+            lambda _v: self._cam_ref_update(dlg))
+        dlg.spn_cam_ron.valueChanged.connect(
+            lambda _v: self._cam_ref_update(dlg))
         dlg.spn_cam_dark.setValue(
             float(config.get("cam_dark_current_e_s") or 0))
         dlg.spn_cam_max_exp.setValue(
@@ -1088,6 +1125,8 @@ class MainWindow(QMainWindow):
                    dlg.edt_exotic_python.text().strip())
         config.set("exotic_install_dir",
                    dlg.edt_exotic_install.text().strip())
+        config.set("ccd_gain", dlg.spn_cam_gain.value() or None)
+        config.set("ccd_read_noise", dlg.spn_cam_ron.value() or None)
         config.set("cam_preset", dlg.cmb_cam_preset.currentData() or "")
         config.set("cam_full_well_e", dlg.spn_cam_full_well.value() or None)
         config.set("cam_linearity_adu",

@@ -39,7 +39,7 @@ analysis-layer checklist. No Qt, no network.
 
 import logging
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -157,6 +157,7 @@ class SeriesResult:
     apertures: dict = field(default_factory=dict)   # per-night k (T3)
     align_report: dict = None                       # D44: frame alignment
     comp_report: dict = None                        # the comps' tie
+    gain_report: dict = None                        # the resolved gain
     model_notes: list = field(default_factory=list)  # [{es,en}] the error
                                                      # model's caveats
 
@@ -1123,6 +1124,51 @@ def sweep_aperture(paths, cfg, ks=None):
     return out
 
 
+def _resolve_gain(cfg, paths):
+    # The working gain of the run (quality plan, phase G): what Ajustes
+    # says, else what the frame header says, else what the frames
+    # themselves say. Without any of the three the error bars stay the
+    # scatter of the comps, and the panel says so instead of pretending.
+    #
+    # The measurement is only attempted when the first two failed: it
+    # costs two frame reads and an observer who set their gain never pays
+    # for it.
+    # @args: cfg - the SeriesConfig, paths - the series in observing order
+    # @return: (cfg with the resolved site gain/ron, the report dict)
+    from . import gain as gain_mod
+    header = None
+    for path in list(paths)[:3]:
+        try:
+            header = fits_io.read_header(path)
+            break
+        except fits_io.FitsError:
+            continue
+    estimate = None
+    head = gain_mod.header_numbers(header)
+    if cfg.site_gain is None and head.get("gain") is None and paths:
+        try:
+            estimate = gain_mod.estimate_from_paths(
+                paths, level_max=cfg.site_saturate)
+        except Exception as err:                     # never fatal
+            logger.warning("gain estimate failed: %s", err)
+            estimate = None
+    resolved = gain_mod.resolve(
+        settings_gain=cfg.site_gain, settings_ron=cfg.site_ron,
+        header=header, estimate=estimate)
+    if resolved.get("gain") is not None:
+        resolved["used"] = resolved["gain"]
+    report = dict(resolved)
+    if estimate is not None:
+        report["n_boxes"] = estimate.get("n_boxes")
+        report["n_kept"] = estimate.get("n_kept")
+        report["pair"] = estimate.get("pair")
+    g = resolved.get("gain")
+    r = resolved.get("ron")
+    if g is not None and (g != cfg.site_gain or r != cfg.site_ron):
+        cfg = replace(cfg, site_gain=g, site_ron=r)
+    return cfg, report
+
+
 def _align_report(report, cfg):
     # The alignment block that travels with the run (D44): how many
     # frames were aligned, how far the field really moved, how well the
@@ -1198,24 +1244,34 @@ def align_messages(report):
     return out
 
 
-def _model_notes(frames, cfg):
-    # The error model's caveats, in plain language (C4: what is missing is
-    # said, never hidden). The CCD equation needs a gain; without one the
-    # error bar is only the scatter of the comparison stars, which on a
-    # faint target is a different (and usually rosier and rougher) thing.
-    # @args: frames - the measured frame dicts, cfg - the SeriesConfig
+def _model_notes(frames, cfg, gain_report=None):
+    # The error model's caveats and facts, in plain language (C4: what is
+    # missing is said, never hidden). The CCD equation needs a gain; the
+    # module resolves it (Ajustes, the header, the frames themselves) and
+    # here it says where the number came from, or that there is none.
+    # @args: frames - the measured frame dicts, cfg - the SeriesConfig,
+    #        gain_report - the _resolve_gain block
     # @return: [{"es", "en"}]
     notes = []
     if not frames:
         return notes
+    from . import gain as gain_mod
+    resolved = gain_report if gain_report is not None else {
+        "gain": cfg.site_gain, "ron": cfg.site_ron, "source": None}
+    if resolved.get("gain") is None:
+        notes.append(gain_mod.summary(resolved))
+        return notes
+    notes.append(gain_mod.summary(resolved))
     if not any(f["res"].gain for f in frames):
+        # the resolution said there is a gain but the recipe did not see
+        # it: that would be a bug, and it must not pass in silence
         notes.append(_msg(
-            "Sin ganancia (ni en Ajustes ni en la cabecera): la barra de "
-            "error es la dispersión de las comparadas, no la ecuación del "
-            "CCD. Ponla en Ajustes para tener errores de verdad.",
-            "No gain (neither in Settings nor in the header): the error "
-            "bar is the scatter of the comparison stars, not the CCD "
-            "equation. Set it in Settings for real errors."))
+            "La ganancia resuelta no ha llegado a la receta: el error de "
+            "los puntos no es la ecuación del CCD",
+            "The resolved gain did not reach the recipe: the point errors "
+            "are not the CCD equation"))
+    for note in resolved.get("notes") or []:
+        notes.append(note)
     return notes
 
 
@@ -1269,6 +1325,7 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     total = len(paths)
     result = SeriesResult(zp_mode=cfg.zp_mode,
                           group_n=max(1, int(cfg.group_n)))
+    cfg, result.gain_report = _resolve_gain(cfg, paths)
     apertures = {}
     if cfg.auto_aperture and cfg.radii is None:
         apertures = sweep_aperture(paths, cfg)
@@ -1386,7 +1443,7 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     ref_data = None       # the alignment grid is no longer needed
     ref_stars = None
     result.align_report = _align_report(report, cfg)
-    result.model_notes = _model_notes(frames, cfg)
+    result.model_notes = _model_notes(frames, cfg, result.gain_report)
     frames.sort(key=lambda f: (f["mjd"] if f["mjd"] is not None
                                else float("inf")))
     n = result.group_n

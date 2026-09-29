@@ -1137,6 +1137,9 @@ class UfeMeasureTab(QWidget):
         for m in series_measure.comp_messages(result.comp_report,
                                               len(points)):
             lines.append("· " + m.get(self._lang, m.get("en", "")))
+        for m in series_measure.seeing_messages(result.seeing_report,
+                                                result.aperture_report):
+            lines.append("· " + m.get(self._lang, m.get("en", "")))
         for m in result.model_notes or []:
             lines.append("· " + m.get(self._lang, m.get("en", "")))
         if guard["level"] == "red":

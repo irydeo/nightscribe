@@ -147,3 +147,29 @@ def test_short_curve_is_refused():
     res = pg.find_period([60000.0, 60000.1], [12.0, 12.1], fap_shuffles=0)
     assert res["period_d"] is None
     assert res["warnings"]
+
+
+def test_the_robust_clip_drops_what_does_not_belong():
+    # A clean sine plus one wild point (a satellite trail, a frame the
+    # aperture could not rescue): folded by the period found in the first
+    # pass, the point leaves the robust scatter of its phase bin and the
+    # search is run again without it (quality plan, B3).
+    t, y = _sine(period_d=0.3, noise=0.004)
+    y = np.copy(y)
+    y[7] += 0.25
+    clipped = pg.find_period(t, y, min_period_d=0.1, max_period_d=1.0,
+                             method="ls", fap_shuffles=0, clip_outliers=True)
+    assert clipped["clipped"]["n_dropped"] == 1
+    assert clipped["period_d"] == pytest.approx(0.3, rel=0.02)
+    assert any("descartado" in n["es"] for n in clipped["notes"])
+
+
+def test_the_robust_clip_keeps_the_curve_itself():
+    # The clip works on the residual against a running median in time, so
+    # the star's own amplitude (or a slow trend) is never an outlier: it
+    # must drop exactly nothing on a clean variable curve.
+    t, y = _sine(period_d=0.3, amp=0.3, noise=0.01)
+    res = pg.find_period(t, y, min_period_d=0.1, max_period_d=1.0,
+                         method="ls", fap_shuffles=0, clip_outliers=True)
+    assert res["clipped"]["n_dropped"] == 0
+    assert res["period_d"] == pytest.approx(0.3, rel=0.02)

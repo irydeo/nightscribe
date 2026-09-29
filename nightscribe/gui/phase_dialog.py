@@ -85,15 +85,25 @@ class PhaseDialog(QDialog):
         return len(keys)
 
     def _curve(self):
-        # @return: (t, y, err) float arrays of the usable points
+        # @return: (t, y, err) float arrays of the usable points, with the
+        #          flagged ones and the robust clip applied when asked
         import numpy as np
+        from ..core import periodogram as pg
+        from ..core.series_measure import has_data_flag
         pts = [p for p in self._points
                if p.get("mjd") is not None and p.get("mag") is not None]
+        skipped = 0
+        if self._ui.chk_skip_flags.isChecked():
+            kept = [p for p in pts if not has_data_flag(p.get("flags"))]
+            skipped = len(pts) - len(kept)
+            pts = kept
+        self._skipped = skipped
         t = np.asarray([p["mjd"] for p in pts], dtype=float)
         y = np.asarray([p["mag"] for p in pts], dtype=float)
         dy = None
-        if any(p.get("err") for p in pts):
-            dy = np.asarray([p.get("err") or 0.0 for p in pts], dtype=float)
+        if any(p.get("err") or p.get("err_internal") for p in pts):
+            dy = np.asarray([p.get("err_internal") or p.get("err") or 0.0
+                             for p in pts], dtype=float)
             dy = np.where(dy > 0.0, dy, np.nan)
         return t, y, dy
 
@@ -115,9 +125,17 @@ class PhaseDialog(QDialog):
             self._found = pg.find_period(
                 t, y, dy, min_period_d=minp, max_period_d=maxp,
                 method=self._ui.cmb_method.currentData() or "ls",
-                fap_shuffles=_FAP_SHUFFLES)
-            self._ui.txt_result.setPlainText(
-                phase_view.fold_summary(self._found, self._lang))
+                fap_shuffles=_FAP_SHUFFLES,
+                clip_outliers=self._ui.chk_clip.isChecked())
+            notes = []
+            if getattr(self, "_skipped", 0):
+                notes.append(self.tr(
+                    "{0} flagged point(s) left out of the search").format(
+                        self._skipped))
+            text = phase_view.fold_summary(self._found, self._lang)
+            if notes:
+                text = "\n".join(notes) + "\n" + text
+            self._ui.txt_result.setPlainText(text)
             self._render(t, y, dy)
         except Exception as err:                       # never a dead window
             logger.warning("period search failed: %s", err)

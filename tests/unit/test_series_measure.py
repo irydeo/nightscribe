@@ -37,6 +37,10 @@ ZP_TRUE = 22.0
 TARGET_XY = (80.4, 80.3)
 COMP_XY = [(45, 45), (115, 45), (45, 115), (115, 115), (80, 125)]
 CHECK_XY = (110, 70)
+# Seeing disc used by the focus-excursion tests: small enough that the
+# 19 px FWHM cutout measures both the sharp and the broadened frames
+# without truncating them (the default SIGMA is a very broad PSF here).
+_SEEING_SIGMA = 1.2
 
 
 def _card(key, value=None, comment=""):
@@ -248,6 +252,91 @@ def test_corrupted_comp_is_vetoed(tmp_path):
 
 
 # ---------------- D12 anchor (d): a flagged point stays ----------------
+
+def test_a_cloud_is_flagged_when_the_psf_does_not_change(tmp_path):
+    # A thin cloud dims the WHOLE field with the same seeing: the zero
+    # point moves and the FWHM does not. That is a cloud, and it is
+    # flagged as one (quality plan, B2).
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    paths = []
+    for i in range(6):
+        data = _plate(noise=0.3, seed=20 + i)
+        if i == 3:
+            # dim everything but the target: the comps lose flux, so the
+            # zero point of that frame drops
+            yy, xx = np.ogrid[:H, :W]
+            for cx, cy in COMP_XY + [CHECK_XY]:
+                data -= 1500.0 * np.exp(-((xx - cx) ** 2
+                                          + (yy - cy) ** 2)
+                                        / (2 * SIGMA ** 2))
+        paths.append(_write_plate(tmp_path / f"c{i:03d}.fits", data,
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    res = sm.measure_series(paths, _config(wcs, comps))
+    flags = [f for p in res.points for f in p.flags]
+    assert "cloud" in flags
+    assert "seeing" not in flags
+    assert res.seeing_report["flagged"] == 0
+
+
+def test_a_focus_excursion_is_seeing_not_cloud(tmp_path):
+    # Two frames of the night lose their focus: the PSF balloons, the sky
+    # does not move and the flux leaves a fixed aperture. The engine must
+    # flag `seeing` (and NOT `cloud`, which would send the observer to
+    # look at the sky), and the aperture must follow the seeing so the
+    # lost flux comes back (quality plan, B1/B2).
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    paths = []
+    for i in range(8):
+        wide = i in (3, 4)
+        # a seeing disc the 19 px FWHM cutout can still measure honestly:
+        # at the test's default sigma the cutout truncates the broad frame
+        # and the ratio it sees is far smaller than the injected one
+        data = _plate(noise=0.3, seed=30 + i,
+                      sigma=_SEEING_SIGMA * (2.0 if wide else 1.0))
+        paths.append(_write_plate(tmp_path / f"s{i:03d}.fits", data,
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    res = sm.measure_series(paths, _config(wcs, comps))
+    flags = [f for p in res.points for f in p.flags]
+    assert "seeing" in flags
+    assert "cloud" not in flags
+    assert res.seeing_report["flagged"] >= 2
+    wide = [p for p in res.points if "seeing" in p.flags]
+    assert all(p.fwhm > 1.5 * np.median([q.fwhm for q in res.points])
+               for p in wide)
+
+
+def test_the_aperture_follows_the_seeing_and_recovers_the_flux(tmp_path):
+    # The same excursion measured with the aperture following the seeing:
+    # the observer's 6 px radius scales with each frame's FWHM, so the
+    # defocused frame stops losing its light AND its error shrinks.
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    paths = []
+    for i in range(8):
+        wide = i in (3, 4)
+        data = _plate(noise=0.3, seed=30 + i,
+                      sigma=_SEEING_SIGMA * (2.0 if wide else 1.0))
+        paths.append(_write_plate(tmp_path / f"f{i:03d}.fits", data,
+                                  date_obs=f"2026-09-20T23:{30 + i:02d}:00"))
+    fixed = sm.measure_series(paths, _config(wcs, comps))
+    scaled = sm.measure_series(paths, _config(wcs, comps,
+                                              seeing_aperture=True))
+    assert scaled.aperture_report["scaled"] >= 2
+    assert scaled.aperture_report["scale_max"] > 1.6
+    # the defocused points move closer to the level of the sharp ones
+    def spread(res):
+        mags = [p.mag for p in res.points]
+        clean = float(np.median([m for m in mags]))
+        return max(abs(m - clean) for m in mags)
+    assert spread(scaled) < spread(fixed)
+    # and their internal error is better (more photons inside)
+    def worst_err(res):
+        return max(p.err_internal for p in res.points
+                   if p.err_internal is not None)
+    assert worst_err(scaled) < worst_err(fixed)
+
 
 def test_cloud_point_is_flagged_but_kept(tmp_path):
     # Frame 3 has all the comps 0.3 mag brighter (a thin cloud shifts the

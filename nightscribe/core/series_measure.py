@@ -62,6 +62,39 @@ _MIN_COMPS = 3
 # A comp needs this many frames before its own offset can be trusted when
 # the sequence is tied (see _tie_comps).
 _TIE_MIN_FRAMES = 5
+# Not every flag means the same thing (quality plan, phase A/B). A DATA
+# flag says the point itself is suspect; a CAVEAT flag says the point is
+# fine but its calibration leans on few comparison stars. The chart and
+# the analysis read this classification, so it lives in the engine and
+# not in the widget.
+DATA_FLAGS = ("unusable", "saturated", "nonlinear", "cosmic", "cloud",
+              "seeing", "align_failed", "align_edge", "guide_jump")
+CAVEAT_FLAGS = ("few_comps", "neighbour_zp", "no_zp")
+
+
+def split_flags(flags):
+    # @args: flags - a point's flag list
+    # @return: (data_flags, caveat_flags) - anything unknown counts as data
+    if not flags:
+        return [], []
+    data = [f for f in flags if f in DATA_FLAGS]
+    caveat = [f for f in flags if f in CAVEAT_FLAGS]
+    other = [f for f in flags if f not in DATA_FLAGS and f not in CAVEAT_FLAGS]
+    return data + other, caveat
+
+
+def has_data_flag(flags):
+    # @return: True when the point carries a flag that puts its DATA in doubt
+    return bool(split_flags(flags)[0])
+# How far the aperture may follow the seeing around the reference frame's
+# FWHM (H3 / quality plan B1): a frame twice as broad gets twice the
+# aperture, but a trail or a mis-detected FWHM cannot open it absurdly.
+_SEEING_SCALE_MIN = 0.6
+_SEEING_SCALE_MAX = 3.0
+# A frame whose FWHM leaves the night's robust range by this much is a
+# focus excursion (or a trail), flagged `seeing` (B2).
+_SEEING_FLAG_K = 3.0
+_SEEING_FLAG_MIN = 1.4      # and at least this fraction over the median
 
 
 @dataclass(frozen=True, eq=False)
@@ -158,6 +191,8 @@ class SeriesResult:
     align_report: dict = None                       # D44: frame alignment
     comp_report: dict = None                        # the comps' tie
     gain_report: dict = None                        # the resolved gain
+    seeing_report: dict = None                      # the focus excursions
+    aperture_report: dict = None                    # the seeing-scaled radii
     model_notes: list = field(default_factory=list)  # [{es,en}] the error
                                                      # model's caveats
 
@@ -404,40 +439,57 @@ def _frame_fwhm(data, res):
     return photometry.estimate_fwhm(data, spots)
 
 
+def _frame_spots(cfg, wcs_ov=None, target_ov=None):
+    # The target and the comps on the frame about to be measured: what the
+    # seeing (and the centroid) is measured on.
+    # @return: [(x, y), ...]
+    spots = [target_ov if target_ov is not None else cfg.target_xy]
+    w = wcs_ov if wcs_ov is not None else cfg.wcs
+    if w is not None:
+        for e in cfg.comp_set:
+            star = e.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                spots.append(w.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+    return spots
+
+
 def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
-                   target_ov=None):
+                   target_ov=None, fwhm_ref=None):
     # One (already loaded) frame through the shared plate recipe. With
     # registration the frame is measured on its NATIVE grid at the mapped
     # coordinates (wcs_ov/target_ov), so the PSF is never resampled (D44).
-    # @return: the frame dict
+    #
+    # H3/the quality plan's B1: when the aperture follows the seeing, the
+    # observer's radii are the ones of the REFERENCE frame and every frame
+    # scales them by its own FWHM (within limits). That is what keeps a
+    # frame whose focus blew up measurable instead of losing half its
+    # flux outside a fixed aperture, and the frame's own FWHM also feeds
+    # the centroid's Gaussian fit.
+    # @return: the frame dict (with "fwhm" and "radii" actually used)
     meta = fits_meta.meta_from_header(header)
     night = _night_of(meta.get("mjd"))
-    radii = None
+    base = None
     if apertures and night in apertures:
-        radii = apertures[night].get("radii")
-    if radii is None:
-        radii = cfg.radii
-    # H3: when the observer asked the aperture to follow the seeing, the
-    # frame's own FWHM sizes it (measured on the target and the comps
-    # before the recipe runs, so the PSF is never resampled and the
-    # aperture follows a seeing that really changed)
+        base = apertures[night].get("radii")
+    if base is None:
+        base = cfg.radii
     fwhm = None
-    if cfg.seeing_aperture and radii is None:
-        spots = [target_ov if target_ov is not None else cfg.target_xy]
-        w = wcs_ov if wcs_ov is not None else cfg.wcs
-        if w is not None:
-            for e in cfg.comp_set:
-                star = e.get("star") or {}
-                if star.get("ra") is None:
-                    continue
-                try:
-                    spots.append(w.sky_to_pixel(star["ra"], star["dec"]))
-                except Exception:
-                    continue
-        fwhm = photometry.estimate_fwhm(data, spots)
+    if cfg.seeing_aperture:
+        fwhm = photometry.estimate_fwhm(
+            data, _frame_spots(cfg, wcs_ov, target_ov))
+    radii = base
+    seen_scale = None
+    if cfg.seeing_aperture and fwhm and fwhm_ref:
+        scale = min(max(fwhm / float(fwhm_ref), _SEEING_SCALE_MIN),
+                    _SEEING_SCALE_MAX)
+        base_radii = base or photometry.aperture_for_fwhm(fwhm_ref)
+        radii = tuple(float(r) * scale for r in base_radii)
+        seen_scale = scale
     rap = (radii if radii else cfg.radii or (photometry.R_AP,))[0]
-    if fwhm is not None:
-        rap = photometry.aperture_for_fwhm(fwhm)[0]
     pcfg = photometry.PlateConfig(
         target_xy=target_ov if target_ov is not None else cfg.target_xy,
         entries=list(cfg.comp_set),
@@ -462,6 +514,8 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
     mjd_mid, exptime = _mid_exposure(meta)
     return {"path": str(path), "data": data, "meta": meta, "res": res,
             "mjd": mjd_mid, "exptime": exptime, "r_ap": rap,
+            "radii": tuple(radii) if radii else None,
+            "seen_fwhm": fwhm, "seen_scale": seen_scale,
             "filter": meta.get("filter")}
 
 
@@ -842,6 +896,12 @@ def _fill_neighbour_zp(points, cfg):
 def _flag_clouds(points, cfg):
     # T7: zero points that leave the series' robust scatter are a thin
     # cloud (marked, never deleted). Catalog mode only.
+    #
+    # Quality plan, B2: a zero point that jumps is not always a cloud. A
+    # FOCUS excursion moves the zero point exactly the same way (the whole
+    # field loses the same flux out of a fixed aperture) and the sky says
+    # so: the `seeing` pass below owns those points, and marking them
+    # "cloud" would send the observer to look at the wrong thing.
     if cfg.zp_mode != "catalog":
         return
     zps = [p.zp for p in points if p.zp is not None
@@ -856,7 +916,45 @@ def _flag_clouds(points, cfg):
     for p in points:
         if p.zp is not None \
                 and abs(p.zp - med) > cfg.zp_outlier_sigma * 1.4826 * mad:
+            if "seeing" in p.flags:
+                continue
             _add_flag(p, "cloud")
+
+
+def _flag_seeing(points):
+    # The point spread function of the night (quality plan, B2): a frame
+    # whose FWHM leaves the robust range of its own night is a focus
+    # excursion, a trail or a satellite through the core. It is marked
+    # `seeing`, never deleted, and it is NOT a cloud (the sky does not
+    # move). Per night, so a session that refocused is judged against its
+    # own neighbours.
+    # @args: points - measured SeriesPoints with their fwhm
+    # @return: {"nights": n, "flagged": n} for the report
+    by_night = {}
+    for i, p in enumerate(points):
+        if p.fwhm is not None:
+            by_night.setdefault(_night_of(p.mjd), []).append(i)
+    flagged = 0
+    for _night, ids in by_night.items():
+        if len(ids) < 4:
+            continue
+        vals = np.asarray([points[i].fwhm for i in ids], dtype=np.float64)
+        med = float(np.median(vals))
+        mad = float(np.median(np.abs(vals - med)))
+        if med <= 0.0:
+            continue
+        # Two ways to be an excursion, joined by OR so a degenerate MAD
+        # does not make the rule LESS sensitive than the plain ratio: the
+        # night's seeing breathes by 10-20 % frame to frame and that is
+        # not news, a 1.5× step is.
+        limit = med * _SEEING_FLAG_MIN
+        if mad > 0.0:
+            limit = min(limit, med + _SEEING_FLAG_K * 1.4826 * mad)
+        for i in ids:
+            if points[i].fwhm > limit:
+                _add_flag(points[i], "seeing")
+                flagged += 1
+    return {"nights": len(by_night), "flagged": flagged}
 
 
 # ---------------- T5: honest detrend ----------------
@@ -1169,6 +1267,55 @@ def _resolve_gain(cfg, paths):
     return cfg, report
 
 
+def seeing_messages(report, aper=None, lang="es"):
+    # The focus excursions and the seeing-scaled aperture in plain
+    # language (quality plan, B1/B2): what was flagged and what the
+    # aperture did.
+    # @args: report - the _flag_seeing block, aper - the _aperture_report
+    # @return: [{"es", "en"}]
+    out = []
+    if report and report.get("flagged"):
+        out.append(_msg(
+            "{} punto(s) con la FWHM fuera del rango de la noche: "
+            "desenfoque, un rastro o un satélite en el núcleo. Están "
+            "marcados como «seeing», no como nube".format(
+                report["flagged"]),
+            "{} point(s) with a FWHM outside the night's range: defocus, a "
+            "trail or a satellite through the core. They are flagged "
+            "«seeing», not «cloud»".format(report["flagged"])))
+    if aper and aper.get("enabled") and aper.get("fwhm_ref"):
+        out.append(_msg(
+            "La apertura siguió el seeing: FWHM de referencia {:.2f} px, "
+            "{:.1f}×–{:.1f}× en las tomas que más se salieron ({} tomas "
+            "escaladas)".format(
+                aper["fwhm_ref"], aper.get("scale_min") or 1.0,
+                aper.get("scale_max") or 1.0, aper.get("scaled") or 0),
+            "The aperture followed the seeing: reference FWHM {:.2f} px, "
+            "{:.1f}×–{:.1f}× on the widest frames ({} frames scaled)"
+            .format(aper["fwhm_ref"], aper.get("scale_min") or 1.0,
+                    aper.get("scale_max") or 1.0, aper.get("scaled") or 0)))
+    return out
+
+
+def _aperture_report(aper):
+    # @args: aper - the running aperture counters of measure_series
+    # @return: the report dict, or None when the aperture was fixed
+    if not aper.get("enabled"):
+        return None
+    scales = aper.get("frames") or []
+    out = {"enabled": True, "scaled": aper.get("scaled", 0),
+           "n_frames": len(scales)}
+    if aper.get("fwhm_ref"):
+        out["fwhm_ref"] = float(aper["fwhm_ref"])
+    if aper.get("radii_ref"):
+        out["radii_ref"] = list(aper["radii_ref"])
+    if scales:
+        out["scale_min"] = float(min(scales))
+        out["scale_max"] = float(max(scales))
+        out["scale_median"] = float(np.median(scales))
+    return out
+
+
 def _align_report(report, cfg):
     # The alignment block that travels with the run (D44): how many
     # frames were aligned, how far the field really moved, how well the
@@ -1349,6 +1496,11 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     report = {"enabled": mode != "off", "mode": mode, "requested": cfg.align,
               "rotation": rigid, "aligned": 0, "failed": [], "inherited": 0,
               "shifts_px": [], "rms_px": [], "angle_deg": []}
+    # the aperture's reference seeing (B1): the first frame measured sets
+    # it, and every later frame scales the observer's radii by its own
+    # FWHM against that reference
+    fwhm_ref = None
+    aper = {"enabled": bool(cfg.seeing_aperture), "frames": [], "scaled": 0}
     for i, path in enumerate(paths):
         if cancel is not None and cancel():
             result.status = "incomplete"
@@ -1415,7 +1567,18 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                                   "angle": used["angle"],
                                   "n": used.get("n") or 0}
         frame = _measure_frame(path, header, data, cfg, apertures,
-                               wcs_ov=wcs_ov, target_ov=target_ov)
+                               wcs_ov=wcs_ov, target_ov=target_ov,
+                               fwhm_ref=fwhm_ref)
+        if cfg.seeing_aperture:
+            if fwhm_ref is None and frame.get("seen_fwhm"):
+                fwhm_ref = float(frame["seen_fwhm"])
+                aper["fwhm_ref"] = fwhm_ref
+                aper["radii_ref"] = list(cfg.radii) if cfg.radii else None
+            if frame.get("seen_scale") is not None:
+                scale = float(frame["seen_scale"])
+                aper["frames"].append(scale)
+                if abs(scale - 1.0) > 0.05:
+                    aper["scaled"] += 1
         if align_info is not None:
             frame["align"] = align_info
             if align_info.get("failed"):
@@ -1450,6 +1613,8 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     points = [_build_point(frames[i:i + n], cfg)
               for i in range(0, len(frames), n)]
     result.comp_report = _tie_comps(points, cfg)
+    result.seeing_report = _flag_seeing(points)
+    result.aperture_report = _aperture_report(aper)
     _fill_neighbour_zp(points, cfg)
     _flag_clouds(points, cfg)
     if cfg.detrend_policy != "off":

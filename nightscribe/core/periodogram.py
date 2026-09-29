@@ -46,6 +46,9 @@ MIN_CYCLES = 2.0
 # Bootstrap shuffles for the false-alarm probability. Cheap enough to be
 # honest; the loop can be switched off for a huge series.
 FAP_SHUFFLES = 120
+# Below this power the folded robust clip is not attempted: folding a
+# curve by a peak that is not there would make the rejection arbitrary.
+_ROBUST_MIN_POWER = 0.2
 
 
 def _as_arrays(t, y, dy=None):
@@ -267,9 +270,66 @@ def false_alarm(power_max, t, y, dy=None, frequencies=None,
             "power_max": float(power_max)}
 
 
+def reject_folded(t, y, dy=None, period_d=None, bins=25, k=4.0, rounds=2):
+    # The robust clip that a periodic curve can actually support (quality
+    # plan, B3): fold at the period found, measure each point against the
+    # MEAN OF ITS OWN PHASE BIN and clip the ones that leave the robust
+    # scatter of those residuals.
+    #
+    # Why not a clip on the time series: a star's own amplitude is not an
+    # outlier, so a MAD on the raw magnitudes either eats the curve or
+    # does nothing (measured: a running-median clip on a clean 0.3 mag
+    # variable drops 7 % of its points and still cannot isolate one wild
+    # one). Folded, the residuals ARE noise around a curve, which is what
+    # a robust clip needs.
+    #
+    # The curve's own features (a deep eclipse) inflate the robust scatter
+    # by themselves, so they are not "outliers" to this rule: only what
+    # leaves the curve goes.
+    #
+    # @args: t - times (days), y - magnitudes, dy - errors (kept, unused
+    #        for the scatter), period_d - the period to fold at (None:
+    #        nothing to do), bins - phase bins, k - robust sigmas kept,
+    #        rounds - passes
+    # @return: {"keep", "n_kept", "n_dropped", "k", "bins", "rounds"}
+    t = np.asarray(t, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    keep = np.isfinite(t) & np.isfinite(y)
+    out = {"keep": keep, "n_kept": int(keep.sum()), "n_dropped": 0,
+           "k": float(k), "bins": int(bins), "rounds": 0}
+    if not period_d or period_d <= 0.0 or keep.sum() < 8:
+        return out
+    epochs = 0
+    for _r in range(max(1, int(rounds))):
+        ids = np.flatnonzero(keep)
+        if ids.size < 8:
+            break
+        phase = np.mod(t[ids] / float(period_d), 1.0)
+        idx = np.minimum((phase * bins).astype(np.int64), bins - 1)
+        count = np.bincount(idx, minlength=bins).astype(np.float64)
+        total = np.bincount(idx, weights=y[ids], minlength=bins)
+        mean = np.divide(total, count, out=np.zeros(bins),
+                         where=count > 0)
+        resid = y[ids] - mean[idx]
+        med = float(np.median(resid))
+        mad = 1.4826 * float(np.median(np.abs(resid - med)))
+        if mad <= 0.0:
+            break
+        good = np.abs(resid - med) <= k * mad
+        new = keep.copy()
+        new[ids[~good]] = False
+        epochs += 1
+        if int(new.sum()) == int(keep.sum()):
+            break
+        keep = new
+    out.update({"keep": keep, "n_kept": int(keep.sum()),
+                "n_dropped": int((~keep).sum()), "rounds": epochs})
+    return out
+
+
 def find_period(t, y, dy=None, min_period_d=None, max_period_d=None,
                 method="ls", samples_per_peak=SAMPLES_PER_PEAK,
-                fap_shuffles=FAP_SHUFFLES):
+                fap_shuffles=FAP_SHUFFLES, clip_outliers=False, clip_k=4.0):
     # Search for the period of a light curve, honestly: the peak, its
     # false-alarm probability, how many cycles the baseline really
     # covers, the window peaks and the aliases, and what the OTHER method
@@ -279,16 +339,19 @@ def find_period(t, y, dy=None, min_period_d=None, max_period_d=None,
     # @args: t - times (days, any zero point), y - magnitudes, dy - their
     #        errors, min/max_period_d - the search range, method - "ls",
     #        "pdm" or "both", samples_per_peak - grid oversampling,
-    #        fap_shuffles - bootstrap shuffles (0 disables the FAP)
+    #        fap_shuffles - bootstrap shuffles (0 disables the FAP),
+    #        clip_outliers - drop the points outside the robust scatter
+    #        before searching (B3), clip_k - the robust sigmas kept
     # @return: {"period_d", "frequency", "power", "method", "fap",
     #          "cycles", "baseline_d", "n_points", "periodogram",
-    #          "pdm", "window", "aliases", "notes", "warnings"}
+    #          "pdm", "window", "aliases", "notes", "warnings",
+    #          "clipped"}
     t, y, w = _as_arrays(t, y, dy)
     out = {"period_d": None, "frequency": None, "power": None,
            "method": method, "fap": None, "cycles": None,
            "baseline_d": baseline_days(t), "n_points": int(t.size),
            "periodogram": None, "pdm": None, "window": None,
-           "aliases": [], "notes": [], "warnings": []}
+           "aliases": [], "notes": [], "warnings": [], "clipped": None}
     if t.size < 4:
         out["warnings"].append({"es": "Hacen falta al menos 4 puntos",
                                 "en": "At least 4 points are needed"})
@@ -321,6 +384,40 @@ def find_period(t, y, dy=None, min_period_d=None, max_period_d=None,
     if out["period_d"]:
         out["frequency"] = 1.0 / out["period_d"]
         out["cycles"] = out["baseline_d"] / out["period_d"]
+    # the robust pass (B3): with a period in hand the curve can be folded,
+    # and only THEN does a robust clip mean anything (see reject_folded).
+    # A second search on the surviving points is the honest answer to "and
+    # without the point that does not belong?".
+    if clip_outliers and out["period_d"] and out["power"] is not None \
+            and out["power"] >= _ROBUST_MIN_POWER:
+        clip = reject_folded(t, y, dy, period_d=out["period_d"], k=clip_k)
+        out["clipped"] = clip
+        if clip["n_dropped"]:
+            keep = clip["keep"]
+            t2 = t[keep]
+            y2 = y[keep]
+            dy2 = dy[keep] if dy is not None else None
+            again = find_period(
+                t2, y2, dy2, min_period_d=min_period_d,
+                max_period_d=max_period_d, method=method,
+                samples_per_peak=samples_per_peak, fap_shuffles=fap_shuffles,
+                clip_outliers=False)
+            again["clipped"] = clip
+            again["notes"] = [
+                {"es": "Con la curva plegada se han descartado {} punto(s) "
+                       "a más de {:.0f}σ de su bin de fase, y se ha vuelto "
+                       "a buscar".format(clip["n_dropped"], clip_k),
+                 "en": "With the curve folded, {} point(s) beyond {:.0f}σ of "
+                       "their phase bin were dropped and the search was run "
+                       "again".format(clip["n_dropped"], clip_k)}
+            ] + list(again.get("notes") or [])
+            return again
+    elif clip_outliers and out["period_d"]:
+        out["notes"].append({
+            "es": "El primer pico es demasiado flojo para plegar con él: no "
+                  "se ha intentado descartar atípicos (sería arbitrario)",
+            "en": "The first peak is too weak to fold by: no outlier "
+                  "rejection was attempted (it would be arbitrary)"})
     # the false-alarm probability of the Lomb-Scargle peak (the PDM has
     # no closed form; it is reported as a cross-check instead)
     if fap_shuffles:

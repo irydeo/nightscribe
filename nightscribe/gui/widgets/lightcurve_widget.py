@@ -111,9 +111,20 @@ FLAG_COLOUR = "#e0a030"
 # calibration leans on few comparison stars. The chart marks the first with
 # the hollow diamond and the second with a faint edge, so a series with a
 # thin comp set does not read as a series with 200 bad points.
-DATA_FLAGS = ("unusable", "saturated", "nonlinear", "cosmic", "cloud",
-              "seeing", "align_failed", "align_edge", "guide_jump")
-CAVEAT_FLAGS = ("few_comps", "neighbour_zp", "no_zp")
+# The flag classification lives in the engine (quality plan, phase A): the
+# chart and the analysis must read the same thing.
+from ...core.series_measure import CAVEAT_FLAGS, DATA_FLAGS  # noqa: E402
+
+
+def _flags_split(flags):
+    # @args: flags - the point's flag list
+    # @return: (data_flags, caveat_flags) - anything unknown counts as data
+    if not flags:
+        return [], []
+    data = [f for f in flags if f in DATA_FLAGS]
+    caveat = [f for f in flags if f in CAVEAT_FLAGS]
+    other = [f for f in flags if f not in DATA_FLAGS and f not in CAVEAT_FLAGS]
+    return data + other, caveat
 
 
 def _fmt_tick(value, span):
@@ -136,16 +147,6 @@ def _fmt_tick(value, span):
         decimals = 4
     return f"{value:.{decimals}f}"
 
-
-def _flags_split(flags):
-    # @args: flags - the point's flag list
-    # @return: (data_flags, caveat_flags)
-    if not flags:
-        return [], []
-    data = [f for f in flags if f in DATA_FLAGS]
-    caveat = [f for f in flags if f in CAVEAT_FLAGS]
-    other = [f for f in flags if f not in DATA_FLAGS and f not in CAVEAT_FLAGS]
-    return data + other, caveat
 
 # Distinct colours per filter (matching the PNG export)
 _FILTER_COLOURS = {

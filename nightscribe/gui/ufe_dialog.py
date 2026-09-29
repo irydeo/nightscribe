@@ -234,6 +234,8 @@ class UfeDialog(QDialog):
         self._wire_topbar()
         self._build_feature_tabs()
         self._place_light_curve()
+        self._bar_doors()
+        self._apply_bar_style()          # the doors' panels included
         self._wire_status()
         # the series block lives at the left of the image (its own pane,
         # hidden unless a visit arms it): the visit strip (frame navigator
@@ -267,6 +269,53 @@ class UfeDialog(QDialog):
             lay = QVBoxLayout(page)
             lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(widget)
+
+    def _bar_doors(self):
+        # U2: the bar keeps what a visit needs (open, export, solve, the two
+        # zooms that are used all the time and the current factor) and puts
+        # the rest behind two doors. They are not deletions: the view
+        # switches (north, scale, annotations, boxes, mark) and the three
+        # occasional zoom factors are the SAME widgets, moved one by one
+        # into their panel (a layout removed from its parent is deleted by
+        # the binding). Their texts and tooltips keep living in the Designer
+        # file (ADR-005), and every name the code and the tests use is
+        # untouched.
+        # @return: None
+        self.btn_view = self._ui.btn_view
+        self.btn_zoom_more = self._ui.btn_zoom_more
+        self._bar_menu(self.btn_view,
+                       ("btn_north", "btn_scale", "btn_annot", "btn_boxes",
+                        "btn_mark"))
+        self._bar_menu(self.btn_zoom_more,
+                       ("btn_zoom_50", "btn_zoom_200", "btn_zoom_400"))
+
+    def _bar_menu(self, tool, names):
+        # Puts a set of existing buttons inside a dropdown panel hanging
+        # from a QToolButton.
+        # @args: tool - the QToolButton, names - the attributes to move
+        # @return: None
+        from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
+                                       QWidget, QWidgetAction)
+        panel = QWidget(self)
+        box = QVBoxLayout(panel)
+        box.setContentsMargins(6, 6, 6, 6)
+        for name in names:
+            w = getattr(self._ui, name, None)
+            if w is None:
+                w = getattr(self, name, None)
+            if w is None:
+                continue
+            # inside a panel an icon with no text would be a riddle: the
+            # icon-only skin must leave these ones their label
+            w.setProperty("in_panel", True)
+            w.setParent(panel)
+            box.addWidget(w)
+        action = QWidgetAction(tool)
+        action.setDefaultWidget(panel)
+        menu = QMenu(tool)
+        menu.addAction(action)
+        tool.setMenu(menu)
+        tool.setPopupMode(QToolButton.InstantPopup)
 
     def _wire_status(self):
         # Every tab reports to the window's single line (U4). The tabs keep
@@ -423,9 +472,12 @@ class UfeDialog(QDialog):
                 continue
             btn.setIcon(ic)
             btn.setIconSize(QSize(16, 16))
-            if spec["icon_only"] and icon_mode:
-                btn.setText("")
-            elif not icon_mode:
+            if spec["icon_only"] and icon_mode \
+                    and not btn.property("in_panel"):
+                btn.setText("")      # in the bar an icon and its tooltip
+            else:
+                # with text, or inside a panel: there an icon with no
+                # label would be a riddle (see _bar_doors)
                 btn.setText(self._bar_labels[name])
         for label, btn in self.btn_zoom.items():
             stem = _ZOOM_ICONS.get(label)
@@ -436,7 +488,9 @@ class UfeDialog(QDialog):
                 continue
             btn.setIcon(ic)
             btn.setIconSize(QSize(16, 16))
-            btn.setText("" if icon_mode
+            # the same rule as the other bar buttons: an icon with no label
+            # is for the BAR; inside a panel the label stays (see _bar_doors)
+            btn.setText("" if (icon_mode and not btn.property("in_panel"))
                         else self._bar_labels["zoom_" + label])
 
     def _bar_reskin_toggle(self, btn, base):

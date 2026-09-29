@@ -7731,6 +7731,22 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <source>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</source>
         <translation>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</translation>
+    </message>
+    <message>
+        <source>What is drawn over the plate: the north arrow, the scale bar, the saved annotations, the metadata boxes and the object's mark. They are view switches, not actions, so they live together</source>
+        <translation>What is drawn over the plate: the north arrow, the scale bar, the saved annotations, the metadata boxes and the object's mark. They are view switches, not actions, so they live together</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>View</translation>
+    </message>
+    <message>
+        <source>The other zoom factors (50 %, 200 %, 400 %). Fit and 100 % stay in the bar because they are the two that are used all the time; the wheel and the presets zoom further</source>
+        <translation>The other zoom factors (50 %, 200 %, 400 %). Fit and 100 % stay in the bar because they are the two that are used all the time; the wheel and the presets zoom further</translation>
+    </message>
+    <message>
+        <source>Zoom</source>
+        <translation>Zoom</translation>
     </message></context>
 <context>
     <name>UfeImageView</name>

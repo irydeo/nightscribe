@@ -7731,6 +7731,22 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</source>
         <translation>Lo que acaba de pasar, en una línea. El resultado de una medida se queda en su propia caja, junto a la acción que lo produjo</translation>
+    </message>
+    <message>
+        <source>What is drawn over the plate: the north arrow, the scale bar, the saved annotations, the metadata boxes and the object's mark. They are view switches, not actions, so they live together</source>
+        <translation>Lo que se dibuja sobre la placa: la flecha del norte, la barra de escala, las anotaciones guardadas, las cajas de metadatos y la marca del objeto. Son conmutadores de vista, no acciones, así que van juntos</translation>
+    </message>
+    <message>
+        <source>View</source>
+        <translation>Vista</translation>
+    </message>
+    <message>
+        <source>The other zoom factors (50 %, 200 %, 400 %). Fit and 100 % stay in the bar because they are the two that are used all the time; the wheel and the presets zoom further</source>
+        <translation>Los demás factores de zoom (50 %, 200 %, 400 %). Fit y 100 % se quedan en la barra porque son los dos que se usan siempre; la rueda y los presets siguen acercando</translation>
+    </message>
+    <message>
+        <source>Zoom</source>
+        <translation>Zoom</translation>
     </message></context>
 <context>
     <name>UfeImageView</name>

@@ -392,10 +392,18 @@ def test_topbar_icons_only_is_the_default(dlg):
     # modes, because the action is long and the glyph only hints at it.
     from PySide6.QtGui import QIcon
     from nightscribe.gui import theme
-    for name in ("btn_load", "btn_export", "btn_north", "btn_scale",
-                 "btn_annot", "btn_boxes", "btn_mark"):
+    # U2: the rule has a second half. The bar's own buttons drop their
+    # labels (a glyph and its tooltip); the ones that live inside the
+    # "View" and "Zoom" panels KEEP them, because an icon with no label in
+    # a dropdown is a riddle.
+    for name in ("btn_load", "btn_export"):
         btn = getattr(dlg, name)
         assert btn.text() == ""
+        assert not btn.icon().isNull()
+    for name in ("btn_north", "btn_scale", "btn_annot", "btn_boxes",
+                 "btn_mark"):
+        btn = getattr(dlg, name)
+        assert btn.text() != ""              # in the View panel, labelled
         assert not btn.icon().isNull()
     # the checked toggles sit on the _on glyph (they start checked)
     want = QIcon(str(theme.asset("ufe_north_on.svg"))).pixmap(16, 16)
@@ -403,9 +411,10 @@ def test_topbar_icons_only_is_the_default(dlg):
         want.toImage()
     assert dlg.btn_solve.text() == "Solve astrometry…"
     assert dlg.lbl_zoom_hint.isVisible() == False
-    for btn in dlg.btn_zoom.values():
-        assert btn.text() == ""
+    for label, btn in dlg.btn_zoom.items():
         assert not btn.icon().isNull()
+        # Fit and 100 % are in the bar (no label), 50/200/400 in the panel
+        assert btn.text() == ("" if label in ("Fit", "100") else label)
 
 
 def test_topbar_text_mode_restores_the_labels(dlg, monkeypatch):
@@ -431,8 +440,10 @@ def test_topbar_text_mode_restores_the_labels(dlg, monkeypatch):
     dlg.hide()
     dlg.show()
     assert dlg.btn_load.text() == ""
-    assert dlg.btn_north.text() == ""
-    assert dlg.btn_zoom["Fit"].text() == ""
+    assert dlg.btn_zoom["Fit"].text() == ""      # Fit stays in the bar
+    # ...while the ones behind the doors keep their words (U2)
+    assert dlg.btn_north.text() == "N"
+    assert dlg.btn_zoom["50"].text() == "50"
     # a checked-state flip re-skins the glyph in icon mode
     dlg.btn_north.setChecked(False)
     off = QIcon(str(theme.asset("ufe_north_off.svg"))).pixmap(16, 16)

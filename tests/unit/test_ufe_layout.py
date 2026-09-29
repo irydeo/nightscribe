@@ -352,3 +352,45 @@ def test_the_status_line_re_elides_on_resize_without_looping():
         assert "Serie" in d._ui.lbl_status_bar.text()
     assert d.status_text() == "Serie: 142 puntos de 142 tomas, 4 heredadas"
     d.close()
+
+
+# ---------------- U2: the top bar's two doors -------------------------
+
+def test_the_bar_keeps_the_daily_actions_and_opens_two_doors():
+    # Eighteen items in the bar is a cockpit. What a visit needs is open,
+    # export, solve, the two zooms that are used all the time, the current
+    # factor and the page switch; the VIEW switches (they are states, not
+    # actions) and the occasional zoom factors live behind one door each.
+    _app()
+    d = _dialog(1400, 800, _OBJECT)
+    bar = d._ui.topbar
+    visible = [bar.itemAt(i).widget() for i in range(bar.count())
+               if bar.itemAt(i).widget() is not None]
+    names = [w.objectName() for w in visible]
+    assert len(names) <= 10, names
+    for must in ("btn_load", "btn_export", "btn_solve", "btn_zoom_fit",
+                 "btn_zoom_100", "btn_view", "btn_zoom_more", "lbl_zoom"):
+        assert must in names, must
+    d.close()
+
+
+def test_the_doors_hold_the_same_widgets_and_nothing_is_lost():
+    # The doors are not deletions: every view switch and every zoom preset
+    # is the same widget, still connected, still reachable by its name.
+    from PySide6.QtWidgets import QPushButton
+    _app()
+    d = _dialog(1400, 800, _OBJECT)
+    view = d.btn_view.menu().actions()[0].defaultWidget()
+    zoom = d.btn_zoom_more.menu().actions()[0].defaultWidget()
+    in_view = {w.objectName() for w in view.findChildren(QPushButton)}
+    in_zoom = {w.objectName() for w in zoom.findChildren(QPushButton)}
+    assert in_view == {"btn_north", "btn_scale", "btn_annot", "btn_boxes",
+                       "btn_mark"}
+    assert in_zoom == {"btn_zoom_50", "btn_zoom_200", "btn_zoom_400"}
+    # and they still DO something: the toggle flips the view's state
+    d.btn_north.setChecked(False)
+    QApplication.processEvents()
+    assert d.view.show_north is False
+    d.btn_north.setChecked(True)
+    assert d.view.show_north is True
+    d.close()

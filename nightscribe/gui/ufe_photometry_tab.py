@@ -30,8 +30,8 @@ ui/ufe_photometry_tab.ui; this class loads it and inserts the two
 code-built sections into the splitter's placeholders.
 """
 
-from PySide6.QtCore import QSize
-from PySide6.QtWidgets import QWidget
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtWidgets import (QFrame, QScrollArea, QWidget)
 
 from .ui_loader import adopt_ui
 
@@ -64,8 +64,24 @@ class UfePhotometryTab(QWidget):
                                             # over: no wrapper, no extra
                                             # margins
         self.splitter = self._ui.splitter
-        self.splitter.replaceWidget(0, self.tab_compare)
-        self.splitter.replaceWidget(1, self.tab_measure)
+        # Each half lives inside a SCROLL AREA of its own (reported: the
+        # series' summary box "is still small and has no scroll"). The
+        # halves are tall forms — the sequence, the measurement, the
+        # summary — and a splitter cannot scroll: in a 800 px window the
+        # Measure half was clamped to 345 px, the summary box fell to its
+        # 160 px floor and the rest of the form was cut off with no way to
+        # reach it (measured at 1000/800/700/600 px: the content needs
+        # 446 px and only the first case had room).
+        #
+        # With widgetResizable, a tall window still stretches the half (the
+        # summary box, the only expanding piece, grows with it) and a short
+        # one scrolls instead of clipping. The widgets stay the same ones:
+        # tab_compare and tab_measure are the halves, exactly as before, so
+        # the click routing, the aliases and the tests are untouched.
+        self.area_compare = self._scrollable(self.tab_compare)
+        self.area_measure = self._scrollable(self.tab_measure)
+        self.splitter.replaceWidget(0, self.area_compare)
+        self.splitter.replaceWidget(1, self.area_measure)
         # setMinimumSize (not the 6.3 "hint" variant: this Qt build's
         # bindings lack it) keeps the top half from collapsing; the
         # compare half is compact now (its table lives in its own
@@ -82,6 +98,18 @@ class UfePhotometryTab(QWidget):
         # Measure band combo without waiting for a first measurement
         self.tab_compare.sequence_changed.connect(
             self.tab_measure.refresh_bands)
+
+    def _scrollable(self, widget):
+        # Wraps a form in a scroll area: the form keeps its natural height
+        # and the column scrolls when the window is short.
+        # @args: widget - the form
+        # @return: the scroll area holding it (the splitter's child)
+        area = QScrollArea(self)
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        area.setWidget(widget)
+        return area
 
     # -------------------------------------------------------- activation
 

@@ -419,3 +419,42 @@ def test_the_doors_hold_the_same_widgets_and_nothing_is_lost():
     d.btn_north.setChecked(True)
     assert d.view.show_north is True
     d.close()
+
+
+# ---------------- E: the series' summary box, and its column ----------
+
+def test_the_summary_box_keeps_its_room_and_its_column_scrolls():
+    # Reported: "the Photometric Series text box is still small and has no
+    # scroll". Measured before: the content of the Measure half needs 446 px;
+    # in a 1000 px window the half got 471 (the box, 192 px) but at 800 px it
+    # was clamped to 345, the box fell to its 160 px floor and the rest of
+    # the form was cut off WITH NO WAY to reach it (a splitter cannot
+    # scroll). Now the box has 200 px of room and the column scrolls.
+    _app()
+    for height in (1000, 800, 700, 600):
+        d = _dialog(1400, height, _OBJECT)
+        d.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+        d.show_tab("measure")
+        for _ in range(4):
+            QApplication.processEvents()
+        box = d.tab_measure.lbl_result
+        assert box.height() >= 200, (height, box.height())
+        # the content is always reachable: either it fits, or the column
+        # offers the bar (never clipped in silence)
+        area = d.tab_photometry.area_measure
+        fits = (d.tab_measure.minimumSizeHint().height()
+                <= d.tab_measure.height())
+        assert fits or area.verticalScrollBar().maximum() > 0, height
+        d.close()
+
+
+def test_the_measure_half_is_still_the_same_widget():
+    # The scroll area is a wrapper, not a new hierarchy: the halves stay
+    # the objects every other piece of code and every test reaches for.
+    _app()
+    d = _dialog(1200, 800, _OBJECT)
+    ph = d.tab_photometry
+    assert ph.area_measure.widget() is d.tab_measure
+    assert ph.area_compare.widget() is d.tab_compare
+    assert ph.splitter.widget(1) is ph.area_measure
+    d.close()

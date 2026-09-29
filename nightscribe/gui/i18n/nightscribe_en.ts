@@ -3908,6 +3908,10 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <source>critical</source>
         <translation>critical</translation>
+    </message>
+    <message>
+        <source>Curve discarded: {0} run(s) undone, {1} points removed</source>
+        <translation>Curve discarded: {0} run(s) undone, {1} points removed</translation>
     </message></context>
 <context>
     <name>NSKinds</name>
@@ -8874,6 +8878,50 @@ not touched.</translation>
     <message>
         <source>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</source>
         <translation>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</translation>
+    </message>
+    <message>
+        <source>This visit's curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</source>
+        <translation>This visit's curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</translation>
+    </message>
+    <message>
+        <source>Curve loaded from the visit: {0} points.</source>
+        <translation>Curve loaded from the visit: {0} points.</translation>
+    </message>
+    <message>
+        <source>This curve does not belong to a visit: there is nothing to discard.</source>
+        <translation>This curve does not belong to a visit: there is nothing to discard.</translation>
+    </message>
+    <message>
+        <source>Discard the visit's curve</source>
+        <translation>Discard the visit's curve</translation>
+    </message>
+    <message>
+        <source>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</source>
+        <translation>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</translation>
+    </message>
+    <message>
+        <source>Could not discard the curve: {0}</source>
+        <translation>Could not discard the curve: {0}</translation>
+    </message>
+    <message>
+        <source>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</source>
+        <translation>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</translation>
+    </message>
+    <message>
+        <source>Discard this visit's curve…</source>
+        <translation>Discard this visit's curve…</translation>
+    </message>
+    <message>
+        <source>Undo every series run of this visit and start the curve from scratch: its points go and the runs stay marked as undone. The frames are never touched, so measuring again is one click</source>
+        <translation>Undo every series run of this visit and start the curve from scratch: its points go and the runs stay marked as undone. The frames are never touched, so measuring again is one click</translation>
+    </message>
+    <message>
+        <source>Save the chart in the visit (PNG)…</source>
+        <translation>Save the chart in the visit (PNG)…</translation>
+    </message>
+    <message>
+        <source>Save the curve exactly as you see it, INTO THIS VISIT: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. The chart joins the visit's resources, next to its frames and its reports</source>
+        <translation>Save the curve exactly as you see it, INTO THIS VISIT: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. The chart joins the visit's resources, next to its frames and its reports</translation>
     </message></context>
 <context>
     <name>UfeSequenceDialog</name>

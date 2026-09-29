@@ -390,3 +390,57 @@ def test_delete_points_only_for_its_plate(tmp_db):
     assert followup.point_by_id(tmp_db, pid) is not None
     assert followup.delete_point(tmp_db, pid) is True
     assert followup.point_by_id(tmp_db, pid) is None
+
+
+# ---------------- the curve a visit holds (D) -------------------------
+
+def test_the_visit_knows_the_curve_it_holds(tmp_path):
+    # The curve of a visit is what the SERIES wrote there: a hand-entered
+    # or survey point in the same visit is context, not the measurement.
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu, project as proj
+    db = Database(str(tmp_path / "t.db"))
+    pid = proj.create(db, "variable", "V0526 Per")["id"]
+    sid = fu.create_session(db, pid, obs_date="2026-09-20")
+    run = fu.create_run(db, session_id=sid, cfg={"series": {"band": "V"}})
+    fu.add_points(db, [
+        {"project_id": pid, "session_id": sid, "mjd": 60000.10,
+         "filter": "V", "mag": 12.34, "err": 0.01, "err_internal": 0.005,
+         "mag_raw": -9.5, "source": "measure", "flags": [], "run_id": run},
+        {"project_id": pid, "session_id": sid, "mjd": 60000.11,
+         "filter": "V", "mag": 12.35, "err": 0.01, "err_internal": 0.005,
+         "mag_raw": -9.4, "source": "measure", "flags": [], "run_id": run},
+        {"project_id": pid, "session_id": sid, "mjd": 60000.12,
+         "filter": "V", "mag": 15.0, "err": 0.2, "source": "manual"}])
+    got = fu.points_for_session(db, sid)
+    assert [round(p["mag"], 2) for p in got] == [12.34, 12.35]     # mjd order
+    assert all(p["run_id"] == run for p in got)
+    # everything is still there for whoever asks for it
+    assert len(fu.points_for_session(db, sid, series_only=False)) == 3
+    assert len(fu.runs_for_session(db, sid)) == 1
+
+
+def test_discarding_the_curve_undoes_its_runs_and_leaves_the_trail(tmp_path):
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu, project as proj
+    db = Database(str(tmp_path / "t.db"))
+    pid = proj.create(db, "variable", "V0526 Per")["id"]
+    sid = fu.create_session(db, pid, obs_date="2026-09-20")
+    runs = []
+    for k in range(2):
+        run = fu.create_run(db, session_id=sid, cfg={"series": {"n": k}})
+        runs.append(run)
+        fu.add_points(db, [
+            {"project_id": pid, "session_id": sid, "mjd": 60000.1 + k,
+             "filter": "V", "mag": 12.3, "err": 0.01, "source": "measure",
+             "flags": [], "run_id": run}])
+    fu.add_point(db, pid, 60000.9, "V", 12.0, source="manual",
+                 session_id=sid)
+    undone, removed = fu.discard_session_curve(db, sid)
+    assert (undone, removed) == (2, 2)
+    assert fu.points_for_session(db, sid) == []          # the curve is gone
+    # the run rows stay, marked: the trail is never silent
+    assert [r["status"] for r in fu.runs_for_session(db, sid)] == \
+        ["undone", "undone"]
+    # and the hand-entered point was never part of the curve
+    assert len(fu.points_for_session(db, sid, series_only=False)) == 1

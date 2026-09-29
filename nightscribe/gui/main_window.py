@@ -8669,6 +8669,15 @@ class MainWindow(QMainWindow):
             # must not mean rebuilding the comparison stars
             dlg.set_sequence_hook(
                 lambda state: self._ufe_sequence_hook(hook_pid, state))
+            # D: the visit's curve. Reading it asks nobody to measure again
+            # (the points are already in the project); discarding it undoes
+            # its series runs, keeping their rows marked. Asked defensively,
+            # like every other hook: a host double need not have the method.
+            curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
+            if callable(curve_hooks):
+                curve_hooks(
+                    lambda: self._ufe_visit_curve(hook_pid, session_id),
+                    lambda: self._ufe_discard_curve(hook_pid, session_id))
             # ADR-048 follow-up: a transit project's reduce/export live in
             # the editor, next to the sequence they need
             proj = project.get(db, hook_pid) or {}
@@ -8687,6 +8696,9 @@ class MainWindow(QMainWindow):
             dlg.set_exoclock_hook(None)
             dlg.set_exotic_hooks(None, None)
             dlg.set_sequence_hook(None)
+            curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
+            if callable(curve_hooks):
+                curve_hooks(None, None)
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
@@ -9065,6 +9077,42 @@ class MainWindow(QMainWindow):
             self.tr("Run undone: {} points removed").format(count), 8000)
         self._project_selected()
         return count
+
+    def _ufe_visit_curve(self, pid, session_id):
+        # The curve a visit already holds (D): the series points saved in
+        # the project for THAT visit, shaped for the chart. No frame is
+        # read and nothing is asked of the observer.
+        # @args: pid - project id, session_id - the visit or None
+        # @return: [point dicts]
+        from ..core import followup as fu
+        if session_id is None:
+            return []
+        out = []
+        for p in fu.points_for_session(db, session_id):
+            if p.get("mjd") is None or p.get("mag") is None:
+                continue
+            out.append({"mjd": p["mjd"], "mag": p["mag"], "err": p.get("err"),
+                        "err_internal": p.get("err_internal"),
+                        "mag_raw": p.get("mag_raw"),
+                        "filter": p.get("filter") or "V",
+                        "flags": list(p.get("flags") or []),
+                        "source": "measure"})
+        return out
+
+    def _ufe_discard_curve(self, pid, session_id):
+        # "Start the curve from scratch": every series run of the visit is
+        # undone (its points go, its run row stays marked undone: the trail
+        # is never silent) and the project view refreshes.
+        # @return: (runs undone, points removed)
+        from ..core import followup as fu
+        if session_id is None:
+            return 0, 0
+        runs, points = fu.discard_session_curve(db, session_id)
+        self.statusBar().showMessage(
+            self.tr("Curve discarded: {0} run(s) undone, {1} points removed"
+                    ).format(runs, points), 8000)
+        self._project_selected()
+        return runs, points
 
     def _ufe_reset_state(self, dlg, pid):
         # The tab already restored the editor's defaults locally (and

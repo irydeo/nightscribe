@@ -3908,6 +3908,10 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>critical</source>
         <translation>Crítica</translation>
+    </message>
+    <message>
+        <source>Curve discarded: {0} run(s) undone, {1} points removed</source>
+        <translation>Curva descartada: {0} pasada(s) deshecha(s), {1} puntos eliminados</translation>
     </message></context>
 <context>
     <name>NSKinds</name>
@@ -8874,6 +8878,50 @@ tocan.</translation>
     <message>
         <source>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</source>
         <translation>Las acciones ocasionales de la serie: deshacer la última pasada, ExoClock, las figuras de la noche, guardar el gráfico, período y fase, la guía</translation>
+    </message>
+    <message>
+        <source>This visit's curve: {0} points already measured with the sequence saved in the project (nothing was read from the frames). Measure the series again to build it from scratch, or discard it below.</source>
+        <translation>Curva de esta visita: {0} puntos ya medidos con la secuencia guardada en el proyecto (no se ha leído ningún frame). Mide la serie otra vez para construirla desde cero, o descártala abajo.</translation>
+    </message>
+    <message>
+        <source>Curve loaded from the visit: {0} points.</source>
+        <translation>Curva cargada de la visita: {0} puntos.</translation>
+    </message>
+    <message>
+        <source>This curve does not belong to a visit: there is nothing to discard.</source>
+        <translation>Esta curva no pertenece a ninguna visita: no hay nada que descartar.</translation>
+    </message>
+    <message>
+        <source>Discard the visit's curve</source>
+        <translation>Descartar la curva de la visita</translation>
+    </message>
+    <message>
+        <source>This undoes every series run of this visit: its points go and the runs stay marked as undone. The frames are untouched and you can measure again.</source>
+        <translation>Esto deshace todas las pasadas de serie de esta visita: sus puntos se van y las pasadas quedan marcadas como deshechas. Las tomas no se tocan y puedes volver a medir.</translation>
+    </message>
+    <message>
+        <source>Could not discard the curve: {0}</source>
+        <translation>No se pudo descartar la curva: {0}</translation>
+    </message>
+    <message>
+        <source>Curve discarded: {0} run(s) undone, {1} points removed. The frames are untouched.</source>
+        <translation>Curva descartada: {0} pasada(s) deshecha(s), {1} puntos eliminados. Las tomas no se han tocado.</translation>
+    </message>
+    <message>
+        <source>Discard this visit's curve…</source>
+        <translation>Descartar la curva de esta visita…</translation>
+    </message>
+    <message>
+        <source>Undo every series run of this visit and start the curve from scratch: its points go and the runs stay marked as undone. The frames are never touched, so measuring again is one click</source>
+        <translation>Deshace todas las pasadas de serie de esta visita y empieza la curva desde cero: sus puntos se van y las pasadas quedan marcadas como deshechas. Las tomas no se tocan nunca, así que volver a medir es un clic</translation>
+    </message>
+    <message>
+        <source>Save the chart in the visit (PNG)…</source>
+        <translation>Guardar el gráfico en la visita (PNG)…</translation>
+    </message>
+    <message>
+        <source>Save the curve exactly as you see it, INTO THIS VISIT: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. The chart joins the visit's resources, next to its frames and its reports</source>
+        <translation>Guarda la curva exactamente como la ves, EN ESTA VISITA: la ventana a la que has hecho zoom, los puntos que has seleccionado o excluido, el rango fijo si lo has puesto. El gráfico se une a los recursos de la visita, junto a sus tomas y sus informes</translation>
     </message></context>
 <context>
     <name>UfeSequenceDialog</name>

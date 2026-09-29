@@ -1618,3 +1618,75 @@ def test_the_result_box_has_room_and_a_scrollbar(dlg):
     assert box.verticalScrollBarPolicy() != Qt.ScrollBarAlwaysOff
     assert box.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
     assert box.isReadOnly()
+
+
+# ---------------- D: the visit's curve is not regenerated ------------
+
+def _visit_points(n=5):
+    return [{"mjd": 60600.0 + 0.01 * i, "mag": 12.34 + 0.004 * i,
+             "err": 0.01, "err_internal": 0.008, "mag_raw": -9.5,
+             "filter": "V", "flags": [], "source": "measure"}
+            for i in range(n)]
+
+
+def test_the_visit_s_curve_is_drawn_without_measuring_anything(dlg):
+    # The observer's ask: a light curve that was generated must not have to
+    # be generated again. Opening the visit draws what the project already
+    # has, read from the database: no frame is touched.
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(5), None)
+    assert len(tab.chart_series._points) == 5
+    assert tab._curve_from_visit is True
+    assert "curve" in tab.lbl_result.toPlainText().lower()
+    assert "5" in tab.lbl_status.text()
+    # the curve is on the chart, not measured: nothing claims a run
+    assert tab._series_result is None
+
+
+def test_measuring_again_replaces_the_visit_s_curve(dlg):
+    # The loaded curve is a starting point, not a lock: a real run replaces
+    # it (and the panel goes back to describing the run).
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(5), None)
+    assert tab._curve_from_visit
+    tab._series_result = object()          # a run landed
+    assert tab.load_visit_curve() == 0     # the visit's copy is not redrawn
+    tab._series_result = None
+
+
+def test_discarding_the_visit_s_curve_clears_it_and_says_what_it_did(dlg,
+                                                                    monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    tab = dlg.tab_measure
+    calls = []
+    tab.set_visit_curve_hooks(
+        lambda: _visit_points(4),
+        lambda: (calls.append(True), (2, 4))[1])
+    assert tab.chart_series._points
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.Yes))
+    tab._on_discard_curve()
+    assert calls == [True]                 # the project undid the runs
+    assert tab.chart_series._points == []  # the chart starts from scratch
+    assert tab._curve_from_visit is False
+    assert "2" in tab.lbl_status.text() and "4" in tab.lbl_status.text()
+
+
+def test_discarding_asks_first_and_a_no_is_a_no(dlg, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    tab = dlg.tab_measure
+    removed = []
+    tab.set_visit_curve_hooks(lambda: _visit_points(3),
+                              lambda: (removed.append(True), (1, 3))[1])
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.No))
+    tab._on_discard_curve()
+    assert removed == []                   # nothing was touched
+    assert tab.chart_series._points       # and the curve is still there
+
+
+def test_a_visit_without_points_opens_with_an_empty_chart(dlg):
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: [], None)
+    assert tab.chart_series._points == []
+    assert tab._curve_from_visit is False

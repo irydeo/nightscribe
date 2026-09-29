@@ -399,10 +399,10 @@
            <item>
             <widget class="QPushButton" name="btn_series_sci">
              <property name="toolTip">
-              <string>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</string>
+              <string>Save the curve exactly as you see it, INTO THIS VISIT: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. The chart joins the visit's resources, next to its frames and its reports</string>
              </property>
              <property name="text">
-              <string>Save what you see (PNG)…</string>
+              <string>Save the chart in the visit (PNG)…</string>
              </property>
             </widget>
            </item>
@@ -423,6 +423,16 @@
              </property>
              <property name="text">
               <string>?</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_discard">
+             <property name="toolTip">
+              <string>Undo every series run of this visit and start the curve from scratch: its points go and the runs stay marked as undone. The frames are never touched, so measuring again is one click</string>
+             </property>
+             <property name="text">
+              <string>Discard this visit's curve…</string>
              </property>
             </widget>
            </item>

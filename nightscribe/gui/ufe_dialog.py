@@ -695,6 +695,17 @@ class UfeDialog(QDialog):
         #          opened ad-hoc (Measure tab hides its save button)
         return self._point_hook
 
+    def set_visit_curve_hooks(self, load, clear):
+        # The visit's curve, through the project (D): the Measure tab draws
+        # what the visit already has and can discard it. Setting them asks
+        # the tab to load, so the curve is there the moment the visit opens.
+        # @args: load - callable() -> [point dicts] or None,
+        #        clear - callable() -> (runs, points) or None
+        # @return: None
+        hook = getattr(self.tab_measure, "set_visit_curve_hooks", None)
+        if callable(hook):
+            hook(load, clear)
+
     def set_sequence_hook(self, fn):
         # @args: fn - callable(state) receiving the Compare tab's sequence
         #        (project context shape) whenever the observer changes it,

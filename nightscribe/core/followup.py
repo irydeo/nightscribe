@@ -401,6 +401,61 @@ def list_points_for_run(db, run_id):
     return [_point_dict(r) for r in rows]
 
 
+def points_for_session(db, session_id, series_only=True):
+    # The points a VISIT holds, oldest first: what a curve is made of.
+    #
+    # `series_only` keeps the ones the series engine wrote (source
+    # "measure"): they are the curve. A hand-entered or survey point in the
+    # same visit is context, not the night's measurement, and it is not
+    # touched by the visit's curve nor by discarding it.
+    # @args: db - Database, session_id - the visit, series_only - the
+    #        curve's own points only
+    # @return: [{id, project_id, session_id, mjd, filter, mag, err, source,
+    #           file_id, mag_raw, flags, run_id, err_internal}, ...]
+    sql = ("SELECT id, project_id, session_id, mjd, filter, mag, err, source,"
+           " file_id, mag_raw, flags, run_id, err_internal"
+           " FROM photometry_points WHERE session_id=?")
+    params = [session_id]
+    if series_only:
+        sql += " AND source=?"
+        params.append("measure")
+    sql += " ORDER BY mjd"
+    return [_point_dict(r) for r in db.execute(sql, tuple(params)).fetchall()]
+
+
+def runs_for_session(db, session_id, series_only=True):
+    # The runs a visit holds, oldest first.
+    # @return: [{id, session_id, created, cfg, status}, ...]
+    rows = db.execute(
+        "SELECT id, session_id, created, cfg_json, status"
+        " FROM measurement_runs WHERE session_id=? ORDER BY id",
+        (session_id,)).fetchall()
+    out = []
+    for r in rows:
+        cfg = json.loads(r[3] or "{}")
+        if series_only and "series" not in cfg:
+            continue
+        out.append({"id": r[0], "session_id": r[1], "created": r[2],
+                    "cfg": cfg, "status": r[4]})
+    return out
+
+
+def discard_session_curve(db, session_id):
+    # "Discard this visit's curve, and build it again from scratch": every
+    # SERIES run of the visit is undone the way the per-run undo does it
+    # (its points go, its run row stays marked undone, so the trail is never
+    # silent). The visit's other points (hand-entered, survey) are not part
+    # of the curve and are left alone.
+    # @args: db - Database, session_id - the visit
+    # @return: (runs undone, points removed)
+    runs = runs_for_session(db, session_id)
+    removed = 0
+    for run in runs:
+        removed += delete_points_for_run(db, run["id"])
+        set_run_status(db, run["id"], "undone")
+    return len(runs), removed
+
+
 def delete_points(db, ids):
     # Undo by explicit id list (ADR-048): never touches another run.
     # @return: the number of points deleted

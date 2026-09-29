@@ -149,6 +149,9 @@ class UfeMeasureTab(QWidget):
                                             # over: no wrapper margins
         self.lbl_status = self._ui.lbl_status
         self._status_hook = None     # the window's single status line (U4)
+        self._curve_load = None      # fn() -> the visit's saved points (D)
+        self._curve_clear = None     # fn() -> undo every series run (D)
+        self._curve_from_visit = False   # the chart shows the visit's curve
         self.cmb_band = self._ui.cmb_band
 
         # The recipe knobs live one click open (ADR-044 rev): the daily
@@ -329,6 +332,8 @@ class UfeMeasureTab(QWidget):
         # the same ones).
         self.btn_series_chart = self._ui.btn_series_chart
         self.btn_series_chart.clicked.connect(self._open_series_chart)
+        self.btn_series_discard = self._ui.btn_series_discard
+        self.btn_series_discard.clicked.connect(self._on_discard_curve)
         self.btn_series_more = self._ui.btn_series_more
         row_out = getattr(self._ui, "row_series_out", None)
         if row_out is not None:
@@ -1351,6 +1356,95 @@ class UfeMeasureTab(QWidget):
         self._update_selection_label()
         self._refresh_chart_notes()
 
+    def set_visit_curve_hooks(self, load, clear):
+        # The visit's curve, through its project (D): `load` answers with
+        # the points this visit already has (read from the database, no
+        # frames touched) and `clear` undoes every series run of the visit.
+        # @args: load - callable() -> [point dicts] or None, clear -
+        #        callable() -> (runs, points) or None
+        # @return: None
+        self._curve_load = load
+        self._curve_clear = clear
+        self.load_visit_curve()
+
+    def load_visit_curve(self):
+        # Draws the curve the visit ALREADY has, instead of an empty chart
+        # (the observer's point: a light curve that was generated must not
+        # be generated again). Measuring is still one click away, and a new
+        # run replaces this one.
+        #
+        # Nothing is read from the frames and nothing is written: the points
+        # come from the project's own database.
+        # @return: the number of points drawn (0 when there were none)
+        if self._curve_load is None or self._series_result is not None:
+            return 0
+        try:
+            points = self._curve_load() or []
+        except Exception as err:                # a hook never kills a tab
+            logger.warning("could not read the visit's curve: %s", err)
+            return 0
+        if not points:
+            return 0
+        payload = [p for p in points if p.get("mjd") is not None
+                   and p.get("mag") is not None]
+        if not payload:
+            return 0
+        own = [dict(p, source="measure", filter=p.get("filter") or "V")
+               for p in payload]
+        self._series_payload = own
+        self.chart_series.set_data(own)
+        self._curve_from_visit = True
+        self._panel_summary = [self.tr(
+            "This visit's curve: {0} points already measured with the "
+            "sequence saved in the project (nothing was read from the "
+            "frames). Measure the series again to build it from scratch, "
+            "or discard it below.").format(len(own))]
+        self._render_panel()
+        self._update_selection_label()
+        self._say(self.tr(
+            "Curve loaded from the visit: {0} points.").format(len(own)))
+        return len(own)
+
+    def _on_discard_curve(self):
+        # "Discard this visit's curve, and build it again from scratch":
+        # the SERIES runs of the visit are undone (their points go, their
+        # run rows stay marked, the trail is never silent) and the chart
+        # goes back to empty. Asked first: it is the night's work.
+        # @return: None
+        if self._curve_clear is None:
+            self._say(self.tr(
+                "This curve does not belong to a visit: there is nothing "
+                "to discard."), "warn")
+            return
+        from PySide6.QtWidgets import QMessageBox
+        answer = QMessageBox.question(
+            self, self.tr("Discard the visit's curve"),
+            self.tr("This undoes every series run of this visit: its "
+                    "points go and the runs stay marked as undone. The "
+                    "frames are untouched and you can measure again."),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            runs, points = self._curve_clear() or (0, 0)
+        except Exception as err:
+            logger.warning("could not discard the visit's curve: %s", err)
+            self._say(self.tr("Could not discard the curve: {0}").format(
+                err), "error")
+            return
+        self._series_result = None
+        self._series_payload = []
+        self._curve_from_visit = False
+        self._panel_summary = []
+        self.chart_series.set_data([])
+        self.chart_series.set_outliers([])
+        self.chart_series.set_excluded([])
+        self.lbl_result.setText("–")
+        self._update_selection_label()
+        self._say(self.tr(
+            "Curve discarded: {0} run(s) undone, {1} points removed. The "
+            "frames are untouched.").format(runs, points))
+
     def clear_session(self):
         # A different project is a different session (issue report): the
         # previous series, its points, its panel and its undo must not
@@ -1365,6 +1459,7 @@ class UfeMeasureTab(QWidget):
         self.chk_series_live.blockSignals(False)
         self._series_result = None
         self._series_payload = []
+        self._curve_from_visit = False
         self._live_points = []
         self._live_run_ids = []
         self._panel_summary = []

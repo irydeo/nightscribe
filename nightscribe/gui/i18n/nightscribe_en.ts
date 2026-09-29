@@ -621,7 +621,7 @@
         <source>The next plate keeps these black, white, gamma and invert values instead of the auto percentiles</source>
         <translation>The next plate keeps these black, white, gamma and invert values instead of the auto percentiles</translation>
     </message>
-</context>
+<message><source>Mirror:</source><translation>Mirror:</translation></message><message><source>Left-right</source><translation>Left-right</translation></message><message><source>Up-down</source><translation>Up-down</translation></message><message><source>Mirror the picture left-right. The plate's pixels, its saved marks and every measurement stay in their own frame: only what you see turns.</source><translation>Mirror the picture left-right. The plate's pixels, its saved marks and every measurement stay in their own frame: only what you see turns.</translation></message><message><source>Mirror the picture up-down (the same rule: the pixels and the measurements do not move).</source><translation>Mirror the picture up-down (the same rule: the pixels and the measurements do not move).</translation></message></context>
 <context>
     <name>JournalDialog</name>
     <message>

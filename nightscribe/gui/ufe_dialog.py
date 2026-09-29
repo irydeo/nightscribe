@@ -536,6 +536,11 @@ class UfeDialog(QDialog):
                                gamma=s.get("gamma"))
         if bool(s.get("invert", False)) != self.state.inverted:
             self.state.toggle_invert()
+        for axis, key in (("h", "flip_h"), ("v", "flip_v")):
+            flipped = (self.state.flip_h if axis == "h"
+                       else self.state.flip_v)
+            if bool(s.get(key, False)) != flipped:
+                self.state.toggle_flip(axis)
         self.tab_photometry.apply_state(st)
 
     def load_saved_sequence(self, seq):

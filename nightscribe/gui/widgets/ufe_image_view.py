@@ -259,8 +259,39 @@ class UfeImageView(ChartView):
         tr = QTransform()
         tr.scale(plate_w / w, plate_h / h)
         self._pix_item.setTransform(tr)
+        self._apply_flip()
 
     # ------------------------------------------------------- fit / zoom
+
+    def _apply_flip(self):
+        # The display mirror (E6), applied as a transform of what you SEE.
+        #
+        # The scene is left in original plate pixels, so every mapping the
+        # app depends on keeps working untouched: a click still lands on
+        # the plate pixel under the cursor, an annotation stays where it
+        # was stored, and a measured centroid is the same number whether
+        # the picture is mirrored or not. Mirroring the PIXELS instead
+        # would corrupt all three.
+        #
+        # The mirror is pre-multiplied (delta * T) because the flip is a
+        # change of the final view coordinates, not of the scene's.
+        #
+        # What the view ACTUALLY carries is read from its own matrix, never
+        # remembered in a flag: fitInView keeps the sign while an explicit
+        # resetTransform clears it, and a remembered flag would either undo
+        # a live mirror or lose it after a reset. Reading the matrix makes
+        # this idempotent whatever the last fit did.
+        # @return: None
+        want_x = -1.0 if self._state.flip_h else 1.0
+        want_y = -1.0 if self._state.flip_v else 1.0
+        now = self.transform()
+        have_x = -1.0 if now.m11() < 0 else 1.0
+        have_y = -1.0 if now.m22() < 0 else 1.0
+        if (have_x, have_y) == (want_x, want_y):
+            return
+        fix = QTransform()
+        fix.scale(want_x * have_x, want_y * have_y)
+        self.setTransform(fix * now)
 
     def fit_to_scene(self, pad=0.02):
         # The base fit pins the sceneRect to the padded frame, which would
@@ -272,6 +303,7 @@ class UfeImageView(ChartView):
             w, h = self._state.plate_shape
             self.setSceneRect(QRectF(-0.25 * w, -0.25 * h,
                                      1.5 * w, 1.5 * h))
+        self._apply_flip()
         self.zoom_changed.emit(self.current_factor())
 
     def fit_to_factor(self, factor):
@@ -283,6 +315,7 @@ class UfeImageView(ChartView):
         self.resetTransform()
         self.scale(factor, factor)
         self.centerOn(centre)
+        self._apply_flip()
         self._user_zoomed = True
         self.zoom_changed.emit(self.current_factor())
 
@@ -708,13 +741,33 @@ class UfeImageView(ChartView):
                 self._boxes_tl_h = bh + margin
         return True
 
+    def export_flip(self):
+        # The PNG promises the scene you are looking at, mirror included.
+        # @return: (horizontal, vertical) booleans
+        return (bool(self._state.flip_h), bool(self._state.flip_v))
+
+    def _flip_angle(self, angle):
+        # The compass is painted in VIEWPORT coordinates, so a display
+        # mirror (E6) has to be applied to it by hand: otherwise the arrow
+        # would keep pointing at the north of the old orientation while
+        # the sky on screen has turned around. A left-right mirror negates
+        # a screen angle, an up-down mirror takes it to 180 - a, and doing
+        # both is the 180 turn, exactly as the transform composes.
+        # @args: angle - screen angle in degrees, clockwise from up
+        # @return: the angle a mirror-aware compass must use
+        if self._state.flip_h:
+            angle = -angle
+        if self._state.flip_v:
+            angle = 180.0 - angle
+        return angle
+
     def _paint_north(self, painter, w, h, k, bottom=False):
         # North arrow, rotated by the plate PA (positive = east of north,
         # clockwise; the legacy convention). Legacy spot: top-right, N
         # only. With the corner boxes on it becomes the bottom-centre
         # compass: the same arrow plus the east leg (90° anticlockwise
         # from north on screen, flipped on mirrored plates).
-        pa = -self._state.wcs.rotation()
+        pa = self._flip_angle(-self._state.wcs.rotation())
         cx, cy = (w / 2.0, h - 44 * k) if bottom else (w - 44 * k, 48 * k)
         length = 30 * k
         legs = [("N", pa)]

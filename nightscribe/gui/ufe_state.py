@@ -65,8 +65,13 @@ class UfeImageState(QObject):
         self.white = 1.0
         self.gamma = 1.0
         self.inverted = False
+        self.flip_h = False        # display mirrors (E6): the PICTURE
+        self.flip_v = False        # turns, the scene does not (see
+                                   # toggle_flip); they belong to how the
+                                   # plate is looked at, not to the plate
         self.keep_stretch = False  # True: loads keep black/white/gamma/
-                                   # invert instead of the auto percentiles
+                                   # invert/flips instead of the auto
+                                   # percentiles
         self.annotations = []     # ANNOTATE cards read at load (read-only)
         self._disp_scale = 1      # plate px per display px (2x2 steps)
 
@@ -115,6 +120,8 @@ class UfeImageState(QObject):
         self.annotations = fits_annotate.read_annotations(self.path)
         if not self.keep_stretch:
             self.inverted = False
+            self.flip_h = False
+            self.flip_v = False
             self.gamma = 1.0
             self.auto()
         self.image_loaded.emit()
@@ -175,18 +182,22 @@ class UfeImageState(QObject):
         # ADR-047: the stretch knobs as plain JSON, what the plate's
         # saved state stores and what a restore or a state reset reads
         # back.
-        # @return: the {"black", "white", "gamma", "invert"} dict
+        # @return: the {"black", "white", "gamma", "invert", "flip_h",
+        #          "flip_v"} dict
         return {"black": float(self.black), "white": float(self.white),
-                "gamma": float(self.gamma), "invert": bool(self.inverted)}
+                "gamma": float(self.gamma), "invert": bool(self.inverted),
+                "flip_h": bool(self.flip_h), "flip_v": bool(self.flip_v)}
 
     def reset_stretch(self):
         # Back to first sight of a plate (ADR-047): the auto limits, no
-        # inversion. No-op without data.
+        # inversion and no mirror. No-op without data.
         # @args: none
         # @return: None; the view redraws through stretch_changed
         if self.data is None:
             return
         self.inverted = False
+        self.flip_h = False
+        self.flip_v = False
         self.auto()
 
     def set_stretch(self, black=None, white=None, gamma=None):
@@ -220,6 +231,24 @@ class UfeImageState(QObject):
         if self.data is None:
             return
         self.inverted = not self.inverted
+        self.stretch_changed.emit()
+
+    def toggle_flip(self, axis):
+        # A display mirror (E6): the picture turns and the SCENE does not.
+        #
+        # That distinction is the whole point of doing it here instead of
+        # flipping the pixels: a click, a saved annotation or a measured
+        # centroid lives in original plate pixels, so mirroring the plate
+        # to compare it with someone else's chart can never move the
+        # science. The view applies it as a transform of what you see.
+        # @args: axis - "h" (left-right) or "v" (up-down)
+        # @return: None; emits stretch_changed when a plate is loaded
+        if self.data is None:
+            return
+        if axis == "h":
+            self.flip_h = not self.flip_h
+        else:
+            self.flip_v = not self.flip_v
         self.stretch_changed.emit()
 
     def display_uint8(self):

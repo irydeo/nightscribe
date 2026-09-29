@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QPointF
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -438,3 +439,131 @@ def test_object_mark_burns_into_the_export_when_visible(view, tmp_path):
     assert a != b                               # visible: it burns in
     view.set_object_mark_visible(False)
     assert view.export_png(tmp_path / "off2.png").read_bytes() == a
+
+
+# ---------------- the display mirror (E6) ----------------
+
+def _flip(view, axis, state_ready=True):
+    # Toggles the mirror and applies it the way the app does (the state
+    # emits stretch_changed -> the view coalesces a render).
+    view._state.toggle_flip(axis)
+    view._render()
+
+
+def test_the_mirror_turns_the_picture_not_the_scene(view):
+    # The invariant that keeps the science safe: the scene stays in
+    # original plate pixels, so mirroring the plate to compare it with
+    # someone else's chart cannot move a click, a saved mark or a
+    # measured centroid.
+    view._state.load(MONO)
+    view.fit_to_scene()
+    before = view.transform()
+    scene_box = view.sceneRect()
+    _flip(view, "h")
+    after = view.transform()
+    assert after.m11() == pytest.approx(-before.m11(), rel=1e-9)
+    assert after.m22() == pytest.approx(before.m22(), rel=1e-9)
+    # the scene is untouched: same rect, same plate shape
+    assert view.sceneRect() == scene_box
+    assert view._state.plate_shape is not None
+    # and the mapping is still a bijection: a click lands where it looks
+    q = view.viewportTransform()
+    inv, ok = q.inverted()
+    assert ok
+    for vp in (QPointF(10.0, 20.0), QPointF(300.0, 150.0)):
+        scene_pt = inv.map(vp)
+        back = q.map(scene_pt)
+        assert back.x() == pytest.approx(vp.x(), abs=1e-6)
+        assert back.y() == pytest.approx(vp.y(), abs=1e-6)
+
+
+def test_the_mirror_is_about_the_centre_of_the_view(view):
+    # Qt applies the view transform around the viewport's own centre, so
+    # pre-multiplying a mirror keeps the picture where it was instead of
+    # pushing it off screen. Checked empirically, because that is the part
+    # a reader would doubt.
+    view._state.load(MONO)
+    view.fit_to_scene()
+    vw = view.viewport().width()
+    vh = view.viewport().height()
+    left = view.mapToScene(vw // 4, vh // 2)
+    middle = view.mapToScene(vw // 2, vh // 2)
+    _flip(view, "h")
+    assert view.mapToScene(vw - vw // 4, vh // 2).x() == \
+        pytest.approx(left.x(), abs=1e-6)
+    # the centre is on the mirror axis: what is in the middle stays there
+    assert view.mapToScene(vw // 2, vh // 2).x() == \
+        pytest.approx(middle.x(), abs=1e-6)
+
+
+def test_mirroring_twice_returns_to_the_same_view(view):
+    view._state.load(MONO)
+    view.fit_to_scene()
+    before = view.transform()
+    _flip(view, "h")
+    _flip(view, "h")
+    assert view.transform() == before
+
+
+def test_both_mirrors_are_the_180_turn(view):
+    view._state.load(MONO)
+    view.fit_to_scene()
+    before = view.transform()
+    _flip(view, "h")
+    _flip(view, "v")
+    after = view.transform()
+    assert after.m11() == pytest.approx(-before.m11(), rel=1e-9)
+    assert after.m22() == pytest.approx(-before.m22(), rel=1e-9)
+
+
+def test_the_mirror_survives_a_fit(view):
+    # fit_to_scene/fit_to_factor reset the transform; the mirror must be
+    # re-applied or the orientation would silently jump back
+    view._state.load(MONO)
+    _flip(view, "v")
+    view.fit_to_scene()
+    assert view.transform().m22() < 0
+    view.fit_to_factor(1.0)
+    assert view.transform().m22() < 0
+    assert view.transform().m11() == pytest.approx(1.0)
+
+
+def test_the_export_saves_what_you_see_mirrored(view, tmp_path):
+    # "Export PNG…" promises the visible scene, and a mirror is part of how
+    # the observer is looking at the plate.
+    from PySide6.QtGui import QImage
+    view._state.load(MONO)
+    view.fit_to_scene()
+    plain = view.export_png(tmp_path / "plain.png")
+    _flip(view, "v")
+    flipped = view.export_png(tmp_path / "flip.png")
+    a = QImage(str(plain))
+    b = QImage(str(flipped))
+    assert a.size() == b.size()
+    # row 0 of the mirrored file is the original's last row
+    top = b.pixelColor(a.width() // 2, 0)
+    bottom = a.pixelColor(a.width() // 2, a.height() - 1)
+    assert top == bottom
+
+
+def test_the_mirror_is_undone_by_a_state_reset(view):
+    # Back to first sight of a plate (ADR-047): no inversion, no mirror.
+    view._state.load(MONO)
+    _flip(view, "h")
+    assert view._state.flip_h is True
+    view._state.reset_stretch()
+    assert view._state.flip_h is False
+    assert view._state.flip_v is False
+    assert "flip_h" in view._state.stretch_state()
+
+
+def test_the_compass_follows_the_mirror(view):
+    # The compass is painted in viewport coordinates: if it did not follow
+    # the mirror it would keep pointing at the old north while the sky on
+    # screen has turned around.
+    assert view._flip_angle(10.0) == pytest.approx(10.0)
+    view._state.flip_h = True
+    assert view._flip_angle(10.0) == pytest.approx(-10.0)
+    view._state.flip_v = True
+    assert view._flip_angle(10.0) == pytest.approx(190.0)   # -10 -> 180+10
+    assert view._flip_angle(0.0) == pytest.approx(180.0)

@@ -621,7 +621,7 @@
         <source>The next plate keeps these black, white, gamma and invert values instead of the auto percentiles</source>
         <translation>La siguiente placa conserva los valores de negro, blanco, gamma e invertir en vez de los percentiles automáticos</translation>
     </message>
-</context>
+<message><source>Mirror:</source><translation>Espejo:</translation></message><message><source>Left-right</source><translation>Izquierda-derecha</translation></message><message><source>Up-down</source><translation>Arriba-abajo</translation></message><message><source>Mirror the picture left-right. The plate's pixels, its saved marks and every measurement stay in their own frame: only what you see turns.</source><translation>Espeja la imagen de izquierda a derecha. Los píxeles de la placa, sus marcas guardadas y toda medida se quedan en su propio marco: sólo gira lo que ves.</translation></message><message><source>Mirror the picture up-down (the same rule: the pixels and the measurements do not move).</source><translation>Espeja la imagen de arriba abajo (la misma regla: los píxeles y las medidas no se mueven).</translation></message></context>
 <context>
     <name>JournalDialog</name>
     <message>

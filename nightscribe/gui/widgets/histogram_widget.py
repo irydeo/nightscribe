@@ -221,6 +221,28 @@ class HistogramWidget(QFrame):
         self.btn_invert.toggled.connect(self._on_invert_toggled)
         row_b.addWidget(self.btn_invert)
         col.addLayout(row_b)
+        # orientation (E6): mirror the PICTURE to match someone else's
+        # chart or a finder, without ever touching the plate's pixels
+        row_o = QHBoxLayout()
+        row_o.addWidget(QLabel(self.tr("Mirror:")))
+        self.btn_flip_h = QPushButton(self.tr("Left-right"))
+        self.btn_flip_h.setCheckable(True)
+        self.btn_flip_h.setToolTip(self.tr(
+            "Mirror the picture left-right. The plate's pixels, its saved "
+            "marks and every measurement stay in their own frame: only "
+            "what you see turns."))
+        self.btn_flip_h.toggled.connect(
+            lambda c: self._on_flip_toggled("h", c))
+        row_o.addWidget(self.btn_flip_h)
+        self.btn_flip_v = QPushButton(self.tr("Up-down"))
+        self.btn_flip_v.setCheckable(True)
+        self.btn_flip_v.setToolTip(self.tr(
+            "Mirror the picture up-down (the same rule: the pixels and "
+            "the measurements do not move)."))
+        self.btn_flip_v.toggled.connect(
+            lambda c: self._on_flip_toggled("v", c))
+        row_o.addWidget(self.btn_flip_v)
+        col.addLayout(row_o)
         self.chk_keep = QCheckBox(self.tr("Keep stretch on load"))
         self.chk_keep.setToolTip(self.tr(
             "The next plate keeps these black, white, gamma and invert "
@@ -276,6 +298,8 @@ class HistogramWidget(QFrame):
             self.spn_white.setValue(self._state.white)
             self.spn_gamma.setValue(self._state.gamma)
             self.btn_invert.setChecked(self._state.inverted)
+            self.btn_flip_h.setChecked(self._state.flip_h)
+            self.btn_flip_v.setChecked(self._state.flip_v)
         finally:
             self._ui_sync = False
         self.canvas.update()
@@ -298,7 +322,16 @@ class HistogramWidget(QFrame):
                 and checked != self._state.inverted:
             self._state.toggle_invert()
 
+    def _on_flip_toggled(self, axis, checked):
+        # @args: axis - "h" | "v", checked - the button's new state
+        if self._ui_sync or not self._state.has_image:
+            return
+        now = self._state.flip_h if axis == "h" else self._state.flip_v
+        if checked != now:
+            self._state.toggle_flip(axis)
+
     def _set_enabled(self, flag):
         for w in (self.spn_black, self.spn_white, self.spn_gamma,
-                  self.btn_auto, self.btn_invert):
+                  self.btn_auto, self.btn_invert, self.btn_flip_h,
+                  self.btn_flip_v):
             w.setEnabled(flag)

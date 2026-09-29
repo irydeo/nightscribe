@@ -572,14 +572,29 @@ def test_workbench_can_be_maximized(dlg):
     assert flags & Qt.WindowMinimizeButtonHint
 
 
-def test_bars_grow_with_the_window(dlg):
+def test_the_width_goes_to_the_plate_not_to_the_form(dlg):
+    # Reported: maximizing the window grew the right column (the tabs) and
+    # the plate stayed in the middle with two fat margins. The plate is
+    # what the window is FOR: the sides keep the width they need and the
+    # centre takes every extra pixel.
     from PySide6.QtWidgets import QApplication
-    dlg.resize(1700, 950)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
     QApplication.processEvents()
-    wide = dlg.tabs.width()
-    dlg.resize(1000, 700)
-    QApplication.processEvents()
-    assert wide > dlg.tabs.width()          # the tab column takes its share
+    sizes = {}
+    for width in (1000, 1700, 2400):
+        dlg.resize(width, 900)
+        for _ in range(3):
+            QApplication.processEvents()
+        sizes[width] = (dlg.series_pane.width(), dlg.view.width(),
+                        dlg.tabs.width())
+    # the visit pane and the tab column keep their width...
+    assert sizes[1000][0] == sizes[2400][0]
+    assert sizes[1000][2] == sizes[2400][2]
+    # ...and the plate takes the 1400 px the window gained
+    assert sizes[2400][1] - sizes[1000][1] == 1400
+    # and the tab column is capped, so a 4K window does not give it a
+    # runway either
+    assert dlg.tabs.maximumWidth() <= 600
 
 
 def test_series_pane_is_not_capped(dlg):

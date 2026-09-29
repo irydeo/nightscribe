@@ -609,3 +609,31 @@ def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
     window._load_editor_sequence(_D(), 1, "/x.fits")
     assert calls["applied"] == 1
     assert calls["loaded"] == [seq]
+
+
+# ---------------- the workbench is one session at a time (issue) ------
+
+def test_another_project_does_not_inherit_the_previous_session(dlg):
+    # Reported: switching project kept the previous one's plate, sequence
+    # and target in the workbench, and it did the same when opening it
+    # from the Tools menu. The dialog is persistent on purpose (the plate
+    # and the stretch survive a close), which is exactly why it has to
+    # know when the SESSION changed.
+    dlg.begin_session((1, 10))
+    dlg.set_object({"name": "T CrB", "ra": 238.0, "dec": 25.9})
+    dlg.state.load(MONO)
+    dlg.tab_compare.edt_target.setText("T CrB")
+    assert dlg.state.has_image and dlg.view.title_line()
+    # the same session again: nothing is thrown away
+    assert dlg.begin_session((1, 10)) is False
+    assert dlg.state.has_image
+    # another project: a clean workbench, and nothing is lost (the plate,
+    # the sequence and the points live in their own project)
+    assert dlg.begin_session((2, 20)) is True
+    assert not dlg.state.has_image
+    assert dlg.view.title_line() == ""
+    assert dlg.tab_compare.edt_target.text() == ""
+    # the ad-hoc open from Tools is its own session too
+    dlg.state.load(MONO)
+    assert dlg.begin_session(None) is True
+    assert not dlg.state.has_image

@@ -8583,6 +8583,9 @@ class MainWindow(QMainWindow):
     def _tools_ufe(self):
         # Menu Tools → FITS editor… (ADR-044)
         dlg = self._ufe_build()
+        begin = getattr(dlg, "begin_session", None)
+        if callable(begin):
+            begin(None)              # ad-hoc: its own session (issue report)
         dlg.set_save_hook(None)      # ad-hoc: no project registration
         dlg.set_point_hook(None)     # and no project to save points to
         dlg.set_reset_hooks(None, None)   # and nothing to reset (ADR-047)
@@ -8630,6 +8633,13 @@ class MainWindow(QMainWindow):
         #        session_id - the visit a saved point belongs to, or None
         # @return: the UfeDialog
         dlg = self._ufe_build()
+        # a different project (or visit) is a different SESSION: the
+        # persistent dialog must not carry the previous one's plate,
+        # sequence or series into it (issue report). Asked defensively: a
+        # double in a test (or a future host) need not have the method.
+        begin = getattr(dlg, "begin_session", None)
+        if callable(begin):
+            begin((hook_pid, session_id))
         dlg.set_save_hook(None)
         dlg.set_object(obj)
         if hook_pid is not None:

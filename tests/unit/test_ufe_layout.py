@@ -202,6 +202,31 @@ def test_the_object_is_painted_over_the_plate_not_a_row_of_the_window():
     d.close()
 
 
+def test_the_object_line_sits_low_and_never_under_the_switch():
+    # Reported: the coordinates at the top-left did not read well, they
+    # collided with the bar over the picture. The line lives at the
+    # bottom-left now, the only corner the other overlays leave free.
+    from nightscribe.gui.ufe_dialog import UfeDialog
+    _app()
+    d = UfeDialog()
+    d.resize(1000, 800)
+    d.show()
+    assert d.open_plate(str(MONO))
+    d.set_object(_OBJECT)
+    _settle(d)
+    d.view.repaint()                        # the HUD paints on the viewport
+    QApplication.processEvents()
+    rect = d.view._title_rect
+    assert rect is not None
+    height = d.view.viewport().height()
+    assert rect.top() > height / 2          # the lower half, not the top
+    assert rect.left() < 40                 # and against the left edge
+    d.set_object(None)
+    QApplication.processEvents()
+    assert d.view._title_rect is None
+    d.close()
+
+
 def test_the_object_line_goes_into_the_exported_png(tmp_path):
     # "On screen and in the exported PNG" is the rule the corner boxes and
     # the compass already follow; the object's line is part of the HUD, so

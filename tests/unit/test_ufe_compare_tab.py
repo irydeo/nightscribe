@@ -607,6 +607,12 @@ def test_repropose_is_covered_by_the_busy_dialog(dlg, monkeypatch):
     # The second (and later) clicks only re-propose, but the proposal is
     # not instant on a big field: it rides under the busy dialog like
     # the field query does (a bare freeze reads as a hang).
+    #
+    # The dialog is DEFERRED now (it only appears if the work takes longer
+    # than _BUSY_SHOW_MS, see _busy_wait): this test wants it on screen, so
+    # it asks for it immediately.
+    from nightscribe.gui import ufe_compare_tab as _mod
+    monkeypatch.setattr(_mod, "_BUSY_SHOW_MS", 0)
     from PySide6.QtWidgets import QProgressDialog
     from nightscribe.core import compstars
     tab = dlg.tab_compare
@@ -852,3 +858,46 @@ def test_manual_band_reaches_the_measure_combo(dlg):
         {"label": "R", "value": 11.5, "derived": False, "origin": "manual"})
     measure.refresh_bands()
     assert measure.cmb_band.findText("R") >= 0
+
+
+def test_a_quick_proposal_never_flashes_a_dialog(dlg, monkeypatch):
+    # Reported: "a dialog appears and disappears at once and the sequence is
+    # not built". Part of that is the flash itself: a busy window that lives
+    # twenty milliseconds is noise and reads as a failure. It is shown only
+    # when the work really takes a moment, and a quick job leaves no trace.
+    from PySide6.QtWidgets import QProgressDialog
+    from nightscribe.gui import ufe_compare_tab as _mod
+    tab = dlg.tab_compare
+    wait = _mod._busy_wait(tab, "Working…", "Test")
+    seen = []
+    wait._show_timer.timeout.connect(lambda: seen.append(True))
+    _mod._reap_wait(wait)                        # finished at once
+    assert seen == []                            # never shown
+    assert not any(w.isVisible() for w in tab.findChildren(QProgressDialog))
+
+
+def test_a_broken_proposal_says_so_instead_of_vanishing(dlg, monkeypatch):
+    # Reported: the button built nothing and said nothing. Whatever raises
+    # inside the proposal is now reported on the window's status line, with
+    # its own text: a failure nobody can read is a failure nobody can fix.
+    from nightscribe.core import compstars
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    monkeypatch.setattr(compstars, "propose_comps",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            RuntimeError("catalog rows have no magnitude")))
+    tab._on_auto()
+    assert "catalog rows have no magnitude" in tab.lbl_status.text()
+
+
+def test_a_reproposal_that_changes_nothing_says_so(dlg):
+    # The same proposal is not a failure, but it LOOKS like one: nothing on
+    # screen changes. Say it instead of letting the observer guess.
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._on_propose()
+    first = len(tab._entries)
+    tab._on_propose()                            # the very same proposal
+    assert len(tab._entries) == first
+    assert "same as before" in tab.lbl_status.text() or \
+        "igual que antes" in tab.lbl_status.text()

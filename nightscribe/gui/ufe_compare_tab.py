@@ -33,7 +33,7 @@ dialog's top bar). The object itself wears the dialog's global red mark
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QObject, Qt, Signal
+from PySide6.QtCore import QEvent, QObject, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QFont, QPen
 from PySide6.QtWidgets import (QComboBox, QDoubleSpinBox, QFileDialog,
                                QProgressDialog, QPushButton, QTableWidgetItem,
@@ -55,6 +55,10 @@ C_COMP = "#4dd0e1"      # comparison ring
 C_CHECK = "#ff7ad9"     # check square
 C_VAR = "#ff6378"       # known variable ring
 C_RING = "#58d68d"      # catalog label ring
+
+# a busy dialog is shown only if the work takes this long: a flash of a
+# window is worse than no window at all
+_BUSY_SHOW_MS = 250
 
 _PICK_PX = 11.0         # click/hover radius in SCREEN px at any zoom
 _MAX_LABELS = 34        # catalog magnitude labels, brightest first
@@ -103,12 +107,23 @@ def _busy_wait(host, label, title):
     wait.setAutoClose(False)
     wait.setAutoReset(False)
     wait.installEventFilter(_CenterOnWindow(wait, host))
-    wait.show()
+    # A dialog that appears for twenty milliseconds is noise, and it reads
+    # as "something failed" (reported: "a dialog appears and disappears at
+    # once and the sequence is not built"). It is shown only when the work
+    # really takes a moment; if it finishes first, the observer never sees
+    # it. _reap_wait cancels the pending show.
+    wait._show_timer = QTimer(wait)
+    wait._show_timer.setSingleShot(True)
+    wait._show_timer.timeout.connect(wait.show)
+    wait._show_timer.start(_BUSY_SHOW_MS)
     return wait
 
 
 def _reap_wait(wait):
     # @args: wait - the busy dialog to close once the worker finished
+    timer = getattr(wait, "_show_timer", None)
+    if timer is not None:
+        timer.stop()
     wait.close()
     wait.deleteLater()
 
@@ -325,6 +340,22 @@ class UfeCompareTab(QWidget):
             self._say(self.tr(
                 "The sequence field is empty: build it with «Generate "
                 "field…», or restore the one saved with the plate."))
+
+    def clear_session(self):
+        # A different PROJECT is a different session (issue report: opening
+        # the workbench on another project kept the previous one's plate,
+        # sequence and target). The dialog asks for this on every change of
+        # project, and nothing here is a deletion of the observer's work:
+        # the sequence lives in its project and comes back with it.
+        # @return: None
+        self.reset_state()
+        self.edt_target.clear()
+        self._prefill_sky = None
+        self._auto_propose = False
+        if self._worker is not None:
+            self._worker = None
+        if self._cutout_worker is not None:
+            self._cutout_worker = None
 
     def reset_state(self):
         # ADR-047: the sequence field's zero point: no catalog, no
@@ -974,10 +1005,21 @@ class UfeCompareTab(QWidget):
                 "stars to propose the sequence."))
             return
         self._flush_table()
-        validator = self._comp_validator()
-        seq = compstars.propose_comps(
-            self._stars, self.spn_mag.value(), validator=validator,
-            margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
+        before = [e.get("name") for e in self._entries]
+        try:
+            validator = self._comp_validator()
+            seq = compstars.propose_comps(
+                self._stars, self.spn_mag.value(), validator=validator,
+                margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
+        except Exception as err:
+            # reported: pressing this button showed a dialog that vanished
+            # and built nothing, with no word about why. A failure the
+            # observer cannot read is a failure nobody can fix, so it is
+            # said on the status line with its own text.
+            logger.exception("sequence proposal failed: %s", err)
+            self._say(self.tr("Could not build the sequence: {0}").format(
+                err), "error")
+            return
         self._entries = (seq["comps"]
                          + ([seq["check"]] if seq["check"] else []))
         self._redraw_entries()
@@ -993,6 +1035,11 @@ class UfeCompareTab(QWidget):
             text += " " + self.tr("Left out {0} on your own plate: {1}").format(
                 len(rejected),
                 ", ".join(f"{k} × {v}" for k, v in sorted(counts.items())))
+        if before == [e.get("name") for e in self._entries]:
+            # the same proposal is not a failure, but it LOOKS like one
+            # (nothing on screen changes): say it instead of letting the
+            # observer guess
+            text += " " + self.tr("The sequence is the same as before.")
         self._say(text)
         self._commit()
 

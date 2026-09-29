@@ -691,9 +691,18 @@ class UfeImageView(ChartView):
         return self._title_line
 
     def _paint_title(self, painter, w, h, k=1.0):
+        # The object's line, at the BOTTOM-LEFT of the plate.
+        #
+        # It was at the top-left, where the workbench's own "Image | Light
+        # curve" switch sits right above the picture: the two read as one
+        # crowded band (reported). The bottom-left corner is the only one
+        # left free by the other overlays (the metadata boxes take the top,
+        # the compass the bottom-centre and the scale bar the bottom-right),
+        # and a margin keeps it off the edge in the export too.
         # @args: painter - device-coords painter, w/h - surface in device
         #        px, k - export pixel ratio
         # @return: True when something was drawn
+        self._title_rect = None
         if not self._title_line or not self._state.has_image:
             return False
         from PySide6.QtGui import QFont, QFontMetricsF
@@ -703,9 +712,13 @@ class UfeImageView(ChartView):
         f.setBold(True)
         fm = QFontMetricsF(f)
         pad = 8.0 * k
-        text = fm.elidedText(self._title_line, Qt.ElideRight,
-                             max(60.0, w - 2 * pad))
-        rect = QRectF(pad, 4.0 * k, w - 2 * pad, fm.height() + 6 * k)
+        room = max(60.0, w - 2 * pad)
+        text = fm.elidedText(self._title_line, Qt.ElideRight, room)
+        # its own width, bottom-left, a margin from both edges
+        box_w = min(room, fm.horizontalAdvance(text) + 12 * k)
+        rect = QRectF(pad, h - fm.height() - 12 * k, box_w,
+                      fm.height() + 6 * k)
+        self._title_rect = rect
         painter.save()
         painter.setFont(f)
         # a dark plaque under it: the same trick as the boxes, so a bright

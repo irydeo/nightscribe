@@ -47,7 +47,14 @@ class UfeSeriesDialog(QDialog):
         super().__init__(parent)
         self._ui = adopt_ui(self, "ufe_series_dialog")
         self.setWindowTitle(self.tr("Chart and quality"))
-        self.setMinimumWidth(430)
+        # the window sizes itself to its content: it arrived with the
+        # Designer's default and the third block was cut off (reported).
+        # A minimum keeps it sane if a style reports odd metrics.
+        self.setMinimumWidth(470)
+        self.adjustSize()
+        hint = self.sizeHint()
+        self.resize(max(470, hint.width() + 20),
+                    max(360, hint.height() + 20))
         # the controls, by name: the Measure tab reads them from here and
         # wires them exactly as it did (see UfeMeasureTab.__init__)
         self.cmb_series_scale = self._ui.cmb_series_scale

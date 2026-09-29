@@ -52,6 +52,13 @@ _STATUS_GLYPH = {"info": "ⓘ", "warn": "⚠", "error": "✕"}
 _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
                  (2.0, "200"), (4.0, "400"))
 
+# The three columns' widths: the sides get what they need, the plate gets
+# the rest (a maximized window must widen the PICTURE, not the form).
+_SERIES_W = 300
+_TABS_W = 380
+_SERIES_MAX_W = 420
+_TABS_MAX_W = 520
+
 # ADR-044 rev (2026-09-24): the top-bar button table for the bar style
 # (icons-only vs icon + text). `base` is the asset stem in assets/;
 # toggles flip the _on / _off glyphs with their checked state. `icon_only`
@@ -226,9 +233,14 @@ class UfeDialog(QDialog):
         # bar, the work area, the strip and the status line are not a place
         # to spend the plate's height
         root.setSpacing(4)
-        self.splitter.setStretchFactor(0, 1)     # series: grows a bit
-        self.splitter.setStretchFactor(1, 4)     # the centre dominates
-        self.splitter.setStretchFactor(2, 2)     # the tab column grows too
+        # WHO GETS THE WIDTH. Maximizing the window used to grow the right
+        # column (the tabs) by its own stretch factor, and the plate stayed
+        # in the middle with two fat margins: the plate is what the window
+        # is FOR. The sides keep the width they need and nothing more, the
+        # centre takes every extra pixel.
+        self.splitter.setStretchFactor(0, 0)     # the visit pane
+        self.splitter.setStretchFactor(1, 1)     # the plate: everything else
+        self.splitter.setStretchFactor(2, 0)     # the tab column
         self.tabs = self._ui.tabs
 
         self._wire_topbar()
@@ -253,8 +265,20 @@ class UfeDialog(QDialog):
         self.series_pane.setMinimumWidth(300)
         self.splitter.replaceWidget(0, self.series_pane)
         self.series_pane.hide()
+        self._layout_widths()
         self._frame_index = 0
         self._wire_frame_nav()
+
+    def _layout_widths(self):
+        # The sides' width, once every column exists (the tab column and
+        # the visit pane are built further down than the splitter).
+        # @return: None
+        # the tab column is capped (a form does not need to grow with a
+        # 4K window) and the visit pane is NOT: that was decided before
+        # (its content must never be clipped on a wide font) and it does
+        # not need a cap, because with no stretch factor it keeps its width
+        self.tabs.setMaximumWidth(_TABS_MAX_W)
+        self.splitter.setSizes([_SERIES_W, 900, _TABS_W])
 
     def _centre_page(self, index, widget):
         # Puts a real widget inside one of the centre's pages. The pages are
@@ -269,6 +293,38 @@ class UfeDialog(QDialog):
             lay = QVBoxLayout(page)
             lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(widget)
+
+    def begin_session(self, key):
+        # The workbench is PERSISTENT on purpose (the observer's plate and
+        # stretch survive a close), and that is exactly why it has to know
+        # when the session changed: opening it on another project kept the
+        # previous one's plate, sequence, series and target (reported, and
+        # the same when opening it from Tools).
+        #
+        # A key of (project id, visit id) names a session; None is the
+        # ad-hoc open from the Tools menu. When it changes, the plate and
+        # every tab's per-project state go: nothing is lost, because all of
+        # it lives in its project.
+        # @args: key - the session's key, or None
+        # @return: True when a reset happened
+        if key == getattr(self, "_session_key", "unset"):
+            return False
+        self._session_key = key
+        self.state.clear()         # the previous project's plate
+        self.set_object(None)      # and its object's line over the plate
+        for tab in (getattr(self, "tab_measure", None),
+                    getattr(self, "tab_compare", None),
+                    getattr(self, "tab_annotate", None),
+                    getattr(self, "tab_blink", None)):
+            clear = getattr(tab, "clear_session", None)
+            if callable(clear):
+                try:
+                    clear()
+                except Exception as err:        # never a dead window
+                    logger.warning("session reset failed for %s: %s",
+                                   type(tab).__name__, err)
+        self.set_status("")
+        return True
 
     def _bar_doors(self):
         # U2: the bar keeps what a visit needs (open, export, solve, the two

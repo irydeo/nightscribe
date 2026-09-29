@@ -275,17 +275,22 @@ class UfeMeasureTab(QWidget):
         self.cmb_series_scale.currentIndexChanged.connect(
             self._on_series_scale_changed)
         self.btn_series_robust = self._series_dlg.btn_series_robust
+        self.btn_series_robust.toggled.connect(self.chart_series.set_robust)
         self.btn_series_robust.toggled.connect(
-            self.chart_series.set_robust)
+            lambda _on: self._refresh_chart_notes())
         self.btn_series_zoomfit = self._series_dlg.btn_series_zoomfit
         self.btn_series_zoomfit.clicked.connect(
             self.chart_series.reset_view)
         self.btn_series_errors = self._series_dlg.btn_series_errors
         self.btn_series_errors.toggled.connect(
             self.chart_series.set_errors_visible)
+        self.btn_series_errors.toggled.connect(
+            lambda _on: self._refresh_chart_notes())
         self.btn_series_hideflags = self._series_dlg.btn_series_hideflags
         self.btn_series_hideflags.toggled.connect(
             self.chart_series.set_hide_flagged)
+        self.btn_series_hideflags.toggled.connect(
+            lambda _on: self._refresh_chart_notes())
         # --- the observer's decisions on the curve (quality plan, phase A)
         self.btn_series_fixaxis = self._series_dlg.btn_series_fixaxis
         self.spn_series_maglo = self._series_dlg.spn_series_maglo
@@ -1251,6 +1256,7 @@ class UfeMeasureTab(QWidget):
         # magnitude visible on a night.
         if not self.btn_series_fixaxis.isChecked():
             self.chart_series.clear_y_range()
+            self._refresh_chart_notes()
             return
         lo = self.spn_series_maglo.value()
         hi = self.spn_series_maghi.value()
@@ -1260,6 +1266,7 @@ class UfeMeasureTab(QWidget):
                 "magnitude must be larger than the brightest."))
             return
         self._update_selection_label()
+        self._refresh_chart_notes()
 
     def _on_bin_changed(self, *_a):
         # The chart's binning and its mean curve (presentation only).
@@ -1269,6 +1276,7 @@ class UfeMeasureTab(QWidget):
         self.chart_series.set_mean_curve(
             self.spn_series_meanwin.value()
             if self.chk_series_mean.isChecked() else 0)
+        self._refresh_chart_notes()
 
     def _on_detect_outliers(self, *_a):
         # The detector runs on the plotted curve, with the threshold the
@@ -1284,6 +1292,7 @@ class UfeMeasureTab(QWidget):
         marked = [i for i, flag in enumerate(res["flags"]) if flag]
         self.chart_series.set_outliers(marked)
         self._update_selection_label()
+        self._refresh_chart_notes()
 
     def _series_measured(self):
         # The measured points of the chart, in the same order the chart
@@ -1309,6 +1318,7 @@ class UfeMeasureTab(QWidget):
             return
         self._set_excluded_pool(set(self.chart_series.excluded())
                                 | set(marked))
+        self._refresh_chart_notes()
 
     def _on_exclude_selected(self):
         chosen = self.chart_series.selected()
@@ -1318,6 +1328,7 @@ class UfeMeasureTab(QWidget):
             return
         self._set_excluded_pool(set(self.chart_series.excluded())
                                 | set(chosen))
+        self._refresh_chart_notes()
 
     def _on_restore_all(self):
         self._set_excluded_pool(set())
@@ -1338,6 +1349,64 @@ class UfeMeasureTab(QWidget):
         self._draw_series(self._series_result.points
                           if self._series_result is not None else [])
         self._update_selection_label()
+        self._refresh_chart_notes()
+
+    def clear_session(self):
+        # A different project is a different session (issue report): the
+        # previous series, its points, its panel and its undo must not
+        # travel to the next one. Nothing is deleted: the points are in
+        # their project.
+        # @return: None
+        if self._live_worker is not None:
+            self._live_worker.cancel()
+            self._live_worker = None
+        self.chk_series_live.blockSignals(True)
+        self.chk_series_live.setChecked(False)
+        self.chk_series_live.blockSignals(False)
+        self._series_result = None
+        self._series_payload = []
+        self._live_points = []
+        self._live_run_ids = []
+        self._panel_summary = []
+        self._series_run_id = None
+        self._last = None
+        self._diff = None
+        self._pair_obs = None
+        self._last_suggestions = []
+        self.chart_series.set_data([])
+        self.chart_series.set_outliers([])
+        self.chart_series.set_excluded([])
+        self.chart_series.clear_selection()
+        self.chart_series.reset_view()
+        self.lbl_result.setText("–")
+        self.btn_series_undo.setEnabled(False)
+        self.btn_series_exoclock.setEnabled(False)
+        self._update_selection_label()
+
+    def _render_panel(self):
+        # The panel's text, in one place: the run's summary and the chart's
+        # OWN notes, rebuilt together.
+        #
+        # The notes (what the chart clipped, what it left out of this scale,
+        # which series the axis is not showing, the mean curve...) used to be
+        # written once, when the run finished. Marking outliers or excluding
+        # points afterwards left them stale, and the observer read a panel
+        # that described a chart they no longer had. A full rewrite on every
+        # change is cheap and cannot accumulate.
+        # @return: None
+        lines = list(getattr(self, "_panel_summary", None) or [])
+        notes = self.chart_series.notes()
+        if notes:
+            if lines:
+                lines.append("")             # the chart's own block
+            lines += ["· " + n for n in notes]
+        self.lbl_result.setText("\n".join(lines) if lines else "–")
+
+    def _refresh_chart_notes(self):
+        # Called by every control that changes what the chart shows: the
+        # panel must describe the chart that is on screen NOW.
+        # @return: None
+        self._render_panel()
 
     def _update_selection_label(self):
         # The counter under the chart: how many are selected, excluded and
@@ -1498,11 +1567,6 @@ class UfeMeasureTab(QWidget):
             lines.append("⚠ " + self.tr(
                 "{0} frame(s) had no DATE-OBS and were not timed: they "
                 "are not on the curve").format(n_frames))
-        # what the chart used to write over the curve (the legend's
-        # caveats) is shown here instead: the chart says it, the panel
-        # shows it, and neither invents it (see LightCurveChart.notes)
-        for note in self.chart_series.notes():
-            lines.append("· " + note)
         errors = result.errors or {}
         if errors:
             lines.append("⚠ " + self.tr(
@@ -1512,7 +1576,11 @@ class UfeMeasureTab(QWidget):
                 lines.append("· " + self.tr(
                     "Frame {0} could not be read: {1}").format(
                         Path(path).name, self._plain_engine_error(err)))
-        self.lbl_result.setText("\n".join(lines))
+        # the run's own summary is KEPT (not painted yet): the panel always
+        # renders summary + the chart's current notes, so marking an outlier
+        # cannot leave a stale line behind (see _render_panel)
+        self._panel_summary = list(lines)
+        self._render_panel()
 
     def _plain_engine_error(self, err):
         # The engine reports its read failures in technical English (core
@@ -1587,6 +1655,7 @@ class UfeMeasureTab(QWidget):
         had_range = self.chart_series.is_y_range_fixed() is not None
         if not self.chart_series.set_mag_mode(mode):
             return
+        self._refresh_chart_notes()
         if had_range:
             self.btn_series_fixaxis.setChecked(False)
             self._say(self.tr(
@@ -2045,7 +2114,11 @@ class UfeMeasureTab(QWidget):
                     "measurement is NOT reliable").format(
                         chk["name"], chk["delta"]))
         lines.extend(f"· {n}" for n in notes)
-        self.lbl_result.setText("\n".join(lines))
+        # the run's own summary is KEPT (not painted yet): the panel always
+        # renders summary + the chart's current notes, so marking an outlier
+        # cannot leave a stale line behind (see _render_panel)
+        self._panel_summary = list(lines)
+        self._render_panel()
 
     # ---------------------------------------------------------- overlays
 

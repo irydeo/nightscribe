@@ -1574,3 +1574,47 @@ def test_a_failed_series_does_not_leave_the_tab_looking_hung(dlg):
     assert tab.btn_series.text() == tab._btn_series_label   # not "Cancel"
     assert tab._series_worker is None
     assert "negative dimensions" in tab.lbl_status.text()
+
+
+# ---------------- the panel follows the chart (issue report) ----------
+
+def test_the_panel_always_describes_the_chart_on_screen(dlg, qapp):
+    # Reported: "if I mark outliers the messages stack on the chart and do
+    # not update". The chart does not accumulate anything (it rebuilds its
+    # scene), but the PANEL was written once per run: marking outliers, or
+    # hiding the flagged points, left it describing a chart that was no
+    # longer there. It is rebuilt now — summary plus the chart's own notes —
+    # on every change, and a full rewrite cannot accumulate.
+    tab = dlg.tab_measure
+    tab._panel_summary = ["Serie: 3 puntos"]
+    tab.chart_series.set_data([
+        {"mjd": 60600.0, "mag": 12.34, "err": 0.01, "err_internal": 0.008,
+         "filter": "V", "source": "measure", "flags": ["cosmic"]},
+        {"mjd": 60601.0, "mag": 12.36, "err": 0.01, "err_internal": 0.008,
+         "filter": "V", "source": "measure", "flags": []}])
+    tab._render_panel()
+    before = tab.lbl_result.toPlainText()
+    assert "Serie: 3 puntos" in before
+    # hiding the flagged points changes what the chart does: the panel must
+    # say it WITHOUT a new run
+    tab.btn_series_hideflags.setChecked(True)
+    qapp.processEvents()
+    after = tab.lbl_result.toPlainText()
+    assert after != before
+    assert "Serie: 3 puntos" in after            # the summary is not lost
+    assert after.count("Serie: 3 puntos") == 1   # and it never stacks
+    tab.btn_series_hideflags.setChecked(False)
+    qapp.processEvents()
+    assert "Serie: 3 puntos" in tab.lbl_result.toPlainText()
+
+
+def test_the_result_box_has_room_and_a_scrollbar(dlg):
+    # Reported: the "Photometric series" messages needed more height and a
+    # scrollbar "just in case". The summary of a night with four flags, a
+    # per-night detrend and two warnings is LONG.
+    from PySide6.QtCore import Qt
+    box = dlg.tab_measure.lbl_result
+    assert box.minimumHeight() >= 150
+    assert box.verticalScrollBarPolicy() != Qt.ScrollBarAlwaysOff
+    assert box.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
+    assert box.isReadOnly()

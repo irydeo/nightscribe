@@ -174,6 +174,22 @@ class UfeBlinkTab(QWidget):
             self._view.set_frame_override(None)     # hand the plate back
             self._drop_marker_items()
 
+    def clear_session(self):
+        # A different project is a different session (issue report): the
+        # prepared pair and the target belong to the previous one.
+        # @return: None
+        self._pair = None
+        self._obs8 = self._ref8 = None
+        self._nudge = [0.0, 0.0]
+        self._timer.stop()
+        if self._view is not None:
+            self._view.set_frame_override(None)
+            self._drop_marker_items()
+        self.edt_name.clear()
+        self.edt_ra.clear()
+        self.edt_dec.clear()
+        self.chk_manual.setChecked(False)
+
     def shutdown(self):
         # Stops timers before the dialog dies (the shiboken trap).
         self._timer.stop()

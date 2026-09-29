@@ -7048,7 +7048,11 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <source>Saved {0} annotated copy(ies). Last: {1}</source>
         <translation>Guardadas {0} copias anotadas. Última: {1}</translation>
     </message>
-</context>
+
+    <message>
+        <source>Annotation cleared with the project.</source>
+        <translation>Anotación limpiada al cambiar de proyecto.</translation>
+    </message></context>
 <context>
     <name>UfeBlinkTab</name>
     <message>
@@ -7407,7 +7411,15 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <source>Left out {0} on your own plate: {1}</source>
         <translation>Descartadas {0} en tu propia placa: {1}</translation>
     </message>
-</context>
+
+    <message>
+        <source>Could not build the sequence: {0}</source>
+        <translation>No se pudo construir la secuencia: {0}</translation>
+    </message>
+    <message>
+        <source>The sequence is the same as before.</source>
+        <translation>La secuencia es la misma que antes.</translation>
+    </message></context>
 <context>
     <name>UfeDialog</name>
     <message>

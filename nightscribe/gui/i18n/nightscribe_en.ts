@@ -7048,7 +7048,11 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <source>Saved {0} annotated copy(ies). Last: {1}</source>
         <translation>Saved {0} annotated copy(ies). Last: {1}</translation>
     </message>
-</context>
+
+    <message>
+        <source>Annotation cleared with the project.</source>
+        <translation>Annotation cleared with the project.</translation>
+    </message></context>
 <context>
     <name>UfeBlinkTab</name>
     <message>
@@ -7407,7 +7411,15 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <source>Left out {0} on your own plate: {1}</source>
         <translation>Left out {0} on your own plate: {1}</translation>
     </message>
-</context>
+
+    <message>
+        <source>Could not build the sequence: {0}</source>
+        <translation>Could not build the sequence: {0}</translation>
+    </message>
+    <message>
+        <source>The sequence is the same as before.</source>
+        <translation>The sequence is the same as before.</translation>
+    </message></context>
 <context>
     <name>UfeDialog</name>
     <message>

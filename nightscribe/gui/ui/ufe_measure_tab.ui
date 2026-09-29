@@ -373,6 +373,16 @@
             </widget>
            </item>
            <item>
+            <widget class="QPushButton" name="btn_series_night">
+             <property name="toolTip">
+              <string>Write the two figures that explain the night: the airmass of every point (a curve that fades and comes back is often the sky) and the position of the target (with the alignment on, this is the guide residual: the frame that jumped shows as a spike). Both are scientific figures, ready for the report</string>
+             </property>
+             <property name="text">
+              <string>Night conditions (PNG)…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QPushButton" name="btn_series_sci">
              <property name="toolTip">
               <string>Write the scientific figure of this curve: white background, black frame, ticks pointing inwards, error bars with caps and the magnitude axis on round numbers (the style a report or a colleague expects). It is the same data as the panel, drawn for paper</string>

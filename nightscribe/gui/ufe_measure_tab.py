@@ -224,6 +224,8 @@ class UfeMeasureTab(QWidget):
         self.btn_series_phase.clicked.connect(self._on_series_phase)
         self.btn_series_sci = self._ui.btn_series_sci
         self.btn_series_sci.clicked.connect(self._on_series_sci)
+        self.btn_series_night = self._ui.btn_series_night
+        self.btn_series_night.clicked.connect(self._on_series_night)
         self.lbl_series_frames = self._ui.lbl_series_frames
         self.lbl_series_cadence = self._ui.lbl_series_cadence
         self.prg_series = self._ui.prg_series
@@ -1092,6 +1094,52 @@ class UfeMeasureTab(QWidget):
             bits.append(self.tr("band {0}").format(band))
         bits.append(self.tr("NightScribe"))
         return " · ".join(bits)
+
+    def _on_series_night(self):
+        # The two figures that explain the night (quality plan, A1): the
+        # airmass and the measured position. They are written next to the
+        # project and opened in the chart viewer, because a diagnosis the
+        # observer cannot see is not a diagnosis.
+        if self._series_result is None or not self._series_result.points:
+            self.lbl_status.setText(self.tr(
+                "Measure the series first: the figures are its night."))
+            return
+        from ..viz import night_view
+        from ..core import project
+        from .. import paths as paths_mod
+        ctx = self._series_context() or {}
+        pid = ctx.get("pid")
+        row = project.get(db, pid) if pid else None
+        if row:
+            folder = paths_mod.project_dir(
+                pid, row.get("object_name") or "", row.get("root_dir") or "")
+        else:
+            folder = paths_mod.data_dir()
+        name = (row or {}).get("object_name") or "series"
+        stem = "".join(ch if ch.isalnum() or ch in "-_" else "_"
+                       for ch in name)[:40]
+        sub = self._series_subtitle(ctx)
+        written = []
+        try:
+            written.append(night_view.draw_airmass(
+                self._series_result.points,
+                out=str(folder / "{0}_aire.png".format(stem)),
+                subtitle=sub, lang=self._lang))
+            written.append(night_view.draw_drift(
+                self._series_result.points,
+                out=str(folder / "{0}_deriva.png".format(stem)),
+                subtitle=sub, lang=self._lang))
+        except Exception as err:                     # never a dead window
+            logger.warning("night figures failed: %s", err)
+            self.lbl_status.setText(self.tr(
+                "Could not write the night figures: {0}").format(err))
+            return
+        self.lbl_status.setText(self.tr(
+            "Night figures written: {0}").format(", ".join(written)))
+        from .chart_viewer import open_chart
+        for path in written:
+            open_chart(self, path, title=self.tr("Night conditions"),
+                       obj_name=name, chart_key="series-night")
 
     def _on_series_phase(self):
         # Quality plan (C): the period search opens from where the series

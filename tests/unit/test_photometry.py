@@ -955,3 +955,41 @@ def test_a_small_aperture_recovers_the_flux_a_star_really_has():
     # the aperture holds the gaussian inside r = 3: 1 - exp(-r^2/2s^2)
     inside = 1.0 - math.exp(-(3.0 ** 2) / (2 * sigma ** 2))
     assert r["flux"] == pytest.approx(truth * inside, rel=0.05)
+
+
+def test_the_radial_fwhm_is_right_on_a_broad_psf():
+    # Phase A: the radial profile (the radius of the half maximum, with a
+    # median per annulus) is the measure that survives a broad PSF and a
+    # hot pixel. The moments are better on a narrow one; the table of the
+    # trade-off is in estimate_fwhm's comment, and these are its anchors.
+    yy, xx = np.ogrid[0:80, 0:80]
+    amp, sky = 5000.0, 100.0
+    for sigma in (2.0, 3.0):
+        data = sky + amp * np.exp(-((xx - 40.0) ** 2 + (yy - 40.0) ** 2)
+                                  / (2 * sigma ** 2))
+        true = 2.3548 * sigma
+        radial = phot.fwhm_radial(data, 40.0, 40.0)
+        moments = phot.estimate_fwhm(data, [(40.0, 40.0)], method="moments")
+        assert radial == pytest.approx(true, rel=0.12)
+        # and the radial one is the better of the two once the disc is
+        # broader than the moments' cutout can hold
+        if sigma >= 3.0:
+            assert abs(radial - true) < abs(moments - true)
+
+
+def test_a_hot_pixel_does_not_move_the_radial_fwhm():
+    # The whole reason the annulus uses a MEDIAN: one wild pixel inside a
+    # ring changes nothing. This is what a cosmic ray does to a night.
+    yy, xx = np.ogrid[0:60, 0:60]
+    data = 100.0 + 5000.0 * np.exp(-((xx - 30.0) ** 2 + (yy - 30.0) ** 2)
+                                   / (2 * 2.5 ** 2))
+    clean = phot.fwhm_radial(data, 30.0, 30.0)
+    dirty = np.copy(data)
+    dirty[30, 33] += 40000.0                   # a cosmic ray, 3 px away
+    hurt = phot.fwhm_radial(dirty, 30.0, 30.0)
+    assert hurt == pytest.approx(clean, rel=0.05)
+    # and the moments, which weight every pixel by the square of its
+    # distance, feel it more: that is the whole difference
+    m_clean = phot.estimate_fwhm(data, [(30.0, 30.0)], method="moments")
+    m_dirty = phot.estimate_fwhm(dirty, [(30.0, 30.0)], method="moments")
+    assert abs(m_dirty - m_clean) > abs(hurt - clean)

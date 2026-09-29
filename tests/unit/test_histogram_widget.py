@@ -162,8 +162,16 @@ def test_dn_x_roundtrip(strip):
 
 
 def test_strip_has_room_for_its_rows(strip):
-    # the four control rows (black, white, gamma, buttons + keep) must
-    # never be squeezed: the strip's floor covers their natural height
-    assert strip.minimumHeight() >= 170
-    assert strip.canvas.minimumHeight() >= 100
-    assert strip.sizeHint().height() >= 170
+    # U1: the controls live in TWO rows now (black/white/gamma, then the
+    # toggles), not six stacked ones. The floor must still cover their
+    # natural height so nothing is ever squeezed, and the strip now has a
+    # CEILING as well: it sits at the bottom of the editor and it used to
+    # reserve 175-200 px of every window for itself.
+    assert strip.minimumHeight() >= 80
+    assert strip.maximumHeight() <= 120
+    strip.show()
+    from PySide6.QtWidgets import QApplication
+    QApplication.processEvents()
+    assert strip.spn_black.height() >= 22        # a real spin box, not a slit
+    assert strip.spn_gamma.height() >= 22
+    assert strip.canvas.height() >= 60

@@ -34,9 +34,11 @@ from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, \
     QProgressDialog, QVBoxLayout, QWidget
 
+from ..config import config
 from ..core import fits_io
 from .ufe_state import UfeImageState
 from .ui_loader import adopt_ui, drop_in, load_ui
+from .widgets.collapsible_section import CollapsibleSection
 from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
 
@@ -178,15 +180,46 @@ class UfeDialog(QDialog):
         # (after the adoption the layout answers to self, not the husk;
         # drop_in also hides the placeholder: QLayout.replaceWidget does
         # not, and a visible one eats the top bar's clicks)
-        drop_in(self.layout(), self._ui.ph_histogram, self.histogram)
+        #
+        # U1: the histogram strip goes inside a foldable section with the
+        # state remembered. It is the strip the observer needs while
+        # stretching and forgets the rest of the time, and while it was
+        # always open it kept 200 px of a 1000 px window (a fifth of it)
+        # for two rows of controls.
+        self.hist_section = CollapsibleSection(self.tr("Histogram"), self)
+        self.hist_section.contentLayout().addWidget(self.histogram)
+        self.hist_section.setCollapsed(
+            bool(config.get("ufe_histogram_folded", 0)))
+        self.hist_section.sectionToggled.connect(self._on_histogram_fold)
+        drop_in(self.layout(), self._ui.ph_histogram, self.hist_section)
+        # U1: WHO OWNS THE EXTRA HEIGHT. The Designer file carries the
+        # stretch (0,0,1,0) but QUiLoader does NOT apply it, so every item
+        # came out with stretch 0: nobody wanted the extra space and Qt
+        # gave it to whatever could grow. That is why the top bar measured
+        # 69 px in a tall window (its zoom label has a Preferred policy)
+        # and 25 px in a short one, and why the work area was left with
+        # 70 % of the window. Set here, explicitly, and the work area gets
+        # everything the rest does not need.
+        root = self.layout()
+        for i in range(root.count()):
+            root.setStretch(i, 0)
+        # the splitter is found, not counted: this layout has already lost
+        # a row (the object line is painted over the plate now) and a
+        # hardcoded index would silently hand the stretch to whatever
+        # happened to sit there
+        for i in range(root.count()):
+            if root.itemAt(i).widget() is self.splitter:
+                root.setStretch(i, 1)    # the work area: image + tabs
+                break
+        # and nothing above or below the work area may grow on its own
+        from PySide6.QtWidgets import QSizePolicy
+        for w in (self._ui.lbl_zoom, self._ui.lbl_zoom_hint):
+            w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.splitter.setStretchFactor(0, 1)     # series: grows a bit
         self.splitter.setStretchFactor(1, 4)     # the centre dominates
         self.splitter.setStretchFactor(2, 2)     # the tab column grows too
         self.tabs = self._ui.tabs
-        self.lbl_object = self._ui.lbl_object
-        from . import theme
-        self.lbl_object.setStyleSheet(
-            f"color: {theme.C_TEXT_DIM}; padding: 0 4px;")
+
         self._wire_topbar()
         self._build_feature_tabs()
         self._place_light_curve()
@@ -989,11 +1022,23 @@ class UfeDialog(QDialog):
             site=chart_annotate.site_from_config(config),
             measured=measured)
 
+    def _on_histogram_fold(self, expanded):
+        # The observer's choice is remembered: the strip comes back as it
+        # was left (a real click only: setCollapsed stays silent).
+        # @args: expanded - the new state
+        # @return: None
+        config.set("ufe_histogram_folded", 0 if expanded else 1)
+
     def _update_object_line(self):
-        # The thin line under the top bar: name, RA/Dec, magnitude; only
-        # visible while an object is attached.
+        # The object, as a line over the plate itself: name, RA/Dec,
+        # magnitude, while an object is attached.
+        #
+        # U1: it used to be a row of the window UNDER the top bar, which
+        # cost 31 px of height for one line of text and drew the eye
+        # out of the picture. The object belongs to the image; the image
+        # paints it now (see UfeImageView.set_title_line).
         if not self._object:
-            self.lbl_object.setVisible(False)
+            self.view.set_title_line("")
             return
         parts = []
         if self._object.get("name"):
@@ -1012,8 +1057,7 @@ class UfeDialog(QDialog):
                     float(self._object["mag"])))
             except (TypeError, ValueError):
                 parts.append(f"mag {self._object['mag']}")
-        self.lbl_object.setText("   ·   ".join(parts))
-        self.lbl_object.setVisible(bool(parts))
+        self.view.set_title_line("   ·   ".join(parts))
 
     def _update_title(self):
         # Brand · object (when attached) · plate file name (when loaded).

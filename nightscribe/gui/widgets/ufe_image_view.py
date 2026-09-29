@@ -155,6 +155,10 @@ class UfeImageView(ChartView):
         # layer, like the ANNOTATE one, so feature tabs never touch it
         self._object_mark_items = []
         self._object_mark_radec = None   # (ra_deg, dec_deg) or None
+        # the object's line, painted OVER the plate (UFE layout v2: it used
+        # to be a row of the window under the top bar, 31 px of height for
+        # one line of text and a distraction from the picture)
+        self._title_line = ""
         self._show_object_mark = True    # the top bar toggle; on by default
         self._frame_override = None  # Blink tab: fn() -> uint8 display
                                      # frame replacing the state's own
@@ -670,6 +674,52 @@ class UfeImageView(ChartView):
             painter.drawLine(0, y + dy, x - gap + dx, y + dy)
             painter.drawLine(x + gap + dx, y + dy, w, y + dy)
 
+    def set_title_line(self, text):
+        # The object this plate belongs to, drawn ON the plate: one line,
+        # top-left, dim, with a dark halo so it reads over the sky.
+        #
+        # It lives in the HUD and not in the window's layout on purpose:
+        # a row of its own cost 31 px of height and took the eye out of
+        # the picture. The object belongs to the image.
+        # @args: text - the line, or "" to clear it
+        # @return: None
+        self._title_line = str(text or "")
+        self.viewport().update()
+
+    def title_line(self):
+        # @return: the object's line currently shown ("" when none)
+        return self._title_line
+
+    def _paint_title(self, painter, w, h, k=1.0):
+        # @args: painter - device-coords painter, w/h - surface in device
+        #        px, k - export pixel ratio
+        # @return: True when something was drawn
+        if not self._title_line or not self._state.has_image:
+            return False
+        from PySide6.QtGui import QFont, QFontMetricsF
+        f = QFont(self._label_font) if hasattr(self, "_label_font") \
+            else QFont()
+        f.setPointSizeF((f.pointSizeF() or 9.0) + 1.0)
+        f.setBold(True)
+        fm = QFontMetricsF(f)
+        pad = 8.0 * k
+        text = fm.elidedText(self._title_line, Qt.ElideRight,
+                             max(60.0, w - 2 * pad))
+        rect = QRectF(pad, 4.0 * k, w - 2 * pad, fm.height() + 6 * k)
+        painter.save()
+        painter.setFont(f)
+        # a dark plaque under it: the same trick as the boxes, so a bright
+        # sky behind never eats the letters
+        plaque = QColor(0, 0, 0, 130)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(plaque))
+        painter.drawRoundedRect(rect.adjusted(-3 * k, -2 * k, 3 * k, 2 * k),
+                                3 * k, 3 * k)
+        painter.setPen(QPen(QColor(palette.FG)))
+        painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, text)
+        painter.restore()
+        return True
+
     def _paint_hud(self, painter, w, h, k=1.0):
         # @args: painter - device-coords painter, w, h - surface size in
         #        device px, k - export pixel ratio (1.0 on screen)
@@ -680,6 +730,8 @@ class UfeImageView(ChartView):
         # keeps its corners free.
         if not self._state.has_image:
             return
+        # the object's line first: it is the plate's own heading
+        self._paint_title(painter, w, h, k)
         boxes_on = self._paint_boxes(painter, w, h, k)
         if self._state.wcs is None:
             return

@@ -7723,7 +7723,11 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <source>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</source>
         <translation>La serie medida a tamaño completo, en el mismo sitio que la imagen. Se abre sola en cuanto termina una medida; la rueda hace zoom y el arrastre mueve la ventana</translation>
     </message>
-</context>
+
+    <message>
+        <source>Histogram</source>
+        <translation>Histograma</translation>
+    </message></context>
 <context>
     <name>UfeImageView</name>
     <message>

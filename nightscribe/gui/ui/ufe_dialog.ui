@@ -37,7 +37,6 @@
      <item><spacer name="hsp_bar_end"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
     </layout>
    </item>
-   <item><widget class="QLabel" name="lbl_object"><property name="text"><string/></property><property name="toolTip"><string>The object this editor was opened from</string></property><property name="visible"><bool>false</bool></property></widget></item>
    <item>
     <widget class="QSplitter" name="splitter">
      <property name="orientation"><enum>Qt::Horizontal</enum></property>

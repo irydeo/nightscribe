@@ -477,9 +477,9 @@ def test_set_object_fills_everything(dlg):
            "mag": 10.5, "bv": 0.62}
     dlg.set_object(obj)
     assert dlg.windowTitle() == "NightScribe Image Workbench · T CrB"
-    line = dlg.lbl_object.text()
+    line = dlg.view.title_line()
     assert "T CrB" in line and "RA" in line and "mag 10.50" in line
-    assert dlg.lbl_object.isVisible()
+    assert dlg.view.title_line()
     assert dlg.tab_blink.edt_name.text() == "T CrB"
     assert dlg.tab_blink.chk_manual.isChecked()
     assert dlg.tab_compare.edt_target.text() == "T CrB"
@@ -494,10 +494,10 @@ def test_object_survives_a_plate_load_and_clears_adhoc(dlg):
     dlg.open_plate(str(MONO))
     assert "T CrB" in dlg.windowTitle()          # the object stays
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
-    assert dlg.lbl_object.isVisible()
+    assert dlg.view.title_line()
     dlg.set_object(None)                          # the ad-hoc open
     assert dlg.object() is None
-    assert not dlg.lbl_object.isVisible()
+    assert not dlg.view.title_line()
     assert "T CrB" not in dlg.windowTitle()
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
 

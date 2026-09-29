@@ -7723,7 +7723,11 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <source>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</source>
         <translation>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</translation>
     </message>
-</context>
+
+    <message>
+        <source>Histogram</source>
+        <translation>Histogram</translation>
+    </message></context>
 <context>
     <name>UfeImageView</name>
     <message>

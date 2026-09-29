@@ -183,9 +183,16 @@ class HistogramWidget(QFrame):
         self._state = state
         self._ui_sync = False          # guards spinboxes during mirroring
         self.setFrameShape(QFrame.StyledPanel)
-        # never fixed: the controls column (black/white/gamma/buttons/keep)
-        # must get its natural height in every language and font size
-        self.setMinimumHeight(175)
+        # Two rows of controls instead of six stacked ones: the strip sits
+        # at the bottom of the editor, and a column 175 px tall was taking
+        # a fifth of the window for what fits in two lines. The height is
+        # a range on purpose: enough for the two rows in any language, and
+        # never able to grow into the image's space.
+        self.setMinimumHeight(88)
+        # 96 px + the fold section's header (~25) keeps the whole strip
+        # under 121 px: a fifth of a 1000 px window is the most it is
+        # allowed to want
+        self.setMaximumHeight(96)
         lay = QHBoxLayout(self)
         self.canvas = _HistogramCanvas(state)
         lay.addWidget(self.canvas, 1)
@@ -195,36 +202,42 @@ class HistogramWidget(QFrame):
         self._set_enabled(False)
 
     def _build_controls(self):
-        # @return: the right-hand controls column (DN spins, gamma,
-        #          Auto, Invert)
+        # @return: the controls block, TWO rows: the stretch on the left,
+        #          the display toggles on the right.
+        #
+        # It used to be a column of six rows (black, white, gamma, the
+        # two buttons, the mirror, the keep checkbox) which is what made
+        # the whole strip 175 px tall. Same controls, same order of
+        # reading, half the height.
         col = QVBoxLayout()
-        self.spn_black = self._dn_spin(self.tr("Black:"), col)
-        self.spn_white = self._dn_spin(self.tr("White:"), col)
-        row_g = QHBoxLayout()
-        row_g.addWidget(QLabel(self.tr("Gamma:")))
+        col.setSpacing(4)
+        row_1 = QHBoxLayout()
+        row_1.setSpacing(6)
+        self.spn_black = self._dn_spin(self.tr("Black:"), row_1)
+        self.spn_white = self._dn_spin(self.tr("White:"), row_1)
+        row_1.addWidget(QLabel(self.tr("Gamma:")))
         self.spn_gamma = QDoubleSpinBox()
         self.spn_gamma.setRange(0.05, 10.0)
         self.spn_gamma.setSingleStep(0.05)
         self.spn_gamma.setDecimals(2)
         self.spn_gamma.setValue(1.0)
         self.spn_gamma.valueChanged.connect(self._on_gamma_edited)
-        row_g.addWidget(self.spn_gamma)
-        col.addLayout(row_g)
-        row_b = QHBoxLayout()
+        row_1.addWidget(self.spn_gamma)
+        col.addLayout(row_1)
+        row_2 = QHBoxLayout()
+        row_2.setSpacing(6)
         self.btn_auto = QPushButton(self.tr("Auto"))
         self.btn_auto.setToolTip(self.tr(
             "Black and white at the 1 / 99.5 percentiles"))
         self.btn_auto.clicked.connect(lambda: self._state.auto())
-        row_b.addWidget(self.btn_auto)
+        row_2.addWidget(self.btn_auto)
         self.btn_invert = QPushButton(self.tr("Invert"))
         self.btn_invert.setCheckable(True)
         self.btn_invert.toggled.connect(self._on_invert_toggled)
-        row_b.addWidget(self.btn_invert)
-        col.addLayout(row_b)
+        row_2.addWidget(self.btn_invert)
         # orientation (E6): mirror the PICTURE to match someone else's
         # chart or a finder, without ever touching the plate's pixels
-        row_o = QHBoxLayout()
-        row_o.addWidget(QLabel(self.tr("Mirror:")))
+        row_2.addWidget(QLabel(self.tr("Mirror:")))
         self.btn_flip_h = QPushButton(self.tr("Left-right"))
         self.btn_flip_h.setCheckable(True)
         self.btn_flip_h.setToolTip(self.tr(
@@ -233,7 +246,7 @@ class HistogramWidget(QFrame):
             "what you see turns."))
         self.btn_flip_h.toggled.connect(
             lambda c: self._on_flip_toggled("h", c))
-        row_o.addWidget(self.btn_flip_h)
+        row_2.addWidget(self.btn_flip_h)
         self.btn_flip_v = QPushButton(self.tr("Up-down"))
         self.btn_flip_v.setCheckable(True)
         self.btn_flip_v.setToolTip(self.tr(
@@ -241,27 +254,25 @@ class HistogramWidget(QFrame):
             "the measurements do not move)."))
         self.btn_flip_v.toggled.connect(
             lambda c: self._on_flip_toggled("v", c))
-        row_o.addWidget(self.btn_flip_v)
-        col.addLayout(row_o)
+        row_2.addWidget(self.btn_flip_v)
+        col.addLayout(row_2)
         self.chk_keep = QCheckBox(self.tr("Keep stretch on load"))
         self.chk_keep.setToolTip(self.tr(
             "The next plate keeps these black, white, gamma and invert "
             "values instead of the auto percentiles"))
         self.chk_keep.toggled.connect(
             lambda checked: setattr(self._state, "keep_stretch", checked))
-        col.addWidget(self.chk_keep)
+        row_2.addWidget(self.chk_keep)
         return col
 
-    def _dn_spin(self, label, col):
-        # @args: label - the row caption, col - the controls column layout
+    def _dn_spin(self, label, row):
+        # @args: label - the row caption, row - the row's layout
         # @return: the QDoubleSpinBox, already parked and wired
-        row = QHBoxLayout()
         row.addWidget(QLabel(label))
         spn = QDoubleSpinBox()
         spn.setKeyboardTracking(False)   # fire on commit, not per keystroke
         spn.setAccessibleName(label.rstrip(":"))
         row.addWidget(spn)
-        col.addLayout(row)
         spn.valueChanged.connect(self._on_dn_edited)
         return spn
 

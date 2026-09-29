@@ -6106,8 +6106,12 @@ class MainWindow(QMainWindow):
         ctx = p["context"]
         camp = _series.analyze_campaign(
             camp_pts, sn_type=ctx.get("sn_type") or ctx.get("otype"))
+        used = camp.get("points", len(camp_pts))
         text = self.tr("{n} nights · {p} points").format(
-            n=camp.get("nights", 0), p=len(camp_pts))
+            n=camp.get("nights", 0), p=used)
+        skipped = len(camp_pts) - used
+        if skipped > 0:
+            text += self.tr(" · {0} without magnitude ignored").format(skipped)
         slope = camp.get("slope_mag_per_day")
         if slope is not None:
             text += self.tr(" · {:.2f} mag/day").format(slope)

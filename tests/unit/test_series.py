@@ -260,3 +260,26 @@ def test_quicklook_auto_peak():
     ]
     s = analyze_campaign(points, sn_type="SN Ia")
     assert s["delta_from_peak"] is not None
+
+
+def test_analyze_campaign_ignores_points_without_magnitude():
+    # regression: a saved point may carry mag=None (rejected measure,
+    # imported row); comparing it with a float used to break the Analysis
+    # tab on its first open
+    points = [
+        {"mjd": 60000.0, "mag": None, "err": 0.02, "filter": "Clear"},
+        {"mjd": 60002.0, "mag": "16.40", "err": 0.02, "filter": "Clear"},
+        {"mjd": 60004.0, "mag": 16.90, "err": 0.02, "filter": "Clear"},
+        {"mjd": None, "mag": 16.0, "err": 0.02, "filter": "Clear"},
+    ]
+    s = analyze_campaign(points, sn_type="SN Ia")
+    assert s["verdict"] != "no_data"
+    assert s["nights"] == 2
+    assert s["points"] == 2
+    assert s["slope_mag_per_day"] > 0
+
+
+def test_analyze_campaign_all_without_magnitude_is_no_data():
+    s = analyze_campaign([{"mjd": 1.0, "mag": None},
+                          {"mjd": 2.0, "mag": "x"}])
+    assert s["verdict"] == "no_data" and s["points"] == 0

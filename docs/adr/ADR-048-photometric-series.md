@@ -612,3 +612,19 @@ the frames. `QUALITY_MIN` is gone as a gate and `register.trusted` takes its pla
 The regression fixture (`tests/data/v0526per/`, 8 cropped real frames) keeps the
 case from coming back.
 
+
+**Revisión (2026-09-29, puntos sin magnitud)**: el resumen de campaña del Análisis
+pasaba a `analyze_campaign` todos los puntos guardados, y un punto con `mag = None`
+(una medida rechazada, importada o a mano) rompía la pestaña en su primera apertura
+(`min()` comparaba `None` con `float`). Ahora `analyze_campaign` se queda con los
+puntos que tienen `mjd` y `mag` numéricos, devuelve `no_data` si no queda ninguno y
+cuenta los usados (`points`); el resumen dice cuántos se ignoraron. Ninguna fila
+mala tumba ya la página.
+
+**Revision (2026-09-29, points without a magnitude)**: the Analysis campaign summary
+fed `analyze_campaign` every saved point, and a point with `mag = None` (a rejected
+measure, an imported row, a hand entry) broke the tab on its first open (`min()`
+compared `None` with `float`). `analyze_campaign` now keeps only the points with a
+numeric `mjd` and `mag`, returns `no_data` when none is left and reports the used
+count (`points`); the summary says how many were ignored. No bad row breaks the page
+anymore.

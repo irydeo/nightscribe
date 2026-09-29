@@ -43,6 +43,16 @@ from . import wcs as wcs_mod
 
 logger = logging.getLogger(__name__)
 
+
+def _num(value):
+    # @args: value - anything from a DB row
+    # @return: float, or None when it is not a usable number (a stored
+    #          point may carry a NULL magnitude)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
 # Default aperture radii (pixels). The SN is a point source on a stacked
 # image: a moderate aperture captures most of the PSF; the annulus
 # estimates the local sky without being so wide it hits a neighbour.
@@ -340,10 +350,24 @@ def analyze_campaign(points, sn_type=None, peak_mjd=None, peak_mag=None):
     # @args: points - list of {mjd, mag, err, filter} (differential or imported),
     #        sn_type - for the template verdict,
     #        peak_mjd/mag - to compute Δmag-from-peak; auto if None
-    # @return: dict {slope_mag_per_day, delta_from_peak, nights, verdict}
+    # @return: dict {slope_mag_per_day, delta_from_peak, nights, points, verdict}
+    # A saved point may carry no magnitude (a rejected measure, an imported
+    # row, a hand entry): comparing None with a float would raise, and the
+    # campaign line lives in the Analysis tab, so one bad row used to break
+    # the whole page. Keep only the usable points and report the rest away.
+    usable = []
+    for p in points or []:
+        mjd = _num(p.get("mjd"))
+        mag = _num(p.get("mag"))
+        if mjd is None or mag is None:
+            continue
+        q = dict(p)
+        q["mjd"], q["mag"] = mjd, mag
+        usable.append(q)
+    points = usable
     if not points:
         return {"slope_mag_per_day": None, "delta_from_peak": None,
-                "nights": 0, "verdict": "no_data"}
+                "nights": 0, "points": 0, "verdict": "no_data"}
     # auto-peak: brightest (lowest mag) point
     if peak_mjd is None or peak_mag is None:
         brightest = min(points, key=lambda p: p["mag"])
@@ -386,6 +410,7 @@ def analyze_campaign(points, sn_type=None, peak_mjd=None, peak_mag=None):
     return {"slope_mag_per_day": float(slope),
             "delta_from_peak": delta_from_peak,
             "nights": nights,
+            "points": len(points),
             "verdict": verdict,
             "filter": main_filt}
 

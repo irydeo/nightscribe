@@ -131,6 +131,16 @@ class ChartView(QGraphicsView):
         for it in reversed(self._items_registered):
             self._scene.removeItem(it)
         self._items_registered = []
+        # The hover tooltip is NOT registered with add_item (it is added
+        # straight to the scene, because it lives above everything and no
+        # subclass should ever clear it by accident). Forgetting its
+        # reference without taking it out of the scene left an ORPHAN: a
+        # chart that rebuilds on every click grew one frozen tooltip per
+        # click, with no way to remove them (measured: 1 -> 5 in four
+        # clicks). It is removed here, and then forgotten.
+        for it in (self._tooltip, self._tip_panel):
+            if it is not None and it.scene() is self._scene:
+                self._scene.removeItem(it)
         self._tooltip = None
         self._tip_panel = None
         self._scene_rect_hint = None

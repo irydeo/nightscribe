@@ -289,8 +289,14 @@ class LightCurveChart(ChartView):
     def mousePressEvent(self, event):
         # The left button starts a WINDOW drag (the base's hand-drag scrolls
         # the view, which is not the same thing and would fight this one).
+        #
+        # A click also takes the hover tooltip away: the observer is
+        # DECIDING something (selecting a point, marking it), and leaving
+        # the bubble pinned over the curve makes a decision look like a
+        # note that got stuck there (reported as "annotations that stack").
         if event.button() == Qt.LeftButton and not self._embedded:
             self._pan_from = event.position().toPoint()
+            self._hide_tooltip()
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):

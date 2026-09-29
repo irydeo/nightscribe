@@ -955,3 +955,68 @@ def test_the_time_labels_get_room_to_breathe():
     spacing = [b - a for a, b in zip(gaps, gaps[1:])]
     if spacing:
         assert min(spacing) > max(widths)      # never overlapping
+
+
+# ---------------- the tooltip must not be left behind (report) --------
+
+def _tooltip_items(chart):
+    # @return: the hover bubbles still in the scene. They are the only
+    #          MULTI-LINE text items on the chart (the axis note also says
+    #          "MJD", so the line break is what tells them apart).
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    return [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsSimpleTextItem)
+            and "\n" in it.text() and "MJD" in it.text()]
+
+
+def test_a_clicking_session_never_leaves_bubbles_behind():
+    # Reported: "if I click a point an annotation with its MJD and mag gets
+    # pinned, and clicking again piles another one up, with no way to remove
+    # them". It was the hover bubble: `clear()` (which runs on EVERY rebuild,
+    # i.e. on every click) dropped its reference without taking it out of
+    # the scene, because the bubble is added straight to the scene and not
+    # through the registered add_item. Measured before the fix: one orphan
+    # per click (1 -> 2 -> 3 -> 4).
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve(30))
+    for n in range(4):
+        chart._show_tooltip(QPointF(200.0, 200.0),
+                            ["MJD 60600.%02d · mag 12.34" % n, "V · Series"])
+        chart._build_scene()             # what a click does
+    assert _tooltip_items(chart) == []   # nothing was left behind
+
+
+def test_a_click_takes_the_bubble_away():
+    # A click is a DECISION (select this point); leaving the bubble pinned
+    # over the curve makes a decision look like a note stuck there.
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QMouseEvent
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve(30))
+    chart._show_tooltip(QPointF(150.0, 150.0), ["MJD 60600.01 · mag 12.34"])
+    assert chart._tooltip is not None
+    press = QMouseEvent(QEvent.MouseButtonPress, QPointF(400.0, 200.0),
+                        QPointF(400.0, 200.0), Qt.LeftButton,
+                        Qt.LeftButton, Qt.NoModifier)
+    chart.mousePressEvent(press)
+    assert chart._tooltip is None
+    assert _tooltip_items(chart) == []
+
+
+def test_clearing_a_chart_takes_the_bubble_out_of_the_scene():
+    # The base class contract: clear() leaves no item behind, registered or
+    # not.
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve(5))
+    chart._show_tooltip(QPointF(100.0, 100.0), ["MJD 1 · mag 2"])
+    assert chart._tooltip is not None
+    chart.clear()
+    assert chart._tooltip is None
+    assert chart._tip_panel is None
+    assert _tooltip_items(chart) == []

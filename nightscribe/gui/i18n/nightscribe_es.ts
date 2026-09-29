@@ -9315,4 +9315,8 @@ tocan.</translation>
     <message>
         <source>Mark the points that do not belong, and leave them out: marked, never deleted</source>
         <translation>Marca los puntos que no encajan y déjalos fuera: marcados, nunca borrados</translation>
+    </message>
+    <message>
+        <source>Window of the moving average, in plotted points (on by default: the trend is the first thing to read, and the raw points stay on the chart)</source>
+        <translation>Ventana de la media móvil, en puntos dibujados (encendida por defecto: la tendencia es lo primero que se lee, y los puntos crudos siguen en el gráfico)</translation>
     </message></context></TS>

@@ -1020,3 +1020,82 @@ def test_clearing_a_chart_takes_the_bubble_out_of_the_scene():
     assert chart._tooltip is None
     assert chart._tip_panel is None
     assert _tooltip_items(chart) == []
+
+
+# ---------------- F: the chart's reading order (report)---------------
+
+def _items_by_z(chart, z):
+    from PySide6.QtWidgets import QGraphicsLineItem
+    return [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsLineItem)
+            and abs(it.zValue() - z) < 1e-6]
+
+
+def test_the_trend_is_the_one_bright_line():
+    # Reported: "everything is monotonous and the same colour". The trend
+    # used to be painted in the BAND's colour, 1.6 px, UNDER the points
+    # (z 1.9 against the data's 2.0). Now it is the app's ink, wider, and
+    # above every measurement.
+    from nightscribe.gui.widgets.lightcurve_widget import _Z_DATA, _Z_MEAN
+    from nightscribe.viz import palette
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve(20))
+    chart.set_mean_curve(5)
+    assert _Z_MEAN > _Z_DATA                     # the reading order
+    trend = _items_by_z(chart, _Z_MEAN)
+    assert trend
+    pales = {it.pen().color().name() for it in trend}
+    # the ink and its dark halo, and nothing else in the band's colour
+    assert palette.FG.lower() in pales
+    assert pales <= {palette.FG.lower(), palette.BG.lower()}
+    assert any(it.pen().color().name() == palette.FG.lower()
+               and it.pen().widthF() >= 2.0 for it in trend)
+
+
+def test_the_error_bars_are_quiet_and_behind_the_points():
+    # A fence of bars in the series colour was painted ON TOP of the
+    # measurements (z 3.0 against the data's 2.0). The error is context: it
+    # goes grey, thin, and behind.
+    from nightscribe.gui.widgets.lightcurve_widget import _Z_DATA, _Z_ERROR
+    from nightscribe.viz import palette
+    _app()
+    chart = LightCurveChart()
+    chart.set_data([{"mjd": 60600.0 + 0.01 * i, "mag": 12.34,
+                     "err": 0.08, "err_internal": 0.2, "filter": "V",
+                     "source": "measure", "flags": []} for i in range(8)])
+    chart.set_errors_visible(True)
+    assert _Z_ERROR < _Z_DATA
+    bars = _items_by_z(chart, _Z_ERROR)
+    assert bars
+    for it in bars:
+        assert it.pen().color().name() == palette.MUTED.lower()
+        assert it.pen().color().alpha() < 140        # quiet
+        assert it.pen().widthF() <= 0.7
+
+
+def test_the_links_are_rounded_and_faint():
+    # "Soften the joins": the line between measurements guides the eye and
+    # never competes with them.
+    from PySide6.QtCore import Qt
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve(10))
+    pen = chart._link_pen("measure", "V")
+    assert pen.joinStyle() == Qt.RoundJoin
+    assert pen.capStyle() == Qt.RoundCap
+    assert 100 <= pen.color().alpha() <= 180
+    assert pen.widthF() <= 1.0
+
+
+def test_the_smoothed_trend_never_invents_a_peak():
+    # A guide that overshoots is a guide that lies: a monotone cubic stays
+    # between the values it interpolates, so a step does not become a spike.
+    from nightscribe.gui.widgets.lightcurve_widget import _monotone_points
+    pts = [(0.0, 100.0), (1.0, 100.0), (2.0, 40.0), (3.0, 40.0), (4.0, 40.0)]
+    ys = [y for _x, y in _monotone_points(pts)]
+    assert min(ys) >= 40.0 - 1e-9
+    assert max(ys) <= 100.0 + 1e-9
+    # and a two-point trend is left alone (nothing to smooth)
+    assert _monotone_points([(0.0, 1.0), (1.0, 2.0)]) == [(0.0, 1.0),
+                                                          (1.0, 2.0)]

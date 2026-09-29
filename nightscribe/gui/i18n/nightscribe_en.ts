@@ -9315,4 +9315,8 @@ not touched.</translation>
     <message>
         <source>Mark the points that do not belong, and leave them out: marked, never deleted</source>
         <translation>Mark the points that do not belong, and leave them out: marked, never deleted</translation>
+    </message>
+    <message>
+        <source>Window of the moving average, in plotted points (on by default: the trend is the first thing to read, and the raw points stay on the chart)</source>
+        <translation>Window of the moving average, in plotted points (on by default: the trend is the first thing to read, and the raw points stay on the chart)</translation>
     </message></context></TS>

@@ -39,13 +39,24 @@ from ...core import sn_templates, ticks
 from ...viz import palette
 from .base_chart import ChartView
 
-# Scene z-order (higher = drawn on top)
+# Scene z-order (higher = drawn on top).
+#
+# The order is the reading order, and it was wrong: the error bars sat on
+# TOP of the points (3.0 against the data's 2.0) and the trend line under
+# them (1.9), so a chart looked like a fence of error bars with the two
+# things that matter buried under it. Now:
+#
+#   grid < calibration bands < error bars < links < points < TREND < labels
+#
+# The error is context and it goes behind; the measurements carry the
+# colour of their band; and the trend is the one bright line, on top.
 _Z_GRID = 0.0
 _Z_SYSTEM = 0.5
+_Z_ERROR = 0.8
 _Z_TEMPLATE = 1.0
 _Z_LINK = 1.5
 _Z_DATA = 2.0
-_Z_ERROR = 3.0
+_Z_MEAN = 2.6
 _Z_LABEL = 4.0
 
 # Font sizes in PIXELS, not in scene units: the scene is fitted to the
@@ -89,6 +100,13 @@ _ROBUST_K = 6.0
 _MIN_WINDOW = 0.05          # mag: never a degenerate window
 _PAD = 0.10                 # 10 % of the window as air
 
+# How opaque a filled marker is: enough to read the band's colour, a hair
+# short of solid so a dense cloud keeps its texture
+_POINT_ALPHA = 0.92
+
+# How opaque the line between measurements is: a guide for the eye
+_LINK_ALPHA = 0.55
+
 # A bar taller than this share of the half-height carries no information at
 # the plot's scale (a bad calibration says so in the legend, not by
 # painting over everything) and is clipped.
@@ -110,6 +128,55 @@ _BAR_CLIP = 0.12
 #     trend) travel together because both are differences now.
 MAG_CALIBRATED = "calibrated"
 MAG_DIFFERENTIAL = "differential"
+
+
+def _monotone_points(pts, steps=8):
+    # The trend line as a smooth path through its own points.
+    #
+    # A monotone cubic (Fritsch-Carlson) is the ONE interpolation that
+    # cannot overshoot: between two samples it stays inside their values, so
+    # a smoothed night never shows a peak that was not measured. A plain
+    # cubic spline would, and a light curve is not a place for decoration.
+    #
+    # @args: pts - [(x, y)] in SCENE coordinates, steps - points per span
+    # @return: [(x, y)] with `steps` interpolated points per span
+    n = len(pts)
+    if n < 3:
+        return list(pts)
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    # secants between consecutive samples
+    dx = [xs[i + 1] - xs[i] for i in range(n - 1)]
+    dy = [ys[i + 1] - ys[i] for i in range(n - 1)]
+    slope = [(dy[i] / dx[i]) if dx[i] else 0.0 for i in range(n - 1)]
+    # tangents: the average of the neighbouring secants, clamped so the
+    # curve stays monotone around each sample (the Fritsch-Carlson rule)
+    tang = [slope[0]] + [(slope[i - 1] + slope[i]) / 2.0
+                         for i in range(1, n - 1)] + [slope[-1]]
+    for i in range(n - 1):
+        if slope[i] == 0.0:
+            tang[i] = tang[i + 1] = 0.0
+            continue
+        a, b = tang[i] / slope[i], tang[i + 1] / slope[i]
+        mag = a * a + b * b
+        if mag > 9.0:                       # beyond this the curve wiggles
+            scale = 3.0 / math.sqrt(mag)
+            tang[i] = scale * a * slope[i]
+            tang[i + 1] = scale * b * slope[i]
+    out = []
+    for i in range(n - 1):
+        h = dx[i]
+        for k in range(steps):
+            t = k / float(steps)
+            t2, t3 = t * t, t * t * t
+            # Hermite basis: exact at both ends, tangents as chosen
+            y = ((2 * t3 - 3 * t2 + 1) * ys[i]
+                 + (t3 - 2 * t2 + t) * h * tang[i]
+                 + (-2 * t3 + 3 * t2) * ys[i + 1]
+                 + (t3 - t2) * h * tang[i + 1])
+            out.append((xs[i] + t * h, y))
+    out.append(pts[-1])
+    return out
 
 
 def _series_style(src_class):
@@ -1193,7 +1260,12 @@ class LightCurveChart(ChartView):
         # @return: the item, already added to the scene
         item = QGraphicsEllipseItem(x - radius, y - radius,
                                     radius * 2, radius * 2)
-        item.setBrush(QBrush(colour if filled else QColor(palette.BG)))
+        brush = QColor(colour)
+        if filled:
+            # a hair of transparency: a dense night does not become a solid
+            # mass, and the grid behind it stays readable
+            brush.setAlphaF(_POINT_ALPHA)
+        item.setBrush(QBrush(brush if filled else QColor(palette.BG)))
         # a filled point gets a thin dark edge: it separates it from the
         # background and from its neighbours in a dense cloud, which is
         # what makes a scatter read as measurements instead of smudges
@@ -1252,7 +1324,7 @@ class LightCurveChart(ChartView):
                     if off:
                         self._over_note += 1
                     colour, filled = _point_style(p)
-                    radius = 4.6
+                    radius = 4.2
                     if excluded:
                         # out of the curve but ON the chart: a grey cross,
                         # never a silent deletion
@@ -1290,8 +1362,13 @@ class LightCurveChart(ChartView):
                             self.add_item(ring)
                     err = self._bar_error(p) if self._show_errors else None
                     if err is not None and span > 0.0:
-                        self._draw_error_bar(x, y_draw, err, span, colour,
-                                             alpha=faded)
+                        # the error is CONTEXT, not data: a muted, thin bar
+                        # behind the points (it used to be painted in the
+                        # series colour ON TOP of them, and a chart of
+                        # hundredths turned into a fence of bars)
+                        self._draw_error_bar(x, y_draw, err, span,
+                                             QColor(palette.MUTED),
+                                             alpha=0.35 * faded)
             # 2. the binned means (in front, one dot per group)
             for q in binned:
                 x = self._map_x(q["mjd"])
@@ -1301,8 +1378,8 @@ class LightCurveChart(ChartView):
                 self._dot(x, y_draw, 3.8, colour, filled=True, width=0.8,
                           z=_Z_DATA + 0.5)
                 if self._show_errors and q["err"] and span > 0.0:
-                    self._draw_error_bar(x, y_draw, q["err"], span, colour,
-                                         alpha=1.0)
+                    self._draw_error_bar(x, y_draw, q["err"], span,
+                                         QColor(palette.MUTED), alpha=0.35)
             # 3. the mean curve (a guide for the eye, drawn last)
             if self._mean_window:
                 series = [{"mjd": q["mjd"], "mag": q["mag"]}
@@ -1364,7 +1441,7 @@ class LightCurveChart(ChartView):
         if ey > clip:
             ey = clip
             self._clip_note += 1
-        pen = QPen(colour, 0.8)
+        pen = QPen(colour, 0.6)
         pen.setColor(QColor(colour.red(), colour.green(), colour.blue(),
                             int(255 * alpha)))
         bar = QGraphicsLineItem(x, y - ey, x, y + ey)
@@ -1374,30 +1451,43 @@ class LightCurveChart(ChartView):
         # caps: the small horizontal strokes that make an error bar a
         # measurement instead of a line
         for yy in (y - ey, y + ey):
-            cap = QGraphicsLineItem(x - 2.2, yy, x + 2.2, yy)
+            cap = QGraphicsLineItem(x - 1.8, yy, x + 1.8, yy)
             cap.setPen(pen)
             cap.setZValue(_Z_ERROR)
             self.add_item(cap)
 
     def _draw_mean_curve(self, smooth, band, src):
-        # The moving average, with a white halo under it so it reads on
-        # top of a dense cloud of points (the trick the Photometrica tool
-        # uses; it costs one extra pass and saves the eye).
-        # @args: smooth - [(mjd, mag)], band/src - the series it belongs to
+        # THE TREND: the one line that has to stand out (the observer's
+        # ask, after seeing a chart where everything - points, links, trend
+        # and error bars - was the same blue).
+        #
+        # It is drawn in the app's INK (palette.FG), 2.4 px over a dark
+        # halo, above every measurement, and smoothed with a monotone
+        # cubic: the eye follows the shape of a small-amplitude night
+        # without reading the noise.
+        #
+        # Two honest properties, and both are tested:
+        #   * the trend is a GUIDE, never a measurement: the raw points stay
+        #     on the chart and the notes say what the line is;
+        #   * the monotone interpolation cannot overshoot: between two
+        #     points it never goes outside their own values, which is the
+        #     difference between smoothing a curve and inventing peaks.
+        # @args: smooth - [(mjd, mag)] of the moving average, band/src -
+        #        the series it belongs to (kept for the report)
         if len(smooth) < 2:
             return
-        colour, _filled = _point_style({"filter": band, "source": src})
         pts = [(self._map_x(mjd), self._map_y(mag)) for mjd, mag in smooth]
-        for width, pen_colour in ((3.2, QColor(palette.BG)),
-                                  (1.6, colour)):
+        path = _monotone_points(pts)
+        for width, pen_colour in ((4.0, QColor(palette.BG)),
+                                  (2.4, QColor(palette.FG))):
             pen = QPen(pen_colour, width)
             pen.setCapStyle(Qt.RoundCap)
             pen.setJoinStyle(Qt.RoundJoin)
-            for i in range(len(pts) - 1):
-                line = QGraphicsLineItem(pts[i][0], pts[i][1],
-                                          pts[i + 1][0], pts[i + 1][1])
+            for i in range(len(path) - 1):
+                line = QGraphicsLineItem(path[i][0], path[i][1],
+                                         path[i + 1][0], path[i + 1][1])
                 line.setPen(pen)
-                line.setZValue(_Z_LINK + 0.4)
+                line.setZValue(_Z_MEAN)
                 self.add_item(line)
 
 
@@ -1407,7 +1497,14 @@ class LightCurveChart(ChartView):
         #          dashed for quick-look and survey (mirrors the PNG)
         colour, _filled = _point_style(
             {"filter": band, "source": source, "mjd": 0, "mag": 0})
-        pen = QPen(colour, 1.1)
+        # a whisper, not a fence: the line guides the eye between the
+        # measurements and never competes with them, and its joins are
+        # rounded so a light curve reads as a curve
+        pen = QPen(colour, 0.9)
+        pen.setColor(QColor(colour.red(), colour.green(), colour.blue(),
+                            int(255 * _LINK_ALPHA)))
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
         if (source or "manual").startswith("survey") or source == "quicklook":
             pen.setStyle(Qt.DashLine)
         return pen

@@ -1690,3 +1690,12 @@ def test_a_visit_without_points_opens_with_an_empty_chart(dlg):
     tab.set_visit_curve_hooks(lambda: [], None)
     assert tab.chart_series._points == []
     assert tab._curve_from_visit is False
+
+
+def test_the_trend_is_on_by_default(dlg):
+    # The observer's ask: the trend is the first thing to read on a curve.
+    # It comes on (window 5) and the raw points stay on the chart: nothing
+    # is hidden, and the panel's notes say the line is a guide.
+    tab = dlg.tab_measure
+    assert tab.chk_series_mean.isChecked()
+    assert tab.spn_series_meanwin.value() == 5

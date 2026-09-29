@@ -278,6 +278,90 @@ def set_run_status(db, run_id, status):
     return cur.rowcount > 0
 
 
+def save_pass(db, entries, cfg=None):
+    # A campaign pass writes ONE run per project (E5c).
+    #
+    # The frames, the comparison stars and the zero point were measured a
+    # single time; each project still receives its own run and its own
+    # points, because a project is one object and "undo this run" must
+    # undo exactly that object's curve. The shared facts (which pass this
+    # was, which other objects were measured with it) ride in the run's
+    # cfg echo, so the journal can say so without a schema change.
+    # @args: db - Database, entries - [{"project_id", "session_id", "rows",
+    #        "label"}], cfg - JSON-safe echo of the shared configuration
+    #        (it gets a "pass" block with the labels of the whole pass)
+    # @return: [{"project_id", "label", "run_id", "session_id", "points"}]
+    labels = [e.get("label") or "" for e in entries]
+    out = []
+    for entry in entries:
+        rows = list(entry.get("rows") or [])
+        echo = dict(cfg or {})
+        echo["pass"] = {"labels": [l for l in labels if l],
+                        "target": entry.get("label") or "",
+                        "campaign": echo.get("campaign")}
+        run_id = create_run(db, session_id=entry.get("session_id"),
+                            cfg=echo, status=entry.get("status")
+                            or "complete")
+        for r in rows:
+            r["project_id"] = entry["project_id"]
+            r["session_id"] = entry.get("session_id")
+            r["run_id"] = run_id
+        ids = add_points(db, rows) if rows else []
+        out.append({"project_id": entry["project_id"],
+                    "label": entry.get("label") or "",
+                    "run_id": run_id,
+                    "session_id": entry.get("session_id"),
+                    "points": len(ids)})
+    return out
+
+
+def share_frames(db, paths, projects, obs_date=None, notes="", meta=None):
+    # The same frames in every project of a pass (E5c).
+    #
+    # A pass measures one set of files for several objects, and a visit is
+    # a night of ONE project: so each of those projects gets its own visit
+    # that night, holding those very files. Nothing is copied: the paths
+    # are registered, exactly as if the observer had attached them by hand
+    # in each project.
+    #
+    # A project that already has a visit with those frames reuses it (that
+    # is the point of a pass: measuring what was already filed).
+    # @args: db - Database, paths - the frames of the pass, projects -
+    #        [{"project_id"} | {"id"}] of the projects that will hold them,
+    #        obs_date - the night (ISO date) for the visits it creates,
+    #        notes - the visit's note, meta - plate facts per path or None
+    # @return: {project_id: session_id}
+    from . import project as project_mod
+    out = {}
+    for p in projects or []:
+        pid = p.get("project_id") or p.get("id")
+        if pid is None:
+            continue
+        have = {}
+        for s in list_sessions(db, pid):
+            for f in project_mod.files_for_session(db, s["id"]):
+                if f.get("kind") == "fits" and f.get("path"):
+                    have[str(f["path"])] = s["id"]
+        wanted = [str(x) for x in paths or []]
+        session_id = next((have[w] for w in wanted if w in have), None)
+        if session_id is None:
+            session_id = create_session(db, pid, obs_date=obs_date,
+                                        notes=notes or "")
+        already = set()
+        for f in project_mod.files_for_session(db, session_id):
+            if f.get("kind") == "fits" and f.get("path"):
+                already.add(str(f["path"]))
+        facts = meta if isinstance(meta, dict) else {}
+        for path in wanted:
+            if path in already:
+                continue
+            project_mod.add_file(db, pid, path, "fits",
+                                 session_id=session_id,
+                                 meta=facts.get(path))
+        out[pid] = session_id
+    return out
+
+
 def add_points(db, rows):
     # Batch write of series points (ADR-048, D9/D18): one transaction for
     # a whole run. Each row is a dict with project_id, session_id, mjd,

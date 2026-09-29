@@ -385,10 +385,10 @@
            <item>
             <widget class="QPushButton" name="btn_series_sci">
              <property name="toolTip">
-              <string>Write the scientific figure of this curve: white background, black frame, ticks pointing inwards, error bars with caps and the magnitude axis on round numbers (the style a report or a colleague expects). It is the same data as the panel, drawn for paper</string>
+              <string>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</string>
              </property>
              <property name="text">
-              <string>Scientific chart (PNG)…</string>
+              <string>Save what you see (PNG)…</string>
              </property>
             </widget>
            </item>

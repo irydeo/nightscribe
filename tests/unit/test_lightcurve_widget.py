@@ -542,3 +542,150 @@ def test_the_legend_does_not_promise_a_series_that_is_not_drawn():
     chart.set_mag_mode("differential")
     texts = _scene_texts(chart)
     assert not any("Δ magnitude view" in t for t in texts)
+
+
+# ---------------- V3: the window, the wheel and the export ----------------
+
+def _curve(n=40, base=12.34):
+    return [{"mjd": 60600.0 + 0.01 * i, "mag": base + 0.004 * i,
+             "err": 0.01, "err_internal": 0.008, "filter": "V",
+             "source": "measure", "flags": []} for i in range(n)]
+
+
+def test_the_window_narrows_and_still_covers_the_data():
+    # Zooming is a change of WHAT PIECE of the curve is on screen, not a
+    # magnifying glass over the drawing: the frame and the labels stay put
+    # and the axis re-rounds its ticks.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    full = chart._bounds
+    scale_before = chart.transform().m11()
+    assert chart.zoom_window(2.0) is True
+    zoomed = chart._bounds
+    assert zoomed[1] - zoomed[0] < full[1] - full[0]
+    assert zoomed[3] - zoomed[2] < full[3] - full[2]
+    # the view is not magnified: the drawing keeps its size
+    assert chart.transform().m11() == scale_before
+    # the centre of the window stayed where it was (zoom about the middle)
+    assert (zoomed[0] + zoomed[1]) / 2 == pytest.approx(
+        (full[0] + full[1]) / 2, abs=1e-9)
+    assert chart.window() is not None
+
+
+def test_the_zoom_is_limited_so_the_curve_is_never_lost():
+    # The limits exist to keep the chart alive, not to decide for the
+    # observer: past them the window is refused and the chart stays as it
+    # was, instead of showing a piece of nothing.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    before = chart._bounds
+    assert chart.zoom_window(1e6) is False
+    assert chart._bounds == before
+    assert chart.zoom_window(0.0) is False
+    assert chart.zoom_window(-3.0) is False
+
+
+def test_a_fixed_magnitude_range_is_never_zoomed_away():
+    # The observer's own scale is a decision, not a view: the wheel takes
+    # the time axis and leaves the magnitudes where they were put.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    chart.set_y_range(12.34, 12.44)
+    chart.zoom_window(2.0)
+    assert chart._bounds[2] == pytest.approx(12.34)
+    assert chart._bounds[3] == pytest.approx(12.44)
+    assert chart._bounds[1] - chart._bounds[0] < 0.39      # time did zoom
+
+
+def test_the_wheel_and_the_drag_move_the_window():
+    # The two gestures of the group's tool: the wheel narrows around the
+    # cursor, the drag slides the window under the frame.
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import Qt
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    full = chart._bounds
+    press = QMouseEvent(QEvent.MouseButtonPress, QPointF(400.0, 200.0),
+                        QPointF(400.0, 200.0), Qt.LeftButton,
+                        Qt.LeftButton, Qt.NoModifier)
+    chart.mousePressEvent(press)
+    move = QMouseEvent(QEvent.MouseMove, QPointF(460.0, 200.0),
+                       QPointF(460.0, 200.0), Qt.NoButton,
+                       Qt.LeftButton, Qt.NoModifier)
+    chart.mouseMoveEvent(move)
+    release = QMouseEvent(QEvent.MouseButtonRelease, QPointF(460.0, 200.0),
+                          QPointF(460.0, 200.0), Qt.LeftButton,
+                          Qt.NoButton, Qt.NoModifier)
+    chart.mouseReleaseEvent(release)
+    assert chart.window() is not None
+    # dragging right takes the window back in time
+    assert chart._bounds[0] < full[0]
+
+
+def test_a_double_click_frames_the_whole_curve_again():
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    full = chart._bounds
+    chart.zoom_window(3.0)
+    assert chart.window() is not None
+    event = QMouseEvent(QEvent.MouseButtonDblClick, QPointF(450.0, 250.0),
+                        QPointF(450.0, 250.0), Qt.LeftButton,
+                        Qt.LeftButton, Qt.NoModifier)
+    chart.mouseDoubleClickEvent(event)
+    assert chart.window() is None
+    assert chart._bounds == full
+
+
+def test_a_new_series_gets_a_fresh_window_and_a_live_one_keeps_it():
+    # A different series deserves a fresh look; the live curve growing is
+    # the SAME series continuing, and resetting the zoom at every batch
+    # would take the observer's place away once a minute.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    chart.zoom_window(2.0)
+    win = chart.window()
+    assert win is not None
+    chart.set_data(_curve(45), keep_window=True)
+    assert chart.window() == win
+    chart.set_data(_curve(50))
+    assert chart.window() is None
+
+
+def test_the_export_carries_the_window_you_framed(tmp_path):
+    # "Save what you see" has to be true even zoomed in: the file is the
+    # chart's own visible view, marks and fixed range included.
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    whole = chart.export_png(tmp_path / "whole.png")
+    assert chart.zoom_window(4.0) is True
+    framed = chart.export_png(tmp_path / "framed.png")
+    assert whole.read_bytes() != framed.read_bytes()
+    # the axis in the file belongs to the FRAMED window: its ticks are the
+    # ones that window calls for, not the whole curve's. The expected ones
+    # come from the same planner the chart uses, so this checks that the
+    # export and the screen agree, not that a string looks a given way
+    # (values far from zero have their constant factored out and written
+    # once, which is the didactic style of core/ticks).
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    from nightscribe.core import ticks as ticks_mod
+    win = chart.window()
+    assert win[3] - win[2] < 0.05          # a four-times zoom of 0.14 mag
+    plan = ticks_mod.axis_plan(win[2], win[3], target=5)
+    labels = [it.text() for it in chart.scene().items()
+              if isinstance(it, QGraphicsSimpleTextItem)]
+    assert plan["labels"]
+    for lbl in plan["labels"]:
+        assert lbl in labels

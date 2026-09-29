@@ -31,7 +31,7 @@ from PySide6.QtGui import (QBrush, QColor, QPen, QFont, QPolygonF)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout,
                                 QGraphicsEllipseItem, QGraphicsLineItem,
                                 QGraphicsPolygonItem, QGraphicsRectItem,
-                                QGraphicsSimpleTextItem)
+                                QGraphicsSimpleTextItem, QGraphicsView)
 
 import numpy as np
 
@@ -172,6 +172,15 @@ class LightCurveChart(ChartView):
         self._mag_ref = None     # the level a differential axis counts
                                  # from (the measured series' robust median),
                                  # fixed when the data lands
+        # The window the observer is looking at, in DATA units, or None for
+        # "whatever the data wants" (see zoom_window). This is what the
+        # wheel moves: not a magnifying glass over the drawing, a narrower
+        # piece of the curve.
+        self._window = None
+        self._pan_from = None    # viewport point where the current drag began
+        # the window IS the pan: the base's hand-drag would also scroll the
+        # view, and two pans fighting over one drag is a bug
+        self.setDragMode(QGraphicsView.NoDrag)
         self._schematic = None
         self._bounds = None   # (x_min, x_max, mag_min, mag_max)
         self._tpl_visible = True   # template overlay: ON by default
@@ -200,13 +209,76 @@ class LightCurveChart(ChartView):
         self.scene_clicked.connect(self._on_scene_click)
 
     def mouseDoubleClickEvent(self, event):
-        # A double-click asks the host for a big view (the base has no
-        # fit-on-double-click, so nothing else is lost).
+        # A double-click frames the whole curve again: the quickest way back
+        # after wandering into the zoom, and what the group's tool does. The
+        # "show me this big" host signal is still emitted, because a chart
+        # embedded in a page has no other way to ask for it.
         if event.button() == Qt.LeftButton:
+            self.reset_view()
             self.enlarge_requested.emit()
             event.accept()
             return
         super().mouseDoubleClickEvent(event)
+
+    def wheelEvent(self, event):
+        # The wheel narrows the DATA window around the cursor (V3), which is
+        # not the same thing as magnifying the drawing: the labels keep
+        # their size, the axis re-rounds its ticks, and a hundredth of a
+        # magnitude becomes readable instead of growing into a blur.
+        #
+        # Shift narrows the time only and Ctrl the magnitude only: reading a
+        # small-amplitude curve means asking one of the two axes a question
+        # at a time. Embedded in a page the wheel belongs to the page (the
+        # base's rule, kept).
+        # @args: event - the QWheelEvent
+        # @return: None
+        if self._embedded or event.angleDelta().y() == 0:
+            event.ignore()
+            return
+        pos = self.mapToScene(event.position().toPoint())
+        x0, x1, y0, y1 = self._bounds
+        fx = (pos.x() + _HALF) / (2 * _HALF) if x1 > x0 else 0.5
+        # the magnitude axis is inverted on screen, so the fraction counts
+        # from the top (the window's y0) downwards
+        fy = (_HALF - pos.y()) / (2 * _HALF) if y1 > y0 else 0.5
+        axes = "both"
+        if event.modifiers() & Qt.ShiftModifier:
+            axes = "x"
+        elif event.modifiers() & Qt.ControlModifier:
+            axes = "y"
+        # 1.2 per notch: the group's own feel, and it is a good one (a
+        # quarter of the window per three notches, easy to land where you
+        # wanted)
+        factor = 1.2 if event.angleDelta().y() > 0 else 1.0 / 1.2
+        self.zoom_window(factor, fx, fy, axes=axes)
+        event.accept()
+
+    def mousePressEvent(self, event):
+        # The left button starts a WINDOW drag (the base's hand-drag scrolls
+        # the view, which is not the same thing and would fight this one).
+        if event.button() == Qt.LeftButton and not self._embedded:
+            self._pan_from = event.position().toPoint()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        # Dragging slides the window through the data: the frame stays and
+        # the curve moves under it. A press without motion is still a click
+        # (the base decides that on release, by distance).
+        if (self._pan_from is not None and not self._embedded
+                and event.buttons() & Qt.LeftButton):
+            pos = event.position().toPoint()
+            dx = pos.x() - self._pan_from.x()
+            dy = pos.y() - self._pan_from.y()
+            if dx or dy:
+                self._pan_from = pos
+                self.pan_window(dx, dy)
+                event.accept()
+                return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._pan_from = None
+        super().mouseReleaseEvent(event)
 
     def filter_label(self, filt):
         # @args: filt - filter name (None/"Clear"/"None" = the generic band)
@@ -399,7 +471,7 @@ class LightCurveChart(ChartView):
 
     def set_data(self, points, sn_type=None, peak_mjd=None, peak_mag=None,
                  fold_period_d=None, epoch_mjd=None, schematic=None,
-                 mag_mode=None):
+                 mag_mode=None, keep_window=False):
         # @args: points - list of {mjd, mag, err, filter, source} dicts,
         #        sn_type - for the template overlay, peak_mjd/mag - to align
         #        it, fold_period_d - pulsation period in days: folds the x
@@ -409,7 +481,9 @@ class LightCurveChart(ChartView):
         #        [(phase, mag)] reference curve drawn dashed (e.g. the
         #        hads.sawtooth_template — never real data), mag_mode -
         #        "calibrated" | "differential" (None keeps the current one):
-        #        which quantity the axis shows, see MAG_CALIBRATED above
+        #        which quantity the axis shows, see MAG_CALIBRATED above,
+        #        keep_window - True keeps the zoom the observer made (a
+        #        growing live curve is the same series continuing)
         # Replaces the current data and rebuilds the scene.
         self._points = sorted(points, key=lambda p: p["mjd"])
         self._sn_type = sn_type
@@ -420,6 +494,9 @@ class LightCurveChart(ChartView):
         self._schematic = schematic
         if mag_mode in (MAG_CALIBRATED, MAG_DIFFERENTIAL):
             self._mag_mode = mag_mode
+        if not keep_window:
+            # a different series deserves a fresh look, on the whole curve
+            self._window = None
         if fold_period_d and self._points and self._epoch is None:
             self._epoch = self._points[0]["mjd"]
         self._compute_bounds()
@@ -462,10 +539,12 @@ class LightCurveChart(ChartView):
             return
         lo, hi = self._mag_window(mags)
         if self._fold_p:
-            self._bounds = (0.0, 2.0, lo, hi)
+            self._bounds = self._window or (0.0, 2.0, lo, hi)
             return
         mjds = [p["mjd"] for p in self._points if p["mjd"] is not None]
-        self._bounds = (min(mjds), max(mjds), lo, hi)
+        self._bounds = self._window or (min(mjds), max(mjds), lo, hi)
+        if self._window is not None:
+            return
         # auto-peak: brightest point (lowest mag)
         if self._peak_mjd is None or self._peak_mag is None:
             brightest = min((p for p in self._points
@@ -628,6 +707,107 @@ class LightCurveChart(ChartView):
         self._build_scene()
         self.fit_to_scene()
         return True
+
+    def window(self):
+        # The piece of the curve on screen, in data units
+        # (x0, x1, y0, y1), or None when the chart is showing it all.
+        # @return: the window or None
+        return self._window
+
+    def zoom_window(self, factor, fx=None, fy=None, axes="both"):
+        # Narrows the DATA window around a point of the view.
+        #
+        # This is what the group's tool does, and it is not the same thing
+        # as magnifying the drawing: the labels keep their size, the axis
+        # re-rounds its ticks and a tenth of a magnitude can be read
+        # comfortably instead of growing into a blur. The chart is a
+        # measurement instrument, not a picture.
+        #
+        # A magnitude range fixed by hand is never zoomed away: that range
+        # is the observer's decision and it must not move under their feet.
+        # @args: factor - >1 zooms in (a narrower window), <1 zooms out;
+        #        fx/fy - the focal point as a fraction of the window
+        #        (0..1, the cursor), None = the centre; axes - "both" |
+        #        "x" | "y"
+        # @return: True when the window changed
+        try:
+            factor = float(factor)
+        except (TypeError, ValueError):
+            return False
+        if not math.isfinite(factor) or factor <= 0.0:
+            return False
+        if axes not in ("both", "x", "y"):
+            return False
+        x0, x1, y0, y1 = self._bounds
+        fx = 0.5 if fx is None else min(max(float(fx), 0.0), 1.0)
+        fy = 0.5 if fy is None else min(max(float(fy), 0.0), 1.0)
+        if axes in ("both", "x"):
+            span = (x1 - x0) / factor
+            x0, x1 = x0 + fx * (x1 - x0) - fx * span, \
+                x0 + fx * (x1 - x0) - fx * span + span
+        if axes in ("both", "y") and self._y_range is None:
+            span = (y1 - y0) / factor
+            y0, y1 = y0 + fy * (y1 - y0) - fy * span, \
+                y0 + fy * (y1 - y0) - fy * span + span
+        return self._set_window(x0, x1, y0, y1)
+
+    def pan_window(self, dx_px, dy_px):
+        # Slides the window through the data, the way a drag should: the
+        # frame stays put and the curve moves under it.
+        # @args: dx_px/dy_px - how far the cursor travelled, in screen px
+        # @return: True when the window changed
+        x0, x1, y0, y1 = self._bounds
+        scale = abs(self.transform().m11()) or 1.0
+        dx = (dx_px / scale) / (2 * _HALF) * (x1 - x0)
+        dy = (dy_px / scale) / (2 * _HALF) * (y1 - y0)
+        if dx == 0.0 and dy == 0.0:
+            return False
+        return self._set_window(x0 - dx, x1 - dx, y0 - dy, y1 - dy)
+
+    def _set_window(self, x0, x1, y0, y1):
+        # Clamps and installs a window. The limits are generous on purpose
+        # (a ten-thousandth of the data's own span, or twenty times it):
+        # they exist to keep the chart alive, not to decide for the
+        # observer. What the observer must be stopped from is losing the
+        # curve into a window with nothing in it.
+        # @return: True when the window was accepted
+        data = self._data_span()
+        if data is None:
+            return False
+        (dx, dy) = data
+        if not (x1 > x0 and y1 > y0):
+            return False
+        span_x, span_y = x1 - x0, y1 - y0
+        if (span_x < dx / 1e4 or span_x > dx * 20
+                or span_y < dy / 1e4 or span_y > dy * 20):
+            return False
+        self._window = (float(x0), float(x1), float(y0), float(y1))
+        self._compute_bounds()
+        self._build_scene()
+        return True
+
+    def _data_span(self):
+        # The span of the data itself (x and mag), the ruler the zoom
+        # limits are measured against.
+        # @return: (x_span, y_span) or None without data
+        if not self._points:
+            return None
+        xs = [p["mjd"] for p in self._points if p["mjd"] is not None]
+        mags = [v for v in (self._plot_mag(p) for p in self._points)
+                if v is not None]
+        if not xs or not mags:
+            return None
+        x_span = (max(xs) - min(xs)) or 1.0
+        y_span = (max(mags) - min(mags)) or _MIN_WINDOW
+        return (x_span, y_span)
+
+    def reset_view(self):
+        # Back to the whole curve (the "Fit" button, a double-click).
+        # @return: None
+        self._window = None
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
 
     def clear_y_range(self):
         # Back to the automatic (robust) window.

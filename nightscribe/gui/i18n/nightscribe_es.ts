@@ -3824,7 +3824,51 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <source>Pass saved. {0} project(s) stayed out of it: see the dialog.</source>
         <translation>Pasada guardada. {0} proyecto(s) quedaron fuera: ver el diálogo.</translation>
     </message>
-<message><source>none</source><translation>Ninguna</translation></message><message><source>minimal</source><translation>Mínima</translation></message><message><source>very low</source><translation>Muy baja</translation></message><message><source>low</source><translation>Baja</translation></message><message><source>med-low</source><translation>Med-baja</translation></message><message><source>med</source><translation>Media</translation></message><message><source>medium</source><translation>Media</translation></message><message><source>med-high</source><translation>Med-alta</translation></message><message><source>high</source><translation>Alta</translation></message><message><source>very high</source><translation>Muy alta</translation></message><message><source>critical</source><translation>Crítica</translation></message></context>
+
+    <message>
+        <source>none</source>
+        <translation>Ninguna</translation>
+    </message>
+    <message>
+        <source>minimal</source>
+        <translation>Mínima</translation>
+    </message>
+    <message>
+        <source>very low</source>
+        <translation>Muy baja</translation>
+    </message>
+    <message>
+        <source>low</source>
+        <translation>Baja</translation>
+    </message>
+    <message>
+        <source>med-low</source>
+        <translation>Med-baja</translation>
+    </message>
+    <message>
+        <source>med</source>
+        <translation>Media</translation>
+    </message>
+    <message>
+        <source>medium</source>
+        <translation>Media</translation>
+    </message>
+    <message>
+        <source>med-high</source>
+        <translation>Med-alta</translation>
+    </message>
+    <message>
+        <source>high</source>
+        <translation>Alta</translation>
+    </message>
+    <message>
+        <source>very high</source>
+        <translation>Muy alta</translation>
+    </message>
+    <message>
+        <source>critical</source>
+        <translation>Crítica</translation>
+    </message></context>
 <context>
     <name>NSKinds</name>
     <message>
@@ -8702,7 +8746,27 @@ tocan.</translation>
         <source>Click a point to select it; click the empty space (or double-click) to bring the curve to the front</source>
         <translation>Un clic en un punto lo selecciona; un clic en el hueco (o doble clic) pone la curva delante</translation>
     </message>
-</context>
+
+    <message>
+        <source>Save the chart</source>
+        <translation>Guardar el gráfico</translation>
+    </message>
+    <message>
+        <source>Chart written as you see it: {0}</source>
+        <translation>Gráfico guardado tal como lo ves: {0}</translation>
+    </message>
+    <message>
+        <source>Could not write the chart: {0}</source>
+        <translation>No se pudo escribir el gráfico: {0}</translation>
+    </message>
+    <message>
+        <source>Save what you see (PNG)…</source>
+        <translation>Guardar lo que ves (PNG)…</translation>
+    </message>
+    <message>
+        <source>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</source>
+        <translation>Guarda la curva exactamente como la ves: la ventana a la que has hecho zoom, los puntos que has seleccionado o excluido, el rango fijo si lo has puesto. Lo que hay en pantalla es lo que va al fichero</translation>
+    </message></context>
 <context>
     <name>UfeSequenceDialog</name>
     <message>

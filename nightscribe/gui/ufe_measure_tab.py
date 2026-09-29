@@ -1045,45 +1045,50 @@ class UfeMeasureTab(QWidget):
         self.lbl_status.setText(self.tr("Measuring the series…"))
 
     def _on_series_sci(self):
-        # The scientific figure of the curve (quality plan, A1): the same
-        # points the panel shows, with the observer's decisions (marked,
-        # excluded, fixed axis) drawn the way a report reads them.
-        from .widgets.lightcurve_widget import LightCurveChart
+        # Save the curve AS YOU SEE IT (V3).
+        #
+        # It used to be a matplotlib figure drawn from the same points by
+        # another renderer: the two could pick different windows (and they
+        # did: the exported chart carried the 2 to 14 axis long after the
+        # screen did not), and nothing the observer had framed on screen
+        # survived into the file. A figure that disagrees with what you were
+        # looking at is worse than no figure.
+        #
+        # The export renders the chart's own visible view, zoom included.
+        # @return: None
+        from PySide6.QtWidgets import QFileDialog
+        from .. import paths as paths_mod
         if self._series_result is None or not self._series_payload:
             self.lbl_status.setText(self.tr(
                 "Measure the series first: the figure is the curve."))
             return
-        # the figure is drawn from what the AXIS is showing (V1): handing
-        # it the raw payload would put the detrended curve on an absolute
-        # axis again and the exported chart would lie exactly like the
-        # screen used to
-        pts = self.chart_series.axis_points()
-        mags = [p["mag"] for p in pts if p.get("mag") is not None]
-        if not mags:
-            return
-        from ..viz import sci_style
-        from .. import paths as paths_mod
-        scene = self._series_context() or {}
         name = ""
         window = self.window()
         obj = getattr(window, "object", None)
         if callable(obj):
             name = (obj() or {}).get("name") or ""
         start = paths_mod.data_dir()
-        from PySide6.QtWidgets import QFileDialog
         target, _sel = QFileDialog.getSaveFileName(
-            self, self.tr("Save the scientific chart"),
+            self, self.tr("Save the chart"),
             str(start / "{0}_curva.png".format(
                 (name or "series").replace(" ", "_"))),
             self.tr("PNG image (*.png)"))
         if not target:
             return
-        out = sci_style.draw_scientific(
-            pts, out=target, title=name or self.tr("Photometric series"),
-            subtitle=self._series_subtitle(scene), lang=self._lang,
-            figsize=(9.0, 5.2), dpi=150)
-        self.lbl_status.setText(self.tr("Scientific chart written: {0}")
-                                .format(out))
+        try:
+            out = self.chart_series.export_png(target)
+        except Exception as err:                  # never a dead window
+            logger.warning("chart export failed: %s", err)
+            self.lbl_status.setText(self.tr(
+                "Could not write the chart: {0}").format(err))
+            return
+        self.lbl_status.setText(self.tr(
+            "Chart written as you see it: {0}").format(out))
+        # ADR-045: the scene export registers like the other tabs' files
+        dlg = self.window()
+        notify = getattr(dlg, "notify_saved", None)
+        if callable(notify):
+            notify([out], "chart")
 
     def _series_subtitle(self, context):
         # The second line of the scientific figure: what a reader needs to

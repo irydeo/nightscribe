@@ -3824,7 +3824,51 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <source>Pass saved. {0} project(s) stayed out of it: see the dialog.</source>
         <translation>Pass saved. {0} project(s) stayed out of it: see the dialog.</translation>
     </message>
-<message><source>none</source><translation>none</translation></message><message><source>minimal</source><translation>minimal</translation></message><message><source>very low</source><translation>very low</translation></message><message><source>low</source><translation>low</translation></message><message><source>med-low</source><translation>med-low</translation></message><message><source>med</source><translation>med</translation></message><message><source>medium</source><translation>medium</translation></message><message><source>med-high</source><translation>med-high</translation></message><message><source>high</source><translation>high</translation></message><message><source>very high</source><translation>very high</translation></message><message><source>critical</source><translation>critical</translation></message></context>
+
+    <message>
+        <source>none</source>
+        <translation>none</translation>
+    </message>
+    <message>
+        <source>minimal</source>
+        <translation>minimal</translation>
+    </message>
+    <message>
+        <source>very low</source>
+        <translation>very low</translation>
+    </message>
+    <message>
+        <source>low</source>
+        <translation>low</translation>
+    </message>
+    <message>
+        <source>med-low</source>
+        <translation>med-low</translation>
+    </message>
+    <message>
+        <source>med</source>
+        <translation>med</translation>
+    </message>
+    <message>
+        <source>medium</source>
+        <translation>medium</translation>
+    </message>
+    <message>
+        <source>med-high</source>
+        <translation>med-high</translation>
+    </message>
+    <message>
+        <source>high</source>
+        <translation>high</translation>
+    </message>
+    <message>
+        <source>very high</source>
+        <translation>very high</translation>
+    </message>
+    <message>
+        <source>critical</source>
+        <translation>critical</translation>
+    </message></context>
 <context>
     <name>NSKinds</name>
     <message>
@@ -8702,7 +8746,27 @@ not touched.</translation>
         <source>Click a point to select it; click the empty space (or double-click) to bring the curve to the front</source>
         <translation>Click a point to select it; click the empty space (or double-click) to bring the curve to the front</translation>
     </message>
-</context>
+
+    <message>
+        <source>Save the chart</source>
+        <translation>Save the chart</translation>
+    </message>
+    <message>
+        <source>Chart written as you see it: {0}</source>
+        <translation>Chart written as you see it: {0}</translation>
+    </message>
+    <message>
+        <source>Could not write the chart: {0}</source>
+        <translation>Could not write the chart: {0}</translation>
+    </message>
+    <message>
+        <source>Save what you see (PNG)…</source>
+        <translation>Save what you see (PNG)…</translation>
+    </message>
+    <message>
+        <source>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</source>
+        <translation>Save the curve exactly as you see it: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. What is on screen is what lands in the file</translation>
+    </message></context>
 <context>
     <name>UfeSequenceDialog</name>
     <message>

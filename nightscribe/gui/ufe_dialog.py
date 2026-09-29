@@ -614,6 +614,9 @@ class UfeDialog(QDialog):
         # or a Live watch left behind keeps measuring and writing runs
         # into the DB forever (shutdown cancels both and waits).
         self.tab_blink.shutdown()
+        stop = getattr(self.tab_compare, "shutdown", None)
+        if callable(stop):
+            stop()
         try:
             self.tab_measure.shutdown()
         except Exception as err:      # a failed cleanup never blocks close

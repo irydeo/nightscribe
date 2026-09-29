@@ -7439,6 +7439,30 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>{0} Your sequence of {1} stars is kept; nothing was lost.</source>
         <translation>{0} Tu secuencia de {1} estrellas se mantiene; no se ha perdido nada.</translation>
+    </message>
+    <message>
+        <source>Proposing the sequence from the {0} catalog stars on the plate (no plate to check them against yet).</source>
+        <translation>Proponiendo la secuencia a partir de las {0} estrellas de catálogo que hay en la placa (aún no hay placa contra la que comprobarlas).</translation>
+    </message>
+    <message>
+        <source>Proposing the sequence: checking the {0} catalog stars on your plate…</source>
+        <translation>Proponiendo la secuencia: comprobando en tu placa las {0} estrellas de catálogo…</translation>
+    </message>
+    <message>
+        <source>Checking the candidates on your plate…</source>
+        <translation>Comprobando las candidatas en tu placa…</translation>
+    </message>
+    <message>
+        <source>Comparisons</source>
+        <translation>Comparsas</translation>
+    </message>
+    <message>
+        <source>Could not build the sequence: the plate check failed.</source>
+        <translation>No se pudo construir la secuencia: falló la comprobación en la placa.</translation>
+    </message>
+    <message>
+        <source>Sequence proposal cancelled: nothing was changed. Your sequence is as it was.</source>
+        <translation>Propuesta cancelada: no se ha cambiado nada. Tu secuencia está como estaba.</translation>
     </message></context>
 <context>
     <name>UfeDialog</name>

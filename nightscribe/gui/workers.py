@@ -239,6 +239,78 @@ class UfeFieldWorker(QThread):
         self.finished.emit(field or {})
 
 
+class UfeProposeWorker(QThread):
+    # Proposes the comparison sequence off the GUI thread (H2).
+    #
+    # The proposal itself is arithmetic, but it asks the OBSERVER'S PLATE
+    # about every candidate (does this star saturate? is it above the
+    # linearity? is it measurable at all?), and that measurement is the
+    # expensive part. It used to run on the GUI thread under a modal
+    # dialog: the window could not repaint, and the observer read a frozen
+    # app with no word about what it was doing (reported). Here it runs
+    # where it belongs, the window stays alive, and the dialog can say
+    # where the work is and offer a way out.
+    #
+    # The validator reads the plate array and never writes it, so handing
+    # it to this thread is safe; the cancellation flag is checked inside
+    # the validator wrapper (compstars has no cancellation of its own, and
+    # adding one there would tie the core to the GUI's lifecycle).
+    finished = Signal(object)       # the compstars result, or None
+    progress = Signal(dict)         # stage {"es", "en"} for the status line
+    cancelled = Signal()
+
+    def __init__(self, stars, target_mag, validator, n=8,
+                 spread_arcmin=0.0, margin_arcsec=0.0):
+        super().__init__()
+        self._stars = list(stars)
+        self._target_mag = target_mag
+        self._validator = validator
+        self._n = n
+        self._spread = spread_arcmin
+        self._margin = margin_arcsec
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the tab (the Cancel button): the wrapper below stops at
+        # the next candidate and the partial work is thrown away (a half
+        # sequence is worse than none).
+        # @return: None
+        self._cancel = True
+
+    def run(self):
+        from ..core import compstars
+        self.progress.emit({"es": "Comprobando las candidatas en tu placa…",
+                            "en": "Checking the candidates on your plate…"})
+
+        def guarded(star, role="comp"):
+            if self._cancel:
+                raise _Cancelled()
+            if self._validator is None:
+                return None
+            return self._validator(star, role)
+
+        try:
+            result = compstars.propose_comps(
+                self._stars, self._target_mag, n=self._n,
+                spread_arcmin=self._spread, validator=guarded,
+                margin_arcsec=self._margin)
+        except _Cancelled:
+            self.cancelled.emit()
+            return
+        except Exception as err:    # never crash the GUI on data problems
+            logger.exception("propose worker failed: %s", err)
+            self.finished.emit(None)
+            return
+        self.finished.emit(result)
+
+
+class _Cancelled(Exception):
+    # Raised inside the validator wrapper to stop the proposal: a plain
+    # exception is the only way out of a function that does not know about
+    # cancellation, and it never leaves this module.
+    pass
+
+
 class UfeCutoutWorker(QThread):
     # Downloads a survey FITS field (PS1-g, DSS2-red fallback) for the
     # UFE's Compare tab in the background, through the db cache

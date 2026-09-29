@@ -961,3 +961,76 @@ def test_build_without_a_wcs_keeps_the_sequence_it_already_has(dlg,
     assert calls == []                       # no catalogue, no blind solve
     assert len(tab._entries) == 1            # and the sequence is untouched
     assert "no solved position" in tab.lbl_status.text()
+
+
+# ---------------- H2/H3: the button decides and says it ---------------
+
+def test_a_small_field_proposes_inline_and_says_what_it_is_checking(dlg):
+    # After H1 the plate check costs ~2 ms per candidate: a normal field is
+    # a tenth of a second of work, so there is nothing to wait for and no
+    # thread to babysit. The status line still says what is happening.
+    from nightscribe.gui.ufe_compare_tab import _PROPOSE_THREAD_MIN
+    tab = dlg.tab_compare
+    said = []
+    real_say = tab._say
+    tab._say = lambda text, level=None: (said.append(str(text)),
+                                         real_say(text, level))[0]
+    tab._on_field_ready(_field(dlg, n=60))
+    assert len(tab._stars) < _PROPOSE_THREAD_MIN
+    tab._on_propose()
+    assert tab._propose_worker is None            # inline, no thread
+    assert len(tab._entries) == 9                 # 8 comps + the check
+    # the messages are a SEQUENCE: what it is about to do, then the result
+    assert any("checking" in t for t in said)
+    assert any("Proposed" in t for t in said)
+
+
+def test_a_crowded_field_goes_to_its_own_thread(dlg, qapp):
+    # Above the threshold the proposal asks the plate hundreds of times, and
+    # the window must stay alive: the work runs in a thread and the result
+    # lands when it lands.
+    from nightscribe.gui.ufe_compare_tab import _PROPOSE_THREAD_MIN
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg, n=_PROPOSE_THREAD_MIN + 40))
+    tab._on_propose()
+    assert tab._propose_worker is not None
+    assert tab._propose_worker.wait(30000)        # it finishes
+    for _ in range(6):
+        qapp.processEvents()
+    assert len(tab._entries) >= 8
+    tab.shutdown()
+
+
+def test_a_cancelled_proposal_changes_nothing(dlg):
+    # The Cancel of the wait must be a real way out, and a half proposal is
+    # thrown away: a sequence that is neither the old one nor the new one is
+    # worse than either.
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg, n=40))
+    tab._on_propose()
+    before = [(e["name"], e["star"]["id"]) for e in tab._entries]
+    tab._on_propose_cancelled()
+    after = [(e["name"], e["star"]["id"]) for e in tab._entries]
+    assert before == after
+    assert "cancelled" in tab.lbl_status.text()
+    assert tab._propose_worker is None
+
+
+def test_the_button_says_what_it_is_doing_at_every_step(dlg, monkeypatch):
+    # "Build the sequence" should be more intelligent and SAY what it is
+    # doing: with no field it goes and gets one (announcing the query), and
+    # with a field it proposes (announcing the plate check). Nothing is a
+    # silent wait.
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
+                        lambda *a, **kw: _FakeFieldWorker(
+                            *a, field=_field(dlg), **kw))
+    tab = dlg.tab_compare
+    said = []
+    real_say = tab._say
+    tab._say = lambda text, level=None: (said.append(str(text)),
+                                         real_say(text, level))[0]
+    tab._field = None
+    tab.btn_auto.click()
+    assert any("catalog" in t.lower() for t in said)   # it says it is going
+    assert tab._field is not None                      # and it got one
+    assert len(tab._entries) >= 8                      # and proposed

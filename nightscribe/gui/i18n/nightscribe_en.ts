@@ -7439,6 +7439,30 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <source>{0} Your sequence of {1} stars is kept; nothing was lost.</source>
         <translation>{0} Your sequence of {1} stars is kept; nothing was lost.</translation>
+    </message>
+    <message>
+        <source>Proposing the sequence from the {0} catalog stars on the plate (no plate to check them against yet).</source>
+        <translation>Proposing the sequence from the {0} catalog stars on the plate (no plate to check them against yet).</translation>
+    </message>
+    <message>
+        <source>Proposing the sequence: checking the {0} catalog stars on your plate…</source>
+        <translation>Proposing the sequence: checking the {0} catalog stars on your plate…</translation>
+    </message>
+    <message>
+        <source>Checking the candidates on your plate…</source>
+        <translation>Checking the candidates on your plate…</translation>
+    </message>
+    <message>
+        <source>Comparisons</source>
+        <translation>Comparisons</translation>
+    </message>
+    <message>
+        <source>Could not build the sequence: the plate check failed.</source>
+        <translation>Could not build the sequence: the plate check failed.</translation>
+    </message>
+    <message>
+        <source>Sequence proposal cancelled: nothing was changed. Your sequence is as it was.</source>
+        <translation>Sequence proposal cancelled: nothing was changed. Your sequence is as it was.</translation>
     </message></context>
 <context>
     <name>UfeDialog</name>

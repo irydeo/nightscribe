@@ -60,6 +60,13 @@ C_RING = "#58d68d"      # catalog label ring
 # window is worse than no window at all
 _BUSY_SHOW_MS = 250
 
+# Above this many catalog stars on the plate, the proposal goes to its own
+# thread. The plate check costs ~2 ms per candidate (measured after H1):
+# below the threshold the whole thing is a tenth of a second and a thread
+# would be a lifecycle liability (a worker alive at close aborts the app);
+# above it the window must stay alive while the plate is asked.
+_PROPOSE_THREAD_MIN = 300
+
 _PICK_PX = 11.0         # click/hover radius in SCREEN px at any zoom
 _MAX_LABELS = 34        # catalog magnitude labels, brightest first
 
@@ -156,6 +163,8 @@ class UfeCompareTab(QWidget):
         self._auto_propose = False   # the field worker landed from the
                                      # one-click path: propose on arrival
         self._worker = None
+        self._propose_worker = None  # the proposal's own thread (H2)
+        self._names_before_build = None   # was the proposal any different?
         self._cutout_worker = None   # UfeCutoutWorker while DSS2 lands
         self._prefill_sky = None     # (ra, dec) from the host, for DSS2
         self._build_ui()
@@ -340,6 +349,18 @@ class UfeCompareTab(QWidget):
             self._say(self.tr(
                 "The sequence field is empty: build it with «Generate "
                 "field…», or restore the one saved with the plate."))
+
+    def shutdown(self):
+        # Stops the propose thread before the tab goes: a QThread destroyed
+        # while it runs aborts the whole application (the shiboken trap the
+        # Blink tab already documents).
+        # @return: None
+        worker = getattr(self, "_propose_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            worker.wait(3000)
+        self._propose_worker = None
+        self._reap_propose_wait()
 
     def clear_session(self):
         # A different PROJECT is a different session (issue report: opening
@@ -1055,6 +1076,13 @@ class UfeCompareTab(QWidget):
         # the target's brightness (compstars' criteria), VALIDATED on the
         # open plate (quality plan, C1): saturated, non-linear, off-sensor
         # or too faint candidates are dropped with their reason said.
+        #
+        # ONE DECISION, SAID OUT LOUD. The plate check is the expensive
+        # half (measuring a candidate asks the plate, and there can be
+        # hundreds): it runs off the GUI thread when there is a plate to ask
+        # and the status line narrates it. With no plate there is nothing
+        # expensive to do: the catalogue's own criteria are arithmetic over
+        # a list, and a dialog for that would be noise.
         if self._field is None:
             # no silent no-op: say what to do first, in both languages
             self._say(self.tr(
@@ -1062,21 +1090,100 @@ class UfeCompareTab(QWidget):
                 "stars to propose the sequence."))
             return
         self._flush_table()
-        before = [e.get("name") for e in self._entries]
+        self._build_backup = list(self._entries)
+        self._names_before_build = [e.get("name") for e in self._entries]
+        validator = self._comp_validator()
+        if validator is None:
+            self._say(self.tr(
+                "Proposing the sequence from the {0} catalog stars on the "
+                "plate (no plate to check them against yet).").format(
+                    len(self._stars)))
+            self._propose_inline(validator)
+            return
+        if len(self._stars) < _PROPOSE_THREAD_MIN:
+            # a field this size is a tenth of a second of arithmetic: the
+            # status line says what is happening and the window never
+            # notices
+            self._say(self.tr(
+                "Proposing the sequence: checking the {0} catalog stars on "
+                "your plate…").format(len(self._stars)))
+            self._propose_inline(validator)
+            return
+        self._start_propose_worker(validator)
+
+    def _propose_inline(self, validator):
+        # The plain path: no plate to ask, so nothing to wait for.
+        # @args: validator - None
+        # @return: None
         try:
-            validator = self._comp_validator()
             seq = compstars.propose_comps(
                 self._stars, self.spn_mag.value(), validator=validator,
                 margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
         except Exception as err:
-            # reported: pressing this button showed a dialog that vanished
-            # and built nothing, with no word about why. A failure the
-            # observer cannot read is a failure nobody can fix, so it is
-            # said on the status line with its own text.
             logger.exception("sequence proposal failed: %s", err)
             self._say(self.tr("Could not build the sequence: {0}").format(
                 err), "error")
             return
+        self._apply_proposal(seq)
+
+    def _start_propose_worker(self, validator):
+        # The plate has to be asked once per candidate: that is seconds on a
+        # crowded field, so it goes to a thread and the window stays alive.
+        # The wait is the shared one (shown only if the work really takes a
+        # moment, with a real Cancel).
+        # @args: validator - the plate's verdict callable
+        # @return: None
+        from .workers import UfeProposeWorker
+        self._propose_worker = UfeProposeWorker(
+            self._stars, self.spn_mag.value(), validator,
+            margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
+        self._propose_worker.progress.connect(self._on_propose_stage)
+        self._propose_worker.finished.connect(self._on_proposed)
+        self._propose_worker.cancelled.connect(self._on_propose_cancelled)
+        self._say(self.tr(
+            "Proposing the sequence: checking the {0} catalog stars on your "
+            "plate…").format(len(self._stars)))
+        self._propose_wait = _busy_wait(
+            self, self.tr("Checking the candidates on your plate…"),
+            self.tr("Comparisons"))
+        self._propose_wait.canceled.connect(self._propose_worker.cancel)
+        self._propose_worker.start()
+
+    def _on_propose_stage(self, stage):
+        # @args: stage - {"es", "en"} from the worker
+        if stage:
+            self._say(stage.get(self._lang, stage.get("en", "")))
+
+    def _on_proposed(self, seq):
+        # @args: seq - the compstars result, or None on a data failure
+        self._reap_propose_wait()
+        self._propose_worker = None
+        if seq is None:
+            self._say(self.tr(
+                "Could not build the sequence: the plate check failed."),
+                "error")
+            return
+        self._apply_proposal(seq)
+
+    def _on_propose_cancelled(self):
+        self._reap_propose_wait()
+        self._propose_worker = None
+        self._say(self.tr(
+            "Sequence proposal cancelled: nothing was changed. Your "
+            "sequence is as it was."))
+
+    def _reap_propose_wait(self):
+        wait = getattr(self, "_propose_wait", None)
+        if wait is not None:
+            self._propose_wait = None
+            _reap_wait(wait)
+
+    def _apply_proposal(self, seq):
+        # The proposal's outcome, said in the observer's words: what was
+        # proposed, what the PLATE refused (with its reasons), and whether
+        # anything changed at all.
+        # @args: seq - the compstars result
+        # @return: None
         self._entries = (seq["comps"]
                          + ([seq["check"]] if seq["check"] else []))
         self._redraw_entries()
@@ -1093,19 +1200,20 @@ class UfeCompareTab(QWidget):
                 len(rejected),
                 ", ".join(f"{k} × {v}" for k, v in sorted(counts.items())))
         if not self._entries:
-            # the proposal has nothing usable: say it and keep what was
-            # there (the reasons are already counted in the message below)
             if self._restore_sequence(self.tr(
                     "The proposal found no usable comparison star.")):
                 return
         self._build_backup = []
-        if before == [e.get("name") for e in self._entries]:
-            # the same proposal is not a failure, but it LOOKS like one
-            # (nothing on screen changes): say it instead of letting the
-            # observer guess
+        if self._last_proposal_was_same():
             text += " " + self.tr("The sequence is the same as before.")
         self._say(text)
         self._commit()
+
+    def _last_proposal_was_same(self):
+        # @return: True when the proposal did not change the sequence
+        before = getattr(self, "_names_before_build", None)
+        now = [e.get("name") for e in self._entries]
+        return before is not None and before == now
 
     # ------------------------------------------------------------- table
 

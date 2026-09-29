@@ -6732,6 +6732,26 @@ class MainWindow(QMainWindow):
         form.addRow(self.tr("Format:"), cmb_fmt)
         chk_ql = QCheckBox(self.tr("Include quick-look (indicative) points"))
         form.addRow(chk_ql)
+        # the report's columns are the observer's choice (quality plan, A2):
+        # one colleague wants the curve, another wants the quality controls
+        lst_cols = QListWidget()
+        lst_cols.setSelectionMode(QListWidget.NoSelection)
+        lst_cols.setMaximumHeight(190)
+        for key, label in photometry_export.column_labels(self._lang()):
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, key)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked
+                               if key in photometry_export.DEFAULT_COLUMNS
+                               else Qt.Unchecked)
+            lst_cols.addItem(item)
+        lvl_cols = QLabel(self.tr(
+            "The columns of the file. The header always carries the "
+            "canonical name of each column, so a colleague's reader does "
+            "not break because of the language."))
+        lvl_cols.setWordWrap(True)
+        form.addRow(lvl_cols)
+        form.addRow(lst_cols)
         box = QDialogButtonBox(QDialogButtonBox.Save
                                | QDialogButtonBox.Cancel)
         box.accepted.connect(dlg.accept)
@@ -6739,6 +6759,9 @@ class MainWindow(QMainWindow):
         form.addRow(box)
         if dlg.exec() != QDialog.Accepted:
             return
+        columns = [lst_cols.item(i).data(Qt.UserRole)
+                   for i in range(lst_cols.count())
+                   if lst_cols.item(i).checkState() == Qt.Checked]
         pts = photometry_export.collect_points(db, pid,
                                                include_quicklook=
                                                chk_ql.isChecked())
@@ -6783,7 +6806,9 @@ class MainWindow(QMainWindow):
                                                 **meta)
         else:
             path = photometry_export.export_csv(pts, out, observer=observer,
-                                                comp_stars=comps, **meta)
+                                                comp_stars=comps,
+                                                columns=columns or None,
+                                                **meta)
         project.add_file(db, pid, str(path), "report")
         self.statusBar().showMessage(
             self.tr("Written to %1").replace("%1", str(path)), 8000)

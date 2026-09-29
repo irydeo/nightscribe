@@ -44,6 +44,11 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 - **Voz humana**: comentarios cortos sobre cada método con `# @args:` / `# @return:`,
   como en el proyecto hermano `saas/`. Nada de docstrings robóticos ni sobre-ingeniería.
   Los TODOs se escriben como `# TODO: ...` donde apliquen.
+- **Código didáctico (regla permanente)**: quien lo lea tiene que entender **por qué**,
+  no sólo qué. Cada bloque no obvio explica el motivo, la física o el fallo que evita;
+  los números medidos se escriben en el comentario (lo que se ganó, lo que costó), y
+  nada se deja «porque sí». Un comentario que no enseña nada sobra, y una decisión que
+  no se explica es una decisión que se perderá: el código es también documentación.
 - **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
   «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
 - **Mantenible por personas**: funciones cortas, dependencias mínimas, sin magia.
@@ -267,6 +272,12 @@ drafts + tweet + ready-to-attach PNG charts).
 - **The header block above goes in EVERY `.py` file** (adjust module name).
 - **Human voice**: short `# @args:` / `# @return:` comments above each method, in the
   spirit of the sibling project `saas/`. No robotic docstrings, no over-engineering.
+- **Didactic code (permanent rule)**: whoever reads it must understand **why**, not just
+  what. Every non-obvious block explains its reason, the physics, or the failure it
+  prevents; measured numbers go in the comment (what was gained, what it cost), and
+  nothing is left as "just because". A comment that teaches nothing is noise, and a
+  decision that is not explained is a decision that will be lost: the code is
+  documentation too.
 - **Docs in natural language**: never use the em dash ("—"); we write with ":", ","
   and ";". The en dash ("–") stays reserved for numeric ranges (0–100).
 - **The interface is defined in `gui/ui/*.ui` (ADR-005)**: every window, dialog or tab

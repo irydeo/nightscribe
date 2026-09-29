@@ -42,6 +42,7 @@ from .ui_loader import adopt_ui, drop_in, load_ui
 from .widgets.collapsible_section import CollapsibleSection
 from .widgets.histogram_widget import HistogramWidget
 from .widgets.ufe_image_view import UfeImageView
+from .widgets.ufe_project_badge import UfeProjectBadge
 
 logger = logging.getLogger("nightscribe.gui.ufe_dialog")
 
@@ -189,6 +190,9 @@ class UfeDialog(QDialog):
         self.btn_page_image = self._ui.btn_page_image
         self.btn_page_curve = self._ui.btn_page_curve
         self._centre_page(0, self.view)
+        # G: the project this window is open for, in the corner of the bar
+        self.badge = UfeProjectBadge(self)
+        drop_in(self._ui.topbar, self._ui.ph_badge, self.badge)
         self.btn_page_image.toggled.connect(
             lambda on: on and self.stack_centre.setCurrentIndex(0))
         self.btn_page_curve.toggled.connect(
@@ -694,6 +698,17 @@ class UfeDialog(QDialog):
         # @return: the point hook callable, or None when the editor was
         #          opened ad-hoc (Measure tab hides its save button)
         return self._point_hook
+
+    def set_project_badge(self, payload):
+        # The project behind this window, in the list's own language (G).
+        # The host builds the payload with the same function the project
+        # rows use, so the badge cannot drift from what the observer just
+        # left; None hides it (the Tools menu opens with no project).
+        # @args: payload - the project row's kwargs, or None
+        # @return: None
+        badge = getattr(self, "badge", None)
+        if badge is not None:
+            badge.set_badge(payload)
 
     def set_visit_curve_hooks(self, load, clear):
         # The visit's curve, through the project (D): the Measure tab draws

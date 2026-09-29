@@ -37,6 +37,7 @@
      <item><widget class="QToolButton" name="btn_zoom_more"><property name="toolTip"><string>The other zoom factors (50 %, 200 %, 400 %). Fit and 100 % stay in the bar because they are the two that are used all the time; the wheel and the presets zoom further</string></property><property name="text"><string>Zoom</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
      <item><widget class="QLabel" name="lbl_zoom"><property name="text"><string/></property><property name="toolTip"><string>Current zoom: 100 % is one plate pixel per screen pixel</string></property><property name="minimumSize"><size><width>44</width><height>0</height></size></property></widget></item>
      <item><spacer name="hsp_bar_end"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QWidget" name="ph_badge"/></item>
     </layout>
    </item>
    <item>

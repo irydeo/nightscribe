@@ -730,3 +730,30 @@ def test_a_pass_files_each_curve_in_its_own_project(window, tmp_path):
     for echo in echoes:
         assert echo["pass"]["labels"] == ["PasA", "PasB"]
         assert echo["pass"]["target"] in ("PasA", "PasB")
+
+
+def test_the_workbench_badge_speaks_the_project_list_s_language(window):
+    # G: the badge is fed by the SAME builder the project rows use, so the
+    # two cannot drift apart (a badge with its own words and colours would
+    # be a second truth about the same project).
+    from nightscribe.core import project as proj_mod
+    from nightscribe.gui import main_window as mw
+    row = proj_mod.create(mw.db, "variable", "V0526 badge",
+                          {"ra_deg": 31.0, "dec_deg": 46.7})
+    pid = row["id"]
+    expected = window._project_row_payload(
+        proj_mod.get(mw.db, pid), None, {})
+    dlg = window._ufe_open("measure", hook_pid=pid,
+                           obj=window._ufe_object_from_project(row))
+    window._ufe = dlg                          # keep the dialog alive here
+    from PySide6.QtWidgets import QApplication
+    QApplication.processEvents()
+    assert dlg.badge.isVisible()
+    assert dlg.badge.lbl_name.text() == expected["name"]
+    assert dlg.badge.lbl_kind.text() == expected["kind_label"]
+    assert expected["kind_color"] in dlg.badge.lbl_kind.styleSheet()
+    assert expected["next_text"] in dlg.badge.toolTip()
+    # and the ad-hoc open (Tools) has no project behind it
+    dlg.set_project_badge(None)
+    assert not dlg.badge.isVisible()
+    dlg.close()

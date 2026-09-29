@@ -26,15 +26,34 @@ the survey field (DSS2/PS1) as a FITS with WCS and works on it directly.
 ## The window
 
 ```
-| Load · Export PNG · Fit 50 100 200 400 · %                         |
-|────────────────────────────────────────────|──────────────────────|
-|                                            | [Blink][Photometry]  |
-|              IMAGE                         | [Annotate]           |
-|                                            | (one tab per         |
-|                                            |  feature)            |
-|────────────────────────────────────────────|──────────────────────|
-| Histogram with handles + Black/White/Gamma + Auto + Invert          |
+| [Open][Export][Solve] | [Fit][100 %][Zoom ▾] 100 % | [View ▾] | Image|Curve |
+|───────────────────┬────────────────────────────────────────┬──────────────|
+|  visit / series   |                                        |  tab         |
+|  (foldable)       |   IMAGE  (or the curve)                |  ────────    |
+|                   |   · the object, over the plate          |  primary     |
+|                   |                                        |  [Settings▸] |
+|───────────────────┴────────────────────────────────────────┴──────────────|
+| Histogram ▸  (folded: 24 px; open: ~110 px, two rows of controls)         |
+|──────────────────────────────────────────────────────────────────────────|
+| ⓘ status: one line, fixed height, never grows                            |
 ```
+
+The chrome takes what it NEEDS and the work area gets everything else: the
+plate is what the window is for. The top bar is stable (it measured 25 px
+in a short window and 69 px in a tall one before: the layout's stretch was
+never applied by the loader), and the histogram strip is compact and folds
+with its state remembered. The object's name, position and magnitude are
+painted OVER the plate (and into the exported PNG), not in a row of their
+own.
+
+The series block in the left panel keeps what an observer touches while
+measuring (the frame navigator, the grouping of frames, **Measure the
+sequence**, live mode and the progress) and puts the rest behind two
+doors: **Chart and quality…** opens the chart's own non-modal window
+(scale, error bars, binning, mean curve, outliers and exclusions) and
+**Series ▾** holds the occasional actions (undo, ExoClock, the night's
+figures, save the chart, period and phase, the guide). Before this the
+same panel showed some thirty controls stacked in a column.
 
 * **Image**: takes up most of the window. The wheel zooms anchored at
   the cursor; dragging pans; double-click returns to the fit. Hovering

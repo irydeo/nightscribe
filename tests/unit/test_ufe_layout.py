@@ -193,3 +193,61 @@ def test_the_object_line_goes_into_the_exported_png(tmp_path):
     with_object = d.view.export_png(tmp_path / "with.png").read_bytes()
     assert with_object != without
     d.close()
+
+
+# ---------------- U6: the left panel's doors --------------------------
+
+_CHART_KNOBS = (
+    "cmb_series_scale", "btn_series_robust", "btn_series_fixaxis",
+    "spn_series_maglo", "spn_series_maghi", "btn_series_zoomfit",
+    "btn_series_errors", "btn_series_hideflags", "cmb_series_bin",
+    "spn_series_binn", "chk_series_mean", "spn_series_meanwin",
+    "chk_series_outliers", "spn_series_outsigma", "btn_series_exclout",
+    "btn_series_exclsel", "btn_series_restore")
+
+
+def test_the_chart_knobs_live_in_their_own_window():
+    # Seventeen controls about how the curve is DRAWN were stacked in the
+    # left panel's 300 px column, mixed with the action that measures the
+    # night. They are knobs you touch while LOOKING at the curve, so they
+    # have their own window, and it does not block the workbench: the whole
+    # point is to change them while watching the curve move.
+    _app()
+    d = _dialog(1500, 1000, _OBJECT)
+    tab = d.tab_measure
+    chart_dlg = tab._series_dlg
+    assert not chart_dlg.isVisible()          # closed until asked
+    tab._open_series_chart()
+    QApplication.processEvents()
+    assert chart_dlg.isVisible()
+    assert not chart_dlg.isModal()
+    # the SAME widgets, by name: the tab wires them exactly as before
+    for name in _CHART_KNOBS:
+        assert getattr(tab, name) is getattr(chart_dlg, name), name
+    chart_dlg.close()
+    d.close()
+
+
+def test_the_panel_keeps_only_what_is_touched_while_measuring():
+    # The count is the measure of the overload: the left panel showed ~30
+    # interactive controls. What must stay visible is the frame navigator,
+    # the measuring action and the doors; everything else is one click
+    # away, and NOTHING is gone (the widgets are all still there).
+    from PySide6.QtWidgets import (QCheckBox, QComboBox, QDoubleSpinBox,
+                                   QPushButton, QSpinBox, QToolButton, QWidget)
+    _app()
+    d = _dialog(1500, 1000, _OBJECT)
+    d.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+    for _ in range(4):
+        QApplication.processEvents()
+    panel = d.series_pane
+    assert panel.isVisible()                  # a visit arms the panel
+    kinds = (QPushButton, QToolButton, QComboBox, QSpinBox, QDoubleSpinBox,
+             QCheckBox)
+    visible = [w for w in panel.findChildren(QWidget)
+               if isinstance(w, kinds) and w.isVisible()]
+    assert len(visible) <= 14, [w.objectName() for w in visible]
+    # and every knob is still there, one click away
+    assert all(getattr(d.tab_measure, n, None) is not None
+               for n in _CHART_KNOBS)
+    d.close()

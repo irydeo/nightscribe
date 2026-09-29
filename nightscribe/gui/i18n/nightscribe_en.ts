@@ -8822,6 +8822,22 @@ not touched.</translation>
     <message>
         <source>Click a point to select it; drag to move the view; the wheel zooms BOTH axes around the cursor, Shift zooms the time only and Ctrl the magnitudes only; double-click frames the whole curve again</source>
         <translation>Click a point to select it; drag to move the view; the wheel zooms BOTH axes around the cursor, Shift zooms the time only and Ctrl the magnitudes only; double-click frames the whole curve again</translation>
+    </message>
+    <message>
+        <source>Chart and quality…</source>
+        <translation>Chart and quality…</translation>
+    </message>
+    <message>
+        <source>Series</source>
+        <translation>Series</translation>
+    </message>
+    <message>
+        <source>How the curve is drawn (scale, error bars, binning, mean) and which points you leave out. Opens in its own window, so you can watch the curve while changing it</source>
+        <translation>How the curve is drawn (scale, error bars, binning, mean) and which points you leave out. Opens in its own window, so you can watch the curve while changing it</translation>
+    </message>
+    <message>
+        <source>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</source>
+        <translation>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</translation>
     </message></context>
 <context>
     <name>UfeSequenceDialog</name>
@@ -9183,4 +9199,36 @@ not touched.</translation>
         <translation>Load a plate to see its histogram</translation>
     </message>
 </context>
-</TS>
+<context><name>UfeSeriesDialog</name>
+    <message>
+        <source>Chart and quality</source>
+        <translation>Chart and quality</translation>
+    </message>
+    <message>
+        <source>How the measured curve is drawn and judged. Nothing here changes the measurement: it changes what you see and which points you leave out.</source>
+        <translation>How the measured curve is drawn and judged. Nothing here changes the measurement: it changes what you see and which points you leave out.</translation>
+    </message>
+    <message>
+        <source>Scale and points</source>
+        <translation>Scale and points</translation>
+    </message>
+    <message>
+        <source>Grouping</source>
+        <translation>Grouping</translation>
+    </message>
+    <message>
+        <source>Outliers and exclusions</source>
+        <translation>Outliers and exclusions</translation>
+    </message>
+    <message>
+        <source>What the vertical axis measures, whether it follows the core of the curve, a range fixed by hand, the error bars and the flagged points</source>
+        <translation>What the vertical axis measures, whether it follows the core of the curve, a range fixed by hand, the error bars and the flagged points</translation>
+    </message>
+    <message>
+        <source>Groups the POINTS on the chart (a presentation choice): the engine's own grouping of frames happens in the measurement</source>
+        <translation>Groups the POINTS on the chart (a presentation choice): the engine's own grouping of frames happens in the measurement</translation>
+    </message>
+    <message>
+        <source>Mark the points that do not belong, and leave them out: marked, never deleted</source>
+        <translation>Mark the points that do not belong, and leave them out: marked, never deleted</translation>
+    </message></context></TS>

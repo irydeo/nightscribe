@@ -44,6 +44,7 @@ from ..core import coords, fits_meta, photometry, photometry_export, \
     series_measure, stretch
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
+from .ufe_series_dialog import UfeSeriesDialog
 from .ui_loader import adopt_ui
 from .widgets.lightcurve_widget import LightCurveChart
 
@@ -242,6 +243,12 @@ class UfeMeasureTab(QWidget):
         self._live_points = []
         self._live_run_ids = []      # the live session's batches: one
                                      # undoable run (ADR-050, P2 #19)
+        # U6: the chart's own controls (scale, error bars, binning, mean,
+        # outliers, exclusions) live in their own non-modal window now: the
+        # left panel had seventeen of them stacked in a 300 px column, and
+        # they are knobs you touch while LOOKING at the curve, not while
+        # measuring it. The widgets are the same ones, wired here.
+        self._series_dlg = UfeSeriesDialog(self)
         self.chart_series = LightCurveChart()
         self.chart_series.setToolTip(self.tr(
             "Click a point to select it; drag to move the view; the wheel "
@@ -259,56 +266,96 @@ class UfeMeasureTab(QWidget):
         # what the vertical axis MEASURES (V1): a measured magnitude and a
         # differential one are different quantities, and drawing both on
         # one axis is what gave a curve of hundredths an axis from 2 to 14
-        self.cmb_series_scale = self._ui.cmb_series_scale
+        self.cmb_series_scale = self._series_dlg.cmb_series_scale
         self.cmb_series_scale.addItem(self.tr("Calibrated magnitude"),
                                       "calibrated")
         self.cmb_series_scale.addItem(self.tr("Δ magnitude (differential)"),
                                       "differential")
         self.cmb_series_scale.currentIndexChanged.connect(
             self._on_series_scale_changed)
-        self.btn_series_robust = self._ui.btn_series_robust
+        self.btn_series_robust = self._series_dlg.btn_series_robust
         self.btn_series_robust.toggled.connect(
             self.chart_series.set_robust)
-        self.btn_series_zoomfit = self._ui.btn_series_zoomfit
+        self.btn_series_zoomfit = self._series_dlg.btn_series_zoomfit
         self.btn_series_zoomfit.clicked.connect(
             self.chart_series.reset_view)
-        self.btn_series_errors = self._ui.btn_series_errors
+        self.btn_series_errors = self._series_dlg.btn_series_errors
         self.btn_series_errors.toggled.connect(
             self.chart_series.set_errors_visible)
-        self.btn_series_hideflags = self._ui.btn_series_hideflags
+        self.btn_series_hideflags = self._series_dlg.btn_series_hideflags
         self.btn_series_hideflags.toggled.connect(
             self.chart_series.set_hide_flagged)
         # --- the observer's decisions on the curve (quality plan, phase A)
-        self.btn_series_fixaxis = self._ui.btn_series_fixaxis
-        self.spn_series_maglo = self._ui.spn_series_maglo
-        self.spn_series_maghi = self._ui.spn_series_maghi
+        self.btn_series_fixaxis = self._series_dlg.btn_series_fixaxis
+        self.spn_series_maglo = self._series_dlg.spn_series_maglo
+        self.spn_series_maghi = self._series_dlg.spn_series_maghi
         self.btn_series_fixaxis.toggled.connect(self._on_fix_axis)
         self.spn_series_maglo.valueChanged.connect(self._on_fix_axis)
         self.spn_series_maghi.valueChanged.connect(self._on_fix_axis)
-        self.cmb_series_bin = self._ui.cmb_series_bin
+        self.cmb_series_bin = self._series_dlg.cmb_series_bin
         self.cmb_series_bin.addItem(self.tr("None (one point per frame)"),
                                     "off")
         self.cmb_series_bin.addItem(self.tr("Every N frames"), "frames")
         self.cmb_series_bin.addItem(self.tr("Every N minutes"), "minutes")
         self.cmb_series_bin.currentIndexChanged.connect(self._on_bin_changed)
-        self.spn_series_binn = self._ui.spn_series_binn
+        self.spn_series_binn = self._series_dlg.spn_series_binn
         self.spn_series_binn.valueChanged.connect(self._on_bin_changed)
-        self.chk_series_mean = self._ui.chk_series_mean
-        self.spn_series_meanwin = self._ui.spn_series_meanwin
+        self.chk_series_mean = self._series_dlg.chk_series_mean
+        self.spn_series_meanwin = self._series_dlg.spn_series_meanwin
         self.chk_series_mean.toggled.connect(self._on_bin_changed)
         self.spn_series_meanwin.valueChanged.connect(self._on_bin_changed)
-        self.chk_series_outliers = self._ui.chk_series_outliers
-        self.spn_series_outsigma = self._ui.spn_series_outsigma
+        self.chk_series_outliers = self._series_dlg.chk_series_outliers
+        self.spn_series_outsigma = self._series_dlg.spn_series_outsigma
         self.chk_series_outliers.toggled.connect(self._on_detect_outliers)
         self.spn_series_outsigma.valueChanged.connect(
             self._on_detect_outliers)
-        self.btn_series_exclout = self._ui.btn_series_exclout
+        self.btn_series_exclout = self._series_dlg.btn_series_exclout
         self.btn_series_exclout.clicked.connect(self._on_exclude_outliers)
-        self.btn_series_exclsel = self._ui.btn_series_exclsel
+        self.btn_series_exclsel = self._series_dlg.btn_series_exclsel
         self.btn_series_exclsel.clicked.connect(self._on_exclude_selected)
-        self.btn_series_restore = self._ui.btn_series_restore
+        self.btn_series_restore = self._series_dlg.btn_series_restore
         self.btn_series_restore.clicked.connect(self._on_restore_all)
-        self.lbl_series_selection = self._ui.lbl_series_selection
+        self.lbl_series_selection = self._series_dlg.lbl_series_selection
+        # U6: two doors instead of the wall. "Chart and quality…" opens the
+        # window above; "Series ▾" holds the six occasional actions that
+        # used to be six more buttons in the column (the row is MOVED into
+        # the menu's panel, so the widgets, their texts and their names are
+        # the same ones).
+        self.btn_series_chart = self._ui.btn_series_chart
+        self.btn_series_chart.clicked.connect(self._open_series_chart)
+        self.btn_series_more = self._ui.btn_series_more
+        row_out = getattr(self._ui, "row_series_out", None)
+        if row_out is not None:
+            from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
+                                           QWidget, QWidgetAction)
+            panel = QWidget(self)
+            box = QVBoxLayout(panel)
+            box.setContentsMargins(6, 6, 6, 6)
+            # the buttons are MOVED one by one, not the layout: a layout
+            # removed from its parent is deleted by the binding, and the
+            # widgets' texts keep living in the Designer file where they
+            # belong (ADR-005)
+            for name in ("btn_series_undo", "btn_series_exoclock",
+                         "btn_series_night", "btn_series_sci",
+                         "btn_series_phase", "btn_series_help"):
+                btn = getattr(self._ui, name, None)
+                if btn is None:
+                    continue
+                btn.setParent(panel)
+                box.addWidget(btn)
+            action = QWidgetAction(self.btn_series_more)
+            action.setDefaultWidget(panel)
+            menu = QMenu(self.btn_series_more)
+            menu.addAction(action)
+            self.btn_series_more.setMenu(menu)
+            self.btn_series_more.setPopupMode(QToolButton.InstantPopup)
+            # the emptied row goes: nothing is left in it to keep
+            section = getattr(self._ui, "vbox_series_actions", None)
+            if section is not None:
+                try:
+                    section.removeItem(row_out)
+                except RuntimeError:
+                    pass
         self.chart_series.point_clicked.connect(self._on_point_clicked)
         # the chart belongs to this tab (the logic is here) but lives in
         # the CENTRE of the window (V2): ufe_dialog places it. The left
@@ -1543,6 +1590,12 @@ class UfeMeasureTab(QWidget):
             return
         self._show_curve()
         self.chart_series.fit_to_scene()
+
+    def _open_series_chart(self):
+        # The chart's controls, non-modal: the point of the window is to
+        # keep looking at the curve while changing how it is drawn.
+        # @return: None
+        self._series_dlg.show_nonmodal()
 
     def _show_curve(self):
         # Asks the window for the centre's curve page. The tab does not

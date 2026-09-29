@@ -27,15 +27,34 @@ del survey (DSS2/PS1) como FITS con WCS y trabaja sobre él directamente.
 ## La ventana
 
 ```
-| Cargar · Exportar PNG · Fit 50 100 200 400 · %                      |
-|────────────────────────────────────────────|──────────────────────|
-|                                            | [Blink][Fotometría]  |
-|              IMAGEN                        | [Anotar]             |
-|                                            | (una pestaña por     |
-|                                            |  funcionalidad)      |
-|────────────────────────────────────────────|──────────────────────|
-| Histograma con tiradores + Negro/Blanco/Gamma + Auto + Invertir     |
+| [Abrir][Exportar][Resolver] | [Fit][100 %][Zoom ▾] 100 % | [Vista ▾] | Imagen|Curva |
+|───────────────────┬────────────────────────────────────────┬──────────────|
+|  visita / serie   |                                        |  pestaña     |
+|  (plegable)       |   IMAGEN  (o la curva)                 |  ────────    |
+|                   |   · el objeto, sobre la placa          |  primario    |
+|                   |                                        |  [Ajustes▸]  |
+|───────────────────┴────────────────────────────────────────┴──────────────|
+| Histograma ▸  (plegado: 24 px; abierto: ~110, dos filas de controles)    |
+|──────────────────────────────────────────────────────────────────────────|
+| ⓘ estado: una línea, altura fija, nunca crece                            |
 ```
+
+El marco de la ventana ocupa lo que NECESITA y el área de trabajo se queda
+con el resto: la placa es para lo que existe la ventana. La barra superior
+es estable (antes medía 25 px en una ventana baja y 69 en una alta: el
+`layoutStretch` del Designer no lo aplica el cargador), y la tira del
+histograma es compacta y se pliega recordando cómo la dejaste. El nombre,
+la posición y la magnitud del objeto se pintan SOBRE la placa (y viajan al
+PNG exportado), no en una fila propia.
+
+El bloque de serie del panel izquierdo conserva lo que se toca al medir
+(el navegador de tomas, la agrupación de tomas, **Medir la secuencia**, el
+modo en vivo y el progreso) y deja el resto detrás de dos puertas:
+**Gráfico y calidad…** abre la ventana propia del gráfico (no modal: escala,
+barras de error, agrupación, media, anómalos y exclusiones) y **Serie ▾**
+guarda las acciones ocasionales (deshacer, ExoClock, las figuras de la
+noche, guardar el gráfico, período y fase, la guía). Antes ese mismo panel
+mostraba una treintena de controles apilados.
 
 * **Imagen**: ocupa la mayor parte de la ventana. La rueda hace zoom
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.

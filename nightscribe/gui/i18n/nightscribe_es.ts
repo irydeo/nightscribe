@@ -8822,6 +8822,22 @@ tocan.</translation>
     <message>
         <source>Click a point to select it; drag to move the view; the wheel zooms BOTH axes around the cursor, Shift zooms the time only and Ctrl the magnitudes only; double-click frames the whole curve again</source>
         <translation>Un clic en un punto lo selecciona; arrastra para mover la vista; la rueda acerca LOS DOS ejes en el cursor, con Shift sólo el tiempo y con Ctrl sólo las magnitudes; doble clic encuadra la curva entera otra vez</translation>
+    </message>
+    <message>
+        <source>Chart and quality…</source>
+        <translation>Gráfico y calidad…</translation>
+    </message>
+    <message>
+        <source>Series</source>
+        <translation>Serie</translation>
+    </message>
+    <message>
+        <source>How the curve is drawn (scale, error bars, binning, mean) and which points you leave out. Opens in its own window, so you can watch the curve while changing it</source>
+        <translation>Cómo se dibuja la curva (escala, barras de error, agrupación, media) y qué puntos dejas fuera. Se abre en su propia ventana, para que veas la curva mientras la cambias</translation>
+    </message>
+    <message>
+        <source>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</source>
+        <translation>Las acciones ocasionales de la serie: deshacer la última pasada, ExoClock, las figuras de la noche, guardar el gráfico, período y fase, la guía</translation>
     </message></context>
 <context>
     <name>UfeSequenceDialog</name>
@@ -9183,4 +9199,36 @@ tocan.</translation>
         <translation>Carga una placa para ver su histograma</translation>
     </message>
 </context>
-</TS>
+<context><name>UfeSeriesDialog</name>
+    <message>
+        <source>Chart and quality</source>
+        <translation>Gráfico y calidad</translation>
+    </message>
+    <message>
+        <source>How the measured curve is drawn and judged. Nothing here changes the measurement: it changes what you see and which points you leave out.</source>
+        <translation>Cómo se dibuja y se juzga la curva medida. Nada de aquí cambia la medida: cambia lo que ves y qué puntos dejas fuera.</translation>
+    </message>
+    <message>
+        <source>Scale and points</source>
+        <translation>Escala y puntos</translation>
+    </message>
+    <message>
+        <source>Grouping</source>
+        <translation>Agrupación</translation>
+    </message>
+    <message>
+        <source>Outliers and exclusions</source>
+        <translation>Anómalos y exclusiones</translation>
+    </message>
+    <message>
+        <source>What the vertical axis measures, whether it follows the core of the curve, a range fixed by hand, the error bars and the flagged points</source>
+        <translation>Qué mide el eje vertical, si sigue el núcleo de la curva, un rango fijado a mano, las barras de error y los puntos marcados</translation>
+    </message>
+    <message>
+        <source>Groups the POINTS on the chart (a presentation choice): the engine's own grouping of frames happens in the measurement</source>
+        <translation>Agrupa los PUNTOS del gráfico (una elección de presentación): la agrupación de tomas del motor ocurre en la medida</translation>
+    </message>
+    <message>
+        <source>Mark the points that do not belong, and leave them out: marked, never deleted</source>
+        <translation>Marca los puntos que no encajan y déjalos fuera: marcados, nunca borrados</translation>
+    </message></context></TS>

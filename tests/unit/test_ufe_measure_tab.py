@@ -26,6 +26,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PySide6.QtWidgets import QPushButton
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -1386,39 +1387,35 @@ def test_exoclock_write_failure_is_reported(dlg, qapp, tmp_path, monkeypatch):
 
 # ---------------- P3: the series buttons on wide fonts ----------------
 
-def test_series_actions_wrap_into_two_rows_and_stay_narrow(dlg, qapp):
-    # Regression (P3): the four series buttons on one row escaped the
-    # dialog on Windows, where the fonts are wide: their minimum widths
-    # added up and dragged the whole tab (and the editor's side pane)
-    # with them. The .ui wraps them into two rows (ADR-005), so with a
-    # 1.5x font the tab's minimum size hint stays inside a sane width.
+def test_the_series_block_stays_narrow_and_keeps_its_actions_reachable(
+        dlg, qapp):
+    # Regression (P3) plus U6. P3 was about the four series buttons on one
+    # row escaping the dialog on Windows, where the fonts are wide. U6 has
+    # changed where they live: the block keeps ONE action (Measure/Cancel)
+    # and the six occasional ones moved into the "Series" menu, so the row
+    # cannot be dragged wide by them any more.
+    #
+    # What must hold now: the block stays narrow with a 1.5x font, and the
+    # six actions are still THERE, reachable behind their door.
     tab = dlg.tab_measure
     dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
     assert tab.grp_series.isVisible()          # the block is armed
     # the theme pins the font size in px through a stylesheet, so the
-    # 1.5x simulation goes through the same channel: 13px -> 20px. The
-    # series block lives in its own left pane now (it is reparented there),
-    # so the style is set on the group that hosts the buttons.
+    # 1.5x simulation goes through the same channel: 13px -> 20px
     tab.grp_series.setStyleSheet("* { font-size: 20px; }")
     qapp.processEvents()
-    buttons = (tab.btn_series, tab.btn_series_undo,
-               tab.btn_series_exoclock, tab.btn_series_help)
-    assert all(b.font().pixelSize() == 20 for b in buttons)
-    # they wrap: no single row carries the four of them (the walker
-    # starts at the series block: the buttons live in ITS layout)
-    rows = {}
-    for b in buttons:
-        row = _innermost_row_of(tab.grp_series, b)
-        assert row is not None
-        rows.setdefault(row, []).append(b)
-    assert len(rows) >= 2
-    assert all(len(v) <= 2 for v in rows.values())
-    # and the tab's minimum width stays sane: below the four side by side
-    # (what a single row would force) and inside the editor's side pane
-    one_row = sum(b.minimumSizeHint().width() for b in buttons)
-    hint = tab.minimumSizeHint().width()
-    assert hint < one_row
-    assert hint <= 560
+    assert tab.btn_series.font().pixelSize() == 20
+    assert _innermost_row_of(tab.grp_series, tab.btn_series) is not None
+    # the block's own width stays sane: the six moved ones cannot add to it
+    assert tab.grp_series.minimumSizeHint().width() <= 560
+    # and the door holds them all, as a real panel (not a dead list)
+    panel = tab.btn_series_more.menu().actions()[0].defaultWidget()
+    assert panel is not None
+    inside = {w.objectName() for w in panel.findChildren(QPushButton)}
+    for name in ("btn_series_undo", "btn_series_exoclock",
+                 "btn_series_night", "btn_series_sci", "btn_series_phase",
+                 "btn_series_help"):
+        assert name in inside, name
 
 
 # ---------------- P3: nights are named by their civil date ----------------
@@ -1475,7 +1472,7 @@ def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
     assert not dlg.series_pane.isVisible()
 
 
-# ------------------------------------------------ series curve, large (ADR-051 rev.)
+# ------------------------------------- the curve in the centre (ADR-051 rev.)
 
 def test_the_curve_lives_in_the_centre_of_the_window(dlg):
     # V2: the measured curve is not a small box you have to click, nor a

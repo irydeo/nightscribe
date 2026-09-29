@@ -103,6 +103,16 @@ class SeriesConfig:
     # live driver read their widgets/Ajustes into this; no dict magic).
     wcs: object = None              # reference WCS (D17: no per-frame)
     target_xy: tuple = (0.0, 0.0)   # target in reference pixels
+    targets: tuple = ()             # SEVERAL targets of the same field, as
+                                    # ((label, x, y) | (label, x, y, bv), ...)
+                                    # in REFERENCE pixels: a campaign pass
+                                    # measures them in one read of the frames,
+                                    # sharing the comps (therefore the
+                                    # ensemble and the zero point) and the
+                                    # alignment. Each label gets its OWN curve
+                                    # and is written into its own project: the
+                                    # concept stays one project, one object.
+                                    # Empty means "the one in target_xy"
     comp_set: tuple = ()            # fixed entries (D35), as a tuple
     band: str = None
     fallback_band: str = "V"
@@ -192,6 +202,8 @@ class SeriesResult:
     points: list = field(default_factory=list)
     errors: dict = field(default_factory=dict)
     band: str = None
+    target_label: str = ""         # which target of a pass this curve is:
+                                   # "" for the historical single target
     zp_mode: str = "catalog"
     detrend: dict = None
     group_n: int = 1
@@ -203,6 +215,71 @@ class SeriesResult:
     aperture_report: dict = None                    # the seeing-scaled radii
     model_notes: list = field(default_factory=list)  # [{es,en}] the error
                                                      # model's caveats
+
+
+@dataclass
+class PassResult:
+    # One pass over the frames, one curve per target (a campaign pass).
+    #
+    # What is shared is the EXPENSIVE part: the frames are read once, the
+    # alignment is solved once and the comparison stars are measured once
+    # per frame. What is not shared is the data: each target gets its own
+    # SeriesResult, which its own project stores, because a project is one
+    # object and its curve is its own.
+    status: str = "complete"
+    targets: list = field(default_factory=list)   # [{"label", "xy", "result"}]
+    shared: dict = field(default_factory=dict)    # gain, alignment, aperture
+    errors: dict = field(default_factory=dict)    # unreadable frames
+
+
+class _PlateView:
+    # A frame's PlateResult seen from ONE of its targets.
+    #
+    # Everything that belongs to the plate (the comps, the zero point, the
+    # gain, the seeing, the band, the radii) was measured once and is
+    # shared verbatim; only the target's own numbers differ. Reading the
+    # view is reading a PlateResult, so every point builder of this module
+    # works unchanged for one target or for five.
+    def __init__(self, res, item):
+        self._res = res
+        self.label = item.get("label")
+        self.target = item.get("target")
+        self.col = item.get("col")
+        self.row = item.get("row")
+        self.ok = bool(item.get("ok"))
+        self.reason = item.get("reason")
+        self.inst_t = item.get("inst_t")
+        self.mag = item.get("mag")
+        self.err_internal = item.get("err_internal")
+        self.err_total = item.get("err_total")
+        self.scint = item.get("scint")
+        self.check = item.get("check")
+        self.zp = item.get("zp")
+
+    def __getattr__(self, name):
+        # anything the target does not own is the plate's (the comps, the
+        # gain, the seeing, the skipped counters)
+        return getattr(object.__getattribute__(self, "_res"), name)
+
+
+def _view_frame(frame, item):
+    # The frame as seen from one target: the plate result becomes the view
+    # and the per-target geometry (its mapped position, its cosmic verdict,
+    # its off-footprint verdict) takes the place of the shared one.
+    label = item.get("label")
+    out = dict(frame)
+    out["res"] = _PlateView(frame["res"], item)
+    ref = (frame.get("ref_xy_by") or {}).get(label)
+    if ref is not None:
+        out["ref_xy"] = ref
+    cosmic = frame.get("cosmic_by")
+    if cosmic is not None:
+        out["cosmic"] = cosmic.get(label, False)
+    edge = frame.get("align_edge_by")
+    if edge is not None:
+        out["align_edge"] = edge.get(label, False)
+    out.pop("data", None)
+    return out
 
 
 # ---------------- small numeric helpers ----------------
@@ -439,19 +516,34 @@ def _frame_fwhm(data, res):
     # @args: data - the frame the recipe ran on, res - its PlateResult
     # @return: the FWHM in px (the recipe's own when it carried one), or
     #          None when nothing is measurable
-    if res.fwhm is not None or not res.ok or res.col is None:
+    if res.fwhm is not None or not res.ok:
         return res.fwhm
-    spots = [(res.col, res.row)]
+    # with several targets, measure on the first one that came out: a
+    # target lost behind a satellite must not cost the frame its seeing
+    spot = None
+    for item in (getattr(res, "targets", None) or ()):
+        if item.get("ok") and item.get("col") is not None:
+            spot = (item["col"], item["row"])
+            break
+    if spot is None:
+        if res.col is None:
+            return res.fwhm
+        spot = (res.col, res.row)
+    spots = [spot]
     spots += [(r["x"], r["y"]) for _e, r in res.used
               if r.get("x") is not None and r.get("y") is not None]
     return photometry.estimate_fwhm(data, spots)
 
 
-def _frame_spots(cfg, wcs_ov=None, target_ov=None):
-    # The target and the comps on the frame about to be measured: what the
+def _frame_spots(cfg, wcs_ov=None, targets_ov=None):
+    # The targets and the comps on the frame about to be measured: what the
     # seeing (and the centroid) is measured on.
+    # @args: targets_ov - the targets on THIS frame's grid, as
+    #        ((label, x, y, bv), ...); None means the one in cfg.target_xy
     # @return: [(x, y), ...]
-    spots = [target_ov if target_ov is not None else cfg.target_xy]
+    spots = [(float(t[1]), float(t[2])) for t in (targets_ov or ())]
+    if not spots:
+        spots = [cfg.target_xy]
     w = wcs_ov if wcs_ov is not None else cfg.wcs
     if w is not None:
         for e in cfg.comp_set:
@@ -466,10 +558,10 @@ def _frame_spots(cfg, wcs_ov=None, target_ov=None):
 
 
 def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
-                   target_ov=None, fwhm_ref=None):
+                   targets_ov=None, fwhm_ref=None):
     # One (already loaded) frame through the shared plate recipe. With
     # registration the frame is measured on its NATIVE grid at the mapped
-    # coordinates (wcs_ov/target_ov), so the PSF is never resampled (D44).
+    # coordinates (wcs_ov/targets_ov), so the PSF is never resampled (D44).
     #
     # H3/the quality plan's B1: when the aperture follows the seeing, the
     # observer's radii are the ones of the REFERENCE frame and every frame
@@ -477,6 +569,11 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
     # frame whose focus blew up measurable instead of losing half its
     # flux outside a fixed aperture, and the frame's own FWHM also feeds
     # the centroid's Gaussian fit.
+    #
+    # Several targets go through here as one plate recipe: the comps are
+    # the same stars for all of them, so they are measured once and each
+    # target hangs from that single measurement (that is the whole saving
+    # of a campaign pass).
     # @return: the frame dict (with "fwhm" and "radii" actually used)
     meta = fits_meta.meta_from_header(header)
     night = _night_of(meta.get("mjd"))
@@ -488,7 +585,7 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
     fwhm = None
     if cfg.seeing_aperture:
         fwhm = photometry.estimate_fwhm(
-            data, _frame_spots(cfg, wcs_ov, target_ov))
+            data, _frame_spots(cfg, wcs_ov, targets_ov))
     radii = base
     seen_scale = None
     if cfg.seeing_aperture and fwhm and fwhm_ref:
@@ -499,7 +596,9 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         seen_scale = scale
     rap = (radii if radii else cfg.radii or (photometry.R_AP,))[0]
     pcfg = photometry.PlateConfig(
-        target_xy=target_ov if target_ov is not None else cfg.target_xy,
+        target_xy=(cfg.target_xy if not targets_ov
+                   else (targets_ov[0][1], targets_ov[0][2])),
+        targets=tuple(targets_ov or ()),
         entries=list(cfg.comp_set),
         header=header, wcs=wcs_ov if wcs_ov is not None else cfg.wcs,
         fwhm=fwhm,
@@ -1482,24 +1581,54 @@ def comp_messages(report, total=None):
     return out
 
 
-def measure_series(paths, cfg, progress=None, cancel=None):
-    # Measure a whole series frame by frame (T1-T7), grouping when asked
-    # (D19). Never raises for a bad frame: unreadable files are recorded
-    # and skipped; a cancelled run returns status "incomplete".
+def _target_list(cfg):
+    # The targets of this run, in REFERENCE pixels, as (label, x, y, bv).
+    #
+    # One target is the historical case and carries no label; several come
+    # from a campaign pass and each carries the name of its own project, so
+    # the curve it produces can be filed where it belongs.
+    # @args: cfg - SeriesConfig
+    # @return: [(label, x, y, bv), ...]
+    out = []
+    for entry in (cfg.targets or ()):
+        e = tuple(entry)
+        bv = (float(e[3]) if len(e) > 3 and e[3] is not None
+              else cfg.target_bv)
+        out.append((str(e[0]), float(e[1]), float(e[2]), bv))
+    if not out:
+        out.append(("", float(cfg.target_xy[0]), float(cfg.target_xy[1]),
+                    cfg.target_bv))
+    return out
+
+
+def _measure_frames(paths, cfg, targets, progress=None, cancel=None):
+    # The pass over the frames: the images are read once, the alignment is
+    # solved once and the comparison stars are measured once per frame, and
+    # every target is measured on that same read.
+    #
+    # That is the whole point of several targets: the comps are the same
+    # stars for all of them, so measuring them again per target would be
+    # the same numbers bought twice. What is NOT shared is the data: each
+    # target leaves here with its own measurements, to be filed in its own
+    # project.
+    #
+    # Never raises for a bad frame: unreadable files are recorded and
+    # skipped; a cancelled run comes back with status "incomplete".
     # @args: paths - FITS paths (visit order), cfg - SeriesConfig,
+    #        targets - [(label, x, y, bv)] in reference pixels,
     #        progress - optional callable(done, total),
     #        cancel - optional callable() -> True to stop
-    # @return: a SeriesResult
+    # @return: (frames, shared, status, errors, cfg) - cfg is the run's own,
+    #          with the gain it resolved
     paths = list(paths)
     total = len(paths)
-    result = SeriesResult(zp_mode=cfg.zp_mode,
-                          group_n=max(1, int(cfg.group_n)))
-    cfg, result.gain_report = _resolve_gain(cfg, paths)
+    cfg, gain_report = _resolve_gain(cfg, paths)
     apertures = {}
     if cfg.auto_aperture and cfg.radii is None:
         apertures = sweep_aperture(paths, cfg)
-        result.apertures = apertures
     frames = []
+    errors = {}
+    status = "complete"
     ref_data = None
     ref_stars = None
     prev_align = None
@@ -1525,11 +1654,11 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     aper = {"enabled": bool(cfg.seeing_aperture), "frames": [], "scaled": 0}
     for i, path in enumerate(paths):
         if cancel is not None and cancel():
-            result.status = "incomplete"
+            status = "incomplete"
             break
         loaded, err = _read_frame(path)
         if loaded is None:
-            result.errors[str(path)] = err
+            errors[str(path)] = err
             if progress is not None:
                 progress(i + 1, total)
             continue
@@ -1537,7 +1666,7 @@ def measure_series(paths, cfg, progress=None, cancel=None):
         align_info = None
         used = None
         wcs_ov = None
-        target_ov = None
+        targets_ov = None
         warped_mask = None
         if mode != "off":
             # the first readable frame is the reference grid (target_xy
@@ -1570,7 +1699,8 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                     report["shifts_px"].append(float(used["shift_px"]))
                     if used.get("rms_px") is not None:
                         report["rms_px"].append(float(used["rms_px"]))
-                    report["angle_deg"].append(float(used.get("angle_deg") or 0.0))
+                    report["angle_deg"].append(
+                        float(used.get("angle_deg") or 0.0))
                     if mode in ("warp", "similarity"):
                         data = register.apply_transform(
                             data, used["angle"], used["dx"], used["dy"])
@@ -1583,15 +1713,22 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                         # measure on the native grid at the mapped
                         # coordinates: the PSF is never resampled
                         wcs_ov = register.compose_wcs(cfg.wcs, used)
-                        target_ov = register.ref_to_src_point(
-                            used, cfg.target_xy, data.shape)
+                        targets_ov = [
+                            (t[0],
+                             *register.ref_to_src_point(
+                                 used, (t[1], t[2]), data.shape),
+                             t[3]) for t in targets]
                     prev_align = {"dx": used["dx"], "dy": used["dy"],
                                   "angle": used["angle"],
                                   "n": used.get("n") or 0}
+        if targets_ov is None:
+            targets_ov = [(t[0], t[1], t[2], t[3]) for t in targets]
         # a MOVING target (a NEO, a comet): the frame's own pointing says
         # where the ephemeris position lands on it. Without the per-frame
         # WCS this cannot be answered, and that is honest: a fixed frame
-        # carries a fixed answer, which is the reference plate's.
+        # carries a fixed answer, which is the reference plate's. It is the
+        # FIRST target, because that is what a moving object is; the rest
+        # of a pass are the fixed stars of the same field.
         if cfg.target_motion is not None:
             here = wcs_ov if wcs_ov is not None else cfg.wcs
             meta = fits_meta.meta_from_header(header)
@@ -1600,12 +1737,14 @@ def measure_series(paths, cfg, progress=None, cancel=None):
                 where = cfg.target_motion(jd)
                 if where is not None:
                     try:
-                        target_ov = here.sky_to_pixel(float(where[0]),
-                                                      float(where[1]))
+                        mx, my = here.sky_to_pixel(float(where[0]),
+                                                   float(where[1]))
+                        targets_ov[0] = (targets_ov[0][0], mx, my,
+                                         targets_ov[0][3])
                     except Exception:
-                        target_ov = None
+                        pass
         frame = _measure_frame(path, header, data, cfg, apertures,
-                               wcs_ov=wcs_ov, target_ov=target_ov,
+                               wcs_ov=wcs_ov, targets_ov=targets_ov,
                                fwhm_ref=fwhm_ref)
         if cfg.seeing_aperture:
             if fwhm_ref is None and frame.get("seen_fwhm"):
@@ -1621,43 +1760,87 @@ def measure_series(paths, cfg, progress=None, cancel=None):
             frame["align"] = align_info
             if align_info.get("failed"):
                 frame["align_failed"] = True
-        if used is not None and frame["res"].col is not None:
-            # the guide gate compares against the REFERENCE plate, so a
-            # frame measured on its own grid has to be mapped back
-            if mode == "coords":
-                frame["ref_xy"] = register.src_to_ref_point(
-                    used, (frame["res"].col, frame["res"].row), data.shape)
-            else:
-                frame["ref_xy"] = (frame["res"].col, frame["res"].row)
+        # the per-target geometry and verdicts, computed while the image is
+        # still alive (the array is released right after: the series holds
+        # points and flags, never pixels)
+        ref_by, cosmic_by, edge_by = {}, {}, {}
+        for item in frame["res"].targets:
+            label = item.get("label")
+            if item.get("col") is not None:
+                if used is not None and mode == "coords":
+                    # the guide gate compares against the REFERENCE plate,
+                    # so a frame measured on its own grid is mapped back
+                    ref_by[label] = register.src_to_ref_point(
+                        used, (item["col"], item["row"]), data.shape)
+                else:
+                    ref_by[label] = (item["col"], item["row"])
+            view = _PlateView(frame["res"], item)
+            cosmic_by[label] = _cosmic_flag({**frame, "res": view}, cfg)
+            if warped_mask is not None:
+                edge_by[label] = _aperture_off_footprint(
+                    warped_mask, view, frame["r_ap"])
+        frame["ref_xy_by"] = ref_by
+        frame["cosmic_by"] = cosmic_by
         if warped_mask is not None:
-            frame["align_edge"] = _aperture_off_footprint(
-                warped_mask, frame["res"], frame["r_ap"])
-            warped_mask = None
-        # the cosmic gate runs here, while the image is alive; the full
-        # array is released right away, so the series holds points and
-        # flags, never pixels (one frame in RAM at a time)
-        frame["cosmic"] = _cosmic_flag(frame, cfg)
+            frame["align_edge_by"] = edge_by
+        warped_mask = None
         frame.pop("data", None)
         frames.append(frame)
         if progress is not None:
             progress(i + 1, total)
     ref_data = None       # the alignment grid is no longer needed
     ref_stars = None
-    result.align_report = _align_report(report, cfg)
-    result.model_notes = _model_notes(frames, cfg, result.gain_report)
-    frames.sort(key=lambda f: (f["mjd"] if f["mjd"] is not None
-                               else float("inf")))
+    shared = {"gain_report": gain_report,
+              "align_report": _align_report(report, cfg),
+              "apertures": apertures,
+              "aperture_report": _aperture_report(aper)}
+    return frames, shared, status, errors, cfg
+
+
+def _series_result(frames, cfg, target, shared, status="complete",
+                   errors=None):
+    # The curve of ONE target, built from frames a pass already measured.
+    #
+    # The expensive part (reading the images, solving the alignment,
+    # measuring the comps on every frame) is behind us, so the second and
+    # third curves of a pass cost nothing but arithmetic. Each one comes
+    # out as a full SeriesResult because that is what a project stores.
+    # @args: frames - the measured frame dicts, cfg - the run's SeriesConfig
+    #        (with the gain it resolved), target - (label, x, y, bv) in
+    #        reference pixels, shared - the pass's shared blocks
+    # @return: a SeriesResult
+    label, tx, ty, bv = target
+    cfg_t = replace(cfg, target_xy=(tx, ty),
+                    target_bv=(bv if bv is not None else cfg.target_bv))
+    result = SeriesResult(zp_mode=cfg_t.zp_mode,
+                          group_n=max(1, int(cfg_t.group_n)))
+    result.status = status
+    result.errors = dict(errors or {})
+    result.gain_report = shared.get("gain_report")
+    result.align_report = shared.get("align_report")
+    result.apertures = shared.get("apertures") or {}
+    result.aperture_report = shared.get("aperture_report")
+    result.target_label = label
+    own = []
+    for f in frames:
+        item = next((it for it in f["res"].targets
+                     if it.get("label") == label), None)
+        if item is None:
+            continue
+        own.append(_view_frame(f, item))
+    result.model_notes = _model_notes(own, cfg_t, result.gain_report)
+    own.sort(key=lambda f: (f["mjd"] if f["mjd"] is not None
+                            else float("inf")))
     n = result.group_n
-    points = [_build_point(frames[i:i + n], cfg)
-              for i in range(0, len(frames), n)]
-    result.comp_report = _tie_comps(points, cfg)
+    points = [_build_point(own[i:i + n], cfg_t)
+              for i in range(0, len(own), n)]
+    result.comp_report = _tie_comps(points, cfg_t)
     result.seeing_report = _flag_seeing(points)
-    result.aperture_report = _aperture_report(aper)
-    _fill_neighbour_zp(points, cfg)
-    _flag_clouds(points, cfg)
-    if cfg.detrend_policy != "off":
+    _fill_neighbour_zp(points, cfg_t)
+    _flag_clouds(points, cfg_t)
+    if cfg_t.detrend_policy != "off":
         info = detrend_series(
-            points, "auto" if cfg.detrend_policy == "auto" else "airmass")
+            points, "auto" if cfg_t.detrend_policy == "auto" else "airmass")
         result.detrend = info
         if info:
             for p, d in zip(points, info["detrended"]):
@@ -1665,8 +1848,52 @@ def measure_series(paths, cfg, progress=None, cancel=None):
     for i, p in enumerate(points):
         p.index = i
     result.points = points
-    result.band = cfg.band or cfg.fallback_band
+    result.band = cfg_t.band or cfg_t.fallback_band
     return result
+
+
+def measure_series(paths, cfg, progress=None, cancel=None):
+    # Measure a whole series frame by frame (T1-T7), grouping when asked
+    # (D19). Never raises for a bad frame: unreadable files are recorded
+    # and skipped; a cancelled run returns status "incomplete".
+    #
+    # This returns ONE curve. If cfg.targets carries several targets the
+    # curve is the first one's: a pass over several objects is measured
+    # with measure_pass, and each curve is filed in its own project.
+    # @args: paths - FITS paths (visit order), cfg - SeriesConfig,
+    #        progress - optional callable(done, total),
+    #        cancel - optional callable() -> True to stop
+    # @return: a SeriesResult
+    targets = _target_list(cfg)
+    frames, shared, status, errors, run_cfg = _measure_frames(
+        paths, cfg, targets, progress, cancel)
+    return _series_result(frames, run_cfg, targets[0], shared, status, errors)
+
+
+def measure_pass(paths, cfg, targets=None, progress=None, cancel=None):
+    # One pass over the frames, one curve per target (a campaign pass).
+    #
+    # A project is one object, so this never means several curves inside
+    # one project: it means one read of the frames feeding several
+    # projects. The comparison stars, their ensemble and the zero point
+    # are measured once per frame and shared; the alignment is solved once;
+    # and each target leaves with its own SeriesResult, to be written into
+    # its own project (and its own visit) by the caller.
+    # @args: paths - FITS paths, cfg - SeriesConfig, targets - optional
+    #        ((label, x, y) | (label, x, y, bv), ...) in reference pixels
+    #        (cfg.targets when omitted), progress/cancel - as measure_series
+    # @return: a PassResult with one entry per target
+    if targets:
+        cfg = replace(cfg, targets=tuple(tuple(t) for t in targets))
+    wanted = _target_list(cfg)
+    frames, shared, status, errors, run_cfg = _measure_frames(
+        paths, cfg, wanted, progress, cancel)
+    out = PassResult(status=status, errors=errors, shared=shared)
+    for t in wanted:
+        out.targets.append({"label": t[0], "xy": (t[1], t[2]),
+                            "result": _series_result(frames, run_cfg, t,
+                                                     shared, status, errors)})
+    return out
 
 
 # ---------------- D20: cadence guard (analysis layer) ----------------

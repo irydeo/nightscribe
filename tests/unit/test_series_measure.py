@@ -888,3 +888,138 @@ def test_a_moving_target_is_measured_where_the_ephemeris_says(tmp_path):
     mags = [p.mag for p in moved.points if p.mag is not None]
     assert len(mags) == len(paths)
     assert max(mags) - min(mags) < 0.05
+
+
+# ---------------- a campaign pass: several targets, one read ----------
+
+# A second object of the same field, well clear of the comps (the nearest
+# one is 34 px away, the annulus ends at 15) and of the main target.
+SECOND_XY = (80.4, 45.0)
+
+
+def _plate_two(target_amp=7000.0, second_amp=3200.0, sky=100.0, noise=0.0,
+               seed=1, sigma=SIGMA):
+    # The same field as _plate, plus a second object: the campaign case,
+    # where the frames carry two variables and the comps serve both.
+    data = np.full((H, W), sky, dtype=np.float64)
+    yy, xx = np.ogrid[:H, :W]
+    stars = [(TARGET_XY[0], TARGET_XY[1], target_amp),
+             (SECOND_XY[0], SECOND_XY[1], second_amp)]
+    stars += [(x, y, a) for (x, y), a in
+              zip(COMP_XY, (11000, 10500, 11500, 10800, 10200))]
+    stars.append((CHECK_XY[0], CHECK_XY[1], 9000.0))
+    for sx, sy, amp in stars:
+        data += amp * np.exp(-((xx - sx) ** 2 + (yy - sy) ** 2)
+                             / (2 * sigma ** 2))
+    if noise > 0.0:
+        data += np.random.default_rng(seed).normal(0.0, noise, (H, W))
+    return data
+
+
+def _write_pass_frames(tmp_path, n=6, second_amp=3200.0):
+    paths = []
+    for i in range(n):
+        data = _plate_two(second_amp=second_amp, seed=1 + i)
+        date = f"2026-09-20T23:{30 + i:02d}:00"
+        paths.append(_write_plate(tmp_path / f"pass{i:03d}.fits", data,
+                                  date_obs=date, exptime=10.0))
+    return paths
+
+
+def _both_targets():
+    return (("A", TARGET_XY[0], TARGET_XY[1]),
+            ("B", SECOND_XY[0], SECOND_XY[1]))
+
+
+def test_a_pass_measures_every_target_with_one_ensemble(tmp_path):
+    # Two objects of the same field, one read of the frames: each gets its
+    # own curve, flat, and the comparison stars (therefore the ensemble
+    # and the zero point) are the same for both.
+    paths = _write_pass_frames(tmp_path)
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    cfg = _config(wcs, comps)
+    passed = sm.measure_pass(paths, cfg, targets=_both_targets())
+    assert passed.status == "complete"
+    assert [t["label"] for t in passed.targets] == ["A", "B"]
+    for entry in passed.targets:
+        result = entry["result"]
+        assert result.target_label == entry["label"]
+        pts = [p for p in result.points if p.mag is not None]
+        assert len(pts) == len(paths)
+        mags = [p.mag for p in pts]
+        assert max(mags) - min(mags) < 0.02
+    # one ensemble for both: the zero point of the frame is the comps', and
+    # the comps are the same stars
+    zp_a = passed.targets[0]["result"].points[0].zp
+    zp_b = passed.targets[1]["result"].points[0].zp
+    assert zp_a == pytest.approx(zp_b, abs=1e-9)
+
+
+def test_a_pass_curve_is_the_curve_a_solo_run_gives(tmp_path):
+    # Parity, the acceptance of the feature: measuring two objects together
+    # must not change either object's numbers. If it did, the saving would
+    # be paid in science.
+    paths = _write_pass_frames(tmp_path)
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    passed = sm.measure_pass(paths, _config(wcs, comps),
+                             targets=_both_targets())
+    solo_a = sm.measure_series(paths, _config(wcs, comps))
+    solo_b = sm.measure_series(paths, _config(wcs, comps,
+                                              target_xy=SECOND_XY))
+    for got, want in zip(passed.targets[0]["result"].points, solo_a.points):
+        assert got.mag == pytest.approx(want.mag, abs=1e-9)
+        assert got.err == pytest.approx(want.err, abs=1e-12)
+    for got, want in zip(passed.targets[1]["result"].points, solo_b.points):
+        assert got.mag == pytest.approx(want.mag, abs=1e-9)
+        assert got.err == pytest.approx(want.err, abs=1e-12)
+    # the shared blocks are the pass's, and they are copied to each curve
+    assert passed.targets[0]["result"].align_report == \
+        passed.targets[1]["result"].align_report
+    assert (passed.targets[0]["result"].gain_report
+            == passed.targets[1]["result"].gain_report)
+
+
+def test_the_pass_measures_the_comps_once_per_frame(tmp_path, monkeypatch):
+    # The saving, measured: adding a target costs ONE measurement per
+    # frame, not a whole second pass over the comparison stars.
+    paths = _write_pass_frames(tmp_path, n=5)
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    cfg = _config(wcs, comps)
+    calls = []
+    real = phot.measure_point
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(phot, "measure_point", counting)
+    sm.measure_series(paths, cfg)
+    solo = len(calls)
+    calls.clear()
+    sm.measure_pass(paths, cfg, targets=_both_targets())
+    both = len(calls)
+    assert both - solo == len(paths)      # one more target per frame
+    assert both < 2 * solo                # and nothing else was repeated
+    assert both == len(paths) * (2 + 6)   # 2 targets + 5 comps + 1 check
+
+
+def test_a_lost_target_does_not_take_the_other_with_it(tmp_path):
+    # A wrong coordinate (or a satellite trail, or an object out of the
+    # field) loses ITS curve and says why; the sibling is measured as if
+    # nothing had happened. Mark, never delete; and never drag the other
+    # down with it.
+    paths = _write_pass_frames(tmp_path, n=4)
+    wcs = _reference_wcs()
+    comps = _comp_set(wcs)
+    passed = sm.measure_pass(
+        paths, _config(wcs, comps),
+        targets=(("A", TARGET_XY[0], TARGET_XY[1]), ("lost", 4.0, 4.0)))
+    good = passed.targets[0]["result"]
+    assert len([p for p in good.points if p.mag is not None]) == len(paths)
+    lost = passed.targets[1]["result"]
+    assert all(p.mag is None for p in lost.points)
+    assert all("unusable" in p.flags for p in lost.points)
+    assert passed.status == "complete"

@@ -1077,3 +1077,98 @@ def test_a_lonely_star_is_untouched_by_the_defences():
                                     robust=True)
     assert robust["x"] == pytest.approx(plain["x"], abs=0.02)
     assert robust["y"] == pytest.approx(plain["y"], abs=0.02)
+
+
+# ---------------- several targets, one set of comps (E5a) --------------
+
+_SECOND_TARGET = (140.3, 100.2)
+
+
+def _two_target_plate():
+    # The campaign case on a synthetic plate: two objects of the same field
+    # (the frozen contract star and a second one well clear of the comp
+    # ring), the same comparison stars for both.
+    stars = [(_CONTRACT_TARGET[0], _CONTRACT_TARGET[1], 8000.0)]
+    stars += [(x, y, a) for (x, y), a in
+              zip(_CONTRACT_COMPS, (12000, 11000, 10500, 11500, 10800))]
+    stars.append((_CONTRACT_CHECK[0], _CONTRACT_CHECK[1], 9000.0))
+    stars.append((_SECOND_TARGET[0], _SECOND_TARGET[1], 5000.0))
+    return _plate(200, 200, stars, sky=100.0, noise=1.0, seed=7)
+
+
+def _plate_kwargs(entries):
+    return dict(entries=entries, wcs=_FlatWcs(), band="V",
+                radii=(6.0, 10.0, 15.0), fwhm=None, site_gain=2.0,
+                site_ron=5.0, site_flat=0.007, site_lat=40.0,
+                site_lon=-3.0, site_aperture_m=0.254, site_height_m=650.0)
+
+
+def test_every_target_of_a_plate_is_measured_like_it_was_alone():
+    # Parity is the acceptance of the whole feature: measuring two objects
+    # in one pass must give each of them exactly the numbers a solo
+    # measurement gives. Otherwise the saving would be paid in science.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    both = phot.measure_plate(data, phot.PlateConfig(
+        targets=(("A", _CONTRACT_TARGET[0], _CONTRACT_TARGET[1]),
+                 ("B", _SECOND_TARGET[0], _SECOND_TARGET[1])), **base))
+    solo_a = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, **base))
+    solo_b = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_SECOND_TARGET, **base))
+    assert both.ok
+    assert [t["label"] for t in both.targets] == ["A", "B"]
+    assert both.targets[0]["mag"] == pytest.approx(solo_a.mag, abs=1e-9)
+    assert both.targets[1]["mag"] == pytest.approx(solo_b.mag, abs=1e-9)
+    assert both.targets[0]["err_total"] == pytest.approx(solo_a.err_total,
+                                                         abs=1e-12)
+    assert both.targets[1]["err_total"] == pytest.approx(solo_b.err_total,
+                                                         abs=1e-12)
+    # the scalar fields are the first target's, exactly as before
+    assert both.mag == pytest.approx(solo_a.mag, abs=1e-9)
+    assert both.col == pytest.approx(solo_a.col, abs=1e-9)
+    assert both.check["delta"] == pytest.approx(solo_a.check["delta"],
+                                                abs=1e-12)
+
+
+def test_the_comparison_stars_are_measured_once_for_every_target(monkeypatch):
+    # The whole point of the feature: the comps are the same stars for all
+    # the targets, so the second target costs ONE measurement per plate,
+    # not a whole new set of comps. That is the saving of a campaign pass.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    calls = []
+    real = phot.measure_point
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(phot, "measure_point", counting)
+    phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, **base))
+    one = len(calls)
+    calls.clear()
+    phot.measure_plate(data, phot.PlateConfig(
+        targets=(("A", _CONTRACT_TARGET[0], _CONTRACT_TARGET[1]),
+                 ("B", _SECOND_TARGET[0], _SECOND_TARGET[1])), **base))
+    two = len(calls)
+    # five comps plus the check are the shared six; only the target moves
+    assert one == 1 + 6
+    assert two == 2 + 6
+    assert two < 2 * one
+
+
+def test_a_refused_target_does_not_refuse_the_others():
+    # One object lands on empty sky (a wrong coordinate, a satellite trail):
+    # it is refused, and the other one is still measured and calibrated.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    both = phot.measure_plate(data, phot.PlateConfig(
+        targets=(("A", _CONTRACT_TARGET[0], _CONTRACT_TARGET[1]),
+                 ("sky", 3.0, 3.0)), **base))
+    assert both.ok and both.mag is not None
+    assert both.targets[0]["ok"] and both.targets[0]["mag"] is not None
+    assert not both.targets[1]["ok"]
+    assert both.targets[1]["mag"] is None
+    assert both.targets[1]["reason"]

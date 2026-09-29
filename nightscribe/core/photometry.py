@@ -1455,6 +1455,13 @@ class PlateConfig:
     # Every knob of the single-plate recipe, resolved by the caller (the
     # GUI reads its widgets and Ajustes; the series engine its own cfg).
     target_xy: tuple = (0.0, 0.0)   # the click, in plate pixels
+    targets: tuple = ()             # SEVERAL targets on the same plate, as
+                                    # ((label, x, y) | (label, x, y, bv), ...).
+                                    # The label travels with the curve; the
+                                    # optional B-V is that object's own
+                                    # colour, because the colour term is per
+                                    # target even when the comps are shared.
+                                    # Empty means "the one in target_xy"
     entries: list = field(default_factory=list)
     header: dict = field(default_factory=dict)
     wcs: object = None
@@ -1497,6 +1504,13 @@ class PlateResult:
     ok: bool = False
     reason: dict = None
     target: dict = None
+    targets: list = field(default_factory=list)   # every target of the plate,
+                                    # each {"label", "target", "col", "row",
+                                    # "bv", "ok", "reason", "inst_t", "zp",
+                                    # "mag", "err_internal", "err_total",
+                                    # "scint", "check"}. The scalar fields
+                                    # above mirror the FIRST one, which is
+                                    # what a single-target caller reads
     col: float = None               # measured centroid, in plate pixels
     row: float = None
     fwhm: float = None
@@ -1580,34 +1594,61 @@ def measure_plate(image, cfg):
     lin = cfg.linear_adu if scale == 1.0 else None
     res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
                       sigma_clip=cfg.sigmaclip)
-    tx, ty = cfg.target_xy
-    if cfg.comp_image is not None:
-        # H2b: the target on the difference, the comps on the work frame
-        target = measure_point(
-            image, tx / scale, ty / scale,
-            r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
-            r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
-            sat_adu=None, sky_mode=cfg.sky_mode,
-            fwhm=(fwhm / scale if fwhm else None))
-    else:
-        target = measure_point(
-            image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
-            r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
-            linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm,
-            robust=cfg.robust_centroid)
-    res.target = target
-    if not target["ok"]:
-        res.reason = target.get("reason")
+    # ---- the targets ------------------------------------------------
+    # One target is the historical case; several is the campaign pass, and
+    # the whole point is what is NOT repeated: the comparison stars are
+    # measured ONCE per plate and every target hangs from that same
+    # measurement. A project is one object and its curve is its own, so
+    # "several targets" never means several curves inside one project: it
+    # means one pass over the frames feeding several projects.
+    targets = [tuple(t) for t in (cfg.targets or ())]
+    if not targets:
+        targets = [("", cfg.target_xy[0], cfg.target_xy[1])]
+    measured = []
+    for entry in targets:
+        label, tx, ty = entry[0], float(entry[1]), float(entry[2])
+        bv = (float(entry[3]) if len(entry) > 3 and entry[3] is not None
+              else cfg.target_bv)
+        if cfg.comp_image is not None:
+            # H2b: the target on the difference, the comps on the work frame
+            target = measure_point(
+                image, tx / scale, ty / scale,
+                r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
+                r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
+                sat_adu=None, sky_mode=cfg.sky_mode,
+                fwhm=(fwhm / scale if fwhm else None))
+        else:
+            target = measure_point(
+                image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
+                r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
+                linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm,
+                robust=cfg.robust_centroid)
+        mx, my = target["x"], target["y"]
+        if cfg.comp_image is not None:
+            mx, my = mx * scale, my * scale
+        measured.append({
+            "label": label, "target": target, "col": mx, "row": my,
+            "bv": bv, "ok": bool(target["ok"]),
+            "reason": target.get("reason"),
+            "inst_t": (-2.5 * math.log10(target["flux"])
+                       if target["ok"] and target.get("flux") else None),
+            # calibrated further down; every key exists from here so a
+            # caller writing a curve always reads the same shape
+            "zp": None, "mag": None, "err_internal": None,
+            "err_total": None, "scint": None, "check": None})
+    res.targets = measured
+    # the scalar fields describe the FIRST target: a caller that asked for
+    # one keeps reading exactly what it always read
+    first = measured[0]
+    res.target, res.col, res.row = first["target"], first["col"], first["row"]
+    res.inst_t = first["inst_t"]
+    if not any(m["ok"] for m in measured):
+        # nothing could be measured: there is no light to calibrate
+        res.reason = first.get("reason")
         return res
-    mx, my = target["x"], target["y"]
-    if cfg.comp_image is not None:
-        mx, my = mx * scale, my * scale
-    res.col, res.row = mx, my
     res.ok = True
     band, bands = pick_band(cfg.entries, cfg.band, cfg.fallback_band)
     res.band, res.bands_avail = band, bands
-    inst_t = -2.5 * math.log10(target["flux"])
-    res.inst_t = inst_t
     # the comps on the same plate (or the paired work frame); the ceiling
     # applies to them too: a clipped comp poisons the zero point
     inst, cat, bvs, used_entries = [], [], [], []
@@ -1655,40 +1696,51 @@ def measure_plate(image, cfg):
     res.skipped = skipped
     res.derived = any(band_of(e["star"], band)[1]
                       for e, _r in used_entries)
-    if cfg.color:
-        zp = calibrate_with_color(inst, cat, bvs,
-                                  target_bv=cfg.target_bv)
-    else:
-        zp = calibrate_zero_point(inst, cat)
-    zp.setdefault("color_used", False)   # the plain path carries none
-    res.zp = zp
     # error budget: CCD equation (gain from header or Ajustes) + the
-    # zero point + scintillation + the flat residual + the colour term
+    # zero point + scintillation + the flat residual + the colour term.
+    # The gain and the comps are the frame's, so they are resolved once;
+    # the zero point is fitted per target only because the colour term
+    # hangs from the target's own B-V.
     inst_header = header_instrument(cfg.header)
     gain = (inst_header["gain"] if inst_header["gain"] is not None
             else cfg.site_gain)
     ron = (inst_header["ron"] if inst_header["ron"] is not None
            else cfg.site_ron)
     res.gain = gain
-    flux_err = ccd_flux_error(target["flux"], target["sky_pp"],
-                              target["n_pix"], gain=gain, ron=ron,
-                              exptime=inst_header["exptime"],
-                              dark_e_s=cfg.site_dark,
-                              n_sky=target.get("n_sky"))
-    ccd_mag_err = mag_error(target["flux"], flux_err)
-    res.err_internal = ccd_mag_err
-    scint = _plate_scintillation(cfg, mx, my, inst_header["exptime"])
-    res.scint = scint
-    color_err = zp.get("target_color_err")
-    err_total = combine_errors(ccd_mag_err, zp["zp_err"], scint,
-                               cfg.site_flat, color_err)
-    res.err_total = err_total
-    zp_for_mag = zp["zp"]
-    if zp.get("color_used") and zp["k"] is not None:
-        # the fit's zero point is at B-V = 0: move the target onto it
-        zp_for_mag = zp["zp"] + zp["k"] * cfg.target_bv
-    mag, _e = calibrated_mag(inst_t, zp_for_mag)
-    res.mag = mag
-    res.check = _check_verdict(cfg.entries, used_entries, band, zp,
-                               err_total)
+    for m in measured:
+        if not m["ok"]:
+            continue
+        if cfg.color:
+            zp = calibrate_with_color(inst, cat, bvs, target_bv=m["bv"])
+        else:
+            zp = calibrate_zero_point(inst, cat)
+        zp.setdefault("color_used", False)   # the plain path carries none
+        m["zp"] = zp
+        target = m["target"]
+        flux_err = ccd_flux_error(target["flux"], target["sky_pp"],
+                                  target["n_pix"], gain=gain, ron=ron,
+                                  exptime=inst_header["exptime"],
+                                  dark_e_s=cfg.site_dark,
+                                  n_sky=target.get("n_sky"))
+        m["err_internal"] = mag_error(target["flux"], flux_err)
+        m["scint"] = _plate_scintillation(cfg, m["col"], m["row"],
+                                          inst_header["exptime"])
+        m["err_total"] = combine_errors(
+            m["err_internal"], zp["zp_err"], m["scint"], cfg.site_flat,
+            zp.get("target_color_err"))
+        zp_for_mag = zp["zp"]
+        if zp.get("color_used") and zp["k"] is not None:
+            # the fit's zero point is at B-V = 0: move the target onto it
+            zp_for_mag = zp["zp"] + zp["k"] * m["bv"]
+        m["mag"], _e = calibrated_mag(m["inst_t"], zp_for_mag)
+        m["check"] = _check_verdict(cfg.entries, used_entries, band, zp,
+                                    m["err_total"])
+    # the first target's own numbers are the plate's numbers (legacy view)
+    if first["ok"]:
+        res.zp = first.get("zp")
+        res.err_internal = first.get("err_internal")
+        res.scint = first.get("scint")
+        res.err_total = first.get("err_total")
+        res.mag = first.get("mag")
+        res.check = first.get("check")
     return res

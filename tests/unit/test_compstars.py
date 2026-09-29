@@ -494,3 +494,54 @@ def test_propose_comps_reports_what_the_plate_rejected():
     assert len(seq["comps"]) == 5
     assert seq["rejected"] == [{"name": "S3", "key": "saturated",
                                 "es": "satura", "en": "saturated"}]
+
+
+# ---------------- the expensive question is asked late (H1) ----------
+
+def test_the_plate_is_asked_only_about_the_candidates_being_picked():
+    # Measuring the plate per candidate is what costs (58.8 ms on a real
+    # 2048² frame). It used to be asked of EVERY isolated star in the
+    # field, including the ones the brightness tiers discard for free:
+    # measured, 200 checks and 10.4 s for a 200-star field. It is asked now
+    # about the stars actually being picked, in ranked order, and each one
+    # ONCE (the memo), which is what the check star already did.
+    stars = []
+    for i in range(60):
+        stars.append(_star(10.0 + i * 0.02, 20.0, 12.0 + i * 0.05, bv=0.8))
+    asked = []
+
+    def validator(star, role="comp"):
+        asked.append(star["id"])
+        return None
+
+    seq = compstars.propose_comps(stars, 12.5, validator=validator)
+    assert len(seq["comps"]) == 8
+    # one question per picked candidate (plus the check), never one per star
+    assert len(asked) <= 12, len(asked)
+    assert len(asked) == len(set(asked))          # and never twice
+    assert seq["rejected"] == []                  # nothing was refused
+    # parity: the sequence is the one a field with no plate check gives
+    plain = compstars.propose_comps(stars, 12.5)
+    assert [e["name"][-1] for e in seq["comps"]] == \
+        [e["name"][-1] for e in plain["comps"]]
+    assert [e["star"]["id"] for e in seq["comps"]] == \
+        [e["star"]["id"] for e in plain["comps"]]
+
+
+def test_a_refused_candidate_is_reported_once_and_the_next_one_takes_its_place():
+    # A refusal is not a hole: the next candidate in the ranked order comes
+    # in, and the refusal is counted once (it was counted twice: once as a
+    # comp candidate and once as a check candidate).
+    stars = [_star(10.0 + i * 0.05, 20.0, 12.0 + i * 0.1, bv=0.8)
+             for i in range(12)]
+    victim = stars[3]["id"]
+
+    def validator(star, role="comp"):
+        if star["id"] == victim:
+            return {"key": "saturated", "es": "satura", "en": "saturated"}
+        return None
+
+    seq = compstars.propose_comps(stars, 12.5, validator=validator)
+    assert [r["name"] for r in seq["rejected"]] == [victim] * 1
+    assert len(seq["comps"]) == 8
+    assert victim not in [e["star"]["id"] for e in seq["comps"]]

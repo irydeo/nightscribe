@@ -139,29 +139,44 @@ def pixel_coverage(shape, cx, cy, r, subsample=8):
     # them) are measured by subsampling a grid inside the pixel. A few
     # dozen small computations per star, not one per plate pixel.
     #
-    # @args: shape - (h, w) of the plate, cx/cy - the star's centre (in
-    #        float pixels), r - the aperture radius, subsample - the grid
-    #        per axis used on the boundary pixels
-    # @return: a (h, w) float array of coverages in 0..1
-    h, w = shape
-    yy, xx = np.ogrid[:h, :w]
+    # The answer is the PATCH the aperture needs, not the whole plate: a
+    # (h, w) array per star cost 38 of the 50 ms that measure_point spent
+    # on a 2048² plate (measured), and that price was paid for every
+    # candidate of a proposal and every frame of a series. A star is a few
+    # pixels wide; the plate is not.
+    # @args: shape - (h, w) of the plate (the bounds), cx/cy - the star's
+    #        centre (in float pixels), r - the aperture radius,
+    #        subsample - the grid per axis used on the boundary pixels
+    # @return: (cover, y0, x0): the coverages in 0..1 of the pixels around
+    #          the aperture, and the plate coordinates of the patch's
+    #          top-left corner (empty patch when the star is off-plate)
+    h, w = int(shape[0]), int(shape[1])
+    y0 = max(0, int(math.floor(cy - r - 1.0)))
+    y1 = min(h, int(math.ceil(cy + r + 1.0)) + 1)
+    x0 = max(0, int(math.floor(cx - r - 1.0)))
+    x1 = min(w, int(math.ceil(cx + r + 1.0)) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return np.zeros((0, 0), dtype=np.float64), 0, 0
+    yy, xx = np.mgrid[y0:y1, x0:x1]
     dist = np.hypot(xx - cx, yy - cy)
-    cover = np.zeros((h, w), dtype=np.float64)
+    cover = np.zeros(dist.shape, dtype=np.float64)
     cover[dist <= r - 0.8] = 1.0
     maybe = (dist > r - 0.8) & (dist < r + 0.8)
     if not np.any(maybe):
-        return cover
+        return cover, y0, x0
     n = max(2, int(subsample))
     offsets = (np.arange(n) + 0.5) / n - 0.5      # sub-pixel centres
     rows, cols = np.nonzero(maybe)
     for py, px in zip(rows, cols):
         # the fraction of THIS pixel inside the circle: how many of the
-        # sub-samples fall within the radius
-        sx = px + offsets[:, None]
-        sy = py + offsets[None, :]
+        # sub-samples fall within the radius. The sub-samples use the
+        # PLATE's coordinates (the patch's own indices are local: mixing
+        # them up answers about the wrong pixel)
+        sx = (px + x0) + offsets[:, None]
+        sy = (py + y0) + offsets[None, :]
         inside = ((sx - cx) ** 2 + (sy - cy) ** 2) <= r * r
         cover[py, px] = float(inside.sum()) / float(n * n)
-    return cover
+    return cover, y0, x0
 
 
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
@@ -209,22 +224,37 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                                 robust=robust)
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
         cen_ok = cen["ok"]
-    yy, xx = np.ogrid[:h, :w]
+    # EVERYTHING BELOW HAPPENS IN A PATCH around the star (the aperture
+    # and the sky annulus need nothing else): the plate-wide arrays this
+    # used to build per star were 20 times the work of the arithmetic they
+    # fed (measured on a 2048² plate: 38 ms of `pixel_coverage` plus the
+    # full-frame radius grid).
+    pad = int(math.ceil(max(r_ann_out, r_ap))) + 2
+    py0 = max(0, int(math.floor(cy)) - pad)
+    py1 = min(h, int(math.ceil(cy)) + pad + 1)
+    px0 = max(0, int(math.floor(cx)) - pad)
+    px1 = min(w, int(math.ceil(cx)) + pad + 1)
+    sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
+    yy, xx = np.mgrid[py0:py1, px0:px1]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
     # the aperture, pixel by pixel: each pixel weighs the fraction of its
     # area that falls inside the circle (see pixel_coverage). The effective
     # AREA is the sum of those weights, and it is what the sky is scaled
     # by: using the pixel COUNT here would subtract too much sky from a
     # small aperture and too little from a big one.
-    weights = pixel_coverage((h, w), cx, cy, r_ap)
+    cover, cy0, cx0 = pixel_coverage((h, w), cx, cy, r_ap)
+    weights = np.zeros(sub.shape, dtype=np.float64)
+    if cover.size:
+        weights[cy0 - py0:cy0 - py0 + cover.shape[0],
+                cx0 - px0:cx0 - px0 + cover.shape[1]] = cover
     usable = weights > 0.0
     if not np.any(usable):
         out = _fail("sin píxeles de apertura", "no aperture pixels")
         out.update(x=cx, y=cy)
         return out
-    finite = np.isfinite(data[usable])
+    finite = np.isfinite(sub[usable])
     w_eff = np.where(finite, weights[usable], 0.0)
-    values = np.where(finite, data[usable], 0.0)
+    values = np.where(finite, sub[usable], 0.0)
     area = float(w_eff.sum())
     if area <= 0.0:
         out = _fail("sin píxeles finitos en la apertura",
@@ -233,14 +263,14 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         return out
     n_pix = area
     total = float((values * w_eff).sum())
-    peak = float(np.nanmax(data[usable]))
+    peak = float(np.nanmax(sub[usable]))
     ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
-    ann_pixels = data[ann_mask]
+    ann_pixels = sub[ann_mask]
     if ann_pixels.size:
         iters = SIG_ITERS if sigma_clip else 0
         if sky_mode == "plane":
-            ann_x = np.broadcast_to(xx, data.shape)[ann_mask]
-            ann_y = np.broadcast_to(yy, data.shape)[ann_mask]
+            ann_x = np.broadcast_to(xx, sub.shape)[ann_mask]
+            ann_y = np.broadcast_to(yy, sub.shape)[ann_mask]
             sky_pp = _sky_plane_at(ann_x, ann_y,
                                    ann_pixels, cx, cy, iters=iters)
         else:
@@ -262,7 +292,7 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     if not saturated and frame_max > sky_pp:
         eps = 1e-6 * max(1.0, frame_max)
         plateau = int(np.count_nonzero(
-            (r2 <= r_ann_in ** 2) & (data > frame_max - eps)))
+            (r2 <= r_ann_in ** 2) & (sub > frame_max - eps)))
         saturated = plateau >= _CLIP_MIN_PIXELS
     if not saturated and sat_adu is None and linear_adu is None:
         # No ceiling anywhere (no SATURATE card, no setting, no camera

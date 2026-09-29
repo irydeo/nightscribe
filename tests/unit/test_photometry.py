@@ -923,21 +923,28 @@ def test_pixel_coverage_is_the_true_area():
     #   * a big aperture sums to pi r^2 (the staircase cancels out);
     #   * a small one does NOT (that is exactly the error it fixes);
     #   * a pixel entirely inside weighs 1 and one entirely outside 0.
+    # the coverage comes as a PATCH around the aperture (with the plate
+    # coordinates of its corner): building the whole plate was 38 ms per
+    # star on a real 2048² frame, and a star is a few pixels wide
     for r in (2.0, 3.0, 6.0, 12.0):
-        cover = phot.pixel_coverage((80, 80), 40.0, 40.0, r)
+        cover, _y0, _x0 = phot.pixel_coverage((80, 80), 40.0, 40.0, r)
         area = float(cover.sum())
         true_area = math.pi * r * r
         assert area == pytest.approx(true_area, rel=0.02), (r, area)
     # the small aperture: whole pixels would count 13 against 12.57
-    cover = phot.pixel_coverage((20, 20), 10.0, 10.0, 2.0)
+    cover, _y0, _x0 = phot.pixel_coverage((20, 20), 10.0, 10.0, 2.0)
     assert float(cover.sum()) == pytest.approx(math.pi * 4, rel=0.02)
     whole = int(np.count_nonzero(
         np.hypot(*np.mgrid[0:20, 0:20] - 10.0) <= 2.0))
     assert whole != pytest.approx(math.pi * 4, rel=0.02)
-    # the extremes
-    cover = phot.pixel_coverage((40, 40), 20.0, 20.0, 5.0)
-    assert cover[20, 20] == 1.0
+    # the extremes: the centre weighs one, the patch's corner (outside the
+    # circle) weighs nothing
+    cover, y0, x0 = phot.pixel_coverage((40, 40), 20.0, 20.0, 5.0)
+    assert cover[20 - y0, 20 - x0] == 1.0
     assert cover[0, 0] == 0.0
+    # and a star off the plate comes back as an empty patch, never a crash
+    empty, _y0, _x0 = phot.pixel_coverage((40, 40), -60.0, 20.0, 5.0)
+    assert empty.size == 0
 
 
 def test_a_small_aperture_recovers_the_flux_a_star_really_has():

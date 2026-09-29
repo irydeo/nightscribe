@@ -433,7 +433,7 @@ def local_sky_sigma(plate, x, y, r_ap):
 
 def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
                       linear_adu=None, gain=None, ron=None, shape=None,
-                      margin_px=0.0):
+                      margin_px=0.0, centroid_mode="raw"):
     # Measures ONE candidate on the observer's own plate and says whether
     # it is usable (quality plan, C1). The catalogue cannot know this: it
     # does not see a saturated core, a sensor that stops being linear at
@@ -449,6 +449,13 @@ def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
     #        gain/ron - e-/ADU and e- (a real SNR when known, a proxy when
     #        not), shape - the frame's (h, w), margin_px - the ring kept
     #        clear at the edges
+    #    centroid_mode - how the aperture is centred: "raw" (the
+    #        catalogue's own position, the default here) or "gaussian"
+    #        (the matched filter). A VERDICT needs a peak and a flux, not a
+    #        0.01 px centroid: the matched filter costs ten milliseconds of
+    #        the fourteen and cannot change a yes/no about saturation, so
+    #        the cheap centring is the honest default for a validation
+    #        (measured: 13.8 ms -> 4.2 ms per candidate).
     # @return: None when the star is fine, else {"key", "es", "en"}
     if plate is None or wcs is None:
         return None
@@ -471,7 +478,8 @@ def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
                 "es": "el anillo de cielo se sale del marco",
                 "en": "its sky annulus falls off the frame"}
     r = photometry.measure_point(plate, x, y, r_ap=r_ap, r_ann_in=r_in,
-                                 r_ann_out=r_out, sat_adu=None)
+                                 r_ann_out=r_out, sat_adu=None,
+                                 centroid_mode=centroid_mode)
     if not r.get("ok"):
         return {"key": "unmeasurable",
                 "es": "no se puede medir en esta placa",
@@ -552,18 +560,6 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
             if s.get("vsx") is None
             and _is_isolated(s, stars, isolation_arcsec)]
     rejected = []
-    if validator is not None:
-        kept = []
-        for s in pool:
-            verdict = validator(s, "comp")
-            if verdict is None:
-                kept.append(s)
-            else:
-                rejected.append({"name": s.get("name") or s.get("id"),
-                                 "key": verdict.get("key"),
-                                 "es": verdict.get("es"),
-                                 "en": verdict.get("en")})
-        pool = kept
 
     def color_rank(s):
         # @return: (colour outside tolerance?, |ΔB−V| or worst-case)
@@ -596,6 +592,35 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
                        - bright_window),
                       key=lambda s: (color_rank(s), close(s)))
     ordered = near + fainter + brighter
+    # The plate is asked ONCE per candidate, whatever role it plays: the
+    # same answer applies to a star considered as a comp and then as the
+    # check, and asking twice both wastes the expensive measurement and
+    # reports the same refusal twice. The memo lives for this call only:
+    # the caller owns the plate and may ask again with another one.
+    validated = {}
+    reported = set()
+
+    def note_refusal(cand, verdict):
+        # @args: cand - the star, verdict - the plate's verdict
+        # @return: None. Each refusal is reported ONCE, whatever role the
+        #          star was playing when it was refused
+        if id(cand) in reported:
+            return
+        reported.add(id(cand))
+        rejected.append({"name": cand.get("name") or cand.get("id"),
+                         "key": verdict.get("key"),
+                         "es": verdict.get("es"),
+                         "en": verdict.get("en")})
+
+    def verdict_of(cand, role):
+        # @args: cand - the star, role - "comp" | "check"
+        # @return: the plate's verdict (None when the star is fine)
+        key = id(cand)
+        if key not in validated:
+            validated[key] = (validator(cand, role)
+                              if validator is not None else None)
+        return validated[key]
+
     picked = []
     for cand in ordered:
         if len(picked) >= n:
@@ -604,19 +629,27 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
                 separation_arcsec(cand, p["star"]) < spread_arcmin * 60.0
                 for p in picked):
             continue
+        # THE EXPENSIVE QUESTION IS ASKED ONLY HERE. Measuring the plate per
+        # candidate is what costs (58 ms on a real field): it was asked of
+        # EVERY isolated star in the field, including the ones that were
+        # never going to be chosen because they are far too faint or too
+        # bright (the tiers below decide that for free). It is asked now
+        # about the stars that are actually being picked, in ranked order,
+        # which is what the check star already did.
+        if validator is not None:
+            verdict = verdict_of(cand, "comp")
+            if verdict is not None:
+                note_refusal(cand, verdict)
+                continue
         picked.append(entry(cand, f"Comp{len(picked) + 1}", "comp"))
     check_entry = None
     if check:
         for cand in ordered:
             if all(p["star"] is not cand for p in picked):
                 if validator is not None:
-                    verdict = validator(cand, "check")
+                    verdict = verdict_of(cand, "check")
                     if verdict is not None:
-                        rejected.append({"name": cand.get("name")
-                                         or cand.get("id"),
-                                         "key": verdict.get("key"),
-                                         "es": verdict.get("es"),
-                                         "en": verdict.get("en")})
+                        note_refusal(cand, verdict)
                         continue
                 check_entry = entry(cand, "Check", "check")
                 break

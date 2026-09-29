@@ -973,18 +973,31 @@ is in `docs/PLANS/series-quality.md`.
 
 **Numbers**: 244/244 measurable points (was 5), **0.899** correlation with the
 observer's independent reduction (was 0.32), **0.0094 mag** residual (was 0.13),
-0.23 s/frame (was 4.6 s and not converging), unit suite green: **2071**.
+0.23 s/frame (was 4.6 s and not converging), unit suite green: **2105**.
+
+**Following phases (done the same day, see ADR-048 rev.)**:
+
+- **G1/G3 · The gain**: `core/gain.py` measures it on the frames themselves (0.772 ±
+  0.002 e-/ADU on the real series) and Settings gains the two fields nobody could
+  fill. A point's internal error goes from non-existent to **0.0052 mag**.
+- **A · The chart**: robust scale, zoom/pan, bar = photon and band = systematic
+  (`err_internal`, migration **v13**), data flags separated from calibration
+  caveats, and controls in the series block.
+- **B · Robustness**: the aperture really follows the seeing (the radii belong to the
+  reference FWHM), a **`seeing`** flag against `cloud`, and a robust analysis (clip on
+  the folded curve; the clip on the time series was measured and rejected).
+- **C · Comps**: `validate_on_plate` measures every candidate on the open plate
+  (saturation, linearity, sensor, SNR) and the field is the sensor's real rectangle.
+- **D · The curve**: AAVSO's `fetch_lightcurve`, joint folding, and a bounded search
+  so a decade of history cannot freeze the window (from 60 s to 3-4 s).
 
 **Entry point (for whoever picks this up)**:
 
-1. **B2 remainder**: the comparison *proposal* (`core/compstars.py`) must place comps
-   inside the **real sensor rectangle** (today the FOV acts as a square and the real
-   set had 4 of 9 saturated and 1 off-frame) and warn about those the drift loses.
-   The engine already says so in the panel; the builder must stop proposing them.
-2. **C3**: `core/sources/aavso.py` can fetch the community's **latest** magnitude;
-   fixing a one-night period needs the **whole curve** (same token and cache), as the
-   author of the reference report did with ASASSN.
-3. **D5 remainder**: ADR-054 and the ADR-048 revision are written; what remains are
-   the equivalent sections in `PRECISION` if T8 is to be linked.
+1. **G2**: the "Measure the gain…" dialog (two pairs, with the read noise) on top of
+   `core/gain.py`, which already does the two-level fit; only the window is missing.
+2. **`seeing` in the analysis**: the per-night zero-point offset in the multi-night
+   fold (the plan's D3) is still open.
+3. **Declared debt**: the AAVSO curve package has no network test; its parsing
+   (`_parse_curve`) is covered by the priority-chain tests.
 4. The fixture `tests/data/v0526per/` (8 cropped real frames, 4 MB) is the safety
    net: **do not replace it with synthetic data**.

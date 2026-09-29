@@ -555,7 +555,8 @@ su propia guía: `SEQUENCES`. Cuando la curva ya está, **buscar el período y p
 
 *Detalles de implementación y decisiones: `core/series.py`,
 `core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`,
-`core/series_measure.py`, `core/register.py`, `core/periodogram.py`;
+`core/series_measure.py`, `core/register.py`, `core/periodogram.py`,
+`core/gain.py`;
 ADR-018 (FITS/WCS propio), ADR-042 (secuencias fotométricas), ADR-044
 (Editor FITS unificado), ADR-048 (la serie frame a frame y su alineación),
 ADR-054 (búsqueda de período).*

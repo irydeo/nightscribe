@@ -109,7 +109,12 @@ nightscribe/
                       #   física (estrellas emparejadas + rms en px), numpy puro
     periodogram.py   # búsqueda de período (ADR-054): Lomb-Scargle generalizado
                       #   con media flotante + PDM + ventana espectral, FAP por
-                      #   bootstrap, ciclos cubiertos y notas honestas
+                      #   bootstrap con presupuesto de trabajo, ciclos cubiertos
+                      #   y notas honestas
+    gain.py          # ganancia y ruido de lectura medidos en las propias tomas
+                      #   (par a la misma exposición: var(F1-F2) = 2·nivel/g +
+                      #   2·RON²/g²; cajas de cielo robustas) y la cadena de
+                      #   prioridad Ajustes → cabecera → medida (ADR-048 rev.)
     transit_fit.py   # modelo de tránsito con limb darkening cuadrático (numpy,
                       #   paridad <1e-5 vs batman) + ajuste LM con detrend
                       #   conjunto y errores OOT (plan fase 7; compuerta abierta)

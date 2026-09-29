@@ -137,6 +137,47 @@ comparadas no coinciden entre sí y de las que no han entrado en casi ningún fr
 eso suele querer decir que hay que rehacer la secuencia con estrellas más cercanas
 al objetivo y de brillo parecido.
 
+Y la secuencia que la app propone ya no sale del catálogo a ciegas: cada candidata se
+**mide en tu propia placa** y se descarta con su motivo (saturada, por encima de la
+linealidad de la cámara, fuera del rectángulo real del sensor, o demasiado débil).
+El campo es el rectángulo del sensor, no un cuadrado, y lleva un anillo de seguridad
+para que la deriva de la noche no se lleve una comp del borde.
+
+### 5.3 Ganancia y ruido de lectura: o el error no es el del CCD
+
+Sin ganancia, el error de un punto es la dispersión de las comparadas, no la ecuación
+del CCD (en la serie de V0526 Per, 0.17 mag en lugar de 0.005). Los dos campos están
+en **Ajustes → perfil de cámara**: el ruido de lectura se precarga del preset (es un
+dato de datasheet) y la ganancia no, porque depende de la unidad y del ajuste. Si no
+la pones, el motor **la mide en tus propias tomas** (dos tomas a la misma exposición
+bastan) y lo dice en el panel, con su incertidumbre y su origen; nunca la escribe en
+Ajustes por su cuenta.
+
+### 5.4 La escala de la gráfica
+
+El eje de magnitud sigue el **núcleo** de la curva (mediana ± 6 sigmas robustas), no
+el mínimo y el máximo, así un punto anómalo no aplasta el resto; los que caen fuera
+siguen en la gráfica anclados al borde. La rueda acerca, el botón izquierdo arrastra
+y **Ajustar** vuelve al panel. Los botones **Robusta**, **Errores** y **Ocultar
+marcados** están sobre la curva del bloque de serie: «Errores» dibuja el error de
+fotones de cada punto y la **banda** del sistemático de calibración (el punto cero es
+de toda la noche: como banda, nunca como una barra por punto).
+
+**Marcados: dos clases.** Una bandera de **dato** (saturado, rayo cósmico,
+desenfoque, nube, toma sin alinear) sale como rombo hueco. Un **aviso** de
+calibración (pocas comparsas, punto cero prestado) es el marcador normal con un borde
+ámbar tenue: la curva no está mal, su calibración se apoya en pocas estrellas.
+
+### 5.5 El desenfoque no es una nube
+
+Si la FWHM de una toma se sale del rango robusto de su noche, el punto se marca
+**`seeing`** (desenfoque, un rastro o un satélite en el núcleo) y no `cloud`: una
+nube mueve el cielo y el punto cero **sin** cambiar la PSF, un desenfoque cambia la
+PSF y deja el cielo quieto. Con «la apertura sigue el seeing» encendida (por
+defecto), los radios que eliges son los de la FWHM de referencia y cada toma los
+escala por la suya, así que el flujo que se iba fuera de la apertura vuelve: en la
+serie real, la toma desenfocada pasa de desviarse 0.049 a 0.017 mag.
+
 El **perfil de cámara** (Ajustes → Perfil de cámara fotométrica) fija el
 **full well, la corriente de oscuridad y el límite de linealidad / tope de
 exposición por ganancia** (mídelos; hay un valor sugerido). En un sCMOS muy
@@ -204,6 +245,14 @@ venga cada punto).
   por él. Sólo se guarda si tú lo pides y sólo si hay período.
 - **Exportar**: PNG del informe (como el de PerWin/PhaseWin, con los dos paneles) y
   un CSV con el periodograma completo y la curva plegada.
+- **La curva de la comunidad**: «Añadir la curva de la comunidad…» trae las
+  observaciones AAVSO de la estrella (necesita el token de la API en Ajustes) y las
+  pliega **con** las tuyas, en gris y huecas, nunca mezcladas. Así una noche deja de
+  ser toda la historia, y así se hizo el informe de referencia.
+- **Robustez**: «Dejar fuera los puntos marcados» (encendido) evita que un punto cuyo
+  dato está en duda guíe el periodograma, y «Descartar atípicos» pliega la curva con
+  el período de la primera pasada y quita lo que se sale de su propio bin de fase,
+  diciendo cuántos.
 
 Ejemplo real: la serie de **V0526 Per** (244 tomas, 2,9 h) da un pico en 0,134 d con
 FAP 0,016 y **1,0 ciclos cubiertos**. El informe del observador, con varias noches y

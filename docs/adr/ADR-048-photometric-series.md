@@ -330,6 +330,215 @@ han quedado las tomas. `QUALITY_MIN` desaparece como puerta y aparece
 `register.trusted`. La fixture de regresión (`tests/data/v0526per/`, 8 frames
 recortados reales) guarda el caso para que no vuelva.
 
+## Revisión (2026-09-29, la ganancia, la escala y el seeing): lo que hacía ilegibles las curvas
+
+**Contexto**: con la alineación arreglada, la serie real seguía sin poder leerse. Tres
+causas distintas, medidas:
+
+1. **La ganancia no se podía introducir.** `ccd_gain` y `ccd_read_noise` estaban
+   declaradas en la configuración y las leían tres módulos (la ecuación del CCD, la
+   receta de la placa y el «full well ≈ X ADU at your gain» del panel de cámara),
+   pero **ningún control de Ajustes las escribía**. Sin ganancia el error de un punto
+   es la dispersión de las comparadas: 0.17 mag en esta serie.
+2. **La gráfica dibujaba ese sistemático 244 veces.** Las barras de error tenían 0.17
+   mag de media sobre una curva que varía 0.12: el panel entero eran barras. Y los
+   ejes ponían una sola cifra decimal («12.5», «60297.8»), distinta para cada punto.
+3. **Los frames 189-191 no eran una nube.** El cielo no se movió (4015 → 4020 ADU),
+   el pico cayó un factor 4 y la FWHM pasó de 3.3 a 8.8 px: un **desenfoque**. El
+   motor los marcaba `cloud` (o nada) y, con la apertura fija, perdían 0.75 mag.
+
+**Decisión**:
+
+- **`core/gain.py`**: la ganancia y el ruido de lectura se **miden en las propias
+  tomas**. Dos tomas a la misma exposición dan `var(F1−F2) = 2·nivel/g + 2·RON²/g²`,
+  así que una recta ajustada sobre cajas de cielo robustas da la ganancia (la
+  pendiente) y el ruido de lectura (el término constante). Un segundo par a otro
+  nivel abre la palanca y fija el RON; con un solo nivel se mide la ganancia y **se
+  dice** que el RON queda desconocido. Medido en la serie real: **0.772 ± 0.002
+  e-/ADU** con 473 de 475 cajas limpias.
+- **Ajustes gana los dos campos** (Ajustes → perfil de cámara), con el ruido de
+  lectura precargado del preset (es un dato de datasheet) y la ganancia nunca
+  (depende de la unidad y del ajuste). El panel dice en vivo qué implica.
+- **Cadena de prioridad**: Ajustes → cabecera del FITS (`GAIN`/`EGAIN`/`CCDGAIN`,
+  `RDNOISE`/`READNOIS`/`RON`) → **estimada de las propias tomas** → ninguna. El valor,
+  su origen y su incertidumbre viajan en el `cfg_json` de la ejecución y el panel lo
+  dice en lenguaje llano. **Nunca** se escribe en Ajustes a espaldas del observador.
+- **El punto guarda su propio error** (`photometry_points.err_internal`, migración
+  **v13**): `err` sigue siendo el total, que es lo que ven AAVSO y el CSV.
+- **La escala es robusta** (mediana ± 6 sigmas robustas, intersectada con el dato, más
+  un 10 % de aire): un punto anómalo ya no aplasta la curva. Los que caen fuera se
+  anclan al borde con una marca, nunca se esconden. Las etiquetas de los ejes llevan
+  las cifras decimales que pide el rango.
+- **La barra es el fotón, el sistemático es una banda.** Cuando el sistemático es más
+  ancho que la ventana no se dibuja (llenaría el panel): lo dice la leyenda.
+- **Las banderas se separan**: una bandera de DATO (saturado, cósmico, desenfoque,
+  nube, sin alinear) es el rombo hueco de siempre; un AVISO de calibración (pocas
+  comparsas) es el marcador normal con un borde ámbar tenue, para que una secuencia
+  con pocas comps no parezca una secuencia con 200 puntos malos. «Ocultar marcados»
+  oculta sólo los primeros y viene apagado (T7).
+- **La apertura sigue el seeing de verdad**: los radios del observador son los de la
+  **FWHM de referencia** y cada toma los escala por la suya (con topes). La FWHM de
+  la toma alimenta además el ajuste gaussiano del centroide. La toma 190 pasa de
+  desviarse 0.049 a 0.017 mag y su error baja un tercio.
+- **`seeing` es una bandera nueva** (FWHM fuera del rango robusto de su noche), y
+  `cloud` sólo salta cuando el punto cero se mueve **y** la PSF no se ha movido, que
+  es lo que es una nube.
+- **El análisis es robusto como puede serlo una curva periódica**: el recorte
+  pliega la curva con el período de la primera pasada y descarta lo que se sale de su
+  propio bin de fase, y vuelve a buscar. Se probó primero el recorte sobre la serie
+  temporal y **se rechazó con medidas**: sobre una variable limpia de 0.3 mag se
+  llevaba el 7 % de la curva y seguía sin aislar el punto salvaje. El diálogo de
+  período gana las dos casillas (dejar fuera los marcados, descartar atípicos).
+
+**Alternativas**: pedir la ganancia al observador sin darle forma de medirla
+(rechazado: es lo que había); recortar la barra sin separar el sistemático
+(rechazado: mezcla dos cosas distintas en el mismo símbolo); un recorte de atípicos
+sobre la serie temporal (rechazado con medidas, arriba); llamar «nube» a un
+desenfoque (rechazado: manda al observador a mirar lo que no es).
+
+**Consecuencias**: `err_internal` pasa de inexistente a **0.0052 mag** en la serie
+real, así que la gráfica se lee y el error dice la verdad (el total de 0.176 mag es
+el sistemático, y ahora se ve como banda). Queda una deuda declarada: la **propuesta
+de comparsas** debe validarse contra la placa del observador (saturación, linealidad,
+rectángulo del sensor, SNR), no sólo contra el catálogo.
+
+## Revision (2026-09-29, the gain, the scale and the seeing): what made the curves unreadable
+
+**Context**: with alignment fixed, the real series was still unreadable. Three
+different causes, measured:
+
+1. **The gain could not be entered.** `ccd_gain` and `ccd_read_noise` were declared
+   in the config and read by three modules (the CCD equation, the plate recipe and
+   the camera panel's "full well ≈ X ADU at your gain"), but **no Settings control
+   ever wrote them**. Without a gain a point's error is the scatter of the
+   comparison stars: 0.17 mag on this series.
+2. **The chart drew that systematic 244 times.** The error bars averaged 0.17 mag on
+   a curve that varies 0.12: the whole panel was bars. And the axes printed a single
+   decimal ("12.5", "60297.8"), the same for every point.
+3. **Frames 189-191 were not a cloud.** The sky did not move (4015 → 4020 ADU), the
+   peak fell by a factor of four and the FWHM went from 3.3 to 8.8 px: a **focus
+   excursion**. The engine flagged them `cloud` (when it flagged them at all) and,
+   with a fixed aperture, they lost 0.75 mag.
+
+**Decision**:
+
+- **`core/gain.py`**: the gain and the read noise are **measured on the frames
+  themselves**. Two frames at the same exposure give
+  `var(F1−F2) = 2·level/g + 2·ron²/g²`, so a line fitted over robust sky boxes
+  yields the gain (the slope) and the read noise (the intercept). A second pair at
+  another level widens the lever arm and pins the read noise; with one level only the
+  gain comes out and the module **says** the read noise stays unknown. Measured on
+  the real series: **0.772 ± 0.002 e-/ADU**, 473 of 475 boxes clean.
+- **Settings gains the two fields** (Settings → camera profile), with the read noise
+  filled from the preset (a datasheet fact) and the gain never (per unit and per gain
+  setting). The panel says live what it implies.
+- **Priority chain**: settings → the FITS header (`GAIN`/`EGAIN`/`CCDGAIN`,
+  `RDNOISE`/`READNOIS`/`RON`) → **measured on the frames** → none. The value, its
+  origin and its uncertainty travel in the run's `cfg_json` and the panel says it in
+  plain language. It is **never** written into Settings behind the observer's back.
+- **A point keeps its own error** (`photometry_points.err_internal`, migration
+  **v13**): `err` stays the total, which is what AAVSO and the CSV see.
+- **The scale is robust** (median ± 6 robust sigmas, intersected with the data, 10 %
+  of air): an anomalous point can no longer flatten the curve. The ones outside are
+  anchored to the edge with a caret, never hidden. The axis labels carry as many
+  decimals as the span needs.
+- **The bar is the photon, the systematic is a band.** When the systematic is wider
+  than the window it is not drawn (it would fill the panel): the legend says it.
+- **Flags are split**: a DATA flag (saturated, cosmic, focus, cloud, unaligned) is
+  the hollow diamond it always was; a calibration CAVEAT (few comps) is the normal
+  marker with a faint amber edge, so a thin comp set does not read as 200 bad points.
+  "Hide flagged" hides only the first and is off by default (T7).
+- **The aperture follows the seeing for real**: the observer's radii belong to the
+  **reference FWHM** and each frame scales them by its own (within limits). The
+  frame's FWHM also feeds the centroid's Gaussian fit. Frame 190's deviation drops
+  from 0.049 to 0.017 mag and its error by a third.
+- **`seeing` is a new flag** (FWHM outside its night's robust range), and `cloud`
+  only fires when the zero point moves **and** the PSF did not, which is what a cloud
+  is.
+- **The analysis is robust the way a periodic curve can be**: the clip folds the
+  curve by the first pass's period and rejects what leaves its own phase bin, then
+  searches again. A clip on the time series was tried first and **rejected on
+  measurements**: on a clean 0.3 mag variable it threw away 7 % of the curve and
+  still could not isolate one wild point. The period dialog gains the two switches
+  (leave out the flagged points, reject outliers).
+
+**Alternatives**: asking for the gain without giving a way to measure it (rejected:
+that was the state); clipping the bar without separating the systematic (rejected:
+two different things in one symbol); an outlier clip on the time series (rejected on
+measurements, above); calling a focus excursion a cloud (rejected: it sends the
+observer to look at the wrong thing).
+
+**Consequences**: `err_internal` goes from non-existent to **0.0052 mag** on the real
+series, so the chart reads and the error tells the truth (the 0.176 mag total is the
+systematic, and it now shows as a band). One debt is declared: the **comparison
+proposal** must be validated against the observer's plate (saturation, linearity,
+sensor rectangle, SNR), not only against the catalogue.
+
+## Revisión (2026-09-29, comparsas validadas y la curva de la comunidad)
+
+**Decisión** (cierre de la deuda anterior, más la D del plan):
+
+- **`compstars.validate_on_plate`**: cada candidata se mide en la **placa abierta** y
+  se descarta con su motivo: fuera del sensor (con margen de seguridad), anillo de
+  cielo fuera del marco, saturada, por encima de la linealidad de la cámara, o
+  demasiado débil (pico por debajo de 12 sigmas de cielo, o SNR de flujo por debajo
+  de 30, el real cuando hay ganancia y un proxy honesto en ADU cuando no).
+  `propose_comps` acepta un `validator` y devuelve la lista de descartes con su
+  motivo; el núcleo sigue sin Qt y sin placa, y un validador falso ejercita los cinco
+  veredictos en los tests. El panel de la pestaña Compare dice cuántas se han dejado
+  fuera y por qué. El caso real (4 de 9 saturadas, 1 fuera del sensor) es justo lo
+  que esto devuelve.
+- **El campo es el rectángulo REAL del sensor**, no un cuadrado: 43' en una cámara de
+  1663 × 1252 son 43' × 32', y el cuadrado proponía estrellas que el sensor no ve.
+  Ambos lados se encogen además por un anillo de seguridad de 90" para que la deriva
+  de la noche no se lleve una comp del borde.
+- **La curva de la comunidad (AAVSO)**: `sources/aavso.py` gana
+  `fetch_lightcurve(name, token, days, bands)` (toda la curva de la estrella, con sus
+  errores, su banda y si el punto es una estimación visual; caché 12 h; el mismo
+  token que las vigilias). El diálogo de período la añade y la pliega **con** la
+  curva propia: en gris y hueca, nunca mezclada, con las visuales ponderadas
+  conservadoramente. Es la vía para fijar el período de una sola noche, y es como se
+  hizo el informe de referencia.
+- **La búsqueda escala**: añadir una década de historia a una noche pedía cientos de
+  miles de frecuencias y el bootstrap lo multiplicaba por 120 (medido: un minuto
+  congelado). La rejilla tiene tope (`GRID_MAX`) con el sobremuestreo relajado y el
+  tope **dicho**; el bootstrap y los niveles de FAP del gráfico reciben un
+  presupuesto de trabajo que elige su rejilla y **compara el pico observado en esa
+  misma rejilla**; el PDM tiene su propio tope y la ventana espectral está
+  vectorizada. El mismo caso responde en 3-4 s.
+
+## Revision (2026-09-29, validated comps and the community curve)
+
+**Decision** (closing the debt above, plus phase D of the plan):
+
+- **`compstars.validate_on_plate`**: every candidate is measured on the **open
+  plate** and rejected with its reason: outside the sensor (with a safety margin),
+  its sky annulus off the frame, saturated, above the camera's linearity limit, or
+  too faint (a peak below 12 sky sigmas, or a flux SNR below 30, the real one when a
+  gain is known and an honest ADU proxy when not). `propose_comps` takes a
+  `validator` and returns the rejected list with the reason; the core stays free of
+  Qt and of the plate, and a fake validator exercises the five verdicts in the tests.
+  The Compare tab's panel says how many were left out and why. The real case (4 of 9
+  saturated, 1 off-sensor) is exactly what this returns.
+- **The field is the REAL sensor rectangle**, not a square: 43' on a 1663 x 1252
+  camera is 43' x 32', and the square proposed stars the sensor never shows. Both
+  sides also shrink by a 90" safety ring so the night's drift cannot lose a comp at
+  the very edge.
+- **The community curve (AAVSO)**: `sources/aavso.py` gains
+  `fetch_lightcurve(name, token, days, bands)` (the star's whole curve, with its
+  errors, its band and whether the point is a visual estimate; cached 12 h; the same
+  token the vigils use). The period dialog adds it and folds it **with** the
+  observer's own curve: grey and hollow, never mixed, with visual estimates weighted
+  conservatively. It is how a one-night period gets fixed, and how the reference
+  report was made.
+- **The search scales**: adding a decade of history to one night asked for hundreds
+  of thousands of frequencies and the bootstrap multiplied that by 120 (measured: a
+  minute frozen). The grid is capped (`GRID_MAX`) with the oversampling relaxed and
+  the cap **said**; the bootstrap and the plot's FAP levels get a work budget that
+  picks their grid and **compares the observed peak on that same grid**; the PDM has
+  its own cap and the spectral window is vectorised. The same case answers in 3-4 s.
+
+
 ## Revision (2026-09-29, D17/D44): per-frame alignment stops being opt-in
 
 **Context**: a real series from the ObSN group (V0526 Per, 244 frames of 40 s, no

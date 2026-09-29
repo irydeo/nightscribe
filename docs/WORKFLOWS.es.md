@@ -1220,19 +1220,32 @@ después) está en `docs/PLANS/series-quality.md`.
 
 **Números**: 244/244 puntos medibles (antes 5), correlación **0.899** con la
 reducción independiente del observador (antes 0.32), residuo **0.0094 mag** (antes
-0.13), 0,23 s/frame (antes 4,6 s y sin converger), suite unitaria verde: **2071**.
+0.13), 0,23 s/frame (antes 4,6 s y sin converger), suite unitaria verde: **2105**.
+
+**Fases siguientes (hechas el mismo día, ver ADR-048 rev.)**:
+
+- **G1/G3 · La ganancia**: `core/gain.py` la mide en las propias tomas (0.772 ± 0.002
+  e-/ADU en la serie real) y Ajustes gana los dos campos que nadie podía rellenar. El
+  error interno de un punto pasa de inexistente a **0.0052 mag**.
+- **A · La gráfica**: escala robusta, zoom/paneo, barra = fotón y banda = sistemático
+  (`err_internal`, migración **v13**), banderas de dato separadas de los avisos de
+  calibración, y controles en el bloque de serie.
+- **B · Robustez**: la apertura sigue el seeing de verdad (los radios son los de la
+  FWHM de referencia), bandera **`seeing`** frente a `cloud`, y análisis robusto
+  (recorte sobre la curva plegada; el recorte sobre la serie temporal se midió y se
+  rechazó).
+- **C · Comparsas**: `validate_on_plate` mide cada candidata en la placa abierta
+  (saturación, linealidad, sensor, SNR) y el campo es el rectángulo real del sensor.
+- **D · La curva**: `fetch_lightcurve` de AAVSO, plegado conjunto, y la búsqueda
+  acotada para que una década de historia no congele la ventana (de 60 s a 3-4 s).
 
 **Punto de entrada (para quien retome)**:
 
-1. **B2 restante**: la *propuesta* de comparaciones (`core/compstars.py`) debe
-   colocar las comps dentro del **rectángulo real del sensor** (hoy el FOV actúa de
-   cuadrado y el set del caso real tenía 4 de 9 saturadas y 1 fuera del marco) y
-   avisar de las que se pierden con la deriva. El motor ya lo dice en el panel; falta
-   que el constructor no las proponga.
-2. **C3**: `core/sources/aavso.py` sabe pedir la **última** magnitud de la comunidad;
-   para fijar un período de una sola noche hace falta la **curva completa** (mismo
-   token y misma caché), como hizo el autor del informe de referencia con ASASSN.
-3. **D5 restante**: ADR-054 y la revisión de ADR-048 están escritas; quedan las
-   secciones equivalentes en `PRECISION` si se quiere enlazar T8.
+1. **G2**: el diálogo «Medir la ganancia…» (dos pares, con el ruido de lectura) sobre
+   `core/gain.py`, que ya hace el ajuste de dos niveles; sólo falta la ventana.
+2. **`seeing` en el análisis**: el desfase de punto cero por noche en el plegado
+   multinoche (D3 del plan) sigue abierto.
+3. **Deuda declarada**: el paquete AAVSO de la curva no tiene test de red; su parseo
+   (`_parse_curve`) sí está cubierto por los tests de la cadena de prioridad.
 4. La fixture `tests/data/v0526per/` (8 frames reales recortados, 4 MB) es la red de
    seguridad: **no la sustituyas por datos sintéticos**.

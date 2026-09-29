@@ -133,6 +133,47 @@ disagree with each other and about those missing from almost every frame: that
 usually means the sequence deserves rebuilding with stars closer to the target and of
 similar brightness.
 
+And the sequence the app proposes no longer comes from the catalogue blind: every
+candidate is **measured on your own plate** and rejected with its reason (saturated,
+above the camera's linearity limit, outside the sensor's real rectangle, or too
+faint). The field is the sensor's rectangle, not a square, and it carries a safety
+ring so the night's drift cannot lose a comp at the very edge.
+
+### 5.3 Gain and read noise: or the error is not the CCD's
+
+Without a gain, a point's error is the scatter of the comparison stars, not the CCD
+equation (0.17 mag instead of 0.005 on the V0526 Per series). Both fields live in
+**Settings → camera profile**: the read noise is filled from the preset (a datasheet
+fact) and the gain never is, because it depends on the unit and the gain setting. If
+you do not set it, the engine **measures it on your own frames** (two frames at the
+same exposure are enough) and says so in the panel, with its uncertainty and its
+origin; it never writes it into Settings behind your back.
+
+### 5.4 The chart's scale
+
+The magnitude axis follows the **core** of the curve (median ± 6 robust sigmas), not
+the minimum and maximum, so an anomalous point does not flatten the rest; the ones
+outside stay on the chart, anchored to the edge. The wheel zooms, the left button
+drags and **Fit** returns to the panel. The **Robust**, **Errors** and **Hide
+flagged** buttons sit above the series curve: "Errors" draws each point's photon
+error and the **band** of the calibration systematic (the zero point belongs to the
+whole night: a band, never a bar per point).
+
+**Flags come in two kinds.** A **data** flag (saturated, cosmic ray, focus, cloud,
+unaligned frame) comes out as the hollow diamond. A calibration **caveat** (few
+comps, a borrowed zero point) is the normal marker with a faint amber edge: the curve
+is fine, its calibration leans on few stars.
+
+### 5.5 A defocus is not a cloud
+
+If a frame's FWHM leaves its night's robust range, the point is flagged **`seeing`**
+(defocus, a trail or a satellite through the core) and not `cloud`: a cloud moves the
+sky and the zero point **without** changing the PSF, a defocus changes the PSF and
+leaves the sky alone. With "the aperture follows the seeing" on (the default), the
+radii you choose belong to the reference FWHM and each frame scales them by its own,
+so the light that was falling outside the aperture comes back: on the real series,
+the defocused frame goes from deviating 0.049 to 0.017 mag.
+
 The **camera profile** (Settings → Photometric camera profile) fixes the
 **full well, the dark current and the linearity limit / working max exposure per
 gain** (measure them; a suggested value is offered). On a very sensitive sCMOS
@@ -197,6 +238,14 @@ the one in the series block of the editor's Measure tab. The window works on the
   is only saved when you ask, and only when there is a period.
 - **Export**: the report PNG (like PerWin's/PhaseWin's, both panels) and a CSV with
   the whole periodogram and the folded curve.
+- **The community's curve**: "Add the community curve…" fetches the AAVSO
+  observations of the star (it needs the API token in Settings) and folds them WITH
+  yours, grey and hollow, never mixed. This is how one night stops being the whole
+  story and how the reference report was made.
+- **Robustness**: "Leave out the flagged points" (on by default) keeps a point whose
+  data is in doubt from steering the periodogram, and "Reject outliers" folds the
+  curve by the first pass's period and drops what leaves its own phase bin, saying
+  how many.
 
 A real example: the **V0526 Per** series (244 frames, 2.9 h) peaks at 0.134 d with
 FAP 0.016 and **1.0 cycles covered**. The observer's own report, with several nights

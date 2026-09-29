@@ -554,7 +554,8 @@ two-panel report) lives in `SEQUENCES` §9 and ADR-054.
 
 *Implementation details and decisions: `core/series.py`,
 `core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`,
-`core/series_measure.py`, `core/register.py`, `core/periodogram.py`;
+`core/series_measure.py`, `core/register.py`, `core/periodogram.py`,
+`core/gain.py`;
 ADR-018 (own FITS/WCS), ADR-042 (photometric sequences), ADR-044
 (unified FITS editor), ADR-048 (the frame-by-frame series and its alignment),
 ADR-054 (period search).*

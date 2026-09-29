@@ -244,8 +244,10 @@ class UfeMeasureTab(QWidget):
                                      # undoable run (ADR-050, P2 #19)
         self.chart_series = LightCurveChart()
         self.chart_series.setToolTip(self.tr(
-            "Click a point to select it; click the empty space (or "
-            "double-click) to bring the curve to the front"))
+            "Click a point to select it; drag to move the view; the wheel "
+            "zooms BOTH axes around the cursor, Shift zooms the time only "
+            "and Ctrl the magnitudes only; double-click frames the whole "
+            "curve again"))
         # A click on a POINT selects it (quality plan, A); a click on the
         # empty space still opens the big view, and the double-click keeps
         # working too. The chart itself decides which is which, because

@@ -562,11 +562,14 @@ def test_the_legend_is_a_footnote_and_the_caveats_go_to_the_notes():
         assert not any(noise in t for t in texts)
     # the little font and the muted colour are the point, not decoration
     from PySide6.QtWidgets import QGraphicsSimpleTextItem
-    from nightscribe.gui.widgets.lightcurve_widget import _FONT_LEGEND
+    from nightscribe.gui.widgets.lightcurve_widget import _FONT_LEGEND_PX
     legend = [it for it in chart.scene().items()
               if isinstance(it, QGraphicsSimpleTextItem)
               and "measured" in it.text()]
-    assert legend and legend[0].font().pointSize() == _FONT_LEGEND
+    assert legend
+    # the font is sized so that it RENDERS at _FONT_LEGEND_PX pixels
+    assert legend[0].font().pixelSize() == pytest.approx(
+        _FONT_LEGEND_PX / chart._scale, rel=0.15)
 
 
 # ---------------- V3: the window, the wheel and the export ----------------
@@ -857,3 +860,98 @@ def test_the_plot_has_a_frame_and_not_just_a_floating_grid():
              if 5.0 <= max(abs(l.line().x2() - l.line().x1()),
                            abs(l.line().y2() - l.line().y1())) <= 8.0]
     assert long_h and long_v and len(short) >= 3
+
+
+# ---------------- the plot takes the shape of its window (A4) ----------
+
+def _shown(width=1200, height=520):
+    # A chart with a REAL viewport: the plot's shape follows the window, so
+    # a test without one would measure the default 640x480 stand-in.
+    _app()
+    chart = LightCurveChart()
+    chart.show()
+    chart.resize(width, height)
+    QApplication.processEvents()
+    chart._do_fit()
+    return chart
+
+
+def test_the_plot_is_not_a_square_in_a_wide_window():
+    # The observer's ask, and the reason the time axis had no room: a fixed
+    # square fitted into a wide panel leaves two dead margins and squeezes
+    # the labels. A light curve is horizontal; the plot stretches with it.
+    chart = _shown(1200, 520)
+    from nightscribe.gui.widgets.lightcurve_widget import _HALF
+    assert chart._hx > 1.5 * _HALF          # clearly wider than tall
+    # and the whole scene takes the window's proportions, so the fit FILLS
+    # the panel instead of letterboxing
+    r = chart.sceneRect()
+    vp = chart.viewport()
+    assert (r.width() / r.height()) == pytest.approx(
+        vp.width() / float(vp.height()), rel=0.02)
+
+
+def test_a_narrow_window_gets_a_narrow_plot_but_never_a_square():
+    # Never narrower than a square: a tall, narrow panel would otherwise
+    # ask for a plot with no width at all.
+    chart = _shown(360, 700)
+    from nightscribe.gui.widgets.lightcurve_widget import _HALF
+    assert chart._hx == pytest.approx(_HALF)
+
+
+def test_the_time_axis_can_be_zoomed_on_its_own():
+    # "the X axis should be zoomable too": the wheel zooms both, Shift the
+    # time only and Ctrl the magnitudes only.
+    chart = _shown()
+    chart.set_data(_curve(40))
+    before = chart._bounds
+    assert chart.zoom_window(2.0, axes="x") is True
+    after = chart._bounds
+    assert after[1] - after[0] < before[1] - before[0]      # time narrowed
+    assert after[3] - after[2] == pytest.approx(before[3] - before[2])
+    # and the other way round
+    chart.reset_view()
+    before = chart._bounds
+    chart.zoom_window(2.0, axes="y")
+    after = chart._bounds
+    assert after[1] - after[0] == pytest.approx(before[1] - before[0])
+    assert after[3] - after[2] < before[3] - before[2]
+
+
+def test_the_labels_are_sized_in_pixels_and_do_not_grow_with_the_window():
+    # A size in scene units grows and shrinks with the panel: a maximized
+    # window would come out with giant labels. The reader's own size is in
+    # pixels, and the conversion is exactly this.
+    small = _shown(700, 380)
+    big = _shown(1600, 900)
+    assert small._scale != big._scale
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    for chart in (small, big):
+        texts = [it for it in chart.scene().items()
+                 if isinstance(it, QGraphicsSimpleTextItem)]
+        assert texts
+        for item in texts:
+            rendered = item.font().pixelSize() * chart._scale
+            # every label renders at its own size, within a pixel
+            assert 9.0 <= rendered <= 14.0
+
+
+def test_the_time_labels_get_room_to_breathe():
+    # A date like "20 Sep 2026" takes twice the room of a "21:30", so the
+    # axis asks for fewer ticks instead of letting them collide. The scene
+    # units are roughly the tick font's own units, so this is an honest
+    # measure of what the reader sees.
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    from PySide6.QtGui import QFontMetricsF
+    chart = _shown(1200, 520)
+    chart.set_data(_curve(40))                      # a night: 0.39 d
+    items = [it for it in chart.scene().items()
+             if isinstance(it, QGraphicsSimpleTextItem)
+             and len(it.text()) == 5 and it.text()[2] == ":"]
+    assert len(items) >= 3
+    widths = [QFontMetricsF(it.font()).horizontalAdvance(it.text())
+              for it in items]
+    gaps = sorted(i.pos().x() for i in items)
+    spacing = [b - a for a, b in zip(gaps, gaps[1:])]
+    if spacing:
+        assert min(spacing) > max(widths)      # never overlapping

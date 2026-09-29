@@ -48,12 +48,12 @@ _Z_DATA = 2.0
 _Z_ERROR = 3.0
 _Z_LABEL = 4.0
 
-# Font sizes in scene units
-_FONT_TICK = 18
-_FONT_LABEL = 22
-# The legend is a footnote, not a title: it used to be as loud as the axis
-# and it ate a corner of the plot (the observer asked for it twice).
-_FONT_LEGEND = 12
+# Font sizes in PIXELS, not in scene units: the scene is fitted to the
+# widget, so a size in scene units grows and shrinks with the panel and the
+# labels of a maximized window come out huge. These are the sizes the
+# reader actually sees, and _sync_geometry converts them.
+_FONT_TICK_PX = 12
+_FONT_LEGEND_PX = 11
 _LEGEND_SWATCH = 24.0     # the colour line that stands for a series
 _LEGEND_PITCH = 20.0      # vertical distance between legend rows
 
@@ -67,9 +67,19 @@ _MONTHS = {
            "Oct", "Nov", "Dec"),
 }
 
-# Scene half-extent: the data area is always this wide/tall, independent of
-# the data's actual span. The mapping scales the data into this box.
+# Scene half-height: the plot's height is fixed in scene units and the data
+# is mapped into the box (its width follows the WINDOW, see _sync_geometry),
+# so the two axes always share one scale and an error bar stays an error bar.
 _HALF = 500.0
+
+# The room the labels need around the plot, in scene units. They are
+# generous on purpose (the observer asked for the texts to breathe) and the
+# bottom is the widest side, because a date like "20 Sep 2026" is a long
+# label under a tick.
+_PAD_LEFT = 124.0
+_PAD_RIGHT = 34.0
+_PAD_TOP = 66.0
+_PAD_BOTTOM = 108.0
 
 # Robust window (quality plan, phase A): the magnitude scale is set by the
 # CORE of the data (median ± K robust sigmas), never by min/max, so one
@@ -194,6 +204,12 @@ class LightCurveChart(ChartView):
         self._window = None
         self._pan_from = None    # viewport point where the current drag began
         self._notes = []         # what the legend no longer says (see notes())
+        # the plot's half-WIDTH, in scene units: it follows the shape of the
+        # window (see _sync_geometry) while the height stays _HALF, and
+        # _scale is how many units a pixel is worth, so the labels can be
+        # sized in the pixels the reader actually sees
+        self._hx = _HALF
+        self._scale = 0.45
         # the window IS the pan: the base's hand-drag would also scroll the
         # view, and two pans fighting over one drag is a bug
         self.setDragMode(QGraphicsView.NoDrag)
@@ -256,7 +272,7 @@ class LightCurveChart(ChartView):
         # the fraction of the window under the cursor, the exact inverse of
         # _map_x/_map_y: keeping them in step is the difference between
         # zooming where the cursor is and zooming somewhere else
-        fx = (pos.x() + _HALF) / (2 * _HALF) if x1 > x0 else 0.5
+        fx = (pos.x() + self._hx) / (2 * self._hx) if x1 > x0 else 0.5
         fy = (pos.y() + _HALF) / (2 * _HALF) if y1 > y0 else 0.5
         axes = "both"
         if event.modifiers() & Qt.ShiftModifier:
@@ -775,7 +791,7 @@ class LightCurveChart(ChartView):
         # @return: True when the window changed
         x0, x1, y0, y1 = self._bounds
         scale = abs(self.transform().m11()) or 1.0
-        dx = (dx_px / scale) / (2 * _HALF) * (x1 - x0)
+        dx = (dx_px / scale) / (2 * self._hx) * (x1 - x0)
         dy = (dy_px / scale) / (2 * _HALF) * (y1 - y0)
         if dx == 0.0 and dy == 0.0:
             return False
@@ -837,13 +853,50 @@ class LightCurveChart(ChartView):
         # @return: (lo, hi) when the observer fixed it, else None
         return self._y_range
 
+    def _sync_geometry(self):
+        # The plot takes the SHAPE of the space it is given.
+        #
+        # It used to be a fixed square (both axes 2 * _HALF wide) fitted
+        # into whatever panel it lived in: a wide panel then showed a small
+        # square with two dead margins, the time axis had no room and the
+        # labels were squeezed against the frame. A light curve is a
+        # HORIZONTAL thing (time runs along it), so the plot stretches with
+        # the window, and the width is chosen so that the scene's own
+        # proportions match the viewport's: the fit then fills the panel
+        # exactly, with no letterboxing and no wasted side.
+        #
+        # @return: True when the width changed (the scene must be rebuilt)
+        vw = max(120, self.viewport().width())
+        vh = max(120, self.viewport().height())
+        scene_h = 2 * _HALF + _PAD_TOP + _PAD_BOTTOM
+        want = ((vw / float(vh)) * scene_h - _PAD_LEFT - _PAD_RIGHT) / 2.0
+        # sanity bounds: never narrower than a square, never absurdly long
+        want = min(max(want, _HALF), _HALF * 8.0)
+        if abs(want - self._hx) < 1.0:
+            return False
+        self._hx = want
+        # how many SCENE UNITS one pixel is worth, for the labels: the base
+        # fits the scene with a 2 % pad, so this is the honest conversion
+        # from the pixel sizes the reader sees to the units the items use
+        self._scale = vh / (scene_h * 1.04)
+        return True
+
+    def _do_fit(self):
+        # One deferred pass per resize burst (the base's own coalescing):
+        # the plot's shape is recomputed and, when it changed, the scene is
+        # rebuilt BEFORE the fit, so the picture follows the window.
+        # @return: None
+        if self._sync_geometry():
+            self._build_scene()
+        super()._do_fit()
+
     def _map_x(self, mjd):
         # @args: mjd - float
         # @return: scene x coordinate
         lo, hi, _, _ = self._bounds
         if hi == lo:
             return 0.0
-        return -_HALF + (mjd - lo) / (hi - lo) * 2 * _HALF
+        return -self._hx + (mjd - lo) / (hi - lo) * 2 * self._hx
 
     def _map_y(self, mag):
         # The magnitude axis, the astronomical way: the FAINTEST (the big
@@ -916,9 +969,14 @@ class LightCurveChart(ChartView):
     def _build_scene(self):
         self.clear()
         self._has_mean = False
+        if self._bounds is None:
+            # a resize can arrive before any data (the plot is rebuilt when
+            # the window changes shape): the axis still has to exist
+            self._compute_bounds()
         b = self._bounds
-        self.set_scene_rect(-_HALF - 60, -_HALF - 50,
-                             2 * _HALF + 120, 2 * _HALF + 100)
+        self.set_scene_rect(-self._hx - _PAD_LEFT, -_HALF - _PAD_BOTTOM,
+                            2 * self._hx + _PAD_LEFT + _PAD_RIGHT,
+                            2 * _HALF + _PAD_BOTTOM + _PAD_TOP)
         # grid + axes
         self._draw_grid()
         # series linking (like the PNG export): solid line for the
@@ -1033,7 +1091,7 @@ class LightCurveChart(ChartView):
             ys = [self._map_y(self._plot_mag(p)) for p in pts]
             top, bottom = min(ys), max(ys)
             half = sys / span * 2 * _HALF
-            rect = QGraphicsRectItem(-_HALF, top - half, 2 * _HALF,
+            rect = QGraphicsRectItem(-self._hx, top - half, 2 * self._hx,
                                       (bottom - top) + 2 * half)
             fill = QColor(palette.MUTED)
             fill.setAlpha(26)
@@ -1414,7 +1472,7 @@ class LightCurveChart(ChartView):
             return
         fmt = QFont(self._label_font) if hasattr(self, "_label_font") \
             else QFont()
-        fmt.setPointSize(_FONT_LEGEND)
+        fmt.setPixelSize(self._font_px(_FONT_LEGEND_PX))
         fm = QFontMetricsF(fmt)
         rows = [(text, color, fm.horizontalAdvance(text))
                 for text, color in entries]
@@ -1423,7 +1481,7 @@ class LightCurveChart(ChartView):
         gap = 8                      # swatch -> text gap
         pad = 8                      # backdrop padding
         row_h = _LEGEND_PITCH        # vertical pitch between rows
-        right = _HALF - 10
+        right = self._hx - 10
         text_x = right - text_w
         sw_x = text_x - gap - sw
         top = _HALF - 10 - row_h * len(entries)
@@ -1526,23 +1584,45 @@ class LightCurveChart(ChartView):
         faint.setAlpha(70)
         grid_pen.setColor(faint)
         axis_pen = QPen(QColor(palette.MUTED), 1.4)
-        x_plan = ticks.axis_plan(b[0], b[1], target=6)
+        # how many TIME labels fit: a date like "20 Sep 2026" takes twice
+        # the room of a "21:30", and a tick that collides with its
+        # neighbour is worse than one tick fewer (the scene units are
+        # roughly the tick font's own units, so these are honest budgets)
+        if self._fold_p:
+            tick_budget = 90.0
+        elif (b[1] - b[0]) <= 1.2:
+            tick_budget = 72.0            # a night: HH:MM
+        else:
+            tick_budget = 150.0           # dates
+        target_x = int(min(max(2 * self._hx / tick_budget, 3.0), 8.0))
+        x_plan = ticks.axis_plan(b[0], b[1], target=target_x)
         y_plan = ticks.axis_plan(b[2], b[3], target=5)
         # the frame: two axes and their short marks, the way a measured
         # figure is drawn. A floating dotted grid alone made the plot read
         # as a draft: the eye needs to know where the scale starts.
-        for x0, y0, x1, y1 in ((-_HALF, -_HALF, -_HALF, _HALF),
-                               (-_HALF, _HALF, _HALF, _HALF)):
+        for x0, y0, x1, y1 in ((-self._hx, -_HALF, -self._hx, _HALF),
+                               (-self._hx, _HALF, self._hx, _HALF)):
             line = QGraphicsLineItem(x0, y0, x1, y1)
             line.setPen(axis_pen)
             line.setZValue(_Z_GRID + 0.1)
             self.add_item(line)
-        # X grid lines: the tick's own x, not an even division
-        for tv, label in zip(x_plan["ticks"] + [x_plan["offset"]],
-                             x_plan["labels"] + [""]):
+        # X grid lines: the tick's own x, not an even division.
+        #
+        # The planner's extra "offset" entry is how a Julian number is
+        # printed once ("+60297.65") instead of six times, and it is
+        # pointless now: the chart writes the labels itself in civil time
+        # and says the MJD in its own note. Keeping it printed "00:00"
+        # twice, because that constant IS the first tick of a short span.
+        if self._fold_p:
+            x_pairs = list(zip(x_plan["ticks"] + [x_plan["offset"]],
+                               x_plan["labels"] + [""]))
+        else:
+            x_pairs = [(tv, self._x_tick_label(tv))
+                       for tv in x_plan["ticks"]]
+        for tv, text in x_pairs:
             if x_span <= 0.0:
                 break
-            x = -_HALF + (tv - b[0]) / x_span * 2 * _HALF
+            x = -self._hx + (tv - b[0]) / x_span * 2 * self._hx
             line = QGraphicsLineItem(x, -_HALF, x, _HALF)
             line.setPen(grid_pen)
             line.setZValue(_Z_GRID)
@@ -1551,33 +1631,36 @@ class LightCurveChart(ChartView):
             mark.setPen(axis_pen)
             mark.setZValue(_Z_GRID + 0.1)
             self.add_item(mark)
-            text = self._x_tick_label(tv) if not self._fold_p else label
             if text:
-                self._tick_label(text, x - 22, _HALF + 14)
+                self._tick_label(text, x, _HALF + 20, align="center")
         # Y grid lines (inverted axis: brighter on top)
         for tv, label in zip(y_plan["ticks"], y_plan["labels"]):
             if y_span <= 0.0:
                 break
             y = self._map_y(tv)          # one rule, never a copy
-            line = QGraphicsLineItem(-_HALF, y, _HALF, y)
+            line = QGraphicsLineItem(-self._hx, y, self._hx, y)
             line.setPen(grid_pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            mark = QGraphicsLineItem(-_HALF - 7, y, -_HALF, y)
+            mark = QGraphicsLineItem(-self._hx - 7, y, -self._hx, y)
             mark.setPen(axis_pen)
             mark.setZValue(_Z_GRID + 0.1)
             self.add_item(mark)
-            self._tick_label(label, -_HALF - 62, y - 8)
+            # right-aligned against the axis: a wall of numbers left of a
+            # plot is exactly what "let the texts breathe" is about
+            self._tick_label(label, -self._hx - 12, y - 8, align="right")
         # the factored-out constant, said once (never hidden)
         if y_plan["offset_label"]:
-            self._tick_label(y_plan["offset_label"], -_HALF - 60, -_HALF - 26)
+            self._tick_label(y_plan["offset_label"], -self._hx - 12,
+                             -_HALF - 30, align="right")
         note_x = self._x_axis_note()
         if note_x:
             # the corner note: the civil date the night happened on and the
             # MJD a report would ask for. Nobody should convert by hand.
-            self._tick_label(note_x, -_HALF, _HALF + 34)
+            self._tick_label(note_x, -self._hx, _HALF + 44)
         elif x_plan["offset_label"]:
-            self._tick_label(x_plan["offset_label"], _HALF - 40, _HALF + 30)
+            self._tick_label(x_plan["offset_label"], self._hx - 60,
+                             _HALF + 44)
         # WHAT the numbers are: the mode, and on a differential axis the
         # level they count from. A reader must never have to guess whether
         # 12.34 is a star's magnitude or a difference, and an axis that
@@ -1588,19 +1671,41 @@ class LightCurveChart(ChartView):
                     else self.tr("Δ magnitude"))
         else:
             note = self.tr("Calibrated magnitude")
-        self._tick_label(note, -_HALF, -_HALF - 18)
+        self._tick_label(note, -self._hx, -_HALF - 34)
 
-    def _tick_label(self, text, x, y):
+    def _font_px(self, pixels):
+        # A font size that RENDERS at `pixels` on this window: the scene is
+        # fitted, so a size in scene units would grow and shrink with the
+        # panel and a maximized window would show giant labels. _scale is
+        # the honest conversion (see _sync_geometry).
+        # @args: pixels - the size the reader should see
+        # @return: the font's pixel size in the item's own units
+        return max(7, int(round(pixels / max(self._scale, 1e-3))))
+
+    def _tick_label(self, text, x, y, align="left"):
         # One small grey tick label at a scene position.
-        # @args: text - the label, x/y - scene coordinates
+        #
+        # The alignment exists so the numbers can be pushed AGAINST the
+        # axis instead of floating in a column: with right-aligned
+        # magnitudes and centred times, the axis is a frame and the text
+        # has room, which is what the observer asked for.
+        # @args: text - the label, x/y - scene coordinates (x is the edge
+        #        the text is aligned to), align - "left" | "center" | "right"
+        # @return: the item, already added
+        from PySide6.QtGui import QFontMetricsF
         lbl = QGraphicsSimpleTextItem(text)
+        f = QFont()
+        f.setPixelSize(self._font_px(_FONT_TICK_PX))
+        lbl.setFont(f)
+        if align == "right":
+            x -= QFontMetricsF(f).horizontalAdvance(text)
+        elif align == "center":
+            x -= QFontMetricsF(f).horizontalAdvance(text) / 2.0
         lbl.setPos(x, y)
         lbl.setBrush(QBrush(QColor(palette.MUTED)))
-        f = QFont()
-        f.setPointSize(_FONT_TICK)
-        lbl.setFont(f)
         lbl.setZValue(_Z_LABEL)
         self.add_item(lbl)
+        return lbl
 
     def _probe(self, sx, sy):
         # @args: sx, sy - scene coordinates

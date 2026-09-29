@@ -559,6 +559,42 @@ class SeriesWorker(QThread):
         self.finished.emit(result)
 
 
+class PassWorker(QThread):
+    # Measures a campaign pass off the GUI thread (E5c): the same
+    # core/series_measure.measure_pass the tests use, wrapped with progress
+    # and cancellation. The result is a PassResult (signal(object) passes
+    # it through untouched), and the window files each curve in its own
+    # project.
+
+    progress = Signal(int, int)      # (done, total)
+    finished = Signal(object)        # PassResult
+    failed = Signal(str)             # an unexpected error, in English
+
+    def __init__(self, paths, cfg):
+        super().__init__()
+        self._paths = list(paths)
+        self._cfg = cfg
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the window (the Cancel button): the engine stops between
+        # frames and comes back with status "incomplete".
+        self._cancel = True
+
+    def run(self):
+        from ..core import series_measure
+        try:
+            result = series_measure.measure_pass(
+                self._paths, self._cfg,
+                progress=lambda done, total: self.progress.emit(done, total),
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("pass worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(result)
+
+
 class LiveSeriesWorker(QThread):
     # Live mode off the GUI thread (series plan, phase 10 / D21): watches
     # the session folder and measures each new stable batch through the

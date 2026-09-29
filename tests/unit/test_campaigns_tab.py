@@ -641,3 +641,92 @@ def test_vigil_signal_double_click_jumps_to_existing_project(window):
         window._goto_active_project = orig_goto
         window._open_explore_dialog = orig_exp
         _wipe_vigil_cache(mw.db)
+
+
+# ---------------- E5c: the campaign pass, from the console ----------
+
+def test_the_campaign_menu_offers_the_pass(window):
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.gui import main_window as mw
+    cid = camp_mod.create(mw.db, "Campaña de pasada")
+    window._refresh_campaigns_tab()
+    lst = window.campaigns.lst_campaigns
+    item = next(lst.item(i) for i in range(lst.count())
+                if lst.item(i).data(Qt.UserRole) == cid)
+    lst.setCurrentItem(item)
+    labels = [a.text() for a in
+              window.campaigns.btn_cmore.menu().actions()]
+    assert any("pass" in t.lower() or "pasada" in t.lower()
+               for t in labels)
+
+
+def test_a_pass_files_each_curve_in_its_own_project(window, tmp_path):
+    # End to end, minus the modal dialog: the engine measures the two
+    # objects of the field in ONE pass, and the window files each curve in
+    # its own project, with its own run, on its own visit, and with the
+    # pass recorded in the run's echo.
+    import test_series_measure as series_t
+    from nightscribe.core import campaign as camp_mod
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj_mod
+    from nightscribe.core import series_measure
+    from nightscribe.gui import main_window as mw
+    wcs = series_t._reference_wcs()
+    seq = {"catalog": "APASS DR9", "entries": series_t._comp_set(wcs),
+           "fov_arcmin": 30.0}
+    cid = camp_mod.create(mw.db, "Pasada")
+    camp_mod.set_sequence(mw.db, cid, seq)
+    ra_a, dec_a = wcs.pixel_to_sky(*series_t.TARGET_XY)
+    ra_b, dec_b = wcs.pixel_to_sky(*series_t.SECOND_XY)
+    pid_a = proj_mod.create(mw.db, "variable", "PasA",
+                            {"ra_deg": ra_a, "dec_deg": dec_a},
+                            campaign_id=cid)["id"]
+    pid_b = proj_mod.create(mw.db, "variable", "PasB",
+                            {"ra_deg": ra_b, "dec_deg": dec_b},
+                            campaign_id=cid)["id"]
+    sid = fu.create_session(mw.db, pid_a, obs_date="2026-09-20")
+    paths = []
+    for i in range(3):
+        p = tmp_path / f"p{i:03d}.fits"
+        series_t._write_plate(p, series_t._plate_two(seed=1 + i),
+                              date_obs=f"2026-09-20T23:{30 + i:02d}:00",
+                              exptime=10.0)
+        proj_mod.add_file(mw.db, pid_a, str(p), "fits", session_id=sid)
+        paths.append(str(p))
+    window._pass_wcs = wcs
+    # the objects' places are already in reference pixels (that is what
+    # the dialog's sky_to_pixel produces)
+    targets = [{"pid": pid_a, "label": "PasA", "xy": series_t.TARGET_XY},
+               {"pid": pid_b, "label": "PasB", "xy": series_t.SECOND_XY}]
+    cfg = window._pass_config(targets, seq, "V")
+    assert cfg is not None and len(cfg.targets) == 2
+    result = series_measure.measure_pass(paths, cfg)
+    # the window files it exactly as the worker's callback does
+    window._pass_source = {"pid": pid_a, "session_id": sid,
+                           "obs_date": "2026-09-20", "paths": paths}
+    window._pass_targets = targets
+    window._pass_camp = camp_mod.get(mw.db, cid)
+    window._pass_band = "V"
+    window._pass_left = []
+    window._pass_worker = None
+    window._pass_wait = None
+    window._pass_done(result)
+    # each project has its own curve, its own run and its own visit
+    for pid, label, mag in ((pid_a, "PasA", None), (pid_b, "PasB", None)):
+        files = [f for f in proj_mod.list_files(mw.db, pid)
+                 if f.get("kind") == "fits"]
+        assert len(files) == 3
+        sessions = fu.list_sessions(mw.db, pid)
+        assert len(sessions) == 1
+        pts = fu.list_points(mw.db, pid)
+        assert len(pts) == 3
+        assert all(p["mag"] is not None for p in pts)
+    # and the echo of each run says it was a shared pass
+    import json
+    runs = mw.db.execute(
+        "SELECT cfg_json FROM measurement_runs ORDER BY id").fetchall()
+    echoes = [json.loads(r[0]) for r in runs]
+    assert len(echoes) == 2
+    for echo in echoes:
+        assert echo["pass"]["labels"] == ["PasA", "PasB"]
+        assert echo["pass"]["target"] in ("PasA", "PasB")

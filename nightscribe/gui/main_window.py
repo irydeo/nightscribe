@@ -44,8 +44,8 @@ from .widgets.campaign_row import CampaignRow
 from .widgets.project_row import ProjectRow
 from .widgets.sparkline import sparkline_pixmap
 from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
-                      ExploreWorker, MpcResolveWorker, PostWorker, SunWorker,
-                      TonightWorker)
+                      ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
+                      SunWorker, TonightWorker)
 
 logger = logging.getLogger(__name__)
 
@@ -7502,6 +7502,8 @@ class MainWindow(QMainWindow):
                 self.tr("(no campaign selected)")).setEnabled(False)
             return
         for label, slot in (
+                (self.tr("Measure the campaign pass…"), self._camp_pass),
+                ("SEP", None),
                 (self.tr("New project in this campaign…"),
                  self._camp_new_project),
                 (self.tr("Attach project…"), self._camp_attach),
@@ -8800,6 +8802,179 @@ class MainWindow(QMainWindow):
                     float(payload["mag"])), 6000)
         # refresh the panel: light curve, visits and campaign summary update
         self._project_selected()
+
+    # ---------------- E5c: the campaign pass ----------------
+
+    def _camp_pass(self):
+        # One read of the frames for every sibling project of the campaign
+        # that shares the field. The dialog decides who travels (and
+        # core.campaign says why the others do not), the engine measures
+        # them in ONE pass — comps and zero point measured once per frame —
+        # and each curve is filed in its own project, with its own run.
+        from ..core import campaign as _camp
+        from .pass_dialog import PassDialog
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        camp = _camp.get(db, cid)
+        if camp is None:
+            return
+        if getattr(self, "_pass_worker", None) is not None:
+            self.statusBar().showMessage(
+                self.tr("A pass is already running."), 6000)
+            return
+        dlg = PassDialog(self, db_obj=db, camp=camp, lang=self._lang())
+        if dlg.exec() != QDialog.Accepted:
+            return
+        source = dlg.source()
+        seq, seq_source = dlg.sequence()
+        targets = dlg.targets()
+        if source is None or not targets or not seq:
+            return
+        self._pass_wcs = dlg.wcs()
+        self._pass_camp = camp
+        self._pass_start(source, targets, seq, seq_source, dlg.band(),
+                         dlg.left_out())
+
+    def _pass_start(self, source, targets, seq, seq_source, band, left):
+        # Everything the dialog decided, put to work: the frames of the
+        # source visit, the shared sequence, the objects and the band. The
+        # measurement runs off the GUI thread; the frames are read once.
+        cfg = self._pass_config(targets, seq, band)
+        if cfg is None:
+            return
+        self._pass_source = source
+        self._pass_targets = list(targets)
+        self._pass_band = band
+        self._pass_left = list(left or [])
+        self._pass_worker = PassWorker(source["paths"], cfg)
+        self._pass_worker.progress.connect(self._pass_progress)
+        self._pass_worker.finished.connect(self._pass_done)
+        self._pass_worker.failed.connect(self._pass_failed)
+        self._pass_wait = QProgressDialog(
+            self.tr("Measuring the pass: {0} objects").format(len(targets)),
+            self.tr("Cancel"), 0, len(source["paths"]), self)
+        self._pass_wait.setWindowTitle(self.tr("Campaign pass"))
+        self._pass_wait.setAutoClose(False)
+        self._pass_wait.setAutoReset(False)
+        self._pass_wait.canceled.connect(self._pass_cancel)
+        self._pass_wait.show()
+        # the sequence's origin is said out loud: an observer measuring
+        # with someone else's comparison stars must be able to see it
+        self.statusBar().showMessage(self.tr(
+            "Pass over {0} frames with the {1}").format(
+                len(source["paths"]),
+                self.tr("campaign's shared sequence")
+                if seq_source == "campaign"
+                else self.tr("project's own sequence")), 8000)
+        self._pass_worker.start()
+
+    def _pass_config(self, targets, seq, band):
+        # The engine's configuration for a pass, from the dialog and
+        # Ajustes. It needs the reference pointing: without it the dialog
+        # does not accept, and this is the last honest check.
+        from ..core import photometry, series_measure
+        from ..config import config
+        if getattr(self, "_pass_wcs", None) is None:
+            return None
+        wanted = tuple((t["label"], float(t["xy"][0]), float(t["xy"][1]))
+                       for t in targets)
+        entries = tuple(seq.get("entries") or ())
+        # catalog mode needs the sequence to carry the catalogue's own
+        # values; without them the honest measurement is the differential
+        # one (D40), and the choice is not left to chance
+        zp_mode = "catalog" if any(
+            photometry.band_of((e.get("star") or {}), band)[0] is not None
+            for e in entries) else "relative"
+        return series_measure.SeriesConfig(
+            wcs=self._pass_wcs, targets=wanted,
+            target_xy=(wanted[0][1], wanted[0][2]),
+            comp_set=entries, band=band, fallback_band="V",
+            zp_mode=zp_mode, align="coords", seeing_aperture=True,
+            site_gain=config.get("ccd_gain"),
+            site_ron=config.get("ccd_read_noise"),
+            site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
+            site_saturate=config.get("ccd_saturate"),
+            site_lon=config.get("lon"), site_lat=config.get("lat"),
+            site_aperture_m=float(config.get("aperture_inches", 10.0))
+            * 0.0254,
+            site_height_m=float(config.get("height", 0) or 0.0),
+            site_linear=config.get("cam_linearity_adu"),
+            site_dark=config.get("cam_dark_current_e_s"))
+
+    def _pass_progress(self, done, total):
+        if getattr(self, "_pass_wait", None) is not None:
+            self._pass_wait.setMaximum(max(1, total))
+            self._pass_wait.setValue(done)
+
+    def _pass_cancel(self):
+        worker = getattr(self, "_pass_worker", None)
+        if worker is not None:
+            worker.cancel()
+            self.statusBar().showMessage(
+                self.tr("Cancelling the pass… the frames already measured "
+                        "are kept."), 6000)
+
+    def _pass_failed(self, message):
+        self._pass_close_wait()
+        self._pass_worker = None
+        QMessageBox.warning(
+            self, self.tr("Campaign pass"),
+            self.tr("The pass failed: {0}").format(message))
+
+    def _pass_close_wait(self):
+        wait = getattr(self, "_pass_wait", None)
+        if wait is not None:
+            wait.blockSignals(True)
+            wait.close()
+            self._pass_wait = None
+
+    def _pass_done(self, result):
+        # The frames are filed in every measured project, and each curve
+        # goes to its own project with its own run. The pass is recorded
+        # in each run's echo, so the journal can say what it was.
+        from ..core import followup as fu
+        from ..core import project as project_mod, series_measure
+        self._pass_close_wait()
+        self._pass_worker = None
+        if result is None:
+            return
+        source = self._pass_source
+        targets = list(self._pass_targets)
+        wanted = [t for t in targets]
+        sessions = fu.share_frames(
+            db, source["paths"],
+            [{"project_id": t["pid"]} for t in wanted],
+            obs_date=source.get("obs_date"),
+            notes=self.tr("Campaign pass: shared frames"))
+        entries = []
+        measured = 0
+        for t, got in zip(wanted, result.targets):
+            rows = series_measure.series_rows(got["result"].points)
+            if rows:
+                measured += 1
+            by_path = {f["path"]: f["id"]
+                       for f in project_mod.list_files(db, t["pid"])
+                       if f.get("kind") == "fits"}
+            for r in rows:
+                r["file_id"] = by_path.get(r.get("path"))
+            entries.append({"project_id": t["pid"],
+                            "session_id": sessions.get(t["pid"]),
+                            "rows": rows, "label": t["label"],
+                            "status": result.status})
+        fu.save_pass(db, entries, cfg={
+            "campaign": (self._pass_camp or {}).get("name"),
+            "band": self._pass_band})
+        self.statusBar().showMessage(self.tr(
+            "Pass saved: {0} objects, {1} frames, {2} points").format(
+                measured, len(source["paths"]),
+                sum(len(e["rows"]) for e in entries)), 10000)
+        left = getattr(self, "_pass_left", None) or []
+        if left:
+            self.statusBar().showMessage(
+                self.tr("Pass saved. {0} project(s) stayed out of it: see "
+                        "the dialog.").format(len(left)), 10000)
+        self._campaign_selected()
 
     # ---------------- UFE plate resets (ADR-047) ----------------
 

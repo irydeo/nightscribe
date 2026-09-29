@@ -58,3 +58,5 @@
 | [050](ADR-050-live-mode-grouping.md) | En vivo y agrupación de tomas cortas en el dominio de la medida (nunca apilado de píxeles) / live mode and short-exposure grouping in the measurement domain (never pixel stacking) |
 | [051](ADR-051-local-plate-solver.md) | Solver local ASTAP tras un dispatcher, WCS en memoria, `-update` solo explícito / local ASTAP solver behind a dispatcher, in-memory WCS, `-update` opt-in only |
 | [052](ADR-052-exotic-orchestration.md) | Orquestación de EXOTIC: ejecución externa headless e importación de su curva y parámetros (la vía numpy queda de previsualización) / EXOTIC orchestration: external headless run and import of its curve and parameters (the numpy path stays as a preview) |
+| [053](ADR-053-help-redesign.md) | Rediseño del menú Ayuda: guía curada, fuentes, novedades y Acerca de / Help menu redesign: curated guide, sources, what's new and About |
+| [054](ADR-054-period-search.md) | Búsqueda de período (Lomb-Scargle + PDM), plegado e informe de fase, con lo que la línea base no puede decir / period search (Lomb-Scargle + PDM), folding and the phase report, with what the baseline cannot say |

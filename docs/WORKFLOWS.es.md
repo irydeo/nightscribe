@@ -1187,3 +1187,52 @@ coordenadas.
 - La carta PNG del CLI (`--fits`) y la escena del widget comparten matemática
   (`core/field_math.py`): cualquier mejora visual va en ambos o en ninguno.
 - Suite unitaria verde: **1461**.
+
+
+---
+
+## Calidad de las secuencias fotométricas (2026-09-29)
+
+**Por qué**: una observación real del grupo ObSN (V0526 Per, 244 tomas de 40 s, sin
+WCS) salió **desastrosa** con el motor de serie: el campo derivó 134" en 2,9 h, la
+estrella salió de la apertura en menos de un minuto y la curva quedó en un rango de
+8 magnitudes con errores de 0,5 mag. El diagnóstico completo (con las medidas antes y
+después) está en `docs/PLANS/series-quality.md`.
+
+**Qué se ha hecho** (fases A, B y C del plan; ADR-048 revisado y ADR-054):
+
+- `core/register.py` reescrito: se quita el cielo, **las estrellas votan** la
+  transformación (traslación primero), la calidad es **física** (estrellas
+  emparejadas y rms en px) y una rotación sólo entra si reduce el residuo real. Un
+  frame que no se puede verificar hereda la anterior y se marca `align_failed`.
+- La **alineación está encendida por defecto** (`align="auto"` → `coords`: se mide en
+  la rejilla nativa, la PSF nunca se remuestrea) y se persiste en `cfg_json`.
+- El **punto cero se ata por comparada** (`_tie_comps`): una comp que entra y sale del
+  campo o que satura ya no mueve la curva. La check nunca entra en el punto cero.
+- La **apertura sigue el seeing** en serie y, para `variable`/`hads`, el detrend por
+  defecto es el mínimo de masa de aire.
+- El motor **dice lo que no sabe** en el panel: deriva, residuo de las estrellas,
+  comps que nunca entraron o están saturadas, y la ganancia que falta.
+- `core/periodogram.py` + `viz/phase_view.py` + `gui/phase_dialog.py`: búsqueda de
+  período (Lomb-Scargle generalizado + PDM + ventana espectral, FAP por bootstrap),
+  plegado y el informe de dos paneles, con ciclos cubiertos y avisos de alias. Se
+  abre desde la ventana de la visita y desde la pestaña Medir del editor.
+
+**Números**: 244/244 puntos medibles (antes 5), correlación **0.899** con la
+reducción independiente del observador (antes 0.32), residuo **0.0094 mag** (antes
+0.13), 0,23 s/frame (antes 4,6 s y sin converger), suite unitaria verde: **2071**.
+
+**Punto de entrada (para quien retome)**:
+
+1. **B2 restante**: la *propuesta* de comparaciones (`core/compstars.py`) debe
+   colocar las comps dentro del **rectángulo real del sensor** (hoy el FOV actúa de
+   cuadrado y el set del caso real tenía 4 de 9 saturadas y 1 fuera del marco) y
+   avisar de las que se pierden con la deriva. El motor ya lo dice en el panel; falta
+   que el constructor no las proponga.
+2. **C3**: `core/sources/aavso.py` sabe pedir la **última** magnitud de la comunidad;
+   para fijar un período de una sola noche hace falta la **curva completa** (mismo
+   token y misma caché), como hizo el autor del informe de referencia con ASASSN.
+3. **D5 restante**: ADR-054 y la revisión de ADR-048 están escritas; quedan las
+   secciones equivalentes en `PRECISION` si se quiere enlazar T8.
+4. La fixture `tests/data/v0526per/` (8 frames reales recortados, 4 MB) es la red de
+   seguridad: **no la sustituyas por datos sintéticos**.

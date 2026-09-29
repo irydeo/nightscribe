@@ -98,13 +98,18 @@ nightscribe/
                       #   sugerida (datasheet; linealidad y tope de exposición
                       #   se miden por ganancia)
     series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
-                      #   frame y ensemble con veto MAD, puertas que marcan y
-                      #   nunca borran, tiempo a media exposición (MJD/HJD),
-                      #   agrupación en el dominio de la medida, apertura
-                      #   óptima por noche (T3) y detrend honesto multinoche
-                      #   a1·exp(a2·X)+a3 (T5; plan fase 3)
-    register.py      # registro opt-in de frames sin WCS/alineación (D44):
-                      #   rotación + traslación subpíxel por Fourier, numpy puro
+                      #   frame atado por comparada, ensemble con veto MAD,
+                      #   puertas que marcan y nunca borran, tiempo a media
+                      #   exposición (MJD/HJD), agrupación en el dominio de la
+                      #   medida, apertura óptima por noche (T3) y detrend
+                      #   honesto multinoche a1·exp(a2·X)+a3 (T5)
+    register.py      # registro de frames sin WCS/alineación (D44, por defecto
+                      #   encendido): se quita el cielo, las estrellas votan la
+                      #   transformación (traslación primero) y la calidad es
+                      #   física (estrellas emparejadas + rms en px), numpy puro
+    periodogram.py   # búsqueda de período (ADR-054): Lomb-Scargle generalizado
+                      #   con media flotante + PDM + ventana espectral, FAP por
+                      #   bootstrap, ciclos cubiertos y notas honestas
     transit_fit.py   # modelo de tránsito con limb darkening cuadrático (numpy,
                       #   paridad <1e-5 vs batman) + ajuste LM con detrend
                       #   conjunto y errores OOT (plan fase 7; compuerta abierta)
@@ -171,6 +176,8 @@ nightscribe/
                       #   la "prueba de fuego", Track C)
                       # + finder_view (carta de comparación: secuencia fotométrica
                       #   sobre DSS2 o el FITS del usuario — ADR-042)
+                      # + phase_view (informe período+fase: periodograma con FAP
+                      #   y curva plegada por noche — ADR-054)
     gui/               # app, main_window, workers (QThread), wizard, ui_loader,
                        #   ui/ (*.ui Designer);
                        # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
@@ -179,7 +186,8 @@ nightscribe/
                        # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
                        # widgets/ufe_image_view.py + widgets/histogram_widget.py +
                        # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py +
-                       # ufe_measure_tab.py, ADR-044; el panel izquierdo de la
+                       # ufe_measure_tab.py, ADR-044; phase_dialog.py: período
+                       # y fase del proyecto, ADR-054; el panel izquierdo de la
                        # visita (ufe_visit_panel.ui: navegador de tomas + bloque
                        # EXOTIC de tránsito + el bloque de serie, ADR-048 rev.)
                        # vive a la izquierda de la imagen, visible solo con visita)

@@ -373,6 +373,16 @@
             </widget>
            </item>
            <item>
+            <widget class="QPushButton" name="btn_series_phase">
+             <property name="toolTip">
+              <string>Search the project's curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say</string>
+             </property>
+             <property name="text">
+              <string>Period and phase…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QPushButton" name="btn_series_help">
              <property name="toolTip">
               <string>Open the sequences guide (SEQUENCES) in the documentation browser</string>

@@ -4491,6 +4491,9 @@ class MainWindow(QMainWindow):
             # editor's series block for this visit (D8/D36)
             measure_series=lambda sid:
                 self._visit_measure_series(pid, sid),
+            # quality plan (C): the period search works on the project's
+            # curve, from the visit window where the observer already is
+            phase=lambda pid_: self._open_phase_dialog(pid_),
             on_change=lambda: self._visit_data_changed(pid),
             kind=kind)
         panel.set_project(pid)
@@ -4654,6 +4657,30 @@ class MainWindow(QMainWindow):
         # is one; without it, the project's saved sequence fills the
         # Compare tab (ADR-048 follow-up: EXOTIC finds the comps)
         self._load_editor_sequence(dlg, pid, path)
+
+    def _open_phase_dialog(self, pid):
+        # The period + phase window (quality plan, C): it takes the
+        # project's own curve, whatever measured it, and remembers the
+        # period in the project when the observer says so.
+        # @args: pid - the project id
+        # @return: the dialog, or None when there are no points yet
+        from .phase_dialog import collect_project_points, open_phase
+        pts = collect_project_points(db, pid)
+        if not pts:
+            self.statusBar().showMessage(self.tr(
+                "This project has no measured points yet: measure the "
+                "series (or import a curve) first."), 8000)
+            return None
+        p = project.get(db, pid) or {}
+        kind = p.get("kind")
+        if kind not in ("sn", "hads", "variable", "transit"):
+            self.statusBar().showMessage(self.tr(
+                "The period search is for light-curve projects (a "
+                "variable, a HADS star, a supernova)."), 8000)
+            return None
+        return open_phase(self, pts,
+                          title=p.get("object_name") or "",
+                          lang=self._lang(), db=db, project_id=pid)
 
     def _visit_measure_series(self, pid, session_id):
         # ADR-048 (D8/D36): the visit's frames become a series. The

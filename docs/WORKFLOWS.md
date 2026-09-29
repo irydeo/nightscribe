@@ -939,3 +939,52 @@ visible. Titan is documented as out of season (~2040). In Tonight, up to 3
 Horizons refinement of satellite phenomena (~1 min, spike first); eclipse
 contact times; stellar occultations; the "impact" line still reads only
 Moon+Kp (events could feed it in v2).
+
+
+---
+
+## Photometric series quality (2026-09-29)
+
+**Why**: a real observation from the ObSN group (V0526 Per, 244 frames of 40 s, no
+WCS) came out **catastrophic** with the series engine: the field drifted 134" in
+2.9 h, the star left the aperture in under a minute and the curve came out across 8
+magnitudes with 0.5 mag errors. The full diagnosis (with the before/after numbers)
+is in `docs/PLANS/series-quality.md`.
+
+**What was done** (phases A, B and C of the plan; ADR-048 revised and ADR-054):
+
+- `core/register.py` rewritten: the sky is removed, **the stars vote** the transform
+  (translation first), quality is **physical** (matched stars and rms in px) and a
+  rotation only enters when it removes real residual. A frame that cannot be verified
+  inherits the previous one and is flagged `align_failed`.
+- **Alignment is on by default** (`align="auto"` -> `coords`: measured on the native
+  grid, the PSF is never resampled) and is persisted in `cfg_json`.
+- The **zero point is tied per comparison star** (`_tie_comps`): a comp that comes in
+  and out of the frame, or that saturates, no longer moves the curve. The check star
+  never enters the zero point.
+- The **aperture follows the seeing** in a series and, for `variable`/`hads`, the
+  default detrend is the airmass minimum.
+- The engine **says what it does not know** in the panel: drift, star residual, comps
+  that never entered or are saturated, and the missing gain.
+- `core/periodogram.py` + `viz/phase_view.py` + `gui/phase_dialog.py`: period search
+  (generalised Lomb-Scargle + PDM + spectral window, bootstrap FAP), folding and the
+  two-panel report, with cycles covered and alias warnings. Reachable from the visit
+  window and from the editor's Measure tab.
+
+**Numbers**: 244/244 measurable points (was 5), **0.899** correlation with the
+observer's independent reduction (was 0.32), **0.0094 mag** residual (was 0.13),
+0.23 s/frame (was 4.6 s and not converging), unit suite green: **2071**.
+
+**Entry point (for whoever picks this up)**:
+
+1. **B2 remainder**: the comparison *proposal* (`core/compstars.py`) must place comps
+   inside the **real sensor rectangle** (today the FOV acts as a square and the real
+   set had 4 of 9 saturated and 1 off-frame) and warn about those the drift loses.
+   The engine already says so in the panel; the builder must stop proposing them.
+2. **C3**: `core/sources/aavso.py` can fetch the community's **latest** magnitude;
+   fixing a one-night period needs the **whole curve** (same token and cache), as the
+   author of the reference report did with ASASSN.
+3. **D5 remainder**: ADR-054 and the ADR-048 revision are written; what remains are
+   the equivalent sections in `PRECISION` if T8 is to be linked.
+4. The fixture `tests/data/v0526per/` (8 cropped real frames, 4 MB) is the safety
+   net: **do not replace it with synthetic data**.

@@ -38,6 +38,12 @@
      <item><widget class="QComboBox" name="cmb_detrend"><property name="toolTip"><string>Series only: off keeps the raw curve; airmass removes the minimum (a1·exp(a2·X)+a3); auto adds FWHM/sky/x-y only when the residual really improves. The raw curve is always kept</string></property></widget></item>
     </layout>
    </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_align">
+     <item><widget class="QLabel" name="lbl_align"><property name="text"><string>Align frames:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_align"><property name="toolTip"><string>Series only: the frames of a visit rarely sit on the same pixels (the mount drifts, or the telescope was re-pointed). Auto measures each frame on its own grid at the mapped coordinates, so the star never leaves the aperture and the point spread is never resampled. Off assumes the frames are already aligned (a solved WCS per frame does the same job)</string></property></widget></item>
+    </layout>
+   </item>
    <item><widget class="QCheckBox" name="chk_auto_aperture"><property name="text"><string>Aperture sweep per night (T3)</string></property><property name="toolTip"><string>Series only: pick the aperture k in [1.0, 2.0]·FWHM whose check-star scatter is smallest, one choice per night</string></property></widget></item>
    <item>
     <layout class="QHBoxLayout" name="row_saturate">

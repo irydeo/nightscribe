@@ -52,6 +52,16 @@ class UfeAdvancedDialog(QDialog):
         # series knobs (series plan, phase 5): group_n, detrend policy,
         # per-night aperture sweep and the saturation ceiling
         self.spn_group_n = self._ui.spn_group_n
+        self.cmb_align = self._ui.cmb_align
+        # Auto is the honest default: a visit's frames rarely sit on the
+        # same pixels, and measuring them as if they did is how a series
+        # is lost (see the V0526 Per case in docs/PLANS/series-quality.md)
+        self.cmb_align.addItem(self.tr("Auto (recommended)"), "auto")
+        self.cmb_align.addItem(self.tr("Off (frames already aligned)"),
+                               "off")
+        self.cmb_align.addItem(self.tr("Translation only"), "translation")
+        self.cmb_align.addItem(self.tr("Rotation and translation"),
+                               "similarity")
         self.cmb_detrend = self._ui.cmb_detrend
         self.cmb_detrend.addItem(self.tr("Off (raw curve)"), "off")
         self.cmb_detrend.addItem(self.tr("Airmass (minimum)"), "airmass")

@@ -81,16 +81,57 @@ series block, **group frames** (`group_n`). The rest live in **Advanced...**
 |---|---|---|
 | Sky | median | flat median or a tilted plane (galactic cores) |
 | Sigma-clip | on | two 2.5-sigma rounds on the sky annulus |
-| Aperture follows the seeing | on | `r = 1.35 · FWHM` measured on the comps |
+| Aperture follows the seeing | on | `r = 1.35 · FWHM` measured on the comps; in a series, each frame's own FWHM |
 | Colour term | on | fits the ZP and its slope with the comps' B-V |
 | Subtract host galaxy | off | aligned PS1 reference, scaled by the comps |
+| **Align frames** | **auto** | see below; `off` only when the frames are already aligned |
 | **Group frames** (`group_n`) | 1 | combines N frames per point in the measurement domain; never pixel stacking; also a quick knob in the series block |
-| **Detrend** | off | `airmass` removes the minimum; `auto` adds FWHM/sky/x-y only if it improves |
+| **Detrend** | off (variable/HADS: airmass) | `airmass` removes the minimum; `auto` adds FWHM/sky/x-y only if it improves |
 | **Aperture sweep per night (T3)** | off | picks the k in [1.0, 2.0]·FWHM with the smallest check scatter |
 | **Saturation ceiling** | 0 = auto | absolute ADU value; 0 uses the SATURATE card or Settings |
 
 Every control has its tooltip with units and reason, and there is a **"Restore
 defaults"**.
+
+### 5.1 Aligning the frames (important)
+
+**The frames of a visit rarely land on the same pixels.** The telescope drifts
+(polar misalignment, refraction, guiding) and a frame may carry a dither. If the
+engine always measures where the reference plate said, the star **walks out of the
+aperture**: in the real V0526 Per series (244 frames of 40 s) the field moved 134"
+in 2.9 h and the curve went from 13.4 to 17.4 magnitudes with 0.5 mag errors. That
+no longer happens: `align="auto"` is on and it does this:
+
+1. it removes the sky from each frame (block medians) so vignetting is not mistaken
+   for signal;
+2. **the stars vote the transform**: for every candidate rotation each star pair
+   proposes a translation and the one most independent pairs agree on wins; a **pure
+   translation** is tried first and the rotation only enters when it is not enough;
+3. it measures each frame **on its own native grid** with the composed WCS
+   (`coords`), so the PSF is **never resampled**;
+4. it **verifies** the transform against the stars it paired: quality is the number
+   of pairs and their residual in pixels, not a magic correlation number.
+
+A frame that cannot be verified **inherits the previous alignment and is flagged**
+(`align_failed`): it is never measured on a guess. The summary panel says all of it
+in plain language: how many frames were aligned, how far the image moved (px and
+arcmin), the star residual and the frames left unverified.
+
+Aligning costs about 0.15 s per frame (2 % of the total) and can be switched off in
+**Advanced... → Align frames** when your frames are already aligned (for instance if
+every one carries its own WCS).
+
+### 5.2 The comparison stars: the zero point is tied per star
+
+A comp's catalogue value can be wrong (on very red stars the V derived from Gaia
+deviates by up to 0.9 mag) and, on top of that, the drift makes a comp **come in and
+out of the frame** or saturate. The median of whatever was left used to jump from
+frame to frame; now each comp measures its **own level** over the whole series and
+the zero point no longer depends on which ones were present. The **check star never
+enters the zero point** (it is the monitor). The panel warns you when the comps
+disagree with each other and about those missing from almost every frame: that
+usually means the sequence deserves rebuilding with stars closer to the target and of
+similar brightness.
 
 The **camera profile** (Settings → Photometric camera profile) fixes the
 **full well, the dark current and the linearity limit / working max exposure per
@@ -127,7 +168,42 @@ A **single point** (for example an SN among other observations) is a
 **single-plate** action: measure it in the Photometry tab and save the point;
 the series engine only starts with two or more frames.
 
-## 9. Live mode
+## 9. The period: find it, fold it, and say what cannot be known
+
+Once the curve is measured, the next question is **what its period is**. There are
+two doors: the **"Period and phase…"** button in the visit window (Analysis tab) and
+the one in the series block of the editor's Measure tab. The window works on the
+**project's** curve (every visit, whatever measured each point).
+
+- **Methods**: the generalised Lomb-Scargle (with a floating mean: nothing has to be
+  centred and every point is weighted by its own error) and the **PDM** (phase
+  dispersion minimisation), which assumes no shape and is the honest cross-check for
+  an eclipser or a sawtooth. **"Both"** runs each and tells you whether they agree.
+- **What you see**: the periodogram with the peak marked and the **FAP** levels
+  (dashed lines, obtained by shuffling your own magnitudes), and the **curve folded
+  to two cycles with one colour per night**, with error bars and a binned mean.
+- **What the tool says, which is the important part**:
+  - **cycles covered**: if the baseline does not reach two cycles, the period is
+    **not fixed**. One 3 h night of a 0.127 d variable is one cycle: the periodogram
+    will show a peak, but any peak out there is as good as an alias. The answer is
+    another night or community photometry.
+  - **FAP**: below 0.01 is a serious detection; above it, it may be noise.
+  - **the spectral window**: if your observing pattern peaks right at the period
+    found (the classic one-day alias), the warning says so.
+  - **disagreement between methods**: if Lomb-Scargle and PDM give different
+    periods, one of them is seeing a harmonic or an alias.
+- **Saving**: "Save the period to the project" writes the period (with its method,
+  its FAP and its cycles) into the project, and the project's curve folds by it. It
+  is only saved when you ask, and only when there is a period.
+- **Export**: the report PNG (like PerWin's/PhaseWin's, both panels) and a CSV with
+  the whole periodogram and the folded curve.
+
+A real example: the **V0526 Per** series (244 frames, 2.9 h) peaks at 0.134 d with
+FAP 0.016 and **1.0 cycles covered**. The observer's own report, with several nights
+and ASASSN, gives 0.12695 d: the tool does not contradict it, it says exactly what
+one night can say.
+
+## 10. Live mode
 
 **Optional and off by default.** Turn on **"Live (watch the folder)"** in the
 series block: a light watcher observes the visit's folder, detects new frames
@@ -136,7 +212,7 @@ them with the same engine and updates the curve every few frames. Live files
 need **no astrometry**: the reference plate seeds the target and the
 comparisons.
 
-## 10. ExoClock (manual submission)
+## 11. ExoClock (manual submission)
 
 NightScribe does **not** upload to ExoClock: it prepares the two files and opens
 the upload page in the browser.
@@ -152,7 +228,7 @@ the upload page in the browser.
   ingress, no red flags, coherent dip). It warns, it does not block.
 - On confirming, the project records the outcome **`reported_exoclock`**.
 
-## 11. External reduction with EXOTIC
+## 12. External reduction with EXOTIC
 
 For a scientifically-minded transit, the reduction and the fit are done by
 **EXOTIC** (NASA/JPL), which NightScribe **orchestrates** as an external tool
@@ -213,7 +289,7 @@ environment for you if you prefer. Some EXOTIC dependencies may lack a Windows
 wheel; if `pip install` fails, the app shows the error and the numpy series keeps
 working.
 
-## 12. Troubleshooting
+## 13. Troubleshooting
 
 - **"No visit with frames"**: open the editor from a visit, not from the loose
   Tools menu.
@@ -227,7 +303,7 @@ working.
   flagged (`guide_jump`). Per-frame registration is available as an advanced
   option.
 
-## 13. Glossary and links
+## 14. Glossary and links
 
 - **ZP**: zero point; the difference between the instrumental magnitude and the
   comps' catalogue magnitude.

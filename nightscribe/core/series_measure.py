@@ -52,9 +52,16 @@ logger = logging.getLogger(__name__)
 # (flagged, never deleted).
 _ENSEMBLE_SIGMA = 3.0
 _GROUP_SIGMA = 3.0
+# Below this scatter (mag) the ensemble is statistically
+# indistinguishable: there is nothing to veto, and a veto running on
+# numerical noise would drop a good comp at random.
+_MAD_FLOOR = 0.005
 # A point with fewer than this many usable comparisons borrows a zero
 # point interpolated from the neighbouring frames (D1).
 _MIN_COMPS = 3
+# A comp needs this many frames before its own offset can be trusted when
+# the sequence is tied (see _tie_comps).
+_TIE_MIN_FRAMES = 5
 
 
 @dataclass(frozen=True, eq=False)
@@ -86,11 +93,17 @@ class SeriesConfig:
     site_dark: float = None         # camera profile dark current (e-/px/s)
     group_n: int = 1
     auto_aperture: bool = False     # T3: per-night k sweep (phase 3)
-    align: str = "off"              # "off" | "warp"|"similarity" | "coords"
-                                    # (register.py, D44): opt-in per-frame
-                                    # registration; warp/similarity resample
-                                    # onto the reference grid, coords measure
-                                    # on the native grid at the mapped coords
+    seeing_aperture: bool = False   # size the aperture from each frame's
+                                    # own FWHM (H3), like the plate
+    align: str = "off"              # "off" | "auto" | "translation" |
+                                    # "similarity" | "coords" | "warp"
+                                    # (register.py, D44): per-frame
+                                    # registration; "auto" measures on
+                                    # the native grid at the mapped
+                                    # coordinates (never resampling the
+                                    # PSF), "translation" pins it to a
+                                    # shift, "similarity"/"warp"
+                                    # resample onto the reference grid
     guide_jump_px: float = 2.0      # centroid off the reference (T7)
     cosmic_sigma: float = 8.0       # single-pixel spike over the noise
     zp_outlier_sigma: float = 3.0   # cloud / zero-point outlier (T7)
@@ -124,13 +137,16 @@ class SeriesPoint:
     n_comps: int = 0
     flags: list = field(default_factory=list)
     members: list = field(default_factory=list)   # member frame paths
+    zp_parts: dict = None       # {comp name: (residual, sigma)} of its own
+                                # zero point (the per-comp tie reads it)
+    zp_used: list = None        # the comps the MAD veto actually kept
 
 
 @dataclass
 class SeriesResult:
     # The whole run: status "complete" | "incomplete" (cancelled), the
-    # points, the unreadable frames, the detrend block (phase 3) and the
-    # resolved running parameters for the audit trail.
+    # points, the unreadable frames, the detrend block (phase 3), the
+    # alignment block and the resolved running parameters for the audit.
     status: str = "complete"
     points: list = field(default_factory=list)
     errors: dict = field(default_factory=dict)
@@ -139,6 +155,10 @@ class SeriesResult:
     detrend: dict = None
     group_n: int = 1
     apertures: dict = field(default_factory=dict)   # per-night k (T3)
+    align_report: dict = None                       # D44: frame alignment
+    comp_report: dict = None                        # the comps' tie
+    model_notes: list = field(default_factory=list)  # [{es,en}] the error
+                                                     # model's caveats
 
 
 # ---------------- small numeric helpers ----------------
@@ -186,35 +206,40 @@ def _combine_fluxes(fluxes, errs, k=_GROUP_SIGMA):
     return comb, err, [i for i, _f, _e in kept], rejected
 
 
-def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA):
+def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA, names=None):
     # The frame's zero point as a weighted ensemble with a MAD veto (T2):
     # drop the comps whose residual (cat - inst) leaves the robust
     # scatter, then a 1/sigma^2 weighted mean.
-    # @args: residuals, errs - per-comp (cat - inst) and its sigma
-    # @return: (zp, zp_err, n_used, n_rejected)
-    pairs = [(r, e) for r, e in zip(residuals, errs)
+    # @args: residuals, errs - per-comp (cat - inst) and its sigma,
+    #        names - optional per-comp labels (the veto's verdict then
+    #        travels with the point)
+    # @return: (zp, zp_err, n_used, n_rejected, kept_names or None)
+    pairs = [(r, e, i) for i, (r, e) in enumerate(zip(residuals, errs))
              if r is not None and math.isfinite(r)]
     if not pairs:
-        return None, None, 0, 0
+        return None, None, 0, 0, None
     if len(pairs) == 1:
-        r, e = pairs[0]
-        return r, e, 1, 0
-    arr = np.asarray([r for r, _e in pairs], dtype=np.float64)
+        r, e, i = pairs[0]
+        return r, e, 1, 0, ([names[i]] if names else None)
+    arr = np.asarray([r for r, _e, _i in pairs], dtype=np.float64)
     med = float(np.median(arr))
     mad = float(np.median(np.abs(arr - med)))
-    kept = [p for p in pairs
-            if not (mad > 0.0 and abs(p[0] - med) > k * 1.4826 * mad)]
+    # the veto's scale has a floor: without it a synthetic (or a very
+    # quiet) ensemble scatter of a few micro-magnitudes turns the veto
+    # into a lottery and drops good comps at random
+    scale = max(1.4826 * mad, _MAD_FLOOR)
+    kept = [p for p in pairs if abs(p[0] - med) <= k * scale]
     rejected = len(pairs) - len(kept)
     if not kept:
         kept, rejected = pairs, 0
     wts = [1.0 / (e ** 2) if (e is not None and e > 0) else 1.0
-           for _r, e in kept]
-    zp = _weighted_mean([r for r, _e in kept], wts)
+           for _r, e, _i in kept]
+    zp = _weighted_mean([r for r, _e, _i in kept], wts)
     formal_err = math.sqrt(1.0 / sum(wts)) if sum(wts) > 0 else None
     # robust scatter term (MAD) divided by sqrt(N) ensures honest error
     n_kept = len(kept)
     if n_kept > 0:
-        arr_kept = np.asarray([r for r, _e in kept], dtype=np.float64)
+        arr_kept = np.asarray([r for r, _e, _i in kept], dtype=np.float64)
         med_kept = float(np.median(arr_kept))
         mad_kept = float(np.median(np.abs(arr_kept - med_kept)))
         scatter_err = 1.4826 * mad_kept / math.sqrt(n_kept)
@@ -226,7 +251,8 @@ def _ensemble_zp(residuals, errs, k=_ENSEMBLE_SIGMA):
         zp_err = formal_err
     else:
         zp_err = max(formal_err, scatter_err)
-    return zp, zp_err, len(kept), rejected
+    kept_names = [names[i] for _r, _e, i in kept] if names else None
+    return zp, zp_err, len(kept), rejected, kept_names
 
 
 def _add_flag(pt, flag):
@@ -390,11 +416,32 @@ def _measure_frame(path, header, data, cfg, apertures=None, wcs_ov=None,
         radii = apertures[night].get("radii")
     if radii is None:
         radii = cfg.radii
+    # H3: when the observer asked the aperture to follow the seeing, the
+    # frame's own FWHM sizes it (measured on the target and the comps
+    # before the recipe runs, so the PSF is never resampled and the
+    # aperture follows a seeing that really changed)
+    fwhm = None
+    if cfg.seeing_aperture and radii is None:
+        spots = [target_ov if target_ov is not None else cfg.target_xy]
+        w = wcs_ov if wcs_ov is not None else cfg.wcs
+        if w is not None:
+            for e in cfg.comp_set:
+                star = e.get("star") or {}
+                if star.get("ra") is None:
+                    continue
+                try:
+                    spots.append(w.sky_to_pixel(star["ra"], star["dec"]))
+                except Exception:
+                    continue
+        fwhm = photometry.estimate_fwhm(data, spots)
     rap = (radii if radii else cfg.radii or (photometry.R_AP,))[0]
+    if fwhm is not None:
+        rap = photometry.aperture_for_fwhm(fwhm)[0]
     pcfg = photometry.PlateConfig(
         target_xy=target_ov if target_ov is not None else cfg.target_xy,
         entries=list(cfg.comp_set),
         header=header, wcs=wcs_ov if wcs_ov is not None else cfg.wcs,
+        fwhm=fwhm,
         band=cfg.band,
         fallback_band=cfg.fallback_band, radii=radii,
         sigmaclip=cfg.sigmaclip, sky_mode=cfg.sky_mode,
@@ -493,8 +540,19 @@ def _group_comp(group, star, cfg):
 # ---------------- grouping and calibration ----------------
 
 def _group_centroid(group):
-    xs = [f["res"].col for f in group if f["res"].col is not None]
-    ys = [f["res"].row for f in group if f["res"].row is not None]
+    # The centroid on the REFERENCE plate: a frame measured on its own
+    # grid under registration carries its mapped position in "ref_xy", so
+    # the guide gate always compares like with like (D44).
+    # @args: group - measured frames
+    # @return: (x, y) in reference pixels, or (None, None)
+    xs, ys = [], []
+    for f in group:
+        xy = f.get("ref_xy")
+        if xy is None and f["res"].col is not None:
+            xy = (f["res"].col, f["res"].row)
+        if xy is not None:
+            xs.append(xy[0])
+            ys.append(xy[1])
     if not xs:
         return None, None
     return float(np.mean(xs)), float(np.mean(ys))
@@ -565,9 +623,14 @@ def _flag_gates(pt, group, cfg):
 
 def _catalog_point(pt, group, cfg):
     # T1/T2: the point's zero point from its own comps (weighted ensemble
-    # with a MAD veto); the calibrated magnitude and error.
-    residuals, errors = [], []
-    for e in cfg.comp_set:
+    # with a MAD veto); the calibrated magnitude and error. The CHECK
+    # star is measured on every frame but never enters the zero point: it
+    # is the monitor, and the frame where it leaves the field (or enters
+    # saturated) must not move the curve.
+    residuals, errors, parts = [], [], {}
+    for j, e in enumerate(cfg.comp_set):
+        if (e.get("kind") or "comp") == "check":
+            continue
         inst_c, cat_c, err_c = _group_comp(group, e["star"], cfg)
         if inst_c is None or cat_c is None:
             continue
@@ -584,13 +647,79 @@ def _catalog_point(pt, group, cfg):
             err_c = float(cat_err)
         residuals.append(cat_c - inst_c)
         errors.append(err_c)
-    zp, zp_err, kept, _rej = _ensemble_zp(residuals, errors)
+        parts[_comp_key(e, j)] = (cat_c - inst_c, err_c)
+    names = list(parts.keys())
+    zp, zp_err, kept, _rej, used = _ensemble_zp(residuals, errors, names=names)
     pt.n_comps = kept
     pt.zp, pt.zp_err = zp, zp_err
+    pt.zp_parts = parts
+    pt.zp_used = list(used or [])
     if kept < _MIN_COMPS:
         _add_flag(pt, "few_comps")
     pt.mag = pt.inst + zp if (pt.inst is not None and zp is not None) \
         else None
+
+
+def _comp_key(entry, index=0):
+    # @return: a stable name for a comparison entry (its label, or its
+    #          position in the sequence)
+    name = entry.get("name") or (entry.get("star") or {}).get("id")
+    return name or "comp{}".format(index)
+
+
+def _tie_comps(points, cfg):
+    # Every comparison star is tied to the ensemble with its own level.
+    #
+    # A comp's residual (catalogue minus instrumental) is stable in time:
+    # what it carries is its own catalogue error and its own photometric
+    # systematic, a CONSTANT. The plain per-frame median of whatever
+    # comps happen to be measurable then JUMPS the moment the set changes
+    # (a comp leaves the frame with the drift, another saturates), which
+    # a small-amplitude curve cannot afford.
+    #
+    # So each comp's own median residual is measured over the whole run
+    # and the zero point becomes the ensemble level with every comp tied
+    # to it: the frame's zero point no longer depends on who was present.
+    #
+    # The offsets are reported, never hidden: they say plainly that the
+    # observer's comparison stars disagree.
+    #
+    # @args: points - measured SeriesPoints, cfg - the SeriesConfig
+    # @return: {"offsets", "frames"} or None when there was nothing to tie
+    if cfg.zp_mode != "catalog":
+        return None
+    have = [p for p in points if p.zp_parts]
+    if not have:
+        return None
+    names = sorted({c for p in have for c in p.zp_parts})
+    levels, seen = {}, {}
+    for c in names:
+        vals = [p.zp_parts[c][0] for p in have if c in p.zp_parts]
+        seen[c] = len(vals)
+        levels[c] = float(np.median(vals))
+    core = [levels[c] for c in names if seen[c] >= _TIE_MIN_FRAMES]
+    ref = float(np.median(core)) if core else float(np.median(
+        list(levels.values())))
+    offsets = {c: levels[c] - ref for c in names}
+    for p in have:
+        res, errs, keys = [], [], []
+        for c, (r, e) in p.zp_parts.items():
+            res.append(r - offsets.get(c, 0.0))
+            errs.append(e)
+            keys.append(c)
+        zp, zp_err, kept, _rej, used = _ensemble_zp(res, errs, names=keys)
+        if zp is None:
+            continue
+        p.zp, p.zp_err = zp, zp_err
+        p.n_comps = kept
+        p.zp_used = list(used or [])
+        if kept >= _MIN_COMPS and "few_comps" in p.flags:
+            p.flags.remove("few_comps")
+        if p.inst is not None:
+            p.mag = p.inst + zp
+    return {"offsets": offsets, "frames": seen, "level": ref}
+
+
 
 
 def _relative_point(pt, group, cfg):
@@ -994,6 +1123,140 @@ def sweep_aperture(paths, cfg, ks=None):
     return out
 
 
+def _align_report(report, cfg):
+    # The alignment block that travels with the run (D44): how many
+    # frames were aligned, how far the field really moved, how well the
+    # stars verified it and how many frames could not be verified.
+    # @args: report - the running counters of measure_series,
+    #        cfg - the SeriesConfig (for the plate scale)
+    # @return: a dict, or None when alignment was off
+    if not report.get("enabled"):
+        return None
+    shifts = report.get("shifts_px") or []
+    rms = report.get("rms_px") or []
+    angles = report.get("angle_deg") or []
+    out = {"mode": report["mode"], "requested": report.get("requested"),
+           "aligned": report["aligned"],
+           "inherited": report["inherited"],
+           "failed": list(report["failed"]),
+           "n_failed": len(report["failed"])}
+    if shifts:
+        out["shift_median_px"] = float(np.median(shifts))
+        out["shift_max_px"] = float(max(shifts))
+    if rms:
+        out["rms_median_px"] = float(np.median(rms))
+        out["rms_max_px"] = float(max(rms))
+    if angles:
+        out["angle_max_deg"] = float(max(abs(a) for a in angles))
+    scale = None
+    if cfg is not None and cfg.wcs is not None:
+        try:
+            scale = float(cfg.wcs.pixel_scale())
+        except Exception:
+            scale = None
+    if scale:
+        out["pixel_scale_arcsec"] = scale
+        if shifts:
+            out["shift_max_arcsec"] = out["shift_max_px"] * scale
+    return out
+
+
+def align_messages(report):
+    # The alignment block in plain language for the panel, both
+    # languages, built where the numbers live (the GUI only shows them).
+    # @args: report - the _align_report dict (or None)
+    # @return: [{"es", "en"}] (empty when there is nothing to say)
+    if not report:
+        return []
+    out = []
+    n = int(report.get("aligned") or 0)
+    if n:
+        es = "Frames alineados: {}".format(n)
+        en = "Aligned frames: {}".format(n)
+        if report.get("shift_max_px") is not None:
+            es += "; la imagen se movió hasta {:.1f} px".format(
+                report["shift_max_px"])
+            en += "; the image moved up to {:.1f} px".format(
+                report["shift_max_px"])
+            if report.get("shift_max_arcsec") is not None:
+                es += " ({:.1f}')".format(report["shift_max_arcsec"] / 60.0)
+                en += " ({:.1f}')".format(report["shift_max_arcsec"] / 60.0)
+        out.append(_msg(es, en))
+    if report.get("rms_median_px") is not None:
+        out.append(_msg(
+            "Verificación por estrellas: {:.2f} px de residuo".format(
+                report["rms_median_px"]),
+            "Star verification: {:.2f} px residual".format(
+                report["rms_median_px"])))
+    nf = int(report.get("n_failed") or 0)
+    if nf:
+        out.append(_msg(
+            "{} frame(s) sin verificar: se mide con la alineación "
+            "anterior y se marcan".format(nf),
+            "{} frame(s) unverified: measured with the previous "
+            "alignment and flagged".format(nf)))
+    return out
+
+
+def _model_notes(frames, cfg):
+    # The error model's caveats, in plain language (C4: what is missing is
+    # said, never hidden). The CCD equation needs a gain; without one the
+    # error bar is only the scatter of the comparison stars, which on a
+    # faint target is a different (and usually rosier and rougher) thing.
+    # @args: frames - the measured frame dicts, cfg - the SeriesConfig
+    # @return: [{"es", "en"}]
+    notes = []
+    if not frames:
+        return notes
+    if not any(f["res"].gain for f in frames):
+        notes.append(_msg(
+            "Sin ganancia (ni en Ajustes ni en la cabecera): la barra de "
+            "error es la dispersión de las comparadas, no la ecuación del "
+            "CCD. Ponla en Ajustes para tener errores de verdad.",
+            "No gain (neither in Settings nor in the header): the error "
+            "bar is the scatter of the comparison stars, not the CCD "
+            "equation. Set it in Settings for real errors."))
+    return notes
+
+
+def comp_messages(report, total=None):
+    # The comparison stars in plain language: which of them disagree with
+    # the ensemble and which never made it into the frames (saturated or
+    # outside the sensor). The observer decides what to do with it.
+    # @args: report - the _tie_comps block, total - frames measured
+    # @return: [{"es", "en"}]
+    if not report:
+        return []
+    out = []
+    offsets = report.get("offsets") or {}
+    frames = report.get("frames") or {}
+    off = sorted(((abs(v), k, v) for k, v in offsets.items()), reverse=True)
+    if off and off[0][0] >= 0.15:
+        worst = ", ".join("{} ({:+.2f})".format(k, v)
+                          for _a, k, v in off[:3] if abs(v) >= 0.15)
+        out.append(_msg(
+            "Las comparadas no coinciden entre sí: {} mag. El punto cero "
+            "se ata a cada una, pero conviene revisar la secuencia.".format(
+                worst),
+            "The comparison stars disagree with each other: {} mag. The "
+            "zero point ties each one, but the sequence deserves a "
+            "review.".format(worst)))
+    if total:
+        missing = [(k, n) for k, n in frames.items() if n < 0.4 * total]
+        missing.sort(key=lambda kv: kv[1])
+        if missing:
+            names = ", ".join("{} ({}/{})".format(k, n, total)
+                              for k, n in missing[:4])
+            out.append(_msg(
+                "Fuera de la mayoría de los frames: {}. Una comparada que "
+                "entra y sale del campo o que está saturada no sirve.".format(
+                    names),
+                "Missing from most frames: {}. A comparison star that "
+                "drifts in and out of the field, or that is saturated, is "
+                "no use.".format(names)))
+    return out
+
+
 def measure_series(paths, cfg, progress=None, cancel=None):
     # Measure a whole series frame by frame (T1-T7), grouping when asked
     # (D19). Never raises for a bad frame: unreadable files are recorded
@@ -1012,6 +1275,23 @@ def measure_series(paths, cfg, progress=None, cancel=None):
         result.apertures = apertures
     frames = []
     ref_data = None
+    ref_stars = None
+    prev_align = None
+    mode = cfg.align
+    rigid = True
+    if mode == "translation":
+        # the observer asked for a pure translation: never look for a
+        # rotation, whatever the stars say
+        mode, rigid = "coords", False
+    if mode == "auto":
+        # measuring on the native grid needs the per-frame WCS; without a
+        # reference WCS the warp is the honest fallback
+        mode = "coords" if cfg.wcs is not None else "warp"
+    if mode not in ("warp", "similarity", "coords"):
+        mode = "off"
+    report = {"enabled": mode != "off", "mode": mode, "requested": cfg.align,
+              "rotation": rigid, "aligned": 0, "failed": [], "inherited": 0,
+              "shifts_px": [], "rms_px": [], "angle_deg": []}
     for i, path in enumerate(paths):
         if cancel is not None and cancel():
             result.status = "incomplete"
@@ -1024,50 +1304,77 @@ def measure_series(paths, cfg, progress=None, cancel=None):
             continue
         header, data = loaded
         align_info = None
+        used = None
         wcs_ov = None
         target_ov = None
         warped_mask = None
-        if cfg.align != "off":
+        if mode != "off":
             # the first readable frame is the reference grid (target_xy
             # and the comps live in ITS pixels)
             if ref_data is None:
                 ref_data = data
+                from . import register
+                ref_stars = register.detect_stars(
+                    register.source_image(ref_data), sat=cfg.site_saturate)
             else:
                 from . import register
-                align_info = register.estimate_transform(ref_data, data)
-                if cfg.align in ("warp", "similarity"):
-                    data = register.apply_transform(
-                        data, align_info["angle"], align_info["dx"],
-                        align_info["dy"])
-                    # the warp fills the off-footprint pixels with
-                    # zeros; with a near-zero sky that inflates the
-                    # flux, so apertures touching them are flagged
-                    warped_mask = register.warp_mask(
-                        data.shape, align_info["angle"],
-                        align_info["dx"], align_info["dy"])
-                elif cfg.align == "coords":
-                    # measure on the native grid at the mapped
-                    # coordinates: the PSF is never resampled
-                    if cfg.wcs is not None:
-                        wcs_ov = register.compose_wcs(cfg.wcs, align_info)
-                    target_ov = register.ref_to_src_point(
-                        align_info, cfg.target_xy, data.shape)
+                align_info = register.estimate_transform(
+                    ref_data, data, guess=prev_align, ref_stars=ref_stars,
+                    sat=cfg.site_saturate, allow_rotation=rigid)
+                used = align_info
+                if not register.trusted(align_info):
+                    # a frame that cannot be verified is never aligned on
+                    # a guess: it inherits the previous transform and is
+                    # flagged (the engine marks, never deletes)
+                    align_info["failed"] = True
+                    report["failed"].append(str(path))
+                    if prev_align is not None:
+                        used = dict(prev_align)
+                        used["inherited"] = True
+                        report["inherited"] += 1
+                    else:
+                        used = None
+                if used is not None:
+                    report["aligned"] += 1
+                    report["shifts_px"].append(float(used["shift_px"]))
+                    if used.get("rms_px") is not None:
+                        report["rms_px"].append(float(used["rms_px"]))
+                    report["angle_deg"].append(float(used.get("angle_deg") or 0.0))
+                    if mode in ("warp", "similarity"):
+                        data = register.apply_transform(
+                            data, used["angle"], used["dx"], used["dy"])
+                        # the warp fills the off-footprint pixels with
+                        # zeros; with a near-zero sky that inflates the
+                        # flux, so apertures touching them are flagged
+                        warped_mask = register.warp_mask(
+                            data.shape, used["angle"], used["dx"], used["dy"])
+                    elif mode == "coords":
+                        # measure on the native grid at the mapped
+                        # coordinates: the PSF is never resampled
+                        wcs_ov = register.compose_wcs(cfg.wcs, used)
+                        target_ov = register.ref_to_src_point(
+                            used, cfg.target_xy, data.shape)
+                    prev_align = {"dx": used["dx"], "dy": used["dy"],
+                                  "angle": used["angle"],
+                                  "n": used.get("n") or 0}
         frame = _measure_frame(path, header, data, cfg, apertures,
                                wcs_ov=wcs_ov, target_ov=target_ov)
         if align_info is not None:
             frame["align"] = align_info
-            if align_info.get("quality", 0.0) < register.QUALITY_MIN:
+            if align_info.get("failed"):
                 frame["align_failed"] = True
+        if used is not None and frame["res"].col is not None:
+            # the guide gate compares against the REFERENCE plate, so a
+            # frame measured on its own grid has to be mapped back
+            if mode == "coords":
+                frame["ref_xy"] = register.src_to_ref_point(
+                    used, (frame["res"].col, frame["res"].row), data.shape)
+            else:
+                frame["ref_xy"] = (frame["res"].col, frame["res"].row)
         if warped_mask is not None:
             frame["align_edge"] = _aperture_off_footprint(
                 warped_mask, frame["res"], frame["r_ap"])
             warped_mask = None
-            if cfg.align == "coords" and frame["res"].col is not None:
-                frame["res"].col, frame["res"].row = \
-                    register.src_to_ref_point(align_info,
-                                              (frame["res"].col,
-                                               frame["res"].row),
-                                              data.shape)
         # the cosmic gate runs here, while the image is alive; the full
         # array is released right away, so the series holds points and
         # flags, never pixels (one frame in RAM at a time)
@@ -1077,11 +1384,15 @@ def measure_series(paths, cfg, progress=None, cancel=None):
         if progress is not None:
             progress(i + 1, total)
     ref_data = None       # the alignment grid is no longer needed
+    ref_stars = None
+    result.align_report = _align_report(report, cfg)
+    result.model_notes = _model_notes(frames, cfg)
     frames.sort(key=lambda f: (f["mjd"] if f["mjd"] is not None
                                else float("inf")))
     n = result.group_n
     points = [_build_point(frames[i:i + n], cfg)
               for i in range(0, len(frames), n)]
+    result.comp_report = _tie_comps(points, cfg)
     _fill_neighbour_zp(points, cfg)
     _flag_clouds(points, cfg)
     if cfg.detrend_policy != "off":

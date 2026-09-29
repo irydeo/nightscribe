@@ -544,7 +544,17 @@ usually sits below it. **If you change gain, measure it again.**
 
 ---
 
+**Measuring a series** (one frame after another, with per-frame alignment, a
+zero point tied per comparison star and quality gates) is a different job from
+measuring one plate and has its own guide: `SEQUENCES`. Once the curve is there,
+**finding the period and folding it** (Lomb-Scargle and PDM periodograms, FAP,
+two-panel report) lives in `SEQUENCES` §9 and ADR-054.
+
+---
+
 *Implementation details and decisions: `core/series.py`,
-`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`;
+`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`,
+`core/series_measure.py`, `core/register.py`, `core/periodogram.py`;
 ADR-018 (own FITS/WCS), ADR-042 (photometric sequences), ADR-044
-(unified FITS editor).*
+(unified FITS editor), ADR-048 (the frame-by-frame series and its alignment),
+ADR-054 (period search).*

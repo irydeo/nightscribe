@@ -36,8 +36,8 @@ def test_zp_err_tracks_the_known_comp_scatter():
     rng = np.random.default_rng(42)
     residuals = list(rng.normal(0.0, 0.05, 8))
     errors = [0.001] * 8
-    zp, zp_err, n_used, _rej = series_measure._ensemble_zp(residuals,
-                                                           errors)
+    zp, zp_err, n_used, _rej, _used = series_measure._ensemble_zp(residuals,
+                                                                  errors)
     assert n_used == 8
     want = 0.05 / math.sqrt(8)
     assert zp_err == pytest.approx(want, rel=0.5)
@@ -49,7 +49,7 @@ def test_zp_err_never_beats_the_catalogue_errors():
     # the ZP cannot be known better than 0.02/sqrt(6) ~ 0.0082 mag.
     residuals = [0.0] * 6
     errors = [0.02] * 6
-    zp, zp_err, n_used, _rej = series_measure._ensemble_zp(residuals,
-                                                           errors)
+    zp, zp_err, n_used, _rej, _used = series_measure._ensemble_zp(residuals,
+                                                                  errors)
     assert n_used == 6
     assert zp_err >= 0.02 / math.sqrt(6) * 0.99

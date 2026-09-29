@@ -255,3 +255,151 @@ comparison. The sequence table now has **Band** (editable combo) and **Magnitude
 (`derived=False`, origin "manual"), so `photometry.band_of` and the calibration use
 the manual value; the Measure band combo refreshes at once. The star's other
 catalog bands are kept.
+
+## Revisión (2026-09-29, D17/D44): la alineación por frame deja de ser opt-in
+
+**Contexto**: una serie real del grupo ObSN (V0526 Per, 244 tomas de 40 s, sin WCS
+en la cabecera) derivó **134" (87 px)** en 2.9 h. El motor medía a las coordenadas
+de la placa de referencia, así que la estrella salió de la apertura de 6 px en menos
+de un minuto y la curva quedó en un rango de 8 magnitudes con `err` = 0.5 mag: el
+caso que abrió `docs/PLANS/series-quality.md`.
+
+Medido con el motor real sobre esas tomas:
+
+| | antes | después |
+|---|---|---|
+| puntos medibles | 5 de 244 (3 `unusable`) | **244** |
+| rango de la curva | 8 mag | 0.06 mag |
+| correlación con el informe del observador (FotoDif), 244 frames | 0.32 | **0.899** |
+| residuo contra ese informe | 0.13 mag | **0.0094 mag** |
+| estrella de control | | 0.005 mag |
+| ritmo | 4.6 s/frame y sin converger | **0.23 s/frame** |
+
+**Decisión**:
+
+- **La alineación está encendida por defecto** (`align="auto"` en el diálogo
+  Avanzado; `off`, `translation`, `similarity`, `warp` y `coords` siguen ahí) y
+  queda registrada en `measurement_runs.cfg_json`. D17 describía un mundo donde
+  todas las tomas traían WCS: en la práctica casi ninguna lo trae, y suponerlo es
+  como perder la serie.
+- **`coords` es el modo de `auto`**: cada frame se mide en su rejilla nativa con la
+  WCS por frame compuesta, de modo que la PSF nunca se remuestrea; `warp` y
+  `similarity` (que sí remuestrean) quedan como vías explícitas.
+- **El registro es una cascada, no una búsqueda a ciegas** (`core/register.py`,
+  numpy puro): se quita el cielo (medianas por bloques, que es lo que envenenaba la
+  FFT con el viñeteo), las **estrellas votan** la transformación (para cada rotación
+  candidata, cada par implica una traslación y gana la que más pares independientes
+  confirma), y sólo si la traslación no explica las estrellas se ajusta la rigidez
+  (lstsq + sigma-clip). La anterior búsqueda de ángulo por correlación de fase
+  devolvía −166° con `quality` 43.8 sobre estas tomas y la aceptaba en silencio: el
+  `peak/std` no discrimina. **Se jubila `QUALITY_MIN` como criterio**: la calidad es
+  ahora **física** (`register.trusted`: nº de estrellas emparejadas y rms en px).
+- **Una rotación tiene que ganarse el sitio**: sólo entra si reduce el residuo real
+  ≥ 25 %; y una traslación que sólo ajusta las estrellas del centro (donde una
+  rotación es invisible) no cuenta: los pares deben **cubrir el campo**
+  (`_MIN_SPREAD`).
+- **Un frame que no se puede verificar hereda la transformación anterior y se marca**
+  `align_failed` (nunca se mide con una suposición): se acabó el `guide_jump` en
+  todos los frames, que además era un defecto real (en `coords`, el centroide nunca
+  se remapeaba a la referencia: el remapeo vivía dentro de la rama de `warp`).
+- **El punto cero se ata por comparada** (`_tie_comps`): el residuo de catálogo de
+  cada estrella es estable en el tiempo y, cuando una comp sale del campo o se
+  satura, la mediana de las que quedan **saltaba** (0.23 mag en este set). Ahora cada
+  comp mide su propio nivel y el punto cero deja de depender de quién estaba
+  presente. La estrella de **chequeo nunca entra en el punto cero** (es el monitor).
+  Los desacuerdos entre comps se **dicen** en el panel, no se esconden.
+- **El motor dice lo que no sabe**: avisos en lenguaje llano de en qué han quedado
+  las tomas, de la deriva, del residuo de las estrellas, de las comps que nunca
+  entraron en el marco o están saturadas y de la ganancia que falta (sin ella la
+  barra de error es la dispersión de las comps, no la ecuación del CCD).
+- **Válvula de seguridad por noche y por tipo**: `chk_seeing` pasa el FWHM por frame
+  a la receta en serie (H3) y, para `variable`/`hads`, el detrend por defecto es el
+  mínimo honesto de masa de aire (D11).
+
+**Alternativas**: añadir `astroalign`/`photutils`/`ccdproc` (rechazado: `autophot`
+exige `TELESCOP`/`INSTRUME`/`FILTER` en la cabecera, justo lo que estos FITS no
+tienen, y son 20+ dependencias conda; `astroalign` sólo por sí solo traería scipy y
+la resolución aquí es una traslación + una rotación pequeña, que numpy resuelve en
+0.23 s/frame); seguir con la alineación opt-in (rechazado: es la causa del
+desastre); dejar el aviso del desacuerdo de comps sólo en el log (rechazado: C4).
+
+**Consecuencias**: la calidad de una secuencia queda a la altura de la placa única
+(0.0094 mag de residuo contra una reducción independiente); el coste es una etapa de
+registro de ~0.15 s/frame (2 % del total) y la obligación de decir en el panel en qué
+han quedado las tomas. `QUALITY_MIN` desaparece como puerta y aparece
+`register.trusted`. La fixture de regresión (`tests/data/v0526per/`, 8 frames
+recortados reales) guarda el caso para que no vuelva.
+
+## Revision (2026-09-29, D17/D44): per-frame alignment stops being opt-in
+
+**Context**: a real series from the ObSN group (V0526 Per, 244 frames of 40 s, no
+WCS in the header) drifted **134" (87 px)** in 2.9 h. The engine measured at the
+reference plate's coordinates, so the star left the 6 px aperture in under a minute
+and the curve came out across 8 magnitudes with `err` = 0.5 mag: the case that
+opened `docs/PLANS/series-quality.md`.
+
+Measured with the real engine on those frames:
+
+| | before | after |
+|---|---|---|
+| measurable points | 5 of 244 (3 `unusable`) | **244** |
+| curve range | 8 mag | 0.06 mag |
+| correlation with the observer's own reduction (FotoDif), 244 frames | 0.32 | **0.899** |
+| residual against that reduction | 0.13 mag | **0.0094 mag** |
+| check star | | 0.005 mag |
+| speed | 4.6 s/frame and not converging | **0.23 s/frame** |
+
+**Decision**:
+
+- **Alignment is on by default** (`align="auto"` in the Advanced dialog; `off`,
+  `translation`, `similarity`, `warp` and `coords` all remain) and is recorded in
+  `measurement_runs.cfg_json`. D17 described a world where every frame carried a
+  WCS: in practice almost none does, and assuming it is how a series is lost.
+- **`auto` means `coords`**: each frame is measured on its native grid with the
+  composed per-frame WCS, so the PSF is never resampled; `warp` and `similarity`
+  (which do resample) stay as explicit choices.
+- **Registration is a cascade, not a blind search** (`core/register.py`, pure
+  numpy): the sky is removed (block medians, which is what used to poison the FFT
+  with vignetting), the **stars vote** the transform (for every candidate rotation
+  every pair implies a translation, and the one most independent pairs agree on
+  wins), and only when the translation cannot explain the stars does a rigid fit
+  enter (lstsq + sigma-clip). The old phase-correlation angle search answered
+  −166° with `quality` 43.8 on these frames and accepted it in silence: `peak/std`
+  does not discriminate. **`QUALITY_MIN` is retired as the gate**: quality is now
+  **physical** (`register.trusted`: matched-star count and rms in px).
+- **A rotation has to earn its place**: it enters only when it removes ≥ 25 % of the
+  real residual; and a translation that only fits the stars near the centre (where
+  a rotation is invisible) does not count: the pairs must **span the frame**
+  (`_MIN_SPREAD`).
+- **A frame that cannot be verified inherits the previous transform and is flagged**
+  `align_failed` (never measured on a guess); the `guide_jump` firing on every frame
+  is gone, and it was a real defect too (under `coords` the centroid was never
+  mapped back to the reference: the mapping lived inside the `warp` branch).
+- **The zero point is tied per comparison star** (`_tie_comps`): a comp's catalogue
+  residual is stable in time, and when one leaves the frame or saturates the median
+  of the rest used to **jump** (0.23 mag on this set). Each comp now measures its
+  own level and the zero point no longer depends on who was present. The **check
+  star never enters the zero point** (it is the monitor). Disagreements between
+  comps are **said** in the panel, never hidden.
+- **The engine says what it does not know**: plain-language notes on what happened
+  to the frames, the drift, the star residual, the comps that never entered the
+  sensor or are saturated, and the missing gain (without it the error bar is the
+  scatter of the comps, not the CCD equation).
+- **Safety valves per night and per type**: `chk_seeing` passes each frame's FWHM
+  to the series recipe (H3) and, for `variable`/`hads`, the default detrend is the
+  honest airmass minimum (D11).
+
+**Alternatives**: adding `astroalign`/`photutils`/`ccdproc` (rejected: `autophot`
+requires `TELESCOP`/`INSTRUME`/`FILTER` in the header, exactly what these FITS lack,
+and brings 20+ conda dependencies; `astroalign` alone would drag scipy in, while
+the geometry here is a translation plus a small rotation that numpy solves in
+0.23 s/frame); keeping alignment opt-in (rejected: it is the cause of the desastre);
+keeping the comp-disagreement warning in the log only (rejected: C4).
+
+**Consequences**: a series now reaches single-plate quality (0.0094 mag residual
+against an independent reduction); the cost is a ~0.15 s/frame registration stage
+(2 % of the total) and the duty to tell the observer, in the panel, what became of
+the frames. `QUALITY_MIN` is gone as a gate and `register.trusted` takes its place.
+The regression fixture (`tests/data/v0526per/`, 8 cropped real frames) keeps the
+case from coming back.
+

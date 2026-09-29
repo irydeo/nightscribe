@@ -545,7 +545,17 @@ linealidad suele quedar por debajo. **Si cambias de ganancia, remide.**
 
 ---
 
+**Medir una serie** (una toma detrás de otra, con alineación por frame, punto cero
+atado por comparada y puertas de calidad) es otra cosa que medir una placa, y tiene
+su propia guía: `SEQUENCES`. Cuando la curva ya está, **buscar el período y plegarla**
+(periodograma de Lomb-Scargle y PDM, FAP, informe de dos paneles) vive en
+`SEQUENCES` §9 y en ADR-054.
+
+---
+
 *Detalles de implementación y decisiones: `core/series.py`,
-`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`;
+`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`,
+`core/series_measure.py`, `core/register.py`, `core/periodogram.py`;
 ADR-018 (FITS/WCS propio), ADR-042 (secuencias fotométricas), ADR-044
-(Editor FITS unificado).*
+(Editor FITS unificado), ADR-048 (la serie frame a frame y su alineación),
+ADR-054 (búsqueda de período).*

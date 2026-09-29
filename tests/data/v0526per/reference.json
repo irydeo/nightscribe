@@ -1,0 +1,807 @@
+{
+ "series": {
+  "wcs": {
+   "crval1": 49.99264085174,
+   "crval2": 49.77952159051,
+   "crpix1": 832.0,
+   "crpix2": 626.5,
+   "cd": [
+    [
+     0.0004276374824421,
+     4.955628662279e-05
+    ],
+    [
+     -4.945730932057e-05,
+     0.0004277697071812
+    ]
+   ],
+   "naxis1": 1663,
+   "naxis2": 1252
+  },
+  "target_xy": [
+   804.2478974709531,
+   830.9527603479363
+  ],
+  "band": "V",
+  "entries": [
+   {
+    "name": "Comp1",
+    "kind": "comp",
+    "star": {
+     "ra": 50.26445466999,
+     "dec": 49.66827829655,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.491226,
+       "err": 0.002798,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 12.940343,
+       "err": 0.003028,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.330232,
+       "err": 0.003875,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 2.610111,
+       "err": 0.0049177646344655416,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 14.812948092616256,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 12.696342530730858,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.39995413676274,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 9.487215369551413,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 2.1166055618853985,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 2.1166055618853985
+    }
+   },
+   {
+    "name": "Comp2",
+    "kind": "comp",
+    "star": {
+     "ra": 50.25126833894,
+     "dec": 49.91041713443,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.469865,
+       "err": 0.002781,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 12.526605,
+       "err": 0.002966,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.463228,
+       "err": 0.003806,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 2.063376999999999,
+       "err": 0.004825224554360139,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 13.92785891282999,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 12.260172458416223,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.25873098815493,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 9.92616407298842,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 1.6676864544137668,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 1.6676864544137668
+    }
+   },
+   {
+    "name": "Comp3",
+    "kind": "comp",
+    "star": {
+     "ra": 49.79958853545,
+     "dec": 49.58905403817,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.46091,
+       "err": 0.002767,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 12.290987,
+       "err": 0.002886,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.570385,
+       "err": 0.003795,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 1.7206019999999995,
+       "err": 0.0047677060521806505,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 13.40704562189857,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 12.02908874290102,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.208139897726355,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 10.200455419120658,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 1.3779568789975496,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 1.3779568789975496
+    }
+   },
+   {
+    "name": "Comp4",
+    "kind": "comp",
+    "star": {
+     "ra": 50.46386198733,
+     "dec": 49.47914527419,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.398823,
+       "err": 0.002773,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 12.138267,
+       "err": 0.0029,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.55967,
+       "err": 0.003809,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 1.5785970000000002,
+       "err": 0.004787325035967372,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 13.140940643860246,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 11.88455599746765,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.137516055842832,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 10.25450507239819,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 1.2563846463925952,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 1.2563846463925952
+    }
+   },
+   {
+    "name": "Comp5",
+    "kind": "comp",
+    "star": {
+     "ra": 50.31090507744,
+     "dec": 49.75618016321,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.356943,
+       "err": 0.002768,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 11.739985,
+       "err": 0.00285,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.802943,
+       "err": 0.003799,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 0.9370419999999999,
+       "err": 0.00474920003790112,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 12.252433374954995,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 11.548213942425047,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.126247426197272,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 10.728498903647836,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 0.704219432529948,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 0.704219432529948
+    }
+   },
+   {
+    "name": "Comp6",
+    "kind": "comp",
+    "star": {
+     "ra": 50.29766787251,
+     "dec": 49.74487472236,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.343298,
+       "err": 0.002784,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 11.534009,
+       "err": 0.00286,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 11.018313,
+       "err": 0.003797,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 0.5156960000000002,
+       "err": 0.0047536101018068365,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 11.770368295945534,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 11.418375969130727,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.196485012107209,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 11.045807070351788,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 0.3519923268148073,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 0.3519923268148073
+    }
+   },
+   {
+    "name": "Comp7",
+    "kind": "comp",
+    "star": {
+     "ra": 50.25851910212,
+     "dec": 49.73836097128,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.266196,
+       "err": 0.002767,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 11.71375,
+       "err": 0.002855,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.649531,
+       "err": 0.003792,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 1.0642189999999996,
+       "err": 0.004746608157410932,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 12.31823828334169,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 11.50507441223927,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 11.020170045388976,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 10.536635746738284,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 0.8131638711024198,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 0.8131638711024198
+    }
+   },
+   {
+    "name": "Comp8",
+    "kind": "comp",
+    "star": {
+     "ra": 49.61067720659,
+     "dec": 49.84682984203,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.060753,
+       "err": 0.00277,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 12.172244,
+       "err": 0.003048,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.029928,
+       "err": 0.003809,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 2.142315999999999,
+       "err": 0.004878399840111509,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 13.640103149009928,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 11.906579330814472,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 10.86315080812193,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 9.451238592197205,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 1.7335238181954562,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 1.7335238181954562
+    }
+   },
+   {
+    "name": "Check",
+    "kind": "check",
+    "star": {
+     "ra": 50.46444303332,
+     "dec": 49.50398210929,
+     "band": "G",
+     "bands": [
+      {
+       "label": "G",
+       "value": 11.053037,
+       "err": 0.002761,
+       "derived": false
+      },
+      {
+       "label": "BP",
+       "value": 11.824105,
+       "err": 0.002841,
+       "derived": false
+      },
+      {
+       "label": "RP",
+       "value": 10.198287,
+       "err": 0.003801,
+       "derived": false
+      },
+      {
+       "label": "BP-RP",
+       "value": 1.6258179999999989,
+       "err": 0.004745406410414181,
+       "derived": false
+      },
+      {
+       "label": "B",
+       "value": 12.862425837405683,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "V",
+       "value": 11.565535083070126,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Rc",
+       "value": 10.793978057425488,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "Ic",
+       "value": 9.870178548515257,
+       "err": null,
+       "derived": true
+      },
+      {
+       "label": "B-V",
+       "value": 1.296890754335557,
+       "err": null,
+       "derived": true
+      }
+     ],
+     "bv": 1.296890754335557
+    }
+   }
+  ],
+  "drift_px": [
+   85.0,
+   -21.0
+  ],
+  "n_frames": 244
+ },
+ "crop": {
+  "box": [
+   550,
+   550,
+   512,
+   512
+  ],
+  "frames": [
+   1,
+   40,
+   80,
+   120,
+   160,
+   200,
+   230,
+   244
+  ],
+  "wcs": {
+   "crval1": 49.99264085174,
+   "crval2": 49.77952159051,
+   "crpix1": 282.0,
+   "crpix2": 76.5,
+   "cd": [
+    [
+     0.0004276374824421,
+     4.955628662279e-05
+    ],
+    [
+     -4.945730932057e-05,
+     0.0004277697071812
+    ]
+   ],
+   "naxis1": 512,
+   "naxis2": 512
+  },
+  "target_xy": [
+   254.24789747095315,
+   280.9527603479363
+  ],
+  "band": "Rc",
+  "expected_drift_px": [
+   85.0,
+   -21.0
+  ],
+  "entries": [
+   {
+    "name": "C1",
+    "kind": "comp",
+    "star": {
+     "ra": 49.865662673576296,
+     "dec": 49.86770527477533,
+     "band": "Rc",
+     "bands": [
+      {
+       "label": "Rc",
+       "value": 8.71236341279692,
+       "err": 0.02,
+       "derived": false
+      }
+     ],
+     "bv": 1.2
+    },
+    "xy_full": [
+     618.5508808250252,
+     807.24716377716
+    ]
+   },
+   {
+    "name": "C2",
+    "kind": "comp",
+    "star": {
+     "ra": 49.96645177720903,
+     "dec": 49.88593941819933,
+     "band": "Rc",
+     "bands": [
+      {
+       "label": "Rc",
+       "value": 9.103370186792903,
+       "err": 0.02,
+       "derived": false
+      }
+     ],
+     "bv": 1.2
+    },
+    "xy_full": [
+     763.614621701538,
+     866.4899487596355
+    ]
+   },
+   {
+    "name": "C3",
+    "kind": "comp",
+    "star": {
+     "ra": 49.851776787193494,
+     "dec": 49.81521065291709,
+     "band": "Rc",
+     "bands": [
+      {
+       "label": "Rc",
+       "value": 9.379191729693655,
+       "err": 0.02,
+       "derived": false
+      }
+     ],
+     "bv": 1.2
+    },
+    "xy_full": [
+     611.6993563431473,
+     683.7752982207542
+    ]
+   },
+   {
+    "name": "C4",
+    "kind": "comp",
+    "star": {
+     "ra": 50.00031976867779,
+     "dec": 49.79552046304414,
+     "band": "Rc",
+     "bands": [
+      {
+       "label": "Rc",
+       "value": 9.638571259928938,
+       "err": 0.02,
+       "derived": false
+      }
+     ],
+     "bv": 1.2
+    },
+    "xy_full": [
+     838.1611520119534,
+     663.7292099602854
+    ]
+   },
+   {
+    "name": "C5",
+    "kind": "comp",
+    "star": {
+     "ra": 49.836652007144515,
+     "dec": 49.79034405819768,
+     "band": "Rc",
+     "bands": [
+      {
+       "label": "Rc",
+       "value": 9.613465215899387,
+       "err": 0.02,
+       "derived": false
+      }
+     ],
+     "bv": 1.2
+    },
+    "xy_full": [
+     595.7024442438357,
+     623.8401669861637
+    ]
+   },
+   {
+    "name": "Check",
+    "kind": "check",
+    "star": {
+     "ra": 49.94483496463085,
+     "dec": 49.78271204619638,
+     "band": "Rc",
+     "bands": [
+      {
+       "label": "Rc",
+       "value": 10.502804966981305,
+       "err": 0.02,
+       "derived": false
+      }
+     ],
+     "bv": 1.2
+    },
+    "xy_full": [
+     758.9168915770339,
+     624.6473272011742
+    ]
+   }
+  ]
+ }
+}

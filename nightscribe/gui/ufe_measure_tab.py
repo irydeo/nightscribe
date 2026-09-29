@@ -54,6 +54,29 @@ _C_ANN = "#6ec1ff"     # sky annulus rings in the cool accent
 _C_COMP = "#4dd0e1"    # used comps ring in the compare tab's cyan
 
 
+def _echo_report(report, limit=None):
+    # A JSON-safe echo of a run report for the audit trail: the failure
+    # list is capped (the count is what matters) and only plain values
+    # travel.
+    # @args: report - align_report / comp_report, limit - cap for lists
+    # @return: a JSON-safe dict, or None
+    if not report:
+        return None
+    out = {}
+    for key, value in report.items():
+        if isinstance(value, (int, float, str)) or value is None:
+            out[key] = value
+        elif isinstance(value, (list, tuple)):
+            items = list(value)
+            out[key] = items[:limit] if limit else items
+            if limit and len(items) > limit:
+                out[key + "_total"] = len(items)
+        elif isinstance(value, dict):
+            out[key] = {str(k): v for k, v in value.items()
+                        if isinstance(v, (int, float, str)) or v is None}
+    return out
+
+
 def _decimate(points, max_points=1500):
     # Display-only decimation (D36): a huge series must not stall the
     # chart. A stride keeps the shape; flagged points are never dropped.
@@ -197,6 +220,8 @@ class UfeMeasureTab(QWidget):
         self.btn_series_exoclock.clicked.connect(self._on_series_exoclock)
         self.btn_series_help = self._ui.btn_series_help
         self.btn_series_help.clicked.connect(self._open_series_docs)
+        self.btn_series_phase = self._ui.btn_series_phase
+        self.btn_series_phase.clicked.connect(self._on_series_phase)
         self.lbl_series_frames = self._ui.lbl_series_frames
         self.lbl_series_cadence = self._ui.lbl_series_cadence
         self.prg_series = self._ui.prg_series
@@ -230,6 +255,7 @@ class UfeMeasureTab(QWidget):
         self._series_cfg = None
         self._series_cfg_dict = None
         self._series_attached = False
+        self._kind_defaults_done = False
         # the Advanced window stays a dumb container: its restore button
         # is wired here, where the defaults live
         self._advanced.btn_restore.clicked.connect(
@@ -840,6 +866,8 @@ class UfeMeasureTab(QWidget):
             site_dark=config.get("cam_dark_current_e_s"),
             group_n=int(self._advanced.spn_group_n.value()),
             auto_aperture=auto,
+            seeing_aperture=self.chk_seeing.isChecked(),
+            align=self._advanced.cmb_align.currentData() or "auto",
             detrend_policy=self._advanced.cmb_detrend.currentData()
             or "off")
 
@@ -849,10 +877,26 @@ class UfeMeasureTab(QWidget):
                 "detrend_policy": cfg.detrend_policy,
                 "group_n": cfg.group_n,
                 "auto_aperture": cfg.auto_aperture,
+                "seeing_aperture": cfg.seeing_aperture,
+                "align": cfg.align,
                 "sigmaclip": cfg.sigmaclip, "sky_mode": cfg.sky_mode,
                 "color": cfg.color, "target_bv": cfg.target_bv,
                 "radii": list(cfg.radii) if cfg.radii else None,
                 "target_xy": list(cfg.target_xy)}
+
+    def _apply_kind_defaults(self):
+        # D11: the type picks the parameters. A variable or a HADS star
+        # gains from the honest airmass minimum; a transit must NOT be
+        # detrended (the model and the trend are solved together in the
+        # fit). Applied once, and only when the observer has not chosen.
+        if self._kind_defaults_done:
+            return
+        self._kind_defaults_done = True
+        if self._advanced.cmb_detrend.currentData() != "off":
+            return
+        kind = ((self._series_context() or {}).get("kind") or "").lower()
+        if kind in ("variable", "hads"):
+            self._advanced.cmb_detrend.setCurrentIndex(1)
 
     def _update_series_counter(self, context, points=None):
         n = len((context or {}).get("paths", []))
@@ -921,6 +965,7 @@ class UfeMeasureTab(QWidget):
                 "Measure the target once (a click on it) so the series "
                 "knows where to measure."))
             return
+        self._apply_kind_defaults()
         self._series_cfg = self._series_config(entries, target)
         self._series_cfg_dict = self._series_config_dict(self._series_cfg)
         self._update_series_counter(ctx)
@@ -935,6 +980,21 @@ class UfeMeasureTab(QWidget):
         self._series_worker.failed.connect(self._on_series_failed)
         self._series_worker.start()
         self.lbl_status.setText(self.tr("Measuring the series…"))
+
+    def _on_series_phase(self):
+        # Quality plan (C): the period search opens from where the series
+        # was measured too, on the PROJECT's curve (every visit), so the
+        # observer does not have to hunt for the other door.
+        ctx = self._series_context() or {}
+        pid = ctx.get("pid")
+        dlg = self.window()
+        hook = getattr(dlg, "_open_phase_dialog", None)
+        if pid and callable(hook):
+            hook(pid)
+            return
+        self.lbl_status.setText(self.tr(
+            "The period search works on a project's curve: open the "
+            "editor from a project to reach it."))
 
     def _on_series_progress(self, done, total):
         self.prg_series.setRange(0, total)
@@ -960,6 +1020,10 @@ class UfeMeasureTab(QWidget):
             # stores a cancelled series as "incomplete", never "complete".
             echo = dict(self._series_cfg_dict or {})
             echo["status"] = result.status
+            # the audit trail keeps how the frames were brought onto the
+            # reference grid and what the comparison stars really did
+            echo["alignment"] = _echo_report(result.align_report, 8)
+            echo["comparisons"] = _echo_report(result.comp_report)
             try:
                 self._series_run_id = notify(rows, echo)
             except Exception as err:
@@ -1049,6 +1113,16 @@ class UfeMeasureTab(QWidget):
             period_h=ctxd.get("period_h"),
             period_d=ctxd.get("period_d") or ctxd.get("period"))
         qc = series_measure.night_qc(points)
+        # D44: how the frames were brought onto the reference grid, in the
+        # observer's language (a series that drifted is the rule, not the
+        # exception, and it must not be silent)
+        for m in series_measure.align_messages(result.align_report):
+            lines.append("· " + m.get(self._lang, m.get("en", "")))
+        for m in series_measure.comp_messages(result.comp_report,
+                                              len(points)):
+            lines.append("· " + m.get(self._lang, m.get("en", "")))
+        for m in result.model_notes or []:
+            lines.append("· " + m.get(self._lang, m.get("en", "")))
         if guard["level"] == "red":
             lines.append("⚠ " + self.tr(
                 "Cadence too short for the transit ingress"))
@@ -1359,6 +1433,7 @@ class UfeMeasureTab(QWidget):
         self.spn_target_bv.setValue(0.0)
         self.chk_subtract.setChecked(False)
         self._advanced.spn_group_n.setValue(1)
+        self._advanced.cmb_align.setCurrentIndex(0)
         self._advanced.cmb_detrend.setCurrentIndex(0)
         self._advanced.chk_auto_aperture.setChecked(False)
         self._advanced.spn_saturate.setValue(0.0)

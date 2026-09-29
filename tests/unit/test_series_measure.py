@@ -242,6 +242,9 @@ def test_corrupted_comp_is_vetoed(tmp_path):
     assert abs(mags[2] - clean) < 0.01
     # the veto left that frame with fewer comps than the rest
     assert res.points[2].n_comps < res.points[0].n_comps
+    # and the one it dropped is the one that flared, not an arbitrary one
+    assert "C1" not in (res.points[2].zp_used or [])
+    assert "C1" in (res.points[0].zp_used or [])
 
 
 # ---------------- D12 anchor (d): a flagged point stays ----------------

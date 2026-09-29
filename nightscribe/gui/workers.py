@@ -212,19 +212,27 @@ class UfeFieldWorker(QThread):
     finished = Signal(object)       # compstars.load_field result or {}
     progress = Signal(dict)         # stage {"es", "en"} for the status line
 
-    def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin):
+    def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin, naxis=None,
+                 margin_arcsec=0.0):
         super().__init__()
         self._catalog = catalog
         self._ra = ra_deg
         self._dec = dec_deg
         self._fov = fov_arcmin
+        # the field is the REAL sensor rectangle, shrunk by a safety ring
+        # (quality plan, C2): a 43' square on a 43'x32' camera proposes
+        # stars the sensor never shows, and the drift finishes the job
+        self._naxis = naxis
+        self._margin = margin_arcsec
 
     def run(self):
         from ..core import compstars
         try:
             field = compstars.load_field(self._catalog, self._ra,
                                          self._dec, self._fov,
-                                         progress=self.progress.emit)
+                                         progress=self.progress.emit,
+                                         naxis=self._naxis,
+                                         margin_arcsec=self._margin)
         except Exception as err:    # never crash the GUI on data problems
             logger.exception("ufe field worker failed: %s", err)
             field = None

@@ -93,10 +93,13 @@ def _field(dlg, n=60, with_vsx=True):
 
 class _FakeFieldWorker:
     # Synchronous UfeFieldWorker double.
-    def __init__(self, catalog, ra, dec, fov, field=None):
+    def __init__(self, catalog, ra, dec, fov, field=None, naxis=None,
+                 margin_arcsec=0.0):
         from PySide6.QtCore import QObject, Signal
         self._field = field
         self.query = (catalog, ra, dec, fov)
+        self.naxis = naxis
+        self.margin_arcsec = margin_arcsec
 
         class _Sig(QObject):
             finished = Signal(object)
@@ -145,7 +148,7 @@ def test_generate_queries_around_the_plate_centre(dlg, monkeypatch):
     tab = dlg.tab_compare
     captured = {}
 
-    def fake(catalog, ra, dec, fov):
+    def fake(catalog, ra, dec, fov, **kw):
         captured["args"] = (catalog, ra, dec, fov)
         return _FakeFieldWorker(catalog, ra, dec, fov, field=_field(dlg))
     monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker", fake)
@@ -163,7 +166,7 @@ def test_generate_queries_around_the_plate_centre(dlg, monkeypatch):
 
 def test_generate_failure_is_honest(dlg, monkeypatch):
     monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
-                        lambda *a: _FakeFieldWorker(*a, field=None))
+                        lambda *a, **kw: _FakeFieldWorker(*a, **kw, field=None))
     dlg.tab_compare._on_generate()
     assert "failed" in dlg.tab_compare.lbl_status.text()
 
@@ -175,7 +178,7 @@ def test_generate_reports_the_pipeline_stages(dlg, monkeypatch):
     # dialog kept (Blink and Measure still report theirs).
     created = {}
 
-    def fake(catalog, ra, dec, fov):
+    def fake(catalog, ra, dec, fov, **kw):
         w = _FakeFieldWorker(catalog, ra, dec, fov, field=_field(dlg))
         created["worker"] = w
         return w
@@ -200,7 +203,7 @@ def test_generate_runs_behind_the_busy_dialog(dlg, monkeypatch):
     # It must follow the stages and be reaped when the field lands.
     created = {}
 
-    def fake(catalog, ra, dec, fov):
+    def fake(catalog, ra, dec, fov, **kw):
         w = _HoldingFieldWorker(catalog, ra, dec, fov, field=_field(dlg))
         created["worker"] = w
         return w
@@ -578,7 +581,7 @@ def test_build_sequence_proposes_on_the_fields_arrival(dlg, monkeypatch):
     # the proposal rides the landing (no second click, no hang look: the
     # busy dialog covers the network and the status line narrates).
     monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
-                        lambda *a: _FakeFieldWorker(*a, field=_field(dlg)))
+                        lambda *a, **kw: _FakeFieldWorker(*a, **kw, field=_field(dlg)))
     tab = dlg.tab_compare
     tab.spn_mag.setValue(12.5)
     tab.btn_auto.click()
@@ -594,7 +597,7 @@ def test_build_sequence_with_a_field_only_reproposes(dlg, monkeypatch):
     called = []
     monkeypatch.setattr(
         "nightscribe.gui.workers.UfeFieldWorker",
-        lambda *a: called.append(a) or _FakeFieldWorker(*a))
+        lambda *a, **kw: called.append(a) or _FakeFieldWorker(*a, **kw))
     tab.btn_auto.click()
     assert called == []                         # no second catalog query
     assert len(tab._entries) > 0
@@ -611,10 +614,10 @@ def test_repropose_is_covered_by_the_busy_dialog(dlg, monkeypatch):
     seen = {}
     real = compstars.propose_comps
 
-    def spy(stars, mag):
+    def spy(stars, mag, **kw):
         seen["visible"] = any(w.isVisible()
                               for w in tab.findChildren(QProgressDialog))
-        return real(stars, mag)
+        return real(stars, mag, **kw)
     monkeypatch.setattr(compstars, "propose_comps", spy)
     tab.btn_auto.click()
     assert seen.get("visible") is True
@@ -659,7 +662,7 @@ def test_busy_dialog_is_reaped_even_on_a_field_error(dlg, monkeypatch):
     # A modal dialog surviving an exception reads as a hang: the reap is
     # unconditional (finally), and the status line tells the story.
     monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
-                        lambda *a: _FakeFieldWorker(*a, field=_field(dlg)))
+                        lambda *a, **kw: _FakeFieldWorker(*a, **kw, field=_field(dlg)))
     tab = dlg.tab_compare
 
     def _boom(field):

@@ -586,8 +586,13 @@ class UfeCompareTab(QWidget):
         wait.setRange(0, 3)
         wait.setValue(0)
         stage = {"n": 0}
+        # the field is the sensor's real rectangle (w x h pixels) shrunk by
+        # a safety ring, not a square: quality plan, C2
+        from ..core import compstars
+        margin = compstars.COMP_MARGIN_ARCSEC
         self._worker = UfeFieldWorker(self.cmb_catalog.currentData(),
-                                      ra, dec, fov_arcmin)
+                                      ra, dec, fov_arcmin,
+                                      naxis=(w, h), margin_arcsec=margin)
 
         def _stage(msg):
             # @args: msg - the worker's {"es", "en"} stage text
@@ -903,9 +908,44 @@ class UfeCompareTab(QWidget):
 
     # ---------------------------------------------------------- proposal
 
+    def _comp_validator(self):
+        # The observer's own plate is the only thing that can say whether a
+        # catalogue star is usable (quality plan, C1): the saturated core,
+        # the linearity limit, the sensor's edge and the real SNR all live
+        # here. Returns None when there is no plate to check against, and
+        # then the proposal is the catalogue's alone (as it always was).
+        # @return: a callable(star, role) -> None | {"key","es","en"}
+        state = self._state
+        if state is None or state.data is None or state.wcs is None:
+            return None
+        from ..config import config
+        from ..core import compstars, photometry
+        sat = photometry.saturation_ceiling(
+            state.header, {"ccd_saturate": config.get("ccd_saturate")})
+        lin = photometry.linearity_ceiling(config)
+        gain = config.get("ccd_gain")
+        ron = config.get("ccd_read_noise")
+        # the Compare tab owns no aperture spins (the Measure tab does), so
+        # the check uses the recipe's own default radii: saturation,
+        # linearity, the sensor's edge and the SNR do not depend on the
+        # exact radius
+        radii = None
+        scale = state.wcs.pixel_scale() or 1.0
+        margin_px = compstars.COMP_MARGIN_ARCSEC / scale
+        shape = state.data.shape
+
+        def validator(star, _role="comp"):
+            return compstars.validate_on_plate(
+                star, state.data, state.wcs, radii=radii, sat_adu=sat,
+                linear_adu=lin, gain=gain, ron=ron, shape=shape,
+                margin_px=margin_px)
+        return validator
+
     def _on_propose(self):
         # The automatic sequence: isolated, non-variable stars matched to
-        # the target's brightness (compstars' criteria).
+        # the target's brightness (compstars' criteria), VALIDATED on the
+        # open plate (quality plan, C1): saturated, non-linear, off-sensor
+        # or too faint candidates are dropped with their reason said.
         if self._field is None:
             # no silent no-op: say what to do first, in both languages
             self.lbl_status.setText(self.tr(
@@ -913,14 +953,26 @@ class UfeCompareTab(QWidget):
                 "stars to propose the sequence."))
             return
         self._flush_table()
-        seq = compstars.propose_comps(self._stars, self.spn_mag.value())
+        validator = self._comp_validator()
+        seq = compstars.propose_comps(
+            self._stars, self.spn_mag.value(), validator=validator,
+            margin_arcsec=compstars.COMP_MARGIN_ARCSEC)
         self._entries = (seq["comps"]
                          + ([seq["check"]] if seq["check"] else []))
         self._redraw_entries()
         self._reload_table()
-        self.lbl_status.setText(
-            self.tr("Proposed {0} comparisons (tweak by clicking stars).")
-            .format(len(self._entries)))
+        text = self.tr("Proposed {0} comparisons (tweak by clicking "
+                       "stars).").format(len(self._entries))
+        rejected = seq.get("rejected") or []
+        if rejected:
+            counts = {}
+            for r in rejected:
+                counts[r.get("key") or "other"] = counts.get(
+                    r.get("key") or "other", 0) + 1
+            text += " " + self.tr("Left out {0} on your own plate: {1}").format(
+                len(rejected),
+                ", ".join(f"{k} × {v}" for k, v in sorted(counts.items())))
+        self.lbl_status.setText(text)
         self._commit()
 
     # ------------------------------------------------------------- table

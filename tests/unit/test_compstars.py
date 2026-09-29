@@ -357,3 +357,140 @@ def test_export_sequence_csv_derived_columns(tmp_path):
     row = lines[4].split(",")
     assert row[header.index("G")] == "12.340"
     assert row[header.index("V (est.)")] == "12.44"
+
+
+# ---------------- quality plan, phase C: the plate has the last word ----
+
+import math  # noqa: E402
+
+import numpy as np  # noqa: E402
+
+from nightscribe.core import wcs as wcs_mod  # noqa: E402
+
+
+def _plate(n=240, sky=1000.0, noise=2.0, seed=3):
+    rng = np.random.default_rng(seed)
+    data = np.full((n, n), sky) + rng.normal(0.0, noise, (n, n))
+    return data
+
+
+def _add_star(data, x, y, peak, sigma=2.0):
+    yy, xx = np.ogrid[:data.shape[0], :data.shape[1]]
+    data += peak * np.exp(-((xx - x) ** 2 + (yy - y) ** 2)
+                          / (2.0 * sigma ** 2))
+    return data
+
+
+def _wcs(n=240):
+    # one pixel = 0.001 deg, centre of the frame at (0, 0)
+    return wcs_mod.Wcs(0.0, 0.0, n / 2.0, n / 2.0,
+                       [[0.001, 0.0], [0.0, 0.001]], n, n)
+
+
+def _sky_of(wcs, n=240):
+    # @return: the sky position of a pixel
+    return wcs.pixel_to_sky
+
+
+def test_validate_accepts_a_good_comparison():
+    n = 240
+    w = _wcs(n)
+    data = _plate(n)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    data = _add_star(data, 120.0, 120.0, 8000.0)
+    verdict = compstars.validate_on_plate(
+        {"ra": ra, "dec": dec}, data, w, sat_adu=60000.0,
+        linear_adu=53000.0, gain=0.8, ron=8.0, shape=(n, n),
+        margin_px=10.0)
+    assert verdict is None
+
+
+def test_validate_rejects_a_saturated_comparison():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n), 120.0, 120.0, 70000.0)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    sat_adu=60000.0, shape=(n, n))
+    assert v and v["key"] == "saturated"
+    assert "ADU" in v["es"] and "ADU" in v["en"]
+
+
+def test_validate_rejects_a_comparison_above_the_linearity():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n), 120.0, 120.0, 20000.0)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    sat_adu=60000.0, linear_adu=15000.0,
+                                    shape=(n, n))
+    assert v and v["key"] == "nonlinear"
+
+
+def test_validate_rejects_a_comparison_outside_the_sensor():
+    # the real V0526 Per case: a comp at x = 1617 on a 1663 px sensor
+    n = 240
+    w = _wcs(n)
+    data = _plate(n)
+    ra, dec = w.pixel_to_sky(232.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    shape=(n, n), margin_px=15.0)
+    assert v and v["key"] == "outside"
+
+
+def test_validate_rejects_a_comparison_whose_annulus_leaves_the_frame():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n), 4.0, 120.0, 8000.0)
+    ra, dec = w.pixel_to_sky(4.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    shape=(n, n), margin_px=0.0)
+    assert v and v["key"] == "edge"
+
+
+def test_validate_rejects_a_comparison_too_faint_to_calibrate():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n, noise=6.0), 120.0, 120.0, 40.0)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    gain=0.8, ron=8.0, shape=(n, n))
+    assert v and v["key"] == "faint"
+
+
+def test_the_real_sensor_rectangle_is_not_a_square():
+    # 43' on a 1663 x 1252 sensor: 43' x 32', not 43' x 43'
+    ra_side, dec_side = compstars.field_sides_deg(43.0, 1663, 1252)
+    assert ra_side == pytest.approx(43.0 / 60.0, rel=1e-6)
+    assert dec_side == pytest.approx(43.0 / 60.0 * 1252 / 1663, rel=1e-6)
+    # a square camera keeps the square
+    assert compstars.field_sides_deg(43.0) == (43.0 / 60.0, 43.0 / 60.0)
+
+
+def test_inside_field_knows_the_short_side():
+    center = (0.0, 0.0)
+    # 0.30 deg north is inside a 43' square (half side 0.358) and OUTSIDE
+    # a 43' x 32' sensor (half side 0.267): the star the sensor never sees
+    assert compstars.inside_field(0.0, 0.30, center, 43.0 / 60.0,
+                                  field_dec_deg=32.0 / 60.0) is False
+    assert compstars.inside_field(0.0, 0.30, center, 43.0 / 60.0) is True
+
+
+def test_propose_comps_reports_what_the_plate_rejected():
+    # spread in the sky: stars piled on one pixel are not isolated (the
+    # isolation rule would reject them all, which is another test)
+    stars = [{"id": f"S{i}", "name": None, "ra": i * 0.02, "dec": 0.0,
+              "mag": 12.0 + i * 0.1, "band": "V", "catalog": "Gaia",
+              "bands": [{"label": "V", "value": 12.0 + i * 0.1,
+                         "err": 0.01, "derived": False}],
+              "bv": 1.0, "color_origin": "catalog", "vsx": None}
+             for i in range(6)]
+
+    def validator(star, _role="comp"):
+        if star["id"] == "S3":
+            return {"key": "saturated", "es": "satura", "en": "saturated"}
+        return None
+    seq = compstars.propose_comps(stars, 12.5, validator=validator)
+    assert len(seq["comps"]) == 5
+    assert seq["rejected"] == [{"name": "S3", "key": "saturated",
+                                "es": "satura", "en": "saturated"}]

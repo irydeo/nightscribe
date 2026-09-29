@@ -160,15 +160,27 @@ class UfeDialog(QDialog):
         self._ui = adopt_ui(self, "ufe_dialog")
                                             # over: no wrapper margins
         self.splitter = self._ui.splitter
-        # ph_series (0) | ph_view (1) | tabs (2): the series panel sits at
-        # the left of the image; hidden unless a visit arms the series
-        self.splitter.replaceWidget(1, self.view)
+        # ph_series (0) | centre (1) | tabs (2): the series panel sits at
+        # the left of the image; hidden unless a visit arms the series.
+        #
+        # The centre is a SWITCH (V2): the plate or the light curve, in the
+        # same place and full size. The curve used to live in a small box
+        # of the left panel and you had to click it to see it properly,
+        # which is not a way to look at a curve.
+        self.stack_centre = self._ui.stack_centre
+        self.btn_page_image = self._ui.btn_page_image
+        self.btn_page_curve = self._ui.btn_page_curve
+        self._centre_page(0, self.view)
+        self.btn_page_image.toggled.connect(
+            lambda on: on and self.stack_centre.setCurrentIndex(0))
+        self.btn_page_curve.toggled.connect(
+            lambda on: on and self.stack_centre.setCurrentIndex(1))
         # (after the adoption the layout answers to self, not the husk;
         # drop_in also hides the placeholder: QLayout.replaceWidget does
         # not, and a visible one eats the top bar's clicks)
         drop_in(self.layout(), self._ui.ph_histogram, self.histogram)
         self.splitter.setStretchFactor(0, 1)     # series: grows a bit
-        self.splitter.setStretchFactor(1, 4)     # the image dominates
+        self.splitter.setStretchFactor(1, 4)     # the centre dominates
         self.splitter.setStretchFactor(2, 2)     # the tab column grows too
         self.tabs = self._ui.tabs
         self.lbl_object = self._ui.lbl_object
@@ -177,6 +189,7 @@ class UfeDialog(QDialog):
             f"color: {theme.C_TEXT_DIM}; padding: 0 4px;")
         self._wire_topbar()
         self._build_feature_tabs()
+        self._place_light_curve()
         # the series block lives at the left of the image (its own pane,
         # hidden unless a visit arms it): the visit strip (frame navigator
         # + the EXOTIC reduction for transit projects) carries it in its
@@ -195,6 +208,47 @@ class UfeDialog(QDialog):
         self.series_pane.hide()
         self._frame_index = 0
         self._wire_frame_nav()
+
+    def _centre_page(self, index, widget):
+        # Puts a real widget inside one of the centre's pages. The pages are
+        # .ui containers (the Designer file owns the structure, the code
+        # fills it, ADR-005); the widget is not a page of its own because a
+        # custom canvas has no business living in a Designer file.
+        # @args: index - 0 image | 1 curve, widget - the real widget
+        # @return: None
+        page = self.stack_centre.widget(index)
+        lay = page.layout()
+        if lay is None:
+            lay = QVBoxLayout(page)
+            lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(widget)
+
+    def _place_light_curve(self):
+        # The light curve, in the centre's second page. The Measure tab
+        # OWNS it (all the logic is there: data, selection, outliers,
+        # binning) and this window only gives it a proper home.
+        # @return: None
+        chart = getattr(self.tab_measure, "chart_series", None)
+        if chart is None:
+            return
+        self._centre_page(1, chart)
+
+    def show_curve(self):
+        # Puts the measured series in front (V2). Called by the Measure tab
+        # when a run ends, because that is the moment you want to look at
+        # it, and by the chart's own "show me this big" click.
+        # @return: None
+        self.btn_page_curve.setChecked(True)
+        self.stack_centre.setCurrentIndex(1)
+        chart = getattr(self.tab_measure, "chart_series", None)
+        if chart is not None and getattr(chart, "_points", None):
+            chart.fit_to_scene()
+
+    def show_image(self):
+        # Back to the plate.
+        # @return: None
+        self.btn_page_image.setChecked(True)
+        self.stack_centre.setCurrentIndex(0)
 
     def _wire_topbar(self):
         # Aliases and signal wiring for the Designer top bar (ADR-005).

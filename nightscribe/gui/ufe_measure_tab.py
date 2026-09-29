@@ -44,7 +44,7 @@ from ..core import coords, fits_meta, photometry, photometry_export, \
     series_measure, stretch
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
-from .ui_loader import adopt_ui, drop_in
+from .ui_loader import adopt_ui
 from .widgets.lightcurve_widget import LightCurveChart
 
 logger = logging.getLogger("nightscribe.gui.ufe_measure_tab")
@@ -243,8 +243,9 @@ class UfeMeasureTab(QWidget):
         self._live_run_ids = []      # the live session's batches: one
                                      # undoable run (ADR-050, P2 #19)
         self.chart_series = LightCurveChart()
-        self.chart_series.setToolTip(
-            self.tr("Click: view the curve large"))
+        self.chart_series.setToolTip(self.tr(
+            "Click a point to select it; click the empty space (or "
+            "double-click) to bring the curve to the front"))
         # A click on a POINT selects it (quality plan, A); a click on the
         # empty space still opens the big view, and the double-click keeps
         # working too. The chart itself decides which is which, because
@@ -307,9 +308,10 @@ class UfeMeasureTab(QWidget):
         self.btn_series_restore.clicked.connect(self._on_restore_all)
         self.lbl_series_selection = self._ui.lbl_series_selection
         self.chart_series.point_clicked.connect(self._on_point_clicked)
-        drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
-                self.chart_series)
-        self._series_payload = []    # last drawn points, for the big view
+        # the chart belongs to this tab (the logic is here) but lives in
+        # the CENTRE of the window (V2): ufe_dialog places it. The left
+        # panel keeps only the controls.
+        self._series_payload = []    # last drawn points
         self._series_worker = None
         self._series_run_id = None
         self._series_result = None
@@ -1311,6 +1313,11 @@ class UfeMeasureTab(QWidget):
             and any(p.mag is not None for p in result.points))
         self._series_result = result
         self._draw_series(result.points)
+        if result.points:
+            # the curve in front, because this is the moment it is wanted
+            # (and not on an empty or cancelled run: taking the observer's
+            # place away with nothing to show would be rude)
+            self._show_curve()
         self._fill_series_panel(result, context)
 
     def _night_label(self, night):
@@ -1506,19 +1513,25 @@ class UfeMeasureTab(QWidget):
         self.cmb_series_scale.blockSignals(False)
 
     def _on_series_enlarge(self):
-        # The series curve, large: a fresh chart (the viewer reparents and
-        # owns its payload, so the panel's own curve stays put) with the
-        # same points, in the shared zoom/pan/export viewer.
+        # "Show me this properly": the curve lives in the CENTRE of the
+        # window now, so this only brings it to the front (V2). There is no
+        # second copy in another window to disagree with this one.
+        # @return: None
         if not self._series_payload:
             return
-        from .chart_viewer import open_chart_widget
-        big = LightCurveChart()
-        big.set_data(list(self._series_payload))
-        obj = getattr(self.window(), "object", lambda: None)()
-        name = (obj or {}).get("name") or ""
-        open_chart_widget(self, big,
-                          title=self.tr("Photometric series"),
-                          obj_name=name, chart_key="series")
+        self._show_curve()
+        self.chart_series.fit_to_scene()
+
+    def _show_curve(self):
+        # Asks the window for the centre's curve page. The tab does not
+        # know the window's layout (a dialog is not always the parent, so
+        # the guard is honest about it).
+        # @return: True when the curve is in front
+        show = getattr(self.window(), "show_curve", None)
+        if callable(show):
+            show()
+            return True
+        return False
 
     def _on_series_exoclock(self):
         # D30/D41: prepare the manual ExoClock submission from the last
@@ -1688,6 +1701,8 @@ class UfeMeasureTab(QWidget):
                 self._live_run_ids.append(run_id)
                 self.btn_series_undo.setEnabled(True)
         self._live_points.extend(result.points)
+        # live mode is watching the curve grow: put it in front
+        self._show_curve()
         self._draw_series(self._live_points)
         self._update_series_counter(self._series_context() or {},
                                     self._live_points)

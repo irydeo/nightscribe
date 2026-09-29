@@ -42,7 +42,27 @@
     <widget class="QSplitter" name="splitter">
      <property name="orientation"><enum>Qt::Horizontal</enum></property>
      <widget class="QWidget" name="ph_series"/>
-      <widget class="QWidget" name="ph_view"/>
+      <widget class="QWidget" name="centre">
+       <layout class="QVBoxLayout" name="vbox_centre">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="row_centre_switch">
+          <item><widget class="QPushButton" name="btn_page_image"><property name="text"><string>Image</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The plate, with its marks, its annotations and the measurement overlay</string></property></widget></item>
+          <item><widget class="QPushButton" name="btn_page_curve"><property name="text"><string>Light curve</string></property><property name="checkable"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</string></property></widget></item>
+          <item><spacer name="hsp_centre_switch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QStackedWidget" name="stack_centre">
+          <widget class="QWidget" name="ph_centre_image"/>
+          <widget class="QWidget" name="ph_centre_curve"/>
+         </widget>
+        </item>
+       </layout>
+      </widget>
      <widget class="QTabWidget" name="tabs">
       <property name="minimumSize"><size><width>280</width><height>0</height></size></property>
      </widget>

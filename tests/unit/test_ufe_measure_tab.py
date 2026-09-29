@@ -1477,29 +1477,49 @@ def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
 
 # ------------------------------------------------ series curve, large (ADR-051 rev.)
 
-def test_series_double_click_opens_a_big_view(dlg, monkeypatch):
-    import nightscribe.gui.chart_viewer as cv
-    seen = {}
-    monkeypatch.setattr(cv, "open_chart_widget",
-                        lambda parent, widget, **k: seen.update(widget=widget))
+def test_the_curve_lives_in_the_centre_of_the_window(dlg):
+    # V2: the measured curve is not a small box you have to click, nor a
+    # second copy in another window: it is the other page of the centre,
+    # beside the image, and it is the SAME chart the tab measures into.
     tab = dlg.tab_measure
-    tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
-                            "filter": "V", "source": "measure",
-                            "flags": []}]
-    tab.chart_series.enlarge_requested.emit()
-    big = seen.get("widget")
-    assert big is not None and big._points
-    assert big is not tab.chart_series       # the panel's curve stays put
+    stack = dlg.stack_centre
+    assert stack.count() == 2
+    assert dlg.view is stack.widget(0).layout().itemAt(0).widget()
+    assert tab.chart_series is stack.widget(1).layout().itemAt(0).widget()
+    # the switch drives the pages
+    dlg.show_curve()
+    assert stack.currentIndex() == 1
+    assert dlg.btn_page_curve.isChecked()
+    dlg.show_image()
+    assert stack.currentIndex() == 0
+    assert dlg.btn_page_image.isChecked()
 
 
-def test_series_enlarge_without_data_does_nothing(dlg, monkeypatch):
+def test_a_click_on_the_curve_brings_it_to_the_front(dlg):
+    # "Show me this properly" now means the centre's curve page: no second
+    # copy in another window to disagree with it (V2).
     import nightscribe.gui.chart_viewer as cv
     seen = []
-    monkeypatch.setattr(cv, "open_chart_widget",
-                        lambda *a, **k: seen.append(1))
+    orig = cv.open_chart_widget
+    cv.open_chart_widget = lambda *a, **k: seen.append(1)
+    try:
+        tab = dlg.tab_measure
+        dlg.show_image()
+        tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
+                                "filter": "V", "source": "measure",
+                                "flags": []}]
+        tab.chart_series.enlarge_requested.emit()
+        assert dlg.stack_centre.currentIndex() == 1
+        assert seen == []           # no window, ever
+    finally:
+        cv.open_chart_widget = orig
+
+
+def test_the_curve_page_does_not_open_without_data(dlg):
+    dlg.show_image()
     dlg.tab_measure._series_payload = []
     dlg.tab_measure.chart_series.enlarge_requested.emit()
-    assert seen == []
+    assert dlg.stack_centre.currentIndex() == 0
 
 
 def test_lightcurve_double_click_asks_for_the_big_view(dlg):
@@ -1529,17 +1549,16 @@ def test_group_frames_quick_mirrors_advanced(dlg):
     assert tab.spn_group_quick.value() == 3
 
 
-def test_series_single_click_opens_the_big_view(dlg, monkeypatch):
-    # a plain click on the series curve opens the zoom/export viewer, like
-    # every other chart in the app (the double-click still works too)
-    import nightscribe.gui.chart_viewer as cv
+def test_a_plain_click_on_the_curve_does_not_hide_the_image(dlg):
+    # A click on a point selects it; on the empty space it brings the curve
+    # to the front, which is where it already is when you are looking at it.
+    # What it must never do is open a second copy or move the page: the
+    # observer's place is not to be taken away by a click.
     from PySide6.QtCore import QPointF
-    seen = {}
-    monkeypatch.setattr(cv, "open_chart_widget",
-                        lambda parent, widget, **k: seen.update(widget=widget))
     tab = dlg.tab_measure
     tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
                             "filter": "V", "source": "measure",
                             "flags": []}]
+    dlg.show_curve()
     tab.chart_series.scene_clicked.emit(QPointF(0.0, 0.0))
-    assert seen.get("widget") is not None
+    assert dlg.stack_centre.currentIndex() == 1

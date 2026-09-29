@@ -901,3 +901,26 @@ def test_a_reproposal_that_changes_nothing_says_so(dlg):
     assert len(tab._entries) == first
     assert "same as before" in tab.lbl_status.text() or \
         "igual que antes" in tab.lbl_status.text()
+
+
+def test_build_without_a_wcs_keeps_the_sequence_it_already_has(dlg,
+                                                              tmp_path):
+    # Reported, and reproduced on the observer's own V0526 Per frame (whose
+    # header carries no WCS): pressing "Build the sequence" started a blind
+    # solve, the wait dialog came and went, and nothing was built. A
+    # catalogue field NEEDS a solved plate; when the project already has its
+    # sequence, the honest answer is that the sequence is here and its rings
+    # need a solved plate.
+    from test_fits_annotate import _make_fits
+    dlg.state.load(_make_fits(tmp_path / "plain.fits"))   # no WCS cards
+    tab = dlg.tab_compare
+    assert dlg.state.wcs is None
+    # the project's sequence, loaded by the visit
+    tab._entries = [{"name": "Comp1", "kind": "comp",
+                     "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}}]
+    calls = []
+    tab._on_generate = lambda: calls.append(True)
+    tab.btn_auto.click()
+    assert calls == []                       # no catalogue, no blind solve
+    assert len(tab._entries) == 1            # and the sequence is untouched
+    assert "no solved position" in tab.lbl_status.text()

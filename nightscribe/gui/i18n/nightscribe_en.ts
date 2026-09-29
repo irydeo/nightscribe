@@ -7419,6 +7419,10 @@ Double-click a row to open its project. This strip reads the cache of the last T
     <message>
         <source>The sequence is the same as before.</source>
         <translation>The sequence is the same as before.</translation>
+    </message>
+    <message>
+        <source>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</source>
+        <translation>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</translation>
     </message></context>
 <context>
     <name>UfeDialog</name>

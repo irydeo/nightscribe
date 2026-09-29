@@ -7419,6 +7419,10 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
     <message>
         <source>The sequence is the same as before.</source>
         <translation>La secuencia es la misma que antes.</translation>
+    </message>
+    <message>
+        <source>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</source>
+        <translation>Esta placa no tiene posición resuelta, así que el campo de comparación no se puede construir del catálogo. Tu secuencia ({0} estrellas) está cargada y se medirá con la placa; sus anillos necesitan una placa resuelta: usa «Resolver astrometría…» o el resolutor de Ajustes.</translation>
     </message></context>
 <context>
     <name>UfeDialog</name>

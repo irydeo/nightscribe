@@ -691,18 +691,19 @@ class UfeImageView(ChartView):
         return self._title_line
 
     def _paint_title(self, painter, w, h, k=1.0):
-        # The object's line, at the BOTTOM-LEFT of the plate.
+        # The object's line, AT THE TOP AND ACROSS THE WHOLE PLATE.
         #
-        # It was at the top-left, where the workbench's own "Image | Light
-        # curve" switch sits right above the picture: the two read as one
-        # crowded band (reported). The bottom-left corner is the only one
-        # left free by the other overlays (the metadata boxes take the top,
-        # the compass the bottom-centre and the scale bar the bottom-right),
-        # and a margin keeps it off the edge in the export too.
+        # It is the plate's own heading (the observer preferred it here),
+        # and it owns the full width so a long name, its position and its
+        # magnitude fit in one line. What it must not do is collide with
+        # the other overlays, so the ones that live up there (the metadata
+        # boxes and the compass) start BELOW it: the title is drawn first
+        # and its height is published in _title_h for them.
         # @args: painter - device-coords painter, w/h - surface in device
         #        px, k - export pixel ratio
         # @return: True when something was drawn
         self._title_rect = None
+        self._title_h = 0.0
         if not self._title_line or not self._state.has_image:
             return False
         from PySide6.QtGui import QFont, QFontMetricsF
@@ -714,11 +715,11 @@ class UfeImageView(ChartView):
         pad = 8.0 * k
         room = max(60.0, w - 2 * pad)
         text = fm.elidedText(self._title_line, Qt.ElideRight, room)
-        # its own width, bottom-left, a margin from both edges
-        box_w = min(room, fm.horizontalAdvance(text) + 12 * k)
-        rect = QRectF(pad, h - fm.height() - 12 * k, box_w,
-                      fm.height() + 6 * k)
+        # the whole width, at the top of the plate, and its height is
+        # published so the boxes and the compass start under it
+        rect = QRectF(pad, 6.0 * k, room, fm.height() + 6 * k)
         self._title_rect = rect
+        self._title_h = rect.height() + 10.0 * k
         painter.save()
         painter.setFont(f)
         # a dark plaque under it: the same trick as the boxes, so a bright
@@ -743,7 +744,8 @@ class UfeImageView(ChartView):
         # keeps its corners free.
         if not self._state.has_image:
             return
-        # the object's line first: it is the plate's own heading
+        # the object's line first: it is the plate's own heading, and the
+        # overlays that share the top read its height from here
         self._paint_title(painter, w, h, k)
         boxes_on = self._paint_boxes(painter, w, h, k)
         if self._state.wcs is None:
@@ -784,7 +786,9 @@ class UfeImageView(ChartView):
             bw = max(fm.horizontalAdvance(t) for t in lines) + 2 * pad
             bh = line_h * len(lines) + 2 * pad
             x = w - margin - bw if right else margin
-            y = h - margin - bh if bottom else margin
+            # the top row starts UNDER the object's line (see _paint_title)
+            top = margin + getattr(self, "_title_h", 0.0)
+            y = h - margin - bh if bottom else top
             bg = QColor(palette.BG)
             bg.setAlpha(215)
             painter.setPen(Qt.NoPen)
@@ -833,7 +837,9 @@ class UfeImageView(ChartView):
         # compass: the same arrow plus the east leg (90° anticlockwise
         # from north on screen, flipped on mirrored plates).
         pa = self._flip_angle(-self._state.wcs.rotation())
-        cx, cy = (w / 2.0, h - 44 * k) if bottom else (w - 44 * k, 48 * k)
+        # ... and so does the compass, when it sits at the top
+        top_y = 48 * k + getattr(self, "_title_h", 0.0)
+        cx, cy = (w / 2.0, h - 44 * k) if bottom else (w - 44 * k, top_y)
         length = 30 * k
         legs = [("N", pa)]
         if bottom:

@@ -591,6 +591,21 @@ class UfeCompareTab(QWidget):
                 wait.setValue(1)
                 _reap_wait(wait)
             return
+        # A plate with no solved position cannot give a catalogue field, and
+        # it does not need one when the project ALREADY has its sequence:
+        # rebuilding it from the catalogue is impossible, and the honest
+        # answer is that the sequence is here and its rings need a solved
+        # plate (reported: "I have a comparison star fixed by hand, I press
+        # Build the sequence and it builds nothing"). Without this the click
+        # started a blind solve and the observer saw a dialog come and go.
+        if self._state.wcs is None and self._entries:
+            self._say(self.tr(
+                "This plate has no solved position, so the comparison field "
+                "cannot be built from the catalogue. Your sequence ({0} "
+                "stars) is loaded and will be measured with the plate; its "
+                "rings need a solved plate: use «Solve astrometry…» or the "
+                "Settings solver.").format(len(self._entries)))
+            return
         self._auto_propose = True
         self._on_generate()
 

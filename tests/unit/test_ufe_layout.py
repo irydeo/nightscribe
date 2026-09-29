@@ -202,10 +202,11 @@ def test_the_object_is_painted_over_the_plate_not_a_row_of_the_window():
     d.close()
 
 
-def test_the_object_line_sits_low_and_never_under_the_switch():
-    # Reported: the coordinates at the top-left did not read well, they
-    # collided with the bar over the picture. The line lives at the
-    # bottom-left now, the only corner the other overlays leave free.
+def test_the_object_line_owns_the_top_band_and_nothing_collides():
+    # The observer preferred it at the top, across the whole width, with the
+    # other labels moved down: it is the plate's heading. What it must never
+    # do is overlap them, so the top row of boxes (and the compass) start
+    # below it.
     from nightscribe.gui.ufe_dialog import UfeDialog
     _app()
     d = UfeDialog()
@@ -218,12 +219,17 @@ def test_the_object_line_sits_low_and_never_under_the_switch():
     QApplication.processEvents()
     rect = d.view._title_rect
     assert rect is not None
-    height = d.view.viewport().height()
-    assert rect.top() > height / 2          # the lower half, not the top
-    assert rect.left() < 40                 # and against the left edge
+    vp = d.view.viewport()
+    assert rect.top() < 40                          # the top band
+    assert rect.width() > vp.width() * 0.8          # and across the plate
+    # the other top overlays start under it
+    assert d.view._title_h > 0
+    assert 10 + d.view._title_h > rect.bottom()     # the boxes' own margin
+    # with nothing attached there is no band and no offset
     d.set_object(None)
     QApplication.processEvents()
     assert d.view._title_rect is None
+    assert d.view._title_h == 0.0
     d.close()
 
 

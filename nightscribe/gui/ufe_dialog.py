@@ -29,7 +29,7 @@ sequence-chart dialogs keep living untouched.
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QFontMetrics, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, QSizePolicy, \
     QProgressDialog, QVBoxLayout, QWidget
@@ -54,6 +54,10 @@ _ZOOM_PRESETS = ((None, "Fit"), (0.5, "50"), (1.0, "100"),
 
 # The three columns' widths: the sides get what they need, the plate gets
 # the rest (a maximized window must widen the PICTURE, not the form).
+# the solve's wait dialog appears only after this long (a fast local solve
+# must not flash a window at the observer)
+_SOLVE_SHOW_MS = 250
+
 _SERIES_W = 300
 _TABS_W = 380
 _SERIES_MAX_W = 420
@@ -1467,12 +1471,22 @@ class UfeDialog(QDialog):
         wait.setAutoClose(False)
         wait.setAutoReset(False)
         wait.canceled.connect(self._cancel_solve)
-        wait.show()
+        # a local ASTAP solve can land in a couple of hundred milliseconds,
+        # and a window that appears and disappears reads as a failure: it is
+        # shown only if the solve really takes a moment (the same rule the
+        # sequence's busy dialog follows)
+        wait._show_timer = QTimer(wait)
+        wait._show_timer.setSingleShot(True)
+        wait._show_timer.timeout.connect(wait.show)
+        wait._show_timer.start(_SOLVE_SHOW_MS)
         self._solve_wait = wait
 
     def _close_solve_wait(self):
         wait = getattr(self, "_solve_wait", None)
         if wait is not None:
+            timer = getattr(wait, "_show_timer", None)
+            if timer is not None:
+                timer.stop()
             # closing a QProgressDialog emits canceled(): block it, this
             # close is the solve landing, not the observer cancelling
             wait.blockSignals(True)

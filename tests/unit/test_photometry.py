@@ -803,14 +803,21 @@ def test_measure_plate_frozen_reference():
         site_height_m=650.0)
     res = phot.measure_plate(data, cfg)
     assert res.ok and res.reason is None
-    assert res.target["flux"] == pytest.approx(388555.97, rel=1e-3)
+    # The aperture now weighs each pixel by the fraction of its area
+    # inside the circle (phase A: pixel_coverage), so this flux is 0.26 %
+    # larger than the old staircase count: the boundary pixels that carry
+    # the star's wings were being thrown away. The magnitude follows by
+    # -0.0029 and the error by a hair. This is the honest value, and a
+    # frozen reference exists precisely to make such a change visible.
+    assert res.target["flux"] == pytest.approx(389575.98, rel=1e-3)
+    assert res.target["n_pix"] == pytest.approx(113.0, abs=0.2)
     assert res.col == pytest.approx(100.0002, abs=0.05)
     assert res.row == pytest.approx(100.0, abs=0.05)
     assert res.zp["zp"] == pytest.approx(ZP_CONTRACT, abs=1e-6)
     assert res.zp["n"] == 6
-    assert res.mag == pytest.approx(8.0264, abs=1e-3)
-    assert res.err_total == pytest.approx(0.007111, abs=5e-4)
-    assert res.err_internal == pytest.approx(0.001252, abs=5e-4)
+    assert res.mag == pytest.approx(8.0235, abs=1e-3)
+    assert res.err_total == pytest.approx(0.007112, abs=5e-4)
+    assert res.err_internal == pytest.approx(0.001256, abs=5e-4)
     assert res.err_total >= res.err_internal
     assert res.band == "V" and res.bands_avail == ["V"]
     assert len(res.used) == 6 and res.skipped == {}
@@ -907,3 +914,44 @@ def test_measure_plate_skips_a_nonlinear_comp():
         band="V", radii=(6.0, 10.0, 15.0), linear_adu=20000.0))
     assert res.skipped.get("nonlinear") == 1
     assert res.zp["n"] == 2                # only the linear comps calibrate
+
+
+def test_pixel_coverage_is_the_true_area():
+    # Phase A: the aperture weighs each pixel by how much of it lies
+    # inside the circle. Three properties matter, and they are the ones a
+    # reader would check by hand:
+    #   * a big aperture sums to pi r^2 (the staircase cancels out);
+    #   * a small one does NOT (that is exactly the error it fixes);
+    #   * a pixel entirely inside weighs 1 and one entirely outside 0.
+    for r in (2.0, 3.0, 6.0, 12.0):
+        cover = phot.pixel_coverage((80, 80), 40.0, 40.0, r)
+        area = float(cover.sum())
+        true_area = math.pi * r * r
+        assert area == pytest.approx(true_area, rel=0.02), (r, area)
+    # the small aperture: whole pixels would count 13 against 12.57
+    cover = phot.pixel_coverage((20, 20), 10.0, 10.0, 2.0)
+    assert float(cover.sum()) == pytest.approx(math.pi * 4, rel=0.02)
+    whole = int(np.count_nonzero(
+        np.hypot(*np.mgrid[0:20, 0:20] - 10.0) <= 2.0))
+    assert whole != pytest.approx(math.pi * 4, rel=0.02)
+    # the extremes
+    cover = phot.pixel_coverage((40, 40), 20.0, 20.0, 5.0)
+    assert cover[20, 20] == 1.0
+    assert cover[0, 0] == 0.0
+
+
+def test_a_small_aperture_recovers_the_flux_a_star_really_has():
+    # A synthetic star whose total flux is known: measured with a SMALL
+    # aperture, the fractional coverage must get closer to the truth than
+    # the whole-pixel count, because that is the whole reason it exists.
+    yy, xx = np.ogrid[0:60, 0:60]
+    amp, sigma, sky = 5000.0, 1.2, 100.0
+    data = sky + amp * np.exp(-((xx - 30.0) ** 2 + (yy - 30.0) ** 2)
+                              / (2 * sigma ** 2))
+    truth = 2 * math.pi * sigma * sigma * amp        # the gaussian's flux
+    r = phot.measure_point(data, 30.0, 30.0, r_ap=3.0, r_ann_in=6.0,
+                           r_ann_out=10.0)
+    assert r["ok"]
+    # the aperture holds the gaussian inside r = 3: 1 - exp(-r^2/2s^2)
+    inside = 1.0 - math.exp(-(3.0 ** 2) / (2 * sigma ** 2))
+    assert r["flux"] == pytest.approx(truth * inside, rel=0.05)

@@ -122,6 +122,48 @@ def _sigma_clipped_median(values, level=SIG_LEVEL, iters=SIG_ITERS):
     return float(np.median(arr)), int(arr.size)
 
 
+def pixel_coverage(shape, cx, cy, r, subsample=8):
+    # How much of each pixel lies inside the aperture circle.
+    #
+    # A star is a continuous thing and a sensor is a grid, so the honest
+    # question is not "is this pixel's CENTRE inside the circle?" but "how
+    # much of this pixel is?". Counting whole pixels is the staircase
+    # approximation: fine for a large aperture (the missing and the extra
+    # bits cancel along the circle), plainly wrong for a small one, where
+    # the boundary is a sizeable fraction of the area (r = 2 px: 13
+    # pixels counted against 12.57 of true area, a 3 % flux error that
+    # lands straight in the magnitude).
+    #
+    # Strategy: a pixel well inside is fully covered, a pixel well outside
+    # is not covered at all, and only the BOUNDARY pixels (about 2·pi·r of
+    # them) are measured by subsampling a grid inside the pixel. A few
+    # dozen small computations per star, not one per plate pixel.
+    #
+    # @args: shape - (h, w) of the plate, cx/cy - the star's centre (in
+    #        float pixels), r - the aperture radius, subsample - the grid
+    #        per axis used on the boundary pixels
+    # @return: a (h, w) float array of coverages in 0..1
+    h, w = shape
+    yy, xx = np.ogrid[:h, :w]
+    dist = np.hypot(xx - cx, yy - cy)
+    cover = np.zeros((h, w), dtype=np.float64)
+    cover[dist <= r - 0.8] = 1.0
+    maybe = (dist > r - 0.8) & (dist < r + 0.8)
+    if not np.any(maybe):
+        return cover
+    n = max(2, int(subsample))
+    offsets = (np.arange(n) + 0.5) / n - 0.5      # sub-pixel centres
+    rows, cols = np.nonzero(maybe)
+    for py, px in zip(rows, cols):
+        # the fraction of THIS pixel inside the circle: how many of the
+        # sub-samples fall within the radius
+        sx = px + offsets[:, None]
+        sy = py + offsets[None, :]
+        inside = ((sx - cx) ** 2 + (sy - cy) ** 2) <= r * r
+        cover[py, px] = float(inside.sum()) / float(n * n)
+    return cover
+
+
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
                   linear_adu=None, sky_mode="median",
@@ -168,14 +210,29 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
         cen_ok = cen["ok"]
     yy, xx = np.ogrid[:h, :w]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
-    ap_pixels = data[r2 <= r_ap ** 2]
-    if ap_pixels.size == 0:
+    # the aperture, pixel by pixel: each pixel weighs the fraction of its
+    # area that falls inside the circle (see pixel_coverage). The effective
+    # AREA is the sum of those weights, and it is what the sky is scaled
+    # by: using the pixel COUNT here would subtract too much sky from a
+    # small aperture and too little from a big one.
+    weights = pixel_coverage((h, w), cx, cy, r_ap)
+    usable = weights > 0.0
+    if not np.any(usable):
         out = _fail("sin píxeles de apertura", "no aperture pixels")
         out.update(x=cx, y=cy)
         return out
-    n_pix = int(ap_pixels.size)
-    total = float(np.nansum(ap_pixels))
-    peak = float(np.nanmax(ap_pixels))
+    finite = np.isfinite(data[usable])
+    w_eff = np.where(finite, weights[usable], 0.0)
+    values = np.where(finite, data[usable], 0.0)
+    area = float(w_eff.sum())
+    if area <= 0.0:
+        out = _fail("sin píxeles finitos en la apertura",
+                    "no finite pixel in the aperture")
+        out.update(x=cx, y=cy)
+        return out
+    n_pix = area
+    total = float((values * w_eff).sum())
+    peak = float(np.nanmax(data[usable]))
     ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
     ann_pixels = data[ann_mask]
     if ann_pixels.size:
@@ -264,7 +321,10 @@ def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
     if gain is None or gain <= 0.0 or flux is None or flux < 0.0:
         return None
     var = flux / gain
-    n = int(n_pix or 0)
+    # n_pix is the EFFECTIVE aperture area (a float when the aperture used
+    # fractional pixel coverage), so it stays a float here: rounding it
+    # would quietly change the noise of a small aperture.
+    n = float(n_pix or 0.0)
     sky_factor = 1.0
     if n_sky is not None and n_sky > 0 and n > 0:
         sky_factor = 1.0 + n / float(n_sky)

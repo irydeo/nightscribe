@@ -222,6 +222,8 @@ class UfeMeasureTab(QWidget):
         self.btn_series_help.clicked.connect(self._open_series_docs)
         self.btn_series_phase = self._ui.btn_series_phase
         self.btn_series_phase.clicked.connect(self._on_series_phase)
+        self.btn_series_sci = self._ui.btn_series_sci
+        self.btn_series_sci.clicked.connect(self._on_series_sci)
         self.lbl_series_frames = self._ui.lbl_series_frames
         self.lbl_series_cadence = self._ui.lbl_series_cadence
         self.prg_series = self._ui.prg_series
@@ -241,10 +243,10 @@ class UfeMeasureTab(QWidget):
         self.chart_series = LightCurveChart()
         self.chart_series.setToolTip(
             self.tr("Click: view the curve large"))
-        # one click (a left release without drag) opens the big view, as
-        # everywhere else in the app; the double-click keeps working too
-        self.chart_series.scene_clicked.connect(
-            lambda _pt: self._on_series_enlarge())
+        # A click on a POINT selects it (quality plan, A); a click on the
+        # empty space still opens the big view, and the double-click keeps
+        # working too. The chart itself decides which is which, because
+        # only it knows where the points are.
         self.chart_series.enlarge_requested.connect(self._on_series_enlarge)
         # the chart's own controls (quality plan, phase A): the magnitude
         # scale is robust by default, the error bars are the point's own
@@ -261,6 +263,38 @@ class UfeMeasureTab(QWidget):
         self.btn_series_hideflags = self._ui.btn_series_hideflags
         self.btn_series_hideflags.toggled.connect(
             self.chart_series.set_hide_flagged)
+        # --- the observer's decisions on the curve (quality plan, phase A)
+        self.btn_series_fixaxis = self._ui.btn_series_fixaxis
+        self.spn_series_maglo = self._ui.spn_series_maglo
+        self.spn_series_maghi = self._ui.spn_series_maghi
+        self.btn_series_fixaxis.toggled.connect(self._on_fix_axis)
+        self.spn_series_maglo.valueChanged.connect(self._on_fix_axis)
+        self.spn_series_maghi.valueChanged.connect(self._on_fix_axis)
+        self.cmb_series_bin = self._ui.cmb_series_bin
+        self.cmb_series_bin.addItem(self.tr("None (one point per frame)"),
+                                    "off")
+        self.cmb_series_bin.addItem(self.tr("Every N frames"), "frames")
+        self.cmb_series_bin.addItem(self.tr("Every N minutes"), "minutes")
+        self.cmb_series_bin.currentIndexChanged.connect(self._on_bin_changed)
+        self.spn_series_binn = self._ui.spn_series_binn
+        self.spn_series_binn.valueChanged.connect(self._on_bin_changed)
+        self.chk_series_mean = self._ui.chk_series_mean
+        self.spn_series_meanwin = self._ui.spn_series_meanwin
+        self.chk_series_mean.toggled.connect(self._on_bin_changed)
+        self.spn_series_meanwin.valueChanged.connect(self._on_bin_changed)
+        self.chk_series_outliers = self._ui.chk_series_outliers
+        self.spn_series_outsigma = self._ui.spn_series_outsigma
+        self.chk_series_outliers.toggled.connect(self._on_detect_outliers)
+        self.spn_series_outsigma.valueChanged.connect(
+            self._on_detect_outliers)
+        self.btn_series_exclout = self._ui.btn_series_exclout
+        self.btn_series_exclout.clicked.connect(self._on_exclude_outliers)
+        self.btn_series_exclsel = self._ui.btn_series_exclsel
+        self.btn_series_exclsel.clicked.connect(self._on_exclude_selected)
+        self.btn_series_restore = self._ui.btn_series_restore
+        self.btn_series_restore.clicked.connect(self._on_restore_all)
+        self.lbl_series_selection = self._ui.lbl_series_selection
+        self.chart_series.point_clicked.connect(self._on_point_clicked)
         drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
                 self.chart_series)
         self._series_payload = []    # last drawn points, for the big view
@@ -996,6 +1030,69 @@ class UfeMeasureTab(QWidget):
         self._series_worker.start()
         self.lbl_status.setText(self.tr("Measuring the series…"))
 
+    def _on_series_sci(self):
+        # The scientific figure of the curve (quality plan, A1): the same
+        # points the panel shows, with the observer's decisions (marked,
+        # excluded, fixed axis) drawn the way a report reads them.
+        from .widgets.lightcurve_widget import LightCurveChart
+        if self._series_result is None or not self._series_payload:
+            self.lbl_status.setText(self.tr(
+                "Measure the series first: the figure is the curve."))
+            return
+        pts = [dict(p) for p in self._series_payload]
+        mags = [p["mag"] for p in pts if p.get("mag") is not None]
+        if not mags:
+            return
+        from ..viz import sci_style
+        from .. import paths as paths_mod
+        scene = self._series_context() or {}
+        name = ""
+        window = self.window()
+        obj = getattr(window, "object", None)
+        if callable(obj):
+            name = (obj() or {}).get("name") or ""
+        start = paths_mod.data_dir()
+        from PySide6.QtWidgets import QFileDialog
+        target, _sel = QFileDialog.getSaveFileName(
+            self, self.tr("Save the scientific chart"),
+            str(start / "{0}_curva.png".format(
+                (name or "series").replace(" ", "_"))),
+            self.tr("PNG image (*.png)"))
+        if not target:
+            return
+        lo = hi = None
+        fixed = self.chart_series.is_y_range_fixed()
+        if fixed:
+            lo, hi = fixed
+        out = sci_style.draw_scientific(
+            pts, out=target, title=name or self.tr("Photometric series"),
+            subtitle=self._series_subtitle(scene), lang=self._lang,
+            figsize=(9.0, 5.2), dpi=150)
+        self.lbl_status.setText(self.tr("Scientific chart written: {0}")
+                                .format(out))
+
+    def _series_subtitle(self, context):
+        # The second line of the scientific figure: what a reader needs to
+        # know about the night without asking.
+        # @args: context - the visit context (paths, kind)
+        # @return: the subtitle string
+        n = len((context or {}).get("paths") or [])
+        exps = []
+        for p in (self._series_result.points if self._series_result else []):
+            if p.exptime:
+                exps.append(p.exptime)
+                break
+        bits = []
+        if n:
+            bits.append(self.tr("{0} frames").format(n))
+        if exps:
+            bits.append(self.tr("{0:g} s").format(exps[0]))
+        band = (self.cmb_band.currentText() or "").strip()
+        if band:
+            bits.append(self.tr("band {0}").format(band))
+        bits.append(self.tr("NightScribe"))
+        return " · ".join(bits)
+
     def _on_series_phase(self):
         # Quality plan (C): the period search opens from where the series
         # was measured too, on the PROJECT's curve (every visit), so the
@@ -1010,6 +1107,112 @@ class UfeMeasureTab(QWidget):
         self.lbl_status.setText(self.tr(
             "The period search works on a project's curve: open the "
             "editor from a project to reach it."))
+
+    # ---------------- the chart's controls (quality plan, phase A) ------
+
+    def _on_fix_axis(self, *_a):
+        # The fixed magnitude range: the observer's own scale wins over
+        # the robust automatic one, and it is what makes a hundredth of a
+        # magnitude visible on a night.
+        if not self.btn_series_fixaxis.isChecked():
+            self.chart_series.clear_y_range()
+            return
+        lo = self.spn_series_maglo.value()
+        hi = self.spn_series_maghi.value()
+        if not self.chart_series.set_y_range(lo, hi):
+            self.lbl_series_selection.setText(self.tr(
+                "The fixed range is empty or inverted: the faintest "
+                "magnitude must be larger than the brightest."))
+            return
+        self._update_selection_label()
+
+    def _on_bin_changed(self, *_a):
+        # The chart's binning and its mean curve (presentation only).
+        self.chart_series.set_bin_mode(
+            self.cmb_series_bin.currentData() or "off",
+            self.spn_series_binn.value())
+        self.chart_series.set_mean_curve(
+            self.spn_series_meanwin.value()
+            if self.chk_series_mean.isChecked() else 0)
+
+    def _on_detect_outliers(self, *_a):
+        # The detector runs on the plotted curve, with the threshold the
+        # observer chooses; the candidates are only MARKED (never removed).
+        if not self.chk_series_outliers.isChecked():
+            self.chart_series.set_outliers([])
+            self._update_selection_label()
+            return
+        from ..core import outliers as outliers_mod
+        pts = self._series_measured()
+        res = outliers_mod.outliers_in_points(
+            pts, sigma=self.spn_series_outsigma.value())
+        marked = [i for i, flag in enumerate(res["flags"]) if flag]
+        self.chart_series.set_outliers(marked)
+        self._update_selection_label()
+
+    def _series_measured(self):
+        # The measured points of the chart, in the same order the chart
+        # holds them (so an index means the same thing in both places).
+        # @return: [{"mjd", "mag", "err", "err_internal", "flags"}]
+        return [p for p in (self._series_result.points
+                            if self._series_result is not None else [])
+                if p.mjd is not None and p.mag is not None]
+
+    def _on_point_clicked(self, _idx):
+        # The chart already toggled the selection; here we only refresh
+        # the counter the observer reads.
+        self._update_selection_label()
+
+    def _on_exclude_outliers(self):
+        # Excluding a marked point is a separate, explicit act: the mark
+        # is red, this button takes it out of the curve and the file, and
+        # «Restore all» puts it back.
+        marked = self.chart_series.outliers()
+        if not marked:
+            self.lbl_series_selection.setText(self.tr(
+                "No outlier is marked: switch the detector on first."))
+            return
+        self._set_excluded_pool(set(self.chart_series.excluded())
+                                | set(marked))
+
+    def _on_exclude_selected(self):
+        chosen = self.chart_series.selected()
+        if not chosen:
+            self.lbl_series_selection.setText(self.tr(
+                "No point selected: click one on the chart first."))
+            return
+        self._set_excluded_pool(set(self.chart_series.excluded())
+                                | set(chosen))
+
+    def _on_restore_all(self):
+        self._set_excluded_pool(set())
+
+    def _set_excluded_pool(self, pool):
+        # Applies the exclusion to the CHART and to the points, flags it
+        # (never deletes it) and redraws. The flag travels to the file, so
+        # a curve shared with a colleague says what was left out and why.
+        # @args: pool - set of indexes into _series_measured()
+        pts = self._series_measured()
+        for i, p in enumerate(pts):
+            flags = [f for f in (p.flags or []) if f != "user_excluded"]
+            if i in pool:
+                flags.append("user_excluded")
+            p.flags = flags
+        self.chart_series.set_excluded(sorted(pool))
+        self.chart_series.clear_selection()
+        self._draw_series(self._series_result.points
+                          if self._series_result is not None else [])
+        self._update_selection_label()
+
+    def _update_selection_label(self):
+        # The counter under the chart: how many are selected, excluded and
+        # marked, so nothing happens off-screen.
+        n_sel = len(self.chart_series.selected())
+        n_exc = len(self.chart_series.excluded())
+        n_out = len(self.chart_series.outliers())
+        self.lbl_series_selection.setText(self.tr(
+            "{0} selected · {1} excluded · {2} marked").format(
+                n_sel, n_exc, n_out))
 
     def _on_series_progress(self, done, total):
         self.prg_series.setRange(0, total)

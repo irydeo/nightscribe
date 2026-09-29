@@ -35,7 +35,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout,
 
 import numpy as np
 
-from ...core import sn_templates
+from ...core import sn_templates, ticks
 from ...viz import palette
 from .base_chart import ChartView
 
@@ -127,27 +127,6 @@ def _flags_split(flags):
     return data + other, caveat
 
 
-def _fmt_tick(value, span):
-    # A tick label with as many decimals as the span needs (quality plan,
-    # A1): on a 0.12 mag night "12.5" five times is noise, "12.53" is a
-    # reading, and the same for the MJD axis.
-    # @args: value - the tick value, span - the axis span
-    # @return: the formatted label
-    span = abs(float(span)) if span else 0.0
-    decimals = 3
-    if span <= 0.0:
-        decimals = 3
-    elif span >= 100.0:
-        decimals = 0
-    elif span >= 10.0:
-        decimals = 1
-    elif span >= 1.0:
-        decimals = 2
-    elif span < 0.01:
-        decimals = 4
-    return f"{value:.{decimals}f}"
-
-
 # Distinct colours per filter (matching the PNG export)
 _FILTER_COLOURS = {
     "Clear": palette.ACCENT, "None": palette.ACCENT,
@@ -162,6 +141,7 @@ class LightCurveChart(ChartView):
     # optional template overlay. Hover shows date/mag/filter/source.
 
     enlarge_requested = Signal()   # a click (or double-click) wants a big view
+    point_clicked = Signal(int)    # a click ON a point picked that one
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -181,8 +161,22 @@ class LightCurveChart(ChartView):
         self._robust = True
         self._show_errors = True
         self._hide_flagged = False
+        self._y_range = None       # (lo, hi) when the observer fixed it
+        # the observer's decisions on the curve (phase A): what is out,
+        # what is marked as an outlier and what is selected right now
+        self._excluded = set()
+        self._outlier_idx = set()
+        self._selected = set()
+        # the chart's own binning and its mean curve (presentation only)
+        self._bin_mode = "off"
+        self._bin_n = 5
+        self._mean_window = 0
+        self._has_mean = False
         self._clip_note = 0        # bars clipped by _BAR_CLIP on this draw
         self.set_hover_probe(self._probe)
+        # a single left click picks a point when there is one under the
+        # cursor, and asks for the big view when there is not
+        self.scene_clicked.connect(self._on_scene_click)
 
     def mouseDoubleClickEvent(self, event):
         # A double-click asks the host for a big view (the base has no
@@ -273,6 +267,107 @@ class LightCurveChart(ChartView):
         # @return: whether the flagged points are hidden
         return self._hide_flagged
 
+    def set_excluded(self, indexes):
+        # The points the observer took out of the curve (quality plan, A).
+        # They are NOT deleted and they are NOT hidden: they stay on the
+        # chart as small grey crosses, so the figure says what was left
+        # out. This is the same rule as the engine's flags (T7).
+        # @args: indexes - iterable of indexes into the point list
+        self._excluded = set(int(i) for i in (indexes or ()))
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
+
+    def excluded(self):
+        # @return: the sorted list of excluded indexes
+        return sorted(self._excluded)
+
+    def set_outliers(self, indexes):
+        # The outlier candidates: marked in red, never removed (phase A).
+        # @args: indexes - iterable of indexes into the point list
+        self._outlier_idx = set(int(i) for i in (indexes or ()))
+        self._build_scene()
+        self.fit_to_scene()
+
+    def outliers(self):
+        # @return: the sorted list of marked candidates
+        return sorted(self._outlier_idx)
+
+    def set_selected(self, indexes):
+        # @args: indexes - the points the observer clicked
+        self._selected = set(int(i) for i in (indexes or ()))
+        self._build_scene()
+        self.fit_to_scene()
+
+    def selected(self):
+        # @return: the sorted list of selected indexes
+        return sorted(self._selected)
+
+    def toggle_selection(self, index):
+        # A click on a point adds or removes it from the selection, which
+        # is how the observer says "this one".
+        # @args: index - the point's index
+        # @return: True when it ended selected
+        index = int(index)
+        if index in self._selected:
+            self._selected.discard(index)
+            chosen = False
+        else:
+            self._selected.add(index)
+            chosen = True
+        self._build_scene()
+        self.fit_to_scene()
+        return chosen
+
+    def clear_selection(self):
+        # @return: None
+        self._selected = set()
+        self._build_scene()
+        self.fit_to_scene()
+
+    def set_bin_mode(self, mode, n=5):
+        # The chart's own binning (a presentation choice, not the engine's
+        # frame grouping): "off", "frames" or "minutes".
+        # @args: mode - "off" | "frames" | "minutes", n - frames or minutes
+        self._bin_mode = mode if mode in ("frames", "minutes") else "off"
+        self._bin_n = max(1, int(n or 1))
+        self._build_scene()
+        self.fit_to_scene()
+
+    def set_mean_curve(self, window):
+        # @args: window - points of the moving average, or 0/None to hide it
+        self._mean_window = max(0, int(window or 0))
+        self._build_scene()
+        self.fit_to_scene()
+
+    def point_at(self, scene_x, scene_y, radius=25.0):
+        # The point under a scene position, or None. The chart uses it to
+        # know whether a click meant "this point" or "the empty space".
+        # @args: scene_x/scene_y - scene coordinates, radius - hit radius
+        # @return: the point's index, or None
+        best, best_dist = None, radius * radius
+        for idx, p in enumerate(self._points):
+            if p.get("mag") is None or idx in self._excluded:
+                continue
+            for xv in self._xs(p):
+                dx = self._map_x(xv) - scene_x
+                dy = self._map_y(p["mag"]) - scene_y
+                dist = dx * dx + dy * dy
+                if dist <= best_dist:
+                    best, best_dist = idx, dist
+        return best
+
+    def _on_scene_click(self, point):
+        # A single left click: on a point it selects it; anywhere else it
+        # asks the host for the big view (the old behaviour, kept for the
+        # empty space where there is nothing to select).
+        idx = self.point_at(point.x(), point.y())
+        if idx is None:
+            self.enlarge_requested.emit()
+            return
+        self.toggle_selection(idx)
+        self.point_clicked.emit(idx)
+
     def n_flagged(self):
         # @return: (data flags, calibration caveats) counts
         data = sum(1 for p in self._points if _flags_split(p.get("flags"))[0])
@@ -348,8 +443,18 @@ class LightCurveChart(ChartView):
 
     def _mag_window(self, mags):
         # The magnitude window of the chart (quality plan, A1).
+        #
+        # Three things can decide it, in this order:
+        #   1. the observer, when the manual range is on (their eye knows
+        #      what they are looking for);
+        #   2. the robust core (median ± K robust sigmas), which keeps one
+        #      anomalous frame from flattening the whole curve;
+        #   3. the plain min/max, when robust mode is off or the scatter
+        #      is degenerate.
         # @args: mags - the finite magnitudes on the chart
         # @return: (lo, hi) of the window, padded
+        if self._y_range is not None:
+            return float(self._y_range[0]), float(self._y_range[1])
         vals = np.asarray(mags, dtype=float)
         if not self._robust:
             lo, hi = float(vals.min()), float(vals.max())
@@ -370,6 +475,35 @@ class LightCurveChart(ChartView):
         pad = (hi - lo) * _PAD
         return lo - pad, hi + pad
 
+    def set_y_range(self, lo, hi):
+        # The observer fixes the magnitude axis (quality plan, A1). A range
+        # with no room, or inverted, is refused: an axis is not a place to
+        # be clever, and a bad range would draw an unreadable chart.
+        # @args: lo, hi - magnitudes (lo brighter than hi)
+        # @return: True when the range was accepted
+        try:
+            lo, hi = float(lo), float(hi)
+        except (TypeError, ValueError):
+            return False
+        if not (math.isfinite(lo) and math.isfinite(hi)) or hi <= lo:
+            return False
+        self._y_range = (lo, hi)
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
+        return True
+
+    def clear_y_range(self):
+        # Back to the automatic (robust) window.
+        self._y_range = None
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
+
+    def is_y_range_fixed(self):
+        # @return: (lo, hi) when the observer fixed it, else None
+        return self._y_range
+
     def _map_x(self, mjd):
         # @args: mjd - float
         # @return: scene x coordinate
@@ -388,6 +522,7 @@ class LightCurveChart(ChartView):
 
     def _build_scene(self):
         self.clear()
+        self._has_mean = False
         b = self._bounds
         self.set_scene_rect(-_HALF - 60, -_HALF - 50,
                              2 * _HALF + 120, 2 * _HALF + 100)
@@ -512,12 +647,115 @@ class LightCurveChart(ChartView):
             self.add_item(rect)
         return tallest, largest
 
+    def _bin_groups(self):
+        # The plotted points, grouped the way the chart draws them: one
+        # group per (filter, source). The binning and the mean curve act
+        # inside each group, because averaging a measurement with a
+        # detrended guide (or with another filter) would be meaningless.
+        # @return: {(band, source): [point, ...]} in time order
+        groups = {}
+        for idx, p in enumerate(self._points):
+            if p.get("mag") is None:
+                continue
+            key = (p.get("filter"), p.get("source") or "manual")
+            groups.setdefault(key, []).append((idx, p))
+        for key in groups:
+            groups[key].sort(key=lambda pair: pair[1]["mjd"])
+        return groups
+
+    def _binned(self, members):
+        # The mean of N frames, or of N minutes, for the CHART only (a
+        # presentation choice: the engine's own grouping happens in the
+        # measurement domain and is a different thing).
+        #
+        # The error of a binned point is the quadrature of its members
+        # divided by k (noise averages down) but never smaller than their
+        # standard error of the mean: a group of frames that disagree
+        # among themselves is telling us something, and the error must not
+        # hide it.
+        # @args: members - [(index, point), ...] in time order
+        # @return: [{"x", "mag", "err", "n"}] (x in the chart's units)
+        if not members:
+            return []
+        mode, n = self._bin_mode, max(1, int(self._bin_n))
+        groups = []
+        if mode == "frames":
+            for start in range(0, len(members), n):
+                groups.append(members[start:start + n])
+        elif mode == "minutes":
+            width = n / 1440.0
+            t0 = members[0][1]["mjd"]
+            buckets = {}
+            for idx, p in members:
+                key = int(math.floor((p["mjd"] - t0) / width + 1e-4))
+                buckets.setdefault(key, []).append((idx, p))
+            groups = [buckets[k] for k in sorted(buckets)]
+        else:
+            return []
+        out = []
+        for group in groups:
+            mags = [p["mag"] for _i, p in group]
+            mag = float(np.mean(mags))
+            errs = [p.get("err_internal") or p.get("err") for _i, p in group]
+            errs = [e for e in errs if e]
+            err = None
+            if errs:
+                err = math.sqrt(sum(e * e for e in errs)) / len(group)
+            if len(group) > 1:
+                spread = float(np.std(mags, ddof=1)) / math.sqrt(len(group))
+                err = spread if err is None else max(err, spread)
+            mjd = float(np.mean([p["mjd"] for _i, p in group]))
+            out.append({"mjd": mjd, "mag": mag, "err": err, "n": len(group)})
+        return out
+
+    def _moving_average(self, series):
+        # A centred moving average of the plotted series: the shape of a
+        # small-amplitude curve without the noise. It is a guide for the
+        # eye and the legend says so; the measurements are the points.
+        # @args: series - [{"mjd", "mag"}] in time order
+        # @return: [(mjd, mag)] of the smoothed curve
+        win = max(2, int(self._mean_window or 0))
+        if win < 2 or len(series) < 3:
+            return []
+        half = win // 2
+        out = []
+        for i, p in enumerate(series):
+            lo, hi = max(0, i - half), min(len(series), i + half + 1)
+            chunk = [q["mag"] for q in series[lo:hi]]
+            out.append((p["mjd"], float(np.mean(chunk))))
+        return out
+
+    def _dot(self, x, y, radius, colour, filled=True, pen=None, width=1.5,
+             z=_Z_DATA):
+        # One data marker. Small helper so every style of point (plain,
+        # flagged diamond, excluded cross, selected ring, binned dot)
+        # reads the same in the code below.
+        # @return: the item, already added to the scene
+        item = QGraphicsEllipseItem(x - radius, y - radius,
+                                    radius * 2, radius * 2)
+        item.setBrush(QBrush(colour if filled else QColor(palette.BG)))
+        item.setPen(pen or QPen(colour, width))
+        item.setZValue(z)
+        self.add_item(item)
+        return item
+
     def _draw_points(self):
-        # Every point of the curve: the ones with a DATA flag as hollow
-        # diamonds (never hidden, ADR-048 T7), the ones that only carry a
-        # calibration caveat with a faint amber edge, the rest plain, each
-        # with its own error bar clipped to the plot and anchored to the
-        # edge when it falls outside the robust window (A1/A3/A4).
+        # Every point of the curve, and how the chart shows what the
+        # observer and the detector decided about it (quality plan, phase
+        # A):
+        #
+        #   * a DATA flag (saturated, cosmic, focus, cloud, unaligned) is
+        #     the hollow diamond; a calibration CAVEAT (few comps) is a
+        #     faint amber edge;
+        #   * an OUTLIER candidate is red (marked, never removed);
+        #   * a point the observer EXCLUDED is a small grey cross, still
+        #     visible on purpose: the curve must show what was taken out;
+        #   * a SELECTED point is the same dot with a black ring;
+        #   * when a binning is on, the raw points fade and the binned
+        #     means take the foreground, with their own error;
+        #   * a mean curve, when asked, rides on top with a white halo.
+        #
+        # Nothing is deleted at any step: every decision is reversible.
         # @return: (flagged_seen, caveat_seen, tallest, largest)
         b = self._bounds
         span = b[3] - b[2]
@@ -528,68 +766,174 @@ class LightCurveChart(ChartView):
                                      for p in self._points):
             tallest, largest = self._draw_systematic_bands()
         flagged_seen = caveat_seen = False
-        for p in self._points:
-            if p.get("mag") is None:
-                continue
-            data_flags, caveat = _flags_split(p.get("flags"))
-            flagged = bool(data_flags)
-            if flagged and self._hide_flagged:
-                continue
-            for xv in self._xs(p):
-                x = self._map_x(xv)
-                y = self._map_y(p["mag"])
-                y_draw, off = (y, 0)
-                if y > _HALF:
-                    y_draw, off = _HALF - 10.0, 1
-                elif y < -_HALF:
-                    y_draw, off = -_HALF + 10.0, -1
-                if off:
-                    self._over_note += 1
-                colour, filled = _point_style(p)
-                r = 6.0
-                if flagged:
-                    poly = QPolygonF([
-                        QPointF(x, y_draw - r), QPointF(x + r, y_draw),
-                        QPointF(x, y_draw + r), QPointF(x - r, y_draw)])
-                    dot = QGraphicsPolygonItem(poly)
-                    dot.setBrush(QBrush(QColor(palette.BG)))
-                    dot.setPen(QPen(QColor(FLAG_COLOUR), 1.8))
-                    flagged_seen = True
-                elif off:
-                    # outside the robust window: a small caret anchored to
-                    # the edge, so nothing disappears from the chart
-                    poly = QPolygonF([
-                        QPointF(x, y_draw + off * 10.0), QPointF(x - 7, y_draw),
-                        QPointF(x + 7, y_draw)])
-                    dot = QGraphicsPolygonItem(poly)
-                    dot.setBrush(QBrush(palette.DANGER))
-                    dot.setPen(QPen(QColor(palette.DANGER), 1.0))
-                else:
-                    dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
-                    dot.setBrush(QBrush(colour if filled
-                                        else QColor(palette.BG)))
-                    pen = QPen(colour, 1.5)
-                    if caveat:
-                        # a caveat, not a suspect point: the marker and a
-                        # faint amber edge, so the shape of the curve is
-                        # not drowned in warnings
-                        pen = QPen(QColor(FLAG_COLOUR), 1.0)
-                        caveat_seen = True
-                    dot.setPen(pen)
-                dot.setZValue(_Z_DATA)
-                self.add_item(dot)
-                err = self._bar_error(p) if self._show_errors else None
-                if err is not None and span > 0.0:
-                    ey = err / span * 2 * _HALF
-                    clip = _BAR_CLIP * 2 * _HALF
-                    if ey > clip:
-                        ey = clip
-                        self._clip_note += 1
-                    bar = QGraphicsLineItem(x, y_draw - ey, x, y_draw + ey)
-                    bar.setPen(QPen(colour, 1.0))
-                    bar.setZValue(_Z_ERROR)
-                    self.add_item(bar)
+        groups = self._bin_groups()
+        binned_mode = self._bin_mode in ("frames", "minutes")
+        for (_band, _src), members in groups.items():
+            raw = [(i, p) for i, p in members if i not in self._excluded]
+            binned = self._binned(raw) if binned_mode else []
+            faded = 0.35 if binned else 1.0
+            # 1. the raw measurements (behind, faded when binned)
+            for idx, p in members:
+                excluded = idx in self._excluded
+                data_flags, caveat = _flags_split(p.get("flags"))
+                flagged = bool(data_flags)
+                if flagged and self._hide_flagged:
+                    continue
+                selected = idx in self._selected
+                outlier = idx in self._outlier_idx
+                for xv in self._xs(p):
+                    x = self._map_x(xv)
+                    y = self._map_y(p["mag"])
+                    y_draw, off = self._clipped_y(y)
+                    if off:
+                        self._over_note += 1
+                    colour, filled = _point_style(p)
+                    radius = 6.0
+                    if excluded:
+                        # out of the curve but ON the chart: a grey cross,
+                        # never a silent deletion
+                        self._draw_cross(x, y_draw)
+                        continue
+                    if outlier:
+                        colour = QColor(palette.DANGER)
+                    if flagged:
+                        self._draw_diamond(x, y_draw, radius)
+                        flagged_seen = True
+                    elif off:
+                        self._draw_caret(x, y_draw, off)
+                    else:
+                        pen = QPen(QColor(FLAG_COLOUR), 1.0) if caveat \
+                            else None
+                        if caveat:
+                            caveat_seen = True
+                        if selected:
+                            pen = QPen(QColor(palette.FG), 2.0)
+                            radius = 8.0
+                        self._dot(x, y_draw, radius, colour,
+                                  filled=filled and not selected, pen=pen,
+                                  width=1.5, z=_Z_DATA)
+                        if selected:
+                            # the selection ring is on top of the dot, so
+                            # it reads as "this is the one I picked"
+                            ring = QGraphicsEllipseItem(
+                                x - radius - 2, y_draw - radius - 2,
+                                (radius + 2) * 2, (radius + 2) * 2)
+                            ring.setBrush(QBrush(Qt.NoBrush))
+                            ring.setPen(QPen(QColor(palette.FG), 1.2))
+                            ring.setZValue(_Z_DATA + 0.1)
+                            self.add_item(ring)
+                    err = self._bar_error(p) if self._show_errors else None
+                    if err is not None and span > 0.0:
+                        self._draw_error_bar(x, y_draw, err, span, colour,
+                                             alpha=faded)
+            # 2. the binned means (in front, one dot per group)
+            for q in binned:
+                x = self._map_x(q["mjd"])
+                y_draw, _off = self._clipped_y(self._map_y(q["mag"]))
+                colour = _point_style({"filter": _band,
+                                       "source": _src})[0]
+                self._dot(x, y_draw, 4.6, colour, filled=True, width=0.8,
+                          z=_Z_DATA + 0.5)
+                if self._show_errors and q["err"] and span > 0.0:
+                    self._draw_error_bar(x, y_draw, q["err"], span, colour,
+                                         alpha=1.0)
+            # 3. the mean curve (a guide for the eye, drawn last)
+            if self._mean_window:
+                series = [{"mjd": q["mjd"], "mag": q["mag"]}
+                          for q in (binned or [p for _i, p in raw])]
+                smooth = self._moving_average(series)
+                self._draw_mean_curve(smooth, _band, _src)
+                if smooth:
+                    self._has_mean = True
         return flagged_seen, caveat_seen, tallest, largest
+
+    def _clipped_y(self, y):
+        # @args: y - the scene y of a point
+        # @return: (y to draw, off) where off is -1 above the window,
+        #          +1 below, 0 inside: the points outside are anchored to
+        #          the edge, never hidden (A1)
+        if y > _HALF:
+            return _HALF - 10.0, 1
+        if y < -_HALF:
+            return -_HALF + 10.0, -1
+        return y, 0
+
+    def _draw_cross(self, x, y):
+        # An excluded point: a small grey cross, deliberately visible.
+        pen = QPen(QColor(palette.MUTED), 1.2)
+        for (dx, dy) in ((-5.0, -5.0), (-5.0, 5.0)):
+            line = QGraphicsLineItem(x + dx, y + dy, x - dx, y - dy)
+            line.setPen(pen)
+            line.setZValue(_Z_DATA)
+            self.add_item(line)
+
+    def _draw_diamond(self, x, y, radius):
+        # A point whose DATA is in doubt: the hollow diamond of ADR-048.
+        poly = QPolygonF([QPointF(x, y - radius), QPointF(x + radius, y),
+                          QPointF(x, y + radius), QPointF(x - radius, y)])
+        dot = QGraphicsPolygonItem(poly)
+        dot.setBrush(QBrush(QColor(palette.BG)))
+        dot.setPen(QPen(QColor(FLAG_COLOUR), 1.8))
+        dot.setZValue(_Z_DATA)
+        self.add_item(dot)
+
+    def _draw_caret(self, x, y, off):
+        # A point outside the window: a small triangle on the edge, so the
+        # reader can see there is something beyond without it setting the
+        # scale.
+        poly = QPolygonF([QPointF(x, y + off * 10.0), QPointF(x - 7, y),
+                          QPointF(x + 7, y)])
+        dot = QGraphicsPolygonItem(poly)
+        dot.setBrush(QBrush(palette.DANGER))
+        dot.setPen(QPen(QColor(palette.DANGER), 1.0))
+        dot.setZValue(_Z_DATA)
+        self.add_item(dot)
+
+    def _draw_error_bar(self, x, y, err, span, colour, alpha=1.0):
+        # The point's OWN error, clipped when it is wider than the plot can
+        # carry (the legend says how many were clipped): a 0.17 mag bar on
+        # a 0.12 mag curve would paint over everything.
+        ey = err / span * 2 * _HALF
+        clip = _BAR_CLIP * 2 * _HALF
+        if ey > clip:
+            ey = clip
+            self._clip_note += 1
+        pen = QPen(colour, 1.0)
+        pen.setColor(QColor(colour.red(), colour.green(), colour.blue(),
+                            int(255 * alpha)))
+        bar = QGraphicsLineItem(x, y - ey, x, y + ey)
+        bar.setPen(pen)
+        bar.setZValue(_Z_ERROR)
+        self.add_item(bar)
+        # caps: the small horizontal strokes that make an error bar a
+        # measurement instead of a line
+        for yy in (y - ey, y + ey):
+            cap = QGraphicsLineItem(x - 3.0, yy, x + 3.0, yy)
+            cap.setPen(pen)
+            cap.setZValue(_Z_ERROR)
+            self.add_item(cap)
+
+    def _draw_mean_curve(self, smooth, band, src):
+        # The moving average, with a white halo under it so it reads on
+        # top of a dense cloud of points (the trick the Photometrica tool
+        # uses; it costs one extra pass and saves the eye).
+        # @args: smooth - [(mjd, mag)], band/src - the series it belongs to
+        if len(smooth) < 2:
+            return
+        colour, _filled = _point_style({"filter": band, "source": src})
+        pts = [(self._map_x(mjd), self._map_y(mag)) for mjd, mag in smooth]
+        for width, pen_colour in ((4.2, QColor(palette.BG)),
+                                  (2.0, colour)):
+            pen = QPen(pen_colour, width)
+            pen.setCapStyle(Qt.RoundCap)
+            pen.setJoinStyle(Qt.RoundJoin)
+            for i in range(len(pts) - 1):
+                line = QGraphicsLineItem(pts[i][0], pts[i][1],
+                                          pts[i + 1][0], pts[i + 1][1])
+                line.setPen(pen)
+                line.setZValue(_Z_LINK + 0.4)
+                self.add_item(line)
+
 
     def _link_pen(self, source, band):
         # @args: source - the series' source, band - the series' filter
@@ -663,6 +1007,9 @@ class LightCurveChart(ChartView):
         elif systematic:
             entries.append((self.tr("calibration systematic ±{0:.3f}")
                             .format(systematic), QColor(palette.MUTED)))
+        if self._has_mean:
+            entries.append((self.tr("mean curve (guide for the eye)"),
+                            QColor(palette.MUTED)))
         if self._clip_note:
             entries.append((self.tr("{0} bars clipped (error ≫ scale)")
                             .format(self._clip_note),
@@ -724,47 +1071,61 @@ class LightCurveChart(ChartView):
         self.add_item(bg)
 
     def _draw_grid(self):
-        # Simple grid: a few date ticks on X, a few mag ticks on Y (inverted).
-        # The number of decimals follows the SPAN: a 0.12 mag night needs
-        # three of them, and the old fixed one decimal made every label
-        # read the same ("60297.8", "12.5") on a small-amplitude curve
-        # (quality plan, phase A).
+        # The grid and its labels (quality plan, A1).
+        #
+        # Everything about the numbers comes from core/ticks: the ticks
+        # land on round values, each label carries the decimals its step
+        # needs, and when the values sit far from zero (a Julian Date, a
+        # pixel position) the constant is factored out and written once,
+        # the way a published figure does. Before this, a 0.12 mag night
+        # printed "12.5" five times and the X axis printed "60297.8"
+        # everywhere: the reader had no way to know which tick was which.
         b = self._bounds
         x_span = b[1] - b[0]
         y_span = b[3] - b[2]
         pen = QPen(QColor(palette.MUTED), 0.8)
         pen.setStyle(Qt.DotLine)
-        # X grid lines (5 divisions)
-        for i in range(6):
-            x = -_HALF + i * 2 * _HALF / 5
+        x_plan = ticks.axis_plan(b[0], b[1], target=6)
+        y_plan = ticks.axis_plan(b[2], b[3], target=5)
+        # X grid lines: the tick's own x, not an even division
+        for tv, label in zip(x_plan["ticks"] + [x_plan["offset"]],
+                             x_plan["labels"] + [""]):
+            if x_span <= 0.0:
+                break
+            x = -_HALF + (tv - b[0]) / x_span * 2 * _HALF
             line = QGraphicsLineItem(x, -_HALF, x, _HALF)
             line.setPen(pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            # tick label (MJD, or phase 0..2 in fold mode)
-            xv = b[0] + x_span * i / 5
-            lbl = QGraphicsSimpleTextItem(_fmt_tick(xv, x_span))
-            lbl.setPos(x - 20, _HALF + 10)
-            lbl.setBrush(QBrush(QColor(palette.MUTED)))
-            f = QFont(); f.setPointSize(_FONT_TICK)
-            lbl.setFont(f)
-            lbl.setZValue(_Z_LABEL)
-            self.add_item(lbl)
-        # Y grid lines (4 divisions)
-        for i in range(5):
-            y = _HALF - i * 2 * _HALF / 4
+            if label:
+                self._tick_label(label, x - 20, _HALF + 10)
+        # Y grid lines (inverted axis: brighter on top)
+        for tv, label in zip(y_plan["ticks"], y_plan["labels"]):
+            if y_span <= 0.0:
+                break
+            y = _HALF - (tv - b[2]) / y_span * 2 * _HALF
             line = QGraphicsLineItem(-_HALF, y, _HALF, y)
             line.setPen(pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            mag = b[2] + y_span * i / 4
-            lbl = QGraphicsSimpleTextItem(_fmt_tick(mag, y_span))
-            lbl.setPos(-_HALF - 60, y - 8)
-            lbl.setBrush(QBrush(QColor(palette.MUTED)))
-            f = QFont(); f.setPointSize(_FONT_TICK)
-            lbl.setFont(f)
-            lbl.setZValue(_Z_LABEL)
-            self.add_item(lbl)
+            self._tick_label(label, -_HALF - 60, y - 8)
+        # the factored-out constant, said once (never hidden)
+        if y_plan["offset_label"]:
+            self._tick_label(y_plan["offset_label"], -_HALF - 60, -_HALF - 26)
+        if x_plan["offset_label"]:
+            self._tick_label(x_plan["offset_label"], _HALF - 40, _HALF + 30)
+
+    def _tick_label(self, text, x, y):
+        # One small grey tick label at a scene position.
+        # @args: text - the label, x/y - scene coordinates
+        lbl = QGraphicsSimpleTextItem(text)
+        lbl.setPos(x, y)
+        lbl.setBrush(QBrush(QColor(palette.MUTED)))
+        f = QFont()
+        f.setPointSize(_FONT_TICK)
+        lbl.setFont(f)
+        lbl.setZValue(_Z_LABEL)
+        self.add_item(lbl)
 
     def _probe(self, sx, sy):
         # @args: sx, sy - scene coordinates

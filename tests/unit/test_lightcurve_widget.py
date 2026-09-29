@@ -319,3 +319,109 @@ def test_widget_unfolded_unchanged():
     chart.set_data(_POINTS, sn_type="SN Ia")
     assert chart._fold_p is None
     assert chart._xs(_POINTS[0]) == (60600.0,)
+
+
+# ---------------- quality plan, phase A1: the chart's decisions --------
+
+import math  # noqa: E402
+
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+from PySide6.QtCore import QPointF  # noqa: E402
+
+from nightscribe.gui.widgets.lightcurve_widget import _HALF  # noqa: E402
+
+
+def _points(n=60, seed=5):
+    rng = np.random.default_rng(seed)
+    return [{"mjd": 60297.77 + i * 0.0005,
+             "mag": 12.58 + 0.05 * math.sin(i / 9.0)
+             + rng.normal(0, 0.004),
+             "err": 0.02, "err_internal": 0.004, "filter": "V",
+             "source": "measure", "flags": []}
+            for i in range(n)]
+
+
+def test_the_observer_can_fix_the_magnitude_axis():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    auto = c._bounds[3] - c._bounds[2]
+    assert c.set_y_range(12.55, 12.60) is True
+    assert c.is_y_range_fixed() == (12.55, 12.60)
+    assert (c._bounds[3] - c._bounds[2]) == pytest.approx(0.05)
+    assert c._bounds[3] - c._bounds[2] < auto
+    # an impossible range is refused, not silently accepted
+    assert c.set_y_range(12.60, 12.55) is False
+    assert c.set_y_range("x", 1.0) is False
+    assert c.is_y_range_fixed() == (12.55, 12.60)
+    c.clear_y_range()
+    assert c.is_y_range_fixed() is None
+
+
+def test_a_click_on_a_point_selects_it_and_on_air_asks_for_the_big_view():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    picked, enlarged = [], []
+    c.point_clicked.connect(picked.append)
+    c.enlarge_requested.connect(lambda: enlarged.append(True))
+    p = c._points[10]
+    c._on_scene_click(QPointF(c._map_x(p["mjd"]), c._map_y(p["mag"])))
+    assert picked == [10] and c.selected() == [10]
+    assert enlarged == []
+    # a click far from every point asks for the big view instead
+    c._on_scene_click(QPointF(-_HALF + 1.0, -_HALF + 1.0))
+    assert enlarged == [True]
+    # and clicking the same point again unselects it
+    c._on_scene_click(QPointF(c._map_x(p["mjd"]), c._map_y(p["mag"])))
+    assert c.selected() == []
+
+
+def test_excluded_points_are_never_hidden():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    c.set_excluded([3, 4])
+    assert c.excluded() == [3, 4]
+    # they stay in the chart's data: an exclusion is a decision, not a
+    # deletion (ADR-048, T7)
+    assert len(c._points) == 60
+    c.set_excluded([])
+    assert c.excluded() == []
+
+
+def test_binning_and_mean_curve_are_presentation_only():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    c.set_bin_mode("frames", 5)
+    series = [{"mjd": p["mjd"], "mag": p["mag"]}
+              for p in c._points]
+    binned = c._binned(list(enumerate(c._points)))
+    assert len(binned) == 12               # 60 points / 5 per bin
+    assert binned[0]["n"] == 5
+    # the mean of a group is the mean of its members
+    assert binned[0]["mag"] == pytest.approx(
+        float(np.mean([p["mag"] for p in c._points[:5]])))
+    smooth = c._moving_average(series)
+    assert len(smooth) == len(series)
+    # the moving average is smoother than the curve itself
+    raw = np.array([p["mag"] for p in c._points])
+    sm = np.array([m for _t, m in smooth])
+    assert sm.std() < raw.std()
+    c.set_bin_mode("minutes", 2)
+    assert c._bin_mode == "minutes"
+    c.set_bin_mode("nonsense")
+    assert c._bin_mode == "off"
+
+
+def test_the_hit_test_respects_the_exclusion():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    p = c._points[7]
+    x, y = c._map_x(p["mjd"]), c._map_y(p["mag"])
+    assert c.point_at(x, y) == 7
+    c.set_excluded([7])
+    assert c.point_at(x, y) is None

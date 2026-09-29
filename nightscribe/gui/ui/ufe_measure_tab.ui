@@ -373,6 +373,16 @@
             </widget>
            </item>
            <item>
+            <widget class="QPushButton" name="btn_series_sci">
+             <property name="toolTip">
+              <string>Write the scientific figure of this curve: white background, black frame, ticks pointing inwards, error bars with caps and the magnitude axis on round numbers (the style a report or a colleague expects). It is the same data as the panel, drawn for paper</string>
+             </property>
+             <property name="text">
+              <string>Scientific chart (PNG)…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QPushButton" name="btn_series_phase">
              <property name="toolTip">
               <string>Search the project's curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say</string>
@@ -435,10 +445,34 @@
        <layout class="QHBoxLayout" name="row_series_chart">
         <item><widget class="QLabel" name="lbl_series_scale"><property name="text"><string>Scale:</string></property></widget></item>
         <item><widget class="QPushButton" name="btn_series_robust"><property name="text"><string>Robust</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>The magnitude axis follows the CORE of the curve (median ± 6 robust sigmas) instead of the minimum and maximum, so one anomalous point cannot flatten the rest. Off shows the whole spread; the points outside stay on the chart, anchored to the edge</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_fixaxis"><property name="text"><string>Fix range</string></property><property name="checkable"><bool>true</bool></property><property name="toolTip"><string>Fix the magnitude axis by hand so a hundredth of a magnitude is visible: a 2 to 14 scale hides everything a variable star does. The wheel keeps zooming and dragging keeps panning without touching this</string></property></widget></item>
+        <item><widget class="QDoubleSpinBox" name="spn_series_maglo"><property name="toolTip"><string>Brightest magnitude of the fixed axis (the top of the chart)</string></property><property name="decimals"><number>3</number></property><property name="minimum"><double>-100.0</double></property><property name="maximum"><double>100.0</double></property><property name="singleStep"><double>0.01</double></property><property name="keyboardTracking"><bool>false</bool></property></widget></item>
+        <item><widget class="QDoubleSpinBox" name="spn_series_maghi"><property name="toolTip"><string>Faintest magnitude of the fixed axis (the bottom of the chart)</string></property><property name="decimals"><number>3</number></property><property name="minimum"><double>-100.0</double></property><property name="maximum"><double>100.0</double></property><property name="singleStep"><double>0.01</double></property><property name="keyboardTracking"><bool>false</bool></property></widget></item>
         <item><widget class="QPushButton" name="btn_series_zoomfit"><property name="text"><string>Fit</string></property><property name="toolTip"><string>Fit the chart to the panel again after zooming and panning (the wheel zooms, the left button drags)</string></property></widget></item>
         <item><widget class="QPushButton" name="btn_series_errors"><property name="text"><string>Errors</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Draw each point's own photon error and the calibration band. The zero-point systematic belongs to the whole night, so it is drawn as a band, never as a bar per point; off is for judging the shape of a small-amplitude curve</string></property></widget></item>
         <item><widget class="QPushButton" name="btn_series_hideflags"><property name="text"><string>Hide flagged</string></property><property name="checkable"><bool>true</bool></property><property name="toolTip"><string>Hide the points whose DATA is in doubt (saturated, cosmic ray, focus, cloud, unaligned) to judge the clean curve. A flag marks and never deletes, so hiding is an explicit act, and the calibration caveats (few comps) stay visible</string></property></widget></item>
         <item><spacer name="hsp_series_chart"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_series_chart2">
+        <item><widget class="QLabel" name="lbl_series_bin"><property name="text"><string>Plot binning:</string></property></widget></item>
+        <item><widget class="QComboBox" name="cmb_series_bin"><property name="toolTip"><string>Groups the POINTS on the chart, a presentation choice separate from the engine's frame grouping: none draws one point per frame; «every N frames» or «every N minutes» draws the mean with its error, and the raw points stay behind, faded</string></property></widget></item>
+        <item><widget class="QSpinBox" name="spn_series_binn"><property name="toolTip"><string>How many frames, or how many minutes, per plotted point</string></property><property name="minimum"><number>1</number></property><property name="maximum"><number>500</number></property><property name="value"><number>5</number></property></widget></item>
+        <item><widget class="QCheckBox" name="chk_series_mean"><property name="text"><string>Mean curve</string></property><property name="toolTip"><string>Overlay a moving average of the plotted points: the shape of a small-amplitude curve without the noise. It is a guide for the eye, never a measurement</string></property></widget></item>
+        <item><widget class="QSpinBox" name="spn_series_meanwin"><property name="toolTip"><string>Window of the moving average, in plotted points</string></property><property name="minimum"><number>2</number></property><property name="maximum"><number>101</number></property><property name="value"><number>7</number></property></widget></item>
+        <item><spacer name="hsp_series_chart2"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_series_chart3">
+        <item><widget class="QCheckBox" name="chk_series_outliers"><property name="text"><string>Mark outliers</string></property><property name="toolTip"><string>Marks the points that separate from their neighbours by more than the given number of robust sigmas (the scatter is measured on the residual against a local median, so the curve's own shape is never an outlier). The candidates are drawn in red; excluding them is a separate, explicit decision</string></property></widget></item>
+        <item><widget class="QDoubleSpinBox" name="spn_series_outsigma"><property name="toolTip"><string>Threshold in robust sigmas: 4.5 marks only the wild ones, 3.0 also catches the suspicious</string></property><property name="minimum"><double>2.0</double></property><property name="maximum"><double>10.0</double></property><property name="decimals"><number>1</number></property><property name="value"><double>4.5</double></property><property name="singleStep"><double>0.5</double></property><property name="keyboardTracking"><bool>false</bool></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_exclout"><property name="text"><string>Exclude marked</string></property><property name="toolTip"><string>Excludes every marked outlier from the curve and from the file. The point is never deleted: it is flagged as excluded by hand and can be restored</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_exclsel"><property name="text"><string>Exclude selected</string></property><property name="toolTip"><string>Excludes the points you selected by clicking them on the chart</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_restore"><property name="text"><string>Restore all</string></property><property name="toolTip"><string>Puts every hand-excluded point back on the curve</string></property></widget></item>
+        <item><widget class="QLabel" name="lbl_series_selection"><property name="text"><string/></property><property name="minimumSize"><size><width>180</width><height>0</height></size></property></widget></item>
+        <item><spacer name="hsp_series_chart3"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
        </layout>
       </item>
       <item>

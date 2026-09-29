@@ -206,7 +206,7 @@ def list_points(db, project_id, filter_name=None):
     #          was measured on, or None; mag_raw/flags/run_id carry the
     #          series data when the point came from one, ADR-048)
     col = ("id, project_id, session_id, mjd, filter, mag, err, source,"
-           " file_id, mag_raw, flags, run_id")
+           " file_id, mag_raw, flags, run_id, err_internal")
     if filter_name:
         rows = db.execute(
             f"SELECT {col} FROM photometry_points WHERE project_id=?"
@@ -228,7 +228,8 @@ def _point_dict(row):
     return {"id": row[0], "project_id": row[1], "session_id": row[2],
             "mjd": row[3], "filter": row[4], "mag": row[5], "err": row[6],
             "source": row[7], "file_id": row[8], "mag_raw": row[9],
-            "flags": _flags_in(row[10]), "run_id": row[11]}
+            "flags": _flags_in(row[10]), "run_id": row[11],
+            "err_internal": row[12] if len(row) > 12 else None}
 
 
 def _flags_in(raw):
@@ -249,8 +250,8 @@ def point_by_id(db, point_id):
     # @return: point dict (as list_points), or None
     row = db.execute(
         "SELECT id, project_id, session_id, mjd, filter, mag, err,"
-        " source, file_id, mag_raw, flags, run_id FROM photometry_points"
-        " WHERE id=?", (point_id,)).fetchone()
+        " source, file_id, mag_raw, flags, run_id, err_internal"
+        " FROM photometry_points WHERE id=?", (point_id,)).fetchone()
     return _point_dict(row) if row else None
 
 
@@ -281,7 +282,10 @@ def add_points(db, rows):
     # Batch write of series points (ADR-048, D9/D18): one transaction for
     # a whole run. Each row is a dict with project_id, session_id, mjd,
     # filter, mag, err, source, file_id, mag_raw, flags, run_id; missing
-    # keys become NULL (the legacy single-point contract is unchanged).
+    # keys become NULL (the legacy single-point contract is unchanged);
+    # err_internal is the point's OWN photon error, apart from the
+    # calibration systematic that `err` (the total) carries (quality plan,
+    # phase A).
     # @return: the list of new point ids
     ids = []
     for r in rows:
@@ -290,12 +294,14 @@ def add_points(db, rows):
             flags = json.dumps(list(flags), ensure_ascii=False)
         cur = db.execute(
             "INSERT INTO photometry_points (project_id, session_id, mjd,"
-            " filter, mag, err, source, file_id, mag_raw, flags, run_id)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " filter, mag, err, source, file_id, mag_raw, flags, run_id,"
+            " err_internal)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (r.get("project_id"), r.get("session_id"), r.get("mjd"),
              r.get("filter"), r.get("mag"), r.get("err"),
              r.get("source") or "measure", r.get("file_id"),
-             r.get("mag_raw"), flags, r.get("run_id")))
+             r.get("mag_raw"), flags, r.get("run_id"),
+             r.get("err_internal")))
         ids.append(cur.lastrowid)
     db.commit()
     return ids
@@ -305,8 +311,9 @@ def list_points_for_run(db, run_id):
     # @return: the points of one run, mjd-ordered
     rows = db.execute(
         "SELECT id, project_id, session_id, mjd, filter, mag, err, source,"
-        " file_id, mag_raw, flags, run_id FROM photometry_points"
-        " WHERE run_id=? ORDER BY mjd", (run_id,)).fetchall()
+        " file_id, mag_raw, flags, run_id, err_internal"
+        " FROM photometry_points WHERE run_id=? ORDER BY mjd",
+        (run_id,)).fetchall()
     return [_point_dict(r) for r in rows]
 
 

@@ -85,8 +85,13 @@ def draw_phase(mags, found=None, out=None, fmt="instagram",
     t = np.asarray([p["mjd"] for p in pts], dtype=float)
     y = np.asarray([p["mag"] for p in pts], dtype=float)
     dy = None
-    if any(p.get("err") for p in pts):
-        dy = np.asarray([p.get("err") or 0.0 for p in pts], dtype=float)
+    if any(p.get("err_internal") or p.get("err") for p in pts):
+        # the point's OWN error when the CCD equation could be evaluated;
+        # the total (which is mostly the night's calibration systematic)
+        # as the fallback, and then the bars are dropped if they are
+        # wider than the plot can carry (see below)
+        dy = np.asarray([p.get("err_internal") or p.get("err") or 0.0
+                         for p in pts], dtype=float)
         dy = np.where(dy > 0.0, dy, np.nan)
     err_ok = dy is not None and bool(np.any(np.isfinite(dy)))
     fig = plt.figure()

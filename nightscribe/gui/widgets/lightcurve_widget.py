@@ -23,6 +23,9 @@ The data comes from `core/followup.list_points`; the template from
 (`viz/lightcurve_view.py`) share the same data model so they can never drift.
 """
 
+import logging
+import math
+
 from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import (QBrush, QColor, QPen, QFont, QPolygonF)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout,
@@ -30,12 +33,15 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout,
                                 QGraphicsPolygonItem, QGraphicsRectItem,
                                 QGraphicsSimpleTextItem)
 
+import numpy as np
+
 from ...core import sn_templates
 from ...viz import palette
 from .base_chart import ChartView
 
 # Scene z-order (higher = drawn on top)
 _Z_GRID = 0.0
+_Z_SYSTEM = 0.5
 _Z_TEMPLATE = 1.0
 _Z_LINK = 1.5
 _Z_DATA = 2.0
@@ -49,6 +55,19 @@ _FONT_LABEL = 22
 # Scene half-extent: the data area is always this wide/tall, independent of
 # the data's actual span. The mapping scales the data into this box.
 _HALF = 500.0
+
+# Robust window (quality plan, phase A): the magnitude scale is set by the
+# CORE of the data (median ± K robust sigmas), never by min/max, so one
+# anomalous frame or one badly calibrated night cannot flatten the curve
+# into a line. The points outside stay on the chart, anchored to the edge.
+_ROBUST_K = 6.0
+_MIN_WINDOW = 0.05          # mag: never a degenerate window
+_PAD = 0.10                 # 10 % of the window as air
+
+# A bar taller than this share of the half-height carries no information at
+# the plot's scale (a bad calibration says so in the legend, not by
+# painting over everything) and is clipped.
+_BAR_CLIP = 0.12
 
 
 def _series_style(src_class):
@@ -86,6 +105,48 @@ def _point_style(p):
 # drawn as a hollow diamond, never hidden (ADR-048, T7).
 FLAG_COLOUR = "#e0a030"
 
+# Not every flag means the same thing. A DATA flag says the point itself is
+# suspect (the star saturated, a cosmic ray, the focus blew up, the frame
+# could not be aligned); a CAVEAT flag says the point is fine but its
+# calibration leans on few comparison stars. The chart marks the first with
+# the hollow diamond and the second with a faint edge, so a series with a
+# thin comp set does not read as a series with 200 bad points.
+DATA_FLAGS = ("unusable", "saturated", "nonlinear", "cosmic", "cloud",
+              "seeing", "align_failed", "align_edge", "guide_jump")
+CAVEAT_FLAGS = ("few_comps", "neighbour_zp", "no_zp")
+
+
+def _fmt_tick(value, span):
+    # A tick label with as many decimals as the span needs (quality plan,
+    # A1): on a 0.12 mag night "12.5" five times is noise, "12.53" is a
+    # reading, and the same for the MJD axis.
+    # @args: value - the tick value, span - the axis span
+    # @return: the formatted label
+    span = abs(float(span)) if span else 0.0
+    decimals = 3
+    if span <= 0.0:
+        decimals = 3
+    elif span >= 100.0:
+        decimals = 0
+    elif span >= 10.0:
+        decimals = 1
+    elif span >= 1.0:
+        decimals = 2
+    elif span < 0.01:
+        decimals = 4
+    return f"{value:.{decimals}f}"
+
+
+def _flags_split(flags):
+    # @args: flags - the point's flag list
+    # @return: (data_flags, caveat_flags)
+    if not flags:
+        return [], []
+    data = [f for f in flags if f in DATA_FLAGS]
+    caveat = [f for f in flags if f in CAVEAT_FLAGS]
+    other = [f for f in flags if f not in DATA_FLAGS and f not in CAVEAT_FLAGS]
+    return data + other, caveat
+
 # Distinct colours per filter (matching the PNG export)
 _FILTER_COLOURS = {
     "Clear": palette.ACCENT, "None": palette.ACCENT,
@@ -113,6 +174,13 @@ class LightCurveChart(ChartView):
         self._bounds = None   # (x_min, x_max, mag_min, mag_max)
         self._tpl_visible = True   # template overlay: ON by default
         self._link = True          # series linking lines: ON by default
+        # quality plan, phase A: the scale is robust by default, the bars
+        # are the point's OWN error (the systematic goes to a band) and
+        # the flagged points stay visible unless the observer hides them
+        self._robust = True
+        self._show_errors = True
+        self._hide_flagged = False
+        self._clip_note = 0        # bars clipped by _BAR_CLIP on this draw
         self.set_hover_probe(self._probe)
 
     def mouseDoubleClickEvent(self, event):
@@ -165,6 +233,52 @@ class LightCurveChart(ChartView):
         self._build_scene()
         self.fit_to_scene()
 
+    def set_robust(self, on):
+        # @args: on - the magnitude window follows the CORE of the data
+        #        (median ± K robust sigmas) instead of min/max, so an
+        #        anomalous point cannot flatten the curve. Off shows the
+        #        whole spread.
+        self._robust = bool(on)
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
+
+    def is_robust(self):
+        # @return: whether the magnitude scale is robust
+        return self._robust
+
+    def set_errors_visible(self, on):
+        # @args: on - draw the points' own error bars and the calibration
+        #        band. Off is for judging the SHAPE of a small-amplitude
+        #        curve without the bars in the way.
+        self._show_errors = bool(on)
+        self._build_scene()
+        self.fit_to_scene()
+
+    def is_errors_visible(self):
+        # @return: whether the error bars are drawn
+        return self._show_errors
+
+    def set_hide_flagged(self, on):
+        # @args: on - hide the flagged points to judge the clean curve.
+        #        The default is to SHOW them: a flag marks and never
+        #        deletes (ADR-048, T7), so hiding is an explicit act.
+        self._hide_flagged = bool(on)
+        self._compute_bounds()
+        self._build_scene()
+        self.fit_to_scene()
+
+    def is_hiding_flagged(self):
+        # @return: whether the flagged points are hidden
+        return self._hide_flagged
+
+    def n_flagged(self):
+        # @return: (data flags, calibration caveats) counts
+        data = sum(1 for p in self._points if _flags_split(p.get("flags"))[0])
+        caveat = sum(1 for p in self._points
+                     if _flags_split(p.get("flags"))[1])
+        return data, caveat
+
     def set_data(self, points, sn_type=None, peak_mjd=None, peak_mag=None,
                  fold_period_d=None, epoch_mjd=None, schematic=None):
         # @args: points - list of {mjd, mag, err, filter, source} dicts,
@@ -203,24 +317,57 @@ class LightCurveChart(ChartView):
         return (p["mjd"],)
 
     def _compute_bounds(self):
-        # Finds the data extent (x and mag) for the scene mapping. Falls
-        # back to a small default if there's no data.
+        # Finds the data extent (x and mag) for the scene mapping. The
+        # magnitude window is the data's CORE (median ± K robust sigmas)
+        # when the scale is robust, so an anomalous point cannot set it;
+        # otherwise the plain min/max. Falls back to a small default if
+        # there's no data.
         if not self._points:
             self._bounds = (0, 1, 10, 20)
             return
-        mags = [p["mag"] for p in self._points]
+        mags = [p["mag"] for p in self._points if p["mag"] is not None]
         if self._schematic:
             mags += [m for _ph, m in self._schematic]
-        if self._fold_p:
-            self._bounds = (0.0, 2.0, min(mags), max(mags))
+        if not mags:
+            self._bounds = (0, 1, 10, 20)
             return
-        mjds = [p["mjd"] for p in self._points]
-        self._bounds = (min(mjds), max(mjds), min(mags), max(mags))
+        lo, hi = self._mag_window(mags)
+        if self._fold_p:
+            self._bounds = (0.0, 2.0, lo, hi)
+            return
+        mjds = [p["mjd"] for p in self._points if p["mjd"] is not None]
+        self._bounds = (min(mjds), max(mjds), lo, hi)
         # auto-peak: brightest point (lowest mag)
         if self._peak_mjd is None or self._peak_mag is None:
-            brightest = min(self._points, key=lambda p: p["mag"])
+            brightest = min((p for p in self._points
+                             if p["mag"] is not None),
+                            key=lambda p: p["mag"])
             self._peak_mjd = self._peak_mjd or brightest["mjd"]
             self._peak_mag = self._peak_mag or brightest["mag"]
+
+    def _mag_window(self, mags):
+        # The magnitude window of the chart (quality plan, A1).
+        # @args: mags - the finite magnitudes on the chart
+        # @return: (lo, hi) of the window, padded
+        vals = np.asarray(mags, dtype=float)
+        if not self._robust:
+            lo, hi = float(vals.min()), float(vals.max())
+        else:
+            med = float(np.median(vals))
+            mad = 1.4826 * float(np.median(np.abs(vals - med)))
+            if mad > 0.0:
+                lo, hi = med - _ROBUST_K * mad, med + _ROBUST_K * mad
+                # the core is intersected with the data: a robust window
+                # cannot be WIDER than the curve itself
+                lo = max(lo, float(vals.min()))
+                hi = min(hi, float(vals.max()))
+            else:
+                lo, hi = float(vals.min()), float(vals.max())
+        if hi - lo < _MIN_WINDOW:
+            centre = 0.5 * (lo + hi)
+            lo, hi = centre - _MIN_WINDOW / 2.0, centre + _MIN_WINDOW / 2.0
+        pad = (hi - lo) * _PAD
+        return lo - pad, hi + pad
 
     def _map_x(self, mjd):
         # @args: mjd - float
@@ -286,41 +433,162 @@ class LightCurveChart(ChartView):
                 line.setZValue(_Z_TEMPLATE)
                 self.add_item(line)
             has_overlay = True
-        # data points (drawn twice in fold mode: cycle 0 and cycle 1)
-        flagged_seen = False
+        # data points (drawn twice in fold mode: cycle 0 and cycle 1), the
+        # flagged ones as hollow diamonds, the bars clipped and the
+        # calibration systematic as a band (quality plan, phase A)
+        flagged_seen, caveat_seen, syst, syst_all = self._draw_points()
+        # legend: one entry per (filter, source) series the data has
+        self._add_legend(has_overlay, flagged_seen, syst, caveat_seen,
+                         syst_all)
+
+    def _systematic(self, p):
+        # The part of a point's error that is NOT its own photons: the
+        # zero point and the flat (quality plan, A3). It is common to the
+        # whole night, so drawing it as N giant bars hides the curve
+        # instead of informing; the chart puts it in a band.
+        # @args: p - a photometry point dict
+        # @return: the systematic sigma in mag, or None
+        total = p.get("err")
+        inner = p.get("err_internal")
+        if total is None:
+            return None
+        if inner is None:
+            return float(total)
+        var = float(total) ** 2 - float(inner) ** 2
+        return math.sqrt(var) if var > 0.0 else 0.0
+
+    def _bar_error(self, p):
+        # The half-height of the point's bar: its OWN error when the CCD
+        # equation could be evaluated, else the total (clipped by the
+        # caller).
+        # @args: p - a photometry point dict
+        # @return: sigma in mag, or None
+        if p.get("err_internal") is not None:
+            return float(p["err_internal"])
+        return None if p.get("err") is None else float(p["err"])
+
+    def _draw_systematic_bands(self):
+        # One translucent band per series, centred on the series' median
+        # magnitude and as tall as its systematic: the honest way to show
+        # "your calibration is worth ±0.17" without 244 giant bars.
+        # A band taller than half the window would fill the panel and hide
+        # the very curve it belongs to, so it is NOT drawn: the legend
+        # says the number instead, which is the useful part.
+        # @return: (tallest_drawn, largest_seen) in mag, either may be None
+        b = self._bounds
+        span = b[3] - b[2]
+        if span <= 0.0:
+            return None, None
+        by_series = {}
         for p in self._points:
+            if p.get("mag") is None:
+                continue
+            by_series.setdefault(
+                (p.get("filter"), p.get("source") or "manual"), []).append(p)
+        tallest, largest = None, None
+        for (_band, _src), pts in by_series.items():
+            syss = [self._systematic(p) for p in pts]
+            syss = [s for s in syss if s is not None]
+            if not syss:
+                continue
+            sys = float(np.median(syss))
+            if sys < 0.005:                    # nothing worth a band
+                continue
+            largest = sys if largest is None else max(largest, sys)
+            if sys > span / 2.0:
+                continue
+            tallest = sys if tallest is None else max(tallest, sys)
+            ys = [self._map_y(p["mag"]) for p in pts]
+            top, bottom = min(ys), max(ys)
+            half = sys / span * 2 * _HALF
+            rect = QGraphicsRectItem(-_HALF, top - half, 2 * _HALF,
+                                      (bottom - top) + 2 * half)
+            fill = QColor(palette.MUTED)
+            fill.setAlpha(46)
+            rect.setBrush(QBrush(fill))
+            rect.setPen(QPen(Qt.NoPen))
+            rect.setZValue(_Z_SYSTEM)
+            self.add_item(rect)
+        return tallest, largest
+
+    def _draw_points(self):
+        # Every point of the curve: the ones with a DATA flag as hollow
+        # diamonds (never hidden, ADR-048 T7), the ones that only carry a
+        # calibration caveat with a faint amber edge, the rest plain, each
+        # with its own error bar clipped to the plot and anchored to the
+        # edge when it falls outside the robust window (A1/A3/A4).
+        # @return: (flagged_seen, caveat_seen, tallest, largest)
+        b = self._bounds
+        span = b[3] - b[2]
+        self._clip_note = 0
+        self._over_note = 0
+        tallest = largest = None
+        if self._show_errors and any(self._systematic(p) is not None
+                                     for p in self._points):
+            tallest, largest = self._draw_systematic_bands()
+        flagged_seen = caveat_seen = False
+        for p in self._points:
+            if p.get("mag") is None:
+                continue
+            data_flags, caveat = _flags_split(p.get("flags"))
+            flagged = bool(data_flags)
+            if flagged and self._hide_flagged:
+                continue
             for xv in self._xs(p):
                 x = self._map_x(xv)
                 y = self._map_y(p["mag"])
+                y_draw, off = (y, 0)
+                if y > _HALF:
+                    y_draw, off = _HALF - 10.0, 1
+                elif y < -_HALF:
+                    y_draw, off = -_HALF + 10.0, -1
+                if off:
+                    self._over_note += 1
                 colour, filled = _point_style(p)
                 r = 6.0
-                if p.get("flags"):
-                    # a flagged point keeps its place: a hollow diamond in
-                    # the quality colour, never hidden (ADR-048, T7)
+                if flagged:
                     poly = QPolygonF([
-                        QPointF(x, y - r), QPointF(x + r, y),
-                        QPointF(x, y + r), QPointF(x - r, y)])
+                        QPointF(x, y_draw - r), QPointF(x + r, y_draw),
+                        QPointF(x, y_draw + r), QPointF(x - r, y_draw)])
                     dot = QGraphicsPolygonItem(poly)
                     dot.setBrush(QBrush(QColor(palette.BG)))
                     dot.setPen(QPen(QColor(FLAG_COLOUR), 1.8))
                     flagged_seen = True
+                elif off:
+                    # outside the robust window: a small caret anchored to
+                    # the edge, so nothing disappears from the chart
+                    poly = QPolygonF([
+                        QPointF(x, y_draw + off * 10.0), QPointF(x - 7, y_draw),
+                        QPointF(x + 7, y_draw)])
+                    dot = QGraphicsPolygonItem(poly)
+                    dot.setBrush(QBrush(palette.DANGER))
+                    dot.setPen(QPen(QColor(palette.DANGER), 1.0))
                 else:
                     dot = QGraphicsEllipseItem(x - r, y - r, r * 2, r * 2)
                     dot.setBrush(QBrush(colour if filled
                                         else QColor(palette.BG)))
-                    dot.setPen(QPen(colour, 1.5))
+                    pen = QPen(colour, 1.5)
+                    if caveat:
+                        # a caveat, not a suspect point: the marker and a
+                        # faint amber edge, so the shape of the curve is
+                        # not drowned in warnings
+                        pen = QPen(QColor(FLAG_COLOUR), 1.0)
+                        caveat_seen = True
+                    dot.setPen(pen)
                 dot.setZValue(_Z_DATA)
                 self.add_item(dot)
-                # error bar
-                if p.get("err") is not None:
-                    ey = p["err"] / (b[3] - b[2]) * 2 * _HALF \
-                        if b[3] != b[2] else 0
-                    bar = QGraphicsLineItem(x, y - ey, x, y + ey)
+                err = self._bar_error(p) if self._show_errors else None
+                if err is not None and span > 0.0:
+                    ey = err / span * 2 * _HALF
+                    clip = _BAR_CLIP * 2 * _HALF
+                    if ey > clip:
+                        ey = clip
+                        self._clip_note += 1
+                    bar = QGraphicsLineItem(x, y_draw - ey, x, y_draw + ey)
                     bar.setPen(QPen(colour, 1.0))
                     bar.setZValue(_Z_ERROR)
                     self.add_item(bar)
-        # legend: one entry per (filter, source) series the data has
-        self._add_legend(has_overlay, flagged_seen)
+        return flagged_seen, caveat_seen, tallest, largest
 
     def _link_pen(self, source, band):
         # @args: source - the series' source, band - the series' filter
@@ -360,9 +628,13 @@ class LightCurveChart(ChartView):
                     line.setZValue(_Z_LINK)
                     self.add_item(line)
 
-    def _add_legend(self, has_template, flagged=False):
+    def _add_legend(self, has_template, flagged=False, systematic=None,
+                    caveat=False, systematic_all=None):
         # @args: has_template - whether the schematic overlay is drawn,
-        #        flagged - whether any point carries quality flags
+        #        flagged - whether any point carries a DATA flag,
+        #        systematic - the tallest calibration band drawn (mag),
+        #        caveat - whether any point leans on few comps,
+        #        systematic_all - the largest systematic seen, band or not
         # Draws a compact legend in the bottom-right of the data area
         # (same corner as sky_widget); entries mirror the PNG export so
         # the two renderers cannot disagree (B4).
@@ -375,6 +647,28 @@ class LightCurveChart(ChartView):
         if flagged:
             entries.append((self.tr("flagged (quality gate)"),
                             QColor(FLAG_COLOUR)))
+        if caveat:
+            entries.append((self.tr("few comps (calibration leans on few)"),
+                            QColor(FLAG_COLOUR)))
+        if self._hide_flagged:
+            entries.append((self.tr("flagged points hidden"),
+                            QColor(palette.MUTED)))
+        if systematic_all and not systematic:
+            # the systematic is wider than the window: draw nothing (it
+            # would fill the panel) and SAY it
+            entries.append((self.tr("calibration ±{0:.3f} (wider than this "
+                                    "window)").format(systematic_all),
+                            QColor(palette.MUTED)))
+        elif systematic:
+            entries.append((self.tr("calibration systematic ±{0:.3f}")
+                            .format(systematic), QColor(palette.MUTED)))
+        if self._clip_note:
+            entries.append((self.tr("{0} bars clipped (error ≫ scale)")
+                            .format(self._clip_note),
+                            QColor(palette.MUTED)))
+        if self._over_note:
+            entries.append((self.tr("{0} points off scale").format(
+                self._over_note), QColor(palette.DANGER)))
         # one entry per (band, source) series: human labels, so the
         # observer sees "Pasted data", "From file", "Survey · ALeRCE/ZTF"
         seen = set()
@@ -430,7 +724,13 @@ class LightCurveChart(ChartView):
 
     def _draw_grid(self):
         # Simple grid: a few date ticks on X, a few mag ticks on Y (inverted).
+        # The number of decimals follows the SPAN: a 0.12 mag night needs
+        # three of them, and the old fixed one decimal made every label
+        # read the same ("60297.8", "12.5") on a small-amplitude curve
+        # (quality plan, phase A).
         b = self._bounds
+        x_span = b[1] - b[0]
+        y_span = b[3] - b[2]
         pen = QPen(QColor(palette.MUTED), 0.8)
         pen.setStyle(Qt.DotLine)
         # X grid lines (5 divisions)
@@ -441,8 +741,8 @@ class LightCurveChart(ChartView):
             line.setZValue(_Z_GRID)
             self.add_item(line)
             # tick label (MJD, or phase 0..2 in fold mode)
-            xv = b[0] + (b[1] - b[0]) * i / 5
-            lbl = QGraphicsSimpleTextItem(f"{xv:.1f}")
+            xv = b[0] + x_span * i / 5
+            lbl = QGraphicsSimpleTextItem(_fmt_tick(xv, x_span))
             lbl.setPos(x - 20, _HALF + 10)
             lbl.setBrush(QBrush(QColor(palette.MUTED)))
             f = QFont(); f.setPointSize(_FONT_TICK)
@@ -456,9 +756,9 @@ class LightCurveChart(ChartView):
             line.setPen(pen)
             line.setZValue(_Z_GRID)
             self.add_item(line)
-            mag = b[2] + (b[3] - b[2]) * i / 4
-            lbl = QGraphicsSimpleTextItem(f"{mag:.1f}")
-            lbl.setPos(-_HALF - 50, y - 8)
+            mag = b[2] + y_span * i / 4
+            lbl = QGraphicsSimpleTextItem(_fmt_tick(mag, y_span))
+            lbl.setPos(-_HALF - 60, y - 8)
             lbl.setBrush(QBrush(QColor(palette.MUTED)))
             f = QFont(); f.setPointSize(_FONT_TICK)
             lbl.setFont(f)
@@ -473,6 +773,8 @@ class LightCurveChart(ChartView):
         best = None
         best_dist = 1e9
         for p in self._points:
+            if p.get("mag") is None:
+                continue
             for xv in self._xs(p):
                 dx = self._map_x(xv) - sx
                 dy = self._map_y(p["mag"]) - sy
@@ -494,6 +796,15 @@ class LightCurveChart(ChartView):
             lines.append(f"({self.source_label(best['source'])})")
         if best.get("err") is not None:
             lines.append(f"±{best['err']:.3f}")
+        if best.get("err_internal") is not None:
+            lines.append(self.tr("photons ±{0:.4f}").format(
+                best["err_internal"]))
+            sys_err = self._systematic(best)
+            if sys_err:
+                lines.append(self.tr("calibration ±{0:.3f}").format(
+                    sys_err))
+        if best.get("n_comps") is not None:
+            lines.append(self.tr("{0} comps").format(best["n_comps"]))
         if best.get("flags"):
             lines.append("⚠ " + ", ".join(best["flags"]))
         return True, lines

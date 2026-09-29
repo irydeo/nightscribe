@@ -387,6 +387,22 @@ def _migrate(conn):
                 "CREATE INDEX IF NOT EXISTS idx_photo_points_run"
                 " ON photometry_points(run_id)")
         conn.execute("PRAGMA user_version = 12")
+    if v < 13:
+        # Quality plan, phase A: a point now separates its own random
+        # error (the photons, the CCD equation) from the systematic one
+        # (the zero point, the flat). The total stays in `err`, which is
+        # what goes to AAVSO and to the CSV; `err_internal` is what a
+        # chart can draw as a bar without the night's calibration
+        # swamping every point.
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            if "err_internal" not in cols:
+                conn.execute("ALTER TABLE photometry_points ADD COLUMN"
+                             " err_internal REAL")
+        conn.execute("PRAGMA user_version = 13")
     conn.commit()
 
 
@@ -436,6 +452,10 @@ MIGRATION_NOTES = {
         "Photometric series: each point keeps its raw magnitude, its "
         "quality flags and the run it belongs to, so a bad run can be "
         "undone without touching the rest of the visit."),
+    13: QT_TRANSLATE_NOOP("NSMigrations",
+        "Each photometric point now keeps its own photon error apart from "
+        "the calibration systematic, so a light curve can be drawn (and "
+        "judged) without the night's zero point swamping it."),
 }
 
 

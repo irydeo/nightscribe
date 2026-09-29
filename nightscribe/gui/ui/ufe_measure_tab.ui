@@ -432,6 +432,16 @@
        </widget>
       </item>
       <item>
+       <layout class="QHBoxLayout" name="row_series_chart">
+        <item><widget class="QLabel" name="lbl_series_scale"><property name="text"><string>Scale:</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_robust"><property name="text"><string>Robust</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>The magnitude axis follows the CORE of the curve (median ± 6 robust sigmas) instead of the minimum and maximum, so one anomalous point cannot flatten the rest. Off shows the whole spread; the points outside stay on the chart, anchored to the edge</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_zoomfit"><property name="text"><string>Fit</string></property><property name="toolTip"><string>Fit the chart to the panel again after zooming and panning (the wheel zooms, the left button drags)</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_errors"><property name="text"><string>Errors</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Draw each point's own photon error and the calibration band. The zero-point systematic belongs to the whole night, so it is drawn as a band, never as a bar per point; off is for judging the shape of a small-amplitude curve</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_hideflags"><property name="text"><string>Hide flagged</string></property><property name="checkable"><bool>true</bool></property><property name="toolTip"><string>Hide the points whose DATA is in doubt (saturated, cosmic ray, focus, cloud, unaligned) to judge the clean curve. A flag marks and never deletes, so hiding is an explicit act, and the calibration caveats (few comps) stay visible</string></property></widget></item>
+        <item><spacer name="hsp_series_chart"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+      <item>
        <widget class="QWidget" name="wgt_series_chart">
         <property name="minimumSize">
          <size>

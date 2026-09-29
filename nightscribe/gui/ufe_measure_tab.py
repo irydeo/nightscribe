@@ -246,6 +246,21 @@ class UfeMeasureTab(QWidget):
         self.chart_series.scene_clicked.connect(
             lambda _pt: self._on_series_enlarge())
         self.chart_series.enlarge_requested.connect(self._on_series_enlarge)
+        # the chart's own controls (quality plan, phase A): the magnitude
+        # scale is robust by default, the error bars are the point's own
+        # photons and the flagged points stay visible unless asked
+        self.btn_series_robust = self._ui.btn_series_robust
+        self.btn_series_robust.toggled.connect(
+            self.chart_series.set_robust)
+        self.btn_series_zoomfit = self._ui.btn_series_zoomfit
+        self.btn_series_zoomfit.clicked.connect(
+            self.chart_series.reset_view)
+        self.btn_series_errors = self._ui.btn_series_errors
+        self.btn_series_errors.toggled.connect(
+            self.chart_series.set_errors_visible)
+        self.btn_series_hideflags = self._ui.btn_series_hideflags
+        self.btn_series_hideflags.toggled.connect(
+            self.chart_series.set_hide_flagged)
         drop_in(self.grp_series.layout(), self._ui.wgt_series_chart,
                 self.chart_series)
         self._series_payload = []    # last drawn points, for the big view
@@ -1182,7 +1197,8 @@ class UfeMeasureTab(QWidget):
             if p.mjd is None:
                 continue
             rows.append({"mjd": p.mjd, "filter": p.filter, "mag": p.mag,
-                         "err": p.err, "mag_raw": p.inst, "path": p.path,
+                         "err": p.err, "err_internal": p.err_internal,
+                         "mag_raw": p.inst, "path": p.path,
                          "flags": list(p.flags), "source": "measure"})
         return rows
 

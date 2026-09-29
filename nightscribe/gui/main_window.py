@@ -806,7 +806,7 @@ class MainWindow(QMainWindow):
             fw = cameras.full_well_adu(p, config.get("ccd_gain"))
             if fw:
                 bits.append(self.tr("full well ≈ {0:.0f} ADU at your gain")
-                            .replace("{0}", f"{fw:.0f}"))
+                            .format(fw))
             if p.get("linearity_note"):
                 bits.append(p["linearity_note"])
         dlg.lbl_cam_ref.setText(" · ".join(bits))
@@ -820,11 +820,9 @@ class MainWindow(QMainWindow):
         gain = dlg.spn_cam_gain.value() or None
         ron = dlg.spn_cam_ron.value() or None
         if gain:
-            bits = [self.tr("gain {0:.3g} e-/ADU").replace(
-                "{0}", f"{gain:.3g}")]
+            bits = [self.tr("gain {0:.3g} e-/ADU").format(gain)]
             if ron:
-                bits.append(self.tr("read noise {0:.3g} e-").replace(
-                    "{0}", f"{ron:.3g}"))
+                bits.append(self.tr("read noise {0:.3g} e-").format(ron))
             bits.append(self.tr(
                 "the error bar is the CCD equation"))
             dlg.lbl_cam_gain_note.setText(" · ".join(bits))

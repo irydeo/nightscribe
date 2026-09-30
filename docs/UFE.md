@@ -103,11 +103,16 @@ Builds the photometric sequence on your plate (a WCS is needed; if it
 is missing, the configured solver gets you one, ASTAP or nova):
 
 With the visit open, the left panel also carries the **frame navigator**
-(previous/next, `frame i/N`, "first frame": the open frame is the reference),
-**Solve the visit...** and, in transit projects, the **EXOTIC** reduction
-buttons. The project's saved sequence loads by itself when the visit opens.
+(previous/next, `frame i/N`, "first frame": the open frame is the reference)
+and, in transit projects, the **EXOTIC** reduction buttons. The project's
+saved sequence loads by itself when the visit opens.
 
-**Solve the visit's astrometry...** is preparation, not measurement: it
+The **top bar** carries the two astrometries together, side by side: **Solve
+astrometry...** (this plate) and **Solve the visit...** (every frame of the
+visit in one go). The pair explains itself: the first solves the plate in
+front of you, the second the whole night's field.
+
+**Solve the visit...** is preparation, not measurement: it
 solves every frame of the visit in one go, and what needs it are the visit's
 **products** (the astrometry report and the EXOTIC reduction of a transit),
 not the series, which measures on the reference plate and registers the rest.

@@ -461,6 +461,15 @@ class UfeDialog(QDialog):
             lambda checked: self.view.set_object_mark_visible(checked))
         self.btn_solve = self._ui.btn_solve
         self.btn_solve.clicked.connect(self._on_solve)
+        # "Solve the visit…": the same action one level up (EVERY frame of
+        # the visit, not this plate), so it lives next to it. It is what the
+        # visit's PRODUCTS need (the astrometry report and EXOTIC), not the
+        # series, and it only appears when the visit has frames: in a bar
+        # that is always visible, that means it is not there without a visit
+        self.btn_solve_visit = self._ui.btn_solve_visit
+        self.btn_solve_visit.clicked.connect(self._on_solve_visit)
+        # the .ui owns the wording; the disabled case needs its own reason
+        self._visit_solve_tip = self.btn_solve_visit.toolTip()
         # ADR-044 rev (2026-09-24): the toggles' _on/_off glyphs follow
         # the checked state (icons-only mode)
         for name, base in (("btn_north", "ufe_north"),
@@ -932,9 +941,6 @@ class UfeDialog(QDialog):
         vp.btn_frame_next.clicked.connect(
             lambda: self._goto_frame(self._frame_index + 1))
         vp.btn_frame_first.clicked.connect(self._frame_first)
-        vp.btn_solve_visit.clicked.connect(self._on_solve_visit)
-        # the .ui owns the wording; the disabled case needs its own reason
-        self._visit_solve_tip = vp.btn_solve_visit.toolTip()
         vp.btn_exotic_reduce.clicked.connect(self._notify_exotic_reduce)
         vp.btn_exotic_export.clicked.connect(self._notify_exotic_export)
         self.tab_compare.sequence_changed.connect(self._sync_exotic_block)
@@ -984,9 +990,11 @@ class UfeDialog(QDialog):
         # WHAT IT IS FOR (asked: "el botón 'Solve the visit' no entiendo qué
         # hace ahí"): it solves the astrometry of every frame of the visit in
         # one go, which is what the visit's PRODUCTS need: the MPC report
-        # (in the visit's window) and the EXOTIC reduction of a transit (the
-        # block right below). The series does NOT need it: it measures on
-        # the reference plate and registers the rest.
+        # (in the visit's window) and the EXOTIC reduction of a transit. The
+        # series does NOT need it: it measures on the reference plate and
+        # registers the rest. It lives in the TOP BAR now, next to "Solve
+        # astrometry…" (this plate): the pair explains itself, which is what
+        # was missing when it sat alone in the measurement panel.
         #
         # With no frames there is nothing to solve, so the button is not
         # even shown (a disabled button that explains nothing is how a door
@@ -994,7 +1002,7 @@ class UfeDialog(QDialog):
         # visible and DISABLED, saying why: a batch of 35 solutions in
         # memory only would die with the session (ADR-051).
         # @return: None
-        btn = getattr(self.visit_panel, "btn_solve_visit", None)
+        btn = getattr(self, "btn_solve_visit", None)
         if btn is None:
             return
         from ..config import config

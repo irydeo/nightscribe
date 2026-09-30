@@ -815,7 +815,7 @@ def test_the_visit_solve_button_needs_frames_and_the_write_option(
     # the FITS" off, the 35 solutions would die with the session, so the
     # button says why instead of doing a useless job.
     from nightscribe.config import config
-    btn = dlg.visit_panel.btn_solve_visit
+    btn = dlg.btn_solve_visit                 # in the top bar, with Solve
     _visit(dlg, [])
     assert not btn.isEnabled()
     # and with nothing to solve it is not even shown: it is prep for the

@@ -403,19 +403,24 @@ def test_the_status_line_re_elides_on_resize_without_looping():
 
 def test_the_bar_keeps_the_daily_actions_and_opens_two_doors():
     # Eighteen items in the bar is a cockpit. What a visit needs is open,
-    # export, solve, the two zooms that are used all the time, the current
-    # factor and the page switch; the VIEW switches (they are states, not
-    # actions) and the occasional zoom factors live behind one door each.
+    # export, solve (this plate), solve the visit (all its frames, next to
+    # it: the pair explains itself), the two zooms that are used all the
+    # time, the current factor and the page switch; the VIEW switches (they
+    # are states, not actions) and the occasional zoom factors live behind
+    # one door each.
     _app()
     d = _dialog(1400, 800, _OBJECT)
     bar = d._ui.topbar
     visible = [bar.itemAt(i).widget() for i in range(bar.count())
                if bar.itemAt(i).widget() is not None]
     names = [w.objectName() for w in visible]
-    assert len(names) <= 10, names
-    for must in ("btn_load", "btn_export", "btn_solve", "btn_zoom_fit",
+    assert len(names) <= 11, names
+    for must in ("btn_load", "btn_export", "btn_solve", "btn_solve_visit",
+                 "btn_zoom_fit",
                  "btn_zoom_100", "btn_view", "btn_zoom_more", "lbl_zoom"):
         assert must in names, must
+    # the two solve actions are side by side, and the visit one comes after
+    assert names.index("btn_solve_visit") == names.index("btn_solve") + 1
     d.close()
 
 

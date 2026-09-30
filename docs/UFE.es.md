@@ -106,11 +106,15 @@ falta, la resuelve sola con el solver configurado, ASTAP o nova):
 
 Con la visita abierta, el panel izquierdo lleva además el **navegador de
 tomas** (anterior/siguiente, `toma i/N`, «primera toma»: la toma abierta es la
-referencia), **Resolver la visita…** y, en proyectos de tránsito, los botones de
-**reducción EXOTIC**. La secuencia ya guardada del proyecto se carga sola al
-abrir la visita.
+referencia) y, en proyectos de tránsito, los botones de **reducción EXOTIC**.
+La secuencia ya guardada del proyecto se carga sola al abrir la visita.
 
-**Resolver la astrometría de la visita…** es preparación, no medida: resuelve
+La **barra superior** lleva las dos astrometrías juntas, una al lado de la
+otra: **Resolver astrometría…** (esta placa) y **Resolver la visita…** (todas
+las tomas de la visita de una vez). El par se explica solo: la primera resuelve
+la placa que tienes delante, la segunda el campo entero de la noche.
+
+**Resolver la visita…** es preparación, no medida: resuelve
 de una vez todas las tomas de la visita, y lo que lo necesita son los
 **productos de la visita** (el informe de astrometría y la reducción EXOTIC de
 un tránsito), no la serie, que mide sobre la placa de referencia y registra el

@@ -88,7 +88,9 @@ def _register_children(root):
     # own name fallback: that fallback resolves a name to whatever object
     # carries it, and under a full test run it has handed back a
     # QWidgetItem (a LAYOUT ITEM, not a widget) for
-    # `visit_panel.ph_series` and `visit_panel.btn_solve_visit`, which
+    # `visit_panel.ph_series` and `visit_panel.btn_solve_visit` (that second
+    # one lives in the top bar since 2026-09-30, next to "Solve
+    # astrometry…"), which
     # crashed the dialog while it was being built ("'QWidgetItem' object has
     # no attribute 'clicked'") and fed `drop_in` the wrong kind of argument
     # (intermittent: not reproducible in 120 builds in a row, nor in

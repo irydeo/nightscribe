@@ -5752,7 +5752,13 @@ class MainWindow(QMainWindow):
         ref = ref or frame_paths[0]
         self.statusBar().showMessage(
             self.tr("The first frame has no WCS: solving it…"), 0)
-        worker = UfeSolveWorker(Path(ref))
+        # the project's own coordinates go with the solve: they are what
+        # keeps ASTAP from sweeping the sky (0.1 s against a minute)
+        proj = project.get(db, pid) or {}
+        ctx = proj.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        pointing = (ra, dec) if ra is not None and dec is not None else None
+        worker = UfeSolveWorker(Path(ref), pointing=pointing)
         # the same feedback as the editor (ADR-051 rev.): an indeterminate
         # dialog with a Cancel that kills the solver
         wait = QProgressDialog(

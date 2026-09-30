@@ -69,6 +69,10 @@ def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False):
         "args = sys.argv[1:]",
         "f = args[args.index('-f') + 1]",
         "Path(f + '.argv').write_text(repr(args))",
+        "Path(f + '.argvs').write_text("
+        "(Path(f + '.argvs').read_text() + repr(args) + chr(10)) "
+        "if Path(f + '.argvs').exists() "
+        "else (repr(args) + chr(10)))",
         "Path(f + '.runs').write_text(Path(f + '.runs').read_text() + 'x')"
         " if Path(f + '.runs').exists() else Path(f + '.runs').write_text('x')",
     ]
@@ -226,17 +230,15 @@ def test_dispatcher_auto_prefers_astap(tmp_path, monkeypatch):
 
 # ---------------- the speed fix: -ra in hours, -d, -progress, cancel ----
 
-def test_solve_passes_database_and_progress_but_no_ra_hint(tmp_path,
-                                                           monkeypatch):
-    # the header's RA units are ambiguous; a wrong -ra hint loops ASTAP
-    # ("Found 0 references"), so only the reliable -fov is passed
+def test_solve_passes_database_and_progress(tmp_path, monkeypatch):
+    # the star database and the progress stream go with every attempt; the
+    # pointing only when the app has one (see the pointing tests below)
     monkeypatch.setattr(astap, "db", _FakeCache())
     fits = _write_fits(tmp_path / "p.fits")
     script = _fake_astap(tmp_path, honor_o=True)
     monkeypatch.setattr(astap, "_database_path", lambda *a, **k: "/db")
     astap.solve(fits, astap_path=str(script))
     argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
-    assert "-ra" not in argv and "-spd" not in argv
     assert "-fov" in argv
     assert argv[argv.index("-d") + 1] == "/db"
     assert "-progress" in argv
@@ -334,3 +336,93 @@ def test_solve_falls_back_to_the_auto_field(tmp_path, monkeypatch):
     argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
     assert argv[argv.index("-fov") + 1] == "0"     # the auto retry ran
     assert Path(str(fits) + ".runs").read_text() == "xx"
+
+
+# ---------------- the pointing (ADR-051, the ASTAP loop) --------------
+# Measured on the real V0526 Per visit (a frame with FOCALLEN=0 and no
+# RA/DEC in the header): without a pointing ASTAP swept the whole sky for
+# 55.8 s, and the app's own path cost 66 s per frame (the first attempt was
+# cut at 30 s and the second restarted the sweep). With the project's
+# pointing and a search radius the same frame answered in 0.13 s. -ra/-spd
+# ALONE did nothing (56-65 s): the radius is what makes the hint bite.
+
+def test_the_pointing_goes_in_with_the_radius_astap_needs():
+    # -ra in hours, -spd the south-pole distance (90 + dec: a northern
+    # object gets a value above 90), -r the search radius in degrees
+    args = astap._pointing_args((49.99038, 49.86875))
+    assert args == ["-ra", "3.33269", "-spd", "139.86875", "-r", "5.000"]
+    # a southern field keeps it positive and below 90
+    south = astap._pointing_args((10.0, -30.0))
+    assert south[south.index("-spd") + 1] == "60.00000"
+    # nothing to say, nothing invented
+    assert astap._pointing_args(None) == []
+    assert astap._pointing_args(("x", None)) == []
+    assert astap._pointing_args((None, None)) == []
+
+
+def test_solve_points_astap_when_the_app_knows_the_field(tmp_path,
+                                                         monkeypatch):
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True)
+    cards = astap.solve(fits, astap_path=str(script),
+                        pointing=(49.99038, 49.86875))
+    assert cards and cards["CRVAL1"] == 31.3121
+    argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
+    assert argv[argv.index("-ra") + 1] == "3.33269"
+    assert argv[argv.index("-spd") + 1] == "139.86875"
+    assert argv[argv.index("-r") + 1] == "5.000"
+    # and it was the FIRST thing it tried: no sky sweep before it
+    assert Path(str(fits) + ".runs").read_text() == "x"
+
+
+def test_a_wrong_pointing_is_cheap_and_the_blind_path_still_solves(
+        tmp_path, monkeypatch):
+    # The first run (the pointed one) finds nothing: the blind attempts
+    # follow and solve. In the real binary a wrong pointing gives up by
+    # itself in ~0.28 s, so this order costs almost nothing.
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True, fail_first=True)
+    cards = astap.solve(fits, astap_path=str(script), pointing=(10.0, -30.0))
+    assert cards and cards["CRVAL1"] == 31.3121
+    runs = [ast.literal_eval(ln) for ln in
+            Path(str(fits) + ".argvs").read_text().splitlines()]
+    assert len(runs) >= 2
+    assert "-ra" in runs[0] and "-r" in runs[0]      # pointed first
+    assert "-ra" not in runs[-1]                      # blind last
+    assert Path(str(fits) + ".runs").read_text() == "xx"
+
+
+def test_without_a_pointing_no_hint_is_invented(tmp_path, monkeypatch):
+    # The header's own position is never used (OBJCTRA is hours, CRVAL1 is
+    # degrees: ambiguous), so an ad-hoc plate is solved blind, as before.
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True)
+    astap.solve(fits, astap_path=str(script))
+    argv = ast.literal_eval(Path(str(fits) + ".argv").read_text())
+    assert "-ra" not in argv and "-spd" not in argv and "-r" not in argv
+    assert "-fov" in argv
+
+
+def test_the_dispatcher_hands_the_pointing_to_astap(tmp_path, monkeypatch):
+    # The whole chain shares the same argument: the dispatcher passes it
+    # through so "auto" and "astap" behave the same way.
+    from nightscribe.core import solve as solve_mod
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True)
+    seen = {}
+
+    def fake_astap(path, **kw):
+        seen.update(kw)
+        return {"CRVAL1": 31.3121}
+
+    monkeypatch.setattr(solve_mod, "solve", solve_mod.solve)
+    from nightscribe.core.sources import astap as real_astap
+    monkeypatch.setattr(real_astap, "solve", fake_astap)
+    cards = solve_mod.solve(fits, solver="astap", astap_path=str(script),
+                            pointing=(49.99038, 49.86875))
+    assert cards == {"CRVAL1": 31.3121}
+    assert seen.get("pointing") == (49.99038, 49.86875)

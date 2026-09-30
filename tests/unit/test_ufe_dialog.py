@@ -261,7 +261,7 @@ def test_solve_auto_with_astap_skips_the_nova_key(dlg, monkeypatch):
         progress = _Sig()
         finished = _Sig()
 
-        def __init__(self, path):
+        def __init__(self, path, pointing=None):
             pass
 
         def start(self):
@@ -710,3 +710,32 @@ def test_notify_sequence_ignores_empty_unless_forced(dlg):
     assert dlg.notify_sequence({"entries": []}, force=True) is True
     assert dlg.notify_sequence({"entries": [{"name": "A"}]}) is True
     assert len(seen) == 2
+
+
+# ---------------- where the plate looks (ADR-051) ---------------------
+
+def test_the_solve_carries_where_the_project_looks(dlg, monkeypatch):
+    # The frames of a real visit carry no position of their own (the V0526
+    # Per ones have FOCALLEN=0 and no RA/DEC), and without a pointing ASTAP
+    # sweeps the sky: measured, 66 s per frame against 0.13 s with it. The
+    # window already knows the field: it is the object it was opened from.
+    from nightscribe.core.sources import astap
+    monkeypatch.setattr(astap, "resolve_binary", lambda *a, **k: "/fake/astap")
+    dlg.state.load(MONO)
+    dlg.set_object({"name": "V0526 Per", "ra": 49.99038, "dec": 49.86875})
+    dlg._on_solve()
+    assert dlg._solve_worker is not None
+    assert dlg._solve_worker.pointing == (49.99038, 49.86875)
+
+
+def test_an_ad_hoc_plate_still_solves_blind(dlg, monkeypatch):
+    # Opened from the Tools menu there is no project behind it: nothing is
+    # invented (the header's own RA is ambiguous: hours in OBJCTRA, degrees
+    # in CRVAL1), so ASTAP is left to sweep, as it always was.
+    from nightscribe.core.sources import astap
+    monkeypatch.setattr(astap, "resolve_binary", lambda *a, **k: "/fake/astap")
+    dlg.state.load(MONO)
+    dlg.set_object(None)
+    dlg._on_solve()
+    assert dlg._solve_worker is not None
+    assert dlg._solve_worker.pointing is None

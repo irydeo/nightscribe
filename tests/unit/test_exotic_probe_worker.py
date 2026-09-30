@@ -238,9 +238,11 @@ def _fake_solve_factory(made, cards, qapp):
         finished = Signal(dict)
         progress = Signal(str)
 
-        def __init__(self, path):
+        def __init__(self, path, pointing=None):
             super().__init__()
             self._path = path
+            # the project's field, when the window knows it (ADR-051)
+            self.pointing = pointing
             self._cancelled = False
 
         def start(self):
@@ -397,3 +399,26 @@ def test_exotic_handoff_creates_the_work_folder(window, qapp, monkeypatch,
                                 None, wcs, "/x/f.fits", entries)
     assert (work_root / "exotic" / "inits.json").is_file(), warns
     assert warns == []                     # no silent death, no error box
+
+
+def test_exotic_points_astap_at_the_projects_field(window, qapp, monkeypatch,
+                                                   tmp_path):
+    # Same reason as in the editor: the reduction's reference frame is
+    # usually a frame with no position of its own, and the project knows
+    # its field (measured on the real visit: 66 s blind, 0.13 s pointed).
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import fits_io, project
+    from nightscribe.gui import workers
+    from test_fits_annotate import _make_fits
+    p = project.create(mw.db, "variable", "V0526 Per",
+                       context={"ra_deg": 49.99038, "dec_deg": 49.86875})
+    plate = _make_fits(tmp_path / "first.fits")
+    header, _ = fits_io.read_fits(plate)
+    made = []
+    monkeypatch.setattr(workers, "UfeSolveWorker",
+                        _fake_solve_factory(made, _FAKE_WCS, qapp))
+    monkeypatch.setattr(window, "_persist_solution", lambda *a, **k: True)
+    monkeypatch.setattr(window, "_exotic_launch_final", lambda *a, **k: None)
+    window._exotic_solve_first(p["id"], {"data": {}}, "/py", [str(plate)], 7,
+                               header)
+    assert made and made[0].pointing == (49.99038, 49.86875)

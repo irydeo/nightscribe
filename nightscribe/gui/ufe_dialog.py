@@ -1461,6 +1461,23 @@ class UfeDialog(QDialog):
             return
         self._start_solve()
 
+    def _pointing(self):
+        # Where the plate looks, when the app knows it: the object the
+        # editor was opened from (a project's target, in degrees). It is
+        # what decides between a tenth of a second and a minute of ASTAP
+        # sweeping the sky (ADR-051), because the frames of a real visit
+        # carry no position at all: the V0526 Per ones have FOCALLEN=0 and
+        # no RA/DEC, while the project knows its field.
+        # @return: (ra_deg, dec_deg) or None when there is nothing to say
+        obj = self._object or {}
+        ra, dec = obj.get("ra"), obj.get("dec")
+        try:
+            if ra is None or dec is None:
+                return None
+            return (float(ra), float(dec))
+        except (TypeError, ValueError):
+            return None
+
     def _start_solve(self):
         # The one solve path (the button and request_wcs share it) through
         # the ADR-051 dispatcher (auto: local ASTAP first, nova as the
@@ -1480,7 +1497,8 @@ class UfeDialog(QDialog):
             self._fail_wcs_pending()
             return
         from .workers import UfeSolveWorker
-        self._solve_worker = UfeSolveWorker(Path(self.state.path))
+        self._solve_worker = UfeSolveWorker(Path(self.state.path),
+                                            pointing=self._pointing())
         self._solve_worker.progress.connect(self._on_solve_stage)
         self._solve_worker.finished.connect(self._on_solved)
         self.btn_solve.setEnabled(False)

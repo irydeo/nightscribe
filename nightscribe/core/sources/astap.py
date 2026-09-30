@@ -15,19 +15,28 @@
 
 Same contract as the Astrometry.net client: `solve(path, progress) ->
 cards|None`, with the WCS read into memory from the `-wcs` output, and the
-`astap_cli` barebone preferred so no window or modal hangs the call. No
-`-ra`/`-spd` hint is passed (the header's RA units are ambiguous); the
-`-fov` is the image HEIGHT in degrees from the header's own scale
+`astap_cli` barebone preferred so no window or modal hangs the call.
+
+WHERE THE PLATE LOOKS is the hint that decides everything. A `pointing`
+(ra/dec in degrees, from the project the editor was opened from) goes in
+as `-ra`/`-spd` PLUS `-r`, the search radius; without `-r` ASTAP ignores
+the position and sweeps the sky: measured on a real frame of the V0526 Per
+visit, the same hint took 56-65 s with no radius and 0.13 s with `-r 5`,
+and a WRONG pointing fails in 0.28 s, so a bad hint is cheap and the blind
+path below still saves it. The header's own position is never used (its RA
+units are ambiguous: hours in OBJCTRA, degrees in CRVAL1).
+
+The `-fov` is the image HEIGHT in degrees from the header's own scale
 (IM_SCALE/SECPIX/CDELT/XPIXSZ+FOCALLEN) or the Settings, and the hinted
 attempt is bounded before a fallback to the auto field (`-fov 0`), so a
-wrong hint can never loop ASTAP. `-d` points at the star database when
-found and `-progress` feeds the busy dialog; the run can be killed through
-a `core.solve.SolveCancel`. ASTAP's own outputs are named with `-o` into
-our per-user folder, so the solver never leaves its .ini/.wcs next to the
-observer's images. Results are cached by content hash and backend, so the
-same plate is never solved twice. The solution is returned as cards; the
-caller merges them in memory and writes them into the FITS (ADR-051 rev.),
-never `-update`. No network.
+wrong scale can never loop ASTAP either. `-d` points at the star database
+when found and `-progress` feeds the busy dialog; the run can be killed
+through a `core.solve.SolveCancel`. ASTAP's own outputs are named with `-o`
+into our per-user folder, so the solver never leaves its .ini/.wcs next to
+the observer's images. Results are cached by content hash and backend, so
+the same plate is never solved twice. The solution is returned as cards;
+the caller merges them in memory and writes them into the FITS (ADR-051
+rev.), never `-update`. No network.
 """
 
 import hashlib
@@ -54,6 +63,17 @@ TIMEOUT_S = 180.0
 # sweep the whole sky, so give it a short budget before falling back to
 # the auto field (-fov 0)
 ATTEMPT_S = 30.0
+# The pointed attempt (a known field) gets room: when the pointing is right
+# ASTAP answers in a tenth of a second, and when it is WRONG it gives up by
+# itself in ~0.3 s (measured: it tries radii 1-5 and stops), so this budget
+# is only spent on a plate that is really being solved.
+POINTED_S = 60.0
+# The search radius that goes with a pointing (-r): the offset between the
+# project's target and the plate centre is arcminutes (5.3' in the real
+# V0526 Per visit) and another night's framing stays under a degree, so 5
+# degrees covers it with room to spare, and it costs nothing: measured, the
+# same pointed solve took 0.13 s with -r 1, 3, 5 and 10.
+SEARCH_RADIUS_DEG = 5.0
 
 
 def _install_candidates():
@@ -313,13 +333,42 @@ def _fov_hint(header, config):
     return round(ny * scale / 3600.0, 3)
 
 
+def _pointing_args(pointing, radius_deg=None):
+    # The argv tokens that tell ASTAP where the plate looks. The three
+    # conventions are the binary's own (help + official docs) and the
+    # ADR-051 measurements: -ra in HOURS, -spd the south-pole distance
+    # (90 + dec, so it is 0 at the south pole and 180 at the north: a
+    # northern object gets a value ABOVE 90, which is what tripped the
+    # first attempt at this), and -r the search radius in degrees.
+    #
+    # The radius is what makes the hint DO something: -ra/-spd alone left
+    # ASTAP sweeping the sky (56-65 s measured on the real frame), while
+    # the same call with -r 5 answered in 0.13 s.
+    # @args: pointing - (ra_deg, dec_deg) or None, radius_deg - override
+    # @return: list of argv tokens (empty when there is no usable pointing)
+    if not pointing:
+        return []
+    try:
+        ra_deg = float(pointing[0])
+        dec_deg = float(pointing[1])
+    except (TypeError, ValueError, IndexError):
+        logger.info("ASTAP: unusable pointing %r; solving blind", pointing)
+        return []
+    radius = SEARCH_RADIUS_DEG if radius_deg is None else float(radius_deg)
+    return ["-ra", "%.5f" % (ra_deg / 15.0),
+            "-spd", "%.5f" % (90.0 + dec_deg),
+            "-r", "%.3f" % radius]
+
+
 def solve(path, progress=None, astap_path=None, update=False, config=None,
-          cancel=None):
+          cancel=None, pointing=None):
     # Solves a FITS image locally with ASTAP.
     # @args: path - FITS Path, progress - optional callable(stage_text),
     #        astap_path - configured binary or None (PATH lookup),
     #        update - write the solution back into the FITS (opt-in),
-    #        cancel - a core.solve.SolveCancel (the dialog's Cancel) or None
+    #        cancel - a core.solve.SolveCancel (the dialog's Cancel) or None,
+    #        pointing - (ra_deg, dec_deg) of the field when the app knows it
+    #        (the project's target), or None to solve blind
     # @return: dict of WCS header cards, or None (missing/failed/cancelled)
     binary = resolve_binary(astap_path)
     if binary is None:
@@ -339,11 +388,12 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
         header = {}
     base = _out_base(digest)
 
-    # The hint (image height in degrees, from the header's own scale;
-    # no -ra/-spd: the RA unit is ambiguous and ASTAP reads the header's
-    # position itself). A wrong or missing hint can make ASTAP sweep the
-    # whole sky ("Found 0 references"), so the hinted attempt is bounded
-    # and a second, auto-field attempt (-fov 0) catches what it misses.
+    # The attempts, in the order that answers for the least time: WITH the
+    # pointing when the app knows where the plate looks (0.13 s against a
+    # minute), then the scale hint alone (bounded: a wrong -fov sweeps the
+    # sky, which is what ATTEMPT_S is for), and last the auto field (-fov 0),
+    # which reads the scale off the image itself. A wrong pointing falls
+    # through to the blind ones on its own, in 0.28 s.
     fov = _fov_hint(header, config)
     extra = []
     db_path = _database_path(binary, config)
@@ -351,22 +401,32 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
         extra += ["-d", db_path]
     if update:
         extra.append("-update")
-    targets = [fov, None] if fov else [None]
+    hint = _pointing_args(pointing)
+    attempts = []
+    if hint:
+        attempts.append((hint, fov, POINTED_S))
+    if fov:
+        attempts.append(([], fov, ATTEMPT_S))
+    attempts.append(([], None, None))     # None: whatever the budget has left
     overall = time.monotonic() + TIMEOUT_S
     cards = None
-    for i, target in enumerate(targets):
+    for i, (hint_args, target, budget) in enumerate(attempts):
         tail = max(overall - time.monotonic(), 1.0)
-        budget = min(ATTEMPT_S, tail) if i < len(targets) - 1 else tail
+        last = i == len(attempts) - 1
+        slot = tail if (budget is None or last) else min(budget, tail)
         out_base = Path(f"{base}-a{i}")
         cmd = [binary, "-f", str(path), "-wcs", "-progress",
-               "-o", str(out_base)] + extra \
+               "-o", str(out_base)] + extra + hint_args \
             + ["-fov", str(target) if target else "0"]
         if progress:
-            progress("astap: solving locally" if target
-                     else "astap: solving (auto field)")
+            if hint_args:
+                progress("astap: solving at the project's field")
+            else:
+                progress("astap: solving locally" if target
+                         else "astap: solving (auto field)")
         logger.info("ASTAP: %s", " ".join(cmd))
         lines, cancelled, _timed_out, rc = _run_astap(
-            cmd, progress, cancel, budget)
+            cmd, progress, cancel, slot)
         if cancelled:
             logger.info("ASTAP cancelled for %s", path.name)
             return None
@@ -383,8 +443,7 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
         if time.monotonic() >= overall:
             logger.warning("ASTAP timed out after %ss", TIMEOUT_S)
             break
-        logger.info("ASTAP attempt %s failed (rc=%s); retrying auto field",
-                    i + 1, rc)
+        logger.info("ASTAP attempt %s failed (rc=%s); retrying", i + 1, rc)
     if not cards:
         logger.info("ASTAP returned no usable WCS")
         return None

@@ -177,9 +177,13 @@ class UfeSolveWorker(QThread):
     finished = Signal(dict)         # solved WCS cards, or {} on failure
     progress = Signal(str)          # stage text for the solve button
 
-    def __init__(self, path):
+    def __init__(self, path, pointing=None):
         super().__init__()
         self._path = path
+        # (ra_deg, dec_deg) when the app knows where the plate looks (the
+        # project's target): ASTAP answers in a tenth of a second with it
+        # and sweeps the sky for a minute without it (ADR-051, measured)
+        self._pointing = pointing
         self._cancel = None
 
     def cancel(self):
@@ -197,7 +201,7 @@ class UfeSolveWorker(QThread):
         try:
             cards = solve_mod.solve(
                 self._path, progress=self.progress.emit,
-                cancel=self._cancel)
+                cancel=self._cancel, pointing=self._pointing)
         except Exception as err:    # never crash the GUI on solve problems
             logger.exception("ufe solve worker failed: %s", err)
             cards = None

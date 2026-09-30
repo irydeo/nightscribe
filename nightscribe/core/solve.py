@@ -83,12 +83,15 @@ def cached(path):
 
 
 def solve(path, progress=None, solver=None, astap_path=None, update=False,
-          cancel=None):
+          cancel=None, pointing=None):
     # @args: path - FITS Path, progress - optional callable(stage_text),
     #        solver - "auto"|"astap"|"astrometry" (None reads the setting),
     #        astap_path - the configured ASTAP binary (None reads settings),
     #        update - let a local solve rewrite the FITS header (opt-in),
-    #        cancel - a SolveCancel for the dialog's Cancel, or None
+    #        cancel - a SolveCancel for the dialog's Cancel, or None,
+    #        pointing - (ra_deg, dec_deg) of the field when the app knows it
+    #        (the project's target): it is what turns a minute-long sky
+    #        sweep into a tenth of a second, and a wrong one is cheap
     # @return: dict of WCS cards, or None
     from ..config import config
     from .sources import astap, astrometry
@@ -97,12 +100,12 @@ def solve(path, progress=None, solver=None, astap_path=None, update=False,
         astap_path = config.get("astap_path") or None
     if choice == "astap":
         return astap.solve(path, progress=progress, astap_path=astap_path,
-                           update=update, cancel=cancel)
+                           update=update, cancel=cancel, pointing=pointing)
     if choice == "astrometry":
         return astrometry.solve(path, progress=progress)
     # auto: local first, nova as the fallback
     cards = astap.solve(path, progress=progress, astap_path=astap_path,
-                        update=update, cancel=cancel)
+                        update=update, cancel=cancel, pointing=pointing)
     if cards:
         return cards
     if cancel is not None and cancel.is_set():

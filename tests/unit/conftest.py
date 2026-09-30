@@ -56,9 +56,12 @@ def _fake_solve_worker(monkeypatch):
         finished = Signal(dict)
         progress = Signal(str)
 
-        def __init__(self, path):
+        def __init__(self, path, pointing=None):
             super().__init__()
             self._path = path
+            # the field the window knows (a project's target): a test that
+            # cares about it reads it back from the worker it captured
+            self.pointing = pointing
             self._cancelled = False
 
         def start(self):

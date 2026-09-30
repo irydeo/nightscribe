@@ -13,6 +13,9 @@
 
 from pathlib import Path
 
+import time
+
+import numpy as np
 import pytest
 
 from nightscribe.core import compstars
@@ -363,8 +366,6 @@ def test_export_sequence_csv_derived_columns(tmp_path):
 
 import math  # noqa: E402
 
-import numpy as np  # noqa: E402
-
 from nightscribe.core import wcs as wcs_mod  # noqa: E402
 
 
@@ -545,3 +546,55 @@ def test_a_refused_candidate_is_reported_once_and_the_next_one_takes_its_place()
     assert [r["name"] for r in seq["rejected"]] == [victim] * 1
     assert len(seq["comps"]) == 8
     assert victim not in [e["star"]["id"] for e in seq["comps"]]
+
+
+# ---------------- the isolation screen, O(n) (measured) --------------
+
+def test_the_grid_finds_a_neighbour_in_the_next_cell():
+    # The classic trap of any grid: two stars five arcseconds apart that
+    # fall in DIFFERENT cells. A prune that only looked at the star's own
+    # cell would call them isolated and put a companion in the sequence.
+    # Measured on the real V0526 Per field: the pairwise version spent
+    # 22 020 050 separations and 59.3 s; this one asks about nine cells.
+    cell_deg = 4.0 * compstars.ISOLATION_ARCSEC / 3600.0
+    # a star one arcsecond before a cell boundary and another four after it
+    boundary = 30.0 * cell_deg
+    a = _star(10.0 + (boundary - 1.0 / 3600.0), 20.0, 12.0, bv=0.8)
+    b = _star(10.0 + (boundary + 4.0 / 3600.0), 20.0, 12.0, bv=0.8)
+    cells, key_of = compstars._neighbour_grid([a, b], cell_deg)
+    assert key_of(a["ra"], a["dec"]) != key_of(b["ra"], b["dec"])
+    assert not compstars._isolated(a, cells, key_of,
+                                   compstars.ISOLATION_ARCSEC)
+    # ... and the far one is isolated: the prune is not "never isolated"
+    c = _star(a["ra"] + 30.0 / 3600.0, 20.0, 12.0, bv=0.8)
+    cells, key_of = compstars._neighbour_grid([a, c], cell_deg)
+    assert compstars._isolated(a, cells, key_of, compstars.ISOLATION_ARCSEC)
+
+
+def test_the_isolation_screen_matches_the_pairwise_answer():
+    # Parity with the honest definition, on a random field: a star is
+    # isolated when no other star is within the tolerance.
+    rng = np.random.default_rng(11)
+    stars = [_star(10.0 + rng.uniform(0, 0.3), 20.0 + rng.uniform(0, 0.3),
+                   12.0 + rng.uniform(0, 3), bv=0.8) for _ in range(400)]
+    cells, key_of = compstars._neighbour_grid(
+        stars, 4.0 * compstars.ISOLATION_ARCSEC / 3600.0)
+    for s in stars:
+        pairwise = all(
+            o is s or compstars.separation_arcsec(s, o)
+            >= compstars.ISOLATION_ARCSEC for o in stars)
+        assert compstars._isolated(
+            s, cells, key_of, compstars.ISOLATION_ARCSEC) == pairwise
+
+
+def test_a_crowded_field_proposes_in_a_moment():
+    # The budget that makes "Build the sequence" feel like a button and not
+    # like a hang: 4500 stars, which is the size of the real visit's field.
+    rng = np.random.default_rng(7)
+    stars = [_star(10.0 + rng.uniform(0, 0.7), 20.0 + rng.uniform(0, 0.5),
+                   11.0 + rng.uniform(0, 5), bv=0.8) for _ in range(4500)]
+    t0 = time.monotonic()
+    seq = compstars.propose_comps(stars, 12.5)
+    took = time.monotonic() - t0
+    assert seq["comps"], "la propuesta tiene que salir"
+    assert took < 0.5, f"{took:.2f} s para 4500 estrellas"

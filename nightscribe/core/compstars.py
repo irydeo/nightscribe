@@ -362,13 +362,50 @@ def load_field(catalog, ra_deg, dec_deg, fov_arcmin, max_rows=12000,
 
 # --------------------------- sequence proposal ---------------------------
 
-def _is_isolated(star, stars, tol_arcsec):
-    # @return: True when no other catalog star sits within tol_arcsec
-    for other in stars:
-        if other is star:
-            continue
-        if separation_arcsec(star, other) < tol_arcsec:
-            return False
+def _neighbour_grid(stars, cell_deg):
+    # Buckets the field's stars in a grid, so "is any other star within N
+    # arcseconds?" is asked of the few stars that can possibly be near
+    # instead of every other star in the field.
+    #
+    # Measured on the real V0526 Per field (5157 catalog stars, the app's
+    # own cached Gaia answer): asking every star about every other one spent
+    # 22 020 050 separations and 59.3 s inside propose_comps, and the
+    # question is only ever "is there ANY star within 10 arcsec?".
+    #
+    # The x axis is the RA scaled by the field's own cos(dec): over one
+    # field that is exact enough, and the cell is FOUR times the tolerance
+    # (a whole cell of slack), so the prune cannot miss a real neighbour
+    # even on a wide field at a high declination.
+    # @args: stars - the catalog stars, cell_deg - the grid's cell size
+    # @return: (cells, key_of): the buckets and the function that says which
+    #          bucket a (ra_deg, dec_deg) falls in
+    decs = [s["dec"] for s in stars] or [0.0]
+    cos_ref = max(0.05, math.cos(math.radians(sum(decs) / len(decs))))
+
+    def key_of(ra_deg, dec_deg):
+        # @return: (ix, iy) of the cell that position falls in
+        return (int(math.floor(ra_deg * cos_ref / cell_deg)),
+                int(math.floor(dec_deg / cell_deg)))
+
+    cells = {}
+    for s in stars:
+        cells.setdefault(key_of(s["ra"], s["dec"]), []).append(s)
+    return cells, key_of
+
+
+def _isolated(star, cells, key_of, tol_arcsec):
+    # @args: star - the candidate, cells/key_of - the field's grid,
+    #        tol_arcsec - the isolation radius
+    # @return: True when no other catalog star sits within tol_arcsec (the
+    #          cell and the eight around it are all that can hold one)
+    ix, iy = key_of(star["ra"], star["dec"])
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for other in cells.get((ix + dx, iy + dy), ()):
+                if other is star:
+                    continue
+                if separation_arcsec(star, other) < tol_arcsec:
+                    return False
     return True
 
 
@@ -556,9 +593,13 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
     #        safety ring kept clear on every side (drift, dithering)
     # @return: {"comps": [{"name", "kind", "star", "why"}...],
     #          "check": entry or None, "rejected": [{name, key, es, en}]}
+    # The isolation screen, with the field bucketed ONCE (O(n), not O(n²):
+    # see _neighbour_grid for the 59 s that the pairwise version spent on a
+    # real 5157-star field).
+    cells, key_of = _neighbour_grid(stars, 4.0 * isolation_arcsec / 3600.0)
     pool = [s for s in stars
             if s.get("vsx") is None
-            and _is_isolated(s, stars, isolation_arcsec)]
+            and _isolated(s, cells, key_of, isolation_arcsec)]
     rejected = []
 
     def color_rank(s):

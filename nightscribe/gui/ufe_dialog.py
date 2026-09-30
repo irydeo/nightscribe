@@ -120,6 +120,9 @@ class UfeDialog(QDialog):
         # list and which of them the chart shows
         self._visit_passes_hook = None
         self._visit_choose_hook = None
+        # where a series figure is written (the project's folder): the
+        # Measure tab asks instead of touching the database
+        self._export_folder_hook = None
         # the EXOTIC reduction block (transit projects opened from a
         # visit): the host arms both callables, ADR-048 follow-up
         self._exotic_reduce_hook = None
@@ -1254,6 +1257,24 @@ class UfeDialog(QDialog):
         #        and writes its points in a batch (ADR-048, D9); cfg is
         #        the run echo and carries its status (D18).
         self._points_hook = fn if callable(fn) else None
+
+    def set_export_folder_hook(self, fn):
+        # @args: fn - callable() -> the folder a series figure goes to (the
+        #        project's own), or None. The Measure tab never touches the
+        #        database: this is how it knows WHERE to write (the night
+        #        figures, and whatever else needs a home).
+        self._export_folder_hook = fn if callable(fn) else None
+
+    def export_folder(self):
+        # @return: the folder the host points at, or None (the tab falls
+        #          back to the app's data folder)
+        if self._export_folder_hook is None:
+            return None
+        try:
+            return self._export_folder_hook()
+        except Exception as err:
+            logger.warning("export-folder hook failed: %s", err)
+            return None
 
     def set_visit_passes_hooks(self, load, choose):
         # @args: load - callable() -> {"runs": [...], "curve_run_id": id}

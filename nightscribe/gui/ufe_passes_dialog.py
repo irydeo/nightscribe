@@ -69,6 +69,11 @@ class UfePassesDialog(QDialog):
         self.tbl_passes.itemSelectionChanged.connect(self._update_buttons)
         self.btn_passes_use.clicked.connect(self._on_use)
         self.btn_passes_undo.clicked.connect(self._on_undo)
+        # the last column stretches: the state says the useful part
+        # ("complete · the curve · part of a 3-night pass") and with the
+        # columns fitted to their content it fell outside the window
+        # (reported: "al abrirlo apenas se ve nada")
+        self.tbl_passes.horizontalHeader().setStretchLastSection(True)
         self._runs = []
         self._curve_run_id = None
         self._update_buttons()
@@ -83,6 +88,11 @@ class UfePassesDialog(QDialog):
         #        mjd1, status}, ...], "curve_run_id": int or None}
         # @return: None
         self.set_passes(payload)
+        # a window sized by its CONTENT, with a generous floor: the five
+        # columns and the state need room, and a dialog that opens showing
+        # three rows and half a column is a dialog nobody reads
+        self.resize(max(900, self.sizeHint().width()),
+                    max(460, self.sizeHint().height()))
         self.show()
         self.raise_()
         self.activateWindow()

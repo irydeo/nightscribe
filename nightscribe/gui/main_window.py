@@ -8816,6 +8816,12 @@ class MainWindow(QMainWindow):
                     lambda: self._ufe_visit_passes(hook_pid, session_id),
                     lambda run_id: self._ufe_choose_curve(
                         hook_pid, session_id, run_id))
+            # where the series figures are written: the project's own folder
+            # (the Measure tab never touches the database)
+            folder_hook = getattr(dlg, "set_export_folder_hook", None)
+            if callable(folder_hook):
+                folder_hook(
+                    lambda: self._ufe_export_folder(hook_pid))
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(
@@ -8849,6 +8855,9 @@ class MainWindow(QMainWindow):
             passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
             if callable(passes_hooks):
                 passes_hooks(None, None)
+            folder_hook = getattr(dlg, "set_export_folder_hook", None)
+            if callable(folder_hook):
+                folder_hook(None)
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(None, None)
@@ -9423,6 +9432,19 @@ class MainWindow(QMainWindow):
         return {"points": self._curve_payload(points),
                 "zp_mode": ("relative" if series_cfg.get("zp_mode")
                             == "relative" else "catalog")}
+
+    def _ufe_export_folder(self, pid):
+        # Where this project's own files live: the folder the observer sees
+        # in the project's Details (ADR-045), so a figure written from the
+        # editor lands next to the rest of the project.
+        # @args: pid - project id
+        # @return: the folder (str), or None
+        from .. import paths as paths_mod
+        row = project.get(db, pid)
+        if not row:
+            return None
+        return str(paths_mod.project_dir(
+            pid, row.get("object_name") or "", row.get("root_dir") or ""))
 
     def _ufe_visit_passes(self, pid, session_id):
         # The passes of a visit (2026-09-30): one row per series run, oldest

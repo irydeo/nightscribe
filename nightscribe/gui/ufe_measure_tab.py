@@ -1594,6 +1594,28 @@ class UfeMeasureTab(QWidget):
             return best
         return None
 
+    def _export_folder(self):
+        # Where a series figure goes: the project's own folder, which the
+        # HOST knows (the tab never touches the database: that is what this
+        # file's other exports already do), and the app's data folder when
+        # the editor was opened without a project.
+        # @return: the folder (a Path), created if it did not exist
+        from .. import paths as paths_mod
+        folder = None
+        ask = getattr(self.window(), "export_folder", None)
+        if callable(ask):
+            try:
+                folder = ask()
+            except Exception as err:            # a hook never kills a tab
+                logger.warning("export folder hook failed: %s", err)
+        path = Path(folder) if folder else Path(paths_mod.data_dir())
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError as err:
+            logger.warning("could not create %s: %s", path, err)
+            return Path(paths_mod.data_dir())
+        return path
+
     def _on_series_night(self):
         # The two figures that explain the night (quality plan, A1): the
         # airmass and the measured position. They are written next to the
@@ -1616,8 +1638,6 @@ class UfeMeasureTab(QWidget):
                 "Measure the series first: the figures are its night."))
             return
         from ..viz import night_view
-        from ..core import project
-        from .. import paths as paths_mod
 
         def value(point, key):
             # @return: one field of a point, be it a SeriesPoint or a dict
@@ -1635,14 +1655,18 @@ class UfeMeasureTab(QWidget):
                 "measure the series again to have the night figures."))
             return
         ctx = self._series_context() or {}
-        pid = ctx.get("pid")
-        row = project.get(db, pid) if pid else None
-        if row:
-            folder = paths_mod.project_dir(
-                pid, row.get("object_name") or "", row.get("root_dir") or "")
-        else:
-            folder = paths_mod.data_dir()
-        name = (row or {}).get("object_name") or "series"
+        # WHERE THE FIGURES GO, and the object's name: both asked of the
+        # host, because THIS TAB NEVER TOUCHES THE DATABASE (every other
+        # export here does the same). It used to call `project.get(db, pid)`
+        # and `db` does not exist in this module: the button raised a
+        # NameError inside its slot, Qt swallowed it and NOTHING happened
+        # (reported: "el botón Night Conditions (PNG) no hace nada").
+        folder = self._export_folder()
+        name = "series"
+        window = self.window()
+        obj = getattr(window, "object", None)
+        if callable(obj):
+            name = (obj() or {}).get("name") or name
         stem = "".join(ch if ch.isalnum() or ch in "-_" else "_"
                        for ch in name)[:40]
         sub = self._series_subtitle(ctx)

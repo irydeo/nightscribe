@@ -2348,3 +2348,52 @@ def test_the_block_header_is_never_cut(dlg, qapp):
     assert lbl.isVisible()
     assert lbl.width() >= 50
     assert lbl.height() >= lbl.heightForWidth(lbl.width())
+
+
+def test_the_night_figures_work_with_a_project_behind_them(dlg, tmp_path,
+                                                           monkeypatch):
+    # Reported: "el botón Night Conditions (PNG) no hace nada". With a VISIT
+    # context (a project behind the editor, which is the normal case) the
+    # handler called `project.get(db, pid)` and **`db` does not exist in this
+    # module**: the slot raised a NameError, Qt swallowed it and nothing
+    # happened at all (no figure, no message). The test above passed because
+    # its context had no pid, so the broken branch was never walked.
+    #
+    # The tab asks the HOST where to write now, like its sibling export does.
+    from nightscribe.viz import night_view
+    tab = dlg.tab_measure
+    dlg.set_series_hook(lambda scope="visit": {"pid": 7, "session_id": 2,
+                                               "paths": ["/tmp/a.fits"]})
+    dlg.set_export_folder_hook(lambda: str(tmp_path))
+    points = [dict(p, airmass=1.2 + 0.01 * i, x=800.0 + i, y=600.0 + i)
+              for i, p in enumerate(_visit_points(6))]
+    tab.set_visit_curve_hooks(lambda: points, None)
+    written = []
+    monkeypatch.setattr(
+        night_view, "draw_airmass",
+        lambda pts, out=None, **k: (written.append(out), out)[1])
+    monkeypatch.setattr(
+        night_view, "draw_drift",
+        lambda pts, out=None, **k: (written.append(out), out)[1])
+    monkeypatch.setattr("nightscribe.gui.chart_viewer.open_chart",
+                        lambda *a, **k: None)
+    tab._on_series_night()                     # must not raise
+    assert len(written) == 2                   # the two figures, not one
+    assert all(str(tmp_path) in str(out) for out in written)
+    assert "Night figures written" in tab.lbl_status.text()
+
+
+def test_the_passes_door_opens_with_room_to_read_it(dlg):
+    # Reported: "ajusta el tamaño de Passes of this visit, que al abrirlo
+    # apenas se ve nada". Measured with real data: 533 x 434, a table of
+    # 511 x 174 and a sizeHint of 660 wide, so the state column (which says
+    # "complete · the curve · part of a 3-night pass") fell outside the
+    # window and the useful rows were the ones you had to scroll to.
+    tab = dlg.tab_measure
+    dlg.set_visit_passes_hooks(lambda: _passes(2), lambda run_id: None)
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert door.width() >= 880
+    assert door.tbl_passes.height() >= 200
+    assert door.tbl_passes.horizontalHeader().stretchLastSection()
+    door.close()

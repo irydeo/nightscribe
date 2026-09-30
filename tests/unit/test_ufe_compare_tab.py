@@ -1229,3 +1229,22 @@ def test_an_empty_proposal_says_why(dlg, monkeypatch):
     assert "No catalog star survived" in text
     assert "is kept" in text                  # and nothing was lost
     assert len(tab._entries) == 1
+
+
+def test_the_manual_window_fits_its_content(dlg):
+    # Reported: "ajusta también el diálogo Manual Tweak". It opened at a
+    # fixed 820x400 with the content ending at 278: a dead strip of 111 px
+    # under the last row, because the size hints lie here (sizeHint said
+    # 177, the layout's heightForWidth said 161, and the real rows took
+    # 278). The window measures the laid-out rows now.
+    from PySide6.QtWidgets import QApplication
+    w = dlg.tab_compare.manual
+    w.show()
+    QApplication.processEvents()
+    last = w.btn_seq_open
+    bottom = last.mapTo(w, last.rect().bottomLeft()).y()
+    gap = w.height() - bottom
+    assert gap <= 24, gap                      # no dead strip
+    assert bottom > 0                          # and the content is inside
+    # the width floor stays (the wide-font guard of the test above)
+    assert w.minimumWidth() >= 760

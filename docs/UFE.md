@@ -103,9 +103,20 @@ Builds the photometric sequence on your plate (a WCS is needed; if it
 is missing, the configured solver gets you one, ASTAP or nova):
 
 With the visit open, the left panel also carries the **frame navigator**
-(previous/next, `frame i/N`, "first frame": the open frame is the reference) and,
-in transit projects, the **EXOTIC** reduction buttons. The project's saved
-sequence loads by itself when the visit opens.
+(previous/next, `frame i/N`, "first frame": the open frame is the reference),
+**Solve the visit...** and, in transit projects, the **EXOTIC** reduction
+buttons. The project's saved sequence loads by itself when the visit opens.
+
+**Solve the visit...** solves every frame of the visit in one go. A visit is
+one field, and the project knows where it is, so each frame takes a moment
+instead of a minute of blind search: frames that already carry a WCS are
+skipped, and each solution is written into its own FITS (it needs "Save the
+solved WCS in the FITS" in Settings; with it off the button explains instead
+of leaving solutions that would die with the session). If the project has no
+coordinates, the first frame is solved blind and the rest follow its field.
+One frame that fails does not stop the batch: it is counted and named in the
+status line. A plate opened from a project is also solved with its field, so
+the Solve button of the top bar answers in a moment.
 
 * **Target** and **Target mag** pre-fill what the project knows; the
   approximate magnitude guides the proposal.

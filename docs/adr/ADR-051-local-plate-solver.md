@@ -1,6 +1,6 @@
 # ADR-051: Local plate solver with ASTAP (dispatcher, persisted WCS)
 
-**Estado / Status**: Accepted · revisado / revised 2026-09-28 · **Fecha / Date**: 2026-09-27
+**Estado / Status**: Accepted · revisado / revised 2026-09-30 · **Fecha / Date**: 2026-09-27
 
 ## Español
 
@@ -199,3 +199,106 @@ field is ~0.72°, so ASTAP swept the whole sky. Now:
   `-progress` and a real Cancel. Measured: `HATP-32171220013343.FITS` goes from a
   loop to **0.31 s** (FOV 0.724° from `IM_SCALE`); `-fov 0.186` never solves, no
   `-fov` takes 66 s.
+
+**Corrección (2026-09-30, lo que faltaba era la posición)**: el aviso «otra vez
+igual, entra en bucle y nunca usa el fallback de nova», con la visita nueva de
+V0526 Per (35 tomas, `v526per-020Rcal.fit` … `054Rcal.fit`), tenía otra causa: la
+pista que no se pasaba era **dónde mira la placa**. La toma es de un equipo ajeno
+(`INSTRUME` SXV-H18, `SWOWNER` "Tan Yong Liang"), 1663x1252, `FOCALLEN=0.0` y sin
+ninguna tarjeta de posición; su escala real es 1,55"/px (lo dice el propio ASTAP:
+`Warning scale was inaccurate! Set FOV=0.54d, scale=1.5", FL=1437mm`) mientras la
+app mandaba `-fov 0.359` desde los Ajustes del observador. Sin posición y con la
+escala mal, ASTAP buscó 76 000 campos: **55,8 s** hasta resolver, y como el primer
+intento se corta a los 30 s el camino real de la app eran 30 s tirados más 35,5 s
+del intento automático: **66 s por toma**.
+
+Medido en esa misma toma:
+
+| llamada | tiempo |
+|---|---|
+| `-ra`/`-spd` sin `-r` | 56–65 s (ASTAP ignora la posición y barre el cielo) |
+| `-ra`/`-spd` + `-r 5` + la `-fov` correcta | **0,13 s** |
+| `-ra`/`-spd` + `-r 5` + la `-fov` de Ajustes (mal) | 0,13 s (la escala deja de importar) |
+| `-ra`/`-spd` + `-r 5` + `-fov 0` | 0,8 s |
+| una posición **equivocada** con `-r 5` | 0,28 s (prueba radios 1–5 y se rinde) |
+
+O sea: **`-r` es lo que hace que la pista sirva**. Sin radio, `-ra`/`-spd` no
+restringen nada, que es exactamente por lo que la corrección anterior los quitó;
+la conclusión «la pista mete a ASTAP en bucle» era falsa: lo que lo mete en bucle
+es no tener ninguna. Ahora:
+
+- **El apuntado se pasa cuando la app lo sabe**: las coordenadas del proyecto o de
+  la visita, que están en grados y no son ambiguas (las de la cabecera sí lo son:
+  `OBJCTRA` en horas, `CRVAL1` en grados, y esas siguen sin usarse). `-ra` en horas
+  (`ra/15`), `-spd = 90 + dec` (el polo sur de ASTAP: un objeto boreal da más de 90,
+  que fue el error del primer intento) y `-r 5` (el descentrado del objetivo son
+  arcminutos; medido, `-r` 1, 3, 5 y 10 dan lo mismo).
+- **Orden de intentos**: primero el apuntado (0,13 s), después la escala acotada y
+  por último el campo automático, que siguen siendo la red para una pista
+  equivocada (0,28 s de coste) y para una placa sin proyecto detrás.
+- **Nova recibe lo mismo** (`center_ra`, `center_dec`, `radius`, y la escala como
+  `degwidth` con una ventana del 25 %): su búsqueda por defecto es igual de ciega.
+- **La visita entera se resuelve de una vez** («Resolver la visita…»): salta las
+  tomas que ya traen WCS, escribe cada solución en su FITS, cuenta y nombra los
+  fallos, y cuando el proyecto no tiene coordenadas resuelve la primera toma a
+  ciegas y las demás siguen su campo (un minuto una vez, no una hora). Con
+  `solve_save` apagado el botón está deshabilitado y dice por qué: un lote de 35
+  soluciones solo en memoria moriría al cerrar.
+- **La línea de estado deja de ser un volcado**: solo pasan el veredicto, el tiempo
+  y los avisos de ASTAP (incluido el `WARNING` de base de datos obsoleta, que
+  explica la lentitud); el barrido de 76 000 líneas se queda en el registro.
+
+Funcional real (ASTAP instalado y las tomas reales): cinco tomas de la visita en
+unos 2 s, cuatro resueltas y una saltada (ya traía WCS), sin tocar los originales.
+
+**Correction (2026-09-30, what was missing was the position)**: the report "back
+to the same, it loops and never uses the nova fallback", with the new V0526 Per
+visit (35 frames, `v526per-020Rcal.fit` … `054Rcal.fit`), had another cause: the
+hint that was not being passed was **where the plate looks**. The frame comes from
+somebody else's rig (`INSTRUME` SXV-H18, `SWOWNER` "Tan Yong Liang"), 1663x1252,
+`FOCALLEN=0.0` and no position card at all; its real scale is 1.55"/px (ASTAP
+itself says so: `Warning scale was inaccurate! Set FOV=0.54d, scale=1.5",
+FL=1437mm`) while the app sent `-fov 0.359` from the observer's own Settings.
+Without a position and with the scale wrong, ASTAP searched 76 000 fields:
+**55.8 s** to solve, and since the first attempt is cut at 30 s the app's real
+path was 30 s thrown away plus 35.5 s of the auto attempt: **66 s per frame**.
+
+Measured on that same frame:
+
+| call | time |
+|---|---|
+| `-ra`/`-spd` with no `-r` | 56–65 s (ASTAP ignores the position and sweeps the sky) |
+| `-ra`/`-spd` + `-r 5` + the right `-fov` | **0.13 s** |
+| `-ra`/`-spd` + `-r 5` + the Settings `-fov` (wrong) | 0.13 s (the scale stops mattering) |
+| `-ra`/`-spd` + `-r 5` + `-fov 0` | 0.8 s |
+| a **wrong** pointing with `-r 5` | 0.28 s (it tries radii 1–5 and gives up) |
+
+In other words: **`-r` is what makes the hint do something**. Without a radius,
+`-ra`/`-spd` restrict nothing, which is exactly why the earlier correction removed
+them; the conclusion "the hint loops ASTAP" was false: what loops it is having no
+hint at all. Now:
+
+- **The pointing is passed when the app knows it**: the project's or the visit's
+  coordinates, which are in degrees and are not ambiguous (the header's are:
+  `OBJCTRA` in hours, `CRVAL1` in degrees, and those are still never used). `-ra`
+  in hours (`ra/15`), `-spd = 90 + dec` (ASTAP's south-pole distance: a northern
+  object gets more than 90, which is what tripped the first attempt) and `-r 5`
+  (the target's offset is arcminutes; measured, `-r` 1, 3, 5 and 10 all agree).
+- **Attempt order**: the pointing first (0.13 s), then the bounded scale attempt,
+  then the auto field, which remain the safety net for a wrong hint (0.28 s of
+  cost) and for a plate with no project behind it.
+- **Nova gets the same** (`center_ra`, `center_dec`, `radius`, and the scale as
+  `degwidth` with a 25 % window): its default search is just as blind.
+- **The whole visit is solved in one go** ("Solve the visit…"): it skips the frames
+  that already carry a WCS, writes each solution into its own FITS, counts and
+  names the failures, and when the project has no coordinates it solves the first
+  frame blind and the rest follow its field (a minute once, not an hour). With
+  `solve_save` off the button is disabled and says why: a batch of 35 in-memory
+  solutions would die when the session closes.
+- **The status line stops being a dump**: only ASTAP's verdict, its timing and its
+  warnings get through (including the obsolete-star-database `WARNING`, which
+  explains the slowness); the 76 000-line sweep stays in the log.
+
+Real functional test (ASTAP installed and the real frames): five frames of the
+visit in about 2 s, four solved and one skipped (it already carried a WCS),
+without touching the originals.

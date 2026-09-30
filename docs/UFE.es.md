@@ -106,8 +106,20 @@ falta, la resuelve sola con el solver configurado, ASTAP o nova):
 
 Con la visita abierta, el panel izquierdo lleva además el **navegador de
 tomas** (anterior/siguiente, `toma i/N`, «primera toma»: la toma abierta es la
-referencia) y, en proyectos de tránsito, los botones de **reducción EXOTIC**.
-La secuencia ya guardada del proyecto se carga sola al abrir la visita.
+referencia), **Resolver la visita…** y, en proyectos de tránsito, los botones de
+**reducción EXOTIC**. La secuencia ya guardada del proyecto se carga sola al
+abrir la visita.
+
+**Resolver la visita…** resuelve de una vez todas las tomas de la visita. Una
+visita es un solo campo y el proyecto sabe dónde está, así que cada toma tarda
+un momento en vez de un minuto de búsqueda a ciegas: las tomas que ya traen WCS
+se saltan, y cada solución se escribe en su propio FITS (necesita «Guardar la
+WCS resuelta en el FITS» en Ajustes; con eso apagado el botón lo explica en vez
+de dejar soluciones que morirían al cerrar). Si el proyecto no tiene
+coordenadas, la primera toma se resuelve a ciegas y las demás siguen su campo.
+Una toma que falla no para el lote: se cuenta y se nombra en la línea de estado.
+Una placa abierta desde un proyecto se resuelve también con su campo, así que el
+botón Resolver de la barra superior responde en un momento.
 
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
   sabe; la magnitud aproximada sirve de guía a la propuesta.

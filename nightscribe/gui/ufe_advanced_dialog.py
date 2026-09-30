@@ -68,4 +68,7 @@ class UfeAdvancedDialog(QDialog):
         self.cmb_detrend.addItem(self.tr("Auto (FWHM, sky, x-y)"), "auto")
         self.chk_auto_aperture = self._ui.chk_auto_aperture
         self.spn_saturate = self._ui.spn_saturate
+        # the line that says what "0 = auto" resolves to (header card,
+        # Ajustes or the camera profile's linearity)
+        self.lbl_saturate_auto = self._ui.lbl_saturate_auto
         self.btn_restore = self._ui.btn_restore

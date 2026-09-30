@@ -206,6 +206,8 @@ class UfeMeasureTab(QWidget):
         # is part of the recipe too (it was not wired either)
         self.spn_saturate = self._advanced.spn_saturate
         self.spn_saturate.valueChanged.connect(lambda _v: self._remeasure())
+        self.spn_saturate.valueChanged.connect(
+            lambda _v: self._update_saturate_hint())
 
         # The result log is plain text in a scrollable editor: a long
         # report (comps, guards, verdict) must never squash the tab.
@@ -700,6 +702,7 @@ class UfeMeasureTab(QWidget):
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
         self._say("")
+        self._update_saturate_hint()
 
     # -------------------------------------------------------- measuring
 
@@ -992,6 +995,41 @@ class UfeMeasureTab(QWidget):
                 spn.blockSignals(False)
         return (r_ap, r_in, r_out), fwhm
 
+    def _saturation_override(self):
+        # The Advanced «Saturation (ADU)» box is one knob for BOTH the
+        # single measurement and a series: a positive value wins, 0 means
+        # "use the config" (the header's SATURATE card, then ccd_saturate).
+        # The camera profile's linearity gates separately and stays on.
+        # @return: the ADU override, or None for auto
+        try:
+            value = float(self.spn_saturate.value())
+        except (TypeError, ValueError):
+            return None
+        return value if value > 0 else None
+
+    def _update_saturate_hint(self):
+        # Say what "0 = auto" resolves to, so the box never reads as if it
+        # ignored the config: header SATURATE, then ccd_saturate, plus the
+        # camera profile's linearity (the lower one gates first).
+        from ..config import config
+        lbl = getattr(self._advanced, "lbl_saturate_auto", None)
+        if lbl is None:
+            return
+        override = self._saturation_override()
+        if override is not None:
+            lbl.setText(self.tr("override: {0} ADU").format(int(override)))
+            return
+        parts = []
+        sat = photometry.saturation_ceiling(self._state.header or {}, config)
+        if sat is not None:
+            parts.append(self.tr("SATURATE/ccd_saturate {0} ADU")
+                         .format(int(sat)))
+        lin = photometry.linearity_ceiling(config)
+        if lin is not None:
+            parts.append(self.tr("camera linearity {0} ADU").format(int(lin)))
+        lbl.setText(self.tr("auto: {0}").format(" · ".join(parts)) if parts
+                    else self.tr("auto: no ceiling known (plateau only)"))
+
     def _measure(self, col, row, entries):
         # Build the recipe from the widgets and Ajustes, run the core
         # single-plate function (phase 1 of the series plan: one recipe,
@@ -1015,7 +1053,8 @@ class UfeMeasureTab(QWidget):
             site_gain=config.get("ccd_gain"),
             site_ron=config.get("ccd_read_noise"),
             site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
-            site_saturate=config.get("ccd_saturate"),
+            site_saturate=(self._saturation_override()
+                           or config.get("ccd_saturate")),
             site_lon=config.get("lon"), site_lat=config.get("lat"),
             site_aperture_m=float(config.get("aperture_inches", 10.0))
             * 0.0254,
@@ -1105,7 +1144,6 @@ class UfeMeasureTab(QWidget):
     def _series_config(self, entries, target_xy):
         # Builds the engine config from the tab's widgets and Ajustes.
         from ..config import config
-        sat = self._advanced.spn_saturate.value()
         # T3 (P2 #20): the per-night aperture sweep only runs when the
         # engine owns the radii, so the checkbox hands them over (radii
         # None) instead of pinning the spins on every night.
@@ -1124,8 +1162,8 @@ class UfeMeasureTab(QWidget):
             site_gain=config.get("ccd_gain"),
             site_ron=config.get("ccd_read_noise"),
             site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
-            site_saturate=float(sat) if sat and sat > 0
-            else config.get("ccd_saturate"),
+            site_saturate=self._saturation_override()
+            or config.get("ccd_saturate"),
             site_lon=config.get("lon"), site_lat=config.get("lat"),
             site_aperture_m=float(config.get("aperture_inches", 10.0))
             * 0.0254,

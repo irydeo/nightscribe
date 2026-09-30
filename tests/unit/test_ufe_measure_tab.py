@@ -1935,8 +1935,7 @@ def test_every_control_that_affects_the_measurement_measures_again(
     changed("sigma clip", tab.chk_sigmaclip.toggle)
     changed("colour term", tab.chk_color.toggle)
     changed("target B-V", lambda: tab.spn_target_bv.setValue(0.75))
-    changed("saturation ceiling", lambda: tab.spn_saturate.setValue(
-        tab.spn_saturate.value() + 1000.0))
+    changed("saturation ceiling", lambda: tab.spn_saturate.setValue(100000.0))
 
     def edit_the_sequence():
         # a real edit (the kind of a comp): it leaves the zero point. The
@@ -1984,3 +1983,33 @@ def test_the_panel_paints_a_catalogue_magnitude_in_white(dlg):
     tab._fill_panel(tab._last["band"], 5, 4, {}, False, None)
     html = tab.lbl_result.toHtml()
     assert palette.MEASURE_COLOURS[ca.ROLE_MAG_CAT] in html
+
+
+def test_saturation_box_overrides_and_shows_what_auto_resolves(dlg,
+                                                               monkeypatch):
+    # one knob for measure and series: a positive value wins, 0 means the
+    # config (SATURATE card then ccd_saturate), and the line at its right
+    # says what 0 resolves to, so it never looks like it ignores the config
+    from nightscribe import config as cfgmod
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    seen = []
+    real = phot.measure_plate
+    monkeypatch.setattr(
+        phot, "measure_plate",
+        lambda image, cfg: (seen.append(cfg), real(image, cfg))[1])
+    # auto: the box is 0 and the config has no ccd_saturate
+    tab.spn_saturate.setValue(0.0)
+    _click(dlg, *dlg._test_target)
+    assert seen[-1].site_saturate is None
+    assert "auto" in tab._advanced.lbl_saturate_auto.text()
+    # the hint names the config value when there is one
+    monkeypatch.setitem(cfgmod.config._data, "ccd_saturate", 60000)
+    tab._update_saturate_hint()
+    assert "60000" in tab._advanced.lbl_saturate_auto.text()
+    # the override wins, for a single measurement too
+    tab.spn_saturate.setValue(45000.0)
+    _click(dlg, *dlg._test_target)
+    assert seen[-1].site_saturate == 45000.0
+    assert "override" in tab._advanced.lbl_saturate_auto.text()

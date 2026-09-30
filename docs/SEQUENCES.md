@@ -393,7 +393,11 @@ photometry block stays as a quick **preview**.
 
 Without an EXOTIC environment, the manual **"Export to EXOTIC (inits.json)..."**
 button stays available to reduce outside and come back. EXOTIC's first run needs
-network (NASA Archive, limb-darkening data, astrometry.net).
+network (NASA Archive and limb-darkening data). The **plate solution is never
+asked of astrometry.net**: the app hands the target and the comparisons over in
+pixels and EXOTIC uses the WCS the FITS already carries; if the frame has none,
+it aligns the frames with astroalign and takes the scale from the header. That
+makes the start immediate and independent of the public queue.
 
 ### Real end-to-end test
 
@@ -420,9 +424,10 @@ sequence and the EXOTIC environment prepared.
 6. **Verify**: T_mid within 3 sigma, Rp/Rs within 5 % and depth within 10 %
    against the reference. Then **"ExoClock..."** to submit the transit.
 
-EXOTIC's **first run** needs network (NASA Archive, limb-darkening data,
-astrometry.net). Without an EXOTIC environment, the manual **"Export to EXOTIC
-(inits.json)..."** button stays available.
+EXOTIC's **first run** needs network (NASA Archive and limb-darkening data); the
+plate solution is **not** requested from astrometry.net (see above). Without an
+EXOTIC environment, the manual **"Export to EXOTIC (inits.json)..."** button
+stays available.
 
 **On Windows (the cleanest)**: install **Python 3.10** from python.org (tick the
 *py launcher*) and run `pip install exotic` in it; then point the app to that

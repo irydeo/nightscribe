@@ -29,11 +29,22 @@ _FIELDS = ("pl_name,hostname,pl_orbper,pl_radj,pl_bmassj,pl_eqt,sy_dist,"
            # NB: pscomppars metallicity is st_met (+st_metratio="[Fe/H]") —
            # st_metfe does NOT exist in this table (verified 2026-09-10).
            "pl_orbincl,pl_orbeccen,st_logg,st_met,st_metratio,pl_orbsmax,"
-           "pl_tranmid,sy_pmra,sy_pmdec")
+           "pl_tranmid,sy_pmra,sy_pmdec,"
+           # The uncertainties travel with them (2026-09-30): EXOTIC fits the
+           # transit time inside a window built from them, and with none it
+           # falls back to a window so wide that its aperture/comparison
+           # search cannot fit the time at all (measured: 3 distinct tmid
+           # values in 3809 search fits against 1289 once they are filled,
+           # and the final T_mid went from +-0.0019 to +-0.0011 d).
+           "pl_tranmiderr1,pl_orbpererr1,pl_radjerr1,st_raderr1,"
+           "pl_orbinclerr1,pl_orbsmaxerr1,pl_orbeccenerr1,pl_orblper,"
+           "st_tefferr1,st_tefferr2,st_meterr1,st_meterr2,"
+           "st_loggerr1,st_loggerr2")
 
-# Cache namespace bump (Track D): rows cached before the _FIELDS extension
-# lack the new columns, so they must not be served under the old key.
-_CACHE = "exoplanet_archive:v2"
+# Cache namespace bump (Track D, uncertainties): rows cached before the
+# _FIELDS extension lack the new columns, so they must not be served under
+# the old key. v2 -> v3 (2026-09-30).
+_CACHE = "exoplanet_archive:v3"
 
 
 def planet(name):

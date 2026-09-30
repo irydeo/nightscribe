@@ -192,9 +192,41 @@ sin pedir la carpeta ni las coordenadas.
 plan, out_dir, pre_reduced)`: apunta «Directory with FITS files» a la carpeta de
 las tomas, rellena objetivo y comparaciones en píxeles con la **forma de cadena
 del sample de EXOTIC** (`"[424, 286]"`, lista de 10 con `[]` de relleno), pone
-`"Add Comparison Stars from AAVSO?" = "n"` (headless, fase 0) y `"Plate
-Solution?" = "y"`, y admite `out_dir` y una curva pre-reducida. Tests en
-`tests/unit/test_exotic.py`.
+`"Add Comparison Stars from AAVSO?" = "n"` (headless, fase 0) y
+`"Plate Solution?" = "n"` (corrección 2026-09-30: ver abajo), y admite `out_dir`
+y una curva pre-reducida. Tests en `tests/unit/test_exotic.py`.
+
+**Corrección (2026-09-30)**: la fase B dejó `"Plate Solution?" = "y"` porque la
+fase 0 lo validó así. En uso real eso manda a EXOTIC a **subir la primera toma a
+nova.astrometry.net y sondear la cola pública antes de mirar la WCS del FITS**
+(`exotic.py:671-684`): unos 4 min por corrida con 10 reintentos por etapa y
+esperas de 4 a 37 s, y fallando más veces de las que acertaba. El síntoma era el
+spinner «Thinking | ...» durante minutos, que el observador lee como un cuelgue
+(caso real: proyecto HAT-P-32 b, `exotic_run.log` con 1542 líneas de spinner y
+`exotic.log` acabando en `GET /api/submissions/...`). Ahora es `"n"`:
+EXOTIC usa la WCS que ya traiga el FITS o, si no hay, alinea con astroalign y
+saca escala y masa de aire de la cabecera y del inits. Se pierden el chequeo VSX
+de las comparadas y el reencuadre del píxel del objetivo (informativos). El
+`run` además drena y sale si EXOTIC muere dejando el tubo abierto, marca
+`timed_out` y el diálogo de progreso traduce «Finding transformation i of N».
+
+**Segunda corrección (2026-09-30, misma fecha)**: la fase B dejó **todas las
+incertidumbres en `null`**. EXOTIC las sustituye por 1 (`exotic.py:1996-2002`),
+y en el ajuste final eso no se nota (su tope de ±0,25 P manda), pero en la
+**búsqueda de apertura/comparada** (`fit_lightcurve`, término 25σ) deja el
+tiempo de tránsito **clavado**: medido sobre el set de HAT-P-32 b, 3 valores
+distintos de `tmid` en 3809 ajustes de la búsqueda frente a **1289** con las
+incertidumbres del archivo, y el T_mid final pasó de 2458107.7125 ± 0,0019 a
+**2458107.7146 ± 0,0011** (de 1σ a 0,5σ de lo publicado), con la dispersión de
+0,71 % a 0,61 %. Ahora el `inits.json` las lleva (y Rp/Rs y a/Rs **propagadas**
+desde `pl_radj`/`st_rad` y `pl_orbsmax`/`st_rad`), más el argumento del
+periastro (sin él EXOTIC modela `omega = 0` con e = 0,159) y la fecha de
+observación tomada de la **cabecera de las tomas**. La caché de la fuente sube a
+`exoplanet_archive:v3` porque las filas anteriores no traen esas columnas.
+Queda **abierto** que la calidad fotométrica (Rp/Rs 0,1612 ± 0,0037 frente a
+0,1541 ± 0,0033 publicada) no alcanza la de la corrida de la fase 0 (0,1569 ±
+0,0034): apunta a las comparadas que se entregan (en el set de prueba las #2,
+#3 y #4 se salen del borde al derivar el campo), no a las incertidumbres.
 
 ---
 

@@ -35,6 +35,13 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT_S = 7200.0     # a full EXOTIC run can take a while
 LOG_NAME = "exotic_run.log"
+# After EXOTIC's process is gone, the pipe can still hold its last lines (and
+# a child that inherited the write end can keep it open forever). This is how
+# long the reader keeps draining an already-dead process before we stop: long
+# enough for the tail to land in the log, short enough that a stuck pipe can
+# never masquerade as a two-hour run.
+_DRAIN_GRACE_S = 1.5
+
 # Run EXOTIC through the USER's interpreter (their own install or the venv
 # the app prepared), not the console script: that script's path depends on
 # the install layout, while `-c` works for any interpreter that has EXOTIC.
@@ -82,7 +89,8 @@ def run(python, work_dir, inits_path, mode="red", override=True,
     #        override - pass -ov (adopt our params, skips the interactive
     #        parameter prompt), progress - callable(line),
     #        cancel - callable() -> bool, timeout_s - hard cap
-    # @return: {"ok", "returncode", "log_path", "out_dir", "cancelled"}
+    # @return: {"ok", "returncode", "log_path", "out_dir", "cancelled",
+    #          "timed_out"}
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     log_path = work_dir / LOG_NAME
@@ -92,6 +100,7 @@ def run(python, work_dir, inits_path, mode="red", override=True,
     logger.info("running EXOTIC: %s (cwd=%s)", " ".join(cmd), work_dir)
     start = time.monotonic()
     cancelled = False
+    timed_out = False
     proc = None
     try:
         with open(log_path, "w", encoding="utf-8", errors="replace") as lf:
@@ -110,6 +119,7 @@ def run(python, work_dir, inits_path, mode="red", override=True,
 
             threading.Thread(target=_reader, args=(proc.stdout,),
                              daemon=True).start()
+            gone_at = None
             while True:
                 try:
                     line = lines.get(timeout=0.5)
@@ -127,9 +137,24 @@ def run(python, work_dir, inits_path, mode="red", override=True,
                     _kill_tree(proc)
                     break
                 if timeout_s and time.monotonic() - start > timeout_s:
+                    timed_out = True
                     logger.warning("EXOTIC timed out after %ss", timeout_s)
                     _kill_tree(proc)
                     break
+                if proc.poll() is not None:
+                    # The process is gone: drain what is left in the pipe,
+                    # then stop. Without this we would only leave the loop
+                    # on EOF, and a pipe that never closes (a child holding
+                    # the write end) would keep the app "running" until the
+                    # two-hour timeout while EXOTIC had long finished.
+                    if line:
+                        gone_at = None          # still draining
+                    elif gone_at is None:
+                        gone_at = time.monotonic()
+                    elif time.monotonic() - gone_at > _DRAIN_GRACE_S:
+                        break
+                else:
+                    gone_at = None
             try:
                 proc.wait(timeout=30)
             except subprocess.TimeoutExpired:
@@ -137,11 +162,15 @@ def run(python, work_dir, inits_path, mode="red", override=True,
     except (OSError, subprocess.SubprocessError) as err:
         logger.warning("EXOTIC run failed: %s", err)
         return {"ok": False, "returncode": None, "log_path": str(log_path),
-                "out_dir": str(work_dir), "cancelled": False}
+                "out_dir": str(work_dir), "cancelled": False,
+                "timed_out": False}
     rc = proc.returncode if proc is not None else None
-    return {"ok": (rc == 0 and not cancelled), "returncode": rc,
-            "log_path": str(log_path), "out_dir": str(work_dir),
-            "cancelled": cancelled}
+    logger.info("EXOTIC finished: rc=%s in %.1fs (cancelled=%s, timed_out=%s)",
+                rc, time.monotonic() - start, cancelled, timed_out)
+    return {"ok": (rc == 0 and not cancelled and not timed_out),
+            "returncode": rc, "log_path": str(log_path),
+            "out_dir": str(work_dir), "cancelled": cancelled,
+            "timed_out": timed_out}
 
 
 def find_outputs(out_dir):

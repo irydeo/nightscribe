@@ -207,6 +207,77 @@ def test_progress_line_updates_the_dialog_and_the_status_bar(window, qapp):
     assert window._exotic_wait is None
 
 
+def test_the_spinner_is_not_shown_as_progress(window, qapp):
+    # "Thinking | ..." repeats for minutes while EXOTIC waits on something
+    # slow, and that is exactly what read as a hang (2026-09-30, the
+    # astrometry.net wait). It must not overwrite the last real stage.
+    window._exotic_progress_dialog()
+    try:
+        window._exotic_progress_line("Finding transformation 3 of 142 : a.fits")
+        stage = window._exotic_wait.labelText()
+        for spin in ("Thinking | ...", "Thinking / ...", "Thinking ... DONE!"):
+            window._exotic_progress_line(spin)
+            assert window._exotic_wait.labelText() == stage
+    finally:
+        window._exotic_reap_wait()
+
+
+def test_frame_progress_becomes_a_plain_counter(window, qapp):
+    # EXOTIC's own per-frame line is the only real progress it prints
+    window._exotic_progress_dialog()
+    try:
+        window._exotic_progress_line(
+            "Finding transformation 7 of 142 : /data/HATP-32171220013912.FITS")
+        assert window._exotic_wait.labelText() == \
+            window.tr("Reducing frame {0} of {1}…").format(7, 142)
+    finally:
+        window._exotic_reap_wait()
+
+
+def test_the_mid_transit_warning_becomes_a_neutral_stage(window, qapp):
+    # EXOTIC repeats this once per aperture / comparison-star combination that
+    # does not straddle the transit: 1143 times in a 142-frame run (measured
+    # 2026-09-30) and the observer read it as a failure. It is its own
+    # diagnostic about that combination, so the label says what is happening.
+    window._exotic_progress_dialog()
+    try:
+        window._exotic_progress_line(
+            "\x1b[33m  Estimated mid-transit time is not within the "
+            "observations\x1b[0m")
+        assert window._exotic_wait.labelText() == \
+            window.tr("Comparing apertures and comparison stars…")
+    finally:
+        window._exotic_reap_wait()
+
+
+def test_the_label_drops_exotic_colour_escapes(window, qapp):
+    # the warnings arrive coloured; the raw escapes used to show up in the
+    # label ("[33m  Comparison star #2 star beyond edge of file")
+    window._exotic_progress_dialog()
+    try:
+        window._exotic_progress_line(
+            "\x1b[33m Comparison star #2 star beyond edge of file\x1b[0m")
+        assert window._exotic_wait.labelText() == \
+            "Comparison star #2 star beyond edge of file"
+    finally:
+        window._exotic_reap_wait()
+
+
+def test_timed_out_run_says_it_ran_past_the_limit(window, qapp, monkeypatch,
+                                                  tmp_path):
+    # Killed by the time cap, not crashed: the box must not send the
+    # observer hunting a traceback that is not there.
+    log = _write_log(tmp_path / "exotic_run.log", n_info=3, error=False)
+    shown = _boxes(monkeypatch)
+    window._exotic_done({"ok": False, "returncode": -15,
+                         "log_path": str(log), "out_dir": str(tmp_path),
+                         "cancelled": False, "timed_out": True})
+    assert len(shown) == 1
+    assert "time limit" in shown[0]
+    assert "did not finish" not in shown[0]
+    assert window._exotic_worker is None
+
+
 def test_cancelled_run_reports_plainly_and_reaps_the_dialog(window, qapp,
                                                             monkeypatch,
                                                             tmp_path):

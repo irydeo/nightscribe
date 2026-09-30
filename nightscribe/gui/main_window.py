@@ -13,6 +13,7 @@
 
 import datetime
 import logging
+import re
 import uuid
 from pathlib import Path
 
@@ -6076,10 +6077,41 @@ class MainWindow(QMainWindow):
         # hung app).
         # @args: line - one log line, already stripped
         # @return: nothing
+        stage = self._exotic_stage(line)
+        if not stage:
+            return
         wait = getattr(self, "_exotic_wait", None)
         if wait is not None and Shiboken.isValid(wait):
-            wait.setLabelText(line[-120:])
-        self.statusBar().showMessage(line[-120:], 0)
+            wait.setLabelText(stage[-120:])
+        self.statusBar().showMessage(stage[-120:], 0)
+
+    def _exotic_stage(self, line):
+        # Turns one raw log line into something the observer can read, and
+        # drops the noise. EXOTIC's spinner ("Thinking | ...") repeats the
+        # same text for minutes and reads as a hang: it is exactly what the
+        # astrometry.net wait looked like (2026-09-30, the run that never
+        # moved). "Finding transformation i of N" is its real per-frame
+        # progress, so it becomes a plain counter.
+        # @args: line - one raw log line
+        # @return: the readable stage, or "" when the line is only noise
+        # EXOTIC colours its warnings, and the raw escapes ended up in the
+        # label ("[33m  Warning: ..."): drop them before showing the text.
+        text = re.sub(r"\x1b\[[0-9;]*m", "", line or "").strip()
+        if not text or text.startswith("Thinking"):
+            return ""
+        m = re.match(r"Finding transformation (\d+) of (\d+)", text)
+        if m:
+            return self.tr("Reducing frame {0} of {1}…").format(
+                m.group(1), m.group(2))
+        # EXOTIC prints this once per aperture / comparison-star combination
+        # whose frames do not straddle the transit: 1143 times in a 142-frame
+        # run (measured 2026-09-30), and the observer read it as a failure. It
+        # is its own diagnostic about that one combination, not about the
+        # reduction (the fit of the whole night is unaffected), so the label
+        # says what is really happening instead of repeating it.
+        if "not within the observations" in text:
+            return self.tr("Comparing apertures and comparison stars…")
+        return text
 
     def _exotic_cancel(self):
         # The dialog's Cancel: ask the worker to stop (it takes EXOTIC's
@@ -6119,6 +6151,15 @@ class MainWindow(QMainWindow):
             # the user stopped it: no error box, just the plain outcome
             self.statusBar().showMessage(
                 self.tr("EXOTIC cancelled: nothing was imported."), 8000)
+            return
+        if res.get("timed_out"):
+            # it ran past the limit and was killed: say that, not "did not
+            # finish", which would send the observer hunting a crash
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "EXOTIC ran past its time limit and was stopped. The last "
+                "lines of its log:\n\n{0}"
+            ).format(_exotic_log_tail(res.get("log_path"))
+                     or self.tr("(the log is empty)")))
             return
         if not res.get("ok") or pid is None:
             # P2 #21: the user reads what EXOTIC said, not where its log

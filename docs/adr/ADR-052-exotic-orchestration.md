@@ -97,6 +97,36 @@ el lanzamiento moría con `FileNotFoundError` justo al cerrarse el diálogo: la
 ventana parpadeaba y "no pasaba nada"), y el lanzamiento va **envuelto para que
 cualquier error salga en un aviso**, nunca en la consola.
 
+**Revisión (2026-09-30)**: la app **no pide la solución de placa a
+astrometry.net**. El `inits.json` va con `"Plate Solution? (y/n)" = "n"`: con
+«y», EXOTIC sube la primera toma a nova.astrometry.net y sondea la cola pública
+**antes** de mirar la WCS del FITS, con 10 reintentos por etapa y esperas de 4 a
+37 s (medido: unos 4 min por corrida, y fallando más veces de las que acertaba).
+El síntoma era el spinner «Thinking | ...» repitiéndose minutos, que se lee como
+un cuelgue. Con «n», EXOTIC usa la WCS que ya traiga el FITS; si la toma no tiene
+ninguna, alinea los frames con astroalign, toma la escala de IM_SCALE/PIXSCALE (o
+de nuestro `optional_info`) y la masa de aire de la RA/Dec del inits, así que la
+reducción corre igual, sin red y al instante. Se pierden el chequeo VSX de las
+comparadas y el reencuadre del píxel del objetivo, que solo informan. En la misma
+revisión: el lector del log ya no puede quedarse colgado si EXOTIC muere dejando
+el tubo abierto (drena lo que quede y sale, en vez de esperar al timeout de dos
+horas), el resultado distingue el **timeout** de un fallo, y el diálogo de
+progreso descarta el spinner y traduce «Finding transformation i of N» a «Toma i
+de N».
+
+La misma revisión rellena las **incertidumbres** del archivo en el `inits.json`
+(período, tiempo de tránsito, Rp/Rs y a/Rs propagadas desde `pl_radj`/`st_rad` y
+`pl_orbsmax`/`st_rad`, inclinación, Teff, [Fe/H], log g) y el **argumento del
+periastro**. Sin ellas EXOTIC las sustituye por 1 (`exotic.py:1996-2002`) y la
+ventana donde ajusta el tiempo de tránsito se vuelve tan ancha que la búsqueda
+de apertura/comparada **no puede ajustarlo**: medido sobre el set de HAT-P-32 b
+(142 tomas), 3 valores distintos de `tmid` en 3809 ajustes de la búsqueda frente
+a 1289 con las incertidumbres, y el T_mid final pasó de ±0,0019 a ±0,0011 d (de
+1σ a 0,5σ del valor publicado). La `Observation date` sale ya de la **cabecera de
+las tomas** (MJD-OBS, con DATE-OBS de respaldo): un set de diciembre de 2017 se
+entregaba fechado «hoy» (30-September-2026) y EXOTIC nombraba así todas las
+salidas, figuras y el reporte AAVSO.
+
 **Revision (2026-09-28)**: the reduction starts from the **Unified FITS Editor**,
 next to the sequence it needs (ADR-048 rev.), not from the Analysis tab. The editor
 carries a "Transit reduction (EXOTIC)" block for transit projects opened from a
@@ -109,3 +139,34 @@ WCS, so the reduce failed with "no comparison stars" although it was built). The
 not exist, so the launch died with `FileNotFoundError` right as the dialog closed:
 the window flashed and "nothing happened"), and the launch is **wrapped so any
 error lands in a message box**, never in the console.
+
+**Revision (2026-09-30)**: the app **does not ask astrometry.net for a plate
+solution**. The `inits.json` carries `"Plate Solution? (y/n)" = "n"`: with "y",
+EXOTIC uploads the first frame to nova.astrometry.net and polls the public queue
+**before** looking at the frame's own WCS, with 10 retries per stage and waits of
+4 to 37 s (measured: about 4 min per run, and failing more often than it
+succeeded). The symptom was the "Thinking | ..." spinner repeating for minutes,
+which reads as a hang. With "n", EXOTIC uses the WCS the FITS already carries; if
+the frame has none, it aligns the frames with astroalign, takes the scale from
+IM_SCALE/PIXSCALE (or our `optional_info`) and the airmass from the target RA/Dec
+in the inits, so the reduction runs just the same, offline and at once. What is
+lost is the VSX check on the comparisons and the target-pixel reframing, both
+informational. In the same revision: the log reader can no longer hang when
+EXOTIC dies leaving the pipe open (it drains what is left and stops, instead of
+waiting for the two-hour timeout), the result tells a **timeout** apart from a
+failure, and the progress dialog drops the spinner and turns "Finding
+transformation i of N" into "Frame i of N".
+
+The same revision fills the archive **uncertainties** into the `inits.json`
+(period, transit time, Rp/Rs and a/Rs propagated from `pl_radj`/`st_rad` and
+`pl_orbsmax`/`st_rad`, inclination, Teff, [Fe/H], log g) plus the **argument of
+periastron**. Without them EXOTIC replaces each with 1
+(`exotic.py:1996-2002`) and the window it fits the transit time in becomes so
+wide that its aperture/comparison search **cannot fit the time at all**:
+measured on the HAT-P-32 b set (142 frames), 3 distinct `tmid` values in 3809
+search fits against 1289 with the uncertainties, and the final T_mid went from
++-0.0019 to +-0.0011 d (1 sigma to 0.5 sigma from the published value). The
+`Observation date` now comes from the **frame headers** (MJD-OBS, DATE-OBS as
+fallback): a December 2017 set was handed over dated "today"
+(30-September-2026) and EXOTIC named every output, figure and the AAVSO report
+that way.

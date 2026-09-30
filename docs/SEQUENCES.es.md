@@ -402,7 +402,11 @@ como **previsualización** rápida.
 
 Sin entorno EXOTIC, el botón manual **«Exportar a EXOTIC (inits.json)…»** sigue
 disponible para reducir fuera y volver. La primera ejecución de EXOTIC necesita
-red (NASA Archive, datos de limb darkening, astrometry.net).
+red (NASA Archive y datos de limb darkening). La **solución de placa no se le
+pide a astrometry.net**: la app le da el objetivo y las comparadas en píxeles y
+EXOTIC usa la WCS que ya traiga el FITS; si la toma no tiene ninguna, alinea los
+frames con astroalign y saca la escala de la cabecera. Así el arranque es
+inmediato y no depende de la cola pública.
 
 ### Prueba real de punta a punta
 
@@ -429,9 +433,10 @@ secuencia de comparación y el entorno EXOTIC preparado.
 6. **Verificar**: T_mid a 3σ, Rp/Rs al 5 % y profundidad al 10 % frente a la
    referencia. Después, **«ExoClock…»** para subir el tránsito.
 
-La **primera ejecución** de EXOTIC necesita red (NASA Archive, datos de limb
-darkening, astrometry.net). Sin entorno EXOTIC, el botón manual **«Exportar a
-EXOTIC (inits.json)…»** sigue disponible.
+La **primera ejecución** de EXOTIC necesita red (NASA Archive y datos de limb
+darkening); la solución de placa **no** se pide a astrometry.net (ver arriba).
+Sin entorno EXOTIC, el botón manual **«Exportar a EXOTIC (inits.json)…»** sigue
+disponible.
 
 **En Windows (lo más limpio)**: instala **Python 3.10** desde python.org (marca
 el *py launcher*) y ejecuta `pip install exotic` en él; luego apunta la app a

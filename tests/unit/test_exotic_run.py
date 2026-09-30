@@ -95,6 +95,9 @@ time.sleep(30)
     res = exotic_run.run(script, tmp_path / "w", tmp_path / "inits.json",
                          timeout_s=0.6)
     assert not res["ok"]
+    # the GUI says "ran past its time limit", not "did not finish": the two
+    # send the observer to different places
+    assert res["timed_out"] and not res["cancelled"]
 
 
 def _pid_alive(pid):
@@ -114,6 +117,43 @@ def _pid_alive(pid):
         except OSError:
             pass
     return True
+
+
+def test_run_does_not_hang_on_a_child_holding_the_pipe(tmp_path):
+    # Regression (2026-09-30): a child that inherits stdout keeps the pipe
+    # open after its parent is gone, so the reader never sees EOF. Without
+    # the drain grace the app sat on "Running EXOTIC" until the two-hour
+    # timeout although EXOTIC had finished. The fake prints its child's pid
+    # and exits; the child sleeps, holding the write end.
+    script = _fake(tmp_path, "exotic_orphan.py", """
+import subprocess, sys, time
+child = subprocess.Popen([sys.executable, "-c",
+                          "import time; time.sleep(15)"],
+                         stdin=subprocess.DEVNULL)
+print(child.pid, flush=True)
+print("done", flush=True)
+sys.exit(0)
+""")
+    state = {"child": None}
+
+    def progress(line):
+        if line.strip().isdigit():
+            state["child"] = int(line.strip())
+
+    start = time.monotonic()
+    res = exotic_run.run(script, tmp_path / "w", tmp_path / "inits.json",
+                         progress=progress, timeout_s=20)
+    elapsed = time.monotonic() - start
+    try:
+        assert res["ok"] and res["returncode"] == 0
+        assert elapsed < 6, f"waited {elapsed:.1f}s for a dead parent"
+    finally:
+        if state["child"] is not None and _pid_alive(state["child"]):
+            try:
+                os.kill(state["child"],
+                        getattr(signal, "SIGKILL", signal.SIGTERM))
+            except OSError:
+                pass
 
 
 @pytest.mark.skipif(os.name != "posix",

@@ -1871,8 +1871,13 @@ def series_rows(points):
     # and a campaign pass write the same shape, and two copies of this
     # would drift the moment one of them gains a column.
     # @args: points - measured SeriesPoints
+    # Airmass and the measured position travel with the point on purpose:
+    # they are what the night figures are made of, and a curve read back
+    # from the database (a visit's own curve) must be able to explain its
+    # night without measuring everything again.
     # @return: [{"mjd", "filter", "mag", "err", "err_internal", "mag_raw",
-    #           "path", "flags", "source"}, ...]
+    #           "path", "flags", "source", "airmass", "x", "y", "fwhm",
+    #           "sky"}, ...]
     rows = []
     for p in points:
         if p.mjd is None:
@@ -1880,7 +1885,9 @@ def series_rows(points):
         rows.append({"mjd": p.mjd, "filter": p.filter, "mag": p.mag,
                      "err": p.err, "err_internal": p.err_internal,
                      "mag_raw": p.inst, "path": p.path,
-                     "flags": list(p.flags), "source": "measure"})
+                     "flags": list(p.flags), "source": "measure",
+                     "airmass": p.airmass, "x": p.x, "y": p.y,
+                     "fwhm": p.fwhm, "sky": p.sky})
     return rows
 
 

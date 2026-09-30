@@ -403,6 +403,25 @@ def _migrate(conn):
                 conn.execute("ALTER TABLE photometry_points ADD COLUMN"
                              " err_internal REAL")
         conn.execute("PRAGMA user_version = 13")
+    if v < 14:
+        # The NIGHT figures (airmass and the measured position) travel with
+        # the point: a curve read back from the database, like a visit's
+        # own, must be able to explain its night instead of asking for the
+        # frames again. Same idempotent guard as v9-v13: a hand-seeded old
+        # database may not have the table at all.
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            for name, kind in (("airmass", "REAL"), ("x", "REAL"),
+                               ("y", "REAL"), ("fwhm", "REAL"),
+                               ("sky", "REAL")):
+                if name not in cols:
+                    conn.execute(
+                        "ALTER TABLE photometry_points ADD COLUMN"
+                        f" {name} {kind}")
+        conn.execute("PRAGMA user_version = 14")
     conn.commit()
 
 

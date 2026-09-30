@@ -1800,3 +1800,69 @@ def test_the_buttons_inside_the_doors_still_do_what_they_did(dlg, tmp_path,
     tab.btn_reset_state.click()
     tab.btn_reset_points.click()
     assert seen == ["state", "points"]
+
+
+# ---------------- the chart's PNG exports (reported) ------------------
+
+def test_the_visit_s_curve_can_be_exported_as_a_png(dlg, tmp_path,
+                                                    monkeypatch):
+    # Reported: "the PNG export of the chart does not work, the save dialog
+    # does not even appear". A curve loaded from the visit has no run of this
+    # session behind it, and the export demanded one: it returned BEFORE
+    # opening the dialog. The button saves the chart IN THE VISIT, which is
+    # exactly the curve on screen.
+    from PySide6.QtWidgets import QFileDialog
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(6), None)
+    assert tab._series_result is None and tab._series_payload
+    out = tmp_path / "curva.png"
+    asked = []
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName",
+        staticmethod(lambda *a, **k: (asked.append(True), (str(out), ""))[1]))
+    tab._on_series_sci()
+    assert asked                              # the dialog was reached
+    assert out.exists() and out.stat().st_size > 0
+    assert "written" in tab.lbl_status.text().lower()
+
+
+def test_the_night_figures_use_what_the_visit_s_curve_carries(
+        dlg, tmp_path, monkeypatch):
+    # The airmass and the measured position travel with the point now, so a
+    # curve read back from the database draws its own night without
+    # measuring anything again.
+    from nightscribe.viz import night_view
+    tab = dlg.tab_measure
+    points = [dict(p, airmass=1.2 + 0.01 * i, x=800.0 + i, y=600.0 + i)
+              for i, p in enumerate(_visit_points(6))]
+    tab.set_visit_curve_hooks(lambda: points, None)
+    written = []
+    monkeypatch.setattr(
+        night_view, "draw_airmass",
+        lambda pts, out=None, **k: (written.append("air"), out)[1])
+    monkeypatch.setattr(
+        night_view, "draw_drift",
+        lambda pts, out=None, **k: (written.append("drift"), out)[1])
+    monkeypatch.setattr("nightscribe.gui.chart_viewer.open_chart",
+                        lambda *a, **k: None)
+    tab._on_series_night()
+    assert written == ["air", "drift"]
+    assert "Night figures written" in tab.lbl_status.text()
+
+
+def test_the_night_figures_say_what_an_old_curve_cannot_give(dlg,
+                                                             monkeypatch):
+    # A curve measured before the app stored them carries neither the
+    # airmass nor the position: the button says it instead of going quiet.
+    from nightscribe.viz import night_view
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(4), None)
+    called = []
+    monkeypatch.setattr(night_view, "draw_airmass",
+                        lambda *a, **k: called.append("air"))
+    monkeypatch.setattr(night_view, "draw_drift",
+                        lambda *a, **k: called.append("drift"))
+    tab._on_series_night()
+    assert called == []
+    assert "neither the airmass nor the measured position" \
+        in tab.lbl_status.text()

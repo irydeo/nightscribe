@@ -55,7 +55,7 @@ def test_migration_v3_to_current_preserves_projects(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 13
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 14
     # project survived
     row = db.execute(
         "SELECT kind, object_name FROM projects WHERE id=1").fetchone()
@@ -111,7 +111,7 @@ def test_migration_v9_moves_session_images_into_the_registry(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 13
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 14
     row = db.execute(
         "SELECT path, kind, session_id, meta FROM project_files"
         " WHERE project_id=1").fetchone()
@@ -146,7 +146,7 @@ def test_migration_v5_is_idempotent(tmp_path):
 
     Database(str(file))  # 3 -> current
     db = Database(str(file))  # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 13
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 14
 
 
 # ---------------- sessions CRUD ----------------
@@ -300,7 +300,7 @@ def test_migration_v10_adds_the_pin_column(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 13
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 14
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(project_sessions)").fetchall()}
     assert "pinned" in cols
@@ -333,20 +333,23 @@ def test_migration_v10_gains_the_plate_link(tmp_path):
     db.close()
 
     db = Database(str(f))           # replays the v11 migration
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 13
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 14
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(photometry_points)").fetchall()}
     assert "file_id" in cols
     idx = {r[1] for r in db.execute(
         "PRAGMA index_list(photometry_points)").fetchall()}
     assert "idx_photo_points_file" in idx
-    assert db.execute("SELECT file_id FROM photometry_points").fetchone()[0] is None
+    row = db.execute("SELECT file_id FROM photometry_points").fetchone()
+    assert row[0] is None
     # the link is a real FK with the detach-on-plate-delete rule: the
     # point survives, its file_id simply goes NULL
     db.execute("DELETE FROM project_files WHERE id=?", (fid,))
     db.commit()
-    assert db.execute("SELECT COUNT(*) FROM photometry_points").fetchone()[0] == 1
-    assert db.execute("SELECT file_id FROM photometry_points").fetchone()[0] is None
+    row = db.execute("SELECT COUNT(*) FROM photometry_points").fetchone()
+    assert row[0] == 1
+    row = db.execute("SELECT file_id FROM photometry_points").fetchone()
+    assert row[0] is None
     db.close()
 
 
@@ -444,3 +447,58 @@ def test_discarding_the_curve_undoes_its_runs_and_leaves_the_trail(tmp_path):
         ["undone", "undone"]
     # and the hand-entered point was never part of the curve
     assert len(fu.points_for_session(db, sid, series_only=False)) == 1
+
+
+# ---------------- v14: the night travels with the point ---------------
+
+def test_migration_v14_adds_the_night_fields(tmp_path):
+    # A database from before v14 has points without airmass or position:
+    # the migration adds them, and the guard is idempotent (the v9-v13
+    # pattern) because a hand-seeded old database may not have the table.
+    import sqlite3
+    from nightscribe.core.db import Database
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.execute("""CREATE TABLE photometry_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER,
+        session_id INTEGER, mjd REAL, filter TEXT, mag REAL, err REAL,
+        source TEXT, file_id INTEGER, mag_raw REAL, flags TEXT,
+        run_id INTEGER, err_internal REAL)""")
+    conn.execute("INSERT INTO photometry_points (mjd, mag)"
+                 " VALUES (60000.0, 12.0)")
+    conn.execute("PRAGMA user_version = 13")
+    conn.commit()
+    conn.close()
+    db = Database(path)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(photometry_points)")}
+    assert {"airmass", "x", "y", "fwhm", "sky"} <= cols
+    # the old point is still there, with its new fields empty
+    row = db.execute(
+        "SELECT mjd, airmass, x FROM photometry_points").fetchone()
+    assert row[0] == 60000.0 and row[1] is None and row[2] is None
+    db.close()
+
+
+def test_the_night_fields_survive_a_write_and_a_read(tmp_path):
+    # The whole point: a curve read back from the database (a visit's own
+    # curve) brings the airmass and the measured position, so its night
+    # figures can be drawn months later without measuring again.
+    import pytest
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu
+    db = Database(tmp_path / "p.db")
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    sid = fu.create_session(db, pid, "2026-09-30")
+    ids = fu.add_points(db, [{
+        "project_id": pid, "session_id": sid, "mjd": 60000.25,
+        "filter": "V", "mag": 12.34, "err": 0.05, "source": "measure",
+        "airmass": 1.42, "x": 831.5, "y": 620.25, "fwhm": 3.1, "sky": 420.0}])
+    assert ids
+    back = fu.points_for_session(db, sid)
+    assert len(back) == 1
+    assert back[0]["airmass"] == pytest.approx(1.42)
+    assert back[0]["x"] == pytest.approx(831.5)
+    assert back[0]["y"] == pytest.approx(620.25)
+    assert back[0]["fwhm"] == pytest.approx(3.1)
+    assert back[0]["sky"] == pytest.approx(420.0)
+    db.close()

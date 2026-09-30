@@ -1211,7 +1211,14 @@ class UfeMeasureTab(QWidget):
         # @return: None
         from PySide6.QtWidgets import QFileDialog
         from .. import paths as paths_mod
-        if self._series_result is None or not self._series_payload:
+        # WHAT IS ON THE CHART is what this saves, whether it came from a
+        # run of this session or from the visit's own curve (loaded from the
+        # project's database): the button is "the chart IN THE VISIT". It
+        # used to demand a run of this session, so with a loaded curve it
+        # returned BEFORE opening the save dialog and the observer saw a
+        # button that did nothing (reported: "the PNG export of the chart
+        # does not work, the dialog does not even appear").
+        if not self._series_payload:
             self._say(self.tr(
                 "Measure the series first: the figure is the curve."))
             return
@@ -1249,10 +1256,17 @@ class UfeMeasureTab(QWidget):
         # @args: context - the visit context (paths, kind)
         # @return: the subtitle string
         n = len((context or {}).get("paths") or [])
+        # the exposure can come from the run's own points (SeriesPoint) or
+        # from the drawn payload (dicts, a curve loaded from the visit): a
+        # curve on screen must be exportable without a run of this session
+        points = (self._series_result.points if self._series_result
+                  else self._series_payload)
         exps = []
-        for p in (self._series_result.points if self._series_result else []):
-            if p.exptime:
-                exps.append(p.exptime)
+        for p in points or []:
+            exp = p.get("exptime") if isinstance(p, dict) \
+                else getattr(p, "exptime", None)
+            if exp:
+                exps.append(exp)
                 break
         bits = []
         if n:
@@ -1270,13 +1284,41 @@ class UfeMeasureTab(QWidget):
         # airmass and the measured position. They are written next to the
         # project and opened in the chart viewer, because a diagnosis the
         # observer cannot see is not a diagnosis.
-        if self._series_result is None or not self._series_result.points:
+        #
+        # THEY NEED WHAT THE POINTS CARRY, not a run of this session: a
+        # curve loaded from the visit brings them from the database (they
+        # travel with the point since v14), and a point measured before
+        # that has no airmass to draw. Each figure is written when its own
+        # data is there, and what could not be drawn is said with its
+        # reason instead of the button going quiet (reported: "the PNG
+        # export of the chart does not work, the dialog does not even
+        # appear": the guard demanded a run of this session and returned
+        # before anything).
+        points = (self._series_result.points if self._series_result
+                  else self._series_payload)
+        if not points:
             self._say(self.tr(
                 "Measure the series first: the figures are its night."))
             return
         from ..viz import night_view
         from ..core import project
         from .. import paths as paths_mod
+
+        def value(point, key):
+            # @return: one field of a point, be it a SeriesPoint or a dict
+            if isinstance(point, dict):
+                return point.get(key)
+            return getattr(point, key, None)
+
+        has_air = any(value(p, "airmass") is not None for p in points)
+        has_pos = any(value(p, "x") is not None and value(p, "y") is not None
+                      for p in points)
+        if not has_air and not has_pos:
+            self._say(self.tr(
+                "These points carry neither the airmass nor the measured "
+                "position (they were measured before the app stored them): "
+                "measure the series again to have the night figures."))
+            return
         ctx = self._series_context() or {}
         pid = ctx.get("pid")
         row = project.get(db, pid) if pid else None
@@ -1291,21 +1333,31 @@ class UfeMeasureTab(QWidget):
         sub = self._series_subtitle(ctx)
         written = []
         try:
-            written.append(night_view.draw_airmass(
-                self._series_result.points,
-                out=str(folder / "{0}_aire.png".format(stem)),
-                subtitle=sub, lang=self._lang))
-            written.append(night_view.draw_drift(
-                self._series_result.points,
-                out=str(folder / "{0}_deriva.png".format(stem)),
-                subtitle=sub, lang=self._lang))
+            if has_air:
+                written.append(night_view.draw_airmass(
+                    points, out=str(folder / "{0}_aire.png".format(stem)),
+                    subtitle=sub, lang=self._lang))
+            if has_pos:
+                written.append(night_view.draw_drift(
+                    points, out=str(folder / "{0}_deriva.png".format(stem)),
+                    subtitle=sub, lang=self._lang))
         except Exception as err:                     # never a dead window
             logger.warning("night figures failed: %s", err)
             self._say(self.tr(
                 "Could not write the night figures: {0}").format(err))
             return
-        self._say(self.tr(
-            "Night figures written: {0}").format(", ".join(written)))
+        logger.info("night figures written: %s", ", ".join(written))
+        text = self.tr("Night figures written: {0}").format(
+            ", ".join(written))
+        if not has_air:
+            text += " " + self.tr(
+                "The airmass figure is missing: these points do not carry "
+                "it.")
+        elif not has_pos:
+            text += " " + self.tr(
+                "The drift figure is missing: these points do not carry "
+                "the measured position.")
+        self._say(text)
         from .chart_viewer import open_chart
         for path in written:
             open_chart(self, path, title=self.tr("Night conditions"),

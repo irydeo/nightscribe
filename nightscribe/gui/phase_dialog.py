@@ -269,13 +269,24 @@ class PhaseDialog(QDialog):
         if not target:
             return
         try:
+            wrote_png = False
             if png and os.path.exists(png):
                 import shutil
                 shutil.copyfile(png, target)
+                wrote_png = True
             base = os.path.splitext(target)[0]
             self._write_csv(base + ".csv", np)
-            self._ui.txt_result.setPlainText(self.tr(
-                "Written:\n{0}\n{1}").format(target, base + ".csv"))
+            text = self.tr("Written:\n{0}\n{1}").format(
+                target, base + ".csv")
+            if not wrote_png:
+                # the figure is redrawn by a search and kept in a temporary
+                # file: when it is gone, the report says so instead of
+                # writing a CSV and going quiet
+                text += "\n" + self.tr(
+                    "The figure was no longer on disk: only the CSV was "
+                    "written (search again to draw it and export it).")
+            self._ui.txt_result.setPlainText(text)
+            logger.info("period report written: %s", base)
         except OSError as err:
             self._ui.txt_result.setPlainText(self.tr(
                 "Could not write the report: {0}").format(err))

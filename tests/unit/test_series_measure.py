@@ -1034,8 +1034,12 @@ def test_the_engine_builds_the_rows_a_host_persists(tmp_path):
     res = sm.measure_series(paths, _config(wcs, _comp_set(wcs)))
     rows = sm.series_rows(res.points)
     assert len(rows) == len(paths)
+    # airmass and the measured position travel with the point: the night
+    # figures are made of them, and a curve read back from the database has
+    # to be able to explain its night
     assert set(rows[0]) == {"mjd", "filter", "mag", "err", "err_internal",
-                            "mag_raw", "path", "flags", "source"}
+                            "mag_raw", "path", "flags", "source",
+                            "airmass", "x", "y", "fwhm", "sky"}
     assert rows[0]["source"] == "measure"
     assert rows[0]["path"] in [str(p) for p in paths]
     # a point without a time cannot be placed on a curve: it is not a row

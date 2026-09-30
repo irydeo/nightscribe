@@ -19,10 +19,14 @@ inserts the real widget there (the pattern main_window.ui has always
 used for its tab pages).
 """
 
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QFile
 from PySide6.QtUiTools import QUiLoader
+from PySide6.QtWidgets import QWidget
+
+logger = logging.getLogger("nightscribe.gui.ui_loader")
 
 UI_DIR = Path(__file__).parent / "ui"
 
@@ -35,12 +39,71 @@ def load_ui(name, parent=None):
     # @args: name - the file's basename without ".ui", parent - the
     #        widget the loaded root is parented to
     # @return: the loaded widget; children are reachable as attributes
-    #          through their objectName (PySide6's fallback)
-    file = QFile(str(UI_DIR / f"{name}.ui"))
-    file.open(QFile.ReadOnly)
-    widget = QUiLoader().load(file, parent)
-    file.close()
-    return widget
+    #          through their objectName (registered here, see
+    #          _register_children)
+    path = UI_DIR / f"{name}.ui"
+    names = _named_widgets(path)
+    for attempt in (0, 1):
+        file = QFile(str(path))
+        file.open(QFile.ReadOnly)
+        widget = QUiLoader().load(file, parent)
+        file.close()
+        _register_children(widget)
+        wrong = [n for n in names
+                 if not isinstance(getattr(widget, n, None), QWidget)]
+        if not wrong:
+            return widget
+        # A LOAD THAT CAME BACK WRONG IS NOT A LOAD. Seen under a full test
+        # run: three names of one panel resolved to their widgets and a
+        # fourth to a QWidgetItem (a layout item), which crashed the
+        # workbench while it was being built with a message about 'clicked'
+        # that said nothing about the real problem. It is rare (one load in
+        # a few thousand) and it is per-load, so it is retried once; if the
+        # retry is wrong too, the failure is said out loud here instead of
+        # surfacing as a mystery inside a feature.
+        logger.warning("the %s load came back wrong for %s (attempt %d)",
+                       name, wrong, attempt + 1)
+        widget.deleteLater()
+    raise RuntimeError(
+        f"{name}.ui did not load cleanly: {wrong} did not resolve to widgets")
+
+
+def _named_widgets(path):
+    # @args: path - a Designer file
+    # @return: the objectNames of every widget it declares, except the root
+    #          (the root IS the loaded widget)
+    import xml.etree.ElementTree as ET
+    tree = ET.parse(path).getroot()
+    root = tree.find("widget")
+    if root is None:
+        return []
+    own = root.get("name")
+    return [node.get("name") for node in tree.iter("widget")
+            if node.get("name") and node.get("name") != own]
+
+
+def _register_children(root):
+    # Every named child of a loaded .ui becomes an attribute of the loaded
+    # widget. This is done HERE, by hand, instead of trusting QUiLoader's
+    # own name fallback: that fallback resolves a name to whatever object
+    # carries it, and under a full test run it has handed back a
+    # QWidgetItem (a LAYOUT ITEM, not a widget) for
+    # `visit_panel.ph_series` and `visit_panel.btn_solve_visit`, which
+    # crashed the dialog while it was being built ("'QWidgetItem' object has
+    # no attribute 'clicked'") and fed `drop_in` the wrong kind of argument
+    # (intermittent: not reproducible in 120 builds in a row, nor in
+    # isolation). Setting them here is deterministic and costs a walk over
+    # the tree once per load.
+    # @args: root - the widget QUiLoader returned
+    # @return: None
+    from PySide6.QtCore import QObject
+    for child in root.findChildren(QObject):
+        name = child.objectName()
+        # a name that belongs to the class (a method, a property) is left
+        # alone: only the .ui's own objects are registered
+        if not name or hasattr(type(root), name):
+            continue
+        setattr(root, name, child)
 
 
 def adopt_ui(host, name):

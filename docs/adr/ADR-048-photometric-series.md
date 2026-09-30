@@ -756,3 +756,49 @@ turned off saying why; "discard the curve" is per visit too and with "all
 visits" it is disabled and explains itself. And the UFE chart loads the
 curve of the **scope**: with "all visits", the project's, with the detrend
 refitted **per run** (one night, one policy).
+
+
+**Revisión (2026-09-30, un fotograma, una medida)**: la regla anterior («la
+curva de una noche es la ejecución que la visita marca, o la última») se
+quedaba corta con los datos reales: las 244 tomas de la visita 18 estaban
+medidas otra vez como visitas 20 (35 tomas) y 21 (3), **todas dentro** de las
+244, así que la unión por visitas daba 282 puntos con 38 duplicados a dos
+niveles (12.79-12.83 junto a 11.96-12.06). La invariante que faltaba es la
+que el observador reportó dos veces: **una curva nunca enseña el mismo
+fotograma dos veces**.
+
+`followup.curve_point_ids` es ahora el único lector: la clave de un fotograma
+es su **ruta** (no la fila del registro, porque el mismo fichero puede estar
+registrado en dos visitas: son dos filas y un solo fotograma) con su noche, y
+gana la medida de id más alto, que es la más reciente. La **curva del
+proyecto** (`list_points`) es la unión objetiva, sin la elección de ninguna
+visita en medio; la **curva de la visita** (`points_for_session`) honra su
+pasada elegida y rellena los fotogramas que esa pasada no cubre con su medida
+más reciente (una noche medida en dos pasadas es una curva). El `file_id` de
+cada punto se resuelve por (ruta, visita) y el tab manda la visita de cada
+toma en su fila, así que una toma registrada en dos visitas archiva su punto
+en la suya y no en la que aparezca última. Medido sobre su base: la curva del
+proyecto 113 pasa de 282 a **244** puntos (una noche, 244 fotogramas) y la
+del 96 de 284 a 142.
+
+**Revision (2026-09-30, one frame, one measurement)**: the previous rule ("a
+night's curve is the run the visit marks, or the last one") fell short on the
+real data: the 244 frames of visit 18 had been measured again as visits 20
+(35 frames) and 21 (3), **every one inside** the 244, so the per-visit union
+gave 282 points with 38 of them duplicated at two levels (12.79-12.83 next to
+11.96-12.06). The invariant that was missing is the one the observer reported
+twice: **a curve never shows the same frame twice**.
+
+`followup.curve_point_ids` is now the only reader: a frame's key is its
+**path** (not the registry row, because the same file can be registered in
+two visits: two rows, one frame) with its night, and the highest point id
+wins, which is the newest measurement. The **project's curve**
+(`list_points`) is the objective union, with no visit's choice in the middle;
+the **visit's curve** (`points_for_session`) honours its chosen pass and
+fills the frames that pass does not cover with their newest measurement (a
+night measured in two passes is one curve). Each point's `file_id` is
+resolved by (path, visit) and the tab sends each frame's visit in its row, so
+a frame registered in two visits files its point in its own and not in
+whichever came last. Measured on his database: project 113's curve goes from
+282 to **244** points (one night, 244 frames) and project 96's from 284 to
+142.

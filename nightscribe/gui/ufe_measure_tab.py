@@ -2312,9 +2312,22 @@ class UfeMeasureTab(QWidget):
             "The series failed and stopped: {0}").format(message))
 
     def _series_rows(self, points):
-        # @return: the rows the host persists (one run, one batch). The
-        # shape belongs to the engine: a pass writes the same one.
-        return series_measure.series_rows(points)
+        # The rows the host persists (one run, one batch). The shape belongs
+        # to the engine: a pass writes the same one.
+        #
+        # Each row says WHICH VISIT its frame belongs to (the context knows:
+        # the same frame can be registered in more than one visit, which is
+        # what the observer's own project does), so a multi-night pass files
+        # every night's points in that night's visit.
+        # @args: points - the measured SeriesPoints
+        # @return: the rows
+        rows = series_measure.series_rows(points)
+        by_path = (self._series_context() or {}).get("path_sessions") or {}
+        for row in rows:
+            visit = by_path.get(row.get("path"))
+            if visit is not None:
+                row["session_id"] = visit
+        return rows
 
     def _draw_series(self, points):
         # Raw + detrended, flagged points as hollow diamonds (D13/T7).

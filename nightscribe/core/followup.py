@@ -225,34 +225,84 @@ def add_point(db, project_id, mjd, filter_name, mag, err=None, source="manual",
 # (hand-entered, pasted, survey context) are never a re-measurement: they
 # always belong to the curve.
 
-def _curve_group(session_id, mjd):
-    # @args: session_id - the visit of the point, or None, mjd - its time
-    # @return: what makes two series points share one curve: the VISIT
-    #          when they have one (a visit is one night by construction),
-    #          else the observing night of their mjd (the points measured
-    #          before visits existed: a project holds several of those and
-    #          re-measuring the same night must not double the curve)
-    if session_id is not None:
-        return ("visit", session_id)
+def _curve_night(mjd):
+    # The observing night of an mjd: the engine's own boundary (local noon),
+    # imported and not copied so the two cannot drift.
+    # @args: mjd - Modified Julian Date
+    # @return: the night key
     from . import series_measure
-    return ("night", series_measure._night_of(mjd))
+    return series_measure._night_of(mjd)
 
 
 def _series_point_rows(db, project_id=None, session_id=None):
     # The series points, in INSERTION order: the last row of a group is
     # the last thing that was measured for it, which is the whole point.
-    # @return: rows of (id, session_id, run_id, mjd)
-    sql = ("SELECT id, session_id, run_id, mjd FROM photometry_points"
-           " WHERE source='measure' AND run_id IS NOT NULL")
+    #
+    # The frame comes back as its PATH, not as its registry id: the same
+    # file registered in two visits is two rows (the observer's own project
+    # has the same 244 frames in three visits), and a frame is one frame.
+    # @return: rows of (id, session_id, run_id, mjd, frame path or None)
+    sql = ("SELECT p.id, p.session_id, p.run_id, p.mjd, f.path"
+           " FROM photometry_points p"
+           " LEFT JOIN project_files f ON f.id = p.file_id"
+           " WHERE p.source='measure' AND p.run_id IS NOT NULL")
     params = []
     if project_id is not None:
-        sql += " AND project_id=?"
+        sql += " AND p.project_id=?"
         params.append(project_id)
     if session_id is not None:
-        sql += " AND session_id=?"
+        sql += " AND p.session_id=?"
         params.append(session_id)
-    sql += " ORDER BY id"
+    sql += " ORDER BY p.id"
     return db.execute(sql, tuple(params)).fetchall()
+
+
+def _frame_key(row):
+    # What makes two series points the SAME measurement: the frame they
+    # were measured on (a frame is measured once per pass, and re-measuring
+    # it replaces it). A point whose frame was never registered has no
+    # path, so its time is the only key there is.
+    # @args: row - (id, session_id, run_id, mjd, frame path or None)
+    # @return: the key of the frame
+    night = _curve_night(row[3])
+    if row[4]:
+        return (night, "frame", str(row[4]))
+    return (night, "time", round(float(row[3]), 6))
+
+
+def curve_point_ids(db, project_id=None, session_id=None, use_choice=False):
+    # THE POINTS A CURVE IS MADE OF: ONE PER FRAME.
+    #
+    # This is the invariant the observer reported twice ("la gráfica se
+    # corrompe, esto no puede ocurrir jamás"). A night measured again shows
+    # the newest measurement of each frame, never the same frame twice at
+    # two different levels. Measured on his own database: the 244 frames of
+    # visit 18 were measured again as visits 20 (35 frames) and 21 (3),
+    # every one of them a SUBSET of the 244, so the project's curve held
+    # 282 points with 38 of them duplicated.
+    #
+    # `use_choice` is for the VISIT's own chart: the pass the visit chose
+    # (the passes door) answers for the frames IT covers, and the frames it
+    # does not cover keep their newest measurement. The project's curve
+    # never uses the choice: it is the objective union of the nights, and a
+    # per-visit choice would depend on which visit was asked last.
+    # @args: db - Database, project_id / session_id - what to look at,
+    #        use_choice - honour the visit's chosen pass
+    # @return: the set of point ids
+    rows = _series_point_rows(db, project_id=project_id,
+                              session_id=session_id)
+    keep = {}
+    for r in rows:                      # id order: the newest wins
+        keep[_frame_key(r)] = r[0]
+    if use_choice:
+        chosen = _chosen_runs(db, project_id=project_id,
+                              session_id=session_id)
+        with_points = {r[2] for r in rows}
+        for r in rows:
+            if r[1] is not None and chosen.get(r[1]) == r[2] \
+                    and r[2] in with_points:
+                keep[_frame_key(r)] = r[0]
+    return set(keep.values())
 
 
 def _chosen_runs(db, project_id=None, session_id=None):
@@ -271,26 +321,15 @@ def _chosen_runs(db, project_id=None, session_id=None):
 
 
 def curve_run_ids(db, project_id=None, session_id=None):
-    # Which run each curve is made of.
+    # The runs a curve is made of (the passes it shows points from).
     # @args: db - Database, project_id - limit to one project or None,
     #        session_id - limit to one visit or None
-    # @return: the set of run ids whose points are the curve (one per
-    #          visit, or per night for the points that have no visit)
+    # @return: the set of run ids the curve's points belong to
     rows = _series_point_rows(db, project_id=project_id,
                               session_id=session_id)
-    with_points = {r[2] for r in rows}
-    newest = {}
-    for r in rows:
-        # later rows overwrite earlier ones: the newest measurement wins
-        newest[_curve_group(r[1], r[3])] = r[2]
-    for sid, run_id in _chosen_runs(db, project_id=project_id,
-                                    session_id=session_id).items():
-        # The visit's choice wins, as long as that run still HAS points: an
-        # undone run has none, so the curve falls back to the previous one,
-        # which is exactly what "undo this run" should show.
-        if run_id in with_points:
-            newest[_curve_group(sid, None)] = run_id
-    return set(newest.values())
+    keep = curve_point_ids(db, project_id=project_id, session_id=session_id,
+                           use_choice=True)
+    return {r[2] for r in rows if r[0] in keep}
 
 
 def run_pass_group(db, run_id):
@@ -325,17 +364,27 @@ def runs_in_pass(db, group):
 
 
 def curve_run_for_session(db, session_id):
-    # @return: the run the visit's curve is, or None when it has none
-    ids = curve_run_ids(db, session_id=session_id)
-    return next(iter(ids)) if len(ids) == 1 else None
+    # The run the visit's chart SHOWS: the pass the visit chose, or the
+    # newest one measured.
+    #
+    # It is NOT "the single run the curve is made of": a visit's curve takes
+    # the frames its chosen pass does not cover from their own newest
+    # measurement (a night measured in two passes is one curve), so the
+    # curve can span two runs while the visit still shows ONE pass.
+    # @return: the run id, or None when the visit has no series points
+    rows = _series_point_rows(db, session_id=session_id)
+    with_points = {r[2] for r in rows}
+    chosen = _chosen_runs(db, session_id=session_id).get(session_id)
+    if chosen is not None and chosen in with_points:
+        return chosen
+    return max(with_points) if with_points else None
 
 
 def curve_summary(points):
     # What a curve is, in the two numbers a list row shows (the project
     # list's thumbnail and its tooltip). "Nights" counts the observing
-    # nights, not the visits: a visit is one night by construction, and the
-    # points measured before visits existed are grouped by their own night,
-    # exactly like the curve itself (see _curve_group).
+    # nights of the points (the unit of a curve), never the visits: a night
+    # filed in three visits is still one night.
     # @args: points - the rows of a curve (list_points)
     # @return: {"points": usable points, "nights": observing nights}
     nights = set()
@@ -344,7 +393,7 @@ def curve_summary(points):
         if p.get("mjd") is None or p.get("mag") is None:
             continue
         n += 1
-        nights.add(_curve_group(p.get("session_id"), p["mjd"]))
+        nights.add(_curve_night(p["mjd"]))
     return {"points": n, "nights": len(nights)}
 
 
@@ -387,9 +436,12 @@ def list_points(db, project_id, filter_name=None, curve=True):
     points = [_point_dict(r) for r in rows]
     if not curve:
         return points
-    keep = curve_run_ids(db, project_id=project_id)
+    # the project's curve is the objective union: one point per frame, its
+    # newest measurement, with no per-visit choice in the middle (a choice
+    # made in one visit would depend on which visit was asked last)
+    keep = curve_point_ids(db, project_id=project_id)
     return [p for p in points
-            if p["run_id"] is None or p["run_id"] in keep]
+            if p["run_id"] is None or p["id"] in keep]
 
 
 def _point_dict(row):
@@ -622,9 +674,12 @@ def points_for_session(db, session_id, series_only=True, curve=True):
     points = [_point_dict(r) for r in db.execute(sql, tuple(params))]
     if not curve:
         return points
-    keep = curve_run_ids(db, session_id=session_id)
+    # the visit's own chart: the pass it chose answers for the frames it
+    # covers, and the frames it does not cover keep their newest
+    # measurement (a night measured in two passes is one curve)
+    keep = curve_point_ids(db, session_id=session_id, use_choice=True)
     return [p for p in points
-            if p["run_id"] is None or p["run_id"] in keep]
+            if p["run_id"] is None or p["id"] in keep]
 
 
 def get_run(db, run_id):

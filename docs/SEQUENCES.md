@@ -255,6 +255,22 @@ undo.
 
 ### 7.2 A visit is ONE curve (and the other passes stay)
 
+**One frame, one measurement.** A curve never shows the same frame twice: it
+shows its **newest** measurement. If you measure the whole night again, the
+new pass replaces the old one; if you measure only a part, the rest stays as
+it was and the night is still **one** curve. Measured on your own database:
+the 244 frames of visit 18 had been measured again as visits 20 (35 frames)
+and 21 (3), every one inside the 244, so the union held 282 points with 38 of
+them duplicated at two levels; it is 244 now.
+
+The **visit's curve** is the pass the visit shows (the passes door): that
+pass answers for ITS frames, and the ones it does not cover are filled with
+their newest measurement. The **project's curve** is the objective union: one
+point per frame, its newest measurement, with no visit's choice changing what
+another sees. That is why a visit's chart can show one pass while the
+project's shows the whole set: the first is the working view ("which pass am
+I looking at?"), the second is the science.
+
 A visit can hold **several passes**: you measure the series again with another
 band, with another sequence, or just to check something. Every pass keeps its
 points and none is deleted, but **the visit's chart draws only one**, the one

@@ -181,10 +181,13 @@ def test_the_passes_door_lists_them_and_goes_back(window, visit):
     assert payload["runs"][0]["band"] == "V"
     assert payload["runs"][0]["points"] == 2
     assert payload["runs"][0]["status"] == "complete"
-    # going back to the first pass: nothing is deleted
+    # going back to the first pass: nothing is deleted, and the visit's
+    # chart shows THAT pass. The third frame, which the first pass does not
+    # cover, keeps its own newest measurement: a frame is never shown twice
+    # (the invariant the observer reported twice), so the curve is 2 + 1.
     assert window._ufe_choose_curve(pid, sid, first) is True
     assert window._ufe_visit_passes(pid, sid)["curve_run_id"] == first
-    assert len(window._ufe_visit_curve(pid, sid)["points"]) == 2
+    assert len(window._ufe_visit_curve(pid, sid)["points"]) == 3
     from nightscribe.core import followup as fu
     import nightscribe.gui.main_window as mw
     assert len(fu.points_for_session(mw.db, sid, curve=False)) == 5
@@ -265,18 +268,25 @@ def _frames(window, pid, sid, tag, n=2):
     return out
 
 
-def _rows_for(paths, mag0=12.0, filter_name=None, airmass0=None):
+def _rows_for(paths, mag0=12.0, filter_name=None, airmass0=None,
+              mjd0=60940.5, visit=None):
     # filter_name None is what a real series sends when the frames carry no
     # FILTER keyword: the point then says the band the calibration used.
     # airmass0 is what the detrend needs (a night without airmass has no
-    # detrended curve, which is honest and tested above).
+    # detrended curve, which is honest and tested above). mjd0 says WHICH
+    # night the frames are: two visits of a real multi-night pass are two
+    # nights, and one frame measured twice is one point.
     out = []
     for i, path in enumerate(paths):
-        row = {"mjd": 60940.5 + i * 0.002, "filter": filter_name,
+        row = {"mjd": mjd0 + i * 0.002, "filter": filter_name,
                "mag": mag0 + i * 0.01, "err": 0.01, "mag_raw": -9.5 + i,
                "path": path, "flags": [], "source": "measure"}
         if airmass0 is not None:
             row["airmass"] = airmass0 + i * 0.05
+        if visit is not None:
+            # what the Measure tab sends: the visit of the frame (the
+            # context knows, and the same frame can be in two visits)
+            row["session_id"] = visit
         out.append(row)
     return out
 
@@ -305,7 +315,9 @@ def test_a_multi_night_pass_writes_one_run_per_visit(window, visit):
     other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
     a = _frames(window, pid, sid, "pass-a", 2)
     b = _frames(window, pid, other, "pass-b", 3)
-    run_id = window._ufe_points_hook(pid, sid, _rows_for(a + b), {"band": "V"})
+    rows = (_rows_for(a, mjd0=60940.5, visit=sid)
+            + _rows_for(b, mjd0=60941.5, visit=other))
+    run_id = window._ufe_points_hook(pid, sid, rows, {"band": "V"})
     assert run_id is not None
     # two runs (one per night), each holding ITS night's points
     assert len(fu.points_for_session(mw_db(), sid)) == 2
@@ -326,7 +338,9 @@ def test_undoing_a_multi_night_pass_undoes_every_night(window, visit):
     other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
     a = _frames(window, pid, sid, "undo-a", 2)
     b = _frames(window, pid, other, "undo-b", 3)
-    run_id = window._ufe_points_hook(pid, sid, _rows_for(a + b), {"band": "V"})
+    rows = (_rows_for(a, mjd0=60940.5, visit=sid)
+            + _rows_for(b, mjd0=60941.5, visit=other))
+    run_id = window._ufe_points_hook(pid, sid, rows, {"band": "V"})
     assert window._ufe_run_undo(run_id) == 5     # the WHOLE pass, one click
     assert fu.points_for_session(mw_db(), sid) == []
     assert fu.points_for_session(mw_db(), other) == []
@@ -350,9 +364,12 @@ def test_the_project_scope_curve_carries_the_band_of_each_night(window,
     other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
     a = _frames(window, pid, sid, "band-a", 3)
     b = _frames(window, pid, other, "band-b", 3)
-    window._ufe_points_hook(pid, sid, _rows_for(a, 11.96, airmass0=1.1),
+    window._ufe_points_hook(pid, sid,
+                            _rows_for(a, 11.96, airmass0=1.1,
+                                      mjd0=60940.5),
                             {"band": "G", "detrend_policy": "airmass"})
-    window._ufe_points_hook(pid, other, _rows_for(b, 12.70), {"band": "V"})
+    window._ufe_points_hook(pid, other,
+                            _rows_for(b, 12.70, mjd0=60941.5), {"band": "V"})
     curve = window._ufe_visit_curve(pid, sid, "project")
     points = curve["points"]
     raw = [p for p in points if p["source"] == "measure"]
@@ -364,3 +381,40 @@ def test_the_project_scope_curve_carries_the_band_of_each_night(window,
     # the visit's own scope is only its night
     own = window._ufe_visit_curve(pid, sid, "visit")["points"]
     assert len([p for p in own if p["source"] == "measure"]) == 3
+
+
+def test_one_frame_is_never_measured_twice_in_a_curve(window, visit):
+    # The invariant behind both reports (2026-09-30): a curve shows ONE
+    # point per frame, its newest measurement. Measured on the observer's
+    # database: the 244 frames of visit 18 were measured again as visits 20
+    # (35 frames) and 21 (3), every one a SUBSET of the 244, so the union
+    # held 282 points with 38 of them duplicated at two different levels.
+    pid, sid = visit
+    from nightscribe.core import followup as fu
+    other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
+    # the SAME frames registered in two visits (a night split by mistake,
+    # exactly what the observer had)
+    frames = _frames(window, pid, sid, "same-night", 4)
+    for path in frames:
+        from nightscribe.core import project as project_mod
+        project_mod.add_file(mw_db(), pid, path, "fits", session_id=other,
+                             meta={})
+    # the whole night in the first visit, two of its frames in the second
+    window._ufe_points_hook(pid, sid,
+                            _rows_for(frames, 12.70, visit=sid),
+                            {"band": "V"})
+    window._ufe_points_hook(pid, other,
+                            _rows_for(frames[:2], 11.96, visit=other),
+                            {"band": "G"})
+    curve = fu.list_points(mw_db(), pid)
+    assert len(curve) == 4                    # four frames, four points
+    by_frame = {}
+    for p in curve:
+        by_frame.setdefault(p["file_id"], []).append(p)
+    assert all(len(v) == 1 for v in by_frame.values())
+    # and the two re-measured frames wear the NEWEST calibration
+    newer = [p for p in curve if p["mag"] < 12.0]
+    assert len(newer) == 2
+    # the visit's own chart too: its pass, plus the frames it does not have
+    own = fu.points_for_session(mw_db(), sid)
+    assert len(own) == 4

@@ -260,6 +260,22 @@ deshabilita y dice que abras la visita cuya curva quieres deshacer.
 
 ### 7.2 Una visita es UNA curva (y las demás pasadas siguen ahí)
 
+**Un fotograma, una medida.** Una curva nunca enseña el mismo fotograma dos
+veces: enseña su medida **más reciente**. Si vuelves a medir la noche entera,
+la pasada nueva sustituye a la vieja; si mides solo una parte, el resto se
+queda como estaba y la noche sigue siendo **una** curva. Medido en tu propia
+base: las 244 tomas de la visita 18 estaban medidas otra vez como visitas 20
+(35 tomas) y 21 (3), todas dentro de las 244, así que la unión tenía 282
+puntos con 38 duplicados a dos niveles; ahora son 244.
+
+La **curva de la visita** es la pasada que la visita muestra (la puerta de
+pasadas): esa pasada manda en SUS fotogramas, y los que no cubre se rellenan
+con su medida más reciente. La **curva del proyecto** es la unión objetiva:
+un punto por fotograma, su medida más reciente, sin que la elección de una
+visita cambie lo que ve otra. Por eso la gráfica de una visita puede enseñar
+una pasada y la del proyecto el conjunto: la primera es la vista de trabajo
+(«¿qué pasada estoy mirando?»), la segunda es la ciencia.
+
 Una visita puede tener **varias pasadas**: vuelves a medir la serie con otra
 banda, con otra secuencia, o solo para comprobar algo. Cada pasada guarda sus
 puntos y no se borra ninguna, pero **la gráfica de la visita dibuja una sola**,

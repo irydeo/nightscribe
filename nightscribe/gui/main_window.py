@@ -9189,7 +9189,9 @@ class MainWindow(QMainWindow):
                 return None
             return {"pid": pid, "session_id": session_id, "paths": paths,
                     "kind": p.get("kind"), "context": p.get("context") or {},
-                    "scope": "project", "nights": len(nights)}
+                    "scope": "project", "nights": len(nights),
+                    "path_sessions": {f["path"]: f["session_id"]
+                                      for f in files}}
         files = project.files_for_session(db, session_id)
         paths = sorted(f["path"] for f in files
                        if f.get("kind") == "fits" and f.get("path"))
@@ -9204,7 +9206,8 @@ class MainWindow(QMainWindow):
         return {"pid": pid, "session_id": session_id, "paths": paths,
                 "kind": p.get("kind"), "context": p.get("context") or {},
                 "scope": "visit", "nights": 1,
-                "visits": len(visits)}
+                "visits": len(visits),
+                "path_sessions": {path: session_id for path in paths}}
 
     def _ufe_points_hook(self, pid, session_id, rows, cfg):
         # ADR-048 (D9): one series run = one measurement_runs row; its
@@ -9220,8 +9223,12 @@ class MainWindow(QMainWindow):
         from ..core import followup as fu
         echo = dict(cfg or {})
         status = echo.pop("status", None) or "complete"
-        by_path = {f["path"]: f for f in project.list_files(db, pid)
-                   if f.get("kind") == "fits"}
+        # the frames of the project, by (path, visit) and by path: the
+        # first is exact when the same frame is registered in two visits
+        files = [f for f in project.list_files(db, pid)
+                 if f.get("kind") == "fits"]
+        by_path = {(f["path"], f.get("session_id")): f for f in files}
+        by_path.update({f["path"]: f for f in files})
         # a live batch continues the run its session opened (one live
         # session, one run): the points pile into it, so the curve reloaded
         # from the project is the whole session and "undo" is one click
@@ -9229,10 +9236,13 @@ class MainWindow(QMainWindow):
         run_id = fu.reusable_run(db, append, session_id)
         if run_id is not None:
             for r in rows:
+                sid = r.get("session_id") or session_id
+                f = by_path.get((r.get("path"), sid)) \
+                    or by_path.get(r.get("path")) or {}
                 r["project_id"] = pid
-                r["session_id"] = session_id
+                r["session_id"] = sid
                 r["run_id"] = run_id
-                r["file_id"] = (by_path.get(r.get("path")) or {}).get("id")
+                r["file_id"] = f.get("id")
             if rows:
                 fu.add_points(db, rows)
             self.statusBar().showMessage(
@@ -9248,8 +9258,13 @@ class MainWindow(QMainWindow):
         # what it always was.
         groups = {}
         for r in rows:
-            f = by_path.get(r.get("path")) or {}
-            sid = f.get("session_id") or session_id
+            # the visit the FRAME belongs to: the row says it (the tab took
+            # it from the context), and a frame registered in two visits
+            # would otherwise land in whichever row came last (measured on
+            # the observer's database: the same 244 frames in three visits)
+            sid = r.get("session_id") or session_id
+            f = by_path.get((r.get("path"), sid)) \
+                or by_path.get(r.get("path")) or {}
             r["project_id"] = pid
             r["session_id"] = sid
             r["file_id"] = f.get("id")

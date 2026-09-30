@@ -607,3 +607,24 @@ def test_the_compass_follows_the_mirror(view):
     view._state.flip_v = True
     assert view._flip_angle(10.0) == pytest.approx(190.0)   # -10 -> 180+10
     assert view._flip_angle(0.0) == pytest.approx(180.0)
+
+
+def test_every_role_of_the_band_has_its_colour(qapp):
+    # A role without a colour is painted with the fallback (the ink), which is
+    # exactly how a colour code stops being respected.
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.gui.widgets.ufe_image_view import BAND_COLOURS
+    for role in (ca.ROLE_NAME, ca.ROLE_POS, ca.ROLE_POS_CAT, ca.ROLE_MAG,
+                 ca.ROLE_MAG_FAIR, ca.ROLE_MAG_DOUBT, ca.ROLE_MAG_CAT,
+                 ca.ROLE_CONTEXT):
+        assert role in BAND_COLOURS, role
+    # and the magnitude's scale is FOUR different colours (green, orange,
+    # red and the catalogue's white): it has to be readable at a glance
+    mags = {BAND_COLOURS[r] for r in (ca.ROLE_MAG, ca.ROLE_MAG_FAIR,
+                                      ca.ROLE_MAG_DOUBT, ca.ROLE_MAG_CAT)}
+    assert len(mags) == 4
+    from nightscribe.viz import palette
+    assert BAND_COLOURS[ca.ROLE_MAG] == palette.GOOD
+    assert BAND_COLOURS[ca.ROLE_MAG_FAIR] == palette.FAIR
+    assert BAND_COLOURS[ca.ROLE_MAG_DOUBT] == palette.DANGER
+    assert BAND_COLOURS[ca.ROLE_MAG_CAT] == palette.CATALOG

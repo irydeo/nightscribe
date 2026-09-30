@@ -231,11 +231,17 @@ banda:
 * la **posición** en tinta cuando la coloca la propia solución de esta
   placa, y apagada con un `cat` cuando solo es la del catálogo (placa sin
   resolver);
-* la **magnitud** en verde cuando se midió aquí y sus números aguantan
-  (error, número de comparsas, estrella de chequeo, núcleo recortado), en
-  rojo cuando dicen «mira esto antes de reportarlo», y apagada con un
-  `cat` cuando solo es el valor del proyecto o del catálogo, que no es una
-  medida de esta placa;
+* la **magnitud** con escala propia: **verde** cuando la medida está limpia
+  (error hasta 0,05, comparsas y estrella de chequeo en orden), **naranja**
+  cuando es usable pero no limpia (hasta 0,15, o un aviso leve: solo tres
+  comparsas, magnitud derivada de un color, la secuencia sin estrella de
+  chequeo, un aviso del propio punto), **rojo** cuando no es una medida que
+  se deba reportar sin mirarla (error por encima de 0,15, pocas comparsas,
+  chequeo que falla, núcleo recortado), y **blanca** con un `cat` cuando solo
+  es el valor del proyecto o del catálogo, que no es una medida de esta
+  placa. La magnitud que se enseña es la medida en ESA toma (la curva de la
+  visita cuando la hay), después una medida de placa, y solo entonces el
+  catálogo;
 * lo demás (fecha, exposición, filtro, equipo, estación, escala, FOV) en
   el color discreto: es contexto, no un juicio.
 

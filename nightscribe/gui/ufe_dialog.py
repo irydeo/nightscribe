@@ -1370,15 +1370,37 @@ class UfeDialog(QDialog):
                     wcs_info["ra_deg"], wcs_info["dec_deg"] = ra, dec
                 except Exception:
                     pass
+        # WHAT HAS BEEN MEASURED ON THIS PLATE, in the order that tells the
+        # truth: the visit's curve for THIS frame (the normal flow: a series
+        # is measured, not one plate), then a single-plate measurement of
+        # this plate, and only then the catalogue (which is not a
+        # measurement and wears white). The caveats travel with it: they are
+        # what decides between green, orange and red.
         measured = None
-        last = self.tab_measure._last
-        if last is not None and last.get("mag") is not None:
-            # the measurement's own caveats travel with it: they are what
-            # decides whether its colour says "trust this" or "look at it"
-            measured = {"mag": last["mag"], "err": last.get("err"),
-                        "band": last.get("band"), "used": last.get("used"),
-                        "check": last.get("check"),
-                        "result": last.get("result")}
+        point = None
+        ask = getattr(self.tab_measure, "series_point_for", None)
+        if callable(ask):
+            meta_ = fits_meta.meta_from_header(self.state.header or {})
+            point = ask(self.state.path, meta_.get("mjd"),
+                        meta_.get("exptime_s"))
+        if point is not None:
+            measured = {"mag": point["mag"], "err": point.get("err"),
+                        "band": point.get("filter"),
+                        "comps": point.get("comps"),
+                        "flags": point.get("flags")}
+        else:
+            last = self.tab_measure._last
+            if last is not None and last.get("mag") is not None:
+                check = last.get("check")
+                measured = {"mag": last["mag"], "err": last.get("err"),
+                            "band": last.get("band"),
+                            "comps": len(last.get("used") or []) or None,
+                            "check_ok": (check or {}).get("ok")
+                            if check else None,
+                            "no_check": check is None,
+                            "clipped": bool(
+                                (last.get("result") or {}).get("saturated")),
+                            "derived": bool(last.get("derived"))}
         catalog_mag = None
         try:
             if obj.get("mag") is not None:

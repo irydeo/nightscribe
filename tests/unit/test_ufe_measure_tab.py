@@ -1866,3 +1866,34 @@ def test_the_night_figures_say_what_an_old_curve_cannot_give(dlg,
     assert called == []
     assert "neither the airmass nor the measured position" \
         in tab.lbl_status.text()
+
+
+# ---------------- the band's magnitude comes from the curve -----------
+
+def test_the_band_takes_the_measured_point_of_this_frame(dlg):
+    # Reported: "the colour code for the photometric measurements in the top
+    # band is not being respected". Part of it was this: with a series
+    # measured (the normal flow) the band kept showing the CATALOGUE
+    # magnitude, in white, because it only read a single-plate measurement.
+    # The point of the curve IS the measurement of this plate.
+    tab = dlg.tab_measure
+    frame = str(dlg.state.path)
+    tab._series_payload = [
+        {"mjd": 60000.0, "mag": 12.0, "err": 0.3, "filter": "V",
+         "source": "measure", "path": "/otra/toma.fit", "comps": 5,
+         "flags": []},
+        {"mjd": 60001.0, "mag": 12.44, "err": 0.04, "filter": "V",
+         "source": "measure", "path": frame, "comps": 5, "flags": []}]
+    point = tab.series_point_for(frame)
+    assert point and point["mag"] == 12.44        # the one of THIS frame
+    # by time when the curve carries no paths (loaded from the database)
+    tab._series_payload = [{"mjd": 60001.0, "mag": 12.5, "err": 0.03,
+                            "filter": "V", "source": "measure",
+                            "comps": 4, "flags": []}]
+    assert tab.series_point_for(None, 60001.0, 40.0)["mag"] == 12.5
+    assert tab.series_point_for(None, 60005.0, 40.0) is None
+    # the detrended twin of a point is not "the measured magnitude"
+    tab._series_payload = [{"mjd": 60001.0, "mag": 12.5, "err": 0.03,
+                            "filter": "V", "source": "detrend",
+                            "comps": 4, "flags": []}]
+    assert tab.series_point_for(None, 60001.0, 40.0) is None

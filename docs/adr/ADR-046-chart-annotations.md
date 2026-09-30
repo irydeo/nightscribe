@@ -166,14 +166,23 @@ dato**, para no copiar la estética de las cartas clásicas. Lo que cambia:
 - **Un color por rol**, decidido en el módulo puro y mapeado por el render
   (`BAND_COLOURS`): `name` y `pos` en tinta (lo coloca la propia solución de esta
   placa), `pos-cat` apagado y con la palabra `cat` (es la posición del catálogo, no la
-  de esta placa; el color no basta en un papel), `mag` en verde (medida aquí y
-  fiable), `mag-doubt` en rojo, `mag-cat` apagado y con `cat` (un valor de catálogo no
-  es una medida), y `context` apagado. El verde es `palette.GOOD`, nuevo en la paleta
-  de cartas.
-- **Cuándo la magnitud medida es dudosa**: error total > 0,10 mag, menos de tres
-  comparsas sosteniendo el punto cero, estrella de chequeo que dice que la noche no
-  va, o el núcleo del objetivo recortado. Son cuatro señales que la receta ya calcula;
-  ninguna es una opinión.
+  de esta placa; el color no basta en un papel), y `context` apagado.
+- **La magnitud tiene escala propia, de tres estados más el catálogo** (revisión
+  2026-09-30, a petición del observador): **verde** (`palette.GOOD`) cuando la medida
+  está limpia: error ≤ 0,05, más de tres comparsas sosteniendo el punto cero,
+  estrella de chequeo que pasa, núcleo sin recortar y sin avisos; **naranja**
+  (`palette.FAIR`) cuando es usable pero no limpia: error ≤ 0,15, o exactamente tres
+  comparsas, o la magnitud derivada de un color, o la secuencia sin estrella de
+  chequeo, o un aviso del propio punto; **rojo** (`palette.DANGER`) cuando no es una
+  medida que se deba reportar sin mirarla: error > 0,15, menos de tres comparsas,
+  chequeo que dice que la noche no va, o núcleo recortado; y **blanco**
+  (`palette.CATALOG`) cuando es un valor de catálogo, que no es una medida de esta
+  placa. Las señales son las que la receta ya calcula; los umbrales (0,05 y 0,15) son
+  la línea entre «una placa suelta honrada» y «esto no se reporta sin mirar».
+- **La magnitud de la banda es la que se ha medido**, en este orden: el punto de la
+  curva de la visita **de esa toma** (el flujo normal: se mide la serie, no una placa),
+  después una medida de placa de esta placa, y solo entonces el catálogo, en blanco.
+  Así el color no miente por omisión cuando lo medido es una serie.
 - **Nunca se corta una palabra**: cuando el ancho no da, se sueltan campos enteros en
   `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: lo menos necesario para
   un reporte primero, la fecha la última) y, en el peor caso, la línea 2 entera; la
@@ -210,14 +219,24 @@ boxes were to be rethought: the same style as the band that already heads the im
 - **A colour per role**, decided in the pure module and mapped by the render
   (`BAND_COLOURS`): `name` and `pos` in ink (this plate's own solution places it),
   `pos-cat` dimmed and with the word `cat` (it is the catalogue's position, not this
-  plate's; colour alone is not enough on a printout), `mag` in green (measured here and
-  trustworthy), `mag-doubt` in red, `mag-cat` dimmed and with `cat` (a catalogue value
-  is not a measurement), and `context` dimmed. The green is `palette.GOOD`, new in the
-  chart palette.
-- **When a measured magnitude is doubtful**: total error > 0.10 mag, fewer than three
-  comparisons holding the zero point, a check star that says the night is off, or the
-  target's core clipped. Four signals the recipe already computes; none of them is an
-  opinion.
+  plate's; colour alone is not enough on a printout), and `context` dimmed.
+- **The magnitude has a scale of its own: three states plus the catalogue** (revision
+  2026-09-30, asked for by the observer): **green** (`palette.GOOD`) when the
+  measurement is clean: error ≤ 0.05, more than three comparisons holding the zero
+  point, a check star that passes, a core that is not clipped and no flags;
+  **orange** (`palette.FAIR`) when it is usable but not clean: error ≤ 0.15, or exactly
+  three comparisons, or a magnitude derived from a colour, or a sequence with no check
+  star, or a flag on the point itself; **red** (`palette.DANGER`) when it is not a
+  measurement to report without looking: error > 0.15, fewer than three comparisons, a
+  check star that says the night is off, or a clipped core; and **white**
+  (`palette.CATALOG`) when it is a catalogue value, which is not a measurement of this
+  plate. The signals are the ones the recipe already computes; the thresholds (0.05 and
+  0.15) are the line between "a single plate's honest error" and "do not report this
+  without looking".
+- **The band's magnitude is the one that has been measured**, in this order: the visit
+  curve's point **for that frame** (the normal flow: a series is measured, not one
+  plate), then a single-plate measurement of this plate, and only then the catalogue,
+  in white. The colour cannot lie by omission when what was measured is a series.
 - **A word is never cut**: when the width runs out, whole fields are dropped in
   `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: the least needed for a
   report first, the date last) and, in the worst case, line 2 entirely; line 1 loses

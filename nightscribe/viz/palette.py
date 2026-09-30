@@ -29,6 +29,8 @@ MUTED  = "#8a90a6"   # planet rings, the 1 AU ruler, grids, watermarks
 SUN    = "#ffd76e"   # the Sun marker
 DANGER = "#ff6b6b"   # safety warnings (does-not-fit, moon interference)
 GOOD   = "#46a758"   # a measurement you can trust (the plate's band)
+FAIR = "#ff9e4d"     # usable but not clean: the band's orange (see GOOD)
+CATALOG = "#ffffff"  # a value that is NOT a measurement of this plate
 
 # Per-planet marker rings (kept distinct from the theme above so a chart
 # can tell Earth / Mercury / Venus / Mars apart at a glance).

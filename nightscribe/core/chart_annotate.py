@@ -213,9 +213,10 @@ def site_from_config(cfg):
 ROLE_NAME = "name"            # the object: whose plate this is
 ROLE_POS = "pos"              # the target's position ON this plate (solved)
 ROLE_POS_CAT = "pos-cat"      # its catalog position (no solution to place it)
-ROLE_MAG = "mag"              # measured on THIS plate, and trustworthy
-ROLE_MAG_DOUBT = "mag-doubt"  # measured, but the numbers say be careful
-ROLE_MAG_CAT = "mag-cat"      # only a catalog value: not a measurement
+ROLE_MAG = "mag"              # a CLEAN measurement of this plate (green)
+ROLE_MAG_FAIR = "mag-fair"    # usable, but not clean (orange)
+ROLE_MAG_DOUBT = "mag-doubt"  # not to report without looking (red)
+ROLE_MAG_CAT = "mag-cat"      # only a catalog value: not a measurement (white)
 ROLE_CONTEXT = "context"      # date, exposure, filter, kit, Stn, PSc, FOV
 
 # The context fields, in the order they are DROPPED when the band runs out
@@ -227,33 +228,60 @@ DROP_ORDER = ("fov", "psc", "equip", "filter", "stn", "date")
 # goes first, then the position, and only then is the name elided.
 DROP_ORDER_NAME = ("mag", "pos")
 
-# A measured magnitude whose total error passes this is shown as doubtful:
-# the colour then says "look at this before you report it". 0.10 mag is the
-# line between "a single plate's honest error" and "something is off".
-ERR_DOUBT = 0.10
+# The two lines of the magnitude's colour code, in magnitudes of total
+# error. A single plate's honest error sits around 0.03-0.08, so 0.05 keeps
+# the green for what is really clean and 0.15 is the point where a number
+# stops being worth reporting without looking at it. The observer asked for
+# the three colours and these are the numbers behind them.
+ERR_GOOD = 0.05
+ERR_BAD = 0.15
 
 
 def magnitude_role(measured):
-    # Which colour the magnitude deserves, from the measurement's own
-    # numbers. Four honest signals, all of them things the recipe already
-    # computes: the error it declares, how many comparisons hold the zero
-    # point, what the check star said, and whether the target's core was
-    # clipped on the plate.
-    # @args: measured - {"mag", "err", "band", "used", "check", "result"}
-    #        of a calibration of THIS plate, or None
-    # @return: ROLE_MAG, ROLE_MAG_DOUBT, or None when nothing was measured
+    # Which colour the magnitude deserves: GREEN for a clean measurement,
+    # ORANGE for a usable one that is not clean, RED for one that is not
+    # worth reporting without looking, and WHITE for a value that is not a
+    # measurement of this plate at all (the catalogue's).
+    #
+    # Everything is decided from the measurement's OWN numbers, all of them
+    # things the recipe already computes: the error it declares, how many
+    # comparisons hold the zero point, what the check star said, whether the
+    # target's core was clipped, whether the magnitude came out of a colour
+    # and the flags the point carries. A single plate's measurement and a
+    # point of a series arrive in the same shape, so one curve and one plate
+    # are coloured by the same rule.
+    # @args: measured - {"mag", "err", "band", "comps", "check_ok",
+    #        "no_check", "clipped", "derived", "flags"} of a measurement of
+    #        THIS plate, or None. "check_ok" is the check star's verdict
+    #        (True/False) and "no_check" says that the sequence carried none
+    #        to begin with: a series has no check in its contract, and
+    #        that is not the same as a night nobody verified.
+    # @return: ROLE_MAG, ROLE_MAG_FAIR, ROLE_MAG_DOUBT, or None
     if not measured or measured.get("mag") is None:
         return None
     err = measured.get("err")
-    if err is not None and err > ERR_DOUBT:
+    comps = measured.get("comps")
+    flags = list(measured.get("flags") or [])
+    # FIRST WHAT MAKES A NUMBER UNREPORTABLE, then what makes it merely
+    # imperfect: a serious caveat is not softened by a small error.
+    if err is not None and err > ERR_BAD:
         return ROLE_MAG_DOUBT
-    if len(measured.get("used") or []) < 3:
+    if comps is not None and comps < 3:
         return ROLE_MAG_DOUBT         # the zero point rests on too little
-    check = measured.get("check")
-    if check and check.get("ok") is False:
+    if measured.get("check_ok") is False:
         return ROLE_MAG_DOUBT         # the check star says the night is off
-    if (measured.get("result") or {}).get("saturated"):
+    if measured.get("clipped"):
         return ROLE_MAG_DOUBT         # the target's own core is clipped
+    if err is not None and err > ERR_GOOD:
+        return ROLE_MAG_FAIR          # usable, but not clean
+    if comps == 3:
+        return ROLE_MAG_FAIR          # the minimum that holds a zero point
+    if measured.get("derived"):
+        return ROLE_MAG_FAIR          # the magnitude came out of a colour
+    if measured.get("no_check"):
+        return ROLE_MAG_FAIR          # the sequence had no check star to say
+    if flags:
+        return ROLE_MAG_FAIR          # the point carries its own caveat
     return ROLE_MAG
 
 

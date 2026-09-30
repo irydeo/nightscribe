@@ -169,8 +169,10 @@ _META = {"date_obs": "2023-12-19T18:42:06", "exptime_s": 40.0,
          "filter": "Clear"}
 _WCS = {"ra_deg": 49.9938, "dec_deg": 49.7803, "scale_arcsec_px": 1.55,
         "fov_arcmin": (42.96, 32.34)}
-_GOOD_MAG = {"mag": 12.34, "err": 0.05, "band": "V", "used": [1, 2, 3, 4],
-             "check": {"ok": True}}
+# A CLEAN measurement of this plate, in the shape both a single plate and a
+# point of a series arrive in (see magnitude_role)
+_GOOD_MAG = {"mag": 12.34, "err": 0.04, "band": "V", "comps": 5,
+             "check_ok": True}
 
 
 def _roles(line):
@@ -189,7 +191,7 @@ def test_the_band_says_identity_then_context():
     assert _roles(first) == [
         ("V0526 Per", ca.ROLE_NAME),
         ("RA 03 19 58.5 · Dec +49 46 49.1", ca.ROLE_POS),
-        ("12.34 ± 0.05 (V)", ca.ROLE_MAG)]
+        ("12.34 ± 0.04 (V)", ca.ROLE_MAG)]
     assert _roles(second) == [
         ("2023-12-19 18:42 UT", ca.ROLE_CONTEXT),
         ("40.0 s", ca.ROLE_CONTEXT),
@@ -220,21 +222,41 @@ def test_a_plate_without_a_solution_says_what_it_cannot_say():
 
 
 def test_the_magnitude_wears_the_colour_its_numbers_deserve():
-    # Four honest signals, all of them computed by the recipe: the error it
-    # declares, how many comparisons hold the zero point, what the check
-    # star said, and whether the target's core was clipped.
+    # THE SCALE THE OBSERVER ASKED FOR: green when the measurement is clean,
+    # orange when it is usable but not clean, red when it is not worth
+    # reporting without looking, and white when it is not a measurement of
+    # this plate at all. Everything comes from the measurement's own numbers.
     assert ca.magnitude_role(_GOOD_MAG) == ca.ROLE_MAG
-    assert ca.magnitude_role({**_GOOD_MAG, "err": 0.20}) == \
+
+    # the error's two lines, with their edges (0.05 and 0.15)
+    assert ca.magnitude_role({**_GOOD_MAG, "err": ca.ERR_GOOD}) == ca.ROLE_MAG
+    assert ca.magnitude_role({**_GOOD_MAG, "err": 0.06}) == ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "err": ca.ERR_BAD}) == \
+        ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "err": 0.16}) == \
         ca.ROLE_MAG_DOUBT
-    assert ca.magnitude_role({**_GOOD_MAG, "used": [1, 2]}) == \
+
+    # the serious caveats, which a small error does not soften
+    assert ca.magnitude_role({**_GOOD_MAG, "comps": 2}) == ca.ROLE_MAG_DOUBT
+    assert ca.magnitude_role({**_GOOD_MAG, "check_ok": False}) == \
         ca.ROLE_MAG_DOUBT
-    assert ca.magnitude_role({**_GOOD_MAG, "check": {"ok": False}}) == \
+    assert ca.magnitude_role({**_GOOD_MAG, "clipped": True}) == \
         ca.ROLE_MAG_DOUBT
-    assert ca.magnitude_role({**_GOOD_MAG, "result": {"saturated": True}}) \
-        == ca.ROLE_MAG_DOUBT
+
+    # the light ones, which cost one step and not the measurement
+    assert ca.magnitude_role({**_GOOD_MAG, "comps": 3}) == ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "derived": True}) == \
+        ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "no_check": True}) == \
+        ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "flags": ["cloud"]}) == \
+        ca.ROLE_MAG_FAIR
+
+    # nothing measured is nothing to colour
     assert ca.magnitude_role(None) is None
     assert ca.magnitude_role({"mag": None}) is None
-    # a measurement beats the catalogue, always
+    # a measurement beats the catalogue, always: a poor measurement is red,
+    # never white (white is for the value that is not a measurement)
     band = ca.build_band(name="X", measured={**_GOOD_MAG, "err": 0.3},
                          catalog_mag=11.0)
     assert band["lines"][0][1]["role"] == ca.ROLE_MAG_DOUBT

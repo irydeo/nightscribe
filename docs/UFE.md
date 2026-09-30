@@ -226,11 +226,17 @@ point of the band:
 
 * the **position** in ink when this plate's own solution places it, and
   dimmed with a `cat` when it is only the catalogue's (an unsolved plate);
-* the **magnitude** green when it was measured here and its numbers hold
-  (error, number of comparisons, check star, a clipped core), red when
-  they say "look at this before reporting it", and dimmed with a `cat`
-  when it is only the project's or the catalogue's value, which is not a
-  measurement of this plate;
+* the **magnitude** in a scale of its own: **green** when the measurement
+  is clean (error up to 0.05, comparisons and check star in order),
+  **orange** when it is usable but not clean (up to 0.15, or a light
+  caveat: only three comparisons, a magnitude derived from a colour, no
+  check star in the sequence, a flag on the point), **red** when it is not
+  worth reporting without looking (error above 0.15, too few comparisons, a
+  check star that fails, a clipped core), and **white** with a `cat` when it
+  is only the project's or the catalogue's value, which is not a measurement
+  of this plate. The magnitude shown is the one measured on THAT frame (the
+  visit's curve when there is one), then a single-plate measurement, and
+  only then the catalogue;
 * everything else (date, exposure, filter, kit, station, scale, FOV) in
   the quiet colour: it is context, not a judgement.
 

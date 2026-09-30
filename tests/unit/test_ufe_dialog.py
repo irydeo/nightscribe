@@ -359,8 +359,12 @@ def test_the_band_provider_reads_the_live_state(dlg, monkeypatch):
     cat = next(seg for seg in first if seg["field"] == "mag")
     assert cat["role"] == "mag-cat" and cat["text"].endswith(" cat")
     # a calibrated measurement THIS session beats it, in the measured colour
+    # a CLEAN measurement of this plate: error under 0.05, more than the
+    # minimum comparisons and a check star that passes (three comps alone
+    # would already be the orange "usable but not clean")
     dlg.tab_measure._last = {"mag": 16.391, "err": 0.04, "band": "V",
-                             "col": 100.0, "row": 200.0, "used": [1, 2, 3],
+                             "col": 100.0, "row": 200.0,
+                             "used": [1, 2, 3, 4, 5],
                              "check": {"ok": True}}
     first = dlg._chart_band()["lines"][0]
     mag = next(seg for seg in first if seg["field"] == "mag")
@@ -372,7 +376,8 @@ def test_the_band_provider_reads_the_live_state(dlg, monkeypatch):
     assert coords.ra_deg_to_hms(ra)[:8] in pos["text"]
     # a doubtful measurement wears the warning colour (the numbers decide)
     dlg.tab_measure._last = {"mag": 16.391, "err": 0.30, "band": "V",
-                             "col": 100.0, "row": 200.0, "used": [1, 2, 3]}
+                             "col": 100.0, "row": 200.0,
+                             "used": [1, 2, 3, 4, 5]}
     first = dlg._chart_band()["lines"][0]
     assert next(seg for seg in first
                 if seg["field"] == "mag")["role"] == "mag-doubt"
@@ -922,3 +927,36 @@ def test_a_visit_without_coordinates_is_solved_from_its_first_frame(
     dlg._on_solve_visit()
     assert made and made[0].pointing is None
     assert "first frame" in dlg.status_text()
+
+
+def test_the_band_colours_the_measurement_of_this_frame(dlg):
+    # The observer asked for the scale: GREEN clean, ORANGE usable but not
+    # clean, RED not worth reporting without looking, WHITE the catalogue.
+    # And the measurement shown is the one made on THIS frame (the visit's
+    # curve), not the catalogue's value.
+    from nightscribe.core import fits_meta
+    dlg.state.load(MONO)
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 17.1})
+    tab = dlg.tab_measure
+    meta = fits_meta.meta_from_header(dlg.state.header or {})
+
+    def mag_role():
+        first = dlg._chart_band()["lines"][0]
+        return next(seg for seg in first if seg["field"] == "mag")
+
+    point = {"mjd": meta["mjd"], "mag": 16.50, "err": 0.04, "filter": "V",
+             "source": "measure", "path": str(MONO), "comps": 5, "flags": []}
+    tab._series_payload = [point]
+    seg = mag_role()
+    assert seg["role"] == "mag" and "16.50" in seg["text"]
+    point["comps"] = 3                     # the minimum: usable, not clean
+    assert mag_role()["role"] == "mag-fair"
+    point["comps"] = 5
+    point["err"] = 0.30                    # not worth reporting unwatched
+    assert mag_role()["role"] == "mag-doubt"
+    # with no measurement at all the catalogue's value is shown, in white
+    tab._series_payload = []
+    tab._last = None
+    seg = mag_role()
+    assert seg["role"] == "mag-cat" and seg["text"].endswith(" cat")

@@ -58,9 +58,13 @@ BAND_COLOURS = {
     "name": palette.FG,           # the object: whose plate this is
     "pos": palette.FG,            # placed by this plate's own solution
     "pos-cat": palette.MUTED,     # the catalogue's position, not this plate's
-    "mag": palette.GOOD,          # measured here, and trustworthy
-    "mag-doubt": palette.DANGER,  # measured, but the numbers say be careful
-    "mag-cat": palette.MUTED,     # only a catalogue value
+    # the magnitude's code, three states and the catalogue: GREEN clean,
+    # ORANGE usable but not clean, RED not worth reporting without looking,
+    # WHITE a catalogue value (which is not a measurement of this plate)
+    "mag": palette.GOOD,
+    "mag-fair": palette.FAIR,
+    "mag-doubt": palette.DANGER,
+    "mag-cat": palette.CATALOG,
     "context": palette.MUTED,     # date, exposure, filter, kit, Stn, PSc, FOV
 }
 

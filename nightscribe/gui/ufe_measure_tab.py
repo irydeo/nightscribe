@@ -1279,6 +1279,37 @@ class UfeMeasureTab(QWidget):
         bits.append(self.tr("NightScribe"))
         return " · ".join(bits)
 
+    def series_point_for(self, path, mjd=None, exptime=None):
+        # The point of the curve measured on ONE frame: what the plate's
+        # band shows as the measured magnitude, coloured by the point's own
+        # numbers. Matched by the frame's path when the curve carries it
+        # (a run of this session does), else by the time: the payload's mjd
+        # is the MID exposure and the header's DATE-OBS is the start, so the
+        # tolerance is one exposure.
+        # @args: path - the open frame's path (str) or None, mjd - its
+        #        mid-exposure MJD when known, exptime - its exposure in s
+        # @return: the point dict ({"mag", "err", "filter", "comps",
+        #          "flags"}) or None when this frame is not in the curve
+        points = [p for p in (self._series_payload or [])
+                  if p.get("source") == "measure" and p.get("mag") is not None]
+        if not points:
+            return None
+        if path:
+            for p in points:
+                if p.get("path") and str(p["path"]) == str(path):
+                    return p
+        if mjd is not None:
+            tol = max(float(exptime or 0.0) / 86400.0, 1.0 / 86400.0)
+            best, dist = None, None
+            for p in points:
+                if p.get("mjd") is None:
+                    continue
+                d = abs(float(p["mjd"]) - float(mjd))
+                if d <= tol and (dist is None or d < dist):
+                    best, dist = p, d
+            return best
+        return None
+
     def _on_series_night(self):
         # The two figures that explain the night (quality plan, A1): the
         # airmass and the measured position. They are written next to the
@@ -1874,12 +1905,17 @@ class UfeMeasureTab(QWidget):
 
     def _draw_series(self, points):
         # Raw + detrended, flagged points as hollow diamonds (D13/T7).
+        # the payload carries which frame each point came from and how many
+        # comparisons hold it: the plate's band reads the point of the OPEN
+        # frame from here (its measured magnitude and its own colour code)
         raw = [{"mjd": p.mjd, "mag": p.mag, "err": p.err,
                 "filter": p.filter, "source": "measure",
+                "path": p.path, "comps": p.n_comps, "exptime": p.exptime,
                 "flags": list(p.flags)}
                for p in points if p.mjd is not None and p.mag is not None]
         det = [{"mjd": p.mjd, "mag": p.mag_detrended, "err": p.err,
                 "filter": p.filter, "source": "detrend",
+                "path": p.path, "comps": p.n_comps, "exptime": p.exptime,
                 "flags": list(p.flags)}
                for p in points if p.mjd is not None
                and p.mag_detrended is not None]

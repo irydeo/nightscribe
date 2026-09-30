@@ -37,10 +37,14 @@ def sparkline_pixmap(points, width=110, height=26, color="#6ab0ff"):
     usable = sorted(
         ((p["mjd"], p["mag"]) for p in points
          if p.get("mjd") is not None and p.get("mag") is not None))
+    # Nothing to draw is a NULL pixmap, as the caller's contract says: a
+    # transparent-but-valid one is not null, so the row would show an empty
+    # box instead of hiding the label (measured: a project with no
+    # photometry kept a blank thumbnail slot).
+    if len(usable) < 2:
+        return QPixmap()
     pix = QPixmap(width, height)
     pix.fill(Qt.transparent)
-    if len(usable) < 2:
-        return pix
     xs = [u[0] for u in usable]
     ys = [u[1] for u in usable]
     x0, x1 = min(xs), max(xs)
@@ -53,10 +57,21 @@ def sparkline_pixmap(points, width=110, height=26, color="#6ab0ff"):
         y0, y1 = y0 - 0.5, y1 + 0.5
 
     def _map(x, y):
-        # @return: scene point; fainter mag -> lower on screen (inverted Y)
+        # @return: the point in the pixmap; the magnitude axis is INVERTED
+        #          (the astronomical way): the brightest (the smallest
+        #          number) on top, the faintest at the bottom, exactly like
+        #          the big chart's _map_y.
+        #
+        #          This is the whole direction of the thumbnail and it was
+        #          the other way round: py already puts the bright end on
+        #          top and the old code returned `height - py`, which
+        #          flipped it back. Measured with a star fading from 12.0 to
+        #          13.0: the bright point landed at y=26 of 30 (the bottom)
+        #          and the faint one at y=2 (the top), so every preview in
+        #          the project list read upside down.
         px = _PAD + (x - x0) / (x1 - x0) * (width - 2 * _PAD)
         py = _PAD + (y - y0) / (y1 - y0) * (height - 2 * _PAD)
-        return px, height - py
+        return px, py
 
     painter = QPainter(pix)
     painter.setRenderHint(QPainter.Antialiasing)

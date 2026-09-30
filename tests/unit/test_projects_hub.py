@@ -2560,3 +2560,46 @@ def test_detail_page_has_no_bare_wheel_hijackers(window, panel):
     bad += [type(w).__name__ for w in container.findChildren(QListWidget)
             if not isinstance(w, PassiveList)]
     assert not bad, f"bare wheel-hijacking controls on the detail page: {bad}"
+
+
+def test_every_kind_with_a_curve_shows_its_preview(window, panel):
+    # Reported: "todos los proyectos, sean del tipo que sean, que tengan una
+    # gráfica fotométrica asociada, deberían presentarlo en el listado". The
+    # thumbnail was tied to the follow-up kinds, so a transit project with
+    # 1255 measured points (HAT-P-32 b, on the observer's own database)
+    # showed nothing at all.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project
+    from PySide6.QtCore import Qt
+    p = project.create(dbmod.db, "transit", "HAT-P-32 b")
+    for i, m in enumerate((12.10, 12.12, 12.09, 12.11)):
+        followup.add_point(dbmod.db, p["id"], 60900.0 + i * 0.01, "V", m)
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    row = None
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            row = lst.itemWidget(lst.item(i))
+            break
+    assert row is not None
+    assert not row.lbl_spark.isHidden()          # a transit with a curve
+    assert "1" in row.lbl_spark.toolTip()        # one night
+    assert "4" in row.lbl_spark.toolTip()        # four points
+
+
+def test_a_project_without_a_curve_shows_no_preview(window, panel):
+    # The other half: no photometry, no squiggle (the row hides it itself,
+    # because the pixmap comes back null).
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    from PySide6.QtCore import Qt
+    p = project.create(dbmod.db, "neo", "2026 QK (no curve)")
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    row = None
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            row = lst.itemWidget(lst.item(i))
+            break
+    assert row is not None
+    assert row.lbl_spark.isHidden()

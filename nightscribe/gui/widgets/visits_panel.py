@@ -157,9 +157,13 @@ class VisitsPanel(QWidget):
         self.lst.clear()
         sessions = fu.list_sessions(self._db, self._pid) \
             if self._pid is not None else []
+        # the project's curve ONCE, not once per visit: the chip count is
+        # the same query, and asking it inside the loop costed one full
+        # curve per visit on every refresh (a 20-visit project, 20 queries
+        # for a list that shows five words)
+        pts = fu.list_points(self._db, self._pid) if self._pid else []
         for s in sessions:
             n_img = len(fu.list_images(self._db, s["id"]))
-            pts = fu.list_points(self._db, self._pid)
             n_pts = sum(1 for p in pts if p.get("session_id") == s["id"])
             chips = []
             if n_img:

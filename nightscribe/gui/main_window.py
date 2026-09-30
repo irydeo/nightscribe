@@ -2919,12 +2919,18 @@ class MainWindow(QMainWindow):
             next_text = self.tr("archived")
         # urgency paints the next action (the row says WHY it floats up)
         urgency = (attn or {}).get("urgency")
-        spark = None
-        if kind in FOLLOWUP_KINDS:
-            # sparkline stroked in the row's kind hue (the anchor the chip
-            # and the icon tile already carry)
-            spark = sparkline_pixmap(
-                _fu.list_points(db, p["id"]), color=kind_color)
+        # the curve thumbnail: ANY project that has one, whatever its kind
+        # (reported: a transit project with 1255 measured points showed no
+        # curve in the list, because the thumbnail was tied to the kind).
+        # The sparkline is null when there is nothing to draw (fewer than
+        # two usable points), so the row hides it by itself.
+        pts = _fu.list_points(db, p["id"])
+        spark = sparkline_pixmap(pts, color=kind_color)
+        spark_text = None
+        if not spark.isNull():
+            what = _fu.curve_summary(pts)
+            spark_text = self.tr("{0} nights · {1} points").format(
+                what["nights"], what["points"])
         return {
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),
@@ -2933,6 +2939,7 @@ class MainWindow(QMainWindow):
             "activity_text": self._activity_words(p),
             "window_text": self._project_window_chip(p, full),
             "sparkline": spark,
+            "sparkline_text": spark_text,
             # the icon tile's glyph, drawn by the caller (unknown kinds
             # render a flat tint tile instead)
             "icon": self._type_pixmap(kind, size=28),

@@ -299,6 +299,24 @@ def curve_run_for_session(db, session_id):
     return next(iter(ids)) if len(ids) == 1 else None
 
 
+def curve_summary(points):
+    # What a curve is, in the two numbers a list row shows (the project
+    # list's thumbnail and its tooltip). "Nights" counts the observing
+    # nights, not the visits: a visit is one night by construction, and the
+    # points measured before visits existed are grouped by their own night,
+    # exactly like the curve itself (see _curve_group).
+    # @args: points - the rows of a curve (list_points)
+    # @return: {"points": usable points, "nights": observing nights}
+    nights = set()
+    n = 0
+    for p in points or []:
+        if p.get("mjd") is None or p.get("mag") is None:
+            continue
+        n += 1
+        nights.add(_curve_group(p.get("session_id"), p["mjd"]))
+    return {"points": n, "nights": len(nights)}
+
+
 def set_session_curve_run(db, session_id, run_id):
     # "Make this pass the curve" (the passes door). Nothing is deleted and
     # nothing is re-measured: the visit remembers which of its runs the

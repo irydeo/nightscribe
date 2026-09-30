@@ -40,7 +40,8 @@ from PySide6.QtGui import QColor, QPen
 from PySide6.QtWidgets import (QFileDialog, QWidget, QMessageBox,
                                QGraphicsEllipseItem)
 
-from ..core import coords, fits_meta, photometry, photometry_export, \
+from ..core import chart_annotate, coords, fits_meta, photometry, \
+    photometry_export, \
     series_measure, stretch
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
@@ -153,6 +154,13 @@ class UfeMeasureTab(QWidget):
         self._curve_clear = None     # fn() -> undo every series run (D)
         self._curve_from_visit = False   # the chart shows the visit's curve
         self.cmb_band = self._ui.cmb_band
+        # THE BAND IS PART OF THE RECIPE: it picks the catalogue band of the
+        # comparisons, so changing it changes the magnitude. It was the only
+        # control of the tab that did NOT re-measure (reported: "if you
+        # measure again, changing the band for instance, the magnitude does
+        # not update").
+        self.cmb_band.currentIndexChanged.connect(
+            lambda _i: self._remeasure())
 
         # The recipe knobs live one click open (ADR-044 rev): the daily
         # flow is band, apertures, Suggest; the rest (sky model,
@@ -173,6 +181,12 @@ class UfeMeasureTab(QWidget):
             spn.valueChanged.connect(self._on_radii_edited)
         self.btn_advanced = self._ui.btn_advanced
         self.btn_advanced.clicked.connect(self._open_advanced)
+        # the sequence IS the calibration: adding or removing a comparison
+        # (or retyping it) moves the zero point, so the live point is
+        # measured again (refresh_bands only keeps the combo in step)
+        if self._compare is not None:
+            self._compare.sequence_changed.connect(
+                self._on_sequence_changed)
         # the public attributes the tests and the measure flow pin
         self.chk_sigmaclip = self._advanced.chk_sigmaclip
         self.chk_seeing = self._advanced.chk_seeing
@@ -188,6 +202,10 @@ class UfeMeasureTab(QWidget):
         self.chk_color.toggled.connect(lambda _c: self._remeasure())
         self.spn_target_bv.valueChanged.connect(self._on_bv_edited)
         self.chk_subtract.toggled.connect(self._on_subtract_toggled)
+        # the saturation ceiling decides which comps are usable at all: it
+        # is part of the recipe too (it was not wired either)
+        self.spn_saturate = self._advanced.spn_saturate
+        self.spn_saturate.valueChanged.connect(lambda _v: self._remeasure())
 
         # The result log is plain text in a scrollable editor: a long
         # report (comps, guards, verdict) must never squash the tab.
@@ -310,6 +328,13 @@ class UfeMeasureTab(QWidget):
         self.btn_series_hideflags.toggled.connect(
             self.chart_series.set_hide_flagged)
         self.btn_series_hideflags.toggled.connect(
+            lambda _on: self._refresh_chart_notes())
+        # the points wear the quality code by default (the observer asked
+        # for it): the button gives back the filter colours
+        self.btn_series_quality = self._series_dlg.btn_series_quality
+        self.btn_series_quality.toggled.connect(
+            self.chart_series.set_quality_colours)
+        self.btn_series_quality.toggled.connect(
             lambda _on: self._refresh_chart_notes())
         # --- the observer's decisions on the curve (quality plan, phase A)
         self.btn_series_fixaxis = self._series_dlg.btn_series_fixaxis
@@ -903,6 +928,33 @@ class UfeMeasureTab(QWidget):
         self._remeasure()
 
     # --------------------------------------------------------- seeing
+
+    def measured_facts(self, last=None):
+        # The measurement of this plate in the shape the colour code reads
+        # (core/chart_annotate.magnitude_role): the measurement's own numbers
+        # and nothing else. The panel below and the window's band both use
+        # it, so the two cannot disagree about what the measurement says.
+        # @args: last - the measurement dict (default: the live one)
+        # @return: the unified dict, or None when nothing is measured
+        last = self._last if last is None else last
+        if not last or last.get("mag") is None:
+            return None
+        check = last.get("check")
+        return {"mag": last["mag"], "err": last.get("err"),
+                "band": last.get("band"),
+                "comps": len(last.get("used") or []) or None,
+                "check_ok": (check or {}).get("ok") if check else None,
+                "no_check": check is None,
+                "clipped": bool(
+                    (last.get("result") or {}).get("saturated")),
+                "derived": bool(last.get("derived"))}
+
+    def _on_sequence_changed(self):
+        # The sequence moved under the live point: re-measure it with the
+        # new zero point (a proposal or a hand edit both land here).
+        # @return: None
+        if self._last is not None:
+            self._remeasure()
 
     def _remeasure(self):
         # Re-runs the current measurement with the current controls (the
@@ -1651,6 +1703,8 @@ class UfeMeasureTab(QWidget):
             self.btn_series_errors.isChecked())
         self.chart_series.set_hide_flagged(
             self.btn_series_hideflags.isChecked())
+        self.chart_series.set_quality_colours(
+            self.btn_series_quality.isChecked())
         self.chart_series.set_bin_mode(
             self.cmb_series_bin.currentData() or "off",
             self.spn_series_binn.value())
@@ -1679,7 +1733,26 @@ class UfeMeasureTab(QWidget):
             if lines:
                 lines.append("")             # the chart's own block
             lines += ["· " + n for n in notes]
-        self.lbl_result.setText("\n".join(lines) if lines else "–")
+        if not lines:
+            self.lbl_result.setText("–")
+            return
+        # THE PANEL WEARS THE SAME COLOUR CODE AS THE BAND: the lines that
+        # carry a magnitude keep their role (see _fill_panel) and the rest is
+        # plain text. It goes out as HTML with everything escaped, so the
+        # panel's plain text (what the observer copies and the tests read) is
+        # exactly what it was.
+        import html as _html
+        roles = getattr(self, "_panel_roles", None) or {}
+        out = []
+        for line in lines:
+            role = roles.get(line) or roles.get(line[2:].strip())
+            colour = palette.MEASURE_COLOURS.get(role) if role else None
+            if colour:
+                out.append('<span style="color:{0}">{1}</span>'.format(
+                    colour, _html.escape(line)))
+            else:
+                out.append(_html.escape(line))
+        self.lbl_result.setHtml("<br>".join(out))
 
     def _refresh_chart_notes(self):
         # Called by every control that changes what the chart shows: the
@@ -2223,6 +2296,7 @@ class UfeMeasureTab(QWidget):
     def _fill_panel(self, band, n_seq, n_used, skipped, derived, gain):
         # The result block, in plain language and with every caveat that
         # applies (ADR-038: the panel says what was used and what was not).
+        self._panel_roles = {}       # line text -> the role that colours it
         last = self._last
         result = last["result"]
         zp = last["zp"]
@@ -2276,8 +2350,15 @@ class UfeMeasureTab(QWidget):
         if last["mag"] is not None:
             err_txt = (self.tr("± {0:.3f}").format(last["err"])
                        if last["err"] is not None else "")
-            lines.append(self.tr("Magnitude: {0:.3f} {1} ({2})")
-                         .format(last["mag"], err_txt, band))
+            text = self.tr("Magnitude: {0:.3f} {1} ({2})").format(
+                last["mag"], err_txt, band)
+            lines.append(text)
+            # THE SAME COLOUR CODE AS THE PLATE'S BAND: the measured
+            # magnitude of the target wears its role (green clean, orange
+            # usable, red doubtful), from the same rule and the same palette
+            role = chart_annotate.magnitude_role(self.measured_facts())
+            if role:
+                self._panel_roles[text] = role
         notes = []
         # the cross-match first: which catalogued source this light is
         # (and how far from it) answers half the "is this right?" by
@@ -2292,7 +2373,10 @@ class UfeMeasureTab(QWidget):
                 .format(star["catalog"], star["id"], sep, mband, cmag)
             if last["mag"] is not None and cmag is not None:
                 txt += self.tr(" · Δ {0:+.2f}").format(last["mag"] - cmag)
+            # the cross-matched magnitude IS a catalogue value: white, the
+            # same role the band gives it
             notes.append(txt)
+            self._panel_roles[txt] = chart_annotate.ROLE_MAG_CAT
         else:
             notes.append(self.tr(
                 "No catalogued source within 8″ of the target "

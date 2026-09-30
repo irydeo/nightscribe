@@ -65,6 +65,7 @@ class UfeSeriesDialog(QDialog):
         self.btn_series_zoomfit = self._ui.btn_series_zoomfit
         self.btn_series_errors = self._ui.btn_series_errors
         self.btn_series_hideflags = self._ui.btn_series_hideflags
+        self.btn_series_quality = self._ui.btn_series_quality
         self.cmb_series_bin = self._ui.cmb_series_bin
         self.spn_series_binn = self._ui.spn_series_binn
         self.chk_series_mean = self._ui.chk_series_mean

@@ -1897,3 +1897,90 @@ def test_the_band_takes_the_measured_point_of_this_frame(dlg):
                             "filter": "V", "source": "detrend",
                             "comps": 4, "flags": []}]
     assert tab.series_point_for(None, 60001.0, 40.0) is None
+
+
+def test_every_control_that_affects_the_measurement_measures_again(
+        dlg, monkeypatch):
+    # Reported: "if I measure again, changing the band for instance, the
+    # magnitude does not update". THREE controls were not wired (the band,
+    # the saturation ceiling and the sequence), and that is how such a thing
+    # appears: silently. This walks EVERY control that is part of the recipe,
+    # changes it and demands the measurement to run again, so a new knob
+    # cannot be left out without a red test.
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert tab._last is not None
+    runs = []
+    real = phot.measure_plate
+
+    def spy(*a, **k):
+        runs.append(True)
+        return real(*a, **k)
+    monkeypatch.setattr(phot, "measure_plate", spy)
+
+    def changed(label, act):
+        runs.clear()
+        act()
+        assert runs, label
+
+    if tab.cmb_band.count() < 2:
+        tab.cmb_band.addItem("R")
+    changed("band", lambda: tab.cmb_band.setCurrentIndex(1))
+    changed("aperture", lambda: tab.spn_rap.setValue(
+        tab.spn_rap.value() + 1.0))
+    changed("sky model", lambda: tab.cmb_sky.setCurrentIndex(
+        0 if tab.cmb_sky.currentIndex() else 1))
+    changed("sigma clip", tab.chk_sigmaclip.toggle)
+    changed("colour term", tab.chk_color.toggle)
+    changed("target B-V", lambda: tab.spn_target_bv.setValue(0.75))
+    changed("saturation ceiling", lambda: tab.spn_saturate.setValue(
+        tab.spn_saturate.value() + 1000.0))
+
+    def edit_the_sequence():
+        # a real edit (the kind of a comp): it leaves the zero point. The
+        # table is filled from the sequence first, because the helper above
+        # sets the entries directly
+        compare = dlg.tab_compare
+        compare._reload_table()
+        combo = compare.table.cellWidget(0, 1)
+        combo.setCurrentIndex(1 if combo.currentIndex() == 0 else 0)
+    changed("the sequence", edit_the_sequence)
+    changed("another click on the plate", lambda: _click(
+        dlg, *dlg._test_target))
+
+
+def test_the_panel_paints_the_magnitude_with_the_colour_code(dlg):
+    # The colour code is not only the plate's band: the measurement's panel
+    # wears it too, from the same rule and the same palette, so the two
+    # cannot disagree about what the measurement says.
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.viz import palette
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert tab._last is not None
+    role = ca.magnitude_role(tab.measured_facts())
+    assert role in (ca.ROLE_MAG, ca.ROLE_MAG_FAIR, ca.ROLE_MAG_DOUBT)
+    assert palette.MEASURE_COLOURS[role] in tab.lbl_result.toHtml()
+    # and the panel's PLAIN text is what it always was (what the observer
+    # copies and the tests read)
+    assert "Magnitude:" in tab.lbl_result.toPlainText()
+    assert "<span" not in tab.lbl_result.toPlainText()
+
+
+def test_the_panel_paints_a_catalogue_magnitude_in_white(dlg):
+    # The cross-matched source's magnitude is NOT a measurement of this
+    # plate: it wears the catalogue's white, the same role the band gives it.
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.viz import palette
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab._last["match"] = ({"id": "J1234", "catalog": "Gaia EDR3",
+                           "mag": 12.4, "band": "G",
+                           "bands": [{"label": "G", "value": 12.4}]}, 1.2)
+    tab._fill_panel(tab._last["band"], 5, 4, {}, False, None)
+    html = tab.lbl_result.toHtml()
+    assert palette.MEASURE_COLOURS[ca.ROLE_MAG_CAT] in html

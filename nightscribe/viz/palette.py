@@ -64,3 +64,19 @@ def color(name):
     if name not in keys:
         raise KeyError(f"unknown chart colour: {name!r}")
     return QColor(name)
+
+
+# Which colour each ROLE of a measurement wears. The roles are decided in
+# core/chart_annotate (pure, testable: see magnitude_role) and the colour is
+# here, so the plate's band, the measurement's panel and the curve's points
+# cannot disagree about what "green" means.
+MEASURE_COLOURS = {
+    "name": FG,           # the object: whose plate this is
+    "pos": FG,            # placed by this plate's own solution
+    "pos-cat": MUTED,     # the catalogue's position, not this plate's
+    "mag": GOOD,          # a clean measurement
+    "mag-fair": FAIR,     # usable, but not clean
+    "mag-doubt": DANGER,  # not worth reporting without looking
+    "mag-cat": CATALOG,   # a catalogue value: not a measurement
+    "context": MUTED,     # date, exposure, filter, kit, Stn, PSc, FOV
+}

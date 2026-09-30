@@ -1123,3 +1123,39 @@ def test_the_points_are_subtle_not_shrill():
               if it.brush().color().alpha() > 0}
     assert alphas
     assert max(alphas) <= int(255 * _POINT_ALPHA) + 1
+
+
+def test_the_points_wear_the_quality_colour_code():
+    # The observer asked for the same code on the curve's points: green when
+    # the point is clean, orange when it is usable but not clean, red when
+    # its data is in doubt. The SHAPES keep saying which decision was taken
+    # (the diamond, the faint edge, the cross of an excluded point).
+    from PySide6.QtWidgets import (QGraphicsEllipseItem,
+                                   QGraphicsPolygonItem)
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.viz import palette
+    _app()
+    chart = LightCurveChart()
+    pts = [{"mjd": 60000.0 + i * 0.01, "mag": 12.0 + i * 0.01, "err": 0.02,
+            "filter": "V", "source": "measure", "comps": 5, "flags": []}
+           for i in range(6)]
+    pts[3]["flags"] = ["few_comps"]           # a calibration caveat
+    pts[4]["flags"] = ["saturated"]           # the data itself is in doubt
+    chart.set_data(pts)
+    dots = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsEllipseItem)]
+    diamonds = [it for it in chart.scene().items()
+                if isinstance(it, QGraphicsPolygonItem)]
+    good = palette.MEASURE_COLOURS[ca.ROLE_MAG]
+    fair = palette.MEASURE_COLOURS[ca.ROLE_MAG_FAIR]
+    doubt = palette.MEASURE_COLOURS[ca.ROLE_MAG_DOUBT]
+    assert good in {it.brush().color().name() for it in dots}
+    assert fair in {it.brush().color().name() for it in dots}
+    assert any(it.pen().color().name() == doubt for it in diamonds)
+    # and turning it off gives the filter colours back (the chart's own
+    # button, for whoever wants the old look)
+    chart.set_quality_colours(False)
+    dots = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsEllipseItem)]
+    assert good not in {it.brush().color().name() for it in dots}
+    chart.set_quality_colours(True)

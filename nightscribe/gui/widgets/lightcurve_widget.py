@@ -229,6 +229,26 @@ FLAG_COLOUR = "#c49a4a"
 from ...core.series_measure import CAVEAT_FLAGS, DATA_FLAGS  # noqa: E402
 
 
+def _quality_colour(point):
+    # The point's own quality, in the SAME code as the plate's band and the
+    # measurement's panel (core/chart_annotate + viz/palette): green when the
+    # point is clean, orange when it is usable but not clean, red when its
+    # data is in doubt. A DATA flag (saturated, cosmic, focus, cloud,
+    # unaligned) is exactly "this measurement is not good", and a CAVEAT flag
+    # (few comparisons) is exactly "usable, but not clean".
+    # @args: point - a photometry point dict
+    # @return: a QColor, or None when there is nothing to judge
+    from ...core import chart_annotate
+    data_flags, caveat_flags = _flags_split(point.get("flags"))
+    role = chart_annotate.magnitude_role({
+        "mag": point.get("mag"), "err": point.get("err"),
+        "comps": point.get("comps"), "clipped": bool(data_flags),
+        "flags": caveat_flags})
+    if role is None:
+        return None
+    return QColor(palette.MEASURE_COLOURS.get(role, palette.FG))
+
+
 def _flags_split(flags):
     # @args: flags - the point's flag list
     # @return: (data_flags, caveat_flags) - anything unknown counts as data
@@ -294,6 +314,12 @@ class LightCurveChart(ChartView):
         self._robust = True
         self._show_errors = True
         self._hide_flagged = False
+        # the points wear the quality colour code (the same as the plate's
+        # band and the measurement's panel): green clean, orange usable but
+        # not clean, red when the point's own data is in doubt. The SHAPES
+        # (the diamond, the faint edge, the cross of an excluded point) keep
+        # saying which decision was taken; the colour says how good it is.
+        self._quality_colours = True
         self._y_range = None       # (lo, hi) when the observer fixed it
         # the observer's decisions on the curve (phase A): what is out,
         # what is marked as an outlier and what is selected right now
@@ -469,6 +495,18 @@ class LightCurveChart(ChartView):
     def is_hiding_flagged(self):
         # @return: whether the flagged points are hidden
         return self._hide_flagged
+
+    def set_quality_colours(self, on):
+        # @args: on - colour every point by its own quality (the code of
+        #        chart_annotate.magnitude_role) instead of by its filter.
+        #        Off gives back the filter/source colours.
+        self._quality_colours = bool(on)
+        self._build_scene()
+        self.fit_to_scene()
+
+    def is_colouring_by_quality(self):
+        # @return: whether the points wear the quality colours
+        return self._quality_colours
 
     def set_excluded(self, indexes):
         # The points the observer took out of the curve (quality plan, A).
@@ -1328,6 +1366,10 @@ class LightCurveChart(ChartView):
                     if off:
                         self._over_note += 1
                     colour, filled = _point_style(p)
+                    if self._quality_colours:
+                        # the quality colour, when the point can be judged
+                        # (a point with no magnitude keeps its filter's)
+                        colour = _quality_colour(p) or colour
                     radius = 3.8
                     if excluded:
                         # out of the curve but ON the chart: a grey cross,
@@ -1337,7 +1379,9 @@ class LightCurveChart(ChartView):
                     if outlier:
                         colour = QColor(palette.DANGER)
                     if flagged:
-                        self._draw_diamond(x, y_draw, radius)
+                        self._draw_diamond(
+                            x, y_draw, radius,
+                            colour=colour if self._quality_colours else None)
                         flagged_seen = True
                     elif off:
                         self._draw_caret(x, y_draw, off)
@@ -1414,13 +1458,18 @@ class LightCurveChart(ChartView):
             line.setZValue(_Z_DATA)
             self.add_item(line)
 
-    def _draw_diamond(self, x, y, radius):
-        # A point whose DATA is in doubt: the hollow diamond of ADR-048.
+    def _draw_diamond(self, x, y, radius, colour=None):
+        # A point whose DATA is in doubt: the hollow diamond of ADR-048. The
+        # SHAPE says which decision was taken and the COLOUR says how good
+        # the measurement is (the quality code, when it is on): a diamond in
+        # the warning colour is a point nobody should use.
+        # @args: x, y - scene position, radius - half size, colour - the
+        #        pen's colour (None: the flag amber)
         poly = QPolygonF([QPointF(x, y - radius), QPointF(x + radius, y),
                           QPointF(x, y + radius), QPointF(x - radius, y)])
         dot = QGraphicsPolygonItem(poly)
         dot.setBrush(QBrush(QColor(palette.BG)))
-        dot.setPen(QPen(QColor(FLAG_COLOUR), 1.8))
+        dot.setPen(QPen(QColor(colour or FLAG_COLOUR), 1.8))
         dot.setZValue(_Z_DATA)
         self.add_item(dot)
 

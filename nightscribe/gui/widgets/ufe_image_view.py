@@ -54,19 +54,10 @@ _RENDER_COALESCE_MS = 120   # stretch drags collapse into a single render
 # The band's colours, one per role. The MEANING of each role is decided in
 # core/chart_annotate (pure, testable); here it is only mapped to a colour,
 # so the same datum can never come out in two colours.
-BAND_COLOURS = {
-    "name": palette.FG,           # the object: whose plate this is
-    "pos": palette.FG,            # placed by this plate's own solution
-    "pos-cat": palette.MUTED,     # the catalogue's position, not this plate's
-    # the magnitude's code, three states and the catalogue: GREEN clean,
-    # ORANGE usable but not clean, RED not worth reporting without looking,
-    # WHITE a catalogue value (which is not a measurement of this plate)
-    "mag": palette.GOOD,
-    "mag-fair": palette.FAIR,
-    "mag-doubt": palette.DANGER,
-    "mag-cat": palette.CATALOG,
-    "context": palette.MUTED,     # date, exposure, filter, kit, Stn, PSc, FOV
-}
+# The band's colours, one per role: the map lives in the palette, because
+# the measurement's panel and the curve's points wear the same one (a colour
+# code that means two things is not a code).
+BAND_COLOURS = palette.MEASURE_COLOURS
 
 
 def _round_arcsec(target):

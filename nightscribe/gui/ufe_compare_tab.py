@@ -406,18 +406,28 @@ class UfeCompareTab(QWidget):
     # ----------------------------------------------------- state (ADR-047)
 
     def capture_state(self):
-        # The field and the sequence, as plain JSON (ADR-047): the
-        # catalog, the sky centre and width that produced it, the
-        # target magnitude and every chosen star with the photometry
-        # the calibration needs (band + bands). Only stars inside
-        # entries are kept: the rest is re-derivable from the catalog.
-        # @return: None when there is no field, else the dict
-        if self._field is None:
+        # The sequence (and the field that produced it), as plain JSON
+        # (ADR-047): the catalog, the sky centre and width, the target
+        # magnitude and every chosen star with the photometry the
+        # calibration needs (band + bands). Only stars inside entries are
+        # kept: the rest is re-derivable from the catalog.
+        #
+        # THE SEQUENCE IS THE OBSERVER'S WORK AND DOES NOT NEED A LIVE
+        # FIELD: it survives a frame with no WCS and a field that has not
+        # been rebuilt yet (the visit's navigator captures and re-applies
+        # this state on every frame). The catalog key comes from the combo;
+        # the centre and the width only exist when there is a field.
+        # @return: None when there is neither a sequence nor a field
+        if self._field is None and not self._entries:
             return None
-        field = self._field
+        field = self._field or {}
+        catalog = field.get("catalog") or self.cmb_catalog.currentData()
+        if not catalog:
+            return None
         return {
-            "catalog": field.get("catalog"),
-            "catalog_name": field.get("catalog_name"),
+            "catalog": catalog,
+            "catalog_name": field.get("catalog_name")
+            or self.cmb_catalog.currentText(),
             "center": list(field.get("center") or ()),
             "fov_arcmin": float(field.get("fov_arcmin") or 0.0),
             "target_mag": float(self.spn_mag.value()),
@@ -458,18 +468,19 @@ class UfeCompareTab(QWidget):
         if not st or not st.get("catalog"):
             return
         catalog = st["catalog"]
-        self._field = {
-            "catalog": catalog,
-            "catalog_name": (st.get("catalog_name") or catalog),
-            "center": list(st.get("center") or ()),
-            "fov_arcmin": float(st.get("fov_arcmin") or 0.0),
-            "stars": [],
-            "variables": [],
-            # the VSX cross-match is a network artifact: it re-runs
-            # with the next live query, and the restored stars carry
-            # no variable flag rather than a stale one
-            "vsx_warning": None,
-        }
+        # NO FIELD IS FABRICATED HERE. A field is a live answer from the
+        # catalogue (with its stars placed on THIS plate), not a saved
+        # artifact: the state keeps the sequence, the catalog key and the
+        # target magnitude, and that is what comes back. This used to build
+        # a field with "stars": [] and leave it in place, and the visit's
+        # frame navigator re-applies this state on every frame, so on the
+        # new plate _field was set but empty: "Build the sequence" believed
+        # the field was there and proposed over nothing ("The proposal found
+        # no usable comparison star", reported), while the manual
+        # "Generate field" filled the stars again and everything worked.
+        if self._field is not None and not self._stars:
+            # a field that has no stars on this plate is not a field either
+            self._field = None
         placed = []      # stars that landed on this plate (overlays)
         pairs = []       # (star, saved entry): EVERY entry is kept, the
                          # sequence is RA/Dec and survives a frame with no
@@ -520,9 +531,11 @@ class UfeCompareTab(QWidget):
                                      # re-proposed under the observer's feet
         self._reload_table()
         self._redraw_overlays()     # no-ops off stage (it checks itself)
+        # the catalog NAME comes from the state (the field is not restored
+        # any more: it is a live answer, see above)
         self._say(self.tr(
             "{0}: {1} in the sequence ({2} placed on this frame)")
-            .format(self._field["catalog_name"], len(self._entries),
+            .format(st.get("catalog_name") or catalog, len(self._entries),
                     len(self._stars)))
 
     # ------------------------------------------------------------- field
@@ -602,19 +615,18 @@ class UfeCompareTab(QWidget):
         # Both paths sit under the busy dialog: the proposal is local
         # math, but on a big field it still takes its moment, and a
         # bare freeze reads as a hang.
-        if self._field is not None:
-            wait = _busy_wait(self, self.tr("Proposing the sequence…"),
-                              self.tr("Comparison field"))
-            wait.setRange(0, 1)
-            wait.setValue(0)
-            from PySide6.QtWidgets import QApplication
-            QApplication.processEvents()   # let the dialog paint before
-                                           # the synchronous proposal
-            try:
-                self._on_propose()
-            finally:
-                wait.setValue(1)
-                _reap_wait(wait)
+        if self._field is not None and self._stars:
+            # THE WAIT BELONGS TO WHOEVER DOES THE WORK, and that is either
+            # an inline proposal (a tenth of a second on a normal field, and
+            # it needs no dialog at all) or the proposal's own thread (which
+            # shows its own bar until it lands).
+            #
+            # This branch used to wrap the call in a wait of its own, from
+            # when the proposal was synchronous: with the thread it opened
+            # and closed in the same instant (measured: 0.00 s open), which
+            # the observer read as "a dialog appears and disappears and
+            # nothing happens" (reported).
+            self._on_propose()
             return
         # A plate with no solved position used to be an exception when the
         # project ALREADY had its sequence loaded (the normal case in a
@@ -641,7 +653,7 @@ class UfeCompareTab(QWidget):
         self._auto_propose = False
         self._say(self.tr(
             "The plate has no WCS and it could not be solved: use «Solve "
-            "astrometry…» or check the solver in Settings."))
+            "astrometry…» or check the solver in Settings."), "warn")
 
     def _on_generate(self):
         # Generate field: VizieR catalog + VSX variables around the plate
@@ -738,7 +750,9 @@ class UfeCompareTab(QWidget):
         self._build_backup = []
         text = message
         if not backup:
-            self._say(text)
+            # a WARNING, not a note: "the build did not deliver" is news the
+            # observer has to see (the line is styled, see set_status)
+            self._say(text, "warn")
             return False
         self._entries = backup
         self._redraw_entries()
@@ -746,7 +760,7 @@ class UfeCompareTab(QWidget):
         self._commit()
         self._say(self.tr(
             "{0} Your sequence of {1} stars is kept; nothing was lost."
-        ).format(text, len(backup)))
+        ).format(text, len(backup)), "warn")
         return True
 
     def _on_field_ready(self, field):
@@ -1089,7 +1103,7 @@ class UfeCompareTab(QWidget):
         # and the status line narrates it. With no plate there is nothing
         # expensive to do: the catalogue's own criteria are arithmetic over
         # a list, and a dialog for that would be noise.
-        if self._field is None:
+        if self._field is None or not self._stars:
             # THE STEP THAT IS MISSING, DONE HERE: the field (and the solve
             # behind it when the plate has none), then the proposal. Asking
             # the observer to press another button for a step this one needs
@@ -1221,8 +1235,21 @@ class UfeCompareTab(QWidget):
                 len(rejected),
                 ", ".join(f"{k} × {v}" for k, v in sorted(counts.items())))
         if not self._entries:
-            if self._restore_sequence(self.tr(
-                    "The proposal found no usable comparison star.")):
+            # THE REASON, NOT JUST THE VERDICT. This message used to be the
+            # bare "no usable comparison star" and the reasons built above
+            # were thrown away with it, so a report like "it finds nothing"
+            # could not be answered from what the observer sees.
+            if not self._stars:
+                why = self.tr("The field has no stars on this plate: rebuild "
+                              "it with «Generate field…».")
+            elif not rejected:
+                why = self.tr("No catalog star survived the field's own "
+                              "rules: all of them are known variables or sit "
+                              "too close to a neighbour.")
+            else:
+                why = self.tr("The proposal found no usable comparison "
+                              "star.")
+            if self._restore_sequence(why):
                 return
         self._build_backup = []
         if self._last_proposal_was_same():

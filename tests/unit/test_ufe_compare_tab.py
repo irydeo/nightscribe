@@ -646,32 +646,55 @@ def test_build_sequence_with_a_field_only_reproposes(dlg, monkeypatch):
     assert len(tab._entries) > 0
 
 
-def test_repropose_is_covered_by_the_busy_dialog(dlg, monkeypatch):
-    # The second (and later) clicks only re-propose, but the proposal is
-    # not instant on a big field: it rides under the busy dialog like
-    # the field query does (a bare freeze reads as a hang).
-    #
-    # The dialog is DEFERRED now (it only appears if the work takes longer
-    # than _BUSY_SHOW_MS, see _busy_wait): this test wants it on screen, so
-    # it asks for it immediately.
-    from nightscribe.gui import ufe_compare_tab as _mod
-    monkeypatch.setattr(_mod, "_BUSY_SHOW_MS", 0)
+def test_the_proposal_owns_its_own_wait(dlg, monkeypatch):
+    # ONE CLICK, ONE WAIT, and only when the work needs it. This branch used
+    # to wrap the call in a wait of its own, from when the proposal was
+    # synchronous: with the thread it opened and closed in the same instant
+    # (measured 0.00 s on screen), which the observer read as "a dialog
+    # appears and disappears and nothing happens" (reported).
     from PySide6.QtWidgets import QProgressDialog
-    from nightscribe.core import compstars
+    from nightscribe.gui import ufe_compare_tab as _mod
     tab = dlg.tab_compare
-    tab._on_field_ready(_field(dlg))
-    seen = {}
-    real = compstars.propose_comps
+    tab._on_field_ready(_field(dlg))              # a small field: inline
+    made = []
+    real_wait = _mod._busy_wait
 
-    def spy(stars, mag, **kw):
-        seen["visible"] = any(w.isVisible()
-                              for w in tab.findChildren(QProgressDialog))
-        return real(stars, mag, **kw)
-    monkeypatch.setattr(compstars, "propose_comps", spy)
+    def spy(*args, **kw):
+        made.append(args[1])
+        return real_wait(*args, **kw)
+    monkeypatch.setattr(_mod, "_busy_wait", spy)
     tab.btn_auto.click()
-    assert seen.get("visible") is True
     _spin_events()
-    assert not tab.findChildren(QProgressDialog)   # reaped at the end
+    # the inline proposal is a tenth of a second: no dialog at all
+    assert made == []
+    assert not any(w.isVisible() for w in tab.findChildren(QProgressDialog))
+    assert tab._entries                        # and the sequence is built
+
+
+def test_a_crowded_field_shows_one_wait_until_it_lands(dlg, monkeypatch,
+                                                       qapp):
+    # The thread path owns the wait: exactly one, and it lives until the
+    # work ends (no flash before it, no dialog left behind).
+    from nightscribe.gui import ufe_compare_tab as _mod
+    tab = dlg.tab_compare
+    tab.spn_mag.setValue(12.5)
+    tab._on_field_ready(_field(dlg, n=400))       # over the thread threshold
+    opened, closed = [], []
+    real_wait, real_reap = _mod._busy_wait, _mod._reap_wait
+    monkeypatch.setattr(_mod, "_busy_wait",
+                        lambda *a, **k: (opened.append(a[1]),
+                                         real_wait(*a, **k))[1])
+    monkeypatch.setattr(_mod, "_reap_wait",
+                        lambda w: (closed.append(True), real_reap(w))[1])
+    tab.btn_auto.click()
+    assert len(opened) == 1                       # one wait, not two
+    assert closed == []                           # and not reaped yet
+    worker = tab._propose_worker
+    assert worker is not None and worker.wait(30000)
+    for _ in range(8):
+        qapp.processEvents()
+    assert closed                                  # reaped when it ended
+    tab.shutdown()
 
 
 def test_build_sequence_needs_a_wcs(dlg, tmp_path):
@@ -1093,3 +1116,116 @@ def test_the_button_says_what_it_is_doing_at_every_step(dlg, monkeypatch):
     assert any("catalog" in t.lower() for t in said)   # it says it is going
     assert tab._field is not None                      # and it got one
     assert len(tab._entries) >= 8                      # and proposed
+
+
+def test_a_build_that_cannot_deliver_warns(dlg, monkeypatch):
+    # A build that does not deliver is news, not a footnote: the window's
+    # line wears the WARNING style (the log keeps the detail). Before, the
+    # same words went out as an info note at the bottom of the window and
+    # read as "nothing happened" (reported).
+    _unsolved(dlg)
+    tab = dlg.tab_compare
+    tab._entries = [{"name": "Comp1", "kind": "comp",
+                     "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}}]
+    monkeypatch.setattr(dlg, "request_wcs",
+                        lambda after, on_fail=None: on_fail())
+    tab.btn_auto.click()
+    assert dlg._status_level == "warn"        # not a quiet note
+    assert len(tab._entries) == 1             # and nothing was lost
+    assert "could not be solved" in tab.lbl_status.text()
+
+
+# ------------- the field is a live answer, not a saved artifact -------
+
+def test_the_field_of_another_frame_is_rebuilt_not_reused(dlg, monkeypatch,
+                                                          tmp_path):
+    # Reported, with the visit's navigator: "Build the sequence" answered
+    # "The proposal found no usable comparison star. Your sequence of 9
+    # stars is kept" while the manual "Generate field" fixed it. The
+    # navigator re-applies the compare state on every frame, and that state
+    # FABRICATED a field with no stars: on the new plate the button believed
+    # the field was there and proposed over nothing (measured: 0 candidates
+    # and 0 refusals, which is why the reasons were empty too). A field
+    # without stars is not a field, so the same pipeline runs: solve if
+    # needed, field, proposal.
+    import shutil
+    other = tmp_path / "second.fits"
+    shutil.copyfile(MONO, other)            # the same field, another plate
+    dlg.set_series_hook(lambda: {"paths": [str(MONO), str(other)]})
+    dlg.open_plate(MONO)
+    tab = dlg.tab_compare
+    tab.spn_mag.setValue(12.5)
+    queries = []
+    monkeypatch.setattr(
+        "nightscribe.gui.workers.UfeFieldWorker",
+        lambda *a, **kw: (queries.append(True),
+                          _FakeFieldWorker(*a, field=_field(dlg), **kw))[1])
+    tab.btn_field.click()                    # the field of the first frame
+    assert tab._field is not None and tab._stars
+    queries.clear()
+    dlg._frame_next()                        # the navigator
+    assert tab._field is None                # nothing is invented
+    assert tab._stars == []
+    tab.btn_auto.click()                     # and the button rebuilds it
+    assert queries                           # the catalogue was asked again
+    assert tab._field is not None and tab._stars
+    assert len(tab._entries) > 1             # the sequence is built
+    assert "Proposed" in tab.lbl_status.text()
+
+
+def test_a_field_without_stars_is_not_a_field(dlg, monkeypatch):
+    # The same rule without the navigator: a field whose stars did not land
+    # on this plate is rebuilt instead of proposing over an empty list.
+    tab = dlg.tab_compare
+    tab._field = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+                  "center": (0.0, 0.0), "fov_arcmin": 36.0,
+                  "stars": [], "variables": []}
+    tab._stars = []
+    tab.spn_mag.setValue(12.5)
+    queries = []
+    monkeypatch.setattr(
+        "nightscribe.gui.workers.UfeFieldWorker",
+        lambda *a, **kw: (queries.append(True),
+                          _FakeFieldWorker(*a, field=_field(dlg), **kw))[1])
+    tab.btn_auto.click()
+    assert queries
+    assert tab._stars and len(tab._entries) > 1
+
+
+def test_a_restored_sequence_does_not_invent_a_field(dlg):
+    # A saved sequence is the sequence: the field is a live catalogue answer
+    # and comes back with the next query, never from the state.
+    cra, cdec = dlg.state.wcs.center()
+    seq = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+           "fov_arcmin": 36.0, "target_mag": 12.0,
+           "entries": [{"name": "A", "kind": "comp",
+                        "star": {"ra": cra, "dec": cdec, "band": "V",
+                                 "mag": 12.0, "bands": []}}]}
+    assert dlg.load_saved_sequence(seq)
+    tab = dlg.tab_compare
+    assert tab._field is None                 # no invented field
+    assert len(tab._entries) == 1             # but the sequence is here
+    assert tab._stars                         # and its star landed
+    # and it survives the capture/re-apply of a frame change
+    st = tab.capture_state()
+    assert st and st["entries"]
+
+
+def test_an_empty_proposal_says_why(dlg, monkeypatch):
+    # The verdict used to come alone ("The proposal found no usable
+    # comparison star") and the reasons built beside it were thrown away
+    # with the message, so the observer could not tell a bad field from a bad
+    # night.
+    tab = dlg.tab_compare
+    tab._on_field_ready(_field(dlg))
+    tab._entries = [{"name": "Comp1", "kind": "comp",
+                     "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}}]
+    tab._build_backup = list(tab._entries)
+    monkeypatch.setattr("nightscribe.core.compstars.propose_comps",
+                        lambda *a, **k: {"comps": [], "check": None,
+                                         "rejected": []})
+    tab._on_propose()
+    text = tab.lbl_status.text()
+    assert "No catalog star survived" in text
+    assert "is kept" in text                  # and nothing was lost
+    assert len(tab._entries) == 1

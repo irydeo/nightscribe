@@ -61,17 +61,20 @@ def _dialog(width, height, obj=None, folded=None):
 
 def _settle(d, turns=16):
     # The layout has settled when two consecutive event-loop turns agree on
-    # the work area's height. A busy full-suite run needs more turns than an
-    # isolated one, and measuring before it settled is measuring a window
-    # halfway through a resize (this is exactly how this test failed in the
-    # suite and passed alone).
+    # the work area's HEIGHT and on the viewport's WIDTH. A busy full-suite
+    # run needs more turns than an isolated one, and measuring before it
+    # settled is measuring a window halfway through a resize (this is exactly
+    # how this test failed in the suite and passed alone). The width matters
+    # for the same reason: the plate's own HUD (the object's band) is laid
+    # out from it, and a band measured against a viewport that is still
+    # resizing reads as too narrow.
     # @args: d - the dialog, turns - the patience budget
     # @return: None
     last = None
     for _ in range(turns):
         QApplication.processEvents()
-        now = d.splitter.height()
-        if now == last and now > 0:
+        now = (d.splitter.height(), d.view.viewport().width())
+        if now == last and now[0] > 0:
             return
         last = now
 
@@ -171,8 +174,7 @@ def test_the_histogram_strip_folds_and_remembers_it():
     # programmatic setCollapsed on purpose: closing a block must not fire
     # back), which is also the only thing the memory should react to
     d.hist_section._btn.click()
-    for _ in range(2):
-        QApplication.processEvents()
+    _settle(d)
     assert d.hist_section.isCollapsed()
     bar, work, strip, status = _chrome(d)
     assert strip <= 30                        # a header, nothing else
@@ -243,8 +245,7 @@ def test_the_object_line_goes_into_the_exported_png(tmp_path):
     d.resize(900, 700)
     d.show()
     assert d.open_plate(str(MONO))
-    for _ in range(2):
-        QApplication.processEvents()
+    _settle(d)
     without = d.view.export_png(tmp_path / "without.png").read_bytes()
     d.set_object(_OBJECT)
     with_object = d.view.export_png(tmp_path / "with.png").read_bytes()
@@ -295,8 +296,7 @@ def test_the_panel_keeps_only_what_is_touched_while_measuring():
     _app()
     d = _dialog(1500, 1000, _OBJECT)
     d.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
-    for _ in range(4):
-        QApplication.processEvents()
+    _settle(d)
     panel = d.series_pane
     assert panel.isVisible()                  # a visit arms the panel
     kinds = (QPushButton, QToolButton, QComboBox, QSpinBox, QDoubleSpinBox,
@@ -354,8 +354,7 @@ def test_a_long_message_is_elided_and_never_eats_the_plate():
     work_before = d.splitter.height()
     long_text = ("Serie: 142 puntos de 142 tomas · " + "muy largo " * 40)
     d.set_status(long_text)
-    for _ in range(3):
-        QApplication.processEvents()
+    _settle(d)
     bar = d._ui.lbl_status_bar
     assert bar.height() <= 22
     assert d.status_text() == long_text          # kept whole for the reader
@@ -378,8 +377,7 @@ def test_the_status_line_re_elides_on_resize_without_looping():
     d.set_status("Serie: 142 puntos de 142 tomas, 4 heredadas")
     for width in (600, 1500, 800, 1200):
         d.resize(width, 900)
-        for _ in range(2):
-            QApplication.processEvents()
+        _settle(d)
         assert "Serie" in d._ui.lbl_status_bar.text()
     assert d.status_text() == "Serie: 142 puntos de 142 tomas, 4 heredadas"
     d.close()
@@ -441,8 +439,7 @@ def test_the_summary_box_keeps_its_room_and_its_column_scrolls():
         d = _dialog(1400, height, _OBJECT)
         d.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
         d.show_tab("measure")
-        for _ in range(4):
-            QApplication.processEvents()
+        _settle(d)
         box = d.tab_measure.lbl_result
         assert box.height() >= 200, (height, box.height())
         # the content is always reachable: either it fits, or the column

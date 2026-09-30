@@ -258,10 +258,11 @@ def magnitude_role(measured):
 
 
 # A header's camera name can be a 31-character serial
-# ("QHY42PRO-1d74db4888698d84c-QHYCCD"): a chart does not need that, and it
-# was eating the field of view out of the band. The full value is still in
-# the header and in the other charts' boxes.
-MAX_EQUIP_CHARS = 24
+# ("QHY42PRO-1d74db4888698d84c-QHYCCD"): a chart needs the rig, not its
+# serial number, and the long name was eating the field of view out of the
+# band. Ten characters say SXV-H18, ASI2600 or QHY42PRO. The full value is
+# still in the header and in the other charts' boxes.
+MAX_EQUIP_CHARS = 10
 
 
 def equipment_from_header(header, cfg=None):
@@ -291,7 +292,9 @@ def equipment_from_header(header, cfg=None):
     parts = [p for p in (camera, telescope) if p]
     text = " · ".join(parts)
     if len(text) > MAX_EQUIP_CHARS:
-        text = text[:MAX_EQUIP_CHARS - 1].rstrip() + "…"
+        # cut at the cap and never leave a dangling separator: "ASI2600 ·…"
+        # reads like a typo, "ASI2600…" reads like a cut name
+        text = text[:MAX_EQUIP_CHARS - 1].rstrip(" ·") + "…"
     return text or None
 
 

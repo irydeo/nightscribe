@@ -178,9 +178,12 @@ dato**, para no copiar la estética de las cartas clásicas. Lo que cambia:
   `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: lo menos necesario para
   un reporte primero, la fecha la última) y, en el peor caso, la línea 2 entera; la
   línea 1 pierde la magnitud y luego la posición, y solo se elide un nombre que no cabe
-  ni solo. El equipo se acota a 24 caracteres (un nombre de cámara puede ser un serial
-  de 31 y se comía el FOV; el valor completo sigue en la cabecera y en las otras
-  cartas).
+  ni solo. La línea de contexto va un punto más pequeña y sin negrita: está para leerse,
+  no para competir con el nombre de la placa. El equipo se acota a **10 caracteres** (un
+  nombre de cámara puede ser un serial de 31 y se comía el FOV; 10 dicen SXV-H18,
+  ASI2600 o QHY42PRO, y el valor completo sigue en la cabecera y en las otras cartas), y
+  el fondo de la banda es opaco a propósito (205 de 255): sobre un campo brillante, la
+  primera versión se perdía.
 - **De dónde sale cada cosa**: el nombre del proyecto (o del fichero), la fecha, la
   exposición, el filtro y el equipo **de la cabecera de la propia toma** (el equipo de
   la toma gana al de Ajustes y no se mezclan: su cámara con mi telescopio sería una
@@ -219,9 +222,12 @@ boxes were to be rethought: the same style as the band that already heads the im
   `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: the least needed for a
   report first, the date last) and, in the worst case, line 2 entirely; line 1 loses
   the magnitude and then the position, and only a name that does not fit even alone is
-  elided. The equipment is capped at 24 characters (a camera name can be a 31-character
-  serial and it was eating the FOV; the full value stays in the header and in the other
-  charts).
+  elided. The context line is a point smaller and not bold: it is there to be read, not
+  to compete with the plate's name. The equipment is capped at **10 characters** (a
+  camera name can be a 31-character serial and it was eating the FOV; 10 say SXV-H18,
+  ASI2600 or QHY42PRO, and the full value stays in the header and in the other charts),
+  and the band's plaque is opaque on purpose (205 of 255): over a bright field the first
+  version was lost.
 - **Where each datum comes from**: the name from the project (or the file), the date,
   exposure, filter and equipment **from the plate's own header** (the frame's kit wins
   over the Settings and the two are never mixed: his camera with my telescope would be

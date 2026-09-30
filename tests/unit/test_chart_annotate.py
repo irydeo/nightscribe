@@ -256,17 +256,19 @@ def test_the_equipment_comes_from_the_plate_not_from_my_settings():
     cfg = {"camera_model": "ASI2600", "telescope_desc": "0.25 m"}
     assert ca.equipment_from_header({"INSTRUME": "SXV-H18"}, cfg) == \
         "SXV-H18"
+    assert ca.equipment_from_header({}, {}) is None
+    # the field is capped: a chart needs the rig, not its serial number, and
+    # a 31-character camera name was eating the field of view out of the
+    # band. A name that fits stays whole; a longer one is cut, never leaving
+    # a dangling separator. The full value stays in the header.
+    assert ca.equipment_from_header({}, cfg) == "ASI2600…"
     assert ca.equipment_from_header({"INSTRUME": "SXV-H18",
                                      "TELESCOP": "0.2 m SCT"}, cfg) == \
-        "SXV-H18 · 0.2 m SCT"
-    assert ca.equipment_from_header({}, cfg) == "ASI2600 · 0.25 m"
-    assert ca.equipment_from_header({}, {}) is None
-    # a header camera name can be a 31-character serial, and it was eating
-    # the field of view out of the band: the full value stays in the header
+        "SXV-H18…"
     long_name = ca.equipment_from_header(
         {"INSTRUME": "QHY42PRO-1d74db4888698d84c-QHYCCD"}, {})
-    assert len(long_name) == ca.MAX_EQUIP_CHARS
-    assert long_name.endswith("…")
+    assert long_name == "QHY42PRO-…"
+    assert len(long_name) <= ca.MAX_EQUIP_CHARS
 
 
 def test_a_band_with_nothing_to_say_is_an_empty_identity_line():

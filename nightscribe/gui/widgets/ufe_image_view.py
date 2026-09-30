@@ -744,64 +744,79 @@ class UfeImageView(ChartView):
         f.setPointSizeF((f.pointSizeF() or 9.0) + 1.0)
         f.setBold(True)
         fm = QFontMetricsF(f)
+        # the context line is a size smaller and not bold: it is there to be
+        # read, not to compete with the plate's own name (asked for)
+        f_small = QFont(f)
+        f_small.setPointSizeF(max(6.0, (f.pointSizeF() or 9.0) - 1.5))
+        f_small.setBold(False)
+        fm_small = QFontMetricsF(f_small)
+        # one metrics per line: the widths and the drop rule are measured
+        # with the font that line really wears
+        fms = [fm, fm_small]
         sep = "   ·   "
-        sep_w = fm.horizontalAdvance(sep)
         pad = 8.0 * k
         room = max(60.0, w - 2 * pad)
 
-        def width_of(segs):
+        def width_of(segs, m):
             # @return: the width of a line of segments, separators included
             if not segs:
                 return 0.0
-            return (sum(fm.horizontalAdvance(seg["text"]) for seg in segs)
-                    + sep_w * (len(segs) - 1))
+            return (sum(m.horizontalAdvance(seg["text"]) for seg in segs)
+                    + m.horizontalAdvance(sep) * (len(segs) - 1))
 
-        def fit(segs, order):
+        def fit(segs, order, m):
             # Drops whole fields, in the documented order, until the line
             # fits: half a field is worse than no field.
             segs = list(segs)
             for field in order:
-                if width_of(segs) <= room:
+                if width_of(segs, m) <= room:
                     break
                 segs = [seg for seg in segs if seg.get("field") != field]
             return segs
 
-        lines[0] = fit(lines[0], chart_annotate.DROP_ORDER_NAME)
+        lines[0] = fit(lines[0], chart_annotate.DROP_ORDER_NAME, fm)
         if len(lines) > 1:
-            lines[1] = fit(lines[1], chart_annotate.DROP_ORDER)
+            lines[1] = fit(lines[1], chart_annotate.DROP_ORDER, fm_small)
             if not lines[1]:
                 lines = lines[:1]
         if not lines[0]:
             return False
-        if width_of(lines[0]) > room and len(lines[0]) == 1:
+        if width_of(lines[0], fm) > room and len(lines[0]) == 1:
             # the last resort, and the only place a word is ever cut: a name
             # that does not fit the plate even alone
             seg = lines[0][0]
             seg["text"] = fm.elidedText(seg["text"], Qt.ElideRight,
                                         max(40.0, room))
-        line_h = fm.height()
+        heights = [m.height() for m in fms[:len(lines)]]
+        body = sum(heights)
         plaque = QRectF(pad - 3.0 * k, 6.0 * k - 2.0 * k,
-                        room + 6.0 * k, line_h * len(lines) + 4.0 * k)
-        self._title_rect = QRectF(pad, 6.0 * k, room, line_h * len(lines))
+                        room + 6.0 * k, body + 4.0 * k)
+        self._title_rect = QRectF(pad, 6.0 * k, room, body)
         self._title_h = plaque.height() + 10.0 * k
         painter.save()
-        painter.setFont(f)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(QColor(0, 0, 0, 130)))
+        # a dark plaque under it: opaque enough that a bright sky or a full
+        # moon behind never eats the letters (the first version was too
+        # transparent over bright fields, reported)
+        painter.setBrush(QBrush(QColor(0, 0, 0, 205)))
         painter.drawRoundedRect(plaque, 3.0 * k, 3.0 * k)
+        y = 6.0 * k
         for row, segs in enumerate(lines):
-            y = 6.0 * k + row * line_h
+            m = fms[row]
+            painter.setFont(f if row == 0 else f_small)
             x = pad
             for i, seg in enumerate(segs):
                 if i:
                     painter.setPen(QPen(QColor(palette.MUTED)))
-                    painter.drawText(QRectF(x, y, sep_w, line_h),
+                    painter.drawText(QRectF(x, y, m.horizontalAdvance(sep),
+                                            m.height()),
                                      Qt.AlignLeft | Qt.AlignVCenter, sep)
-                    x += sep_w
+                    x += m.horizontalAdvance(sep)
                 painter.setPen(QPen(QColor(BAND_COLOURS.get(
                     seg.get("role"), palette.FG))))
-                painter.drawText(QPointF(x, y + fm.ascent()), seg["text"])
-                x += fm.horizontalAdvance(seg["text"])
+                painter.drawText(QPointF(x, y + m.ascent()), seg["text"])
+                x += m.horizontalAdvance(seg["text"])
+            y += m.height()
         painter.restore()
         return True
 

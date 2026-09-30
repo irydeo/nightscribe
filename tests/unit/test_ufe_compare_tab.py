@@ -555,7 +555,7 @@ def test_deep_links_land_on_the_photometry_tab(qapp):
         assert d.tabs.currentWidget() is d.tab_photometry
         # opening the manual window hands the clicks to the picking
         d.tab_compare.btn_manual.click()
-        qapp.processEvents()
+        _spin_events()          # the window's signals land in the loop
         d.tab_photometry._apply()
         assert d.tab_compare._active and not d.tab_measure._active
     finally:

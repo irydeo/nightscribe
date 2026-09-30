@@ -45,6 +45,7 @@ from ..core import chart_annotate, coords, fits_meta, photometry, \
     series_measure, stretch
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
+from .ufe_centre_dialog import UfeCentreDialog
 from .ufe_series_dialog import UfeSeriesDialog
 from .ufe_passes_dialog import UfePassesDialog
 from .ui_loader import adopt_ui
@@ -180,17 +181,30 @@ class UfeMeasureTab(QWidget):
         self._radii_manual = False   # True once the observer edits a spin
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
             spn.valueChanged.connect(self._on_radii_edited)
-        # Centre nudge (like the blink's alignment): the observer moves the
-        # measurement centre in 0.5 px steps and the centroid refines again
-        # around it. Session-only: a new click or plate starts at (0, 0).
+        # Manual centre: the tab keeps only the checkbox; the arrows, the
+        # readout and the reset live in their own small non-modal window
+        # (UfeCentreDialog), shown while the box is checked. The observer
+        # moves the centre by hand in 0.1 px steps and the measurement uses
+        # EXACTLY that point (no centroid search): a very faint SN or a
+        # galaxy core cannot drag it. Session-only: a new click or plate
+        # starts at (0, 0).
         self._nudge = [0.0, 0.0]
-        self.lbl_nudge = self._ui.lbl_nudge
-        self.lbl_nudge.setText("(0.0, 0.0)")         # data, not text
-        self._ui.btn_up.clicked.connect(lambda: self._nudge_step(0.0, 0.5))
-        self._ui.btn_left.clicked.connect(lambda: self._nudge_step(-0.5, 0.0))
-        self._ui.btn_right.clicked.connect(lambda: self._nudge_step(0.5, 0.0))
-        self._ui.btn_down.clicked.connect(lambda: self._nudge_step(0.0, -0.5))
-        self._ui.btn_nudge_reset.clicked.connect(self._on_nudge_reset)
+        self._centre = UfeCentreDialog(self)
+        self.lbl_nudge = self._centre.lbl_nudge
+        self._centre.btn_up.clicked.connect(
+            lambda: self._nudge_step(0.0, 0.1))
+        self._centre.btn_left.clicked.connect(
+            lambda: self._nudge_step(-0.1, 0.0))
+        self._centre.btn_right.clicked.connect(
+            lambda: self._nudge_step(0.1, 0.0))
+        self._centre.btn_down.clicked.connect(
+            lambda: self._nudge_step(0.0, -0.1))
+        self._centre.btn_nudge_reset.clicked.connect(self._on_nudge_reset)
+        # closing the window (its X) is the same as unchecking the box
+        self._centre.rejected.connect(
+            lambda: self.chk_manual_centre.setChecked(False))
+        self.chk_manual_centre = self._ui.chk_manual_centre
+        self.chk_manual_centre.toggled.connect(self._on_manual_centre)
         self.btn_advanced = self._ui.btn_advanced
         self.btn_advanced.clicked.connect(self._open_advanced)
         # the sequence IS the calibration: adding or removing a comparison
@@ -743,6 +757,7 @@ class UfeMeasureTab(QWidget):
         self._say("")
         self._update_saturate_hint()
         self._reset_nudge()
+        self._sync_centre_dialog()
 
     # -------------------------------------------------------- measuring
 
@@ -886,6 +901,7 @@ class UfeMeasureTab(QWidget):
             "color": bool(self.chk_color.isChecked()),
             "sky": self.cmb_sky.currentData() or "median",
             "target_bv": float(self.spn_target_bv.value()),
+            "manual_centre": bool(self.chk_manual_centre.isChecked()),
         }
 
     def apply_state(self, st):
@@ -928,6 +944,12 @@ class UfeMeasureTab(QWidget):
             self.spn_target_bv.blockSignals(False)
         self._bv_source = "assumed"
         self._radii_manual = bool(st.get("radii_manual", False))
+        want_manual = bool(st.get("manual_centre", False))
+        if self.chk_manual_centre.isChecked() != want_manual:
+            self.chk_manual_centre.blockSignals(True)
+            self.chk_manual_centre.setChecked(want_manual)
+            self.chk_manual_centre.blockSignals(False)
+        self._sync_centre_dialog()
 
     def _on_seeing_toggled(self, checked):
         # Re-arming the checkbox hands the radii back to the seeing
@@ -1036,6 +1058,24 @@ class UfeMeasureTab(QWidget):
         self._reset_nudge()
         self._remeasure()
 
+    def _sync_centre_dialog(self):
+        # The pad is visible only while the mode is on AND a plate is
+        # loaded: the plate state may restore the box checked, and there is
+        # nothing to place on an empty editor.
+        show = bool(self.chk_manual_centre.isChecked()
+                    and self._state.has_image)
+        if show:
+            self._centre.adjustSize()
+        self._centre.setVisible(show)
+
+    def _on_manual_centre(self, checked):
+        # The checkbox owns the dialog: checking it opens the pad,
+        # unchecking closes it, and both re-measure (the recipe changed).
+        self._sync_centre_dialog()
+        if checked and self._centre.isVisible():
+            self._centre.raise_()
+        self._remeasure()
+
     def _apertures(self, entries):
         # H3: when the seeing checkbox is on, measure the comps' FWHM on
         # the plate and scale the radii; the spins follow so the numbers
@@ -1124,6 +1164,8 @@ class UfeMeasureTab(QWidget):
             site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
             site_saturate=(self._saturation_override()
                            or config.get("ccd_saturate")),
+            centroid_mode=("none" if self.chk_manual_centre.isChecked()
+                           else "gaussian"),
             site_lon=config.get("lon"), site_lat=config.get("lat"),
             site_aperture_m=float(config.get("aperture_inches", 10.0))
             * 0.0254,
@@ -2726,6 +2768,7 @@ class UfeMeasureTab(QWidget):
         self._advanced.cmb_detrend.setCurrentIndex(0)
         self._advanced.chk_auto_aperture.setChecked(False)
         self._advanced.spn_saturate.setValue(0.0)
+        self.chk_manual_centre.setChecked(False)
         self._say(self.tr("Advanced defaults restored."))
 
     # ------------------------------------------------------------- panel
@@ -2819,7 +2862,13 @@ class UfeMeasureTab(QWidget):
                 "No catalogued source within 8″ of the target "
                 "(a new object?)"))
         click = last.get("click")
-        if click is not None:
+        if self.chk_manual_centre.isChecked():
+            # In manual mode there is no centroid to report: the aperture
+            # sits exactly where the observer put it.
+            notes.append(self.tr(
+                "manual centre: measured exactly where you placed it "
+                "(no centroid)"))
+        elif click is not None:
             moved = math.hypot(last["col"] - click[0],
                                last["row"] - click[1])
             if moved > 1.0:

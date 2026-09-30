@@ -79,10 +79,16 @@ class UfeAnnotateTab(QWidget):
         self.btn_color.setText(palette.ACCENT)      # data, not text
         self.btn_color.setAccessibleName("marker color")
         self.btn_color.clicked.connect(self._pick_color)
-        self.spin_dx = self._ui.spin_dx
-        self.spin_dy = self._ui.spin_dy
-        self.btn_nudge = self._ui.btn_nudge
-        self.btn_nudge.clicked.connect(self._apply_nudge)
+        # Nudge pad (like the Blink tab): 0.5 px steps with instant
+        # feedback. The readout is the offset since the last click (or the
+        # plate's centre); a new click starts at (0, 0).
+        self._nudge = [0.0, 0.0]
+        self.lbl_nudge = self._ui.lbl_nudge
+        self.lbl_nudge.setText("(0.0, 0.0)")         # data, not text
+        self._ui.btn_up.clicked.connect(lambda: self._nudge_step(0.0, 0.5))
+        self._ui.btn_left.clicked.connect(lambda: self._nudge_step(-0.5, 0.0))
+        self._ui.btn_right.clicked.connect(lambda: self._nudge_step(0.5, 0.0))
+        self._ui.btn_down.clicked.connect(lambda: self._nudge_step(0.0, -0.5))
         self.chk_marker = self._ui.chk_marker
         self.chk_marker.toggled.connect(self._refresh_marker)
         self.lbl_position = self._ui.lbl_position
@@ -178,6 +184,7 @@ class UfeAnnotateTab(QWidget):
             self._say("")
         else:
             self._marker = None
+        self._reset_nudge()
         self._refresh_marker()
 
     def _on_scene_clicked(self, scene_pt):
@@ -189,6 +196,7 @@ class UfeAnnotateTab(QWidget):
         w, h = self._state.plate_shape
         self._marker = [min(max(col, 0.0), w - 1.0),
                         min(max(row, 0.0), h - 1.0)]
+        self._reset_nudge()
         self._refresh_marker()
 
     # ------------------------------------------------------------- marker
@@ -269,15 +277,27 @@ class UfeAnnotateTab(QWidget):
                 pass
         self.lbl_position.setText("  ·  ".join(parts))
 
-    def _apply_nudge(self):
-        # Shifts the marker by the two nudge fields, clamped to the plate.
+    def _nudge_step(self, dx, dy):
+        # One 0.5 px step of the marker, with instant feedback: the marker
+        # moves (clamped to the plate) and the readout follows. The step
+        # is the offset since the last click, which resets it.
+        # @args: dx, dy - step in plate pixels
         if self._marker is None:
             return
         w, h = self._state.plate_shape
         self._marker = [
-            min(max(self._marker[0] + self.spin_dx.value(), 0.0), w - 1.0),
-            min(max(self._marker[1] + self.spin_dy.value(), 0.0), h - 1.0)]
+            min(max(self._marker[0] + dx, 0.0), w - 1.0),
+            min(max(self._marker[1] + dy, 0.0), h - 1.0)]
+        self._nudge[0] += dx
+        self._nudge[1] += dy
+        self.lbl_nudge.setText(
+            f"({self._nudge[0]:+.1f}, {self._nudge[1]:+.1f})")
         self._refresh_marker()
+
+    def _reset_nudge(self):
+        # @return: None. The readout counts from the last click again.
+        self._nudge = [0.0, 0.0]
+        self.lbl_nudge.setText("(0.0, 0.0)")
 
     def _pick_color(self):
         # Asks for the marker colour and re-draws.

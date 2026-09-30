@@ -195,8 +195,9 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     #        sky_mode - "median" (flat sky) or "plane" (H2: a tilted sky
     #        plane fitted to the annulus, for galactic cores),
     #        centroid_mode - "gaussian" (matched-filter, parabola-fined;
-    #        the default), "refined" (sky-subtracted moment, two passes)
-    #        or "raw" (the legacy one-pass moment),
+    #        the default), "refined" (sky-subtracted moment, two passes),
+    #        "raw" (the legacy one-pass moment) or "none" (the observer's
+    #        hand-placed centre, used exactly: a faint SN is never dragged),
     #        fwhm - the plate's seeing in px when the caller knows it
     #        (the Measure tab's comps-based estimate): the centroid
     #        template then matches the stars instead of trusting a local
@@ -213,7 +214,11 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     if min(x, y, w - x, h - y) < r_ann_out:
         return _fail("demasiado cerca del borde", "too close to the edge")
     cen_ok = None                     # the raw mode carries no verdict
-    if centroid_mode == "raw":
+    if centroid_mode == "none":
+        # The observer placed the centre by hand (a very faint SN the
+        # algorithm would drag to a neighbour): use it EXACTLY, no search.
+        cx, cy = float(x), float(y)
+    elif centroid_mode == "raw":
         cx, cy = series._centroid(data, x, y)      # the legacy one-pass
     elif centroid_mode == "refined":
         cen = refined_centroid(data, x, y)
@@ -1539,6 +1544,10 @@ class PlateConfig:
                                     # hot pixel and a close neighbour (see
                                     # gaussian_centroid); off reproduces the
                                     # historical behaviour
+    centroid_mode: str = "gaussian"  # "gaussian" | "refined" | "raw" | "none"
+                                    # for the TARGET (the comps always
+                                    # centroid): "none" pins the hand-placed
+                                    # centre, for a very faint SN
     sigmaclip: bool = True
     sky_mode: str = "median"
     color: bool = False
@@ -1682,12 +1691,14 @@ def measure_plate(image, cfg):
                 r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
                 r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
                 sat_adu=None, sky_mode=cfg.sky_mode,
+                centroid_mode=cfg.centroid_mode,
                 fwhm=(fwhm / scale if fwhm else None))
         else:
             target = measure_point(
                 image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
                 r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
-                linear_adu=lin, sky_mode=cfg.sky_mode, fwhm=fwhm,
+                linear_adu=lin, sky_mode=cfg.sky_mode,
+                centroid_mode=cfg.centroid_mode, fwhm=fwhm,
                 robust=cfg.robust_centroid)
         mx, my = target["x"], target["y"]
         if cfg.comp_image is not None:

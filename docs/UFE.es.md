@@ -184,10 +184,12 @@ apertura diferencial de una placa):
   apertura** (apertura, anillo interior y exterior): tocar un radio
   re-mide el punto al instante, y tu ajuste manual manda sobre el
   auto-seeing hasta que cargues otra placa (o rearms la casilla).
-* **Centro**: las flechas ↑ ← → ↓ mueven el centro de la medida en pasos
-  de 0,5 px (como la alineación del blink) y el centroide se refina otra
-  vez alrededor; el botón **0** vuelve al centro del clic. Un clic nuevo
-  empieza en (0,0). Sirve cuando el centroide se engancha a un vecino.
+* **Centro manual**: la casilla abre una ventana pequeña y no modal con
+  las flechas ↑ ← → ↓ (pasos de 0,1 px) y el botón **0** (vuelve al clic).
+  Con la casilla marcada la medida usa **exactamente** el centro que pones,
+  sin búsqueda de centroide, para objetos muy débiles o SNe que el
+  algoritmo arrastraría a un vecino; al desmarcarla se cierra la ventana y
+  vuelve el centroide automático. Un clic nuevo empieza en (0,0).
 * **Avanzado…** abre la receta completa en otra ventana pequeña y no
   modal (se puede dejar abierta mientras se mide): modelo de **cielo**
   (mediana plana o plano inclinado para núcleos galácticos),
@@ -314,8 +316,9 @@ secuencia).
 La pestaña **Anotar** guarda copias FITS anotadas compatibles con
 AstroImageJ (el archivo original nunca se modifica):
 
-* **Clic** sobre la imagen coloca el marcador; **dx/dy + Ajustar** lo
-  mueven a décimas de píxel; tamaño y color a elegir.
+* **Clic** sobre la imagen coloca el marcador; las **flechas ↑ ← → ↓**
+  lo mueven en pasos de 0,5 px con feedback instantáneo (la lectura cuenta
+  el desplazamiento desde el último clic); tamaño y color a elegir.
 * **Etiqueta** y **notas** viajan en las tarjetas ANNOTATE y NS_NOTES;
   RA/Dec, escala y PA de norte se escriben desde el WCS de la placa
   (NS_RA, NS_DEC, NS_SCALE, NS_NORTH).

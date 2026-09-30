@@ -181,10 +181,12 @@ differential aperture photometry):
   re-measures the point at once, and your hand edit wins over the
   seeing auto-scale until you load another plate (or re-arm the
   checkbox).
-* **Centre**: the arrows ↑ ← → ↓ move the measurement centre in 0.5 px
-  steps (like the blink's alignment) and the centroid refines again
-  around it; the **0** button returns to the clicked centre. A new click
-  starts at (0,0). It helps when the centroid locks onto a neighbour.
+* **Manual centre**: the checkbox opens a small non-modal window with the
+  arrows ↑ ← → ↓ (0.1 px steps) and the **0** button (back to the click).
+  With it checked the measurement uses **exactly** the centre you place,
+  with no centroid search, for very faint objects or SNe the algorithm
+  would drag to a neighbour; unchecking closes the window and the
+  automatic centroid returns. A new click starts at (0,0).
 * **Advanced...** opens the full recipe in another small non-modal
   window (you can leave it open while measuring): the **sky** model
   (flat median or a tilted plane for galactic cores), **sigma-clip** of
@@ -308,8 +310,9 @@ object's mark: ring with ticks (classic) or full-frame cross with a box
 The **Annotate** tab saves AstroImageJ-compatible annotated FITS copies
 (the original file is never modified):
 
-* **Click** on the image drops the marker; **dx/dy + Nudge** move it by
-  tenths of a pixel; size and colour are yours.
+* **Click** on the image drops the marker; the **arrows ↑ ← → ↓** move it
+  in 0.5 px steps with instant feedback (the readout counts the offset
+  since the last click); size and colour are yours.
 * **Label** and **notes** travel in the ANNOTATE and NS_NOTES cards;
   RA/Dec, plate scale and north PA are written from the plate's WCS
   (NS_RA, NS_DEC, NS_SCALE, NS_NORTH).

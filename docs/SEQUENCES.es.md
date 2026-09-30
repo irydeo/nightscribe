@@ -231,6 +231,35 @@ fallback a solo escala en noches cortas o sin rango de aire. Si mezclas
 filtros, la guardia de banda avisa: no se combinan en una sola curva de
 magnitudes. Un punto cero desplazado se **marca**, nunca se calla.
 
+### 7.1 Una visita es UNA curva (y las demás pasadas siguen ahí)
+
+Una visita puede tener **varias pasadas**: vuelves a medir la serie con otra
+banda, con otra secuencia, o solo para comprobar algo. Cada pasada guarda sus
+puntos y no se borra ninguna, pero **la gráfica de la visita dibuja una sola**,
+la que la visita tiene marcada. Medir otra vez hace que la nueva pasada sea la
+curva (es lo que acabas de medir, y es lo que estabas viendo en vivo); las
+anteriores **no se dibujan**, y si se dibujaran todas a la vez verías la curva
+duplicada a dos niveles distintos unidos por un zigzag.
+
+Para volver a una pasada anterior: **Serie ▾ → Pasadas de esta visita…**. Ahí
+están todas, con su hora, su banda, sus puntos, el tramo de noche que cubren y
+su estado, y la que la gráfica muestra marcada en negrita. Dos acciones por
+fila:
+
+* **Que sea la curva**: la gráfica dibuja esa pasada. **No se borra nada** y no
+  se mide nada otra vez.
+* **Deshacer esta pasada**: sus puntos se van, la fila queda marcada como
+  deshecha y la gráfica cae a la pasada anterior. Las tomas no se tocan.
+
+Deshacer la última pasada **recupera la anterior**, que es justo lo que
+esperas de un Undo. Y el panel de la visita lo dice en voz alta: qué pasada
+está dibujando y cuántas más guarda (con sus puntos), para que no haya una
+lista de pasadas secreta.
+
+El mismo criterio vale para la curva del **proyecto**: agrega las noches, y de
+cada noche toma una sola pasada (la que la visita marca, o la última medida).
+Una noche medida cinco veces cuenta una vez.
+
 ## 8. Cuándo NO hace falta serie
 
 Un **punto suelto** (por ejemplo una SN entre otras observaciones) es una

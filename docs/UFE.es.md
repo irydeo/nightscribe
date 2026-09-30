@@ -213,6 +213,28 @@ atómica, así la placa queda resuelta para cualquier programa).
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
 
+## La curva de una visita: una noche, una pasada
+
+Cuando el editor se abre desde una visita, el gráfico del centro dibuja **la
+curva que la visita ya tiene**, leída del proyecto: no se mide nada otra vez.
+
+Una visita puede tener **varias pasadas** (mediste la serie otra vez con otra
+banda, con otra secuencia, o para comprobar algo). Cada una guarda sus puntos,
+pero **el gráfico dibuja una sola**, la que la visita tiene marcada. Volver a
+medir hace que la pasada nueva sea la curva; las anteriores no se dibujan, y el
+panel lo dice: cuántos puntos tiene la que ves y cuántas pasadas más guarda la
+visita. La puerta **Serie ▾ → Pasadas de esta visita…** las lista todas (hora,
+banda, puntos, tramo de noche, estado) y deja **que sea la curva** cualquiera de
+ellas sin borrar nada, o **deshacer** una pasada (sus puntos se van, la fila
+queda marcada, y la gráfica cae a la pasada anterior).
+
+La banda de la leyenda y del fichero AAVSO es **la banda con la que se
+calibró** (la que el motor usó en las comparsas), no un «V» inventado cuando la
+cabeza de las tomas no trae `FILTER`. Y la curva **detrended** se vuelve a
+ajustar al cargar (es determinista: los mismos puntos y la misma masa de aire
+dan los mismos coeficientes), así que el interruptor de detrended tiene qué
+enseñar también después de reabrir la visita.
+
 ## La banda de la placa y el estilo de marcador (ADR-046)
 
 La placa cuenta lo que sabe en la **banda de la parte alta de la imagen**,

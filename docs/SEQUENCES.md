@@ -227,6 +227,34 @@ an offset-only fallback on short nights or nights without airmass range. If you
 mix filters, the band guard warns: they are not combined into one magnitude
 curve. A shifted zero point is **flagged**, never hidden.
 
+### 7.1 A visit is ONE curve (and the other passes stay)
+
+A visit can hold **several passes**: you measure the series again with another
+band, with another sequence, or just to check something. Every pass keeps its
+points and none is deleted, but **the visit's chart draws only one**, the one
+the visit has marked. Measuring again makes the new pass the curve (it is what
+you just measured, and what you were watching live); the earlier ones are
+**not drawn**, and drawing them all at once is what shows a curve duplicated at
+two levels joined by a zigzag.
+
+To go back to an earlier pass: **Series ▾ → Passes of this visit…**. Every pass
+is there with its time, its band, its points, the stretch of night it covers
+and its state, and the one the chart shows is in bold. Two actions per row:
+
+* **Make this the curve**: the chart draws that pass. **Nothing is deleted**
+  and nothing is measured again.
+* **Undo this pass**: its points go, its row stays marked undone and the chart
+  falls back to the pass before it. The frames are untouched.
+
+Undoing the last pass **brings the previous one back**, which is what you
+expect from an Undo. And the visit's panel says it out loud: which pass it is
+drawing and how many more it holds (with their points), so the list of passes
+is never a secret.
+
+The same rule holds for the **project's** curve: it aggregates the nights, and
+takes one pass per night (the one the visit marks, or the last one measured).
+A night measured five times counts once.
+
 ## 8. When you do NOT need a series
 
 A **single point** (for example an SN among other observations) is a

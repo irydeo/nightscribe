@@ -628,3 +628,78 @@ compared `None` with `float`). `analyze_campaign` now keeps only the points with
 numeric `mjd` and `mag`, returns `no_data` when none is left and reports the used
 count (`points`); the summary says how many were ignored. No bad row breaks the page
 anymore.
+
+
+**Revisión (2026-09-30, una noche es UNA curva)**: la gráfica de una visita
+dibujaba TODAS sus ejecuciones a la vez. Medido en la base real (V0526 Per,
+30 de septiembre): la visita 18 guardaba cuatro pasadas, 976 puntos, en dos
+niveles distintos (11.96–12.07 calibrados en G y 12.70–12.81 en V) unidos por
+un zigzag, mientras la gráfica en vivo había dibujado una sola ejecución
+(244 puntos). Se veía «al cerrar y volver a cargar el programa» porque al
+reabrir la visita se lee la curva del proyecto; el gráfico del proyecto, el
+*sparkline*, el informe y el diálogo de período unían las pasadas igual (el
+proyecto 113: 1014 puntos en la base para una curva de 282; el 96: 1255 para
+284, dos noches de 142).
+
+La regla pasa a estar escrita y en un solo sitio (`followup.curve_run_ids`):
+**la curva de una noche es la ejecución que la visita marca y, si no marcó
+ninguna, la de su última medida** (`MAX(id)`, el orden en que se midió). Los
+puntos sin ejecución (a mano, pegados, de survey) no son una remedida y
+siempre están. La visita recuerda su elección en `project_sessions.curve_run_id`
+(migración v15, con el patrón idempotente de la v9–v14) y una ejecución nueva
+la mueve a sí misma: medir otra vez manda, que es lo que la gráfica en vivo
+enseñaba. Deshacer la última pasada cae a la anterior, que es lo que se espera
+de un Undo.
+
+Como guardar las pasadas sin poder volver a ninguna no tiene sentido (lo
+preguntó el observador), entra la puerta **Serie ▾ → Pasadas de esta visita…**:
+la lista con hora, banda, puntos, tramo de noche y estado, la que está dibujada
+en negrita, y dos acciones por fila, «que sea la curva» (sin borrar nada) y
+«deshacer esta pasada» (sus puntos se van, la fila queda marcada). El panel de
+la visita dice qué pasada dibuja y cuántas más guarda.
+
+Dos cosas más que la recarga tenía mal: la banda de la leyenda y del fichero
+AAVSO es **la que usó la calibración** (los puntos de una serie real no traían
+`FILTER` y una curva en G decía «sin filtro», y el cargador forzaba «V»), y la
+curva **detrended** se reajusta al cargar (`series_measure.detrend_stored`,
+determinista: los mismos puntos con la misma masa de aire dan los mismos
+coeficientes). Una sesión en vivo pasa a ser UNA ejecución (sus lotes se
+añaden a la que abrió el primero): era lo que el propio test declaraba y lo que
+el host real no cumplía, y sin ello la curva recargada de una sesión en vivo
+habría sido solo su último lote.
+
+**Revision (2026-09-30, one night is ONE curve)**: a visit's chart drew EVERY
+run of the visit at once. Measured on the real database (V0526 Per, 30
+September): visit 18 held four passes, 976 points, at two different levels
+(11.96–12.07 calibrated in G and 12.70–12.81 in V) joined by a zigzag, while
+the live chart had drawn one run (244 points). It showed up "when closing and
+reloading the program" because reopening a visit reads the curve from the
+project; the project's chart, the sparkline, the report and the period dialog
+added the passes up in the same way (project 113: 1014 points in the database
+for a curve of 282; project 96: 1255 for 284, two nights of 142).
+
+The rule is now written down and in one place (`followup.curve_run_ids`): **the
+curve of a night is the run the visit marks and, if it marked none, the one its
+last measurement belongs to** (`MAX(id)`, insertion order). Points with no run
+(hand-entered, pasted, survey) are not a re-measurement and always belong to
+it. The visit remembers its choice in `project_sessions.curve_run_id` (v15
+migration, the idempotent v9–v14 pattern) and a new run moves it to itself:
+measuring again rules, which is what the live chart showed. Undoing the last
+pass falls back to the previous one, which is what an Undo is for.
+
+Since keeping the passes with no way back to any of them makes no sense (the
+observer asked), the door **Series ▾ → Passes of this visit…** comes in: the
+list with time, band, points, stretch of night and state, the drawn one in
+bold, and two actions per row, "make this the curve" (deleting nothing) and
+"undo this pass" (its points go, the row stays marked). The visit's panel says
+which pass it draws and how many more it holds.
+
+Two more things the reload got wrong: the band in the legend and in the AAVSO
+file is **the one the calibration used** (the points of a real series carried no
+`FILTER` and a curve in G said "no filter", and the loader forced "V"), and the
+**detrended** curve is refitted on load (`series_measure.detrend_stored`,
+deterministic: the same points with the same airmass give the same
+coefficients). A live session is now ONE run (its batches append to the one the
+first opened): that is what the test itself declared and what the real host did
+not honour, and without it the curve reloaded from a live session would have
+been only its last batch.

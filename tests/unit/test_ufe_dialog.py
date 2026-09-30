@@ -990,7 +990,7 @@ def _band_mag(dlg):
     return next(seg for seg in first if seg["field"] == "mag")
 
 
-def test_the_band_repaints_whenever_the_magnitude_changes(dlg):
+def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
     # Asked: "check that every time the object's magnitude changes, it shows
     # in the band". The content is read WHEN IT PAINTS (no cache), so the
     # only thing that can go wrong is a missing repaint, and that is
@@ -1038,7 +1038,9 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg):
     # 4 · another plate (the same field, the same header): the visit's curve
     # still answers for that frame by time, so the band follows it
     import shutil
-    second = Path(dlg.state.path).parent / "second_plate.fits"
+    # the copy goes to tmp_path: writing it beside the fixture left a
+    # second_plate.fits inside the repository (found in the working tree)
+    second = tmp_path / "second_plate.fits"
     shutil.copyfile(dlg.state.path, second)
     dlg.open_plate(str(second))
     e = _band_strip(dlg)

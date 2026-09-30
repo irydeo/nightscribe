@@ -1236,10 +1236,21 @@ def test_live_session_is_one_undoable_run(dlg, qapp, tmp_path, monkeypatch):
     # Regression (P2 #19 / ADR-050): the live batches were written and
     # their run ids thrown away, so a live session could never be undone.
     # Its batches pile up behind the same Undo button as a normal series.
+    #
+    # And since 2026-09-30 they pile up in ONE run, not one per batch: the
+    # tab tells the host to continue the run its session opened
+    # (`append_run`), which is what makes the curve reloaded from the
+    # project the WHOLE live session instead of its last batch.
     tab = dlg.tab_measure
     undone = []
+    echoes = []
     _arm_live(dlg, tmp_path, "lu")
-    dlg.set_points_hook(lambda rows, cfg: 79)
+
+    def fake_points(rows, cfg):
+        echoes.append(dict(cfg))
+        return 79
+
+    dlg.set_points_hook(fake_points)
     dlg.set_run_undo_hook(lambda run_id: (undone.append(run_id), 2)[1])
     _fast_live(monkeypatch)
     tab.chk_series_live.setChecked(True)
@@ -1250,7 +1261,9 @@ def test_live_session_is_one_undoable_run(dlg, qapp, tmp_path, monkeypatch):
     _wait_live_runs(tab, qapp, 2)
     _stop_live(tab)
     ids = list(tab._live_run_ids)
-    assert len(ids) >= 2 and set(ids) == {79}
+    assert ids == [79]                        # one run, whatever the batches
+    assert "append_run" not in echoes[0]      # the first batch opened it
+    assert all(e.get("append_run") == 79 for e in echoes[1:])
     assert tab.btn_series_undo.isEnabled()
     assert tab._live_points                    # the curve grew live
     tab._on_series_undo()
@@ -2013,3 +2026,157 @@ def test_saturation_box_overrides_and_shows_what_auto_resolves(dlg,
     _click(dlg, *dlg._test_target)
     assert seen[-1].site_saturate == 45000.0
     assert "override" in tab._advanced.lbl_saturate_auto.text()
+
+
+# ------------- one night, one curve: the passes door (asked) ----------
+#
+# The observer's own question: "why do we keep the old passes if there is
+# then no way to get them back?". A visit can hold several series runs and
+# only ONE is drawn (drawing them all at once was the reported corruption);
+# this door is where they are seen and where the drawn one is chosen.
+
+def _passes(curve_id=2, undone_empty=0):
+    # @args: curve_id - which pass the visit says it is showing,
+    #        undone_empty - the undone passes the host counted instead of
+    #        listing (they have no points left)
+    # @return: the payload the host hands the tab
+    return {"undone_empty": undone_empty, "runs": [
+        {"id": 1, "created": 1790750000.0, "band": "V", "points": 10,
+         "mjd0": 60297.77, "mjd1": 60297.79, "status": "complete"},
+        {"id": 2, "created": 1790751000.0, "band": "G", "points": 5,
+         "mjd0": 60297.77, "mjd1": 60297.79, "status": "complete"}],
+        "curve_run_id": curve_id}
+
+
+def test_the_panel_says_which_pass_is_drawn_and_that_others_exist(dlg):
+    # Nothing is hidden: the curve that came from the project says which
+    # pass it is AND that the visit holds others that are not drawn, naming
+    # the door where they are chosen.
+    tab = dlg.tab_measure
+    dlg.set_visit_passes_hooks(lambda: _passes(2), lambda run_id: None)
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(5), "zp_mode": "catalog"}, None)
+    panel = tab.lbl_result.toPlainText()
+    assert "earlier pass" in panel
+    assert "Passes of this visit" in panel
+    assert "10" in panel                       # the points of the other one
+
+
+def test_a_visit_with_one_pass_keeps_the_plain_line(dlg):
+    # With a single pass there is nothing to choose and nothing to warn
+    # about: the panel says what it always said.
+    tab = dlg.tab_measure
+    payload = _passes(1)
+    payload["runs"] = payload["runs"][:1]
+    dlg.set_visit_passes_hooks(lambda: payload, lambda run_id: None)
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(5), "zp_mode": "catalog"}, None)
+    panel = tab.lbl_result.toPlainText()
+    assert "earlier pass" not in panel
+    assert "already measured" in panel
+
+
+def test_the_passes_door_lists_them_and_going_back_redraws(dlg):
+    tab = dlg.tab_measure
+    chosen = []
+    # what the host answers with: the pass the visit is showing. The test
+    # moves it when it presses "Make this the curve", and the chart
+    # following it is the proof that the reload happened.
+    state = {"n": 5}
+
+    def load():
+        return {"points": _visit_points(state["n"]), "zp_mode": "catalog"}
+
+    dlg.set_visit_passes_hooks(lambda: _passes(2), chosen.append)
+    tab.set_visit_curve_hooks(load, None)
+    tab.load_visit_curve()
+    assert len(tab.chart_series._points) == 5
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert door.tbl_passes.rowCount() == 2
+    assert "The chart is showing" in door.lbl_passes_shown.text()
+    assert door.lbl_passes_trail.text() == ""      # nothing hidden
+    assert "the curve" in door.tbl_passes.item(1, 4).text()
+    assert door.btn_passes_use.isEnabled() is False   # row 1 IS the curve
+    door.tbl_passes.selectRow(0)
+    assert door.btn_passes_use.isEnabled() is True
+    state["n"] = 2                              # the pass it goes back to
+    door.btn_passes_use.click()
+    assert chosen == [1]                        # the visit was told
+    assert len(tab.chart_series._points) == 2   # and the chart followed
+    door.close()
+
+
+def test_the_door_counts_the_undone_passes_instead_of_listing_them(dlg):
+    # A real visit had 26 undone passes against 4 that mattered. They are
+    # counted, not listed, and the window says so: the trail keeps them and
+    # nothing was deleted.
+    tab = dlg.tab_measure
+    dlg.set_visit_passes_hooks(lambda: _passes(2, undone_empty=26),
+                               lambda run_id: None)
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert door.tbl_passes.rowCount() == 2          # only the ones with data
+    assert "26" in door.lbl_passes_trail.text()
+    assert "nothing was deleted" in door.lbl_passes_trail.text()
+    door.close()
+
+
+def test_undoing_a_pass_from_the_door_says_what_it_did(dlg):
+    tab = dlg.tab_measure
+    undone = []
+    dlg.set_visit_passes_hooks(lambda: _passes(2), lambda run_id: None)
+    dlg.set_run_undo_hook(lambda run_id: (undone.append(run_id), 7)[1])
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(3), "zp_mode": "catalog"}, None)
+    tab.load_visit_curve()
+    tab._undo_pass(2)
+    assert undone == [2]
+    assert "7" in tab.lbl_status.text()
+
+
+def test_the_door_needs_a_visit_and_says_so(dlg):
+    # An ad-hoc open (the Tools menu) has no visit: the door says why
+    # instead of showing an empty window.
+    tab = dlg.tab_measure
+    tab._open_passes()
+    assert "does not belong to a visit" in tab.lbl_status.text()
+    assert tab._passes_dlg.isVisible() is False
+
+
+def test_undoing_the_last_pass_brings_the_previous_one_back(dlg):
+    # The reason the visit remembers its pass: after undoing the run, the
+    # chart has to show the pass before it (a visit with a single pass
+    # simply ends up empty).
+    tab = dlg.tab_measure
+    state = {"n": 4}
+
+    def load():
+        return {"points": _visit_points(state["n"]), "zp_mode": "catalog"}
+
+    tab.set_visit_curve_hooks(load, None)
+    dlg.set_run_undo_hook(lambda run_id: 4)
+    assert len(tab.chart_series._points) == 4
+    state["n"] = 2                       # the pass before the undone one
+    tab._series_run_id = 9
+    tab._on_series_undo()
+    assert len(tab.chart_series._points) == 2      # the pass before it
+    assert tab._series_result is None
+    assert tab.btn_series_exoclock.isEnabled() is False
+
+
+def test_the_reloaded_curve_keeps_the_axis_it_was_measured_on(dlg):
+    # A relative run already gives differences: the chart has to come back
+    # on the differential axis it was drawn on, or the reload would show
+    # the same numbers on another scale.
+    from nightscribe.gui.widgets.lightcurve_widget import (MAG_CALIBRATED,
+                                                           MAG_DIFFERENTIAL)
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(4), "zp_mode": "relative"}, None)
+    assert tab.chart_series._mag_mode == MAG_DIFFERENTIAL
+    tab._reload_visit_curve()
+    tab._series_result = None
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(4), "zp_mode": "catalog"}, None)
+    assert tab.chart_series._mag_mode == MAG_CALIBRATED

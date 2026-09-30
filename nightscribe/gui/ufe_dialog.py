@@ -116,6 +116,10 @@ class UfeDialog(QDialog):
         self._points_hook = None
         self._run_undo_hook = None
         self._exoclock_hook = None
+        # the passes of the visit (one night, one curve, 2026-09-30): the
+        # list and which of them the chart shows
+        self._visit_passes_hook = None
+        self._visit_choose_hook = None
         # the EXOTIC reduction block (transit projects opened from a
         # visit): the host arms both callables, ADR-048 follow-up
         self._exotic_reduce_hook = None
@@ -1222,6 +1226,36 @@ class UfeDialog(QDialog):
         #        and writes its points in a batch (ADR-048, D9); cfg is
         #        the run echo and carries its status (D18).
         self._points_hook = fn if callable(fn) else None
+
+    def set_visit_passes_hooks(self, load, choose):
+        # @args: load - callable() -> {"runs": [...], "curve_run_id": id}
+        #        (the visit's passes, oldest first), choose - callable(
+        #        run_id) -> None. One night is ONE curve: the list and which
+        #        of the visit's passes the chart shows (2026-09-30).
+        self._visit_passes_hook = load if callable(load) else None
+        self._visit_choose_hook = choose if callable(choose) else None
+
+    def visit_passes(self):
+        # @return: the visit's passes payload ({} with no hook)
+        if self._visit_passes_hook is None:
+            return {}
+        try:
+            return dict(self._visit_passes_hook() or {})
+        except Exception as err:
+            logger.warning("visit-passes hook failed: %s", err)
+            return {}
+
+    def choose_visit_curve(self, run_id):
+        # @args: run_id - the pass the visit will show
+        # @return: True when the hook ran
+        if self._visit_choose_hook is None:
+            return False
+        try:
+            self._visit_choose_hook(run_id)
+            return True
+        except Exception as err:
+            logger.warning("visit-curve hook failed: %s", err)
+            return False
 
     def set_run_undo_hook(self, fn):
         # @args: fn - callable(run_id) -> deleted count, or None. Backs

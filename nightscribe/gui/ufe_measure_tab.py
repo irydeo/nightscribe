@@ -46,6 +46,7 @@ from ..core import chart_annotate, coords, fits_meta, photometry, \
 from ..viz import palette
 from .ufe_advanced_dialog import UfeAdvancedDialog
 from .ufe_series_dialog import UfeSeriesDialog
+from .ufe_passes_dialog import UfePassesDialog
 from .ui_loader import adopt_ui
 from .widgets.lightcurve_widget import LightCurveChart
 
@@ -284,12 +285,20 @@ class UfeMeasureTab(QWidget):
         self._live_points = []
         self._live_run_ids = []      # the live session's batches: one
                                      # undoable run (ADR-050, P2 #19)
+        self._live_run_id = None     # the run those batches pile into (one
+                                     # live session, one run: the curve
+                                     # reloaded is the whole session)
         # U6: the chart's own controls (scale, error bars, binning, mean,
         # outliers, exclusions) live in their own non-modal window now: the
         # left panel had seventeen of them stacked in a 300 px column, and
         # they are knobs you touch while LOOKING at the curve, not while
         # measuring it. The widgets are the same ones, wired here.
         self._series_dlg = UfeSeriesDialog(self)
+        # the passes of the visit, in their own window (one night, one
+        # curve): the list is read-only and the actions travel to the tab
+        self._passes_dlg = UfePassesDialog(self)
+        self._passes_dlg.use_requested.connect(self._use_pass)
+        self._passes_dlg.undo_requested.connect(self._undo_pass)
         self.chart_series = LightCurveChart()
         self.chart_series.setToolTip(self.tr(
             "Click a point to select it; drag to move the view; the wheel "
@@ -379,6 +388,12 @@ class UfeMeasureTab(QWidget):
         self.btn_series_discard = self._ui.btn_series_discard
         self.btn_series_discard.clicked.connect(self._on_discard_curve)
         self.btn_series_more = self._ui.btn_series_more
+        # "Passes of this visit…": the night's passes, which one is drawn
+        # and how to go back to another (it lands in the "Series ▾" menu
+        # with the rest of the row, see below)
+        self.btn_series_passes = getattr(self._ui, "btn_series_passes", None)
+        if self.btn_series_passes is not None:
+            self.btn_series_passes.clicked.connect(self._open_passes)
         row_out = getattr(self._ui, "row_series_out", None)
         if row_out is not None:
             from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
@@ -1613,7 +1628,7 @@ class UfeMeasureTab(QWidget):
         self._curve_clear = clear
         self.load_visit_curve()
 
-    def load_visit_curve(self):
+    def load_visit_curve(self, say=True):
         # Draws the curve the visit ALREADY has, instead of an empty chart
         # (the observer's point: a light curve that was generated must not
         # be generated again). Measuring is still one click away, and a new
@@ -1621,35 +1636,165 @@ class UfeMeasureTab(QWidget):
         #
         # Nothing is read from the frames and nothing is written: the points
         # come from the project's own database.
+        # @args: say - whether to announce it in the status line (an action
+        #        that has already said what it did passes False)
         # @return: the number of points drawn (0 when there were none)
         if self._curve_load is None or self._series_result is not None:
             return 0
         try:
-            points = self._curve_load() or []
+            data = self._curve_load() or []
         except Exception as err:                # a hook never kills a tab
             logger.warning("could not read the visit's curve: %s", err)
             return 0
-        if not points:
-            return 0
+        # The hook hands the points and, when it knows it, what the axis
+        # measures. The run's own words are catalog/relative; the chart's
+        # are calibrated/differential, so the translation lives here. The
+        # plain list is the old shape: a host double may still send one.
+        if isinstance(data, dict):
+            points = data.get("points") or []
+            mode = ("differential" if data.get("zp_mode") == "relative"
+                    else "calibrated")
+        else:
+            points, mode = data, "calibrated"
         payload = [p for p in points if p.get("mjd") is not None
                    and p.get("mag") is not None]
         if not payload:
             return 0
-        own = [dict(p, source="measure", filter=p.get("filter") or "V")
+        # the filter and the source come as the host shaped them: forcing
+        # a "V" here made a curve calibrated in G say V in its legend, and
+        # forcing the source dropped the detrended curve the run had
+        own = [dict(p, source=p.get("source") or "measure")
                for p in payload]
         self._series_payload = own
-        self.chart_series.set_data(own)
+        self._sync_series_scale(mode)
+        self.chart_series.set_data(own, mag_mode=mode)
+        self._apply_chart_presentation()
         self._curve_from_visit = True
-        self._panel_summary = [self.tr(
-            "This visit's curve: {0} points already measured with the "
-            "sequence saved in the project (nothing was read from the "
-            "frames). Measure the series again to build it from scratch, "
-            "or discard it below.").format(len(own))]
+        self._panel_summary = [self._visit_curve_line(len(own))]
         self._render_panel()
         self._update_selection_label()
-        self._say(self.tr(
-            "Curve loaded from the visit: {0} points.").format(len(own)))
+        if say:
+            self._say(self.tr(
+                "Curve loaded from the visit: {0} points.").format(len(own)))
         return len(own)
+
+    def _visit_passes_payload(self):
+        # The passes of the visit, asked of the WINDOW (which owns the
+        # project): the tab never touches the database. A host without the
+        # hook (a test double, an ad-hoc open) simply has none.
+        # @return: {"runs": [...], "curve_run_id": int|None} or {}
+        ask = getattr(self.window(), "visit_passes", None)
+        if not callable(ask):
+            return {}
+        try:
+            return dict(ask() or {})
+        except Exception as err:
+            logger.warning("could not read the visit's passes: %s", err)
+            return {}
+
+    def _visit_passes(self):
+        # @return: the visit's passes, oldest first
+        return list(self._visit_passes_payload().get("runs") or [])
+
+    def _visit_curve_run_id(self):
+        # @return: the run the visit is showing, or None
+        return self._visit_passes_payload().get("curve_run_id")
+
+    def _open_passes(self):
+        # "Passes of this visit…": the night's passes and which one the
+        # chart shows. The window is NON-modal: the point of going back to
+        # a pass is to watch the chart change while choosing it.
+        # @return: None
+        payload = self._visit_passes_payload()
+        if not payload:
+            self._say(self.tr(
+                "This chart does not belong to a visit: there are no passes "
+                "to choose from."), "warn")
+            return
+        self._passes_dlg.show_passes(payload)
+
+    def _use_pass(self, run_id):
+        # "Make this the curve": the visit remembers which pass it shows.
+        # Nothing is deleted and nothing is measured again, and the points
+        # of the other passes stay in the project.
+        # @args: run_id - the pass to draw
+        # @return: None
+        choose = getattr(self.window(), "choose_visit_curve", None)
+        if not callable(choose):
+            return
+        try:
+            choose(run_id)
+        except Exception as err:
+            logger.warning("could not choose the curve's pass: %s", err)
+            self._say(self.tr("Could not show that pass: {0}").format(err),
+                      "error")
+            return
+        self._reload_visit_curve()
+
+    def _undo_pass(self, run_id):
+        # Undo ONE pass from the list (the same undo the button does, for
+        # the pass the observer picked). Its points go, its row stays
+        # marked undone and the chart falls back to the pass before it.
+        # @args: run_id - the pass to undo
+        # @return: None
+        undo = getattr(self.window(), "undo_run", None)
+        count = 0
+        if callable(undo):
+            count = int(undo(run_id) or 0)
+        self._say(self.tr("Pass undone: {0} points removed.").format(count))
+        self._reload_visit_curve(say=False)
+
+    def _reload_visit_curve(self, say=True):
+        # Draws the visit's curve again after the passes changed: the chart
+        # has to show what the visit shows NOW, not what it showed before.
+        # @args: say - whether the reload announces itself (an action that
+        #        has already said what it did keeps its own message)
+        # @return: the number of points drawn
+        self._series_result = None
+        self._curve_from_visit = False
+        self._series_payload = []
+        self.btn_series_exoclock.setEnabled(False)
+        n = self.load_visit_curve(say=say)
+        if not n:
+            self.chart_series.set_data([])
+            self._panel_summary = []
+            self._render_panel()
+            self._update_selection_label()
+        self._refresh_passes()
+        return n
+
+    def _refresh_passes(self):
+        # The list, when it is open, follows every change (a pass undone,
+        # a pass chosen): a window showing stale rows is worse than none.
+        # @return: None
+        if self._passes_dlg.isVisible():
+            self._passes_dlg.set_passes(self._visit_passes_payload())
+
+    def _visit_curve_line(self, n_points):
+        # The line the panel shows for a curve that came from the project:
+        # which pass it is AND how many other passes the visit holds. A
+        # visit can hold several (measuring again with another band is
+        # normal) and only one is drawn, so hiding the rest would make the
+        # list of passes a secret. The door is named, because that is where
+        # they are chosen.
+        # @args: n_points - the points of the pass being drawn
+        # @return: the panel's line
+        runs = self._visit_passes()
+        others = [r for r in runs
+                  if r.get("id") != self._visit_curve_run_id()]
+        if not others:
+            return self.tr(
+                "This visit's curve: {0} points already measured with the "
+                "sequence saved in the project (nothing was read from the "
+                "frames). Measure the series again to build it from "
+                "scratch, or discard it below.").format(n_points)
+        points = sum(int(r.get("points") or 0) for r in others)
+        return self.tr(
+            "This visit's curve: {0} points, the pass the visit shows "
+            "(nothing was read from the frames). The visit also holds {1} "
+            "earlier pass(es) ({2} points) that are not drawn: choose "
+            "another one in Series ▾ → Passes of this visit…").format(
+                n_points, len(others), points)
 
     def _on_discard_curve(self):
         # "Discard this visit's curve, and build it again from scratch":
@@ -1707,6 +1852,7 @@ class UfeMeasureTab(QWidget):
         self._series_payload = []
         self._curve_from_visit = False
         self._live_points = []
+        self._live_run_id = None
         self._live_run_ids = []
         self._panel_summary = []
         self._series_run_id = None
@@ -1853,6 +1999,8 @@ class UfeMeasureTab(QWidget):
             # place away with nothing to show would be rude)
             self._show_curve()
         self._fill_series_panel(result, context)
+        # a new pass is the curve now: the list, if it is open, follows
+        self._refresh_passes()
 
     def _night_label(self, night):
         # The engine keys its per-night blocks by the observing night
@@ -2022,12 +2170,18 @@ class UfeMeasureTab(QWidget):
         raw = [{"mjd": p.mjd, "mag": p.mag, "err": p.err,
                 "filter": p.filter, "source": "measure",
                 "path": p.path, "comps": p.n_comps, "exptime": p.exptime,
-                "flags": list(p.flags)}
+                "flags": list(p.flags),
+                # the night travels with the point: the night figures and
+                # the band's context read it from here (v14)
+                "airmass": p.airmass, "x": p.x, "y": p.y,
+                "fwhm": p.fwhm, "sky": p.sky}
                for p in points if p.mjd is not None and p.mag is not None]
         det = [{"mjd": p.mjd, "mag": p.mag_detrended, "err": p.err,
                 "filter": p.filter, "source": "detrend",
                 "path": p.path, "comps": p.n_comps, "exptime": p.exptime,
-                "flags": list(p.flags)}
+                "flags": list(p.flags),
+                "airmass": p.airmass, "x": p.x, "y": p.y,
+                "fwhm": p.fwhm, "sky": p.sky}
                for p in points if p.mjd is not None
                and p.mag_detrended is not None]
         self._series_payload = _decimate(raw) + _decimate(det)
@@ -2187,11 +2341,18 @@ class UfeMeasureTab(QWidget):
         self._say(
             self.tr("Run undone: {0} points removed.").format(count))
         self._series_run_id = None
+        self._live_run_id = None
         self._live_run_ids = []
         self._live_points = []
         self.btn_series_undo.setEnabled(False)
+        self._series_result = None
+        self.btn_series_exoclock.setEnabled(False)
         self._series_payload = []
         self.chart_series.set_data([])
+        # the visit may hold earlier passes: undoing the last one has to
+        # bring the previous curve back (that is what the passes list is
+        # for, and what the observer asked for)
+        self._reload_visit_curve()
 
     def _on_series_live_toggled(self, checked):
         # D21 (opt-in, off by default): watch the visit folder and measure
@@ -2217,7 +2378,9 @@ class UfeMeasureTab(QWidget):
         self._series_cfg = self._series_config(entries, target)
         self._series_cfg_dict = self._series_config_dict(self._series_cfg)
         self._live_points = []
-        # a new session is a new undoable run (P2 #19)
+        # a new session is a new undoable run (P2 #19), and its batches
+        # pile into it
+        self._live_run_id = None
         self._live_run_ids = []
         self.btn_series_undo.setEnabled(self._series_run_id is not None)
         from .workers import LiveSeriesWorker
@@ -2253,13 +2416,23 @@ class UfeMeasureTab(QWidget):
         dlg = self.window()
         notify = getattr(dlg, "notify_points", None)
         if callable(notify) and rows:
+            echo = dict(self._series_cfg_dict or {})
+            if self._live_run_id is not None:
+                # one live session, ONE run: its batches pile into the run
+                # the first one opened. Two reasons, both measured: the
+                # whole session is undone with one click, and the curve
+                # reloaded from the project is the whole session instead of
+                # just its last batch.
+                echo["append_run"] = self._live_run_id
             try:
-                run_id = notify(rows, self._series_cfg_dict or {})
+                run_id = notify(rows, echo)
             except Exception as err:
                 logger.warning("live save failed: %s", err)
                 run_id = None
             if run_id is not None:
-                self._live_run_ids.append(run_id)
+                self._live_run_id = run_id
+                if run_id not in self._live_run_ids:
+                    self._live_run_ids.append(run_id)
                 self.btn_series_undo.setEnabled(True)
         self._live_points.extend(result.points)
         # live mode is watching the curve grow: put it in front
@@ -2267,6 +2440,7 @@ class UfeMeasureTab(QWidget):
         self._draw_series(self._live_points)
         self._update_series_counter(self._series_context() or {},
                                     self._live_points)
+        self._refresh_passes()
 
     def _on_live_progress(self, key, frames):
         # The driver reports stage keys (core has no tr()): the panel owns

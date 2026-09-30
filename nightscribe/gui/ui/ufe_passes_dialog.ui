@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The passes of a visit (2026-09-30). A visit can hold several series runs:
+  the observer measures again with another band, with another sequence, or
+  just to check something. Every pass keeps its own points, but the CHART
+  shows ONE of them (drawing them all at once is the corruption that was
+  reported: 976 points at two levels joined by a zigzag). This window is
+  where the passes are seen and where the chart's one is chosen, without
+  deleting anything.
+
+  Loaded by gui/ufe_passes_dialog.py through gui/ui_loader.py (ADR-005):
+  the structure and every visible string live here.
+-->
+<ui version="4.0">
+ <class>UfePassesDialog</class>
+ <widget class="QDialog" name="UfePassesDialog">
+  <property name="windowTitle">
+   <string>Passes of this visit</string>
+  </property>
+  <layout class="QVBoxLayout" name="vbox_passes">
+   <property name="leftMargin"><number>11</number></property>
+   <property name="topMargin"><number>11</number></property>
+   <property name="rightMargin"><number>11</number></property>
+   <property name="bottomMargin"><number>11</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_passes_hint">
+     <property name="text">
+      <string>Every pass you have measured on this visit, oldest first. The chart shows ONE of them, the one marked as the curve: measuring again makes the new pass the curve, and here you can go back to an earlier one without deleting anything. Undoing a pass removes its points (its row stays, marked undone, and the chart falls back to the pass before it).</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTableWidget" name="tbl_passes">
+     <property name="editTriggers">
+      <set>QAbstractItemView::NoEditTriggers</set>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectRows</enum>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SingleSelection</enum>
+     </property>
+     <property name="toolTip">
+      <string>One row per pass: when you measured it, the band it was calibrated in, how many points it holds, the stretch of night it covers and its state</string>
+     </property>
+     <column>
+      <property name="text"><string>Measured</string></property>
+     </column>
+     <column>
+      <property name="text"><string>Band</string></property>
+     </column>
+     <column>
+      <property name="text"><string>Points</string></property>
+     </column>
+     <column>
+      <property name="text"><string>From</string></property>
+     </column>
+     <column>
+      <property name="text"><string>State</string></property>
+     </column>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_passes_shown">
+     <property name="text">
+      <string>No curve loaded yet.</string>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_passes_trail">
+     <property name="text">
+      <string/>
+     </property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_passes">
+     <item>
+      <widget class="QPushButton" name="btn_passes_use">
+       <property name="toolTip">
+        <string>Draw this pass in the chart. Nothing is deleted and nothing is measured again: the visit remembers which pass it shows, and its points stay where they are</string>
+       </property>
+       <property name="text">
+        <string>Make this the curve</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_passes_undo">
+       <property name="toolTip">
+        <string>Undo this pass: its points go, its row stays marked undone (the trail is never silent) and the chart falls back to the pass before it. The frames are untouched and you can measure again</string>
+       </property>
+       <property name="text">
+        <string>Undo this pass</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_passes">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0">
+        <size><width>40</width><height>20</height></size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QDialogButtonBox" name="box_passes">
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Close</set>
+     </property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

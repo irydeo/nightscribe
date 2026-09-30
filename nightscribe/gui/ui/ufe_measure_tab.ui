@@ -415,6 +415,16 @@
          <item>
           <layout class="QHBoxLayout" name="row_series_out">
            <item>
+            <widget class="QPushButton" name="btn_series_passes">
+             <property name="toolTip">
+              <string>Every pass you measured on this visit, oldest first, with the one the chart is showing marked. Measuring again makes the new pass the curve; here you can go back to an earlier one WITHOUT deleting anything (the points of the others stay in the project), or undo a pass so its points go (the row stays, marked undone, and the chart falls back to the pass before it)</string>
+             </property>
+             <property name="text">
+              <string>Passes of this visit…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
             <widget class="QPushButton" name="btn_series_exoclock">
              <property name="enabled">
               <bool>false</bool>

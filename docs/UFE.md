@@ -209,6 +209,29 @@ program).
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).
 
+## A visit's curve: one night, one pass
+
+When the editor is opened from a visit, the chart in the centre draws **the
+curve the visit already has**, read from the project: nothing is measured
+again.
+
+A visit can hold **several passes** (you measured the series again with another
+band, with another sequence, or to check something). Every one keeps its points,
+but **the chart draws only one**, the one the visit has marked. Measuring again
+makes the new pass the curve; the earlier ones are not drawn, and the panel says
+so: how many points the one you see has and how many more passes the visit
+holds. The door **Series ▾ → Passes of this visit…** lists them all (time, band,
+points, stretch of night, state) and lets any of them **be the curve** without
+deleting anything, or **undo** a pass (its points go, its row stays marked, and
+the chart falls back to the pass before it).
+
+The band in the legend and in the AAVSO file is **the band it was calibrated
+with** (the one the engine used on the comparisons), not an invented "V" when
+the frames' header carries no `FILTER`. And the **detrended** curve is refitted
+on load (it is deterministic: the same points with the same airmass give the
+same coefficients), so the detrended switch has something to show after
+reopening the visit too.
+
 ## The plate's band and the marker style (ADR-046)
 
 The plate says what it knows in the **band at the top of the image**, on

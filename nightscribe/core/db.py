@@ -422,6 +422,30 @@ def _migrate(conn):
                         "ALTER TABLE photometry_points ADD COLUMN"
                         f" {name} {kind}")
         conn.execute("PRAGMA user_version = 14")
+    if v < 15:
+        # ONE NIGHT IS ONE CURVE (2026-09-30). A visit can hold several
+        # series runs: the observer measures again with another band, with
+        # another sequence, or just to check something, and each run keeps
+        # its own points (that is what "undo this run" undoes, and the
+        # trail is never silent). But the visit's CURVE is ONE of them,
+        # and this column remembers which one, so a chart reloaded from
+        # the database draws the same curve the live chart drew.
+        #
+        # The failure it fixes, measured on a real visit (V0526 Per,
+        # 2026-09-30): four runs, 976 points at two different levels
+        # (11.96-12.07 in G and 12.70-12.81 in V) joined by a zigzag, which
+        # is what "the chart is corrupted after a restart" looked like.
+        # Same idempotent guard as v9-v14: a hand-seeded old database may
+        # not have the table at all.
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "project_sessions" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(project_sessions)")}
+            if "curve_run_id" not in cols:
+                conn.execute("ALTER TABLE project_sessions ADD COLUMN"
+                             " curve_run_id INTEGER")
+        conn.execute("PRAGMA user_version = 15")
     conn.commit()
 
 
@@ -475,6 +499,15 @@ MIGRATION_NOTES = {
         "Each photometric point now keeps its own photon error apart from "
         "the calibration systematic, so a light curve can be drawn (and "
         "judged) without the night's zero point swamping it."),
+    14: QT_TRANSLATE_NOOP("NSMigrations",
+        "Every point remembers the night it was measured on (its airmass "
+        "and its position on the plate), so a curve read back from your "
+        "project can explain that night without measuring again."),
+    15: QT_TRANSLATE_NOOP("NSMigrations",
+        "A visit's chart is one curve again: if you measured the same "
+        "night several times, the visit remembers which pass it shows, "
+        "and you can pick any other from \"Series > Passes of this "
+        "visit\"."),
 }
 
 

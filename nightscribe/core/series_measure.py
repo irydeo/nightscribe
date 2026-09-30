@@ -902,6 +902,24 @@ def _relative_point(pt, group, cfg):
     pt.mag = pt.inst - ref if pt.inst is not None else None
 
 
+def _point_band(frame, cfg):
+    # The band a point's magnitude MEANS: the one the calibration actually
+    # used on that frame (photometry.pick_band, reported by measure_plate),
+    # then the observer's choice, then the frame's own FILTER keyword, then
+    # the engine's fallback.
+    #
+    # Measured why (2026-09-30, a real V0526 Per series): the frames
+    # carried no FILTER keyword, so every stored point had filter=None and
+    # a curve calibrated in G said "no filter" in the chart's legend and
+    # reached the AAVSO file with an empty filter, which is not
+    # submittable. The band the comps were read in is what the number is.
+    # @args: frame - one measured frame of the group, cfg - SeriesConfig
+    # @return: the band, or None when nothing says anything
+    res = frame.get("res")
+    picked = getattr(res, "band", None) if res is not None else None
+    return picked or cfg.band or frame.get("filter") or cfg.fallback_band
+
+
 def _build_point(group, cfg):
     # Collapse one group of measured frames into a single honest point.
     first = group[0]
@@ -910,7 +928,7 @@ def _build_point(group, cfg):
     exps = [f.get("exptime") for f in group]
     tot_exp = sum(e or 0.0 for e in exps) if any(
         e is not None for e in exps) else None
-    pt = SeriesPoint(path=first["path"], filter=first.get("filter"),
+    pt = SeriesPoint(path=first["path"], filter=_point_band(first, cfg),
                      exptime=tot_exp)
     # ExoClock wants the start of the first exposure of the group, not
     # the mid time minus half the sum (cadence gaps would bias it)
@@ -1860,8 +1878,47 @@ def _series_result(frames, cfg, target, shared, status="complete",
     for i, p in enumerate(points):
         p.index = i
     result.points = points
-    result.band = cfg_t.band or cfg_t.fallback_band
+    # the band the curve is IN: the one the calibration used on the frames
+    # (every point carries it), not the one that was asked for. A catalogue
+    # without the requested band calibrates in another one, and the panel,
+    # the chart's legend and the AAVSO file have to say the same thing.
+    result.band = next((p.filter for p in points if p.filter), None) \
+        or cfg_t.band or cfg_t.fallback_band
     return result
+
+
+def detrend_stored(points, policy="airmass", auto_improve=_AUTO_IMPROVE):
+    # The DETRENDED curve of points read back from the database (a visit's
+    # own curve): the same model the run used, refitted on the same points.
+    #
+    # It is deterministic, which is the whole reason this works: the trend
+    # is a1*exp(a2*X)+a3 fitted per night on that night's points, and the
+    # airmass travels with every point since v14. So a chart reloaded from
+    # a visit can draw the detrended curve it drew live, instead of losing
+    # it (the raw magnitudes are the only thing stored, and the "show the
+    # detrended" switch used to have nothing to show after a restart).
+    # @args: points - stored point dicts with mjd, mag, err, airmass (and
+    #        fwhm/sky/x/y for the "auto" policy), policy - the run's own
+    #        ("airmass" | "auto"), auto_improve - the auto policy's bar
+    # @return: the detrended points in the chart's shape (mag = detrended,
+    #          source "detrend"), or [] when nothing can be fitted: points
+    #          measured before v14 have no airmass, and there is nothing
+    #          honest to draw
+    series = [SeriesPoint(index=i, path=p.get("path") or "",
+                          mjd=p.get("mjd"), mag=p.get("mag"),
+                          err=p.get("err"), airmass=p.get("airmass"),
+                          fwhm=p.get("fwhm"), sky=p.get("sky"),
+                          x=p.get("x"), y=p.get("y"))
+              for i, p in enumerate(points or [])]
+    info = detrend_series(series, policy, auto_improve=auto_improve)
+    if not info:
+        return []
+    out = []
+    for p, detrended in zip(points, info["detrended"]):
+        if detrended is None or p.get("mjd") is None:
+            continue
+        out.append(dict(p, mag=detrended, source="detrend"))
+    return out
 
 
 def series_rows(points):

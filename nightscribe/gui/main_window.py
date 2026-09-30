@@ -8713,6 +8713,16 @@ class MainWindow(QMainWindow):
             # (the points are already in the project); discarding it undoes
             # its series runs, keeping their rows marked. Asked defensively,
             # like every other hook: a host double need not have the method.
+            #
+            # The PASSES go first, on purpose: loading the curve tells the
+            # panel how many other passes the visit holds, and that count
+            # comes from this list (one night, one curve, 2026-09-30).
+            passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
+            if callable(passes_hooks):
+                passes_hooks(
+                    lambda: self._ufe_visit_passes(hook_pid, session_id),
+                    lambda run_id: self._ufe_choose_curve(
+                        hook_pid, session_id, run_id))
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(
@@ -8742,6 +8752,9 @@ class MainWindow(QMainWindow):
             dlg.set_exoclock_hook(None)
             dlg.set_exotic_hooks(None, None)
             dlg.set_sequence_hook(None)
+            passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
+            if callable(passes_hooks):
+                passes_hooks(None, None)
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(None, None)
@@ -9083,8 +9096,14 @@ class MainWindow(QMainWindow):
         from ..core import followup as fu
         echo = dict(cfg or {})
         status = echo.pop("status", None) or "complete"
-        run_id = fu.create_run(db, session_id=session_id,
-                               cfg={"series": echo}, status=status)
+        # a live batch continues the run its session opened (one live
+        # session, one run): the points pile into it, so the curve reloaded
+        # from the project is the whole session and "undo" is one click
+        append = echo.pop("append_run", None)
+        run_id = fu.reusable_run(db, append, session_id)
+        if run_id is None:
+            run_id = fu.create_run(db, session_id=session_id,
+                                   cfg={"series": echo}, status=status)
         by_path = {f["path"]: f["id"]
                    for f in project.list_files(db, pid)
                    if f.get("kind") == "fits"}
@@ -9131,22 +9150,103 @@ class MainWindow(QMainWindow):
         # The curve a visit already holds (D): the series points saved in
         # the project for THAT visit, shaped for the chart. No frame is
         # read and nothing is asked of the observer.
+        #
+        # ONE NIGHT, ONE RUN (2026-09-30): the visit may hold several
+        # passes, and the chart draws the one the visit shows (its choice,
+        # else the last one measured). Drawing all of them at once is the
+        # reported corruption: 976 points at two levels joined by a zigzag.
+        #
+        # Two facts the stored points no longer carry travel back with
+        # them, from the RUN: the band the calibration used (the frames of
+        # a real series had no FILTER keyword, so a curve in G said "no
+        # filter" and reached AAVSO with an empty filter) and the detrend
+        # choice (refitted here, which is deterministic: the same points
+        # with the same airmass give the same coefficients).
         # @args: pid - project id, session_id - the visit or None
-        # @return: [point dicts]
-        from ..core import followup as fu
+        # @return: {"points": [point dicts], "zp_mode": "catalog" |
+        #          "relative"} (the raw curve, plus the detrended one when
+        #          the run asked for it), or {} when there is no curve
+        from ..core import followup as fu, project as project_mod
+        from ..core import series_measure
         if session_id is None:
-            return []
+            return {}
+        run = fu.get_run(db, fu.curve_run_for_session(db, session_id)) or {}
+        series_cfg = (run.get("cfg") or {}).get("series") or {}
+        band = series_cfg.get("band")
+        points = fu.points_for_session(db, session_id)
+        # the plate each point was measured on, resolved once: the strip
+        # over the image matches the open frame by PATH (exact) and falls
+        # back to the time, so a reloaded curve still answers for it
+        paths = {}
+        for p in points:
+            fid = p.get("file_id")
+            if fid is not None and fid not in paths:
+                paths[fid] = (project_mod.get_file(db, fid) or {}).get("path")
         out = []
-        for p in fu.points_for_session(db, session_id):
+        for p in points:
             if p.get("mjd") is None or p.get("mag") is None:
                 continue
             out.append({"mjd": p["mjd"], "mag": p["mag"], "err": p.get("err"),
                         "err_internal": p.get("err_internal"),
                         "mag_raw": p.get("mag_raw"),
-                        "filter": p.get("filter") or "V",
+                        "filter": p.get("filter") or band,
                         "flags": list(p.get("flags") or []),
+                        "path": paths.get(p.get("file_id")),
+                        # the NIGHT travels with the point (v14): the night
+                        # figures are drawn from these fields, so a curve
+                        # read back from the visit explains its night
+                        # without measuring anything again. Dropping them
+                        # here is what made those figures refuse.
+                        "airmass": p.get("airmass"), "x": p.get("x"),
+                        "y": p.get("y"), "fwhm": p.get("fwhm"),
+                        "sky": p.get("sky"),
                         "source": "measure"})
-        return out
+        policy = series_cfg.get("detrend_policy")
+        if policy and policy != "off" and out:
+            out += series_measure.detrend_stored(out, policy)
+        return {"points": out,
+                "zp_mode": ("relative" if series_cfg.get("zp_mode")
+                            == "relative" else "catalog")}
+
+    def _ufe_visit_passes(self, pid, session_id):
+        # The passes of a visit (2026-09-30): one row per series run, oldest
+        # first, with the one the chart shows. This is what the "Passes of
+        # this visit" door reads, and the count the panel's line uses.
+        #
+        # A visit can hold several passes (measuring again with another band
+        # is normal) and every one keeps its points; only one is DRAWN, and
+        # drawing them all at once was the reported corruption.
+        #
+        # The passes ALREADY UNDONE are counted, not listed: on a real visit
+        # there were 26 of them against 4 that mattered, and a wall of empty
+        # rows hides the ones you can choose. They are not deleted (the trail
+        # keeps them) and the window says so.
+        # @args: pid - project id, session_id - the visit or None
+        # @return: {"runs": [...], "curve_run_id": int|None, "undone_empty": n}
+        from ..core import followup as fu
+        if session_id is None:
+            return {}
+        runs = fu.runs_for_session(db, session_id)
+        listed = [r for r in runs
+                  if (r.get("status") or "") != "undone" or r.get("points")]
+        return {"runs": listed,
+                "curve_run_id": fu.curve_run_for_session(db, session_id),
+                "undone_empty": len(runs) - len(listed)}
+
+    def _ufe_choose_curve(self, pid, session_id, run_id):
+        # "Make this the curve": the visit remembers which pass it shows.
+        # Nothing is deleted and nothing is measured again: the points of
+        # the other passes stay in the project, and the chart follows.
+        # @args: run_id - the pass to draw
+        # @return: True when the visit was found
+        from ..core import followup as fu
+        if session_id is None:
+            return False
+        ok = fu.set_session_curve_run(db, session_id, run_id)
+        if ok:
+            self.statusBar().showMessage(
+                self.tr("The chart will show that pass of the visit."), 6000)
+        return ok
 
     def _ufe_discard_curve(self, pid, session_id):
         # "Start the curve from scratch": every series run of the visit is

@@ -22,8 +22,14 @@ Network tests belong to tests/functional; everything else fakes its source
 at the function level (test_followup_sequence.py shows the pattern).
 """
 
+import os
+
 import pytest
 import requests
+
+# Every worker (and the plain run) creates a QApplication: offscreen keeps
+# it headless without depending on a display, set before any Qt import.
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 # Before any nightscribe module imports the `db`/`config` singletons, point
 # the per-OS paths at a throwaway tree: Config.save() and every Database

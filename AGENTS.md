@@ -241,6 +241,7 @@ installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Se
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m pytest tests/unit     # rápido, sin red
+.venv/bin/python -m pytest -n auto --dist loadfile tests/unit  # en paralelo (xdist)
 .venv/bin/python -m pytest tests/functional  # con red, verifica funcionalidades
 .venv/bin/python -m nightscribe gui    # arranca la GUI
 ```

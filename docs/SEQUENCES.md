@@ -164,6 +164,15 @@ unaligned frame) comes out as the hollow diamond. A calibration **caveat** (few
 comps, a borrowed zero point) is the normal marker with a faint amber edge: the curve
 is fine, its calibration leans on few stars.
 
+**The colour of each point is a code** (the **Quality colours** button, on by
+default): **green** when the point is clean (error up to 0.05, more than three
+comparisons holding the zero point), **orange** when it is usable but not clean (a
+thin comparison set, an error up to 0.15) and **red** when its data is in doubt. The
+**shape** still says which decision was taken; the colour says how good the
+measurement is. Off gives the filter colours back. The plate's band and the
+measurement's panel wear the same code, with the same thresholds: see
+[the editor's guide](UFE.md).
+
 ### 5.5 A defocus is not a cloud
 
 If a frame's FWHM leaves its night's robust range, the point is flagged **`seeing`**
@@ -181,6 +190,21 @@ gain** (measure them; a suggested value is offered). On a very sensitive sCMOS
 to beat scintillation without saturating or drowning in sky background; modern
 IMX and CCDs take long exposures. The **linearity limit** is what decides which
 stars are good enough as comp/check.
+
+### 5.6 The two PNGs, and what the night figures need
+
+The series block's **Series ▾** door carries two exports:
+
+* **Save the chart in the visit (PNG)…** writes the curve **exactly as you see it**
+  (the window you zoomed to, the points you selected or excluded, the fixed range):
+  what is on screen is what lands in the file. It works with the visit's own curve
+  too, the one loaded from the project without measuring anything again.
+* **Night conditions (PNG)…** writes the two figures that explain the night, the
+  **airmass** and the measured **position** (the drift), and opens them. They are made
+  of fields that travel WITH each point (airmass, x, y, fwhm, sky), so a curve read
+  back from the database can draw its own night months later. A point measured before
+  the app stored them has no airmass to draw, and the button says exactly that instead
+  of going quiet: measure the series again and the figures are there.
 
 ## 6. When to trust it
 

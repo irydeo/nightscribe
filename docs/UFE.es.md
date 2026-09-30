@@ -245,6 +245,12 @@ banda:
 * lo demás (fecha, exposición, filtro, equipo, estación, escala, FOV) en
   el color discreto: es contexto, no un juicio.
 
+El mismo código está en los **puntos de la curva** (botón **Colores de
+calidad** de la ventana de la carta, activado por defecto) y en el **panel de la
+medida**: verde limpia, naranja usable pero no limpia, rojo dudosa, blanco para un
+valor de catálogo. Mira [la guía de la serie](SEQUENCES.es.md) para los umbrales y
+qué necesita cada figura.
+
 La banda nunca corta una palabra: si la ventana es estrecha suelta campos
 enteros (el FOV primero, la fecha la última) y, en el extremo, se va la
 línea de contexto y queda solo el nombre de la placa. El botón **«Datos»**
@@ -319,3 +325,15 @@ placa.
 marca de agua de NightScribe), listo para adjuntar. Las exportaciones de
 datos (FITS anotado, cartas) usan siempre el archivo original, nunca la
 imagen de pantalla.
+
+## Cuando algo no funciona
+
+La ventana tiene **una** línea de estado abajo, con el texto entero en su tooltip
+(el resultado de una medida se queda en su propio recuadro, junto a la acción que lo
+produjo). Una construcción que no puede entregar mantiene tu secuencia y dice por
+qué; una resolución que falla dice qué estaba haciendo.
+
+Y la aplicación **escribe lo que hace en un fichero** mientras funciona:
+**Ayuda > Abrir el log**. Una interfaz lanzada desde un menú no tiene consola, así
+que un aviso como «sale un diálogo, desaparece y no sé qué pasa» tiene ahí su
+respuesta.

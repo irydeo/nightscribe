@@ -168,6 +168,15 @@ desenfoque, nube, toma sin alinear) sale como rombo hueco. Un **aviso** de
 calibración (pocas comparsas, punto cero prestado) es el marcador normal con un borde
 ámbar tenue: la curva no está mal, su calibración se apoya en pocas estrellas.
 
+**El color de cada punto es un código** (botón **Colores de calidad**, activado por
+defecto): **verde** cuando el punto está limpio (error hasta 0,05, más de tres
+comparsas sosteniendo el punto cero), **naranja** cuando es usable pero no limpio
+(comparsas escasas, un error hasta 0,15) y **rojo** cuando sus datos están en duda.
+La **forma** sigue diciendo qué decisión se tomó; el color dice cuán buena es la
+medida. Apagado, vuelven los colores de filtro. La banda de la placa y el panel de la
+medida llevan el mismo código, con los mismos umbrales: mira
+[la guía del editor](UFE.es.md).
+
 ### 5.5 El desenfoque no es una nube
 
 Si la FWHM de una toma se sale del rango robusto de su noche, el punto se marca
@@ -185,6 +194,21 @@ sensible (QHY42Pro/GSENSE400) la receta es **exposiciones de 5–10 s y agrupar*
 (`group_n`) para bajar el centelleo sin saturar ni ahogar en fondo; los IMX
 modernos y los CCD admiten exposiciones largas. El **límite de linealidad** es
 lo que decide qué estrellas valen como comp/check.
+
+### 5.6 Los dos PNG, y qué necesitan las figuras de la noche
+
+La puerta **Serie ▾** del bloque de serie lleva dos exportaciones:
+
+* **Guardar la carta en la visita (PNG)…** escribe la curva **tal como la ves** (la
+  ventana a la que has acercado, los puntos que has seleccionado o excluido, el rango
+  fijo): lo que está en pantalla es lo que va al fichero. Funciona también con la
+  curva de la visita, la que se carga del proyecto sin volver a medir nada.
+* **Condiciones de la noche (PNG)…** escribe las dos figuras que explican la noche,
+  la **masa de aire** y la **posición** medida (la deriva), y las abre. Se hacen de
+  campos que viajan CON cada punto (masa de aire, x, y, fwhm, cielo), así que una
+  curva leída de la base puede dibujar su noche meses después. Un punto medido antes
+  de que la app los guardara no tiene masa de aire que dibujar, y el botón lo dice
+  exactamente en vez de callarse: vuelve a medir la serie y las figuras están.
 
 ## 6. Cuándo fiarse
 

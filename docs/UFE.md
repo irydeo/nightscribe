@@ -240,6 +240,11 @@ point of the band:
 * everything else (date, exposure, filter, kit, station, scale, FOV) in
   the quiet colour: it is context, not a judgement.
 
+The same code is on the **curve's points** (the chart's **Quality colours**
+button, on by default) and on the measurement's **panel**: green clean, orange
+usable but not clean, red doubtful, white for a catalogue value. See
+[the series guide](SEQUENCES.md) for the thresholds and what each figure needs.
+
 The band never cuts a word: when the window is narrow it drops whole
 fields (the FOV first, the date last) and, in the extreme, the context
 line goes and only the plate's name is left. The top bar's **"Data"**
@@ -307,3 +312,15 @@ pans 25 % past the plate edge.
 **Export PNG…** saves exactly what is on screen (with the NightScribe
 watermark), ready to attach. Data exports (annotated FITS, charts)
 always use the original file, never the screen pixmap.
+
+## When something does not work
+
+The window has **one** status line at the bottom, with the whole text in its
+tooltip (the result of a measurement stays in its own box, next to the action
+that produced it). A build that cannot deliver keeps your sequence and says
+why; a solve that fails says what it was doing.
+
+And the application **writes what it does to a file** while it runs:
+**Help > Open the log**. A GUI launched from a menu has no console at all, so
+a report like "a dialog appears and disappears and I do not know what happens"
+has its answer in there.

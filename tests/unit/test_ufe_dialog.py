@@ -960,3 +960,117 @@ def test_the_band_colours_the_measurement_of_this_frame(dlg):
     tab._last = None
     seg = mag_role()
     assert seg["role"] == "mag-cat" and seg["text"].endswith(" cat")
+
+
+# ---------------- the band reflects every change (asked) --------------
+
+def _band_strip(dlg):
+    # @return: a hash of the TOP STRIP of the painted plate: the band and
+    #          nothing else (the measurement's rings, the object's mark and
+    #          the compass all live below it), so a change here can only be
+    #          the band's own pixels.
+    #          The plate's render is COALESCED by a timer and the band is
+    #          painted on a repaint, so the window is given a moment to
+    #          arrive: measuring before that is measuring the old frame (the
+    #          first version of this test read the previous plate).
+    import hashlib
+    from PySide6.QtCore import QEventLoop, QTimer
+    loop = QEventLoop()
+    QTimer.singleShot(250, loop.quit)
+    loop.exec()
+    img = dlg.view.grab().toImage()
+    h = min(60, img.height())
+    return hashlib.sha1(bytes(img.copy(0, 0, img.width(), h).bits())
+                        ).hexdigest()
+
+
+def _band_mag(dlg):
+    # @return: the magnitude's segment of the band
+    first = dlg._chart_band()["lines"][0]
+    return next(seg for seg in first if seg["field"] == "mag")
+
+
+def test_the_band_repaints_whenever_the_magnitude_changes(dlg):
+    # Asked: "check that every time the object's magnitude changes, it shows
+    # in the band". The content is read WHEN IT PAINTS (no cache), so the
+    # only thing that can go wrong is a missing repaint, and that is
+    # invisible in the code: this compares the top strip of the painted plate
+    # for every source of the magnitude, through the app's own paths.
+    from nightscribe.core import fits_meta
+    from nightscribe.core.series_measure import SeriesPoint, SeriesResult
+    dlg.state.load(MONO)
+    tab = dlg.tab_measure
+    meta = fits_meta.meta_from_header(dlg.state.header or {})
+    before = _band_strip(dlg)
+
+    # 1 · the object's magnitude (the catalogue's value, in white)
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 17.1})
+    assert _band_mag(dlg)["role"] == "mag-cat"
+    a = _band_strip(dlg)
+    assert a != before                            # the band repainted
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 15.0})
+    b = _band_strip(dlg)
+    assert b != a and "15.00" in _band_mag(dlg)["text"]
+
+    # 2 · a series measured HERE (what a run does when it lands)
+    point = SeriesPoint(index=0, path=str(MONO), mjd=meta["mjd"], mag=11.11,
+                        err=0.03, exptime=10.0, n_comps=6, filter="V",
+                        flags=[])
+    tab._series_result = SeriesResult(points=[point])
+    tab._draw_series([point])
+    c = _band_strip(dlg)
+    assert c != b and "11.11" in _band_mag(dlg)["text"]
+
+    # 3 · the visit's curve loaded from the project (the same value, another
+    # way in): the band follows the payload
+    tab._series_result = None
+    tab._series_payload = []
+    tab.set_visit_curve_hooks(lambda: [{"mjd": meta["mjd"], "mag": 12.99,
+                                        "err": 0.05, "filter": "V",
+                                        "source": "measure", "comps": 5,
+                                        "flags": []}], None)
+    tab.load_visit_curve()
+    d = _band_strip(dlg)
+    assert d != c and "12.99" in _band_mag(dlg)["text"]
+
+    # 4 · another plate (the same field, the same header): the visit's curve
+    # still answers for that frame by time, so the band follows it
+    import shutil
+    second = Path(dlg.state.path).parent / "second_plate.fits"
+    shutil.copyfile(dlg.state.path, second)
+    dlg.open_plate(str(second))
+    e = _band_strip(dlg)
+    assert e != d and "12.99" in _band_mag(dlg)["text"]
+
+    # 5 · and with nothing measured at all the catalogue comes back, in white
+    tab._series_payload = []
+    tab._curve_from_visit = False
+    dlg.view.viewport().update()
+    f = _band_strip(dlg)
+    assert f != e and _band_mag(dlg)["role"] == "mag-cat"
+
+
+def test_a_hand_measurement_wins_over_the_visit_s_curve(dlg):
+    # The order that tells the truth: the visit's curve is loaded when the
+    # visit opens, BEFORE any click, so a measurement that exists on top of it
+    # is the last thing the observer did and the band shows it. A series
+    # measured NOW (not the visit's) wins over it: then the curve IS the
+    # fresher measurement.
+    from nightscribe.core import fits_meta
+    dlg.state.load(MONO)
+    dlg.set_object({"name": "X", "ra": 20.0, "dec": 62.0, "mag": 17.1})
+    tab = dlg.tab_measure
+    meta = fits_meta.meta_from_header(dlg.state.header or {})
+    tab._curve_from_visit = True
+    tab._series_payload = [{"mjd": meta["mjd"], "mag": 11.11, "err": 0.03,
+                            "filter": "V", "source": "measure",
+                            "comps": 5, "flags": []}]
+    assert "11.11" in _band_mag(dlg)["text"]      # the visit's curve alone
+    tab._last = {"mag": 12.34, "err": 0.04, "band": "V", "col": 1.0,
+                 "row": 1.0, "used": [1, 2, 3, 4, 5],
+                 "check": {"ok": True}, "result": {}}
+    assert "12.34" in _band_mag(dlg)["text"]      # the hand one wins
+    tab._curve_from_visit = False                 # the series just ran here
+    assert "11.11" in _band_mag(dlg)["text"]

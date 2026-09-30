@@ -1371,36 +1371,39 @@ class UfeDialog(QDialog):
                 except Exception:
                     pass
         # WHAT HAS BEEN MEASURED ON THIS PLATE, in the order that tells the
-        # truth: the visit's curve for THIS frame (the normal flow: a series
-        # is measured, not one plate), then a single-plate measurement of
-        # this plate, and only then the catalogue (which is not a
-        # measurement and wears white). The caveats travel with it: they are
-        # what decides between green, orange and red.
+        # truth, and the caveats travel with it (they are what decides
+        # between green, orange and red):
+        #
+        #   1 · A HAND MEASUREMENT OF THIS PLATE, when the curve came from
+        #       the visit: it is the LAST thing the observer did. The visit's
+        #       curve is loaded when the visit opens, before any click, so a
+        #       measurement that exists on top of it is newer by definition.
+        #   2 · the visit curve's point for THIS frame, when the series has
+        #       just been measured here (the normal flow: a series is
+        #       measured, not one plate).
+        #   3 · a hand measurement of this plate.
+        #   4 · and only then the catalogue, which is NOT a measurement and
+        #       wears white.
+        tab = self.tab_measure
+        last = tab._last
+        from_visit = bool(getattr(tab, "_curve_from_visit", False))
         measured = None
-        point = None
-        ask = getattr(self.tab_measure, "series_point_for", None)
-        if callable(ask):
-            meta_ = fits_meta.meta_from_header(self.state.header or {})
-            point = ask(self.state.path, meta_.get("mjd"),
-                        meta_.get("exptime_s"))
-        if point is not None:
-            measured = {"mag": point["mag"], "err": point.get("err"),
-                        "band": point.get("filter"),
-                        "comps": point.get("comps"),
-                        "flags": point.get("flags")}
+        if last is not None and last.get("mag") is not None and from_visit:
+            measured = tab.measured_facts(last)
         else:
-            last = self.tab_measure._last
-            if last is not None and last.get("mag") is not None:
-                check = last.get("check")
-                measured = {"mag": last["mag"], "err": last.get("err"),
-                            "band": last.get("band"),
-                            "comps": len(last.get("used") or []) or None,
-                            "check_ok": (check or {}).get("ok")
-                            if check else None,
-                            "no_check": check is None,
-                            "clipped": bool(
-                                (last.get("result") or {}).get("saturated")),
-                            "derived": bool(last.get("derived"))}
+            point = None
+            ask = getattr(tab, "series_point_for", None)
+            if callable(ask):
+                meta_ = fits_meta.meta_from_header(self.state.header or {})
+                point = ask(self.state.path, meta_.get("mjd"),
+                            meta_.get("exptime_s"))
+            if point is not None:
+                measured = {"mag": point["mag"], "err": point.get("err"),
+                            "band": point.get("filter"),
+                            "comps": point.get("comps"),
+                            "flags": point.get("flags")}
+            elif last is not None and last.get("mag") is not None:
+                measured = tab.measured_facts(last)
         catalog_mag = None
         try:
             if obj.get("mag") is not None:

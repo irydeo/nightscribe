@@ -190,25 +190,35 @@ def test_the_histogram_strip_folds_and_remembers_it():
 
 
 def test_the_object_is_painted_over_the_plate_not_a_row_of_the_window():
-    # 31 px of window height for one line of text, and it drew the eye out
-    # of the picture: the object belongs to the image.
+    # The object's line used to be a ROW of the window under the top bar
+    # (31 px of height for one line of text, and it drew the eye out of the
+    # picture). It is part of the plate's band now (ADR-046 rev.): painted
+    # over the image, so the window keeps its four items and the export
+    # carries it.
+    from nightscribe.gui.ufe_dialog import UfeDialog
     _app()
-    d = _dialog(1500, 1000)
+    d = UfeDialog()
+    d.resize(1500, 1000)
+    d.show()
+    assert d.open_plate(str(MONO))
+    _settle(d)
     # the top bar, the work area, the histogram's section and the status
     # line: four items, and NOT one of them is an object row
     assert d.layout().count() == 4
-    assert d.view.title_line() == ""          # nothing attached, no line
+    # without an object the plate names itself
+    assert d.view.band_lines()["lines"][0][0]["text"] == \
+        "sn2026zji_new_image"
     d.set_object(_OBJECT)
-    line = d.view.title_line()
-    assert "HAT-P-32 b" in line and "RA" in line and "mag 11.30" in line
+    first = d.view.band_lines()["lines"][0]
+    text = " · ".join(seg["text"] for seg in first)
+    assert "HAT-P-32 b" in text and "RA" in text and "11.30" in text
     d.close()
 
 
-def test_the_object_line_owns_the_top_band_and_nothing_collides():
+def test_the_band_owns_the_top_and_nothing_collides():
     # The observer preferred it at the top, across the whole width, with the
     # other labels moved down: it is the plate's heading. What it must never
-    # do is overlap them, so the top row of boxes (and the compass) start
-    # below it.
+    # do is overlap them, so the compass starts below it.
     from nightscribe.gui.ufe_dialog import UfeDialog
     _app()
     d = UfeDialog()
@@ -227,8 +237,14 @@ def test_the_object_line_owns_the_top_band_and_nothing_collides():
     # the other top overlays start under it
     assert d.view._title_h > 0
     assert 10 + d.view._title_h > rect.bottom()     # the boxes' own margin
-    # with nothing attached there is no band and no offset
+    # the band is the PLATE's heading: it stays without an object (the
+    # frame's own date, exposure and scale are still its data) and only
+    # goes when the plate does
     d.set_object(None)
+    QApplication.processEvents()
+    assert d.view._title_rect is not None
+    d.state.clear()
+    d.view.repaint()
     QApplication.processEvents()
     assert d.view._title_rect is None
     assert d.view._title_h == 0.0

@@ -141,16 +141,17 @@ class UfeDialog(QDialog):
         self.state.image_loaded.connect(self._on_image_loaded)
         self.state.wcs_changed.connect(self._sync_wcs_buttons)
         self.view.zoom_changed.connect(self._on_zoom_changed)
-        # ADR-046: the corner boxes always read the live state (solve,
-        # measurement, attached object) through this provider
-        self.view.set_boxes_provider(self._chart_boxes)
+        # ADR-046 rev.: the plate's band always reads the live state
+        # (solve, measurement, attached object, zoom) through this
+        # provider, consulted at paint time
+        self.view.set_band_provider(self._chart_band)
 
     def showEvent(self, event):
-        # The configured defaults land at every show: the corner-boxes
-        # state and the bar style (icons-only vs icon + text). The
-        # observer's own toggles survive while the dialog stays open.
+        # The configured defaults land at every show: what the band says
+        # about the plate and the bar style (icons-only vs icon + text).
+        # The observer's own toggles survive while the dialog stays open.
         from ..config import config
-        self.btn_boxes.setChecked(bool(config.get("chart_boxes", False)))
+        self.btn_boxes.setChecked(bool(config.get("chart_data", True)))
         self._apply_bar_style()
         super().showEvent(event)
 
@@ -441,12 +442,13 @@ class UfeDialog(QDialog):
         self.btn_annot = self._ui.btn_annot
         self.btn_annot.toggled.connect(
             lambda checked: self.view.set_annotations_visible(checked))
-        # ADR-046: the metadata corner boxes (object, date, position,
-        # brightness, site, scale); the configured default lands at every
-        # show, the toggle is the session's own choice
+        # ADR-046 rev.: what the plate's band says about the plate
+        # (position, magnitude, date, exposure, kit, station, scale, field).
+        # The object's name is the heading and stays. The configured
+        # default lands at every show; the toggle is the session's choice.
         self.btn_boxes = self._ui.btn_boxes
         self.btn_boxes.toggled.connect(
-            lambda checked: self.view.set_hud(boxes=checked))
+            lambda checked: self.view.set_hud(data=checked))
         # the global object mark: where the attached project's object
         # sits on the plate (its own layer, visible by default, it never
         # mixes with the feature tabs' markers)
@@ -1274,7 +1276,9 @@ class UfeDialog(QDialog):
         # @args: obj - {"name", "ra", "dec", "mag"} (all optional), or
         #        None to drop the object context (tabs keep their fields)
         self._object = obj or None
-        self._update_object_line()
+        # the plate's band reads the object through its provider: a
+        # repaint is all it takes (ADR-046 rev.)
+        self.view.viewport().update()
         self._update_title()
         # the global object mark rides on the object's coordinates; the
         # view (re)places it on every plate load and solve by itself
@@ -1323,16 +1327,20 @@ class UfeDialog(QDialog):
                 pass
         return None
 
-    def _chart_boxes(self):
-        # The view's boxes provider: assembles the corner-box content
-        # from the live state, following core/chart_annotate's rules
-        # (name always; position/scale only solved; brightness only when
-        # measured this session).
-        # @return: the boxes dict ({} when nothing can be said)
+    def _chart_band(self):
+        # The view's band provider (ADR-046 rev.): assembles what the plate
+        # says about itself from the live state, following
+        # core/chart_annotate's rules (the object's name always; the
+        # position placed by the plate's own solution, marked as the
+        # catalogue's when there is none; the magnitude only when it was
+        # measured HERE, and coloured by its own numbers; the frame's date,
+        # exposure, filter and kit; the station; the scale and the field of
+        # what is shown, which need the solution).
+        # @return: the band dict ({"lines": []} when nothing can be said)
         from ..config import config
         from ..core import chart_annotate, fits_meta
         if not self.state.has_image:
-            return {}
+            return {"lines": []}
         obj = self._object or {}
         name = (obj.get("name") or "").strip()
         if not name:
@@ -1365,12 +1373,30 @@ class UfeDialog(QDialog):
         measured = None
         last = self.tab_measure._last
         if last is not None and last.get("mag") is not None:
+            # the measurement's own caveats travel with it: they are what
+            # decides whether its colour says "trust this" or "look at it"
             measured = {"mag": last["mag"], "err": last.get("err"),
-                        "band": last.get("band")}
-        return chart_annotate.build_boxes(
-            name=name, meta=meta, wcs_info=wcs_info,
-            site=chart_annotate.site_from_config(config),
-            measured=measured)
+                        "band": last.get("band"), "used": last.get("used"),
+                        "check": last.get("check"),
+                        "result": last.get("result")}
+        catalog_mag = None
+        try:
+            if obj.get("mag") is not None:
+                catalog_mag = float(obj["mag"])
+        except (TypeError, ValueError):
+            catalog_mag = None
+        target = None
+        if obj.get("ra") is not None and obj.get("dec") is not None:
+            try:
+                target = (float(obj["ra"]), float(obj["dec"]))
+            except (TypeError, ValueError):
+                target = None
+        return chart_annotate.build_band(
+            name=name, meta=meta, wcs_info=wcs_info, measured=measured,
+            catalog_mag=catalog_mag, target=target,
+            equipment=chart_annotate.equipment_from_header(
+                self.state.header or {}, config),
+            site=chart_annotate.site_from_config(config))
 
     def set_status(self, text, level="info"):
         # The window's ONE line of status (U4).
@@ -1458,36 +1484,6 @@ class UfeDialog(QDialog):
         # @args: expanded - the new state
         # @return: None
         config.set("ufe_histogram_folded", 0 if expanded else 1)
-
-    def _update_object_line(self):
-        # The object, as a line over the plate itself: name, RA/Dec,
-        # magnitude, while an object is attached.
-        #
-        # U1: it used to be a row of the window UNDER the top bar, which
-        # cost 31 px of height for one line of text and drew the eye
-        # out of the picture. The object belongs to the image; the image
-        # paints it now (see UfeImageView.set_title_line).
-        if not self._object:
-            self.view.set_title_line("")
-            return
-        parts = []
-        if self._object.get("name"):
-            parts.append(self._object["name"])
-        ra, dec = self._object.get("ra"), self._object.get("dec")
-        if ra is not None and dec is not None:
-            from ..core import coords
-            try:
-                parts.append(f"RA {coords.ra_deg_to_hms(float(ra))} · "
-                             f"Dec {coords.dec_deg_to_dms(float(dec))}")
-            except (TypeError, ValueError):
-                pass
-        if self._object.get("mag") is not None:
-            try:
-                parts.append(self.tr("mag {0:.2f}").format(
-                    float(self._object["mag"])))
-            except (TypeError, ValueError):
-                parts.append(f"mag {self._object['mag']}")
-        self.view.set_title_line("   ·   ".join(parts))
 
     def _update_title(self):
         # Brand · object (when attached) · plate file name (when loaded).

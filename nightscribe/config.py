@@ -133,7 +133,10 @@ DEFAULTS = {
     "telescope_desc": "",     # free text, e.g. "0.43-m f/4.9 reflector"
     "camera_model": "",
     "marker_style": "ring",   # ring | cross (the object marker)
-    "chart_boxes": False,     # metadata corner boxes on the charts
+    "chart_boxes": False,     # metadata corner boxes on the OTHER charts
+                              # (the blink GIF/MP4 and the finder chart);
+                              # the UFE's plate band is chart_data
+    "chart_data": True,       # what the plate's band says (ADR-046 rev.)
 }
 
 

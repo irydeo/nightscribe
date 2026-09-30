@@ -475,11 +475,17 @@ def test_save_hook_persists_the_target_magnitude(window, monkeypatch):
 def test_set_object_fills_everything(dlg):
     obj = {"name": "T CrB", "ra": 238.08392, "dec": 25.92,
            "mag": 10.5, "bv": 0.62}
+    # the plate first (its load prefills the tab fields), then the object:
+    # the band heads a PLATE, and it carries the object (ADR-046 rev.):
+    # name, position and the catalogue magnitude, which says it is one
+    dlg.state.load(MONO)
     dlg.set_object(obj)
-    assert dlg.windowTitle() == "NightScribe Image Workbench · T CrB"
-    line = dlg.view.title_line()
-    assert "T CrB" in line and "RA" in line and "mag 10.50" in line
-    assert dlg.view.title_line()
+    assert dlg.windowTitle().startswith(
+        "NightScribe Image Workbench · T CrB")
+    first = dlg.view.band_lines()["lines"][0]
+    text = " · ".join(seg["text"] for seg in first)
+    assert "T CrB" in text and "RA" in text and "10.50 cat" in text
+    assert dlg.view.band_lines()["lines"][0]
     assert dlg.tab_blink.edt_name.text() == "T CrB"
     assert dlg.tab_blink.chk_manual.isChecked()
     assert dlg.tab_compare.edt_target.text() == "T CrB"
@@ -494,10 +500,13 @@ def test_object_survives_a_plate_load_and_clears_adhoc(dlg):
     dlg.open_plate(str(MONO))
     assert "T CrB" in dlg.windowTitle()          # the object stays
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
-    assert dlg.view.title_line()
+    assert dlg.view.band_lines()["lines"][0]
     dlg.set_object(None)                          # the ad-hoc open
     assert dlg.object() is None
-    assert not dlg.view.title_line()
+    # the band is the PLATE's heading: without an object it names the plate
+    text = " · ".join(seg["text"]
+                      for seg in dlg.view.band_lines()["lines"][0])
+    assert "sn2026zji_new_image" in text
     assert "T CrB" not in dlg.windowTitle()
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
 
@@ -623,7 +632,7 @@ def test_another_project_does_not_inherit_the_previous_session(dlg):
     dlg.set_object({"name": "T CrB", "ra": 238.0, "dec": 25.9})
     dlg.state.load(MONO)
     dlg.tab_compare.edt_target.setText("T CrB")
-    assert dlg.state.has_image and dlg.view.title_line()
+    assert dlg.state.has_image and dlg.view.band_lines()["lines"][0]
     # the same session again: nothing is thrown away
     assert dlg.begin_session((1, 10)) is False
     assert dlg.state.has_image
@@ -631,7 +640,7 @@ def test_another_project_does_not_inherit_the_previous_session(dlg):
     # the sequence and the points live in their own project)
     assert dlg.begin_session((2, 20)) is True
     assert not dlg.state.has_image
-    assert dlg.view.title_line() == ""
+    assert not dlg.view.band_lines()["lines"]
     assert dlg.tab_compare.edt_target.text() == ""
     # the ad-hoc open from Tools is its own session too
     dlg.state.load(MONO)

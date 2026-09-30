@@ -209,23 +209,38 @@ program).
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).
 
-## Metadata boxes and marker style (ADR-046)
+## The plate's band and the marker style (ADR-046)
 
-The top bar's **"Boxes"** button shows the metadata corner boxes, on
-screen and burned into the exported PNG (and into the blink GIF/MP4 and
-the sequence chart), in the spirit of the classic tracker charts:
+The plate says what it knows in the **band at the top of the image**, on
+screen and burned into the exported PNG, in two lines:
 
-* **Top-left**: the object name (always).
-* **Top-right**: UT date, the target's sexagesimal RA/Dec, its
-  brightness (only when a calibrated measurement exists in the session;
-  a catalog magnitude does not count) and the exposure.
-* **Bottom-left**: observer, measurer, MPC station, telescope and camera
-  (whatever you set in Settings → Site & equipment, "Chart annotations"
-  group), plus the plate scale in ″/px and the FOV of what is shown when
-  the plate is solved.
-* With the boxes on, the compass moves to the bottom centre and gains
-  the **E** leg, and the scale bar moves right, keeping the corners
-  free.
+* **Line 1, who it is**: the object, the target's sexagesimal RA/Dec and
+  its brightness.
+* **Line 2, the context**: UT date, exposure, filter, the kit that took
+  the frame (from its own header), the MPC station, the plate scale in
+  ″/px and the FOV of what is shown (the last two only when the plate is
+  solved).
+
+**The colour of each datum says how much to trust it**, and that is the
+point of the band:
+
+* the **position** in ink when this plate's own solution places it, and
+  dimmed with a `cat` when it is only the catalogue's (an unsolved plate);
+* the **magnitude** green when it was measured here and its numbers hold
+  (error, number of comparisons, check star, a clipped core), red when
+  they say "look at this before reporting it", and dimmed with a `cat`
+  when it is only the project's or the catalogue's value, which is not a
+  measurement of this plate;
+* everything else (date, exposure, filter, kit, station, scale, FOV) in
+  the quiet colour: it is context, not a judgement.
+
+The band never cuts a word: when the window is narrow it drops whole
+fields (the FOV first, the date last) and, in the extreme, the context
+line goes and only the plate's name is left. The top bar's **"Data"**
+button turns it off (Settings → Site & equipment → "Plate band" sets the
+default), and the compass and the scale bar keep their classic corners.
+The **blink GIF/MP4** and the **sequence chart** keep their own metadata
+boxes, with their own switch ("Other charts" in the same Settings group).
 
 In the same Settings group, **Object marker** picks the look of the
 object's mark: ring with ticks (classic) or full-frame cross with a box

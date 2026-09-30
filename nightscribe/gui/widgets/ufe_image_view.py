@@ -43,12 +43,26 @@ from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsLineItem,
                                QGraphicsPixmapItem, QGraphicsRectItem,
                                QGraphicsSimpleTextItem, QGraphicsView)
 
+from ...core import chart_annotate
 from ...viz import palette
 from .base_chart import ChartView
 
 logger = logging.getLogger("nightscribe.gui.ufe_image_view")
 
 _RENDER_COALESCE_MS = 120   # stretch drags collapse into a single render
+
+# The band's colours, one per role. The MEANING of each role is decided in
+# core/chart_annotate (pure, testable); here it is only mapped to a colour,
+# so the same datum can never come out in two colours.
+BAND_COLOURS = {
+    "name": palette.FG,           # the object: whose plate this is
+    "pos": palette.FG,            # placed by this plate's own solution
+    "pos-cat": palette.MUTED,     # the catalogue's position, not this plate's
+    "mag": palette.GOOD,          # measured here, and trustworthy
+    "mag-doubt": palette.DANGER,  # measured, but the numbers say be careful
+    "mag-cat": palette.MUTED,     # only a catalogue value
+    "context": palette.MUTED,     # date, exposure, filter, kit, Stn, PSc, FOV
+}
 
 
 def _round_arcsec(target):
@@ -162,7 +176,6 @@ class UfeImageView(ChartView):
         # plate the bubble must not chase the cursor (it covered the pixels
         # being inspected, and it jumped under the eye)
         self._tooltip_anchor = "bottom_left"
-        self._title_line = ""
         self._show_object_mark = True    # the top bar toggle; on by default
         self._frame_override = None  # Blink tab: fn() -> uint8 display
                                      # frame replacing the state's own
@@ -177,13 +190,12 @@ class UfeImageView(ChartView):
         self._snap_timer.timeout.connect(self._snap_now)
         self.show_north = True      # HUD toggles (need a WCS to paint)
         self.show_scale = True
-        # metadata corner boxes (ADR-046): the provider is consulted at
-        # paint time, so solving, measuring or attaching an object all
-        # show up without any invalidation wiring
-        self.show_boxes = False
-        self._boxes_provider = None    # fn() -> chart_annotate boxes dict
-        self._boxes_tl_h = 0.0         # painted top-left box height
-                                       # (device px; the probe ducks it)
+        # the plate's heading (ADR-046 rev.): what the corner boxes used to
+        # say, in one band with a colour per role. The provider is consulted
+        # at paint time, so solving, measuring or attaching an object all
+        # show up without any invalidation wiring.
+        self.show_data = True          # the top bar toggle: the band's data
+        self._band_provider = None     # fn() -> build_band dict or {}
 
         self._render_timer = QTimer(self)
         self._render_timer.setSingleShot(True)
@@ -506,29 +518,27 @@ class UfeImageView(ChartView):
 
     # ------------------------------------------------------------- HUD
 
-    def set_hud(self, north=None, scale=None, boxes=None):
-        # @args: north, scale - True/False to toggle each HUD piece
-        #        (they only paint when the plate carries a WCS),
-        #        boxes - the metadata corner boxes (ADR-046; they paint
-        #        with or without a WCS: the name and the site lines do
-        #        not need one)
+    def set_hud(self, north=None, scale=None, data=None):
+        # @args: north, scale - True/False to toggle each HUD piece (they
+        #        only paint when the plate carries a WCS), data - what the
+        #        band says about the plate (the object's name stays)
         if north is not None:
             self.show_north = bool(north)
         if scale is not None:
             self.show_scale = bool(scale)
-        if boxes is not None:
-            self.show_boxes = bool(boxes)
+        if data is not None:
+            self.show_data = bool(data)
         self.viewport().update()
 
-    def set_boxes_provider(self, fn):
-        # @args: fn - callable returning a core/chart_annotate boxes dict
+    def set_band_provider(self, fn):
+        # @args: fn - callable returning a core/chart_annotate band dict
         #        (or {}), consulted at every paint; None drops the layer
-        self._boxes_provider = fn
+        self._band_provider = fn
         self.viewport().update()
 
     def drawForeground(self, painter, rect):
-        # Viewport-space HUD (north arrow, scale bar, corner boxes) under
-        # the base's watermark; device coordinates, so zoom/pan never
+        # Viewport-space HUD (the plate's band, north arrow, scale bar)
+        # under the base's watermark; device coordinates, so zoom/pan never
         # move them. The pick reticle goes last: it must sit on top of
         # everything.
         painter.save()
@@ -679,141 +689,142 @@ class UfeImageView(ChartView):
             painter.drawLine(0, y + dy, x - gap + dx, y + dy)
             painter.drawLine(x + gap + dx, y + dy, w, y + dy)
 
-    def set_title_line(self, text):
-        # The object this plate belongs to, drawn ON the plate: one line,
-        # top-left, dim, with a dark halo so it reads over the sky.
-        #
-        # It lives in the HUD and not in the window's layout on purpose:
-        # a row of its own cost 31 px of height and took the eye out of
-        # the picture. The object belongs to the image.
-        # @args: text - the line, or "" to clear it
-        # @return: None
-        self._title_line = str(text or "")
-        self.viewport().update()
+    def band_lines(self):
+        # The band the view would paint right now: the provider is consulted
+        # exactly as the paint does, so a test (or an export) reads what is
+        # really on the plate. A provider hiccup never breaks the paint.
+        # @return: the band dict, or None when there is none
+        if self._band_provider is None:
+            return None
+        try:
+            return self._band_provider() or None
+        except Exception as err:
+            logger.warning("band provider failed: %s", err)
+            return None
 
-    def title_line(self):
-        # @return: the object's line currently shown ("" when none)
-        return self._title_line
-
-    def _paint_title(self, painter, w, h, k=1.0):
-        # The object's line, AT THE TOP AND ACROSS THE WHOLE PLATE.
+    def _paint_band(self, painter, w, h, k=1.0):
+        # The plate's heading, AT THE TOP AND ACROSS THE WHOLE PLATE, in two
+        # lines: line 1 identity (object, position, magnitude) and line 2
+        # context (date, exposure, filter, kit, station, scale, field).
+        # Every segment wears the colour of its role (BAND_COLOURS) and the
+        # segments are joined by a muted dot.
         #
-        # It is the plate's own heading (the observer preferred it here),
-        # and it owns the full width so a long name, its position and its
-        # magnitude fit in one line. What it must not do is collide with
-        # the other overlays, so the ones that live up there (the metadata
-        # boxes and the compass) start BELOW it: the title is drawn first
-        # and its height is published in _title_h for them.
+        # IT NEVER CUTS A WORD: when the width runs out, WHOLE FIELDS are
+        # dropped in the order core/chart_annotate documents (the least
+        # report-critical first, the date last). Line 2 can go entirely and
+        # the identity line loses its magnitude and then its position; the
+        # only thing ever elided is a name too long for the plate.
+        #
+        # The compass and the reticle that share the top read this height
+        # from _title_h, so nothing overlaps the band.
         # @args: painter - device-coords painter, w/h - surface in device
         #        px, k - export pixel ratio
         # @return: True when something was drawn
         self._title_rect = None
         self._title_h = 0.0
-        if not self._title_line or not self._state.has_image:
+        if self._band_provider is None or not self._state.has_image:
             return False
+        band = self.band_lines()
+        if not band:
+            return False
+        lines = [list(line) for line in (band.get("lines") or [])]
+        lines = [line for line in lines if line]
+        if not lines:
+            return False
+        if not self.show_data:
+            # the toggle keeps the heading and hides what it says about the
+            # plate: the object's name is the plate's name
+            lines = [[seg for seg in lines[0]
+                      if seg.get("role") == chart_annotate.ROLE_NAME]]
+            if not lines[0]:
+                return False
         from PySide6.QtGui import QFont, QFontMetricsF
         f = QFont(self._label_font) if hasattr(self, "_label_font") \
             else QFont()
         f.setPointSizeF((f.pointSizeF() or 9.0) + 1.0)
         f.setBold(True)
         fm = QFontMetricsF(f)
+        sep = "   ·   "
+        sep_w = fm.horizontalAdvance(sep)
         pad = 8.0 * k
         room = max(60.0, w - 2 * pad)
-        text = fm.elidedText(self._title_line, Qt.ElideRight, room)
-        # the whole width, at the top of the plate, and its height is
-        # published so the boxes and the compass start under it
-        rect = QRectF(pad, 6.0 * k, room, fm.height() + 6 * k)
-        self._title_rect = rect
-        self._title_h = rect.height() + 10.0 * k
+
+        def width_of(segs):
+            # @return: the width of a line of segments, separators included
+            if not segs:
+                return 0.0
+            return (sum(fm.horizontalAdvance(seg["text"]) for seg in segs)
+                    + sep_w * (len(segs) - 1))
+
+        def fit(segs, order):
+            # Drops whole fields, in the documented order, until the line
+            # fits: half a field is worse than no field.
+            segs = list(segs)
+            for field in order:
+                if width_of(segs) <= room:
+                    break
+                segs = [seg for seg in segs if seg.get("field") != field]
+            return segs
+
+        lines[0] = fit(lines[0], chart_annotate.DROP_ORDER_NAME)
+        if len(lines) > 1:
+            lines[1] = fit(lines[1], chart_annotate.DROP_ORDER)
+            if not lines[1]:
+                lines = lines[:1]
+        if not lines[0]:
+            return False
+        if width_of(lines[0]) > room and len(lines[0]) == 1:
+            # the last resort, and the only place a word is ever cut: a name
+            # that does not fit the plate even alone
+            seg = lines[0][0]
+            seg["text"] = fm.elidedText(seg["text"], Qt.ElideRight,
+                                        max(40.0, room))
+        line_h = fm.height()
+        plaque = QRectF(pad - 3.0 * k, 6.0 * k - 2.0 * k,
+                        room + 6.0 * k, line_h * len(lines) + 4.0 * k)
+        self._title_rect = QRectF(pad, 6.0 * k, room, line_h * len(lines))
+        self._title_h = plaque.height() + 10.0 * k
         painter.save()
         painter.setFont(f)
-        # a dark plaque under it: the same trick as the boxes, so a bright
-        # sky behind never eats the letters
-        plaque = QColor(0, 0, 0, 130)
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QBrush(plaque))
-        painter.drawRoundedRect(rect.adjusted(-3 * k, -2 * k, 3 * k, 2 * k),
-                                3 * k, 3 * k)
-        painter.setPen(QPen(QColor(palette.FG)))
-        painter.drawText(rect, Qt.AlignLeft | Qt.AlignVCenter, text)
+        painter.setBrush(QBrush(QColor(0, 0, 0, 130)))
+        painter.drawRoundedRect(plaque, 3.0 * k, 3.0 * k)
+        for row, segs in enumerate(lines):
+            y = 6.0 * k + row * line_h
+            x = pad
+            for i, seg in enumerate(segs):
+                if i:
+                    painter.setPen(QPen(QColor(palette.MUTED)))
+                    painter.drawText(QRectF(x, y, sep_w, line_h),
+                                     Qt.AlignLeft | Qt.AlignVCenter, sep)
+                    x += sep_w
+                painter.setPen(QPen(QColor(BAND_COLOURS.get(
+                    seg.get("role"), palette.FG))))
+                painter.drawText(QPointF(x, y + fm.ascent()), seg["text"])
+                x += fm.horizontalAdvance(seg["text"])
         painter.restore()
         return True
 
     def _paint_hud(self, painter, w, h, k=1.0):
         # @args: painter - device-coords painter, w, h - surface size in
         #        device px, k - export pixel ratio (1.0 on screen)
-        # The boxes paint with or without a WCS (the name and the site
-        # lines do not need one); north/scale still do. With the boxes
-        # on, the compass moves to the bottom centre (and gains the east
-        # leg) and the scale bar to the bottom right: the report layout
-        # keeps its corners free.
+        # The band paints with or without a WCS (the object's name and the
+        # frame's own date and exposure do not need one); north/scale still
+        # do. The band is the plate's heading, so it is drawn first and the
+        # overlays that share the top read its height from _title_h.
+        # no plate, no heading: the geometry is cleared here (a plate that
+        # goes away must not leave the band's old rectangle behind)
+        self._title_rect = None
+        self._title_h = 0.0
         if not self._state.has_image:
             return
-        # the object's line first: it is the plate's own heading, and the
-        # overlays that share the top read its height from here
-        self._paint_title(painter, w, h, k)
-        boxes_on = self._paint_boxes(painter, w, h, k)
+        self._paint_band(painter, w, h, k)
         if self._state.wcs is None:
             return
         if self.show_north:
-            self._paint_north(painter, w, h, k, bottom=boxes_on)
+            self._paint_north(painter, w, h, k)
         if self.show_scale:
-            self._paint_scale(painter, w, h, k, right=boxes_on)
-
-    def _paint_boxes(self, painter, w, h, k):
-        # The metadata corner boxes (ADR-046): square, dark, monospace,
-        # in the spirit of the classic tracker charts. Content comes
-        # from the provider (core/chart_annotate rules); a provider
-        # hiccup never breaks the paint.
-        # @return: True when something was drawn
-        self._boxes_tl_h = 0.0
-        if not self.show_boxes or self._boxes_provider is None:
-            return False
-        try:
-            boxes = self._boxes_provider() or {}
-        except Exception as err:
-            logger.warning("chart boxes provider failed: %s", err)
-            return False
-        if not boxes:
-            return False
-        font = QFont("monospace")
-        font.setPixelSize(max(8.0, 10.0 * k))
-        painter.setFont(font)
-        fm = painter.fontMetrics()
-        pad, margin = 5.0 * k, 10.0 * k
-        line_h = fm.height()
-        for key, right, bottom in (("top_left", False, False),
-                                   ("top_right", True, False),
-                                   ("bottom_left", False, True)):
-            lines = boxes.get(key)
-            if not lines:
-                continue
-            bw = max(fm.horizontalAdvance(t) for t in lines) + 2 * pad
-            bh = line_h * len(lines) + 2 * pad
-            x = w - margin - bw if right else margin
-            # the top row starts UNDER the object's line (see _paint_title)
-            top = margin + getattr(self, "_title_h", 0.0)
-            y = h - margin - bh if bottom else top
-            bg = QColor(palette.BG)
-            bg.setAlpha(215)
-            painter.setPen(Qt.NoPen)
-            painter.setBrush(bg)
-            painter.drawRect(QRectF(x, y, bw, bh))
-            painter.setBrush(Qt.NoBrush)
-            painter.setPen(QPen(QColor(palette.MUTED), max(1.0, 0.8 * k)))
-            painter.drawRect(QRectF(x, y, bw, bh))
-            painter.setPen(QPen(QColor(palette.FG)))
-            for i, t in enumerate(lines):
-                baseline = y + pad + i * line_h + fm.ascent()
-                if right:
-                    painter.drawText(
-                        QRectF(x, y + pad + i * line_h, bw - pad, line_h),
-                        Qt.AlignRight, t)
-                else:
-                    painter.drawText(QPointF(x + pad, baseline), t)
-            if key == "top_left":
-                self._boxes_tl_h = bh + margin
-        return True
+            self._paint_scale(painter, w, h, k)
 
     def export_flip(self):
         # The PNG promises the scene you are looking at, mirror included.
@@ -835,22 +846,17 @@ class UfeImageView(ChartView):
             angle = 180.0 - angle
         return angle
 
-    def _paint_north(self, painter, w, h, k, bottom=False):
+    def _paint_north(self, painter, w, h, k):
         # North arrow, rotated by the plate PA (positive = east of north,
-        # clockwise; the legacy convention). Legacy spot: top-right, N
-        # only. With the corner boxes on it becomes the bottom-centre
-        # compass: the same arrow plus the east leg (90° anticlockwise
-        # from north on screen, flipped on mirrored plates).
+        # clockwise; the legacy convention), at the top-right and under the
+        # band (the corner boxes used to send it to the bottom centre with
+        # an east leg; there are no boxes any more, so it keeps its own
+        # spot and the plate's corners stay free for the band).
         pa = self._flip_angle(-self._state.wcs.rotation())
-        # ... and so does the compass, when it sits at the top
         top_y = 48 * k + getattr(self, "_title_h", 0.0)
-        cx, cy = (w / 2.0, h - 44 * k) if bottom else (w - 44 * k, top_y)
+        cx, cy = w - 44 * k, top_y
         length = 30 * k
         legs = [("N", pa)]
-        if bottom:
-            east = pa + 90.0 if self._state.wcs.is_mirrored() \
-                else pa - 90.0
-            legs.append(("E", east))
         for label, angle in legs:
             painter.save()
             painter.translate(cx, cy)
@@ -872,17 +878,18 @@ class UfeImageView(ChartView):
                                     28 * k, 14 * k), Qt.AlignHCenter, label)
             painter.restore()
 
-    def _paint_scale(self, painter, w, h, k, right=False):
+    def _paint_scale(self, painter, w, h, k):
         # Scale bar: a round arcsec span that lands near 90 screen px at
-        # the current zoom. Legacy spot: bottom-left; with the corner
-        # boxes on it moves to the bottom-right (that corner stays free).
+        # the current zoom, at the bottom-left, where it has always been
+        # (the corner boxes used to push it to the right; the band lives at
+        # the top, so the bottom is the bar's).
         factor = max(self.current_factor(), 1e-6) * k
         per_px = self._state.wcs.pixel_scale() / factor   # arcsec/device px
         arcsec = _round_arcsec(90.0 * k * per_px)
         bar = min(max(arcsec / per_px, 12.0 * k), w * 0.35)
-        x0 = (w - 16 * k - bar) if right else 16 * k
+        x0 = 16 * k
         y0 = h - 26 * k
-        if not right and self._tooltip is not None:
+        if self._tooltip is not None:
             # the probe's readout is anchored down here: the bar steps up
             # while it is showing (the same trick the corner boxes use for
             # the pick reticle)
@@ -899,13 +906,8 @@ class UfeImageView(ChartView):
         f.setPointSizeF(9 * k)
         painter.setFont(f)
         painter.setPen(QPen(QColor(palette.FG)))
-        if right:
-            painter.drawText(QRectF(x0 - 40 * k, y0 - 22 * k,
-                                    bar + 40 * k, 18 * k),
-                             Qt.AlignRight, f"{arcsec:g}″")
-        else:
-            painter.drawText(QRectF(x0, y0 - 22 * k, bar + 40 * k, 18 * k),
-                             Qt.AlignLeft, f"{arcsec:g}″")
+        painter.drawText(QRectF(x0, y0 - 22 * k, bar + 40 * k, 18 * k),
+                         Qt.AlignLeft, f"{arcsec:g}″")
 
     # ----------------------------------------------------------- export
 

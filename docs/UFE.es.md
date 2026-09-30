@@ -213,24 +213,40 @@ atómica, así la placa queda resuelta para cualquier programa).
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
 
-## Cajas de metadatos y estilo de marcador (ADR-046)
+## La banda de la placa y el estilo de marcador (ADR-046)
 
-El botón **«Cajas»** de la barra superior muestra las cajas de metadatos
-en las esquinas, en pantalla y quemadas en el PNG exportado (y en los
-GIF/MP4 del blink y en la carta de secuencia), al estilo de las cartas
-de seguimiento clásicas:
+La placa cuenta lo que sabe en la **banda de la parte alta de la imagen**,
+en pantalla y quemada en el PNG exportado, en dos líneas:
 
-* **Sup-izq**: el nombre del objeto (siempre).
-* **Sup-der**: fecha UT, AR/Dec sexagesimal del objetivo, su brillo
-  (solo cuando hay una medida calibrada en la sesión; una magnitud de
-  catálogo no vale) y la exposición.
-* **Inf-izq**: observador, medidor, estación MPC, telescopio y cámara
-  (lo que tengas en Ajustes → Sitio y equipo, grupo «Anotación de
-  cartas»), más la escala en ″/px y el FOV de lo que se ve cuando la
-  placa está resuelta.
-* Con las cajas activas, la rosa de los vientos baja al centro inferior
-  y gana la pata **E**, y la barra de escala se mueve a la derecha, para
-  dejar libres las esquinas.
+* **Línea 1, quién es**: el objeto, la AR/Dec sexagesimal del objetivo y
+  su brillo.
+* **Línea 2, el contexto**: fecha UT, exposición, filtro, el equipo que
+  tomó el frame (de su propia cabecera), la estación MPC, la escala en
+  ″/px y el FOV de lo que se ve (las dos últimas solo con la placa
+  resuelta).
+
+**El color de cada dato dice cuánto fiarse**, y ahí está la gracia de la
+banda:
+
+* la **posición** en tinta cuando la coloca la propia solución de esta
+  placa, y apagada con un `cat` cuando solo es la del catálogo (placa sin
+  resolver);
+* la **magnitud** en verde cuando se midió aquí y sus números aguantan
+  (error, número de comparsas, estrella de chequeo, núcleo recortado), en
+  rojo cuando dicen «mira esto antes de reportarlo», y apagada con un
+  `cat` cuando solo es el valor del proyecto o del catálogo, que no es una
+  medida de esta placa;
+* lo demás (fecha, exposición, filtro, equipo, estación, escala, FOV) en
+  el color discreto: es contexto, no un juicio.
+
+La banda nunca corta una palabra: si la ventana es estrecha suelta campos
+enteros (el FOV primero, la fecha la última) y, en el extremo, se va la
+línea de contexto y queda solo el nombre de la placa. El botón **«Datos»**
+de la barra superior la apaga (Ajustes → Sitio y equipo → «Banda de la
+placa» fija el valor por defecto), y la rosa de los vientos y la barra de
+escala conservan sus esquinas clásicas. El **GIF/MP4 del blink** y la
+**carta de secuencia** mantienen sus propias cajas de metadatos, con su
+conmutador («Otras cartas» en el mismo grupo de Ajustes).
 
 En el mismo grupo de Ajustes, **Marcador del objeto** elige la estética
 de la marca del objeto: anillo con ticks (clásica) o cruz a todo el

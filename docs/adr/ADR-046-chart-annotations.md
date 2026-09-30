@@ -151,3 +151,83 @@ redraw the markers instantly: they apply on the next interaction or
 reopen (the boxes toggle is re-read at every show). In the blink, the
 PSc scale is the source plate's when the caller knows it (the UFE), and
 the work frame's on the legacy/CLI paths.
+
+**Revisión (2026-09-30): la placa dice lo suyo en una banda, no en cajas**. Se pidió
+repensar las cajas: el mismo estilo que la banda que ya encabeza la imagen (nombre,
+coordenadas, magnitud), con lo que faltaba (exposición, Stn, PSc, FOV) y **un color por
+dato**, para no copiar la estética de las cartas clásicas. Lo que cambia:
+
+- **El UFE deja de tener cajas de esquina**: `UfeImageView._paint_boxes` desaparece y
+  `core/chart_annotate.build_band` alimenta una **banda de dos líneas** en la parte
+  alta de la placa, dentro de la misma placa oscura. Línea 1 (identidad): objeto,
+  posición y magnitud. Línea 2 (contexto): fecha, exposición, filtro, equipo,
+  estación, escala y campo de visión. Las cajas de esquina **siguen existiendo** en las
+  otras cartas (el blink GIF/MP4 y la carta de secuencia), que no se tocan.
+- **Un color por rol**, decidido en el módulo puro y mapeado por el render
+  (`BAND_COLOURS`): `name` y `pos` en tinta (lo coloca la propia solución de esta
+  placa), `pos-cat` apagado y con la palabra `cat` (es la posición del catálogo, no la
+  de esta placa; el color no basta en un papel), `mag` en verde (medida aquí y
+  fiable), `mag-doubt` en rojo, `mag-cat` apagado y con `cat` (un valor de catálogo no
+  es una medida), y `context` apagado. El verde es `palette.GOOD`, nuevo en la paleta
+  de cartas.
+- **Cuándo la magnitud medida es dudosa**: error total > 0,10 mag, menos de tres
+  comparsas sosteniendo el punto cero, estrella de chequeo que dice que la noche no
+  va, o el núcleo del objetivo recortado. Son cuatro señales que la receta ya calcula;
+  ninguna es una opinión.
+- **Nunca se corta una palabra**: cuando el ancho no da, se sueltan campos enteros en
+  `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: lo menos necesario para
+  un reporte primero, la fecha la última) y, en el peor caso, la línea 2 entera; la
+  línea 1 pierde la magnitud y luego la posición, y solo se elide un nombre que no cabe
+  ni solo. El equipo se acota a 24 caracteres (un nombre de cámara puede ser un serial
+  de 31 y se comía el FOV; el valor completo sigue en la cabecera y en las otras
+  cartas).
+- **De dónde sale cada cosa**: el nombre del proyecto (o del fichero), la fecha, la
+  exposición, el filtro y el equipo **de la cabecera de la propia toma** (el equipo de
+  la toma gana al de Ajustes y no se mezclan: su cámara con mi telescopio sería una
+  mentira peor que cualquiera de las dos), la estación de Ajustes, la posición, la
+  escala y el FOV de la solución de la placa, y la magnitud solo de una medida de esta
+  sesión.
+- **Ajuste nuevo `chart_data`** (por defecto activado) para lo que dice la banda;
+  `chart_boxes` (por defecto desactivado) pasa a gobernar solo las cajas de las otras
+  cartas. La rosa de los vientos y la barra de escala vuelven a sus sitios clásicos
+  (arriba a la derecha bajo la banda, abajo a la izquierda): ya no hay esquinas que
+  liberar.
+
+**Revision (2026-09-30): the plate says its own thing in a band, not in boxes**. The
+boxes were to be rethought: the same style as the band that already heads the image
+(name, coordinates, magnitude), with what was missing (exposure, Stn, PSc, FOV) and
+**a colour per datum**, so as not to copy the classic charts' look. What changes:
+
+- **The UFE has no corner boxes any more**: `UfeImageView._paint_boxes` is gone and
+  `core/chart_annotate.build_band` feeds a **two-line band** at the top of the plate,
+  inside the same dark plaque. Line 1 (identity): object, position and magnitude. Line
+  2 (context): date, exposure, filter, equipment, station, scale and field of view.
+  The corner boxes **still exist** in the other charts (the blink GIF/MP4 and the
+  sequence chart), which are untouched.
+- **A colour per role**, decided in the pure module and mapped by the render
+  (`BAND_COLOURS`): `name` and `pos` in ink (this plate's own solution places it),
+  `pos-cat` dimmed and with the word `cat` (it is the catalogue's position, not this
+  plate's; colour alone is not enough on a printout), `mag` in green (measured here and
+  trustworthy), `mag-doubt` in red, `mag-cat` dimmed and with `cat` (a catalogue value
+  is not a measurement), and `context` dimmed. The green is `palette.GOOD`, new in the
+  chart palette.
+- **When a measured magnitude is doubtful**: total error > 0.10 mag, fewer than three
+  comparisons holding the zero point, a check star that says the night is off, or the
+  target's core clipped. Four signals the recipe already computes; none of them is an
+  opinion.
+- **A word is never cut**: when the width runs out, whole fields are dropped in
+  `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: the least needed for a
+  report first, the date last) and, in the worst case, line 2 entirely; line 1 loses
+  the magnitude and then the position, and only a name that does not fit even alone is
+  elided. The equipment is capped at 24 characters (a camera name can be a 31-character
+  serial and it was eating the FOV; the full value stays in the header and in the other
+  charts).
+- **Where each datum comes from**: the name from the project (or the file), the date,
+  exposure, filter and equipment **from the plate's own header** (the frame's kit wins
+  over the Settings and the two are never mixed: his camera with my telescope would be
+  a worse lie than either), the station from the Settings, the position, scale and FOV
+  from the plate's solution, and the magnitude only from a measurement of this session.
+- **New `chart_data` setting** (on by default) for what the band says; `chart_boxes`
+  (off by default) now governs the other charts' boxes only. The compass and the scale
+  bar return to their classic spots (top right under the band, bottom left): there are
+  no corners to free any more.

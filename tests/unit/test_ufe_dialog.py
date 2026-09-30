@@ -321,66 +321,83 @@ def test_solve_failure_warns(dlg, monkeypatch):
     assert "ASTAP" in seen[0][2] and "Astrometry.net" in seen[0][2]
 
 
-# ------------------------------------------------- chart boxes (ADR-046)
+# -------------------------------------------- the plate's band (ADR-046 rev.)
 
-def test_chart_boxes_provider_reads_the_live_state(dlg, monkeypatch):
-    # name: the plate stem when nothing else speaks; the attached object
-    # wins over it. Date/exposure from the header, position/scale/FOV
-    # from the WCS, brightness only after a measurement.
+def test_the_band_provider_reads_the_live_state(dlg, monkeypatch):
+    # Name: the plate's stem when nothing else speaks, and the attached
+    # object wins over it. Date, exposure, filter and kit come from the
+    # frame itself. The position is placed by the plate's own solution (in
+    # the ink colour) and the magnitude is only the session's measurement:
+    # a catalogue value wears its own colour and SAYS it is one.
     from nightscribe.config import config
-    monkeypatch.setitem(config._data, "observer_name", "F. Calvo")
     monkeypatch.setitem(config._data, "mpc_code", "Z41")
-    monkeypatch.setitem(config._data, "chart_boxes", True)
-    assert dlg._chart_boxes() == {}                    # no plate, no boxes
+    assert dlg._chart_band() == {"lines": []}     # no plate, nothing to say
     dlg.state.load(MONO)
-    boxes = dlg._chart_boxes()
-    assert boxes["top_left"] == ["sn2026zji_new_image"]
-    assert "Date: 2026-08-21 20:54 UT" in boxes["top_right"]
-    assert "Exp: 10.0 s" in boxes["top_right"]
-    # solved plate: scale and FOV always; the RA/Dec lines wait for a
-    # known object position (a field centre is not the object)
-    assert not any(ln.startswith("RA: ") for ln in boxes["top_right"])
-    assert any(ln.startswith("PSc: ") for ln in boxes["bottom_left"])
-    assert "Obs: F. Calvo" in boxes["bottom_left"]
-    assert "Stn: Z41" in boxes["bottom_left"]
-    # no measurement yet: no Mag line
-    assert not any(ln.startswith("Mag: ") for ln in boxes["top_right"])
-    # the attached object wins the name and pins the position (an
-    # off-plate object would paint no position lines at all)
+    first, second = dlg._chart_band()["lines"]
+    assert first[0]["text"] == "sn2026zji_new_image"
+    assert first[0]["role"] == "name"
+    assert "2026-08-21 20:54 UT" in second[0]["text"]
+    ctx = " · ".join(seg["text"] for seg in second)
+    assert "10.0 s" in ctx and "Z41" in ctx
+    # solved plate: scale and field are there; the position waits for a
+    # known object (a field centre is not the object)
+    assert any(seg["field"] == "psc" for seg in second)
+    assert any(seg["field"] == "fov" for seg in second)
+    assert not any(seg["field"] == "pos" for seg in first)
+    assert not any(seg["field"] == "mag" for seg in first)
+    # the attached object wins the name, pins the position (this plate's
+    # own solution places it) and adds the CATALOGUE magnitude
     from nightscribe.core import coords
     cra, cdec = dlg.state.wcs.center()
     dlg.set_object({"name": "AT 2026zji", "ra": cra, "dec": cdec,
                     "mag": 17.1})
-    boxes = dlg._chart_boxes()
-    assert boxes["top_left"] == ["AT 2026zji"]
-    col, row = dlg.state.wcs.sky_to_pixel(cra, cdec)
-    era, edec = dlg.state.wcs.pixel_to_sky(col, row)
-    assert f"RA: {coords.ra_deg_to_hms(era)}" in boxes["top_right"]
-    assert f"Dec: {coords.dec_deg_to_dms(edec)}" in boxes["top_right"]
-    # a catalog magnitude from the project is NOT a calibration: no Mag
-    assert not any(ln.startswith("Mag: ") for ln in boxes["top_right"])
-    # a calibrated measurement this session is
+    first = dlg._chart_band()["lines"][0]
+    assert first[0]["text"] == "AT 2026zji"
+    pos = next(seg for seg in first if seg["field"] == "pos")
+    assert pos["role"] == "pos"
+    assert coords.ra_deg_to_hms(cra)[:8] in pos["text"]
+    cat = next(seg for seg in first if seg["field"] == "mag")
+    assert cat["role"] == "mag-cat" and cat["text"].endswith(" cat")
+    # a calibrated measurement THIS session beats it, in the measured colour
     dlg.tab_measure._last = {"mag": 16.391, "err": 0.04, "band": "V",
-                             "col": 100.0, "row": 200.0}
-    boxes = dlg._chart_boxes()
-    assert "Mag: 16.39 ± 0.04 (V)" in boxes["top_right"]
+                             "col": 100.0, "row": 200.0, "used": [1, 2, 3],
+                             "check": {"ok": True}}
+    first = dlg._chart_band()["lines"][0]
+    mag = next(seg for seg in first if seg["field"] == "mag")
+    assert mag["role"] == "mag"
+    assert mag["text"] == "16.39 ± 0.04 (V)"
     # ... and the position now speaks from the measured centroid
     ra, dec = dlg.state.wcs.pixel_to_sky(100.0, 200.0)
-    assert f"RA: {coords.ra_deg_to_hms(ra)}" in boxes["top_right"]
+    pos = next(seg for seg in first if seg["field"] == "pos")
+    assert coords.ra_deg_to_hms(ra)[:8] in pos["text"]
+    # a doubtful measurement wears the warning colour (the numbers decide)
+    dlg.tab_measure._last = {"mag": 16.391, "err": 0.30, "band": "V",
+                             "col": 100.0, "row": 200.0, "used": [1, 2, 3]}
+    first = dlg._chart_band()["lines"][0]
+    assert next(seg for seg in first
+                if seg["field"] == "mag")["role"] == "mag-doubt"
 
 
-def test_chart_boxes_toggle_default_comes_from_config(dlg, monkeypatch):
+def test_the_band_says_nothing_without_a_plate(dlg):
+    dlg.state.clear()
+    assert dlg._chart_band() == {"lines": []}
+
+
+def test_the_band_toggle_default_comes_from_config(dlg, monkeypatch):
+    # The plate's band says what it says by default (chart_data): the
+    # corner boxes' own switch (chart_boxes) belongs to the OTHER charts
+    # (the blink and the finder), which keep them.
     from nightscribe.config import config
-    monkeypatch.setitem(config._data, "chart_boxes", True)
+    monkeypatch.setitem(config._data, "chart_data", False)
     dlg.hide()
     dlg.show()                          # showEvent re-reads the default
-    assert dlg.btn_boxes.isChecked()
-    assert dlg.view.show_boxes
-    monkeypatch.setitem(config._data, "chart_boxes", False)
+    assert not dlg.btn_boxes.isChecked()
+    assert not dlg.view.show_data
+    monkeypatch.setitem(config._data, "chart_data", True)
     dlg.hide()
     dlg.show()
-    assert not dlg.btn_boxes.isChecked()
-    assert not dlg.view.show_boxes
+    assert dlg.btn_boxes.isChecked()
+    assert dlg.view.show_data
 
 
 # ------------------------------------- top-bar style (ADR-044 rev, 2026-09-24)
@@ -430,7 +447,7 @@ def test_topbar_text_mode_restores_the_labels(dlg, monkeypatch):
     assert dlg.btn_north.text() == "N"
     assert dlg.btn_scale.text() == "Scale"
     assert dlg.btn_annot.text() == "A"
-    assert dlg.btn_boxes.text() == "Boxes"
+    assert dlg.btn_boxes.text() == "Data"
     assert dlg.btn_mark.text() == "Mark"
     assert dlg.btn_solve.text() == "Solve astrometry…"   # unchanged either way
     assert dlg.lbl_zoom_hint.isVisible()

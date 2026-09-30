@@ -28,6 +28,7 @@ ACCENT2 = "#6ec1ff"  # cool blue — Earth, dark-spawn tints
 MUTED  = "#8a90a6"   # planet rings, the 1 AU ruler, grids, watermarks
 SUN    = "#ffd76e"   # the Sun marker
 DANGER = "#ff6b6b"   # safety warnings (does-not-fit, moon interference)
+GOOD   = "#46a758"   # a measurement you can trust (the plate's band)
 
 # Per-planet marker rings (kept distinct from the theme above so a chart
 # can tell Earth / Mercury / Venus / Mars apart at a glance).

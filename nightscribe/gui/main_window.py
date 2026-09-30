@@ -1036,6 +1036,8 @@ class MainWindow(QMainWindow):
                                      "cross")
         dlg.cmb_marker_style.setCurrentIndex(
             1 if config.get("marker_style", "ring") == "cross" else 0)
+        dlg.chk_chart_data.setChecked(
+            bool(config.get("chart_data", True)))
         dlg.chk_chart_boxes.setChecked(
             bool(config.get("chart_boxes", False)))
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
@@ -1148,6 +1150,7 @@ class MainWindow(QMainWindow):
         config.set("camera_model", dlg.edt_camera_model.text().strip())
         config.set("marker_style",
                    dlg.cmb_marker_style.currentData() or "ring")
+        config.set("chart_data", dlg.chk_chart_data.isChecked())
         config.set("chart_boxes", dlg.chk_chart_boxes.isChecked())
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())

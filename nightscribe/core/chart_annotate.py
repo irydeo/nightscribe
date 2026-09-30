@@ -257,6 +257,13 @@ def magnitude_role(measured):
     return ROLE_MAG
 
 
+# A header's camera name can be a 31-character serial
+# ("QHY42PRO-1d74db4888698d84c-QHYCCD"): a chart does not need that, and it
+# was eating the field of view out of the band. The full value is still in
+# the header and in the other charts' boxes.
+MAX_EQUIP_CHARS = 24
+
+
 def equipment_from_header(header, cfg=None):
     # The kit that took THIS plate, preferred over the observer's own
     # Settings: a colleague's frame says SXV-H18, and stamping the
@@ -282,7 +289,10 @@ def equipment_from_header(header, cfg=None):
         camera = str(cfg.get("camera_model") or "").strip()
         telescope = str(cfg.get("telescope_desc") or "").strip()
     parts = [p for p in (camera, telescope) if p]
-    return " · ".join(parts) or None
+    text = " · ".join(parts)
+    if len(text) > MAX_EQUIP_CHARS:
+        text = text[:MAX_EQUIP_CHARS - 1].rstrip() + "…"
+    return text or None
 
 
 def _seg(text, role, field):

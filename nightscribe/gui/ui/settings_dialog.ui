@@ -242,9 +242,16 @@
            </item>
            <item><widget class="QLabel" name="lblH_marker_style"><property name="text"><string>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
            <item>
+            <layout class="QHBoxLayout" name="row_chart_data">
+             <item><widget class="QLabel" name="lbl_chart_data"><property name="text"><string>Plate band:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_chart_data"><property name="text"><string>Say what the plate knows (position, magnitude, date, exposure, kit, station, scale, field)</string></property><property name="toolTip"><string>The plate's band, over the image: what the corner boxes used to say, with a colour per datum. The colour says how much to trust it: ink for what this plate's own solution places, dimmed for what is only the catalogue's, green for a magnitude measured here and red when its error or its caveats say be careful. Off, the band keeps the object's name only</string></property></widget></item>
+             <item><spacer name="hsp_chart_data"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
             <layout class="QHBoxLayout" name="row_chart_boxes">
-             <item><widget class="QLabel" name="lbl_chart_boxes"><property name="text"><string>Corner boxes:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-             <item><widget class="QCheckBox" name="chk_chart_boxes"><property name="text"><string>Stamp the metadata boxes on the charts</string></property></widget></item>
+             <item><widget class="QLabel" name="lbl_chart_boxes"><property name="text"><string>Other charts:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_chart_boxes"><property name="text"><string>Stamp the metadata boxes on the blink and the finder chart</string></property><property name="toolTip"><string>The corner boxes of the OTHER charts (the blink GIF/MP4 and the photometric sequence chart). The plate's own band in the editor is the setting above</string></property></widget></item>
              <item><spacer name="hsp_chart_boxes"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
             </layout>
            </item>

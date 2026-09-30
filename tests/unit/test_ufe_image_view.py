@@ -314,12 +314,17 @@ def test_snap_locks_faint_sources_on_structure(view, qapp):
 
 # ------------------------------------------------- chart boxes (ADR-046)
 
-def _boxes_sample():
-    return {"top_left": ["AT 2026acka"],
-            "top_right": ["Date: 2026-09-20 21:06 UT", "RA: 22 02 16.4",
-                          "Dec: +39 49 46.6", "Mag: 17.10 (G)"],
-            "bottom_left": ["Obs: F. Calvo", "Stn: Z41",
-                            "PSc: 1.07″/px", "FOV: 6.8 × 6.8′"]}
+def _band_sample():
+    # the plate's heading, as core/chart_annotate decides it: two lines of
+    # segments, each with its role and the field the drop order uses
+    return {"lines": [
+        [{"text": "AT 2026acka", "role": "name", "field": "name"},
+         {"text": "RA 22 02 16.4 · Dec +39 49 46.6", "role": "pos",
+          "field": "pos"},
+         {"text": "17.10 (G)", "role": "mag", "field": "mag"}],
+        [{"text": "2026-09-20 21:06 UT", "role": "context", "field": "date"},
+         {"text": "Stn Z41", "role": "context", "field": "stn"},
+         {"text": "1.07″/px", "role": "context", "field": "psc"}]]}
 
 
 def test_cross_marker_items_span_the_plate(view):
@@ -340,37 +345,44 @@ def test_cross_marker_items_span_the_plate(view):
     assert all(it.pen().isCosmetic() for it in items)
 
 
-def test_boxes_follow_the_toggle_on_export(view, tmp_path):
+def test_the_band_follows_the_toggle_on_export(view, tmp_path):
+    # The band burns into the exported PNG (what you see is what lands in
+    # the file) and the toggle governs what it says: with the data off it
+    # keeps the object's name, which is the plate's name.
     view._state.load(MONO)
-    view.set_boxes_provider(_boxes_sample)
-    a = view.export_png(tmp_path / "off.png").read_bytes()    # boxes off
-    view.set_hud(boxes=True)
-    b = view.export_png(tmp_path / "on.png").read_bytes()
-    assert a != b                         # the boxes burn into the file
-    view.set_hud(boxes=False)
-    assert view.export_png(tmp_path / "off2.png").read_bytes() == a
-    view.set_boxes_provider(None)
-    assert view.export_png(tmp_path / "off3.png").read_bytes() == a
+    view.set_band_provider(_band_sample)
+    full = view.export_png(tmp_path / "full.png").read_bytes()
+    view.set_hud(data=False)                  # only the name
+    name_only = view.export_png(tmp_path / "name.png").read_bytes()
+    assert full != name_only
+    view.set_hud(data=True)
+    assert view.export_png(tmp_path / "full2.png").read_bytes() == full
+    view.set_band_provider(None)              # no band at all
+    assert view.export_png(tmp_path / "none.png").read_bytes() != full
 
 
-def test_boxes_paint_needs_no_wcs(view, tmp_path):
-    # the name and the site lines paint even on an unsolved plate
+def test_the_band_paints_without_a_solution(view, tmp_path):
+    # The object's name, the frame's date and its exposure do not need a
+    # WCS: the band is there on an unsolved plate too (and the position it
+    # shows is marked as the catalogue's).
+    from nightscribe.core import chart_annotate as ca
     from test_fits_annotate import _make_fits
     view._state.load(_make_fits(tmp_path / "plain.fits"))
-    view.set_boxes_provider(lambda: {"top_left": ["Thing"]})
-    a = view.export_png(tmp_path / "off.png").read_bytes()
-    view.set_hud(boxes=True)
-    b = view.export_png(tmp_path / "on.png").read_bytes()
-    assert a != b
+    view.set_band_provider(lambda: ca.build_band(
+        name="Thing", meta={"date_obs": "2026-09-30T21:06:00",
+                            "exptime_s": 30.0}))
+    with_band = view.export_png(tmp_path / "with.png").read_bytes()
+    view.set_band_provider(None)
+    without = view.export_png(tmp_path / "without.png").read_bytes()
+    assert with_band != without
 
 
-def test_boxes_provider_hiccup_never_breaks_the_paint(view, tmp_path):
+def test_a_band_provider_hiccup_never_breaks_the_paint(view, tmp_path):
     view._state.load(MONO)
 
     def boom():
-        raise RuntimeError("no boxes today")
-    view.set_boxes_provider(boom)
-    view.set_hud(boxes=True)
+        raise RuntimeError("no band today")
+    view.set_band_provider(boom)
     out = view.export_png(tmp_path / "fine.png")
     assert out.exists() and out.stat().st_size > 0
     view.viewport().repaint()                 # the screen paint survives
@@ -378,22 +390,20 @@ def test_boxes_provider_hiccup_never_breaks_the_paint(view, tmp_path):
 
 def test_the_readout_sits_low_and_the_scale_bar_steps_aside(view, tmp_path):
     # The readout is anchored to the bottom-left (see
-    # test_the_probe_readout_is_anchored_to_the_corner), so the corner the
-    # metadata boxes need is free and the boxes no longer have to duck
-    # anything. What lives down there now is the scale bar, and IT steps up
-    # while the readout is showing: the two must never overlap.
+    # test_the_probe_readout_is_anchored_to_the_corner) and the band lives
+    # at the top, so the two cannot meet. What shares the bottom with the
+    # readout is the scale bar, and IT steps up while the readout shows.
     from PySide6.QtCore import QPointF, QRectF
     view._state.load(MONO)
     view.set_pick_cursor(True)
     _x, y_plain = view._tooltip_anchor_pos(QPointF(3, 3),
                                            QRectF(0, 0, 50, 20))
-    view.set_boxes_provider(_boxes_sample)
-    view.set_hud(boxes=True)
-    view.export_png(tmp_path / "boxes.png")
-    assert view._boxes_tl_h > 0
-    _x, y_boxed = view._tooltip_anchor_pos(QPointF(3, 3),
-                                           QRectF(0, 0, 50, 20))
-    assert y_boxed == pytest.approx(y_plain)      # the boxes do not move it
+    view.set_band_provider(_band_sample)
+    view.export_png(tmp_path / "band.png")
+    assert view._title_h > 0                      # the band is up there
+    _x, y_banded = view._tooltip_anchor_pos(QPointF(3, 3),
+                                            QRectF(0, 0, 50, 20))
+    assert y_banded == pytest.approx(y_plain)     # the band does not move it
     # the scale bar, though, steps up by the readout's own height
     class _Spy:
         def __init__(self):
@@ -414,11 +424,11 @@ def test_the_readout_sits_low_and_the_scale_bar_steps_aside(view, tmp_path):
     spy = _Spy()
     view._tooltip = type("T", (), {"boundingRect": lambda self: QRectF(
         0, 0, 80, 24)})()
-    view._paint_scale(spy, 600, 400, 1.0, right=False)
+    view._paint_scale(spy, 600, 400, 1.0)
     ducked = min(y for line in spy.lines for y in line)
     spy2 = _Spy()
     view._tooltip = None
-    view._paint_scale(spy2, 600, 400, 1.0, right=False)
+    view._paint_scale(spy2, 600, 400, 1.0)
     plain = min(y for line in spy2.lines for y in line)
     assert ducked < plain                         # the bar moved UP
     assert plain - ducked >= 24                   # by the readout's height

@@ -66,6 +66,17 @@ def astap_dir():
     return p
 
 
+def log_path():
+    # @return: Path of the application log. It lives in the app's own data
+    #          folder (the same place as the database) and it exists because
+    #          a GUI launched from a menu has NO console: a report like "a
+    #          dialog appears and disappears and I do not know what happens"
+    #          left no trace anywhere. Help > Open the log shows this file.
+    p = data_dir()
+    p.mkdir(parents=True, exist_ok=True)
+    return p / "nightscribe.log"
+
+
 def docs_dir():
     # @return: Path to the documentation folder (docs/ bundled by the
     # PyInstaller spec, or the repository one when running from source)

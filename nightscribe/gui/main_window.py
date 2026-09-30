@@ -569,6 +569,7 @@ class MainWindow(QMainWindow):
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_sources.triggered.connect(self.on_sources)
         self._menus.action_docs.triggered.connect(self.on_docs)
+        self._menus.action_log.triggered.connect(self.on_open_log)
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_campaigns.triggered.connect(
@@ -1304,6 +1305,22 @@ class MainWindow(QMainWindow):
                     "COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA "
                     "Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI "
                     "Legacy Survey · CDS hips2fits"))
+
+    def on_open_log(self):
+        # Help > Open the log: the file the app writes while it runs, so a
+        # report like "a dialog appeared and nothing happened" can be
+        # answered with what really happened. Opening it is the OS's job;
+        # the path also lands in the status bar (for a file manager).
+        # @return: None
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        path = paths.log_path()
+        if not path.exists():
+            self.statusBar().showMessage(
+                self.tr("No log yet: %1").replace("%1", str(path)), 8000)
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        self.statusBar().showMessage(str(path), 8000)
 
     def on_docs(self):
         # Opens the in-GUI documentation browser (Help > Documentation):

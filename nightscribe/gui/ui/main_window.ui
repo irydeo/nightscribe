@@ -90,6 +90,10 @@
   <action name="action_docs">
     <property name="text"><string>Technical Documentation</string></property>
   </action>
+  <action name="action_log">
+    <property name="text"><string>Open the log…</string></property>
+    <property name="toolTip"><string>What the application has been doing, written while it runs: if something failed without saying why, the answer is in here</string></property>
+  </action>
  </widget>
  <resources/>
  <connections/>

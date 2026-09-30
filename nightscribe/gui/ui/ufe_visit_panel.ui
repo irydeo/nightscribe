@@ -33,8 +33,8 @@
    <item><widget class="QLabel" name="lbl_frame_file"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
    <item>
     <widget class="QPushButton" name="btn_solve_visit">
-     <property name="toolTip"><string>Solve every frame of this visit in one go. A visit is one field, so the project's own coordinates point the solver at it: each frame takes a moment instead of a minute of searching the sky. Frames that already carry a WCS are skipped, and the solution is written into each FITS (needs “Save the solved WCS in the FITS” in Settings)</string></property>
-     <property name="text"><string>Solve the visit…</string></property>
+     <property name="toolTip"><string>Astronomy of the whole visit in one go: it is what the visit's PRODUCTS need (the astrometry report and the EXOTIC reduction of a transit), not the series, which measures on the reference plate and registers the rest. A visit is one field, so the project's own coordinates point the solver at it: each frame takes a moment instead of a minute of searching the sky. Frames that already carry a WCS are skipped, and the solution is written into each FITS (needs “Save the solved WCS in the FITS” in Settings)</string></property>
+     <property name="text"><string>Solve the visit's astrometry…</string></property>
     </widget>
    </item>
    <item><widget class="QWidget" name="ph_series"/></item>

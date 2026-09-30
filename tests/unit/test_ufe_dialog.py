@@ -818,7 +818,13 @@ def test_the_visit_solve_button_needs_frames_and_the_write_option(
     btn = dlg.visit_panel.btn_solve_visit
     _visit(dlg, [])
     assert not btn.isEnabled()
+    # and with nothing to solve it is not even shown: it is prep for the
+    # visit's PRODUCTS (the astrometry report and EXOTIC), not a step of
+    # the measurement, and an always-there dead button is what made the
+    # observer ask "no entiendo qué hace ahí"
+    assert btn.isHidden()
     _visit(dlg, [MONO, MONO])
+    assert not btn.isHidden()
     monkeypatch.setitem(config._data, "solve_save", True)
     dlg._sync_visit_solve()
     assert btn.isEnabled()

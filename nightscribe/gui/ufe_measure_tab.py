@@ -1181,6 +1181,7 @@ class UfeMeasureTab(QWidget):
         if self._series_attached:
             # which scopes this project offers (one visit, or all of them)
             self._sync_series_scope()
+            self._fit_series_hint()
             self._update_series_counter(self._series_context() or {})
         if not self._series_attached and self._series_worker is not None:
             self._series_worker.cancel()
@@ -1190,6 +1191,32 @@ class UfeMeasureTab(QWidget):
             self.chk_series_live.blockSignals(True)
             self.chk_series_live.setChecked(False)
             self.chk_series_live.blockSignals(False)
+
+    def _fit_series_hint(self):
+        # The block's header is a word-wrapped label, and a word-wrapped
+        # QLabel does not always ask for the height its text needs: the
+        # sizeHint is computed for a width that changes later. Measured in
+        # the real panel: it reported 54 px for a text that needs four
+        # lines, so the last one came out half cut ("...quality flags" with
+        # the ")" missing). Asking the label itself, at its REAL width, is
+        # the honest fix: the observer asked for that text to be readable.
+        # @return: None
+        lbl = getattr(self, "lbl_series_hint", None)
+        # a width of a few pixels is not a width: a wrapped label asked for
+        # its height at 1 px wants one line per word, which would blow the
+        # block up. The resize event refits it once there is a real width.
+        if lbl is None or not lbl.isVisible() or lbl.width() < 50:
+            return
+        need = lbl.heightForWidth(lbl.width())
+        if need and need > 0:
+            lbl.setMinimumHeight(int(need))
+
+    def resizeEvent(self, event):
+        # A wider or narrower panel needs another number of lines: the
+        # header is refitted here, where the width is known.
+        # @return: None
+        super().resizeEvent(event)
+        self._fit_series_hint()
 
     def _series_context(self, scope=None):
         # @args: scope - "visit" | "project" (None: the one the observer
@@ -1213,21 +1240,28 @@ class UfeMeasureTab(QWidget):
         return (cmb.currentData() if cmb is not None else None) or "visit"
 
     def _sync_series_scope(self):
-        # The multi-night scope is only OFFERED when the project really has
-        # more than one visit with frames: otherwise it is the same thing
-        # under another name, and a switch that changes nothing is noise.
+        # The selector is ALWAYS in the block: with one visit with frames
+        # there is nothing to choose, so it stays there DISABLED and says
+        # why (a control that disappears teaches nobody that the feature
+        # exists, and the observer asked exactly that: "no veo lo del modo
+        # multinoche, ¿dónde está?").
         # @return: None
         cmb = getattr(self, "cmb_series_scope", None)
         if cmb is None:
             return
-        # the host says how many visits with frames the project has: the
-        # multi-night scope is a choice only when there is more than one
+        if not hasattr(self, "_scope_tip"):
+            self._scope_tip = cmb.toolTip()
         ctx = self._series_context() or {}
         wide = int(ctx.get("visits") or 1) > 1
-        cmb.setVisible(wide)
+        cmb.setVisible(True)
+        cmb.setEnabled(wide)
+        cmb.setToolTip(self._scope_tip if wide else self.tr(
+            "This project has one visit with frames, so there is nothing to "
+            "choose yet: measure the next night and this becomes a choice "
+            "between this visit and every visit of the project."))
         lbl = getattr(self, "lbl_series_scope", None)
         if lbl is not None:
-            lbl.setVisible(wide)
+            lbl.setVisible(True)
         if not wide and cmb.currentIndex() != 0:
             cmb.blockSignals(True)
             cmb.setCurrentIndex(0)

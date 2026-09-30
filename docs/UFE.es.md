@@ -110,10 +110,15 @@ referencia), **Resolver la visita…** y, en proyectos de tránsito, los botones
 **reducción EXOTIC**. La secuencia ya guardada del proyecto se carga sola al
 abrir la visita.
 
-**Resolver la visita…** resuelve de una vez todas las tomas de la visita. Una
-visita es un solo campo y el proyecto sabe dónde está, así que cada toma tarda
-un momento en vez de un minuto de búsqueda a ciegas: las tomas que ya traen WCS
-se saltan, y cada solución se escribe en su propio FITS (necesita «Guardar la
+**Resolver la astrometría de la visita…** es preparación, no medida: resuelve
+de una vez todas las tomas de la visita, y lo que lo necesita son los
+**productos de la visita** (el informe de astrometría y la reducción EXOTIC de
+un tránsito), no la serie, que mide sobre la placa de referencia y registra el
+resto. Con la visita sin tomas el botón no aparece (no hay nada que resolver).
+Una visita es un solo campo y el proyecto sabe dónde está, así que cada toma
+tarda un momento en vez de un minuto de búsqueda a ciegas: las tomas que ya
+traen WCS se saltan, y cada solución se
+escribe en su propio FITS (necesita «Guardar la
 WCS resuelta en el FITS» en Ajustes; con eso apagado el botón lo explica en vez
 de dejar soluciones que morirían al cerrar). Si el proyecto no tiene
 coordenadas, la primera toma se resuelve a ciegas y las demás siguen su campo.

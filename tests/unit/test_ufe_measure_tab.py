@@ -1622,12 +1622,14 @@ def test_the_panel_always_describes_the_chart_on_screen(dlg, qapp):
 
 
 def test_the_result_box_has_room_and_a_scrollbar(dlg):
-    # Reported: the "Photometric series" messages needed more height and a
-    # scrollbar "just in case". The summary of a night with four flags, a
-    # per-night detrend and two warnings is LONG.
+    # Reported twice: the "Photometric series" messages needed more height
+    # and a scrollbar "just in case". The summary of a night with four
+    # flags, a per-night detrend and two warnings is LONG, and with wide
+    # system fonts the box was cramped (the observer asked for more height
+    # again: 150 -> 240 px).
     from PySide6.QtCore import Qt
     box = dlg.tab_measure.lbl_result
-    assert box.minimumHeight() >= 150
+    assert box.minimumHeight() >= 240
     assert box.verticalScrollBarPolicy() != Qt.ScrollBarAlwaysOff
     assert box.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
     assert box.isReadOnly()
@@ -2235,11 +2237,15 @@ def test_manual_centre_pins_the_measurement(dlg):
 
 # ------------- the multi-night scope (asked 2026-09-30) ---------------
 
-def test_the_scope_selector_only_appears_with_several_visits(dlg):
+def test_the_scope_selector_is_always_there_and_explains_itself(dlg):
     # "En las secuencias multi-noche se han de cargar las imágenes de todas
     # las visitas": the scope is offered when the project really has more
-    # than one visit with frames (the host says how many); with one visit it
-    # is the same thing under another name and stays hidden.
+    # than one visit with frames (the host says how many).
+    #
+    # And it is ALWAYS in the block, on its own row: the observer asked
+    # "no veo lo del modo multinoche, ¿dónde está?", so with one visit it
+    # stays visible and DISABLED, saying why, instead of disappearing (a
+    # control that hides teaches nobody that the feature exists).
     tab = dlg.tab_measure
 
     def ctx(scope="visit"):
@@ -2247,16 +2253,23 @@ def test_the_scope_selector_only_appears_with_several_visits(dlg):
                 "visits": 1, "scope": scope}
 
     dlg.set_series_hook(ctx)
-    assert tab.cmb_series_scope.isHidden()
-    assert tab.lbl_series_scope.isHidden()
+    assert not tab.cmb_series_scope.isHidden()
+    assert not tab.lbl_series_scope.isHidden()
+    assert not tab.cmb_series_scope.isEnabled()
+    assert "one visit with frames" in tab.cmb_series_scope.toolTip()
+    # on its own row, and wide enough to read its options whole
+    row = tab.cmb_series_scope.parent().layout()
+    assert row is not None and row.indexOf(tab.lbl_series_frames) < 0
+    need = tab.cmb_series_scope.fontMetrics().horizontalAdvance("all visits")
+    assert tab.cmb_series_scope.minimumSizeHint().width() >= need
 
     def ctx2(scope="visit"):
         return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
                 "visits": 3, "scope": scope}
 
     dlg.set_series_hook(ctx2)
-    assert not tab.cmb_series_scope.isHidden()
-    assert not tab.lbl_series_scope.isHidden()
+    assert tab.cmb_series_scope.isEnabled()
+    assert "all the visits" in tab.cmb_series_scope.toolTip().lower()
 
 
 def test_the_multi_night_scope_steps_aside_live_and_draws_the_project(dlg):
@@ -2318,3 +2331,20 @@ def test_manual_centre_dialog_follows_the_checkbox(dlg):
     assert tab._nudge[0] == pytest.approx(0.1)
     tab.chk_manual_centre.setChecked(False)
     assert not tab._centre.isVisible()
+
+
+def test_the_block_header_is_never_cut(dlg, qapp):
+    # Reported: "haz más grande la caja de texto (más altura) del grupo, la
+    # que está al principio". The header of the block is a word-wrapped
+    # label, and Qt does not always ask for the height its text needs (the
+    # sizeHint is computed for a width that changes later: measured, 54 px
+    # for a text of four lines, so the last one came out half cut). The
+    # block refits it at its REAL width.
+    tab = dlg.tab_measure
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": ["/tmp/a.fits"], "visits": 1})
+    qapp.processEvents()
+    lbl = tab.lbl_series_hint
+    assert lbl.isVisible()
+    assert lbl.width() >= 50
+    assert lbl.height() >= lbl.heightForWidth(lbl.width())

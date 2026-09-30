@@ -979,10 +979,20 @@ class UfeDialog(QDialog):
         return worker is not None and worker.isRunning()
 
     def _sync_visit_solve(self):
-        # The visit's own button: it needs frames and the write option. A
-        # batch that leaves 35 solutions in memory only would die with the
-        # session, so with solve_save off the button says WHY instead of
-        # doing a useless job (the observer's own decision, ADR-051).
+        # The visit's own button: it needs frames and the write option.
+        #
+        # WHAT IT IS FOR (asked: "el botón 'Solve the visit' no entiendo qué
+        # hace ahí"): it solves the astrometry of every frame of the visit in
+        # one go, which is what the visit's PRODUCTS need: the MPC report
+        # (in the visit's window) and the EXOTIC reduction of a transit (the
+        # block right below). The series does NOT need it: it measures on
+        # the reference plate and registers the rest.
+        #
+        # With no frames there is nothing to solve, so the button is not
+        # even shown (a disabled button that explains nothing is how a door
+        # looks broken). With frames and the write option off it stays
+        # visible and DISABLED, saying why: a batch of 35 solutions in
+        # memory only would die with the session (ADR-051).
         # @return: None
         btn = getattr(self.visit_panel, "btn_solve_visit", None)
         if btn is None:
@@ -990,6 +1000,7 @@ class UfeDialog(QDialog):
         from ..config import config
         frames = bool(self._visit_paths())
         saving = bool(config.get("solve_save", True))
+        btn.setVisible(frames)
         btn.setEnabled(frames and saving and not self._visit_running())
         btn.setToolTip(self._visit_solve_tip if (frames and saving) else
                        self.tr("Solving the visit writes the solution into "

@@ -107,7 +107,12 @@ With the visit open, the left panel also carries the **frame navigator**
 **Solve the visit...** and, in transit projects, the **EXOTIC** reduction
 buttons. The project's saved sequence loads by itself when the visit opens.
 
-**Solve the visit...** solves every frame of the visit in one go. A visit is
+**Solve the visit's astrometry...** is preparation, not measurement: it
+solves every frame of the visit in one go, and what needs it are the visit's
+**products** (the astrometry report and the EXOTIC reduction of a transit),
+not the series, which measures on the reference plate and registers the rest.
+With no frames in the visit the button is not shown at all (there is nothing
+to solve). A visit is
 one field, and the project knows where it is, so each frame takes a moment
 instead of a minute of blind search: frames that already carry a WCS are
 skipped, and each solution is written into its own FITS (it needs "Save the

@@ -234,7 +234,7 @@
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>200</height>
+       <height>240</height>
       </size>
      </property>
      <property name="readOnly">
@@ -374,7 +374,7 @@
       <item>
        <widget class="QLabel" name="lbl_series_hint">
         <property name="text">
-         <string>Measure every frame of this visit as one series (the same plate recipe per frame, zero point per frame, quality flags).</string>
+         <string>Measure every frame of the visit(s) chosen below as one series (the same plate recipe per frame, zero point per frame, quality flags).</string>
         </property>
         <property name="wordWrap">
          <bool>true</bool>
@@ -548,7 +548,7 @@
        </widget>
       </item>
       <item>
-       <layout class="QHBoxLayout" name="row_series_info">
+       <layout class="QHBoxLayout" name="row_series_scope">
         <item>
          <widget class="QLabel" name="lbl_series_scope">
           <property name="text">
@@ -559,7 +559,19 @@
         <item>
          <widget class="QComboBox" name="cmb_series_scope">
           <property name="toolTip">
-           <string>Which frames the series measures. THIS VISIT is the night you have open (the normal way). ALL THE VISITS measures every night of the project in ONE pass: each night's points are filed in its own visit, the whole pass is undone with one click, and the curve shows all the nights together (one pass per night). Only offered when the project has more than one visit with frames</string>
+           <string>Which frames the series measures. THIS VISIT is the night you have open (the normal way). ALL THE VISITS measures every night of the project in ONE pass: each night's points are filed in its own visit, the whole pass is undone with one click, and the curve shows all the nights together (one pass per night). It needs a project with more than one visit with frames: with only one, this stays off and says why</string>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>190</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
           </property>
           <item>
            <property name="text">
@@ -573,6 +585,10 @@
           </item>
          </widget>
         </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_series_info">
         <item>
          <widget class="QLabel" name="lbl_series_frames">
           <property name="text">

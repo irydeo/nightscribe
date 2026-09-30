@@ -326,13 +326,19 @@ def test_propose_fills_comps_and_check(dlg):
     assert len(tab._entry_items) == 2 * len(tab._entries)
 
 
-def test_propose_without_a_field_points_the_way(dlg):
-    # No field yet: the button used to do nothing and stay silent, which
-    # the observer read as "it is thinking". It must now say what to do.
+def test_propose_without_a_field_generates_it(dlg, monkeypatch):
+    # The manual window's Propose used to answer "Generate the field first":
+    # a step this button needs, asked of the observer, who had to remember
+    # the order of two buttons. It does it now (the field, and the solve
+    # behind it when the plate has none) and proposes when it lands.
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
+                        lambda *a, **kw: _FakeFieldWorker(
+                            *a, field=_field(dlg), **kw))
     tab = dlg.tab_compare
     assert tab._field is None
     tab._on_propose()
-    assert "Generate the field first" in tab.lbl_status.text()
+    assert tab._field is not None                 # the field was built
+    assert len(tab._entries) > 0                  # and proposed
 
 
 def test_table_edits_flow_to_the_sequence(dlg):
@@ -940,27 +946,80 @@ def test_a_reproposal_that_changes_nothing_says_so(dlg):
         "igual que antes" in tab.lbl_status.text()
 
 
-def test_build_without_a_wcs_keeps_the_sequence_it_already_has(dlg,
-                                                              tmp_path):
-    # Reported, and reproduced on the observer's own V0526 Per frame (whose
-    # header carries no WCS): pressing "Build the sequence" started a blind
-    # solve, the wait dialog came and went, and nothing was built. A
-    # catalogue field NEEDS a solved plate; when the project already has its
-    # sequence, the honest answer is that the sequence is here and its rings
-    # need a solved plate.
-    from test_fits_annotate import _make_fits
-    dlg.state.load(_make_fits(tmp_path / "plain.fits"))   # no WCS cards
+_WCS_CARDS = ("CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2", "CTYPE1", "CTYPE2",
+              "CD1_1", "CD1_2", "CD2_1", "CD2_2")
+
+
+def _unsolved(dlg):
+    # The real fixture plate (a real star field) arriving without its WCS:
+    # the cards are taken out of the header and kept for the fake solve.
+    # This is the observer's own case, a plate that needs solving before
+    # anything can be built on it.
+    dlg.state.load(MONO)
+    cards = {k: dlg.state.header[k] for k in _WCS_CARDS
+             if k in dlg.state.header}
+    for key in cards:
+        dlg.state.header.pop(key)
+    dlg.state.wcs = None
+    return cards
+
+
+def test_build_without_a_wcs_solves_first_and_then_builds_the_field(
+        dlg, monkeypatch):
+    # Reported: "Build the sequence needs the field generated first,
+    # otherwise it finds nothing". With a plate that has no WCS and the
+    # project's sequence already loaded (the normal case in a visit, where
+    # the saved sequence arrives by itself), the click used to stop and
+    # explain that the rings needed a solved plate: no solve, no field, no
+    # proposal. That exception was written when a blind solve took 66 s; it
+    # is a tenth of a second now (ADR-051: the project's field points it),
+    # so the pipeline is the same whatever the plate carries.
+    cards = _unsolved(dlg)
     tab = dlg.tab_compare
     assert dlg.state.wcs is None
-    # the project's sequence, loaded by the visit
+    tab.spn_mag.setValue(12.5)                  # the proposal's anchor
     tab._entries = [{"name": "Comp1", "kind": "comp",
                      "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}}]
-    calls = []
-    tab._on_generate = lambda: calls.append(True)
+    asked = []
+
+    def fake_request(after, on_fail=None):
+        # what the real solve does: the WCS lands and the caller goes on
+        asked.append(True)
+        dlg.state.set_wcs_cards(cards)
+        after()
+
+    monkeypatch.setattr(dlg, "request_wcs", fake_request)
+    monkeypatch.setattr("nightscribe.gui.workers.UfeFieldWorker",
+                        lambda *a, **kw: _FakeFieldWorker(
+                            *a, field=_field(dlg), **kw))
     tab.btn_auto.click()
-    assert calls == []                       # no catalogue, no blind solve
-    assert len(tab._entries) == 1            # and the sequence is untouched
-    assert "no solved position" in tab.lbl_status.text()
+    assert asked                                # the plate was solved first
+    assert tab._field is not None               # the field was built
+    assert len(tab._entries) > 1                # and the proposal landed
+
+
+def test_a_failed_solve_keeps_the_sequence_and_says_why(dlg, monkeypatch):
+    # The other half of the contract: when the plate cannot be solved, the
+    # sequence the observer already had is kept and the line says why. No
+    # rebuild may leave them with less than they had.
+    _unsolved(dlg)
+    tab = dlg.tab_compare
+    tab._entries = [{"name": "Comp1", "kind": "comp",
+                     "star": {"ra": 30.0, "dec": 45.0, "mag": 12.0}}]
+    monkeypatch.setattr(dlg, "request_wcs",
+                        lambda after, on_fail=None: on_fail())
+    tab.btn_auto.click()
+    assert len(tab._entries) == 1               # nothing was lost
+    assert "could not be solved" in tab.lbl_status.text()
+
+
+def test_build_without_a_plate_says_so(dlg):
+    # No plate, nothing to query around: it used to return in silence and
+    # the observer read it as "it is thinking".
+    tab = dlg.tab_compare
+    dlg.state.clear()
+    tab.btn_auto.click()
+    assert "Load a plate first" in tab.lbl_status.text()
 
 
 # ---------------- H2/H3: the button decides and says it ---------------

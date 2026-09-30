@@ -118,6 +118,14 @@ One frame that fails does not stop the batch: it is counted and named in the
 status line. A plate opened from a project is also solved with its field, so
 the Solve button of the top bar answers in a moment.
 
+**Build the sequence...** does the whole pipeline in one click: if the plate
+has no WCS it solves it first (the project's field points the solver, so it
+is a moment), then it queries the catalogue (the field) and proposes. The
+manual window's **Propose sequence** fills in the missing step the same way,
+so the order of the buttons is never something to remember. A rebuild that
+cannot deliver (the query fails, nothing lands on this plate, no usable
+comparison star) keeps the sequence you already had and says why.
+
 * **Target** and **Target mag** pre-fill what the project knows; the
   approximate magnitude guides the proposal.
 * **Generate field** queries the catalog (Gaia EDR3 or APASS DR9) and

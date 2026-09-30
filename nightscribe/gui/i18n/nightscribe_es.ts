@@ -7237,56 +7237,56 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>Ajuste manual…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1271"/>
+        <location filename="../ufe_compare_tab.py" line="1292"/>
         <source>Sequence ({0})…</source>
         <translation>Secuencia ({0})…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="339"/>
+        <location filename="../ufe_compare_tab.py" line="343"/>
         <source>The plate has no WCS: solve it with «Solve astrometry…» to build the comparison field.</source>
         <translation>La placa no tiene WCS: resuélvela con «Resolver astrometría…» para construir el campo de comparación.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="350"/>
-        <location filename="../ufe_compare_tab.py" line="394"/>
+        <location filename="../ufe_compare_tab.py" line="354"/>
+        <location filename="../ufe_compare_tab.py" line="398"/>
         <source>The sequence field is empty: build it with «Generate field…», or restore the one saved with the plate.</source>
         <translation>El campo de la secuencia está vacío: constrúyelo con «Generar campo…», o restaura el guardado con la placa.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="398"/>
+        <location filename="../ufe_compare_tab.py" line="402"/>
         <source>No plate loaded: load a FITS or fetch the field from the survey.</source>
         <translation>No hay placa cargada: carga un FITS o trae el campo del survey.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="539"/>
+        <location filename="../ufe_compare_tab.py" line="543"/>
         <source>Survey field</source>
         <translation>Campo del survey</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="540"/>
+        <location filename="../ufe_compare_tab.py" line="544"/>
         <source>Object or field name (SIMBAD):</source>
         <translation>Nombre del objeto o campo (SIMBAD):</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="555"/>
-        <location filename="../ufe_compare_tab.py" line="556"/>
+        <location filename="../ufe_compare_tab.py" line="559"/>
+        <location filename="../ufe_compare_tab.py" line="560"/>
         <source>Downloading the survey field…</source>
         <translation>Descargando el campo del survey…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="557"/>
-        <location filename="../ufe_compare_tab.py" line="603"/>
-        <location filename="../ufe_compare_tab.py" line="678"/>
+        <location filename="../ufe_compare_tab.py" line="561"/>
+        <location filename="../ufe_compare_tab.py" line="607"/>
+        <location filename="../ufe_compare_tab.py" line="684"/>
         <source>Comparison field</source>
         <translation>Campo de comparación</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="584"/>
+        <location filename="../ufe_compare_tab.py" line="588"/>
         <source>The survey download failed (offline?). Try again later.</source>
         <translation>La descarga del survey falló (¿sin conexión?). Inténtalo más tarde.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="592"/>
+        <location filename="../ufe_compare_tab.py" line="596"/>
         <source>Field loaded: {0}</source>
         <translation>Campo cargado: {0}</translation>
     </message>
@@ -7296,151 +7296,146 @@ Doble clic en una fila para abrir su proyecto. Esta franja lee la caché de la �
         <translation>La placa no tiene WCS y no se pudo resolver: usa «Resolver astrometría…» o revisa el resolutor en Ajustes.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="655"/>
+        <location filename="../ufe_compare_tab.py" line="654"/>
+        <source>Load a plate first (or fetch the field from the survey with «DSS2…»): the catalogue is queried around its centre.</source>
+        <translation>Carga antes una placa (o trae el campo del survey con «DSS2…»): el catálogo se consulta alrededor de su centro.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_compare_tab.py" line="661"/>
         <source>The plate has no WCS: solving it to build the comparison field…</source>
         <translation>La placa no tiene WCS: resolviéndola para construir el campo de comparación…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="671"/>
         <location filename="../ufe_compare_tab.py" line="677"/>
+        <location filename="../ufe_compare_tab.py" line="683"/>
         <source>Querying the catalog…</source>
         <translation>Consultando el catálogo…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="711"/>
+        <location filename="../ufe_compare_tab.py" line="717"/>
         <source>The field landed but its handling failed: {0}</source>
         <translation>El campo llegó pero su tratamiento falló: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="753"/>
+        <location filename="../ufe_compare_tab.py" line="759"/>
         <source>The catalog query failed (offline?). Try again later.</source>
         <translation>La consulta al catálogo falló (¿sin conexión?). Inténtalo más tarde.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="776"/>
+        <location filename="../ufe_compare_tab.py" line="782"/>
         <source>VSX check failed</source>
         <translation>la comprobación VSX falló</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="778"/>
+        <location filename="../ufe_compare_tab.py" line="784"/>
         <source>{0} · field {1}′ · {2} catalog stars on the plate · {3} known variables</source>
         <translation>{0} · campo de {1}′ · {2} estrellas de catálogo en la placa · {3} variables conocidas</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="602"/>
-        <location filename="../ufe_compare_tab.py" line="704"/>
-        <location filename="../ufe_compare_tab.py" line="794"/>
+        <location filename="../ufe_compare_tab.py" line="606"/>
+        <location filename="../ufe_compare_tab.py" line="710"/>
+        <location filename="../ufe_compare_tab.py" line="800"/>
         <source>Proposing the sequence…</source>
         <translation>Proponiendo la secuencia…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="520"/>
+        <location filename="../ufe_compare_tab.py" line="524"/>
         <source>{0}: {1} in the sequence ({2} placed on this frame)</source>
         <translation>{0}: {1} en la secuencia ({2} situadas en esta toma)</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1006"/>
+        <location filename="../ufe_compare_tab.py" line="1012"/>
         <source>{0} is a known variable: it can never be a comparison.</source>
         <translation>{0} es una variable conocida: nunca puede ser comparación.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1033"/>
+        <location filename="../ufe_compare_tab.py" line="1039"/>
         <source>VSX variable</source>
         <translation>Variable VSX</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1034"/>
+        <location filename="../ufe_compare_tab.py" line="1040"/>
         <source>variables cannot be comparisons</source>
         <translation>las variables no sirven de comparación</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1036"/>
+        <location filename="../ufe_compare_tab.py" line="1042"/>
         <source>click: add/remove from the sequence</source>
         <translation>clic: añadir/quitar de la secuencia</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1089"/>
-        <source>Generate the field first: I need the plate&apos;s catalog stars to propose the sequence.</source>
-        <translation>Genera el campo primero: necesito las estrellas del catálogo de la placa para proponer la secuencia.</translation>
-    </message>
-    <message>
-        <location filename="../ufe_compare_tab.py" line="1191"/>
+        <location filename="../ufe_compare_tab.py" line="1212"/>
         <source>Proposed {0} comparisons (tweak by clicking stars).</source>
         <translation>Propuestas {0} comparaciones (ajusta pulsando estrellas).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1410"/>
+        <location filename="../ufe_compare_tab.py" line="1431"/>
         <source>Export sequence CSV</source>
         <translation>Exportar la secuencia CSV</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1429"/>
+        <location filename="../ufe_compare_tab.py" line="1450"/>
         <source>Written to {0}</source>
         <translation>Escrito en {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1199"/>
+        <location filename="../ufe_compare_tab.py" line="1220"/>
         <source>Left out {0} on your own plate: {1}</source>
         <translation>Descartadas {0} en tu propia placa: {1}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1124"/>
+        <location filename="../ufe_compare_tab.py" line="1145"/>
         <source>Could not build the sequence: {0}</source>
         <translation>No se pudo construir la secuencia: {0}</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1208"/>
+        <location filename="../ufe_compare_tab.py" line="1229"/>
         <source>The sequence is the same as before.</source>
         <translation>La secuencia es la misma que antes.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="629"/>
-        <source>This plate has no solved position, so the comparison field cannot be built from the catalogue. Your sequence ({0} stars) is loaded and will be measured with the plate; its rings need a solved plate: use «Solve astrometry…» or the Settings solver.</source>
-        <translation>Esta placa no tiene posición resuelta, así que el campo de comparación no se puede construir del catálogo. Tu secuencia ({0} estrellas) está cargada y se medirá con la placa; sus anillos necesitan una placa resuelta: usa «Resolver astrometría…» o el resolutor de Ajustes.</translation>
-    </message>
-    <message>
-        <location filename="../ufe_compare_tab.py" line="771"/>
+        <location filename="../ufe_compare_tab.py" line="777"/>
         <source>The catalogue returned no stars inside this plate (is the pointing right?).</source>
         <translation>El catálogo no ha devuelto ninguna estrella dentro de esta placa (¿apunta bien la resolución?).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1204"/>
+        <location filename="../ufe_compare_tab.py" line="1225"/>
         <source>The proposal found no usable comparison star.</source>
         <translation>La propuesta no encontró ninguna comparsa válida.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="742"/>
+        <location filename="../ufe_compare_tab.py" line="748"/>
         <source>{0} Your sequence of {1} stars is kept; nothing was lost.</source>
         <translation>{0} Tu secuencia de {1} estrellas se mantiene; no se ha perdido nada.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1098"/>
+        <location filename="../ufe_compare_tab.py" line="1119"/>
         <source>Proposing the sequence from the {0} catalog stars on the plate (no plate to check them against yet).</source>
         <translation>Proponiendo la secuencia a partir de las {0} estrellas de catálogo que hay en la placa (aún no hay placa contra la que comprobarlas).</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1108"/>
-        <location filename="../ufe_compare_tab.py" line="1144"/>
+        <location filename="../ufe_compare_tab.py" line="1129"/>
+        <location filename="../ufe_compare_tab.py" line="1165"/>
         <source>Proposing the sequence: checking the {0} catalog stars on your plate…</source>
         <translation>Proponiendo la secuencia: comprobando en tu placa las {0} estrellas de catálogo…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1147"/>
+        <location filename="../ufe_compare_tab.py" line="1168"/>
         <source>Checking the candidates on your plate…</source>
         <translation>Comprobando las candidatas en tu placa…</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1148"/>
+        <location filename="../ufe_compare_tab.py" line="1169"/>
         <source>Comparisons</source>
         <translation>Comparsas</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1163"/>
+        <location filename="../ufe_compare_tab.py" line="1184"/>
         <source>Could not build the sequence: the plate check failed.</source>
         <translation>No se pudo construir la secuencia: falló la comprobación en la placa.</translation>
     </message>
     <message>
-        <location filename="../ufe_compare_tab.py" line="1172"/>
+        <location filename="../ufe_compare_tab.py" line="1193"/>
         <source>Sequence proposal cancelled: nothing was changed. Your sequence is as it was.</source>
         <translation>Propuesta cancelada: no se ha cambiado nada. Tu secuencia está como estaba.</translation>
     </message>

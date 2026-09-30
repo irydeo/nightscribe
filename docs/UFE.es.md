@@ -121,6 +121,14 @@ Una toma que falla no para el lote: se cuenta y se nombra en la línea de estado
 Una placa abierta desde un proyecto se resuelve también con su campo, así que el
 botón Resolver de la barra superior responde en un momento.
 
+**Construir la secuencia…** hace toda la cadena de un clic: si la placa no
+tiene WCS la resuelve primero (el campo del proyecto apunta al resolutor, así
+que es un momento), después consulta el catálogo (el campo) y propone. El
+**Proponer secuencia** de la ventana Manual rellena igual el paso que falte,
+así que el orden de los botones no hay que recordarlo. Una reconstrucción que
+no puede entregar (falla la consulta, no cae nada en esta placa, ninguna
+comparsa válida) mantiene la secuencia que ya tenías y dice por qué.
+
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
   sabe; la magnitud aproximada sirve de guía a la propuesta.
 * **Generar campo** consulta el catálogo (Gaia EDR3 o APASS DR9) y las

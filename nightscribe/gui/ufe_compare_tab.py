@@ -165,6 +165,10 @@ class UfeCompareTab(QWidget):
         self._worker = None
         self._propose_worker = None  # the proposal's own thread (H2)
         self._names_before_build = None   # was the proposal any different?
+        # what the observer had before a rebuild started: taken BEFORE the
+        # catalogue query goes out (the field's arrival empties the table on
+        # purpose), and what a failed or empty rebuild restores
+        self._build_backup = []
         self._cutout_worker = None   # UfeCutoutWorker while DSS2 lands
         self._prefill_sky = None     # (ra, dec) from the host, for DSS2
         self._build_ui()
@@ -612,26 +616,22 @@ class UfeCompareTab(QWidget):
                 wait.setValue(1)
                 _reap_wait(wait)
             return
-        # A plate with no solved position cannot give a catalogue field, and
-        # it does not need one when the project ALREADY has its sequence:
-        # rebuilding it from the catalogue is impossible, and the honest
-        # answer is that the sequence is here and its rings need a solved
-        # plate (reported: "I have a comparison star fixed by hand, I press
-        # Build the sequence and it builds nothing"). Without this the click
-        # started a blind solve and the observer saw a dialog come and go.
-        # What the observer has right now, kept while the catalogue
-        # answers: a query that fails, or that returns nothing ON THIS
-        # PLATE, must not leave them with an empty sequence (reported as
-        # "it builds nothing" when what it did was erase what was there).
+        # A plate with no solved position used to be an exception when the
+        # project ALREADY had its sequence loaded (the normal case in a
+        # visit): the click stopped and explained that the rings needed a
+        # solved plate, so no solve, no field and no proposal. That was
+        # written when a blind solve took 66 s (the dialog came and went and
+        # nothing was built, reported) and it left the observer with no
+        # field at all: "Build the sequence needs the field generated first,
+        # otherwise it finds nothing" (reported). The solve is a tenth of a
+        # second now (ADR-051: the project's field points it), so the
+        # pipeline is the same whatever the plate carries, solve then field
+        # then proposal. What the observer already has is kept while the
+        # catalogue answers: a query that fails, that returns nothing ON THIS
+        # PLATE, or a solve that does not land, must not leave them with an
+        # empty sequence (reported as "it builds nothing" when what it did
+        # was erase what was there).
         self._build_backup = list(self._entries)
-        if self._state.wcs is None and self._entries:
-            self._say(self.tr(
-                "This plate has no solved position, so the comparison field "
-                "cannot be built from the catalogue. Your sequence ({0} "
-                "stars) is loaded and will be measured with the plate; its "
-                "rings need a solved plate: use «Solve astrometry…» or the "
-                "Settings solver.").format(len(self._entries)))
-            return
         self._auto_propose = True
         self._on_generate()
 
@@ -647,7 +647,13 @@ class UfeCompareTab(QWidget):
         # Generate field: VizieR catalog + VSX variables around the plate
         # centre, off the GUI thread.
         if not self._state.has_image:
+            # never a silent no-op: without a plate there is no centre to
+            # query around and nothing to propose
             self._auto_propose = False
+            self._say(self.tr(
+                "Load a plate first (or fetch the field from the survey "
+                "with «DSS2…»): the catalogue is queried around its "
+                "centre."))
             return
         if self._state.wcs is None:
             # ADR-051: solving is automatic now, never a hand-off
@@ -1084,14 +1090,29 @@ class UfeCompareTab(QWidget):
         # expensive to do: the catalogue's own criteria are arithmetic over
         # a list, and a dialog for that would be noise.
         if self._field is None:
-            # no silent no-op: say what to do first, in both languages
-            self._say(self.tr(
-                "Generate the field first: I need the plate's catalog "
-                "stars to propose the sequence."))
+            # THE STEP THAT IS MISSING, DONE HERE: the field (and the solve
+            # behind it when the plate has none), then the proposal. Asking
+            # the observer to press another button for a step this one needs
+            # was a riddle, and it is the same report the one-click button
+            # answers: "Build the sequence needs the field generated first,
+            # otherwise it finds nothing".
+            self._build_backup = list(self._entries)
+            self._auto_propose = True
+            self._on_generate()
             return
         self._flush_table()
-        self._build_backup = list(self._entries)
-        self._names_before_build = [e.get("name") for e in self._entries]
+        # The backup is what the observer had BEFORE this rebuild started.
+        # The field's arrival empties the table on purpose (a new field is a
+        # new sequence), so taking a fresh copy here would back up an empty
+        # sequence and lose theirs: the one the rebuild must be able to
+        # restore was taken before the query went out.
+        if not self._build_backup:
+            self._build_backup = list(self._entries)
+        # and "was it any different?" compares against that same truth: with
+        # the table already empty (the rebuild path) the reference is the
+        # sequence the rebuild is about to replace.
+        self._names_before_build = [e.get("name") for e in
+                                    (self._entries or self._build_backup)]
         validator = self._comp_validator()
         if validator is None:
             self._say(self.tr(

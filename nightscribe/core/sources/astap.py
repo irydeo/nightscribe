@@ -172,30 +172,33 @@ def probe(astap_path=None):
 
 def _cards_from_wcs_file(wcs_path):
     # Reads the .wcs header ASTAP wrote and keeps the cards we understand.
-    # @return: dict of WCS cards or None
+    # @return: (cards, warning): the WCS cards and ASTAP's own WARNING card
+    #          (it writes one when its star database is obsolete, which is
+    #          the reason a blind solve crawls), or (None, None)
     from .. import fits_io
     try:
         header = fits_io.read_header(wcs_path)
     except Exception as err:
         logger.warning("ASTAP .wcs unreadable: %s", err)
-        return None
+        return None, None
     cards = {k: header[k] for k in _WCS_KEYS if k in header}
-    return cards or None
+    warning = str(header.get("WARNING") or "").strip() or None
+    return (cards or None), warning
 
 
 def _take_wcs(wcs_path):
     # Reads one .wcs sidecar ASTAP wrote and removes it right away.
     # @args: wcs_path - the candidate sidecar
-    # @return: dict of WCS cards, or None when there is no such file
+    # @return: (cards, warning), or (None, None) when there is no such file
     p = Path(wcs_path)
     if not p.is_file():
-        return None
-    cards = _cards_from_wcs_file(p)
+        return None, None
+    cards, warning = _cards_from_wcs_file(p)
     try:
         p.unlink()
     except OSError:
         pass
-    return cards
+    return cards, warning
 
 
 def _out_base(digest):
@@ -420,22 +423,34 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
             + ["-fov", str(target) if target else "0"]
         if progress:
             if hint_args:
-                progress("astap: solving at the project's field")
+                progress("astap:pointed")
+            elif target:
+                progress("astap:solving")
             else:
-                progress("astap: solving locally" if target
-                         else "astap: solving (auto field)")
+                # the honest reason the observer may be in for a minute of
+                # waiting: nothing told ASTAP where the plate looks (see
+                # _pointing_args)
+                progress("astap:blind")
         logger.info("ASTAP: %s", " ".join(cmd))
         lines, cancelled, _timed_out, rc = _run_astap(
             cmd, progress, cancel, slot)
         if cancelled:
             logger.info("ASTAP cancelled for %s", path.name)
             return None
-        cards = _take_wcs(str(out_base) + ".wcs")
+        cards, warning = _take_wcs(str(out_base) + ".wcs")
         if cards is None:
             # an ASTAP that ignores -o still writes the sidecar next to
             # the image, which is where the older versions looked for it
-            cards = _take_wcs(str(path) + ".wcs")
+            cards, warning = _take_wcs(str(path) + ".wcs")
         _drop_outputs(out_base)
+        if warning:
+            # ASTAP's own caveat about the solve (an obsolete star database
+            # is the classic one). It goes to the log and to the busy line:
+            # a solve that took a minute because of it should not look like
+            # a mystery.
+            logger.warning("ASTAP warns for %s: %s", path.name, warning)
+            if progress:
+                progress("ASTAP: %s" % warning)
         if cards is None:
             cards = _cards_from_stdout("".join(lines))
         if cards:
@@ -450,6 +465,22 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
     db.cache_put(key, "astap", json.dumps(cards).encode("utf-8"),
                  "application/json")
     return cards
+
+
+# The lines of ASTAP's own output worth showing the observer: its verdict,
+# its timing and its warnings. Everything else is the search itself, which
+# is noise (and looked like a loop).
+_NOTABLE = ("warning", "error", "no solution", "solution found", "solved in",
+            "not solved", "failed")
+
+
+def _notable(line):
+    # @args: line - one line of ASTAP's output
+    # @return: True when the observer should see it: ASTAP's verdict, its
+    #          timing and its warnings (a wrong scale, an obsolete star
+    #          database). The rest of its output is the SEARCH itself.
+    low = (line or "").lower()
+    return any(marker in low for marker in _NOTABLE)
 
 
 def _run_astap(cmd, progress, cancel, budget):
@@ -469,9 +500,14 @@ def _run_astap(cmd, progress, cancel, budget):
 
     def _pump():
         # Reading off-thread keeps the Cancel responsive while ASTAP runs.
+        # ONLY the lines that say something reach the observer: ASTAP's own
+        # progress is a wall of "Search 75939, [99,138], position: 03:38
+        # 17.2+49d 32 31 ..." that scrolled through the busy dialog and made
+        # a solve that was WORKING look like a loop (reported). The full
+        # output is still kept for the stdout fallback below.
         for line in proc.stdout or ():
             lines.append(line)
-            if progress and line.strip():
+            if progress and _notable(line):
                 progress(line.strip())
 
     reader = threading.Thread(target=_pump, daemon=True)

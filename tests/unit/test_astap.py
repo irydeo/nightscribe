@@ -54,7 +54,8 @@ def _write_fits(path):
     return path
 
 
-def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False):
+def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False,
+                noise=False):
     # a simulated ASTAP: writes <file>.wcs with fixed cards (or prints
     # them), records each run so the cache can be proven, and leaves its
     # command line in <file>.argv; honor_o writes the sidecar at the `-o`
@@ -76,6 +77,14 @@ def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False):
         "Path(f + '.runs').write_text(Path(f + '.runs').read_text() + 'x')"
         " if Path(f + '.runs').exists() else Path(f + '.runs').write_text('x')",
     ]
+    if noise:
+        # what the real binary prints while it searches: a wall of lines
+        # that says nothing about the solve
+        lines += [
+            "print('Search 75939, [99,138], position: 03:38 17.2+49d 32 31')",
+            "print('Found 0 references, max hash bin size: 14')",
+            "print('Find Quads, max bucket size: 3, bucket overflows: 0')",
+        ]
     if fail_first:
         lines += [
             "if not Path(f + '.failfirst').exists():",
@@ -426,3 +435,64 @@ def test_the_dispatcher_hands_the_pointing_to_astap(tmp_path, monkeypatch):
                             pointing=(49.99038, 49.86875))
     assert cards == {"CRVAL1": 31.3121}
     assert seen.get("pointing") == (49.99038, 49.86875)
+
+
+def test_the_sky_sweep_does_not_reach_the_observer(tmp_path, monkeypatch):
+    # Reported as a loop: the busy line poured ASTAP's own search output
+    # ("Search 75939, [99,138], position: 03:38 17.2+49d 32 31") line after
+    # line, so a solve that was WORKING read as a hang. Only the lines that
+    # say something get through: the verdict, the timing and the warnings.
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True, noise=True)
+    said = []
+    astap.solve(fits, astap_path=str(script), progress=said.append)
+    text = "\n".join(said)
+    assert "Search 75939" not in text
+    assert "Found 0 references" not in text
+    assert "Find Quads" not in text
+
+
+def test_the_solver_warnings_do_reach_the_observer(tmp_path, monkeypatch):
+    # ...but its warnings do: a wrong scale or an obsolete star database is
+    # the reason a blind solve crawls, and it should not be a mystery.
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = tmp_path / "warn_astap.py"
+    script.write_text(
+        "#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\n"
+        "f = sys.argv[sys.argv.index('-f') + 1]\n"
+        "print('Warning scale was inaccurate! Set FOV=0.54d')\n"
+        "print('Search 100, [1,2], position: 03:00 00+40d 00 00')\n"
+        "cards = \"CRVAL1  = 31.3121\".ljust(80)\n"
+        "cards += \"CRVAL2  = 46.7691\".ljust(80)\n"
+        "cards += \"CTYPE1  = 'RA---TAN'\".ljust(80)\n"
+        "cards += \"WARNING = 'Old database!'\".ljust(80)\n"
+        "cards += 'END'.ljust(80)\n"
+        "cards += ' ' * ((2880 - len(cards) % 2880) % 2880)\n"
+        "base = sys.argv[sys.argv.index('-o') + 1]\n"
+        "Path(base + '.wcs').write_text(cards)\n")
+    os.chmod(script, 0o755)
+    said = []
+    astap.solve(fits, astap_path=str(script), progress=said.append)
+    text = "\n".join(said)
+    assert "Warning scale was inaccurate" in text      # its own line
+    assert "Old database!" in text                     # its .wcs warning
+    assert "Search 100" not in text                    # the sweep stays out
+
+
+def test_the_stage_keys_are_the_solvers_own_vocabulary(tmp_path,
+                                                       monkeypatch):
+    # The dialog translates these keys; anything else it shows as it comes
+    monkeypatch.setattr(astap, "db", _FakeCache())
+    fits = _write_fits(tmp_path / "p.fits")
+    script = _fake_astap(tmp_path, honor_o=True)
+    said = []
+    astap.solve(fits, astap_path=str(script), pointing=(49.99, 49.86),
+                progress=said.append)
+    assert "astap:pointed" in said
+    monkeypatch.setattr(astap, "db", _FakeCache())     # a fresh cache
+    said = []
+    fits2 = _write_fits(tmp_path / "q.fits")
+    astap.solve(fits2, astap_path=str(script), progress=said.append)
+    assert "astap:solving" in said

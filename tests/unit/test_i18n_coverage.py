@@ -125,7 +125,15 @@ def test_the_series_window_and_the_measure_doors_translate_es():
                 ("UfeSeriesDialog", "Mean curve", "Curva media"),
                 ("UfeSeriesDialog", "Restore all", "Restaurar todos"),
                 ("UfeMeasureTab", "Export", "Exportar"),
-                ("UfeMeasureTab", "Reset", "Restablecer")):
+                ("UfeMeasureTab", "Reset", "Restablecer"),
+                # the solver's stages, which the observer reads while a
+                # plate is being solved (ADR-051)
+                ("UfeDialog", "ASTAP is solving at the project's field",
+                 "ASTAP resuelve en el campo del proyecto"),
+                ("UfeDialog", "this plate carries no position, so ASTAP is "
+                 "sweeping the sky (this can take a minute)",
+                 "esta placa no trae posición, así que ASTAP está barriendo "
+                 "el cielo (esto puede tardar un minuto)")):
             got = QCoreApplication.translate(ctx, src)
             assert got == want, (ctx, src, got)
     finally:

@@ -739,3 +739,40 @@ def test_an_ad_hoc_plate_still_solves_blind(dlg, monkeypatch):
     dlg._on_solve()
     assert dlg._solve_worker is not None
     assert dlg._solve_worker.pointing is None
+
+
+def test_the_busy_line_speaks_about_the_solve(dlg):
+    # The solver's stages in the observer's words (the raw search output no
+    # longer reaches this line at all: see the astap tests), and its own
+    # lines still come through as they are.
+    dlg._on_solve_stage("astap:blind")
+    assert "sweeping the sky" in dlg.btn_solve.text()
+    dlg._on_solve_stage("astap:pointed")
+    assert "project's field" in dlg.btn_solve.text()
+    dlg._on_solve_stage("login")
+    assert "Astrometry.net" in dlg.btn_solve.text()
+    dlg._on_solve_stage("Warning scale was inaccurate! Set FOV=0.54d")
+    assert dlg.btn_solve.text().startswith("Warning scale")
+
+
+def test_a_blind_failure_explains_itself(dlg, monkeypatch):
+    # The plate carries no position and the editor was opened from nowhere:
+    # that is WHY the solver had to search the whole sky. Saying it is the
+    # difference between a mystery and an instruction.
+    from PySide6.QtWidgets import QMessageBox
+    from nightscribe.core.sources import astap
+    monkeypatch.setattr(astap, "resolve_binary", lambda *a, **k: "/fake/astap")
+    seen = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: seen.append(a[2]))
+    dlg.state.load(MONO)
+    dlg.set_object(None)
+    dlg._on_solve()
+    dlg._on_solved({})
+    assert seen and "whole sky" in seen[0]
+    # with a project behind it, no excuse is invented
+    seen.clear()
+    dlg.set_object({"name": "V0526 Per", "ra": 49.99038, "dec": 49.86875})
+    dlg._on_solve()
+    dlg._on_solved({})
+    assert seen and "whole sky" not in seen[0]

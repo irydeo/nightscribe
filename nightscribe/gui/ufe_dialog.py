@@ -1600,16 +1600,43 @@ class UfeDialog(QDialog):
         return self.tr("ASTAP and Astrometry.net")
 
     def _on_solve_stage(self, stage):
-        # @args: stage - the worker's stage text, mirrored on the button
-        #        and on the busy dialog (astap -progress lines are long:
-        #        cap them so the label stays readable)
+        # @args: stage - the worker's stage text: a key of the solver's own
+        #        vocabulary ("astap:blind", "login"…) or a line of the
+        #        solver's output (its verdict and its warnings, which are
+        #        shown as they come)
         stage = (stage or "").strip()
-        text = self.tr("Solving: {0}…").format(stage[:70]) if stage \
-            else self.tr("Solving the plate…")
+        # the solver's keys are its own vocabulary: the ASTAP ones carry
+        # their prefix ("astap:blind"), the nova ones are single words
+        key = stage if stage.startswith("astap:") else stage.split(" ")[0]
+        text = self._solve_stage_text(key)
+        if text is None:
+            text = stage[:70] if stage else self.tr("Solving the plate…")
+        else:
+            text = self.tr("Solving: {0}…").format(text)
         self.btn_solve.setText(text)
         wait = getattr(self, "_solve_wait", None)
         if wait is not None:
             wait.setLabelText(text)
+
+    def _solve_stage_text(self, key):
+        # The solver's stages in the observer's words. The raw output used
+        # to be poured into this line ("Search 75939, [99,138]…"), which is
+        # a wall of noise and made a solve that was WORKING look like a
+        # loop (reported); the solver's warnings still come through, but
+        # they are its own words and are shown as they are.
+        # @args: key - the stage key the solver sent
+        # @return: the translated stage, or None when it is not one of ours
+        return {
+            "login": self.tr("signing in to Astrometry.net"),
+            "upload": self.tr("uploading the plate"),
+            "solving": self.tr("Astrometry.net is solving"),
+            "astap:pointed": self.tr("ASTAP is solving at the project's "
+                                     "field"),
+            "astap:solving": self.tr("ASTAP is solving"),
+            "astap:blind": self.tr("this plate carries no position, so ASTAP "
+                                   "is sweeping the sky (this can take a "
+                                   "minute)"),
+        }.get(key)
 
     def _on_solved(self, cards):
         # @args: cards - solved WCS cards, or {} when the solve failed
@@ -1625,12 +1652,21 @@ class UfeDialog(QDialog):
             self._fail_wcs_pending()
             return
         if not cards:
-            QMessageBox.warning(
-                self, self.tr("NightScribe Image Workbench"),
-                self.tr("{0} could not solve the plate. Check the solver "
-                        "in Settings (ASTAP path, Astrometry.net key) or "
-                        "solve the plate with NINA, Ekos or PixInsight "
-                        "and save it again.").format(self._solver_names()))
+            msg = self.tr("{0} could not solve the plate. Check the solver "
+                          "in Settings (ASTAP path, Astrometry.net key) or "
+                          "solve the plate with NINA, Ekos or PixInsight "
+                          "and save it again.").format(self._solver_names())
+            if self._pointing() is None:
+                # the honest reason it may have taken a minute: nothing told
+                # the solver where to look, so it searched the whole sky
+                msg += "\n\n" + self.tr(
+                    "This plate carries no position of its own and the "
+                    "editor was not opened from a project, so the solver "
+                    "had to search the whole sky. Opening it from its "
+                    "project tells it where the field is, and the solve "
+                    "takes a moment.")
+            QMessageBox.warning(self, self.tr("NightScribe Image Workbench"),
+                                msg)
             self._fail_wcs_pending()
             return
         if self.state.set_wcs_cards(cards):

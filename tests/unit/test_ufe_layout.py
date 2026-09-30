@@ -464,3 +464,52 @@ def test_the_measure_half_is_still_the_same_widget():
     assert ph.area_compare.widget() is d.tab_compare
     assert ph.splitter.widget(1) is ph.area_measure
     d.close()
+
+
+# ---------------- U5: the ways out of a measurement -------------------
+
+def test_the_result_row_keeps_two_doors_and_the_buttons_are_inside():
+    # Four buttons took two rows of the column: the CSV, the AAVSO EFF
+    # report, "reset the plate's state" and "remove the plate's points".
+    # They are not gone and they are not copies: the SAME widgets live
+    # inside two doors now (the export pair in "Export", the reset pair in
+    # "Reset"), so every name the code and the tests reach for is untouched.
+    from PySide6.QtWidgets import QPushButton
+    _app()
+    d = _dialog(1500, 1000, _OBJECT)
+    t = d.tab_measure
+    row = t._ui.row_result_actions
+    in_row = [row.itemAt(i).widget().objectName() for i in range(row.count())
+              if row.itemAt(i).widget() is not None]
+    assert in_row == ["btn_export_more", "btn_reset_more", "btn_save_project"]
+    exp = t.btn_export_more.menu().actions()[0].defaultWidget()
+    res = t.btn_reset_more.menu().actions()[0].defaultWidget()
+    assert {w.objectName() for w in exp.findChildren(QPushButton)} == {
+        "btn_csv", "btn_eff"}
+    assert {w.objectName() for w in res.findChildren(QPushButton)} == {
+        "btn_reset_state", "btn_reset_points"}
+    assert t.btn_csv.parent() is exp and t.btn_eff.parent() is exp
+    assert t.btn_reset_state.parent() is res
+    assert t.btn_reset_points.parent() is res
+    # and the two rows that used to hold them are not left behind empty
+    assert not hasattr(t._ui, "row_export")
+    assert not hasattr(t._ui, "row_project")
+    d.close()
+
+
+def test_the_reset_door_comes_and_goes_with_the_project():
+    # The plate's two resets only make sense inside a project (ADR-047).
+    # The door follows them: without the hooks the row must not keep a
+    # "Reset" that opens onto nothing, and with them it must be there.
+    _app()
+    d = _dialog(1500, 1000, _OBJECT)
+    t = d.tab_measure
+    t.set_reset_attached(True)
+    assert not t.btn_reset_more.isHidden()
+    assert not t.btn_reset_state.isHidden()
+    assert not t.btn_reset_points.isHidden()
+    t.set_reset_attached(False)
+    assert t.btn_reset_more.isHidden()
+    assert t.btn_reset_state.isHidden()
+    assert t.btn_reset_points.isHidden()
+    d.close()

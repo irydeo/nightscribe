@@ -205,8 +205,56 @@
      </property>
     </widget>
    </item>
+   <!-- U5: the ways out of a measurement. Two doors hold the four buttons
+        that used to take two rows (the CSV and the AAVSO EFF report in
+        "Export", the plate's two resets in "Reset"); the code moves them
+        into the panels, one by one, so their names, texts and tooltips are
+        the same ones (ADR-005). The row keeps the doors and the project's
+        save. -->
    <item>
-    <layout class="QHBoxLayout" name="row_export">
+    <layout class="QHBoxLayout" name="row_result_actions">
+     <item>
+      <widget class="QToolButton" name="btn_export_more">
+       <property name="toolTip">
+        <string>What leaves this measurement: the CSV of the measured points and the AAVSO EFF report. They are the same two buttons as always, one click away</string>
+       </property>
+       <property name="text">
+        <string>Export</string>
+       </property>
+       <property name="popupMode">
+        <enum>QToolButton::InstantPopup</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btn_reset_more">
+       <property name="toolTip">
+        <string>The two plate resets: bring this plate back to the editor defaults (stretch, recipe, sequence field) and remove the points registered in this plate. Both ask for confirmation, and neither touches other plates</string>
+       </property>
+       <property name="text">
+        <string>Reset</string>
+       </property>
+       <property name="popupMode">
+        <enum>QToolButton::InstantPopup</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_save_project">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</string>
+       </property>
+       <property name="text">
+        <string>Save…</string>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QPushButton" name="btn_csv">
        <property name="enabled">
@@ -224,26 +272,6 @@
        </property>
        <property name="text">
         <string>AAVSO EFF…</string>
-       </property>
-      </widget>
-     </item>
-     </layout>
-   </item>
-   <item>
-     <layout class="QHBoxLayout" name="row_project">
-     <item>
-      <widget class="QPushButton" name="btn_save_project">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="visible">
-        <bool>false</bool>
-       </property>
-       <property name="toolTip">
-        <string>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</string>
-       </property>
-       <property name="text">
-        <string>Save…</string>
        </property>
       </widget>
      </item>
@@ -273,7 +301,20 @@
        </property>
       </widget>
      </item>
-     </layout>
+     <item>
+      <spacer name="hsp_result_actions">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
    </item>
    <item>
     <widget class="QGroupBox" name="grp_series">

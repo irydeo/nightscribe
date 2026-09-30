@@ -207,6 +207,23 @@ class UfeMeasureTab(QWidget):
         self.btn_reset_state.clicked.connect(self._on_reset_state)
         self.btn_reset_points = self._ui.btn_reset_points
         self.btn_reset_points.clicked.connect(self._on_reset_points)
+        # U5: the ways out of a measurement, behind two doors. "Export" holds
+        # the CSV and the AAVSO EFF report, "Reset" the plate's two resets:
+        # four buttons that used to take two rows of the column. They are the
+        # SAME widgets, moved one by one into their panel (a layout removed
+        # from its parent is deleted by the binding), so every name the code
+        # and the tests use is untouched, and their texts and tooltips keep
+        # living in the Designer file (ADR-005). Same mechanism as the
+        # window's doors (U2) and the series' one (U6).
+        self.btn_export_more = self._ui.btn_export_more
+        self.btn_reset_more = self._ui.btn_reset_more
+        self._door(self.btn_export_more, (self.btn_csv, self.btn_eff))
+        self._door(self.btn_reset_more, (self.btn_reset_state,
+                                         self.btn_reset_points))
+        # the door follows its contents: nothing measured yet, nothing to
+        # export (the .ui ships the buttons disabled, and this is the one
+        # place that turns them on and off from now on)
+        self._set_export_enabled(False)
 
         # series block (series plan, phase 5): hidden unless the dialog was
         # opened from a visit (D8). The compact curve is our custom widget
@@ -494,6 +511,42 @@ class UfeMeasureTab(QWidget):
         elif self._last is not None and self._last.get("mag") is not None:
             self.btn_save_project.setEnabled(True)
 
+    # ------------------------------------------- the ways out (U5)
+
+    def _door(self, tool, widgets):
+        # Puts a set of existing buttons inside the dropdown panel hanging
+        # from a QToolButton (U5).
+        # @args: tool - the QToolButton, widgets - the widgets to move
+        # @return: None
+        from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
+                                       QWidget, QWidgetAction)
+        panel = QWidget(self)
+        box = QVBoxLayout(panel)
+        box.setContentsMargins(6, 6, 6, 6)
+        for w in widgets:
+            if w is None:
+                continue
+            w.setParent(panel)
+            box.addWidget(w)
+        action = QWidgetAction(tool)
+        action.setDefaultWidget(panel)
+        menu = QMenu(tool)
+        menu.addAction(action)
+        tool.setMenu(menu)
+        tool.setPopupMode(QToolButton.InstantPopup)
+
+    def _set_export_enabled(self, flag):
+        # The CSV and the AAVSO EFF report are what the Export door opens
+        # onto, so the door follows them: a door that opens onto two grey
+        # buttons is a lie, and one that stays lit with nothing to export is
+        # a trap (U5). One place decides for the three of them.
+        # @args: flag - True when there is a calibrated magnitude to write
+        # @return: None
+        flag = bool(flag)
+        self.btn_csv.setEnabled(flag)
+        self.btn_eff.setEnabled(flag)
+        self.btn_export_more.setEnabled(flag)
+
     # -------------------------------------------------- resets (ADR-047)
 
     def set_reset_attached(self, flag):
@@ -501,6 +554,9 @@ class UfeMeasureTab(QWidget):
         # project): the two plate resets show. Same rule as the save
         # button: not attached, not visible.
         # @args: flag - True when the dialog's state/points hooks are set
+        # the door goes with them: the row must not keep a Reset button
+        # that opens onto nothing
+        self.btn_reset_more.setVisible(bool(flag))
         self.btn_reset_state.setVisible(bool(flag))
         self.btn_reset_points.setVisible(bool(flag))
 
@@ -615,8 +671,7 @@ class UfeMeasureTab(QWidget):
         self._drop_items()
         self._drop_subtraction()
         self.lbl_result.setText("–")
-        self.btn_csv.setEnabled(False)
-        self.btn_eff.setEnabled(False)
+        self._set_export_enabled(False)
         self.btn_save_project.setEnabled(False)
         self.setEnabled(self._state.has_image)
         self._say("")
@@ -922,8 +977,7 @@ class UfeMeasureTab(QWidget):
             self._say(reason)
             self._last = None
             self._drop_items()
-            self.btn_csv.setEnabled(False)
-            self.btn_eff.setEnabled(False)
+            self._set_export_enabled(False)
             self.btn_save_project.setEnabled(False)
             return
         self._say("")
@@ -948,8 +1002,7 @@ class UfeMeasureTab(QWidget):
         }
         self._fill_panel(res.band, len(entries), len(res.used),
                          res.skipped, res.derived, res.gain)
-        self.btn_csv.setEnabled(res.mag is not None)
-        self.btn_eff.setEnabled(res.mag is not None)
+        self._set_export_enabled(res.mag is not None)
         # the project save tracks the result: a point without a magnitude
         # (only a check ratio) has nothing to register
         self.btn_save_project.setEnabled(res.mag is not None)

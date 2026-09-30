@@ -1754,3 +1754,49 @@ def test_the_trend_is_painted_when_the_curve_is_generated(dlg, qapp):
     tab._apply_chart_presentation()
     assert tab.chart_series._mean_window == tab.spn_series_meanwin.value()
     assert tab.chart_series._mean_window >= 2
+
+
+# ---------------- U5: the doors and what is inside them ---------------
+
+def test_the_export_door_follows_the_measurement(dlg):
+    # A door that opens onto two grey buttons is a lie, and one that stays
+    # lit with nothing to export is a trap: the door and its two contents
+    # are switched by ONE place, so they cannot drift apart.
+    tab = dlg.tab_measure
+    assert not tab.btn_export_more.isEnabled()      # nothing measured yet
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert tab.btn_export_more.isEnabled()
+    assert tab.btn_csv.isEnabled() and tab.btn_eff.isEnabled()
+    # a plate with no target measured takes it back
+    dlg.state.load(dlg.state.path)
+    assert not tab.btn_export_more.isEnabled()
+    assert not tab.btn_csv.isEnabled()
+
+
+def test_the_buttons_inside_the_doors_still_do_what_they_did(dlg, tmp_path,
+                                                              monkeypatch):
+    # The doors are a move, not a rewrite: clicking the CSV inside the
+    # "Export" panel writes the same file the old button wrote, and the
+    # reset inside "Reset" reaches the same handler.
+    from PySide6.QtWidgets import QFileDialog
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    out = tmp_path / "medida.csv"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    panel = tab.btn_export_more.menu().actions()[0].defaultWidget()
+    csv = [w for w in panel.findChildren(type(tab.btn_csv))
+           if w.objectName() == "btn_csv"][0]
+    csv.click()
+    assert out.exists() and out.read_text().count("\n") >= 3
+    # and the reset door's buttons are wired to their own handlers
+    seen = []
+    monkeypatch.setattr(tab, "_on_reset_state",
+                        lambda: seen.append("state"))
+    monkeypatch.setattr(tab, "_on_reset_points",
+                        lambda: seen.append("points"))
+    tab.btn_reset_state.click()
+    tab.btn_reset_points.click()
+    assert seen == ["state", "points"]

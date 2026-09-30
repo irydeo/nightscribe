@@ -4567,10 +4567,19 @@ class MainWindow(QMainWindow):
             # curve, from the visit window where the observer already is
             phase=lambda pid_: self._open_phase_dialog(pid_),
             on_change=lambda: self._visit_data_changed(pid),
+            # the curve below is the one of the visit you are looking at
+            # (reported), so the list has to say which one that is
+            on_visit_selected=lambda _sid: self._fu_curve_refresh(pid),
             kind=kind)
         panel.set_project(pid)
         layout.addWidget(panel, 1)
         self._project_widgets["visits_panel"] = panel
+        # The curve, right under the visits it belongs to and for EVERY
+        # kind that has one (a transit project with 1255 measured points
+        # had no chart here at all: the block was tied to the follow-up
+        # kinds). The switch inside decides between this visit and the
+        # whole project.
+        self._analysis_curve_block(layout, p, pid)
         if kind == "transit":
             self._analysis_transit_block(layout, pid)
         elif kind == "hads":
@@ -4587,6 +4596,124 @@ class MainWindow(QMainWindow):
         # @return: the visits panel's selected visit id, or None
         panel = self._project_widgets.get("visits_panel")
         return panel.current_session_id() if panel is not None else None
+
+    # ------------- the Analysis curve: the selected visit (reported) ----
+
+    def _analysis_curve_block(self, layout, p, pid):
+        # The light curve of the Analysis tab: THE VISIT YOU SELECTED, with
+        # a switch to the whole project.
+        #
+        # Reported: the chart drew the project's pile of points whatever
+        # visit was selected, and it only existed for the follow-up kinds
+        # (sn, variable), so a transit with 1255 measured points showed no
+        # curve here at all. The curve of a night is ONE pass (2026-09-30),
+        # and that is what this draws by default; "all the nights" is the
+        # project's curve, which is what folding a period needs.
+        # @args: layout - the Analysis column, p - the project row, pid -
+        #        the project id
+        # @return: None
+        from .widgets.lightcurve_widget import LightCurveChart
+        grp = QGroupBox(self.tr("Light curve"))
+        glc = QVBoxLayout(grp)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Show:")))
+        cmb = QComboBox()
+        cmb.addItem(self.tr("This visit"), "visit")
+        cmb.addItem(self.tr("All the nights"), "project")
+        cmb.setToolTip(self.tr(
+            "Which curve the chart draws: the one of the visit selected "
+            "above (its own pass of the night, the normal way to look at "
+            "one night) or the whole project, which is the curve of every "
+            "night together, one pass per night (that is the one a period "
+            "search needs)"))
+        row.addWidget(cmb)
+        lbl_what = QLabel("")
+        lbl_what.setWordWrap(True)
+        lbl_what.setStyleSheet("color: #8a90a6; font-size: 12px;")
+        row.addWidget(lbl_what, 1)
+        chk_tpl = QCheckBox(self.tr("Show template"))
+        chk_tpl.setChecked(True)
+        row.addWidget(chk_tpl)
+        glc.addLayout(row)
+        chart = LightCurveChart()
+        chart.setMinimumHeight(220)
+        glc.addWidget(chart, stretch=1)
+        chk_tpl.toggled.connect(chart.set_template_visible)
+        layout.addWidget(grp)
+        w = self._project_widgets
+        w["fu_curve"] = chart
+        w["fu_curve_scope"] = cmb
+        w["fu_curve_what"] = lbl_what
+        w["fu_curve_tpl"] = chk_tpl
+        cmb.currentIndexChanged.connect(
+            lambda _i: self._fu_curve_refresh(pid))
+        self._fu_curve_refresh(pid)
+
+    def _fu_curve_points(self, pid):
+        # The points the Analysis curve draws, and the words that say which
+        # curve it is (a chart of "some" points is a chart nobody trusts).
+        # @args: pid - the project
+        # @return: (points, what)
+        from ..core import followup as fu
+        w = self._project_widgets
+        cmb = w.get("fu_curve_scope")
+        scope = cmb.currentData() if cmb is not None else "visit"
+        if scope == "project":
+            pts = fu.list_points(db, pid)
+            summary = fu.curve_summary(pts)
+            return pts, self.tr(
+                "The whole project: {0} night(s), {1} points").format(
+                    summary["nights"], summary["points"])
+        sid = self._selected_visit_id()
+        if sid is None:
+            pts = fu.list_points(db, pid)
+            return pts, self.tr(
+                "No visit selected: the whole project ({0} points).").format(
+                    len(pts))
+        # the visit's own points: its pass of the series plus whatever was
+        # entered by hand in that visit (never another night's)
+        pts = fu.points_for_session(db, sid, series_only=False)
+        session = fu.get_session(db, sid) or {}
+        return pts, self.tr("Visit {0}: {1} points").format(
+            session.get("obs_date") or "?", len(pts))
+
+    def _fu_curve_refresh(self, pid):
+        # Rebuilds the Analysis curve in place (the selection changed, the
+        # scope changed, or a measurement was saved). The chart's own
+        # template/fold follows the kind, and the checkbox that toggles it
+        # is hidden when there is no template to show.
+        # @args: pid - the project
+        # @return: None
+        w = self._project_widgets
+        chart = w.get("fu_curve")
+        if chart is None:
+            return
+        p = project.get(db, pid)
+        if p is None:
+            return
+        from ..core import lightcurve_data
+        ctx = p.get("context") or {}
+        pts, what = self._fu_curve_points(pid)
+        payload = lightcurve_data.build_payload(
+            {"points": pts, "sn_type": ctx.get("sn_type")},
+            sn_type_fallback=ctx.get("sn_type") or ctx.get("otype"),
+            variable=ctx.get("variable"))
+        chart.set_data(
+            payload["points"],
+            sn_type=payload.get("sn_type"),
+            peak_mjd=payload.get("peak_mjd"),
+            peak_mag=payload.get("peak_mag"),
+            fold_period_d=payload.get("fold_period_d"),
+            epoch_mjd=payload.get("epoch_mjd"),
+            schematic=payload.get("schematic"))
+        lbl = w.get("fu_curve_what")
+        if lbl is not None:
+            lbl.setText(what)
+        chk = w.get("fu_curve_tpl")
+        if chk is not None:
+            has_overlay = bool(payload.get("sn_type")
+                               or payload.get("schematic"))
+            chk.setVisible(has_overlay)
 
     # ------------- the per-kind analysis blocks (ADR-045; absorbed from
     # the retired Process tab; the SN FITS-import/blink block is gone for
@@ -4834,7 +4961,6 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if p is None:
             return
-        from ..core import followup as fu
         lbl = w.get("fu_cadence")
         if lbl is not None:
             text, colour = self._fu_cadence_state(p, pid)
@@ -4847,21 +4973,8 @@ class MainWindow(QMainWindow):
                 lbl.setVisible(True)
         chart = w.get("fu_curve")
         if chart is not None:
-            from ..core import lightcurve_data
-            pts = fu.list_points(db, pid)
-            payload = lightcurve_data.build_payload(
-                {"points": pts,
-                 "sn_type": (p["context"].get("sn_type"))},
-                sn_type_fallback=p["context"].get("sn_type")
-                or p["context"].get("otype"),
-                variable=p["context"].get("variable"))
-            chart.set_data(
-                payload["points"], sn_type=payload.get("sn_type"),
-                peak_mjd=payload.get("peak_mjd"),
-                peak_mag=payload.get("peak_mag"),
-                fold_period_d=payload.get("fold_period_d"),
-                epoch_mjd=payload.get("epoch_mjd"),
-                schematic=payload.get("schematic"))
+            # the curve follows the visit and the scope the observer chose
+            self._fu_curve_refresh(pid)
         camp = w.get("fu_campaign_text")
         if camp is not None:
             camp.setText(self._fu_campaign_text(p, pid))
@@ -6165,9 +6278,9 @@ class MainWindow(QMainWindow):
     def _fu_science_blocks(self, layout, p, ctx, pid):
         # The photometry science blocks under the visits manager
         # (ADR-045): the comparison-chart action and the bulk tools menu,
-        # the sequence status line, the light curve, the campaign
-        # summary and the SN-only animation block.
-        from ..core import followup as fu
+        # the sequence status line, the campaign summary and the SN-only
+        # animation block (the light curve moved up, under the visits:
+        # _analysis_curve_block).
         kind = p["kind"]
         act_row = QHBoxLayout()
         # ADR-042: the photometry prerequisite, «with what do I compare?»,
@@ -6216,40 +6329,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(lbl_seq)
         self._project_widgets["fu_sequence"] = lbl_seq
 
-        # Inline light curve (2026-09-17): all the project's photometry —
-        # manual, pasted, file, measured, survey — with the SN template
-        # or the folded sawtooth. Live in the tab, no dialog, no rebuild;
-        # the template is toggleable without the axis moving.
+        # Inline light curve: it lives right under the visits manager now
+        # (see _analysis_curve_block), for EVERY kind with a curve and
+        # following the selected visit. Here stays what is kind-specific:
+        # the campaign summary and, for an SN, the animation block.
         if kind in ("sn", "variable"):
-            from .widgets.lightcurve_widget import LightCurveChart
-            from ..core import lightcurve_data
-            grp_lc = QGroupBox(self.tr("Light curve"))
-            glc = QVBoxLayout(grp_lc)
-            chk_tpl = QCheckBox(self.tr("Show template"))
-            chk_tpl.setChecked(True)
-            glc.addWidget(chk_tpl)
-            lchart = LightCurveChart()
-            lchart.setMinimumHeight(220)
-            glc.addWidget(lchart, stretch=1)
-            lcurve_pts = fu.list_points(db, pid)
-            if lcurve_pts:
-                payload = lightcurve_data.build_payload(
-                    {"points": lcurve_pts,
-                     "sn_type": ctx.get("sn_type")},
-                    sn_type_fallback=ctx.get("sn_type") or ctx.get("otype"),
-                    variable=ctx.get("variable"))
-                lchart.set_data(
-                    payload["points"],
-                    sn_type=payload.get("sn_type"),
-                    peak_mjd=payload.get("peak_mjd"),
-                    peak_mag=payload.get("peak_mag"),
-                    fold_period_d=payload.get("fold_period_d"),
-                    epoch_mjd=payload.get("epoch_mjd"),
-                    schematic=payload.get("schematic"))
-            chk_tpl.toggled.connect(lchart.set_template_visible)
-            layout.addWidget(grp_lc)
-            self._project_widgets["fu_curve"] = lchart
-
             # campaign summary over the saved points (ADR-044): the series
             # engine reports how the campaign goes so far, rebuilt on tab
             # open and refreshed in place after each saved point

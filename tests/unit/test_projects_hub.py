@@ -2603,3 +2603,68 @@ def test_a_project_without_a_curve_shows_no_preview(window, panel):
             break
     assert row is not None
     assert row.lbl_spark.isHidden()
+
+
+def test_the_analysis_curve_follows_the_selected_visit(window, panel):
+    # Reported: "La curva de luz que se muestre en Project details -> Analysis
+    # ha de ser la de la visita seleccionada, quizás la última". The chart
+    # drew the project's pile of points whatever visit was selected, and the
+    # panel opened with no visit selected at all.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup as fu
+    from PySide6.QtCore import Qt
+    p = _create_and_select(window, "variable", "V0526curva",
+                           {"kind": "variable"})
+    early = fu.create_session(dbmod.db, p["id"], obs_date="2026-09-28")
+    run1 = fu.create_run(dbmod.db, session_id=early, cfg={"series": {}})
+    fu.add_points(dbmod.db, [
+        {"project_id": p["id"], "session_id": early,
+         "mjd": 60297.80 + i * 0.001, "filter": "V", "mag": 12.70 + i * 0.01,
+         "err": 0.01, "source": "measure", "flags": [], "run_id": run1}
+        for i in range(2)])
+    last = fu.create_session(dbmod.db, p["id"], obs_date="2026-09-30")
+    run2 = fu.create_run(dbmod.db, session_id=last, cfg={"series": {}})
+    fu.add_points(dbmod.db, [
+        {"project_id": p["id"], "session_id": last,
+         "mjd": 60299.80 + i * 0.001, "filter": "V", "mag": 11.96 + i * 0.01,
+         "err": 0.01, "source": "measure", "flags": [], "run_id": run2}
+        for i in range(3)])
+    vp = _visits_panel(window)                  # builds the Analysis tab
+    w = window._project_widgets
+    # the newest visit is selected by itself (the list is newest first), and
+    # the chart draws ITS curve, saying which one it is
+    assert vp.current_session_id() == last
+    assert len(w["fu_curve"]._points) == 3
+    assert "2026-09-30" in w["fu_curve_what"].text()
+    # select the earlier visit: the chart follows it
+    for row in range(vp.lst.count()):
+        if vp.lst.item(row).data(Qt.UserRole) == early:
+            vp.lst.setCurrentRow(row)
+    assert len(w["fu_curve"]._points) == 2
+    assert "2026-09-28" in w["fu_curve_what"].text()
+    # and the switch to the whole project draws every night, once each
+    cmb = w["fu_curve_scope"]
+    cmb.setCurrentIndex(cmb.findData("project"))
+    assert len(w["fu_curve"]._points) == 5
+    assert "whole project" in w["fu_curve_what"].text()
+
+
+def test_the_analysis_curve_exists_for_every_kind_with_one(window, panel):
+    # Reported: "todos los proyectos, sean del tipo que sean, que tengan una
+    # gráfica fotométrica asociada, deberían presentarlo". The block was
+    # tied to sn/variable, so a transit with 1255 measured points (HAT-P-32
+    # b, on the observer's own database) had no curve in the Analysis tab.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup as fu
+    p = _create_and_select(window, "transit", "HAT-P-32 curva",
+                           {"kind": "transit"})
+    fu.add_points(dbmod.db, [
+        {"project_id": p["id"], "session_id": None,
+         "mjd": 60940.5 + i * 0.001, "filter": "V", "mag": 12.10 + i * 0.01,
+         "err": 0.01, "source": "measure", "flags": []} for i in range(4)])
+    _visits_panel(window)
+    w = window._project_widgets
+    assert w["fu_curve"] is not None
+    assert len(w["fu_curve"]._points) == 4
+    # no template for a transit: the checkbox is hidden instead of lying
+    assert w["fu_curve_tpl"].isHidden()

@@ -90,7 +90,8 @@ class VisitsPanel(QWidget):
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
                  curve_kind=True, kind=None, on_measure_click=None,
-                 measure_series=None, phase=None, parent=None):
+                 measure_series=None, phase=None, on_visit_selected=None,
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._lang = lang
@@ -99,6 +100,9 @@ class VisitsPanel(QWidget):
         self._on_measure_click = on_measure_click
         self._measure_series = measure_series
         self._phase = phase
+        # the host is told which visit is selected: the Analysis curve is
+        # the one of the visit you are looking at, not the project's pile
+        self._on_visit_selected = on_visit_selected
         # the project's kind drives what a visit carries: light-curve
         # kinds get the measurements block, MPC kinds the astrometry one
         self._kind = kind if kind is not None else (
@@ -184,7 +188,15 @@ class VisitsPanel(QWidget):
                 if self.lst.item(row).data(Qt.UserRole) == sel:
                     self.lst.setCurrentRow(row)
                     break
+        elif n:
+            # A fresh open selects the newest visit (the list is newest
+            # first): "the visit you are looking at" has to be a real one,
+            # and the Analysis curve, the Open button and the report all
+            # hang from it. Measured: without it the panel opened with
+            # nothing selected and the curve had no night to show.
+            self.lst.setCurrentRow(0)
         self.btn_open.setEnabled(self.current_session_id() is not None)
+        self._tell_selection()
 
     def _show_empty(self, flag):
         # @args: flag - no visits exist
@@ -194,6 +206,20 @@ class VisitsPanel(QWidget):
 
     def _on_select(self):
         self.btn_open.setEnabled(self.current_session_id() is not None)
+        self._tell_selection()
+
+    def _tell_selection(self):
+        # The host follows the selection (the Analysis curve is the visit's).
+        # A callback that throws must never break the list.
+        # @return: None
+        if self._on_visit_selected is None:
+            return
+        try:
+            self._on_visit_selected(self.current_session_id())
+        except Exception as err:                # never kills the panel
+            import logging
+            logging.getLogger(__name__).warning(
+                "visit-selection callback failed: %s", err)
 
     # ------------------------------------------------- the visit window
 

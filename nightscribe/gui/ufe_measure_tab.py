@@ -180,6 +180,17 @@ class UfeMeasureTab(QWidget):
         self._radii_manual = False   # True once the observer edits a spin
         for spn in (self.spn_rap, self.spn_rin, self.spn_rout):
             spn.valueChanged.connect(self._on_radii_edited)
+        # Centre nudge (like the blink's alignment): the observer moves the
+        # measurement centre in 0.5 px steps and the centroid refines again
+        # around it. Session-only: a new click or plate starts at (0, 0).
+        self._nudge = [0.0, 0.0]
+        self.lbl_nudge = self._ui.lbl_nudge
+        self.lbl_nudge.setText("(0.0, 0.0)")         # data, not text
+        self._ui.btn_up.clicked.connect(lambda: self._nudge_step(0.0, 0.5))
+        self._ui.btn_left.clicked.connect(lambda: self._nudge_step(-0.5, 0.0))
+        self._ui.btn_right.clicked.connect(lambda: self._nudge_step(0.5, 0.0))
+        self._ui.btn_down.clicked.connect(lambda: self._nudge_step(0.0, -0.5))
+        self._ui.btn_nudge_reset.clicked.connect(self._on_nudge_reset)
         self.btn_advanced = self._ui.btn_advanced
         self.btn_advanced.clicked.connect(self._open_advanced)
         # the sequence IS the calibration: adding or removing a comparison
@@ -718,6 +729,7 @@ class UfeMeasureTab(QWidget):
         self.setEnabled(self._state.has_image)
         self._say("")
         self._update_saturate_hint()
+        self._reset_nudge()
 
     # -------------------------------------------------------- measuring
 
@@ -761,6 +773,7 @@ class UfeMeasureTab(QWidget):
                 "«Build the sequence…»."))
             return
         self._last_suggestions = []     # a new target: stale reasons go
+        self._reset_nudge()             # a new click starts at (0, 0)
         col, row = self._state.scene_to_data(scene_pt.x(), scene_pt.y())
         self._prefill_bv_from_field(col, row)
         self._measure(col, row, entries)
@@ -976,11 +989,37 @@ class UfeMeasureTab(QWidget):
 
     def _remeasure(self):
         # Re-runs the current measurement with the current controls (the
-        # aperture spins live-edit the result).
+        # aperture spins live-edit the result). The centre is the original
+        # click plus the observer's nudge, NOT the refined centroid: adding
+        # the offset to a value that already moved would double-count it.
         if self._last is None or not self._state.has_image:
             return
         entries = self._sequence()
-        self._measure(self._last["col"], self._last["row"], entries)
+        base = self._last.get("click") or (self._last["col"],
+                                           self._last["row"])
+        self._measure(base[0] + self._nudge[0], base[1] + self._nudge[1],
+                      entries, click=base)
+
+    def _nudge_step(self, dx, dy):
+        # One 0.5 px step of the measurement centre, like the blink's
+        # alignment; the centroid is refined again around the new centre.
+        # @args: dx, dy - step in plate pixels
+        if self._last is None:
+            return
+        self._nudge[0] += dx
+        self._nudge[1] += dy
+        self.lbl_nudge.setText(
+            f"({self._nudge[0]:+.1f}, {self._nudge[1]:+.1f})")
+        self._remeasure()
+
+    def _reset_nudge(self):
+        # Back to the clicked centre (no re-measure: the caller decides).
+        self._nudge = [0.0, 0.0]
+        self.lbl_nudge.setText("(0.0, 0.0)")
+
+    def _on_nudge_reset(self):
+        self._reset_nudge()
+        self._remeasure()
 
     def _apertures(self, entries):
         # H3: when the seeing checkbox is on, measure the comps' FWHM on
@@ -1045,7 +1084,7 @@ class UfeMeasureTab(QWidget):
         lbl.setText(self.tr("auto: {0}").format(" · ".join(parts)) if parts
                     else self.tr("auto: no ceiling known (plateau only)"))
 
-    def _measure(self, col, row, entries):
+    def _measure(self, col, row, entries, click=None):
         # Build the recipe from the widgets and Ajustes, run the core
         # single-plate function (phase 1 of the series plan: one recipe,
         # shared with the series engine), and paint the outcome.
@@ -1101,7 +1140,9 @@ class UfeMeasureTab(QWidget):
             "band": res.band, "used": res.used, "derived": res.derived,
             "inst_t": res.inst_t, "fwhm": res.fwhm, "radii": res.radii,
             "scint": res.scint, "check": res.check, "col": res.col,
-            "row": res.row, "click": (col, row), "skipped": res.skipped,
+            "row": res.row,
+            "click": click if click is not None else (col, row),
+            "skipped": res.skipped,
             "bands_avail": res.bands_avail,
             "match": self._field_match(res.col, res.row),
             "sky_mode": res.sky_mode, "sigma_clip": res.sigma_clip,

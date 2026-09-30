@@ -175,6 +175,10 @@ apertura diferencial de una placa):
   apertura** (apertura, anillo interior y exterior): tocar un radio
   re-mide el punto al instante, y tu ajuste manual manda sobre el
   auto-seeing hasta que cargues otra placa (o rearms la casilla).
+* **Centro**: las flechas ↑ ← → ↓ mueven el centro de la medida en pasos
+  de 0,5 px (como la alineación del blink) y el centroide se refina otra
+  vez alrededor; el botón **0** vuelve al centro del clic. Un clic nuevo
+  empieza en (0,0). Sirve cuando el centroide se engancha a un vecino.
 * **Avanzado…** abre la receta completa en otra ventana pequeña y no
   modal (se puede dejar abierta mientras se mide): modelo de **cielo**
   (mediana plana o plano inclinado para núcleos galácticos),

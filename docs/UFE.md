@@ -171,6 +171,10 @@ differential aperture photometry):
   re-measures the point at once, and your hand edit wins over the
   seeing auto-scale until you load another plate (or re-arm the
   checkbox).
+* **Centre**: the arrows ↑ ← → ↓ move the measurement centre in 0.5 px
+  steps (like the blink's alignment) and the centroid refines again
+  around it; the **0** button returns to the clicked centre. A new click
+  starts at (0,0). It helps when the centroid locks onto a neighbour.
 * **Advanced...** opens the full recipe in another small non-modal
   window (you can leave it open while measuring): the **sky** model
   (flat median or a tilted plane for galactic cores), **sigma-clip** of

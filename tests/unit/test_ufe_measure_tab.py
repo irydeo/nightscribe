@@ -2180,3 +2180,33 @@ def test_the_reloaded_curve_keeps_the_axis_it_was_measured_on(dlg):
     tab.set_visit_curve_hooks(
         lambda: {"points": _visit_points(4), "zp_mode": "catalog"}, None)
     assert tab.chart_series._mag_mode == MAG_CALIBRATED
+
+
+def test_centre_nudge_moves_the_measurement(dlg, monkeypatch):
+    # like the blink's alignment: 0.5 px steps move the measurement centre
+    # and the point is measured again from there
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    seen = []
+    real = phot.measure_plate
+    monkeypatch.setattr(
+        phot, "measure_plate",
+        lambda image, cfg: (seen.append(cfg.target_xy), real(image, cfg))[1])
+    _click(dlg, *dlg._test_target)
+    click = tab._last["click"]
+    assert seen[-1] == pytest.approx(click)
+    tab._nudge_step(0.5, 0.0)
+    assert seen[-1][0] == pytest.approx(click[0] + 0.5)
+    assert seen[-1][1] == pytest.approx(click[1])
+    assert tab.lbl_nudge.text() == "(+0.5, +0.0)"
+    # the reset button goes back to the clicked centre and re-measures
+    tab._nudge_step(0.0, -0.5)
+    tab._on_nudge_reset()
+    assert tab._nudge == [0.0, 0.0]
+    assert seen[-1] == pytest.approx(click)
+    # a new click starts at (0, 0) too
+    tab._nudge_step(0.5, 0.5)
+    _click(dlg, *dlg._test_target)
+    assert tab._nudge == [0.0, 0.0]
+    assert seen[-1] == pytest.approx(click)

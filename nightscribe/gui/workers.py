@@ -12,6 +12,7 @@
 ############################################################
 
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
@@ -206,6 +207,93 @@ class UfeSolveWorker(QThread):
             logger.exception("ufe solve worker failed: %s", err)
             cards = None
         self.finished.emit(cards or {})
+
+
+class VisitSolveWorker(QThread):
+    # Solves a whole visit's frames off the GUI thread (ADR-051).
+    #
+    # A visit is ONE field: the 35 frames of the real V0526 Per visit are the
+    # same pointing, and none of them carries a position or a scale of its
+    # own (FOCALLEN=0, no RA/DEC). Solved one by one by hand that was 35 x
+    # 66 s (measured: the sky sweep); with the field known it is 35 x 0.13 s.
+    #
+    # The batch SKIPS what is already done (a frame whose header carries a
+    # WCS, or one the app solved before and has cached) and, when nothing
+    # knows where the field is, solves the FIRST frame blind and lets the
+    # rest follow its field: one minute once instead of an hour.
+    progress = Signal(int, int, str)     # (done, total, file name)
+    finished = Signal(object)            # the summary dict (see run)
+    failed = Signal(str)                 # an unexpected error, in English
+
+    def __init__(self, paths, pointing=None, open_path=None):
+        super().__init__()
+        self._paths = list(paths)
+        self._pointing = pointing
+        self._open_path = str(open_path) if open_path else None
+        self._cancel = False
+        self._frame_cancel = None
+
+    def cancel(self):
+        # Asked by the dialog: the batch stops between frames, and the frame
+        # being solved right now is killed through the same SolveCancel the
+        # single solve uses.
+        # @return: None
+        self._cancel = True
+        if self._frame_cancel is not None:
+            self._frame_cancel.set()
+
+    def run(self):
+        from ..core import solve as solve_mod
+        from ..core import wcs_store
+        out = {"solved": 0, "skipped": 0, "failed": 0, "not_written": 0,
+               "failures": [], "cancelled": False, "cards": None}
+        total = len(self._paths)
+        pointing = self._pointing
+        for i, path in enumerate(self._paths):
+            if self._cancel:
+                out["cancelled"] = True
+                break
+            self.progress.emit(i, total, Path(path).name)
+            cards = solve_mod.solved_cards(path)
+            if cards is not None:
+                out["skipped"] += 1
+            else:
+                cancel = solve_mod.SolveCancel()
+                self._frame_cancel = cancel
+                if self._cancel:
+                    cancel.set()
+                try:
+                    cards = solve_mod.solve(path, pointing=pointing,
+                                            cancel=cancel)
+                except Exception as err:   # never crash the GUI thread
+                    logger.exception("visit solve failed on %s: %s", path, err)
+                    cards = None
+                self._frame_cancel = None
+                if cards:
+                    done, err = wcs_store.persist_solution(path, cards)
+                    if not done and err:
+                        # solved but not saved: the observer must know, or
+                        # the visit would look solved and be forgotten
+                        logger.warning("visit solve: cannot write %s: %s",
+                                       Path(path).name, err)
+                        out["not_written"] += 1
+                    out["solved"] += 1
+                else:
+                    out["failed"] += 1
+                    out["failures"].append(Path(path).name)
+            if pointing is None and cards:
+                # the field, learned from the first frame that worked: the
+                # pilot solve, or a frame that arrived already solved
+                ra, dec = cards.get("CRVAL1"), cards.get("CRVAL2")
+                if ra is not None and dec is not None:
+                    pointing = (ra, dec)
+            if self._open_path and str(path) == self._open_path and cards:
+                out["cards"] = cards
+            if self._cancel:
+                out["cancelled"] = True
+                break
+        self.progress.emit(total, total, "")
+        self.finished.emit(out)
 
 
 class UfeFieldWorker(QThread):

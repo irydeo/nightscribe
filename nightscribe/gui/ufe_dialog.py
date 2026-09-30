@@ -93,6 +93,8 @@ class UfeDialog(QDialog):
         self._last_dir = ""
         self._solve_worker = None   # UfeSolveWorker while a solve runs
         self._solve_wait = None     # the busy dialog shown while it runs
+        self._visit_worker = None   # VisitSolveWorker: the visit's batch
+        self._visit_wait = None     # its bar, with a real Cancel
         self._save_hook = None      # fn(paths, kind, payload) when the
                                     # editor was opened from a project:
                                     # files written get registered there
@@ -621,6 +623,13 @@ class UfeDialog(QDialog):
             self.tab_measure.shutdown()
         except Exception as err:      # a failed cleanup never blocks close
             logger.warning("measure tab shutdown failed: %s", err)
+        # and the visit's batch: a QThread destroyed while it runs aborts
+        # the whole application (the same trap the tabs document)
+        worker = getattr(self, "_visit_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.cancel()
+            worker.wait(5000)
+        self._visit_worker = None
         super().closeEvent(event)
 
     # -------------------------------------------------------- extension
@@ -908,6 +917,9 @@ class UfeDialog(QDialog):
         vp.btn_frame_next.clicked.connect(
             lambda: self._goto_frame(self._frame_index + 1))
         vp.btn_frame_first.clicked.connect(self._frame_first)
+        vp.btn_solve_visit.clicked.connect(self._on_solve_visit)
+        # the .ui owns the wording; the disabled case needs its own reason
+        self._visit_solve_tip = vp.btn_solve_visit.toolTip()
         vp.btn_exotic_reduce.clicked.connect(self._notify_exotic_reduce)
         vp.btn_exotic_export.clicked.connect(self._notify_exotic_export)
         self.tab_compare.sequence_changed.connect(self._sync_exotic_block)
@@ -944,6 +956,176 @@ class UfeDialog(QDialog):
         vp.btn_frame_prev.setEnabled(n > 0 and self._frame_index > 0)
         vp.btn_frame_next.setEnabled(n > 0 and self._frame_index < n - 1)
         vp.btn_frame_first.setEnabled(n > 0 and self._frame_index > 0)
+        self._sync_visit_solve()
+
+    def _visit_running(self):
+        # @return: True while the visit's batch is solving frames
+        worker = getattr(self, "_visit_worker", None)
+        return worker is not None and worker.isRunning()
+
+    def _sync_visit_solve(self):
+        # The visit's own button: it needs frames and the write option. A
+        # batch that leaves 35 solutions in memory only would die with the
+        # session, so with solve_save off the button says WHY instead of
+        # doing a useless job (the observer's own decision, ADR-051).
+        # @return: None
+        btn = getattr(self.visit_panel, "btn_solve_visit", None)
+        if btn is None:
+            return
+        from ..config import config
+        frames = bool(self._visit_paths())
+        saving = bool(config.get("solve_save", True))
+        btn.setEnabled(frames and saving and not self._visit_running())
+        btn.setToolTip(self._visit_solve_tip if (frames and saving) else
+                       self.tr("Solving the visit writes the solution into "
+                               "every frame: turn on “Save the solved WCS in "
+                               "the FITS” in Settings first."))
+
+    def _visit_pointing(self):
+        # Where the visit's field is: the object the editor was opened from
+        # (a project's target), or the project's own context, which the
+        # visit hook carries. Either way it is in degrees, so there is no
+        # ambiguity to guess about.
+        # @return: (ra_deg, dec_deg) or None
+        point = self._pointing()
+        if point:
+            return point
+        ctx = (self.series_context() or {}).get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        try:
+            if ra is None or dec is None:
+                return None
+            return (float(ra), float(dec))
+        except (TypeError, ValueError):
+            return None
+
+    def _on_solve_visit(self):
+        # Solve every frame of the visit (ADR-051). A visit is one field, so
+        # the project's coordinates point the solver at it: measured, 0.13 s
+        # per frame against 66 s of sky sweep. Without coordinates the first
+        # frame is solved blind and the rest follow its field (a minute once
+        # instead of an hour), which is said before starting.
+        # @return: None
+        paths = list(self._visit_paths())
+        if not paths:
+            self.set_status(self.tr(
+                "This editor was not opened from a visit: there are no "
+                "frames to solve."))
+            return
+        if self._visit_running():
+            return
+        from ..config import config
+        if not bool(config.get("solve_save", True)):
+            self.set_status(self.tr(
+                "Solving the visit writes the solution into every frame: "
+                "turn on “Save the solved WCS in the FITS” in Settings "
+                "first."))
+            return
+        pointing = self._visit_pointing()
+        if pointing is None:
+            self.set_status(self.tr(
+                "This project has no coordinates: the first frame will be "
+                "solved blind and the rest will follow its field."))
+        else:
+            self.set_status(self.tr(
+                "Solving the visit's {0} frames…").format(len(paths)))
+        from .workers import VisitSolveWorker
+        self._visit_worker = VisitSolveWorker(
+            paths, pointing=pointing, open_path=self.state.path)
+        self._visit_worker.progress.connect(self._on_visit_progress)
+        self._visit_worker.finished.connect(self._on_visit_solved)
+        self._visit_worker.failed.connect(self._on_visit_failed)
+        self._sync_visit_solve()
+        self._show_visit_wait(len(paths))
+        self._visit_worker.start()
+
+    def _show_visit_wait(self, total):
+        # A batch is long by nature (35 frames), so this one is shown at
+        # once and with a real bar: how many are done, which one is running
+        # and a Cancel that stops it.
+        # @args: total - the visit's frame count
+        # @return: None
+        wait = QProgressDialog(self.tr("Solving the visit…"),
+                               self.tr("Cancel"), 0, max(int(total), 1), self)
+        wait.setWindowTitle(self.tr("NightScribe Image Workbench"))
+        wait.setWindowModality(Qt.NonModal)
+        wait.setMinimumDuration(0)
+        wait.setAutoClose(False)
+        wait.setAutoReset(False)
+        wait.canceled.connect(self._cancel_visit_solve)
+        wait.show()
+        self._visit_wait = wait
+
+    def _close_visit_wait(self):
+        # @return: None. Closing is the batch landing, not a Cancel: the
+        # signals are blocked so it does not stop what already ended.
+        wait = getattr(self, "_visit_wait", None)
+        if wait is not None:
+            self._visit_wait = None
+            wait.blockSignals(True)
+            wait.close()
+            wait.deleteLater()
+
+    def _cancel_visit_solve(self):
+        # @return: None. The batch stops between frames and the running one
+        # is killed right away.
+        worker = getattr(self, "_visit_worker", None)
+        if worker is not None:
+            worker.cancel()
+
+    def _on_visit_progress(self, done, total, name):
+        # @args: done - frames finished, total - the visit's count, name -
+        #        the frame being solved now
+        wait = getattr(self, "_visit_wait", None)
+        if wait is None:
+            return
+        wait.setValue(int(done))
+        if name:
+            wait.setLabelText(self.tr("Solving frame {0} of {1}: {2}")
+                              .format(done + 1, total, name[:48]))
+        else:
+            wait.setLabelText(self.tr("Solving the visit…"))
+
+    def _on_visit_solved(self, out):
+        # The batch's outcome in the observer's words, and the open frame's
+        # WCS into the editor (it was written into the file by the worker:
+        # this is the in-memory half).
+        # @args: out - the worker's summary dict
+        # @return: None
+        self._close_visit_wait()
+        self._visit_worker = None
+        self._sync_visit_solve()
+        out = out or {}
+        if out.get("cancelled"):
+            self.set_status(self.tr(
+                "Solving the visit was cancelled: {0} frames solved, {1} "
+                "already had a WCS.").format(out.get("solved", 0),
+                                             out.get("skipped", 0)))
+        else:
+            text = self.tr(
+                "Visit solved: {0} frames solved, {1} already had a WCS"
+            ).format(out.get("solved", 0), out.get("skipped", 0))
+            if out.get("failed"):
+                names = ", ".join((out.get("failures") or [])[:3])
+                text += self.tr(", {0} failed ({1})").format(out["failed"],
+                                                             names)
+            if out.get("not_written"):
+                text += self.tr(", {0} could not be written into the file"
+                                ).format(out["not_written"])
+            self.set_status(text)
+        cards = out.get("cards")
+        if cards and self.state.set_wcs_cards(cards):
+            self._drain_wcs_pending()
+
+    def _on_visit_failed(self, message):
+        # @args: message - the worker's error text (English, for the log)
+        # @return: None
+        self._close_visit_wait()
+        self._visit_worker = None
+        self._sync_visit_solve()
+        logger.warning("visit solve failed: %s", message)
+        self.set_status(self.tr("The visit could not be solved: {0}").format(
+            message), "error")
 
     def _goto_frame(self, index):
         # Loads another frame of the visit as the open plate. The Compare

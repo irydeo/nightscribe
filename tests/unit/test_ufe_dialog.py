@@ -776,3 +776,132 @@ def test_a_blind_failure_explains_itself(dlg, monkeypatch):
     dlg._on_solve()
     dlg._on_solved({})
     assert seen and "whole sky" not in seen[0]
+
+
+# ---------------- solving the whole visit (ADR-051) -------------------
+
+def _visit(dlg, paths, context=None):
+    ctx = {"pid": 1, "session_id": 2, "paths": [str(p) for p in paths]}
+    if context:
+        ctx["context"] = context
+    dlg.set_series_hook(lambda: ctx)
+
+
+def test_the_visit_solve_button_needs_frames_and_the_write_option(
+        dlg, monkeypatch):
+    # A batch leaves the visit solved ON DISK: with "save the solved WCS in
+    # the FITS" off, the 35 solutions would die with the session, so the
+    # button says why instead of doing a useless job.
+    from nightscribe.config import config
+    btn = dlg.visit_panel.btn_solve_visit
+    _visit(dlg, [])
+    assert not btn.isEnabled()
+    _visit(dlg, [MONO, MONO])
+    monkeypatch.setitem(config._data, "solve_save", True)
+    dlg._sync_visit_solve()
+    assert btn.isEnabled()
+    monkeypatch.setitem(config._data, "solve_save", False)
+    dlg._sync_visit_solve()
+    assert not btn.isEnabled()
+    assert "Settings" in btn.toolTip()
+
+
+def test_solving_a_visit_without_frames_says_so(dlg):
+    dlg.set_series_hook(None)
+    dlg._on_solve_visit()
+    assert "not opened from a visit" in dlg.status_text()
+
+
+def test_solving_the_visit_reports_and_hands_the_open_frame_its_wcs(
+        dlg, monkeypatch, tmp_path):
+    # The batch writes each solution into its file; the frame OPEN in the
+    # editor needs its cards in memory too, and the observer needs a count
+    # they can trust.
+    from nightscribe.config import config
+    from nightscribe.gui import workers
+    from PySide6.QtCore import QObject, Signal
+
+    monkeypatch.setitem(config._data, "solve_save", True)
+    frames = [tmp_path / "a.fits", tmp_path / "b.fits"]
+    for f in frames:
+        f.write_bytes(b"x")
+    _visit(dlg, frames, context={"ra_deg": 49.99038, "dec_deg": 49.86875})
+
+    class _Worker(QObject):
+        progress = Signal(int, int, str)
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, paths, pointing=None, open_path=None):
+            super().__init__()
+            self.paths = list(paths)
+            self.pointing = pointing
+            self.open_path = open_path
+
+        def start(self):
+            self.finished.emit({
+                "solved": 1, "skipped": 1, "failed": 0, "not_written": 0,
+                "failures": [], "cancelled": False,
+                "cards": {"CRVAL1": 49.9937, "CRVAL2": 49.7802,
+                          "CRPIX1": 832.0, "CRPIX2": 626.5,
+                          "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+                          "CD1_1": -0.000427, "CD1_2": 4.9e-05,
+                          "CD2_1": -4.9e-05, "CD2_2": -0.000427}})
+
+        def isRunning(self):
+            return False
+
+        def cancel(self):
+            pass
+
+    made = []
+    monkeypatch.setattr(workers, "VisitSolveWorker",
+                        lambda *a, **kw: (made.append(_Worker(*a, **kw)) or
+                                          made[-1]))
+    dlg.state.load(MONO)
+    dlg._on_solve_visit()
+    assert made and made[0].pointing == (49.99038, 49.86875)
+    assert "1 frames solved" in dlg.status_text()
+    assert dlg.state.wcs is not None              # the open frame got it
+
+
+def test_a_visit_without_coordinates_is_solved_from_its_first_frame(
+        dlg, monkeypatch, tmp_path):
+    # The project knows nothing: the batch is still worth running, because
+    # the first frame's own solution points the rest (a minute once, not
+    # an hour). It is said before starting.
+    from nightscribe.config import config
+    from nightscribe.gui import workers
+    from PySide6.QtCore import QObject, Signal
+
+    monkeypatch.setitem(config._data, "solve_save", True)
+    f = tmp_path / "a.fits"
+    f.write_bytes(b"x")
+    _visit(dlg, [f])
+    dlg.set_object(None)
+
+    class _Worker(QObject):
+        progress = Signal(int, int, str)
+        finished = Signal(object)
+        failed = Signal(str)
+
+        def __init__(self, *a, **kw):
+            super().__init__()
+            self.pointing = kw.get("pointing")
+
+        def start(self):
+            pass
+
+        def isRunning(self):
+            return False
+
+        def cancel(self):
+            pass
+
+    made = []
+    monkeypatch.setattr(workers, "VisitSolveWorker",
+                        lambda *a, **kw: (made.append(_Worker(*a, **kw)) or
+                                          made[-1]))
+    dlg._on_solve_visit()
+    assert made and made[0].pointing is None
+    assert "first frame" in dlg.status_text()

@@ -39,9 +39,11 @@ TIMEOUT_S = 900.0     # give up on a solve after this
 # Without it nova searches the whole sky.
 SEARCH_RADIUS_DEG = 5.0
 
-# WCS cards we keep from the solved wcs.fits (NAXIS stays from the user image;
-# SIP polynomial cards A_*/B_* are dropped on purpose: our WCS is plain TAN)
-_WCS_KEYS = ("CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2", "CTYPE1", "CTYPE2",
+# WCS cards we keep from a solved wcs.fits (NAXIS stays from the user image;
+# SIP polynomial cards A_*/B_* are dropped on purpose: our WCS is plain TAN).
+# Public because the whole app means the same thing by "the plate is solved":
+# the ASTAP client, the cache and the visit's batch all use this list.
+WCS_KEYS = ("CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2", "CTYPE1", "CTYPE2",
              "CUNIT1", "CUNIT2", "CD1_1", "CD1_2", "CD2_1", "CD2_2",
              "CDELT1", "CDELT2", "CROTA2", "PC1_1", "PC1_2", "PC2_1",
              "PC2_2", "IMAGEW", "IMAGEH", "EQUINOX", "RADESYS")
@@ -156,7 +158,7 @@ def _fetch_wcs(job_id):
     r = requests.get(f"{WCS_URL}/{job_id}", timeout=60)
     r.raise_for_status()
     header = fits_io.read_header(io.BytesIO(r.content))
-    cards = {k: header[k] for k in _WCS_KEYS if k in header}
+    cards = {k: header[k] for k in WCS_KEYS if k in header}
     return cards or None
 
 

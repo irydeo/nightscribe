@@ -7518,8 +7518,8 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Object mark: where the attached object sits on the plate (needs a WCS; on screen and in the exported PNG)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1549"/>
-        <location filename="../ufe_dialog.py" line="1646"/>
+        <location filename="../ufe_dialog.py" line="1731"/>
+        <location filename="../ufe_dialog.py" line="1828"/>
         <location filename="../ui/ufe_dialog.ui" line="28"/>
         <source>Solve astrometry…</source>
         <translation>Solve astrometry…</translation>
@@ -7535,94 +7535,152 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Zoom:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="472"/>
+        <location filename="../ufe_dialog.py" line="474"/>
         <source>Fit</source>
         <translation>Fit</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="473"/>
+        <location filename="../ufe_dialog.py" line="475"/>
         <source>Fit the plate to the window</source>
         <translation>Fit the plate to the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="475"/>
+        <location filename="../ufe_dialog.py" line="477"/>
         <source>Zoom {0} % (1:1 at 100)</source>
         <translation>Zoom {0} % (1:1 at 100)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="938"/>
+        <location filename="../ufe_dialog.py" line="950"/>
         <source>Frame {0}/{1}</source>
         <translation>Frame {0}/{1}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="939"/>
+        <location filename="../ufe_dialog.py" line="951"/>
         <location filename="../ui/ufe_visit_panel.ui" line="22"/>
         <source>Frame</source>
         <translation>Frame</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="940"/>
+        <location filename="../ufe_dialog.py" line="952"/>
         <source>No visit frames</source>
         <translation>No visit frames</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1014"/>
+        <location filename="../ufe_dialog.py" line="980"/>
+        <location filename="../ufe_dialog.py" line="1020"/>
+        <source>Solving the visit writes the solution into every frame: turn on “Save the solved WCS in the FITS” in Settings first.</source>
+        <translation>Solving the visit writes the solution into every frame: turn on “Save the solved WCS in the FITS” in Settings first.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1012"/>
+        <source>This editor was not opened from a visit: there are no frames to solve.</source>
+        <translation>This editor was not opened from a visit: there are no frames to solve.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1027"/>
+        <source>This project has no coordinates: the first frame will be solved blind and the rest will follow its field.</source>
+        <translation>This project has no coordinates: the first frame will be solved blind and the rest will follow its field.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1031"/>
+        <source>Solving the visit&apos;s {0} frames…</source>
+        <translation>Solving the visit&apos;s {0} frames…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1048"/>
+        <location filename="../ufe_dialog.py" line="1087"/>
+        <source>Solving the visit…</source>
+        <translation>Solving the visit…</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1084"/>
+        <source>Solving frame {0} of {1}: {2}</source>
+        <translation>Solving frame {0} of {1}: {2}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1101"/>
+        <source>Solving the visit was cancelled: {0} frames solved, {1} already had a WCS.</source>
+        <translation>Solving the visit was cancelled: {0} frames solved, {1} already had a WCS.</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1106"/>
+        <source>Visit solved: {0} frames solved, {1} already had a WCS</source>
+        <translation>Visit solved: {0} frames solved, {1} already had a WCS</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1110"/>
+        <source>, {0} failed ({1})</source>
+        <translation>, {0} failed ({1})</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1113"/>
+        <source>, {0} could not be written into the file</source>
+        <translation>, {0} could not be written into the file</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1127"/>
+        <source>The visit could not be solved: {0}</source>
+        <translation>The visit could not be solved: {0}</translation>
+    </message>
+    <message>
+        <location filename="../ufe_dialog.py" line="1196"/>
         <source>Uses the open frame and the sequence above.</source>
         <translation>Uses the open frame and the sequence above.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1016"/>
+        <location filename="../ufe_dialog.py" line="1198"/>
         <source>Build the comparison sequence first (Photometry, «Build the sequence…»).</source>
         <translation>Build the comparison sequence first (Photometry, «Build the sequence…»).</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1513"/>
-        <location filename="../ufe_dialog.py" line="1613"/>
+        <location filename="../ufe_dialog.py" line="1695"/>
+        <location filename="../ufe_dialog.py" line="1795"/>
         <source>Solving the plate…</source>
         <translation>Solving the plate…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1514"/>
+        <location filename="../ufe_dialog.py" line="1049"/>
+        <location filename="../ufe_dialog.py" line="1696"/>
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1630"/>
+        <location filename="../ufe_dialog.py" line="1812"/>
         <source>signing in to Astrometry.net</source>
         <translation>signing in to Astrometry.net</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1631"/>
+        <location filename="../ufe_dialog.py" line="1813"/>
         <source>uploading the plate</source>
         <translation>uploading the plate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1632"/>
+        <location filename="../ufe_dialog.py" line="1814"/>
         <source>Astrometry.net is solving</source>
         <translation>Astrometry.net is solving</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1633"/>
+        <location filename="../ufe_dialog.py" line="1815"/>
         <source>ASTAP is solving at the project&apos;s field</source>
         <translation>ASTAP is solving at the project&apos;s field</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1635"/>
+        <location filename="../ufe_dialog.py" line="1817"/>
         <source>ASTAP is solving</source>
         <translation>ASTAP is solving</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1636"/>
+        <location filename="../ufe_dialog.py" line="1818"/>
         <source>this plate carries no position, so ASTAP is sweeping the sky (this can take a minute)</source>
         <translation>this plate carries no position, so ASTAP is sweeping the sky (this can take a minute)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1663"/>
+        <location filename="../ufe_dialog.py" line="1845"/>
         <source>This plate carries no position of its own and the editor was not opened from a project, so the solver had to search the whole sky. Opening it from its project tells it where the field is, and the solve takes a moment.</source>
         <translation>This plate carries no position of its own and the editor was not opened from a project, so the solver had to search the whole sky. Opening it from its project tells it where the field is, and the solve takes a moment.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1693"/>
+        <location filename="../ufe_dialog.py" line="1875"/>
         <source>The solved WCS could not be written into the file ({0}); it stays in memory for this session.</source>
         <translation>The solved WCS could not be written into the file ({0}); it stays in memory for this session.</translation>
     </message>
@@ -7632,81 +7690,82 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Current zoom: 100 % is one plate pixel per screen pixel</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1304"/>
+        <location filename="../ufe_dialog.py" line="1486"/>
         <source>mag {0:.2f}</source>
         <translation>mag {0:.2f}</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1493"/>
+        <location filename="../ufe_dialog.py" line="1675"/>
         <source>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</source>
         <translation>Set your Astrometry.net API key in Settings to solve plates automatically, or solve them with ASTAP, NINA, Ekos or PixInsight and save them again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1615"/>
+        <location filename="../ufe_dialog.py" line="1797"/>
         <source>Solving: {0}…</source>
         <translation>Solving: {0}…</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1655"/>
+        <location filename="../ufe_dialog.py" line="1837"/>
         <source>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</source>
         <translation>{0} could not solve the plate. Check the solver in Settings (ASTAP path, Astrometry.net key) or solve the plate with NINA, Ekos or PixInsight and save it again.</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1600"/>
+        <location filename="../ufe_dialog.py" line="1782"/>
         <source>ASTAP and Astrometry.net</source>
         <translation>ASTAP and Astrometry.net</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1679"/>
+        <location filename="../ufe_dialog.py" line="1861"/>
         <source>The Astrometry.net solution is not usable (non-TAN WCS).</source>
         <translation>The Astrometry.net solution is not usable (non-TAN WCS).</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="580"/>
+        <location filename="../ufe_dialog.py" line="582"/>
         <source>Blink</source>
         <translation>Blink</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="590"/>
+        <location filename="../ufe_dialog.py" line="592"/>
         <source>Annotate</source>
         <translation>Annotate</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1324"/>
+        <location filename="../ufe_dialog.py" line="1506"/>
         <source>Open FITS image</source>
         <translation>Open FITS image</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1325"/>
+        <location filename="../ufe_dialog.py" line="1507"/>
         <source>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</source>
         <translation>FITS images (*.fits *.fit *.fts *.fz);;All files (*)</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="648"/>
-        <location filename="../ufe_dialog.py" line="1335"/>
+        <location filename="../ufe_dialog.py" line="657"/>
+        <location filename="../ufe_dialog.py" line="1517"/>
         <source>Could not read the FITS file:</source>
         <translation>Could not read the FITS file:</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="129"/>
-        <location filename="../ufe_dialog.py" line="647"/>
-        <location filename="../ufe_dialog.py" line="1312"/>
-        <location filename="../ufe_dialog.py" line="1334"/>
-        <location filename="../ufe_dialog.py" line="1492"/>
-        <location filename="../ufe_dialog.py" line="1515"/>
-        <location filename="../ufe_dialog.py" line="1668"/>
-        <location filename="../ufe_dialog.py" line="1678"/>
-        <location filename="../ufe_dialog.py" line="1692"/>
+        <location filename="../ufe_dialog.py" line="131"/>
+        <location filename="../ufe_dialog.py" line="656"/>
+        <location filename="../ufe_dialog.py" line="1050"/>
+        <location filename="../ufe_dialog.py" line="1494"/>
+        <location filename="../ufe_dialog.py" line="1516"/>
+        <location filename="../ufe_dialog.py" line="1674"/>
+        <location filename="../ufe_dialog.py" line="1697"/>
+        <location filename="../ufe_dialog.py" line="1850"/>
+        <location filename="../ufe_dialog.py" line="1860"/>
+        <location filename="../ufe_dialog.py" line="1874"/>
         <source>NightScribe Image Workbench</source>
         <translation>NightScribe Image Workbench</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="584"/>
+        <location filename="../ufe_dialog.py" line="586"/>
         <source>Photometry</source>
         <translation>Photometry</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="1345"/>
+        <location filename="../ufe_dialog.py" line="1527"/>
         <source>Export PNG</source>
         <translation>Export PNG</translation>
     </message>
@@ -7746,27 +7805,37 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>Back to the first frame of the visit, the reference by default</translation>
     </message>
     <message>
+        <location filename="../ui/ufe_visit_panel.ui" line="36"/>
+        <source>Solve every frame of this visit in one go. A visit is one field, so the project&apos;s own coordinates point the solver at it: each frame takes a moment instead of a minute of searching the sky. Frames that already carry a WCS are skipped, and the solution is written into each FITS (needs “Save the solved WCS in the FITS” in Settings)</source>
+        <translation>Solve every frame of this visit in one go. A visit is one field, so the project&apos;s own coordinates point the solver at it: each frame takes a moment instead of a minute of searching the sky. Frames that already carry a WCS are skipped, and the solution is written into each FITS (needs “Save the solved WCS in the FITS” in Settings)</translation>
+    </message>
+    <message>
         <location filename="../ui/ufe_visit_panel.ui" line="37"/>
+        <source>Solve the visit…</source>
+        <translation>Solve the visit…</translation>
+    </message>
+    <message>
+        <location filename="../ui/ufe_visit_panel.ui" line="43"/>
         <source>Transit reduction (EXOTIC)</source>
         <translation>Transit reduction (EXOTIC)</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_visit_panel.ui" line="40"/>
+        <location filename="../ui/ufe_visit_panel.ui" line="46"/>
         <source>Reduce and fit with EXOTIC…</source>
         <translation>Reduce and fit with EXOTIC…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_visit_panel.ui" line="40"/>
+        <location filename="../ui/ufe_visit_panel.ui" line="46"/>
         <source>Generate the visit&apos;s inits.json, run EXOTIC headless and import its light curve and fitted parameters. Uses the open frame as the reference and the sequence built above</source>
         <translation>Generate the visit&apos;s inits.json, run EXOTIC headless and import its light curve and fitted parameters. Uses the open frame as the reference and the sequence built above</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_visit_panel.ui" line="41"/>
+        <location filename="../ui/ufe_visit_panel.ui" line="47"/>
         <source>Export to EXOTIC (inits.json)…</source>
         <translation>Export to EXOTIC (inits.json)…</translation>
     </message>
     <message>
-        <location filename="../ui/ufe_visit_panel.ui" line="41"/>
+        <location filename="../ui/ufe_visit_panel.ui" line="47"/>
         <source>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter</source>
         <translation>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter</translation>
     </message>
@@ -7791,7 +7860,7 @@ Double-click a row to open its project. This strip reads the cache of the last T
         <translation>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</translation>
     </message>
     <message>
-        <location filename="../ufe_dialog.py" line="209"/>
+        <location filename="../ufe_dialog.py" line="211"/>
         <source>Histogram</source>
         <translation>Histogram</translation>
     </message>

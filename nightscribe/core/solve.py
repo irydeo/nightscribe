@@ -82,6 +82,29 @@ def cached(path):
     return None
 
 
+def solved_cards(path):
+    # The WCS the plate ALREADY has, without invoking any solver: its own
+    # header first (solved by us, by another program, or by an earlier
+    # batch) and then the app's cache (with solve_save off the file is left
+    # untouched and the cache still remembers the answer). It is what lets a
+    # visit's batch skip the frames that are done instead of solving them
+    # again.
+    # @args: path - FITS Path
+    # @return: dict of WCS cards, or None when the plate is not solved
+    from pathlib import Path as _Path
+    from . import fits_io
+    from . import wcs as wcs_mod
+    from .sources.astrometry import WCS_KEYS
+    try:
+        header, _data = fits_io.read_fits(path)
+    except Exception as err:
+        logger.warning("cannot read %s: %s", _Path(path).name, err)
+        header = {}
+    if wcs_mod.Wcs.from_header(header) is not None:
+        return {k: header[k] for k in WCS_KEYS if k in header}
+    return cached(path)
+
+
 def solve(path, progress=None, solver=None, astap_path=None, update=False,
           cancel=None, pointing=None):
     # @args: path - FITS Path, progress - optional callable(stage_text),

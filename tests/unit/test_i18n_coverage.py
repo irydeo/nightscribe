@@ -133,7 +133,13 @@ def test_the_series_window_and_the_measure_doors_translate_es():
                 ("UfeDialog", "this plate carries no position, so ASTAP is "
                  "sweeping the sky (this can take a minute)",
                  "esta placa no trae posición, así que ASTAP está barriendo "
-                 "el cielo (esto puede tardar un minuto)")):
+                 "el cielo (esto puede tardar un minuto)"),
+                # and the visit's batch, which the observer reads in the
+                # left panel and in the status line
+                ("UfeDialog", "Solve the visit…", "Resolver la visita…"),
+                ("UfeDialog", "Visit solved: {0} frames solved, {1} already "
+                 "had a WCS",
+                 "Visita resuelta: {0} tomas resueltas, {1} ya tenían WCS")):
             got = QCoreApplication.translate(ctx, src)
             assert got == want, (ctx, src, got)
     finally:

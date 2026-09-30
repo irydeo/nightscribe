@@ -51,7 +51,7 @@ from pathlib import Path
 
 from ..db import db
 from ... import paths
-from .astrometry import _WCS_KEYS
+from .astrometry import WCS_KEYS
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,7 @@ def _cards_from_wcs_file(wcs_path):
     except Exception as err:
         logger.warning("ASTAP .wcs unreadable: %s", err)
         return None, None
-    cards = {k: header[k] for k in _WCS_KEYS if k in header}
+    cards = {k: header[k] for k in WCS_KEYS if k in header}
     warning = str(header.get("WARNING") or "").strip() or None
     return (cards or None), warning
 
@@ -234,7 +234,7 @@ def _cards_from_stdout(text):
             continue
         key, _, rest = line.partition("=")
         key = key.strip()
-        if key not in _WCS_KEYS:
+        if key not in WCS_KEYS:
             continue
         val = rest.split("/")[0].strip().strip("'").strip()
         try:

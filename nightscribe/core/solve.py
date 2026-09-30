@@ -102,7 +102,7 @@ def solve(path, progress=None, solver=None, astap_path=None, update=False,
         return astap.solve(path, progress=progress, astap_path=astap_path,
                            update=update, cancel=cancel, pointing=pointing)
     if choice == "astrometry":
-        return astrometry.solve(path, progress=progress)
+        return astrometry.solve(path, progress=progress, pointing=pointing)
     # auto: local first, nova as the fallback
     cards = astap.solve(path, progress=progress, astap_path=astap_path,
                         update=update, cancel=cancel, pointing=pointing)
@@ -111,4 +111,4 @@ def solve(path, progress=None, solver=None, astap_path=None, update=False,
     if cancel is not None and cancel.is_set():
         return None             # the observer cancelled: no nova fallback
     logger.info("ASTAP did not solve; falling back to nova.astrometry.net")
-    return astrometry.solve(path, progress=progress)
+    return astrometry.solve(path, progress=progress, pointing=pointing)

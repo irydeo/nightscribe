@@ -207,7 +207,7 @@ def test_dispatcher_auto_falls_back_to_nova(tmp_path, monkeypatch):
         calls["astap"] += 1
         return None
 
-    def _nova(path, progress=None):
+    def _nova(path, progress=None, pointing=None):
         calls["nova"] += 1
         return {"CRVAL1": 1.0}
 
@@ -232,7 +232,8 @@ def test_dispatcher_auto_prefers_astap(tmp_path, monkeypatch):
     monkeypatch.setattr(astap, "solve",
                         lambda path, **k: {"CRVAL1": 9.0})
     monkeypatch.setattr(astrometry, "solve",
-                        lambda path, progress=None: {"CRVAL1": 1.0})
+                        lambda path, progress=None, pointing=None:
+                        {"CRVAL1": 1.0})
     assert solve_mod.solve(tmp_path / "p.fits", solver="auto") \
         == {"CRVAL1": 9.0}
 
@@ -305,24 +306,24 @@ class _Cfg:
 
 def test_fov_hint_prefers_the_header_scale():
     # the EXOTIC sample: IM_SCALE 5.21"/px, 500 px high -> 0.724 deg
-    assert astap._fov_hint({"IM_SCALE": 5.21, "NAXIS2": 500},
-                           _Cfg(pixel_um=11.0, focal_mm=2200.0)) \
+    assert astap.fov_hint({"IM_SCALE": 5.21, "NAXIS2": 500},
+                          _Cfg(pixel_um=11.0, focal_mm=2200.0)) \
         == pytest.approx(0.724, abs=1e-3)
     # XPIXSZ + FOCALLEN when there is no scale keyword
-    assert astap._fov_hint({"XPIXSZ": 3.76, "FOCALLEN": 2000.0,
-                            "NAXIS2": 2048}, _Cfg()) \
+    assert astap.fov_hint({"XPIXSZ": 3.76, "FOCALLEN": 2000.0,
+                           "NAXIS2": 2048}, _Cfg()) \
         == pytest.approx(0.221, abs=1e-3)
     # CDELT1 in degrees/pixel
-    assert astap._fov_hint({"CDELT1": 0.001, "NAXIS2": 500}, _Cfg()) \
+    assert astap.fov_hint({"CDELT1": 0.001, "NAXIS2": 500}, _Cfg()) \
         == pytest.approx(0.5, abs=1e-3)
 
 
 def test_fov_hint_falls_back_to_settings_then_auto():
     cfg = _Cfg(pixel_um=3.76, focal_mm=2000.0)
-    assert astap._fov_hint({"NAXIS2": 2048}, cfg) \
+    assert astap.fov_hint({"NAXIS2": 2048}, cfg) \
         == pytest.approx(0.221, abs=1e-3)          # the Settings scale
-    assert astap._fov_hint({"NAXIS2": 2048}, _Cfg()) is None   # nothing
-    assert astap._fov_hint({"IM_SCALE": 5.21}, cfg) is None    # no NAXIS2
+    assert astap.fov_hint({"NAXIS2": 2048}, _Cfg()) is None   # nothing
+    assert astap.fov_hint({"IM_SCALE": 5.21}, cfg) is None    # no NAXIS2
 
 
 def test_fov_hint_on_the_hatp32_sample():
@@ -330,7 +331,7 @@ def test_fov_hint_on_the_hatp32_sample():
     from nightscribe.core import fits_io
     p = Path(__file__).parents[1] / "fixtures" / "hatp32_sample.fits"
     h, _ = fits_io.read_fits(p)
-    assert astap._fov_hint(h, _Cfg(pixel_um=11.0, focal_mm=2200.0)) \
+    assert astap.fov_hint(h, _Cfg(pixel_um=11.0, focal_mm=2200.0)) \
         == pytest.approx(0.724, abs=1e-3)
 
 
@@ -496,3 +497,57 @@ def test_the_stage_keys_are_the_solvers_own_vocabulary(tmp_path,
     fits2 = _write_fits(tmp_path / "q.fits")
     astap.solve(fits2, astap_path=str(script), progress=said.append)
     assert "astap:solving" in said
+
+
+# ---------------- the same hint for nova (ADR-051) --------------------
+
+def test_nova_gets_the_same_hint_when_the_app_knows_the_field(tmp_path):
+    # nova's default is a whole-sky search too: minutes of queue and a good
+    # chance of failing on a plate with no position and no scale of its own
+    # (the V0526 Per frames). With the project's field and the header's own
+    # scale it searches a small box.
+    from nightscribe.core.sources import astrometry
+    fits = _write_fits(tmp_path / "p.fits")
+    hints = astrometry._hints(fits, (49.99038, 49.86875))
+    assert hints["center_ra"] == pytest.approx(49.99038)
+    assert hints["center_dec"] == pytest.approx(49.86875)
+    assert hints["radius"] == astrometry.SEARCH_RADIUS_DEG
+    # the scale travels as a width in degrees with a window (the fixture
+    # carries its own IM_SCALE: 5.21"/px, 500 px high -> 0.724 deg)
+    from nightscribe.core import fits_io
+    sample = Path(__file__).parents[1] / "fixtures" / "hatp32_sample.fits"
+    h, _ = fits_io.read_fits(sample)
+    scaled = astrometry._hints(sample, (49.99038, 49.86875))
+    assert scaled["scale_units"] == "degwidth"
+    assert scaled["scale_lower"] == pytest.approx(0.579, abs=2e-3)
+    assert scaled["scale_upper"] == pytest.approx(0.905, abs=2e-3)
+    assert scaled["center_ra"] == pytest.approx(49.99038)
+    assert h["IM_SCALE"] == 5.21
+
+
+def test_nova_without_a_pointing_asks_for_nothing_it_does_not_know(tmp_path):
+    from nightscribe.core.sources import astrometry
+    fits = _write_fits(tmp_path / "p.fits")
+    hints = astrometry._hints(fits, None)
+    assert "center_ra" not in hints and "center_dec" not in hints
+    assert "radius" not in hints
+    # a nonsense pointing is dropped, not sent
+    assert "center_ra" not in astrometry._hints(fits, ("x", None))
+
+
+def test_the_dispatcher_hands_the_pointing_to_nova(tmp_path, monkeypatch):
+    from nightscribe.core import solve as solve_mod
+    from nightscribe.core.sources import astap as astap_mod
+    from nightscribe.core.sources import astrometry
+    monkeypatch.setattr(astap_mod, "solve", lambda *a, **k: None)
+    seen = {}
+
+    def fake_nova(path, **kw):
+        seen.update(kw)
+        return {"CRVAL1": 31.3121}
+
+    monkeypatch.setattr(astrometry, "solve", fake_nova)
+    cards = solve_mod.solve(tmp_path / "p.fits", solver="auto",
+                            pointing=(49.99038, 49.86875))
+    assert cards == {"CRVAL1": 31.3121}
+    assert seen.get("pointing") == (49.99038, 49.86875)

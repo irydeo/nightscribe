@@ -321,11 +321,14 @@ def _scale_arcsec(header, config):
     return None
 
 
-def _fov_hint(header, config):
+def fov_hint(header, config=None):
     # ASTAP's -fov is the field diameter, taken as the image HEIGHT in
     # degrees (the ADR fixes it so). The old max(nx,ny) over-estimated
     # landscape plates and sent ASTAP to the wrong star database: the
     # "Found 0 references" loop (~19 s+ instead of 0.3 s).
+    # It is public because the nova client wants the same number (its
+    # scale_units=degwidth hints), and one plate has one field.
+    # @args: header - the FITS header cards, config - override or None
     # @return: fov in degrees, or None (the caller passes -fov 0 = auto)
     ny = _num(header.get("NAXIS2"))
     if not ny or ny <= 0:
@@ -397,7 +400,7 @@ def solve(path, progress=None, astap_path=None, update=False, config=None,
     # sky, which is what ATTEMPT_S is for), and last the auto field (-fov 0),
     # which reads the scale off the image itself. A wrong pointing falls
     # through to the blind ones on its own, in 0.28 s.
-    fov = _fov_hint(header, config)
+    fov = fov_hint(header, config)
     extra = []
     db_path = _database_path(binary, config)
     if db_path:

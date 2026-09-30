@@ -550,6 +550,30 @@
       <item>
        <layout class="QHBoxLayout" name="row_series_info">
         <item>
+         <widget class="QLabel" name="lbl_series_scope">
+          <property name="text">
+           <string>Frames of:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="cmb_series_scope">
+          <property name="toolTip">
+           <string>Which frames the series measures. THIS VISIT is the night you have open (the normal way). ALL THE VISITS measures every night of the project in ONE pass: each night's points are filed in its own visit, the whole pass is undone with one click, and the curve shows all the nights together (one pass per night). Only offered when the project has more than one visit with frames</string>
+          </property>
+          <item>
+           <property name="text">
+            <string>this visit</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>all visits</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+        <item>
          <widget class="QLabel" name="lbl_series_frames">
           <property name="text">
            <string>Frames: 0</string>

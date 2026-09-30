@@ -162,12 +162,23 @@ class UfePassesDialog(QDialog):
 
     def _state(self, run, is_curve):
         # @args: run - the pass, is_curve - whether the chart shows it
-        # @return: the state in plain words, with the curve's own tag
+        # @return: the state in plain words, with the curve's own tag and,
+        #          for a run of a multi-night pass, which pass it belongs
+        #          to (that is what "undo this pass" will undo)
         status = (run.get("status") or "complete").lower()
         text = self.tr(_STATE_TEXT.get(status, status))
         if is_curve:
             text += " · " + self.tr("the curve")
+        nights = self._pass_nights(run)
+        if nights:
+            text += " · " + self.tr("part of a {0}-night pass").format(nights)
         return text
+
+    def _pass_nights(self, run):
+        # @args: run - a pass row
+        # @return: how many nights its pass covers, or 0 (a single night)
+        series = (run.get("cfg") or {}).get("series") or {}
+        return int((series.get("pass") or {}).get("nights") or 0)
 
     def _say_shown(self):
         # The line under the table: WHICH pass the chart is showing, in

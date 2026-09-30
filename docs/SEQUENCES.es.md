@@ -231,7 +231,34 @@ fallback a solo escala en noches cortas o sin rango de aire. Si mezclas
 filtros, la guardia de banda avisa: no se combinan en una sola curva de
 magnitudes. Un punto cero desplazado se **marca**, nunca se calla.
 
-### 7.1 Una visita es UNA curva (y las demás pasadas siguen ahí)
+### 7.1 Una serie de varias noches, en UNA pasada
+
+Una variable que sigues toda la campaña se mide **de una vez**, no noche a
+noche. En el bloque de serie, junto al contador de tomas, está el selector
+**«this visit» / «all visits»**: solo aparece si el proyecto tiene más de una
+visita con tomas.
+
+Con **«all visits»** el motor recibe las tomas de **todas las visitas** (en
+orden de tiempo) y las mide como una sola serie. El resultado se archiva
+**una ejecución por visita**, porque una visita es una noche y cada punto
+pertenece a la noche en que se tomó: así la curva de cada visita es la suya y
+la del proyecto es la unión de las noches, una pasada por noche, que es lo que
+necesita el plegado del período. Las noches no se mezclan en la calibración:
+el punto cero, el detrend y el control de calidad son **por noche**, como
+siempre.
+
+La pasada entera es **una sola cosa** para deshacer: el botón Undo quita las
+noches de esa pasada de un clic (las ejecuciones quedan marcadas como
+deshechas, el rastro no se calla). En la puerta **Serie ▾ → Pasadas de esta
+visita…** cada noche de una pasada dice a cuál pertenece («parte de una pasada
+de 3 noches»).
+
+El **modo en vivo** sigue siendo de una visita: vigila la carpeta de hoy. Con
+«all visits» se apaga y lo dice, porque vigilar varias carpetas a la vez es
+otra cosa. Y **descartar la curva** también es por visita: con «all visits» se
+deshabilita y dice que abras la visita cuya curva quieres deshacer.
+
+### 7.2 Una visita es UNA curva (y las demás pasadas siguen ahí)
 
 Una visita puede tener **varias pasadas**: vuelves a medir la serie con otra
 banda, con otra secuencia, o solo para comprobar algo. Cada pasada guarda sus

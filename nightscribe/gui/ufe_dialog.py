@@ -889,10 +889,12 @@ class UfeDialog(QDialog):
     # ---------------------------------------------------- series hooks
 
     def set_series_hook(self, fn):
-        # @args: fn - callable() -> {"pid", "session_id", "paths"} or None.
-        #        The host arms it only when the editor was opened from a
-        #        visit; the Measure tab shows its series block only then
-        #        (D8: without a visit there is no series).
+        # @args: fn - callable(scope) -> {"pid", "session_id", "paths"} or
+        #        None, where scope is "visit" (the night open) or "project"
+        #        (every night of the project, one pass). The host arms it
+        #        only when the editor was opened from a visit; the Measure
+        #        tab shows its series block only then (D8: without a visit
+        #        there is no series).
         self._series_hook = fn if callable(fn) else None
         if hasattr(self, "tab_measure"):
             self.tab_measure.set_series_attached(self._series_hook is not None)
@@ -901,12 +903,19 @@ class UfeDialog(QDialog):
         self._sync_frame_nav()
         self._sync_exotic_block()
 
-    def series_context(self):
-        # @return: the visit context the host hooked, or None
+    def series_context(self, scope="visit"):
+        # @args: scope - "visit" (the night open) | "project" (every night
+        #        of the project, one pass)
+        # @return: the frames context the host hooked, or None
         if self._series_hook is None:
             return None
         try:
-            return self._series_hook()
+            try:
+                return self._series_hook(scope)
+            except TypeError:
+                # a host double from before the scope existed (the tests):
+                # asked without it, exactly as the tab does with the curve
+                return self._series_hook()
         except Exception as err:
             logger.warning("series hook failed: %s", err)
             return None

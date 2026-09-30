@@ -13,6 +13,7 @@
 
 import datetime
 import logging
+import uuid
 from pathlib import Path
 
 from PySide6 import Shiboken
@@ -8789,7 +8790,8 @@ class MainWindow(QMainWindow):
             # ADR-048: the visit context (its frames), the batch writer
             # for a series run and the per-run undo (D8/D9)
             dlg.set_series_hook(
-                lambda: self._ufe_series_context(hook_pid, session_id))
+                lambda scope="visit":
+                self._ufe_series_context(hook_pid, session_id, scope))
             dlg.set_points_hook(
                 lambda rows, cfg: self._ufe_points_hook(
                     hook_pid, session_id, rows, cfg))
@@ -8817,7 +8819,8 @@ class MainWindow(QMainWindow):
             curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
             if callable(curve_hooks):
                 curve_hooks(
-                    lambda: self._ufe_visit_curve(hook_pid, session_id),
+                    lambda scope="visit":
+                    self._ufe_visit_curve(hook_pid, session_id, scope),
                     lambda: self._ufe_discard_curve(hook_pid, session_id))
             # G: the project, in the list's OWN language: the badge is fed
             # by the same builder the project rows use, so the two cannot
@@ -9157,21 +9160,51 @@ class MainWindow(QMainWindow):
 
     # ---------------- UFE plate resets (ADR-047) ----------------
 
-    def _ufe_series_context(self, pid, session_id):
-        # ADR-048 (D8): the series works from the visit's frames, never a
+    def _ufe_series_context(self, pid, session_id, scope="visit"):
+        # ADR-048 (D8): the series works from a visit's frames, never a
         # folder dialog. No visit (or no FITS in it): no series block.
-        # @args: pid - project id, session_id - the visit or None
-        # @return: {"pid", "session_id", "paths"} or None
+        #
+        # MULTI-NIGHT (2026-09-30, the observer's ask): a series that runs
+        # over several nights is measured in ONE pass, so the scope
+        # "project" hands the frames of EVERY visit of the project (ordered
+        # by time). Each frame's point is then filed in its own visit: a
+        # visit is one night, and the project's curve is the union of the
+        # nights (one pass each), which is what the period search needs.
+        # @args: pid - project id, session_id - the visit or None, scope -
+        #        "visit" | "project"
+        # @return: {"pid", "session_id", "paths", "kind", "context",
+        #           "scope", "nights"} or None
         if session_id is None:
             return None
+        p = project.get(db, pid) or {}
+        if scope == "project":
+            files = [f for f in project.list_files(db, pid)
+                     if f.get("kind") == "fits" and f.get("path")
+                     and f.get("session_id") is not None]
+            # the frames in time order: the engine sorts them by their own
+            # mjd too, but the reference frame is the one on stage
+            paths = sorted({f["path"] for f in files})
+            nights = {f["session_id"] for f in files}
+            if not paths:
+                return None
+            return {"pid": pid, "session_id": session_id, "paths": paths,
+                    "kind": p.get("kind"), "context": p.get("context") or {},
+                    "scope": "project", "nights": len(nights)}
         files = project.files_for_session(db, session_id)
         paths = sorted(f["path"] for f in files
                        if f.get("kind") == "fits" and f.get("path"))
         if not paths:
             return None
-        p = project.get(db, pid) or {}
+        # how many visits of this project hold frames: the tab offers the
+        # multi-night scope only when there is more than one (one visit is
+        # the same thing under another name)
+        visits = {f.get("session_id") for f in project.list_files(db, pid)
+                  if f.get("kind") == "fits" and f.get("path")
+                  and f.get("session_id") is not None}
         return {"pid": pid, "session_id": session_id, "paths": paths,
-                "kind": p.get("kind"), "context": p.get("context") or {}}
+                "kind": p.get("kind"), "context": p.get("context") or {},
+                "scope": "visit", "nights": 1,
+                "visits": len(visits)}
 
     def _ufe_points_hook(self, pid, session_id, rows, cfg):
         # ADR-048 (D9): one series run = one measurement_runs row; its
@@ -9187,26 +9220,58 @@ class MainWindow(QMainWindow):
         from ..core import followup as fu
         echo = dict(cfg or {})
         status = echo.pop("status", None) or "complete"
+        by_path = {f["path"]: f for f in project.list_files(db, pid)
+                   if f.get("kind") == "fits"}
         # a live batch continues the run its session opened (one live
         # session, one run): the points pile into it, so the curve reloaded
         # from the project is the whole session and "undo" is one click
         append = echo.pop("append_run", None)
         run_id = fu.reusable_run(db, append, session_id)
-        if run_id is None:
-            run_id = fu.create_run(db, session_id=session_id,
-                                   cfg={"series": echo}, status=status)
-        by_path = {f["path"]: f["id"]
-                   for f in project.list_files(db, pid)
-                   if f.get("kind") == "fits"}
+        if run_id is not None:
+            for r in rows:
+                r["project_id"] = pid
+                r["session_id"] = session_id
+                r["run_id"] = run_id
+                r["file_id"] = (by_path.get(r.get("path")) or {}).get("id")
+            if rows:
+                fu.add_points(db, rows)
+            self.statusBar().showMessage(
+                self.tr("Series saved: {} points").format(len(rows)), 8000)
+            self._project_selected()
+            return run_id
+        # ONE PASS, ONE RUN PER VISIT. A multi-night pass measures the
+        # frames of several visits in one go, and each frame's points are
+        # filed in ITS OWN visit: a visit is one night, so the visit's
+        # curve and the project's (the union of the nights) both read
+        # right, and the whole pass shares a group id so "undo" takes it
+        # all. A single-visit run resolves to one group and is exactly
+        # what it always was.
+        groups = {}
         for r in rows:
+            f = by_path.get(r.get("path")) or {}
+            sid = f.get("session_id") or session_id
             r["project_id"] = pid
-            r["session_id"] = session_id
-            r["run_id"] = run_id
-            r["file_id"] = by_path.get(r.get("path"))
-        if rows:
-            fu.add_points(db, rows)
-        self.statusBar().showMessage(
-            self.tr("Series saved: {} points").format(len(rows)), 8000)
+            r["session_id"] = sid
+            r["file_id"] = f.get("id")
+            groups.setdefault(sid, []).append(r)
+        group = uuid.uuid4().hex if len(groups) > 1 else None
+        run_id = None
+        for sid, own in groups.items():
+            run_echo = dict(echo)
+            if group:
+                run_echo["pass"] = {"group": group, "nights": len(groups)}
+            run_id = fu.create_run(db, session_id=sid,
+                                   cfg={"series": run_echo}, status=status)
+            for r in own:
+                r["run_id"] = run_id
+            fu.add_points(db, own)
+        if group:
+            self.statusBar().showMessage(
+                self.tr("Series saved: {} points over {} nights, one run "
+                        "each").format(len(rows), len(groups)), 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Series saved: {} points").format(len(rows)), 8000)
         self._project_selected()
         return run_id
 
@@ -9227,9 +9292,25 @@ class MainWindow(QMainWindow):
     def _ufe_run_undo(self, run_id):
         # ADR-048 (D6): undo one run's points, keep the run row for the
         # audit trail, and refresh the project view.
+        #
+        # A run that belongs to a MULTI-NIGHT pass (2026-09-30) takes its
+        # whole pass with it: the observer measured one series in one go,
+        # so "undo" has to undo the series and not one of its nights.
         # @args: run_id - the run to undo
         # @return: the number of points deleted
         from ..core import followup as fu
+        group = fu.run_pass_group(db, run_id)
+        if group:
+            runs = fu.runs_in_pass(db, group)
+            count = 0
+            for run in runs:
+                count += fu.delete_points_for_run(db, run["id"])
+                fu.set_run_status(db, run["id"], "undone")
+            self.statusBar().showMessage(
+                self.tr("Pass undone: {} points over {} nights").format(
+                    count, len(runs)), 8000)
+            self._project_selected()
+            return count
         count = fu.delete_points_for_run(db, run_id)
         fu.set_run_status(db, run_id, "undone")
         self.statusBar().showMessage(
@@ -9237,7 +9318,58 @@ class MainWindow(QMainWindow):
         self._project_selected()
         return count
 
-    def _ufe_visit_curve(self, pid, session_id):
+    def _curve_payload(self, points):
+        # The stored rows shaped for the chart: the band each point's run
+        # was calibrated in, the plate it was measured on (so the image's
+        # band matches it by PATH) and, when that run asked for it, the
+        # detrended curve (refitted here: the same points with the same
+        # airmass give the same coefficients).
+        #
+        # The detrend is applied RUN BY RUN on purpose: one run is one
+        # night, and a multi-night curve has one policy per night. Fitting
+        # the whole curve with one policy would smear a night into another.
+        # @args: points - followup rows (a visit's curve, or the project's)
+        # @return: [point dicts] raw + detrended, as the chart reads them
+        from ..core import followup as fu, project as project_mod
+        from ..core import series_measure
+        runs, paths = {}, {}
+        for p in points:
+            rid = p.get("run_id")
+            if rid is not None and rid not in runs:
+                runs[rid] = fu.get_run(db, rid) or {}
+            fid = p.get("file_id")
+            if fid is not None and fid not in paths:
+                paths[fid] = (project_mod.get_file(db, fid) or {}).get("path")
+        raw, by_run = [], {}
+        for p in points:
+            if p.get("mjd") is None or p.get("mag") is None:
+                continue
+            cfg = (runs.get(p.get("run_id")) or {}).get("cfg") or {}
+            band = (cfg.get("series") or {}).get("band")
+            shaped = {"mjd": p["mjd"], "mag": p["mag"], "err": p.get("err"),
+                      "err_internal": p.get("err_internal"),
+                      "mag_raw": p.get("mag_raw"),
+                      "filter": p.get("filter") or band,
+                      "flags": list(p.get("flags") or []),
+                      "path": paths.get(p.get("file_id")),
+                      # the NIGHT travels with the point (v14): the night
+                      # figures are drawn from these, so a curve read back
+                      # from the visit explains its night without measuring
+                      "airmass": p.get("airmass"), "x": p.get("x"),
+                      "y": p.get("y"), "fwhm": p.get("fwhm"),
+                      "sky": p.get("sky"),
+                      "source": "measure"}
+            raw.append(shaped)
+            by_run.setdefault(p.get("run_id"), []).append(shaped)
+        out = list(raw)
+        for rid, own in by_run.items():
+            cfg = (runs.get(rid) or {}).get("cfg") or {}
+            policy = (cfg.get("series") or {}).get("detrend_policy")
+            if policy and policy != "off":
+                out += series_measure.detrend_stored(own, policy)
+        return out
+
+    def _ufe_visit_curve(self, pid, session_id, scope="visit"):
         # The curve a visit already holds (D): the series points saved in
         # the project for THAT visit, shaped for the chart. No frame is
         # read and nothing is asked of the observer.
@@ -9247,55 +9379,33 @@ class MainWindow(QMainWindow):
         # else the last one measured). Drawing all of them at once is the
         # reported corruption: 976 points at two levels joined by a zigzag.
         #
-        # Two facts the stored points no longer carry travel back with
-        # them, from the RUN: the band the calibration used (the frames of
-        # a real series had no FILTER keyword, so a curve in G said "no
-        # filter" and reached AAVSO with an empty filter) and the detrend
-        # choice (refitted here, which is deterministic: the same points
-        # with the same airmass give the same coefficients).
-        # @args: pid - project id, session_id - the visit or None
+        # MULTI-NIGHT (the same day): with the scope "project" the chart
+        # draws the PROJECT's curve, which is the union of its nights, one
+        # pass per night: that is what a series measured across several
+        # nights has to show, and what the period search reads.
+        # @args: pid - project id, session_id - the visit or None, scope -
+        #        "visit" | "project"
         # @return: {"points": [point dicts], "zp_mode": "catalog" |
-        #          "relative"} (the raw curve, plus the detrended one when
-        #          the run asked for it), or {} when there is no curve
-        from ..core import followup as fu, project as project_mod
-        from ..core import series_measure
+        #          "relative"}, or {} when there is no curve
+        from ..core import followup as fu
         if session_id is None:
             return {}
+        if scope == "project":
+            points = fu.list_points(db, pid)
+            # a project curve is on the differential axis only when EVERY
+            # night it holds was measured that way (mixing the two is not
+            # a curve, it is two)
+            modes = set()
+            for p in points:
+                run = fu.get_run(db, p.get("run_id")) or {}
+                cfg = (run.get("cfg") or {}).get("series") or {}
+                modes.add(cfg.get("zp_mode") or "catalog")
+            mode = "relative" if modes == {"relative"} else "catalog"
+            return {"points": self._curve_payload(points), "zp_mode": mode}
         run = fu.get_run(db, fu.curve_run_for_session(db, session_id)) or {}
         series_cfg = (run.get("cfg") or {}).get("series") or {}
-        band = series_cfg.get("band")
         points = fu.points_for_session(db, session_id)
-        # the plate each point was measured on, resolved once: the strip
-        # over the image matches the open frame by PATH (exact) and falls
-        # back to the time, so a reloaded curve still answers for it
-        paths = {}
-        for p in points:
-            fid = p.get("file_id")
-            if fid is not None and fid not in paths:
-                paths[fid] = (project_mod.get_file(db, fid) or {}).get("path")
-        out = []
-        for p in points:
-            if p.get("mjd") is None or p.get("mag") is None:
-                continue
-            out.append({"mjd": p["mjd"], "mag": p["mag"], "err": p.get("err"),
-                        "err_internal": p.get("err_internal"),
-                        "mag_raw": p.get("mag_raw"),
-                        "filter": p.get("filter") or band,
-                        "flags": list(p.get("flags") or []),
-                        "path": paths.get(p.get("file_id")),
-                        # the NIGHT travels with the point (v14): the night
-                        # figures are drawn from these fields, so a curve
-                        # read back from the visit explains its night
-                        # without measuring anything again. Dropping them
-                        # here is what made those figures refuse.
-                        "airmass": p.get("airmass"), "x": p.get("x"),
-                        "y": p.get("y"), "fwhm": p.get("fwhm"),
-                        "sky": p.get("sky"),
-                        "source": "measure"})
-        policy = series_cfg.get("detrend_policy")
-        if policy and policy != "off" and out:
-            out += series_measure.detrend_stored(out, policy)
-        return {"points": out,
+        return {"points": self._curve_payload(points),
                 "zp_mode": ("relative" if series_cfg.get("zp_mode")
                             == "relative" else "catalog")}
 

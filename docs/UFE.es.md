@@ -219,6 +219,15 @@ Para entender cómo se mide después la fotometría con estas secuencias:
 
 ## La curva de una visita: una noche, una pasada
 
+El bloque de serie mide **una visita** (una noche) por defecto. Cuando el
+proyecto tiene más de una visita con tomas, junto al contador aparece el
+selector **«this visit» / «all visits»**: con «all visits» el motor mide las
+tomas de **todas las visitas** en una sola pasada, cada noche se archiva en su
+visita (una ejecución por noche) y el gráfico enseña la curva del proyecto, la
+unión de las noches. El modo en vivo y «descartar la curva» son de una visita:
+con «all visits» se apagan y dicen por qué.
+
+
 Cuando el editor se abre desde una visita, el gráfico del centro dibuja **la
 curva que la visita ya tiene**, leída del proyecto: no se mide nada otra vez.
 

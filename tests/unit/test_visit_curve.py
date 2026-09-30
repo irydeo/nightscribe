@@ -241,3 +241,126 @@ def test_the_run_echo_never_carries_the_append_marker(window, visit):
     row = mw.db.execute("SELECT cfg_json FROM measurement_runs WHERE id=?",
                         (first,)).fetchone()
     assert "append_run" not in json.loads(row[0])
+
+
+# ---------------- multi-night: one pass, one run per visit -------------
+#
+# The observer's ask (2026-09-30): "en las secuencias multi-noche, en UFE no
+# se cargan las imágenes de una visita (una noche), se han de cargar las de
+# todas las visitas". A series that runs over several nights is measured in
+# ONE pass: the frames of every visit, and each night's points filed in the
+# visit that night is, so the visit's curve and the project's both read
+# right.
+
+def _frames(window, pid, sid, tag, n=2):
+    # registers n frames of a visit and returns their paths
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import project as project_mod
+    out = []
+    for i in range(n):
+        path = f"/tmp/{tag}-{i}.fits"
+        project_mod.add_file(mw.db, pid, path, "fits", session_id=sid,
+                             meta={})
+        out.append(path)
+    return out
+
+
+def _rows_for(paths, mag0=12.0, filter_name=None, airmass0=None):
+    # filter_name None is what a real series sends when the frames carry no
+    # FILTER keyword: the point then says the band the calibration used.
+    # airmass0 is what the detrend needs (a night without airmass has no
+    # detrended curve, which is honest and tested above).
+    out = []
+    for i, path in enumerate(paths):
+        row = {"mjd": 60940.5 + i * 0.002, "filter": filter_name,
+               "mag": mag0 + i * 0.01, "err": 0.01, "mag_raw": -9.5 + i,
+               "path": path, "flags": [], "source": "measure"}
+        if airmass0 is not None:
+            row["airmass"] = airmass0 + i * 0.05
+        out.append(row)
+    return out
+
+
+def test_the_multi_night_scope_hands_the_frames_of_every_visit(window, visit):
+    pid, sid = visit
+    from nightscribe.core import followup as fu
+    other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
+    _frames(window, pid, sid, "night-a", 2)
+    _frames(window, pid, other, "night-b", 3)
+    one = window._ufe_series_context(pid, sid, "visit")
+    assert len(one["paths"]) == 2 and one["visits"] == 2
+    allof = window._ufe_series_context(pid, sid, "project")
+    assert len(allof["paths"]) == 5            # every night, one pass
+    assert allof["nights"] == 2 and allof["scope"] == "project"
+
+
+def mw_db():
+    import nightscribe.gui.main_window as mw
+    return mw.db
+
+
+def test_a_multi_night_pass_writes_one_run_per_visit(window, visit):
+    pid, sid = visit
+    from nightscribe.core import followup as fu
+    other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
+    a = _frames(window, pid, sid, "pass-a", 2)
+    b = _frames(window, pid, other, "pass-b", 3)
+    run_id = window._ufe_points_hook(pid, sid, _rows_for(a + b), {"band": "V"})
+    assert run_id is not None
+    # two runs (one per night), each holding ITS night's points
+    assert len(fu.points_for_session(mw_db(), sid)) == 2
+    assert len(fu.points_for_session(mw_db(), other)) == 3
+    # and both belong to the same pass
+    group = fu.run_pass_group(mw_db(), run_id)
+    assert group
+    runs = fu.runs_in_pass(mw_db(), group)
+    assert len(runs) == 2
+    assert {r["session_id"] for r in runs} == {sid, other}
+    # the project's curve is the two nights, once each
+    assert len(fu.list_points(mw_db(), pid)) == 5
+
+
+def test_undoing_a_multi_night_pass_undoes_every_night(window, visit):
+    pid, sid = visit
+    from nightscribe.core import followup as fu
+    other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
+    a = _frames(window, pid, sid, "undo-a", 2)
+    b = _frames(window, pid, other, "undo-b", 3)
+    run_id = window._ufe_points_hook(pid, sid, _rows_for(a + b), {"band": "V"})
+    assert window._ufe_run_undo(run_id) == 5     # the WHOLE pass, one click
+    assert fu.points_for_session(mw_db(), sid) == []
+    assert fu.points_for_session(mw_db(), other) == []
+    # the trail stays: the runs are marked, not deleted
+    assert {r["status"] for r in fu.runs_in_pass(mw_db(), group_of(run_id))} \
+        == {"undone"}
+
+
+def group_of(run_id):
+    from nightscribe.core import followup as fu
+    return fu.run_pass_group(mw_db(), run_id)
+
+
+def test_the_project_scope_curve_carries_the_band_of_each_night(window,
+                                                                visit):
+    # The whole-project curve is the union of the nights: each point says
+    # the band ITS run was calibrated in, and the detrend is refitted per
+    # night (one run, one night, one policy).
+    pid, sid = visit
+    from nightscribe.core import followup as fu
+    other = fu.create_session(mw_db(), pid, obs_date="2026-09-29")
+    a = _frames(window, pid, sid, "band-a", 3)
+    b = _frames(window, pid, other, "band-b", 3)
+    window._ufe_points_hook(pid, sid, _rows_for(a, 11.96, airmass0=1.1),
+                            {"band": "G", "detrend_policy": "airmass"})
+    window._ufe_points_hook(pid, other, _rows_for(b, 12.70), {"band": "V"})
+    curve = window._ufe_visit_curve(pid, sid, "project")
+    points = curve["points"]
+    raw = [p for p in points if p["source"] == "measure"]
+    det = [p for p in points if p["source"] == "detrend"]
+    assert len(raw) == 6
+    assert {p["filter"] for p in raw} == {"G", "V"}   # one per night
+    assert det                                       # the G night's detrend
+    assert {p["filter"] for p in det} == {"G"}
+    # the visit's own scope is only its night
+    own = window._ufe_visit_curve(pid, sid, "visit")["points"]
+    assert len([p for p in own if p["source"] == "measure"]) == 3

@@ -215,6 +215,15 @@ To understand how photometry is then measured with these sequences:
 
 ## A visit's curve: one night, one pass
 
+The series block measures **one visit** (one night) by default. When the
+project has more than one visit with frames, the **"this visit" / "all
+visits"** selector appears next to the frame counter: with "all visits" the
+engine measures the frames of **every visit** in one pass, each night is filed
+in its visit (one run per night) and the chart shows the project's curve, the
+union of the nights. Live mode and "discard the curve" are per visit: with
+"all visits" they step aside and say why.
+
+
 When the editor is opened from a visit, the chart in the centre draws **the
 curve the visit already has**, read from the project: nothing is measured
 again.

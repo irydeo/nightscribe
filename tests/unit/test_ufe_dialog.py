@@ -806,7 +806,7 @@ def _visit(dlg, paths, context=None):
     ctx = {"pid": 1, "session_id": 2, "paths": [str(p) for p in paths]}
     if context:
         ctx["context"] = context
-    dlg.set_series_hook(lambda: ctx)
+    dlg.set_series_hook(lambda scope="visit": ctx)
 
 
 def test_the_visit_solve_button_needs_frames_and_the_write_option(

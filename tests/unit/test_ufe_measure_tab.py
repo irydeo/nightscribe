@@ -2196,17 +2196,125 @@ def test_centre_nudge_moves_the_measurement(dlg, monkeypatch):
     _click(dlg, *dlg._test_target)
     click = tab._last["click"]
     assert seen[-1] == pytest.approx(click)
-    tab._nudge_step(0.5, 0.0)
-    assert seen[-1][0] == pytest.approx(click[0] + 0.5)
+    tab._nudge_step(0.1, 0.0)
+    assert seen[-1][0] == pytest.approx(click[0] + 0.1)
     assert seen[-1][1] == pytest.approx(click[1])
-    assert tab.lbl_nudge.text() == "(+0.5, +0.0)"
+    assert tab.lbl_nudge.text() == "(+0.1, +0.0)"
     # the reset button goes back to the clicked centre and re-measures
-    tab._nudge_step(0.0, -0.5)
+    tab._nudge_step(0.0, -0.1)
     tab._on_nudge_reset()
     assert tab._nudge == [0.0, 0.0]
     assert seen[-1] == pytest.approx(click)
     # a new click starts at (0, 0) too
-    tab._nudge_step(0.5, 0.5)
+    tab._nudge_step(0.1, 0.1)
     _click(dlg, *dlg._test_target)
     assert tab._nudge == [0.0, 0.0]
     assert seen[-1] == pytest.approx(click)
+
+
+def test_manual_centre_pins_the_measurement(dlg):
+    # "Manual centre": the measurement sits EXACTLY where the observer puts
+    # it, with no centroid search, for a very faint SN the algorithm would
+    # drag to a neighbour
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab.chk_manual_centre.setChecked(True)
+    tab._nudge_step(0.1, 0.0)
+    click = tab._last["click"]
+    assert tab._last["col"] == pytest.approx(click[0] + 0.1, abs=1e-6)
+    assert tab._last["row"] == pytest.approx(click[1], abs=1e-6)
+    assert "manual centre" in tab.lbl_result.toPlainText()
+    # and the mode survives a capture/restore of the plate state
+    st = tab.capture_state()
+    assert st["manual_centre"] is True
+    tab.chk_manual_centre.setChecked(False)
+    tab.apply_state(st)
+    assert tab.chk_manual_centre.isChecked() is True
+
+
+# ------------- the multi-night scope (asked 2026-09-30) ---------------
+
+def test_the_scope_selector_only_appears_with_several_visits(dlg):
+    # "En las secuencias multi-noche se han de cargar las imágenes de todas
+    # las visitas": the scope is offered when the project really has more
+    # than one visit with frames (the host says how many); with one visit it
+    # is the same thing under another name and stays hidden.
+    tab = dlg.tab_measure
+
+    def ctx(scope="visit"):
+        return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
+                "visits": 1, "scope": scope}
+
+    dlg.set_series_hook(ctx)
+    assert tab.cmb_series_scope.isHidden()
+    assert tab.lbl_series_scope.isHidden()
+
+    def ctx2(scope="visit"):
+        return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
+                "visits": 3, "scope": scope}
+
+    dlg.set_series_hook(ctx2)
+    assert not tab.cmb_series_scope.isHidden()
+    assert not tab.lbl_series_scope.isHidden()
+
+
+def test_the_multi_night_scope_steps_aside_live_and_draws_the_project(dlg):
+    # With «all visits» the frames come from every night: live mode watches
+    # ONE folder, so it is turned off and disabled SAYING WHY, discarding is
+    # per visit (there is no single night to undo) and the chart reloads the
+    # project's curve.
+    tab = dlg.tab_measure
+
+    def ctx(scope="visit"):
+        return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
+                "visits": 2, "nights": 2, "scope": scope}
+
+    dlg.set_series_hook(ctx)
+    dlg.set_visit_curve_hooks(
+        lambda scope="visit": {
+            "points": _visit_points(5 if scope == "project" else 2),
+            "zp_mode": "catalog"}, None)
+    tab.cmb_series_scope.setCurrentIndex(
+        tab.cmb_series_scope.findData("project"))
+    assert not tab.chk_series_live.isEnabled()
+    assert "one visit" in tab.chk_series_live.toolTip().lower()
+    assert len(tab.chart_series._points) == 5      # the project's curve
+    assert not tab.btn_series_discard.isEnabled()
+    assert "per visit" in tab.btn_series_discard.toolTip()
+    # and back: the visit's own curve, live offered again
+    tab.cmb_series_scope.setCurrentIndex(0)
+    assert tab.chk_series_live.isEnabled()
+    assert len(tab.chart_series._points) == 2
+
+
+def test_the_passes_door_says_when_a_night_belongs_to_a_pass(dlg):
+    # A run of a multi-night pass says so: that is what "undo this pass"
+    # will take with it.
+    tab = dlg.tab_measure
+    payload = _passes(2)
+    payload["runs"][1]["cfg"] = {"series": {"pass": {"group": "abc",
+                                                     "nights": 3}}}
+    dlg.set_visit_passes_hooks(lambda: payload, lambda run_id: None)
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert "3-night pass" in door.tbl_passes.item(1, 4).text()
+    assert "3-night pass" not in door.tbl_passes.item(0, 4).text()
+    door.close()
+
+
+def test_manual_centre_dialog_follows_the_checkbox(dlg):
+    # the tab keeps only the checkbox; the pad lives in its own non-modal
+    # window, opened by checking and closed by unchecking
+    tab = dlg.tab_measure
+    assert not tab._centre.isVisible()
+    assert not tab._centre.isModal()
+    tab.chk_manual_centre.setChecked(True)
+    assert tab._centre.isVisible()
+    # the arrows live there now and still move the measurement centre
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab._centre.btn_right.click()
+    assert tab._nudge[0] == pytest.approx(0.1)
+    tab.chk_manual_centre.setChecked(False)
+    assert not tab._centre.isVisible()

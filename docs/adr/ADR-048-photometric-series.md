@@ -703,3 +703,56 @@ coefficients). A live session is now ONE run (its batches append to the one the
 first opened): that is what the test itself declared and what the real host did
 not honour, and without it the curve reloaded from a live session would have
 been only its last batch.
+
+
+**Revisión (2026-09-30, una serie multinoche en UNA pasada)**: el bloque de
+serie medía solo las tomas de la visita abierta, así que una campaña de cinco
+noches eran cinco aperturas, cinco pasadas y cinco curvas sueltas (el
+observador acabó con cuatro pasadas de la misma noche en su V0526 Per). El
+motor, en cambio, ya era multinoche: el detrend se ajusta por noche, el ZP
+vecino y las nubes son por noche y `night_qc` informa por noche.
+
+Entra un **alcance** en el bloque (`cmb_series_scope`, «this visit» / «all
+visits»), ofrecido solo cuando el proyecto tiene más de una visita con tomas
+(el host lo dice en el contexto, `visits`). Con «all visits» el contexto son
+las tomas de **todas** las visitas, y el host archiva **una ejecución por
+visita**: cada toma lleva sus puntos a la visita que le corresponde (resuelta
+por su fila en `project_files`), así que la curva de la visita sigue siendo su
+noche y la del proyecto es la unión de las noches (una pasada por noche, la
+regla del 2026-09-30 de arriba). Las ejecuciones de una misma pasada comparten
+un grupo en su cfg (`series.pass.group`, sin esquema nuevo: es el patrón que
+ya usaba `save_pass` con las campañas) y **el Undo deshace la pasada entera**
+(`run_pass_group` / `runs_in_pass`), que es lo que el observador midió de una
+vez. La puerta de pasadas dice a qué pasada pertenece cada noche.
+
+El modo en vivo se queda en una visita (vigila una carpeta) y con «all
+visits» se apaga diciendo por qué; «descartar la curva» también es por visita
+y con «all visits» se deshabilita explicándolo. Y el gráfico de UFE carga la
+curva **del alcance**: con «all visits», la del proyecto, con el detrend
+reajustado **por ejecución** (una noche, una política).
+
+**Revision (2026-09-30, a multi-night series in ONE pass)**: the series block
+measured only the frames of the open visit, so a five-night campaign meant
+five openings, five passes and five loose curves (the observer ended up with
+four passes of the same night in his V0526 Per). The engine, on the other
+hand, was already multi-night: the detrend is fitted per night, the neighbour
+ZP and the clouds are per night and `night_qc` reports per night.
+
+A **scope** lands in the block (`cmb_series_scope`, "this visit" / "all
+visits"), offered only when the project has more than one visit with frames
+(the host says so in the context, `visits`). With "all visits" the context is
+the frames of **every** visit, and the host files **one run per visit**: each
+frame's points go to the visit it belongs to (resolved by its row in
+`project_files`), so a visit's curve is still its night and the project's is
+the union of the nights (one pass per night, the rule above from 2026-09-30).
+The runs of one pass share a group in their cfg (`series.pass.group`, no
+schema change: it is the pattern `save_pass` already used for campaigns) and
+**Undo removes the whole pass** (`run_pass_group` / `runs_in_pass`), which is
+what the observer measured in one go. The passes door says which pass each
+night belongs to.
+
+Live mode stays per visit (it watches one folder) and with "all visits" it is
+turned off saying why; "discard the curve" is per visit too and with "all
+visits" it is disabled and explains itself. And the UFE chart loads the
+curve of the **scope**: with "all visits", the project's, with the detrend
+refitted **per run** (one night, one policy).

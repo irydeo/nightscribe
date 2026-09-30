@@ -293,6 +293,37 @@ def curve_run_ids(db, project_id=None, session_id=None):
     return set(newest.values())
 
 
+def run_pass_group(db, run_id):
+    # A multi-night pass writes ONE run per visit (each night's points belong
+    # to the visit that night is) and every one of them carries the same
+    # group id in its cfg. This says which group a run belongs to, so
+    # "undo this pass" can undo the whole pass and not just one night.
+    # @args: db - Database, run_id - the run
+    # @return: the group id, or None (a single-night run has none)
+    run = get_run(db, run_id)
+    if not run:
+        return None
+    series = (run.get("cfg") or {}).get("series") or {}
+    return (series.get("pass") or {}).get("group")
+
+
+def runs_in_pass(db, group):
+    # Every run of a multi-night pass, oldest first.
+    # @args: group - the pass group id (see run_pass_group)
+    # @return: [run dicts, as runs_for_session]
+    if not group:
+        return []
+    rows = db.execute(
+        "SELECT id FROM measurement_runs WHERE cfg_json LIKE ?"
+        " ORDER BY id", ("%\"group\": \"" + str(group) + "\"%",)).fetchall()
+    out = []
+    for r in rows:
+        run = get_run(db, r[0])
+        if run is not None and run_pass_group(db, r[0]) == group:
+            out.append(run)
+    return out
+
+
 def curve_run_for_session(db, session_id):
     # @return: the run the visit's curve is, or None when it has none
     ids = curve_run_ids(db, session_id=session_id)

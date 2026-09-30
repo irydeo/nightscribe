@@ -405,6 +405,19 @@ class UfeMeasureTab(QWidget):
         self.btn_series_passes = getattr(self._ui, "btn_series_passes", None)
         if self.btn_series_passes is not None:
             self.btn_series_passes.clicked.connect(self._open_passes)
+        # the scope: this visit (one night) or every visit of the project
+        # (one pass, one run per night). The multi-night item is only
+        # OFFERED when the project has more than one visit with frames.
+        self.cmb_series_scope = getattr(self._ui, "cmb_series_scope", None)
+        self.lbl_series_scope = getattr(self._ui, "lbl_series_scope", None)
+        if self.cmb_series_scope is not None:
+            self.cmb_series_scope.setItemData(0, "visit")
+            self.cmb_series_scope.setItemData(1, "project")
+            self.cmb_series_scope.currentIndexChanged.connect(
+                self._on_series_scope_changed)
+            self.cmb_series_scope.setVisible(False)
+            if self.lbl_series_scope is not None:
+                self.lbl_series_scope.setVisible(False)
         row_out = getattr(self._ui, "row_series_out", None)
         if row_out is not None:
             from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
@@ -1001,8 +1014,10 @@ class UfeMeasureTab(QWidget):
                       entries, click=base)
 
     def _nudge_step(self, dx, dy):
-        # One 0.5 px step of the measurement centre, like the blink's
-        # alignment; the centroid is refined again around the new centre.
+        # One 0.1 px step of the measurement centre. The pad is the only
+        # way to move it, so the step is fine on purpose: the observer
+        # places the centre by hand, and in manual mode the measurement
+        # uses exactly that point.
         # @args: dx, dy - step in plate pixels
         if self._last is None:
             return
@@ -1163,6 +1178,10 @@ class UfeMeasureTab(QWidget):
         # hidden, and a running worker is cancelled on a detach.
         self._series_attached = bool(flag)
         self.grp_series.setVisible(self._series_attached)
+        if self._series_attached:
+            # which scopes this project offers (one visit, or all of them)
+            self._sync_series_scope()
+            self._update_series_counter(self._series_context() or {})
         if not self._series_attached and self._series_worker is not None:
             self._series_worker.cancel()
         if not self._series_attached and self._live_worker is not None:
@@ -1172,12 +1191,97 @@ class UfeMeasureTab(QWidget):
             self.chk_series_live.setChecked(False)
             self.chk_series_live.blockSignals(False)
 
-    def _series_context(self):
-        # @return: the visit context {"paths", "session_id", ...} the host
-        #          hooked, or None (ad-hoc open)
+    def _series_context(self, scope=None):
+        # @args: scope - "visit" | "project" (None: the one the observer
+        #        chose)
+        # @return: the frames context {"paths", "session_id", ...} the host
+        #          hooked, or None (ad-hoc open, or no frames for that
+        #          scope)
         dlg = self.window()
         getter = getattr(dlg, "series_context", None)
-        return getter() if callable(getter) else None
+        if not callable(getter):
+            return None
+        scope = scope or self._series_scope()
+        try:
+            return getter(scope)
+        except TypeError:               # a host double with no scope
+            return getter()
+
+    def _series_scope(self):
+        # @return: "visit" | "project" — which frames the series measures
+        cmb = getattr(self, "cmb_series_scope", None)
+        return (cmb.currentData() if cmb is not None else None) or "visit"
+
+    def _sync_series_scope(self):
+        # The multi-night scope is only OFFERED when the project really has
+        # more than one visit with frames: otherwise it is the same thing
+        # under another name, and a switch that changes nothing is noise.
+        # @return: None
+        cmb = getattr(self, "cmb_series_scope", None)
+        if cmb is None:
+            return
+        # the host says how many visits with frames the project has: the
+        # multi-night scope is a choice only when there is more than one
+        ctx = self._series_context() or {}
+        wide = int(ctx.get("visits") or 1) > 1
+        cmb.setVisible(wide)
+        lbl = getattr(self, "lbl_series_scope", None)
+        if lbl is not None:
+            lbl.setVisible(wide)
+        if not wide and cmb.currentIndex() != 0:
+            cmb.blockSignals(True)
+            cmb.setCurrentIndex(0)
+            cmb.blockSignals(False)
+        self._sync_live_for_scope()
+
+    def _on_series_scope_changed(self, _index):
+        # A different scope is a different set of frames AND a different
+        # curve: the chart follows, the counter says what will be measured,
+        # and the live mode (which watches ONE folder) steps aside.
+        # @return: None
+        self._sync_live_for_scope()
+        ctx = self._series_context() or {}
+        self._update_series_counter(ctx)
+        self._reload_visit_curve(say=False)
+        if self._series_scope() == "project":
+            self._say(self.tr(
+                "All the visits: {0} night(s), {1} frames. One pass, one "
+                "run per night; the chart shows the project's curve.").format(
+                    ctx.get("nights") or 0, len(ctx.get("paths") or [])))
+        else:
+            self._say(self.tr(
+                "This visit: {0} frame(s).").format(
+                    len(ctx.get("paths") or [])))
+
+    def _sync_live_for_scope(self):
+        # Live mode watches the folder of ONE visit (tonight's): with the
+        # whole project in scope it is turned off and disabled, saying why.
+        # A disabled control that explains nothing is how a door looks
+        # broken.
+        # @return: None
+        chk = getattr(self, "chk_series_live", None)
+        if chk is None:
+            return
+        if not hasattr(self, "_live_tip"):
+            self._live_tip = chk.toolTip()
+        wide = self._series_scope() == "project"
+        if wide and chk.isChecked():
+            chk.setChecked(False)
+        chk.setEnabled(not wide)
+        chk.setToolTip(self.tr(
+            "Live mode watches the folder of ONE visit (tonight's). With "
+            "«all the visits» the frames come from every night, so live "
+            "mode is off: choose «this visit» to watch tonight.")
+            if wide else self._live_tip)
+        btn = getattr(self, "btn_series_discard", None)
+        if btn is not None:
+            if not hasattr(self, "_discard_tip"):
+                self._discard_tip = btn.toolTip()
+            btn.setEnabled(not wide)
+            btn.setToolTip(self.tr(
+                "Discarding is per visit: open the visit whose curve you "
+                "want to undo. With «all the visits» in scope there is no "
+                "single night to undo.") if wide else self._discard_tip)
 
     def _series_target(self):
         # The target position on the open (reference) plate: the last
@@ -1682,8 +1786,12 @@ class UfeMeasureTab(QWidget):
         # @return: the number of points drawn (0 when there were none)
         if self._curve_load is None or self._series_result is not None:
             return 0
+        scope = self._series_scope()
         try:
-            data = self._curve_load() or []
+            try:
+                data = self._curve_load(scope) or []
+            except TypeError:           # a host double with no scope
+                data = self._curve_load() or []
         except Exception as err:                # a hook never kills a tab
             logger.warning("could not read the visit's curve: %s", err)
             return 0
@@ -1823,6 +1931,11 @@ class UfeMeasureTab(QWidget):
         runs = self._visit_passes()
         others = [r for r in runs
                   if r.get("id") != self._visit_curve_run_id()]
+        if self._series_scope() == "project":
+            return self.tr(
+                "This chart is the WHOLE PROJECT: {0} points of every night "
+                "(one pass per night). Choose «this visit» above to see the "
+                "night you have open.").format(n_points)
         if not others:
             return self.tr(
                 "This visit's curve: {0} points already measured with the "

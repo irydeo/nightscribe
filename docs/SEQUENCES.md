@@ -227,7 +227,33 @@ an offset-only fallback on short nights or nights without airmass range. If you
 mix filters, the band guard warns: they are not combined into one magnitude
 curve. A shifted zero point is **flagged**, never hidden.
 
-### 7.1 A visit is ONE curve (and the other passes stay)
+### 7.1 A series over several nights, in ONE pass
+
+A variable you follow for the whole campaign is measured **in one go**, not
+night by night. In the series block, next to the frame counter, is the
+**"this visit" / "all visits"** selector: it only appears when the project has
+more than one visit with frames.
+
+With **"all visits"** the engine gets the frames of **every visit** (in time
+order) and measures them as one series. The result is filed as **one run per
+visit**, because a visit is one night and every point belongs to the night it
+was taken on: each visit's curve is its own and the project's is the union of
+the nights, one pass per night, which is what folding a period needs. The
+nights are not mixed in the calibration: the zero point, the detrend and the
+quality control are **per night**, as always.
+
+The whole pass is **one thing** to undo: the Undo button removes that pass's
+nights in one click (the runs stay marked undone, the trail is never silent).
+In the door **Series ▾ → Passes of this visit…** every night of a pass says
+which pass it belongs to ("part of a 3-night pass").
+
+**Live mode** stays per visit: it watches today's folder. With "all visits" it
+is turned off and says why, because watching several folders at once is
+another thing. And **discarding the curve** is per visit too: with "all
+visits" it is disabled and says to open the visit whose curve you want to
+undo.
+
+### 7.2 A visit is ONE curve (and the other passes stay)
 
 A visit can hold **several passes**: you measure the series again with another
 band, with another sequence, or just to check something. Every pass keeps its

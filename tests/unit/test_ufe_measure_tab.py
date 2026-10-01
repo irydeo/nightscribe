@@ -1421,14 +1421,12 @@ def test_the_series_block_stays_narrow_and_keeps_its_actions_reachable(
     assert _innermost_row_of(tab.grp_series, tab.btn_series) is not None
     # the block's own width stays sane: the six moved ones cannot add to it
     assert tab.grp_series.minimumSizeHint().width() <= 560
-    # and the door holds them all, as a real panel (not a dead list)
-    panel = tab.btn_series_more.menu().actions()[0].defaultWidget()
-    assert panel is not None
-    inside = {w.objectName() for w in panel.findChildren(QPushButton)}
+    # and the door holds them all, one item per button (not a dead list)
+    names = [a.data() for a in tab.btn_series_more.menu().actions()]
     for name in ("btn_series_undo", "btn_series_exoclock",
                  "btn_series_night", "btn_series_sci", "btn_series_phase",
                  "btn_series_help"):
-        assert name in inside, name
+        assert name in names, name
 
 
 # ---------------- P3: nights are named by their civil date ----------------
@@ -1738,16 +1736,17 @@ def test_every_button_of_the_row_lands_in_the_series_menu(dlg, qapp):
     from_row = re.findall(r'name="(btn_[\w]+)"', row.group(1))
     assert from_row, "la fila del Designer tenía botones"
     tab = dlg.tab_measure
-    panel = tab.btn_series_more.menu().actions()[0].defaultWidget()
-    in_menu = {w.objectName() for w in panel.findChildren(QPushButton)}
+    names = [a.data() for a in tab.btn_series_more.menu().actions()]
     for name in from_row:
-        assert name in in_menu, name
-    assert "btn_series_discard" in in_menu          # the one that was lost
-    assert "btn_series_undo" in in_menu             # the one from the run row
-    # and the panel keeps only the doors and the action (the invariant is
-    # about where each button LIVES, not about whether it is on screen)
-    outside = {w.objectName() for w in tab.grp_series.findChildren(QPushButton)
-               if w.parentWidget() is not panel}
+        assert name in names, name
+    assert "btn_series_discard" in names           # the one that was lost
+    assert "btn_series_undo" in names              # the one from the run row
+    # and the door holds exactly those, nothing more and nothing less: the
+    # invariant is about which button each item drives
+    assert set(names) == set(from_row) | {"btn_series_undo"}
+    # the block keeps the doors and the action (the invariant is about where
+    # each button LIVES, not about whether it is on screen)
+    outside = {w.objectName() for w in tab.grp_series.findChildren(QPushButton)}
     assert outside == {"btn_series_chart", "btn_series"}
 
 
@@ -1801,19 +1800,19 @@ def test_the_buttons_inside_the_doors_still_do_what_they_did(dlg, tmp_path,
     out = tmp_path / "medida.csv"
     monkeypatch.setattr(QFileDialog, "getSaveFileName",
                         staticmethod(lambda *a, **k: (str(out), "")))
-    panel = tab.btn_export_more.menu().actions()[0].defaultWidget()
-    csv = [w for w in panel.findChildren(type(tab.btn_csv))
-           if w.objectName() == "btn_csv"][0]
-    csv.click()
+    # the "Export" door's CSV item drives the button that writes the file,
+    # and the items of "Reset" reach the same handlers
+    acts = {a.data(): a for a in tab.btn_export_more.menu().actions()}
+    acts["btn_csv"].trigger()
     assert out.exists() and out.read_text().count("\n") >= 3
-    # and the reset door's buttons are wired to their own handlers
     seen = []
     monkeypatch.setattr(tab, "_on_reset_state",
                         lambda: seen.append("state"))
     monkeypatch.setattr(tab, "_on_reset_points",
                         lambda: seen.append("points"))
-    tab.btn_reset_state.click()
-    tab.btn_reset_points.click()
+    resets = {a.data(): a for a in tab.btn_reset_more.menu().actions()}
+    resets["btn_reset_state"].trigger()
+    resets["btn_reset_points"].trigger()
     assert seen == ["state", "points"]
 
 

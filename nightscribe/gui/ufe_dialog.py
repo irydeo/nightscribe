@@ -367,32 +367,23 @@ class UfeDialog(QDialog):
                        ("btn_zoom_50", "btn_zoom_200", "btn_zoom_400"))
 
     def _bar_menu(self, tool, names):
-        # Puts a set of existing buttons inside a dropdown panel hanging
-        # from a QToolButton.
-        # @args: tool - the QToolButton, names - the attributes to move
+        # Puts a set of existing buttons inside a dropdown hanging from a
+        # QToolButton: a plain menu whose items ARE those buttons (see
+        # gui/widgets/door_menu.py for why it is not a panel of moved
+        # widgets any more: that crashed Windows while the dialog was being
+        # built, 2026-10-01). The buttons stay in the Designer file, hidden,
+        # and keep their texts, tooltips, state and slots.
+        # @args: tool - the QToolButton, names - the attributes the door
+        #        opens onto
         # @return: None
-        from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
-                                       QWidget, QWidgetAction)
-        panel = QWidget(self)
-        box = QVBoxLayout(panel)
-        box.setContentsMargins(6, 6, 6, 6)
+        from .widgets.door_menu import build_door
+        buttons = []
         for name in names:
-            w = getattr(self._ui, name, None)
-            if w is None:
-                w = getattr(self, name, None)
-            if w is None:
-                continue
-            # inside a panel an icon with no text would be a riddle: the
-            # icon-only skin must leave these ones their label
-            w.setProperty("in_panel", True)
-            w.setParent(panel)
-            box.addWidget(w)
-        action = QWidgetAction(tool)
-        action.setDefaultWidget(panel)
-        menu = QMenu(tool)
-        menu.addAction(action)
-        tool.setMenu(menu)
-        tool.setPopupMode(QToolButton.InstantPopup)
+            btn = getattr(self._ui, name, None)
+            if btn is None:
+                btn = getattr(self, name, None)
+            buttons.append(btn)
+        build_door(tool, buttons)
 
     def _wire_status(self):
         # Every tab reports to the window's single line (U4). The tabs keep

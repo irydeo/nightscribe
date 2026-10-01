@@ -442,24 +442,29 @@ def test_the_bar_keeps_the_daily_actions_and_opens_two_doors():
 
 
 def test_the_doors_hold_the_same_widgets_and_nothing_is_lost():
-    # The doors are not deletions: every view switch and every zoom preset
-    # is the same widget, still connected, still reachable by its name.
-    from PySide6.QtWidgets import QPushButton
+    # The doors are not deletions: every view switch and every zoom preset is
+    # still its own widget, still connected, still reachable by its name, and
+    # the door has one item per button that drives it. (It used to be a panel
+    # with the widgets moved into it; that crashed Windows while the dialog
+    # was being built, see gui/widgets/door_menu.py.)
     _app()
     d = _dialog(1400, 800, _OBJECT)
-    view = d.btn_view.menu().actions()[0].defaultWidget()
-    zoom = d.btn_zoom_more.menu().actions()[0].defaultWidget()
-    in_view = {w.objectName() for w in view.findChildren(QPushButton)}
-    in_zoom = {w.objectName() for w in zoom.findChildren(QPushButton)}
-    assert in_view == {"btn_north", "btn_scale", "btn_annot", "btn_boxes",
-                       "btn_mark"}
-    assert in_zoom == {"btn_zoom_50", "btn_zoom_200", "btn_zoom_400"}
-    # and they still DO something: the toggle flips the view's state
+    assert [a.data() for a in d.btn_view.menu().actions()] == [
+        "btn_north", "btn_scale", "btn_annot", "btn_boxes", "btn_mark"]
+    assert [a.data() for a in d.btn_zoom_more.menu().actions()] == [
+        "btn_zoom_50", "btn_zoom_200", "btn_zoom_400"]
+    # the widgets are still there (hidden), and the item drives them
+    assert not d.btn_north.isVisibleTo(d)
+    seen = []
+    d._ui.btn_zoom_50.clicked.connect(lambda: seen.append("zoom50"))
+    d.btn_zoom_more.menu().actions()[0].trigger()
+    assert seen == ["zoom50"]
+    # and a checkable button's own state is the truth: the item follows it
+    act = d.btn_view.menu().actions()[0]
     d.btn_north.setChecked(False)
-    QApplication.processEvents()
-    assert d.view.show_north is False
+    assert act.isChecked() is False
     d.btn_north.setChecked(True)
-    assert d.view.show_north is True
+    assert act.isChecked() is True
     d.close()
 
 
@@ -503,13 +508,12 @@ def test_the_measure_half_is_still_the_same_widget():
 
 # ---------------- U5: the ways out of a measurement -------------------
 
-def test_the_result_row_keeps_two_doors_and_the_buttons_are_inside():
+def test_the_result_row_keeps_two_doors_and_the_buttons_are_reachable():
     # Four buttons took two rows of the column: the CSV, the AAVSO EFF
     # report, "reset the plate's state" and "remove the plate's points".
-    # They are not gone and they are not copies: the SAME widgets live
-    # inside two doors now (the export pair in "Export", the reset pair in
+    # They are not gone and they are not copies: the SAME widgets are the
+    # items of two doors now (the export pair in "Export", the reset pair in
     # "Reset"), so every name the code and the tests reach for is untouched.
-    from PySide6.QtWidgets import QPushButton
     _app()
     d = _dialog(1500, 1000, _OBJECT)
     t = d.tab_measure
@@ -517,15 +521,13 @@ def test_the_result_row_keeps_two_doors_and_the_buttons_are_inside():
     in_row = [row.itemAt(i).widget().objectName() for i in range(row.count())
               if row.itemAt(i).widget() is not None]
     assert in_row == ["btn_export_more", "btn_reset_more", "btn_save_project"]
-    exp = t.btn_export_more.menu().actions()[0].defaultWidget()
-    res = t.btn_reset_more.menu().actions()[0].defaultWidget()
-    assert {w.objectName() for w in exp.findChildren(QPushButton)} == {
-        "btn_csv", "btn_eff"}
-    assert {w.objectName() for w in res.findChildren(QPushButton)} == {
-        "btn_reset_state", "btn_reset_points"}
-    assert t.btn_csv.parent() is exp and t.btn_eff.parent() is exp
-    assert t.btn_reset_state.parent() is res
-    assert t.btn_reset_points.parent() is res
+    assert [a.data() for a in t.btn_export_more.menu().actions()] == [
+        "btn_csv", "btn_eff"]
+    assert [a.data() for a in t.btn_reset_more.menu().actions()] == [
+        "btn_reset_state", "btn_reset_points"]
+    # the buttons are the same widgets, alive and hidden
+    for btn in (t.btn_csv, t.btn_eff, t.btn_reset_state, t.btn_reset_points):
+        assert not btn.isVisibleTo(t)
     # and the two rows that used to hold them are not left behind empty
     assert not hasattr(t._ui, "row_export")
     assert not hasattr(t._ui, "row_project")

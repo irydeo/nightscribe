@@ -58,7 +58,7 @@ jobs:
         # and the ones that never ran hid whatever came next). --dist
         # loadfile because several files hold Qt windows in module-scoped
         # fixtures.
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: python -m pytest tests/unit -v -n auto --dist loadfile
 
       - name: Resolve the package version

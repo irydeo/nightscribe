@@ -169,7 +169,12 @@ sys.exit(0)
     elapsed = time.monotonic() - start
     try:
         assert res["ok"] and res["returncode"] == 0
-        assert elapsed < 6, f"waited {elapsed:.1f}s for a dead parent"
+        # the contract is that it does NOT wait for the child (the old code
+        # sat on the two-hour timeout), not a stopwatch reading: on Windows
+        # the tree is a .cmd plus two interpreters and starting them is slow
+        # (measured in CI: the 6 s bound failed with the design intact)
+        assert not res["timed_out"]
+        assert elapsed < 10, f"waited {elapsed:.1f}s for a dead parent"
     finally:
         if state["child"] is not None and _pid_alive(state["child"]):
             try:

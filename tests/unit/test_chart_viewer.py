@@ -97,8 +97,17 @@ def test_fit_follows_a_bigger_window(qapp, chart, cfg):
     _events()
     v._zoom_fit()
     small = v._label.width()
-    v.resize(1700, 1000)
+    small_win = v.width()
+    # The window has to be able to GROW: the CI's Windows runner has a
+    # 1024x768 desktop, so asking for 1700x1000 came back clamped and the
+    # label did not move with the design intact (measured 2026-10-01). Ask
+    # for the biggest window the desktop allows, and only then check.
+    room = qapp.primaryScreen().availableGeometry()
+    v.resize(max(small_win + 200, min(1700, room.width() - 40)),
+             max(v.height() + 200, min(1000, room.height() - 40)))
     _events()
+    if v.width() <= small_win:
+        pytest.skip("this screen cannot show a wider window")
     v._zoom_fit()
     assert v._label.width() > small
     v.close()

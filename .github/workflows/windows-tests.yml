@@ -64,7 +64,7 @@ jobs:
         # surviving workers wait on the dead one until the bound. `qpa` swaps
         # QT_QPA_PLATFORM, which is how a bug in the offscreen platform
         # plugin is told apart from a bug in the app.
-        timeout-minutes: 15
+        timeout-minutes: 25
         shell: pwsh
         run: |
           $only = "${{ github.event.inputs.only }}"

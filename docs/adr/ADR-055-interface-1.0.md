@@ -76,6 +76,25 @@ pestañas, así que los atajos Ctrl+1..3 pasan a Home · Tonight · Campañas.
 Los tests de navegación comprueban `_shell_stack().currentIndex()` en vez
 del `QTabWidget`.
 
+**Correcciones (2026-10-01, tras la revisión del observador).** Dos
+escollos reales que la primera pasada no vio (y que los tests tapaban al
+forzar `is_configured=False`, que construía Bienvenida y hacía cuadrar los
+índices por casualidad):
+
+1. **Índices fijos.** La pila reserva SIEMPRE seis páginas: las cuatro
+   vistas más dos placeholders para Bienvenida (4) y el UFE (5). Construir
+   las perezosas con `addWidget()` las ponía en el primer índice libre y
+   `VIEW_UFE` quedaba fuera de rango (el taller nunca se veía).
+2. **Reparentar des-oculta.** `QStackedWidget.removeWidget()` esconde la
+   página, y añadirla a un layout **no** la vuelve a mostrar: el panel
+   «Te necesita» y la página de detalle salían en blanco («los proyectos
+   no se cargan»). Hay que llamar a `show()` al re-alojarlas.
+3. El `on_refresh_projects()` de arranque, sin selección, llamaba a
+   `_show_dashboard` y saltaba a Home: ahora solo navega si ya se está en
+   Home o en un proyecto, para no expulsar de Bienvenida en el primer
+   fotograma. El UFE se mantiene vivo al cambiar de vista (solo se apaga al
+   cerrar la app) y `TonightWorker` gana `cancel()`.
+
 **Alternativas descartadas.** Mantener el `QWizard` modal (contradice «la
 app habla primero» y bloquea el arranque). Un `QDockWidget` para el drawer
 (más pesado que la geometría manual actual y con cromo nativo). Reparentar
@@ -134,3 +153,16 @@ its internal behaviour but loses its own window frame. The stacked widget
 replaces the tab bar, so Ctrl+1..3 map to Home · Tonight · Campaigns.
 Navigation tests check `_shell_stack().currentIndex()` instead of the
 `QTabWidget`.
+
+**Corrections (2026-10-01, after the observer's review).** Two real traps
+the first pass missed (and that the tests masked by forcing
+`is_configured=False`, which built Welcome and made the indices line up by
+accident): (1) **fixed indices**: the stack always reserves six pages (the
+four views plus placeholders for Welcome at 4 and the UFE at 5), because
+building the lazy ones with `addWidget()` put them at the first free index
+and left `VIEW_UFE` out of range; (2) **reparenting un-hides**: a
+`QStackedWidget.removeWidget()` page stays hidden, and adding it to a
+layout does not show it again, so the dashboard and the project detail came
+up blank. The startup `on_refresh_projects()` no longer yanks the observer
+out of Welcome, the UFE stays alive across views (only shut down on app
+close) and `TonightWorker` gained `cancel()`.

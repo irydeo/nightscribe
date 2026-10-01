@@ -147,3 +147,47 @@ def test_payload_variable_without_epoch_or_period_fold():
         {"points": []}, variable=_var_entry(period_d=None))
     assert "fold_period_d" not in out2
     assert "schematic" not in out2
+
+
+# ---------------- the magnitude window (2026-10-01) ----------------
+
+def test_mag_window_is_the_core_not_the_min_max():
+    # One anomalous frame must not set the scale: the window comes from the
+    # core (median +/- 6 robust sigmas) intersected with the data. Measured
+    # on a real project: the curve spans 11.074 to 13.224 mag, one bad frame,
+    # while the window is 11.074 to 11.241 (13x narrower).
+    mags = [11.1 + (0.005 if i % 2 else -0.005) for i in range(140)] + [13.2]
+    lo, hi = lightcurve_data.mag_window(mags)
+    assert hi < 11.5                        # the outlier did not widen it
+    assert hi - lo >= lightcurve_data.MIN_WINDOW
+
+
+def test_mag_window_manual_range_wins_and_robust_can_be_off():
+    mags = [11.1, 11.2, 13.2]
+    # the observer's own range wins over everything
+    assert lightcurve_data.mag_window(mags, y_range=(12.0, 13.0)) == \
+        (12.0, 13.0)
+    # with robust off it is the plain min/max
+    lo, hi = lightcurve_data.mag_window(mags, robust=False)
+    assert lo < 11.2 and hi > 13.0
+    # a flat curve still gets a window one can draw in
+    lo2, hi2 = lightcurve_data.mag_window([12.5] * 5)
+    assert hi2 - lo2 >= lightcurve_data.MIN_WINDOW
+    # and no data is no window, not a crash
+    assert lightcurve_data.mag_window([]) is None
+    assert lightcurve_data.mag_window([None, None]) is None
+
+
+def test_the_chart_and_the_thumbnail_share_the_window():
+    # One truth: the chart's own _mag_window is core's rule, so the project
+    # list's thumbnail cannot drift from the chart it claims to match.
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    from nightscribe.gui.widgets.lightcurve_widget import LightCurveChart
+    mags = [12.0, 12.1, 12.05, 12.15, 15.0]
+    chart = LightCurveChart()
+    assert chart._mag_window(mags) == lightcurve_data.mag_window(mags)
+    chart.deleteLater()
+    del app

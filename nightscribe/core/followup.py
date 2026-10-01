@@ -380,6 +380,33 @@ def curve_run_for_session(db, session_id):
     return max(with_points) if with_points else None
 
 
+def latest_curve_run(db, project_id, min_points=2):
+    # The project's newest run with something to draw: what the project
+    # list's thumbnail shows ("the latest available curve of the project").
+    # It is NOT the project's curve (list_points): that one keeps one point
+    # per frame from the series engine, so a curve imported from EXOTIC is
+    # not in it at all (measured: the 142 EXOTIC points of a real project
+    # were in no chart), and the thumbnail is where the last reduction shows
+    # up in the hub.
+    # @args: db - Database, project_id - the project, min_points - how many
+    #        points a run needs to be worth drawing
+    # @return: {id, session_id, created, cfg, points} or None
+    row = db.execute(
+        "SELECT r.id, r.session_id, r.created, r.cfg_json,"
+        " (SELECT COUNT(*) FROM photometry_points p WHERE p.run_id = r.id)"
+        " FROM measurement_runs r"
+        " WHERE r.id IN (SELECT run_id FROM photometry_points"
+        "                WHERE project_id=? AND run_id IS NOT NULL)"
+        " ORDER BY r.created DESC, r.id DESC",
+        (project_id,)).fetchall()
+    for r in row:
+        if (r[4] or 0) >= min_points:
+            cfg = json.loads(r[3] or "{}")
+            return {"id": r[0], "session_id": r[1], "created": r[2],
+                    "cfg": cfg, "points": r[4]}
+    return None
+
+
 def curve_summary(points):
     # What a curve is, in the two numbers a list row shows (the project
     # list's thumbnail and its tooltip). "Nights" counts the observing

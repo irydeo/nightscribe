@@ -2668,3 +2668,60 @@ def test_the_analysis_curve_exists_for_every_kind_with_one(window, panel):
     assert len(w["fu_curve"]._points) == 4
     # no template for a transit: the checkbox is hidden instead of lying
     assert w["fu_curve_tpl"].isHidden()
+
+
+# ---------------- the row's thumbnail (2026-10-01) ----------------
+
+def test_the_row_thumbnail_is_the_latest_curve_in_the_charts_scale(window):
+    # Reported: the thumbnail stretched min-to-max on its own, so a flat
+    # curve and a three-magnitude one looked exactly the same, and it showed
+    # the project's pile instead of the latest available curve. It now draws
+    # the newest run in the same magnitude window the chart uses.
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import followup as fu
+    from nightscribe.core import lightcurve_data
+    from nightscribe.core import project as proj
+    from nightscribe.gui.widgets.lightcurve_widget import source_label
+    db = mw.db
+    p = proj.create(db, "transit", "HAT-P-32 b")
+    sid = fu.create_session(db, p["id"], obs_date="2017-12-20")
+    # a measured night: a flat curve with one anomalous frame
+    run_a = fu.create_run(db, session_id=sid, cfg={"series": {"band": "V"}})
+    rows = [{"project_id": p["id"], "session_id": sid,
+             "mjd": 58107.1 + i * 0.001, "filter": "V",
+             "mag": 11.1 + (0.005 if i % 2 else -0.005), "err": 0.01,
+             "source": "measure", "flags": [], "run_id": run_a}
+            for i in range(40)]
+    rows.append({"project_id": p["id"], "session_id": sid, "mjd": 58107.2,
+                 "filter": "V", "mag": 13.2, "err": 0.05,
+                 "source": "measure", "flags": [], "run_id": run_a})
+    fu.add_points(db, rows)
+    # and the imported curve, the newest run (mag ~0: another frame)
+    run_b = fu.create_run(db, session_id=sid, cfg={"source": "exotic"})
+    fu.add_points(db, [{"project_id": p["id"], "session_id": sid,
+                        "mjd": 58107.3 + i * 0.002, "filter": None,
+                        "mag": i * 0.001, "err": 0.01, "source": "exotic",
+                        "flags": [], "run_id": run_b} for i in range(30)])
+    payload = window._project_row_payload(proj.get(db, p["id"]), None, {})
+    assert not payload["sparkline"].isNull()
+    # the tooltip says WHICH curve it is (the latest one), not just "so far"
+    assert source_label("exotic") in payload["sparkline_text"]
+    # the scale is the chart's rule over THOSE points
+    pts = fu.list_points_for_run(db, run_b)
+    win = lightcurve_data.mag_window([q["mag"] for q in pts])
+    assert win is not None and win[0] <= 0.0 <= win[1]
+    # the measured curve's window is a different one (11.07-11.24): with it
+    # the imported curve would be off the box entirely, which is why the row
+    # frames the curve it draws
+    measured_win = lightcurve_data.mag_window(
+        [q["mag"] for q in fu.list_points(db, p["id"])])
+    assert measured_win[0] > 11.0
+    # a series run (its cfg carries no source) must not read "Manual entry"
+    run_c = fu.create_run(db, session_id=sid, cfg={"series": {"band": "V"}})
+    fu.add_points(db, [{"project_id": p["id"], "session_id": sid,
+                        "mjd": 58107.5 + i * 0.002, "filter": "V",
+                        "mag": 11.1 + i * 0.001, "err": 0.01,
+                        "source": "measure", "flags": [], "run_id": run_c}
+                       for i in range(10)])
+    payload = window._project_row_payload(proj.get(db, p["id"]), None, {})
+    assert source_label("measure") in payload["sparkline_text"]

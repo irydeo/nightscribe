@@ -14,10 +14,16 @@
 """Tiny light-curve sparklines for list rows (Track UX-PC, U2).
 
 A `LightCurveChart` (ADR-029) is the full interactive chart; a sparkline is
-its silent thumbnail — no axes, no labels, just the trend of YOUR
-measurements so a follow-up project shows its growing series right in the
-hub list. Drawn straight to a QPixmap (cheap, no widget needed); the data
-model is the same `core/followup.list_points` the big chart reads.
+its silent thumbnail: no axes, no labels, just the trend of a curve so a
+follow-up project shows its series right in the hub list. Drawn straight to
+a QPixmap (cheap, no widget needed).
+
+Since 2026-10-01 the row draws the project's **latest available curve** (the
+newest run, whatever measured it: the series engine or an EXOTIC reduction
+imported from its CSV) and it is framed in the **chart's own magnitude
+window** (`core/lightcurve_data.mag_window`), passed in as `y_window`.
+Fitting the data to the box, as it used to, showed a flat curve and a
+three-magnitude one exactly the same.
 """
 
 from PySide6.QtCore import Qt
@@ -27,9 +33,17 @@ _PAD = 3.0        # inner margin, px
 _DOT = 2.2        # point radius, px
 
 
-def sparkline_pixmap(points, width=110, height=26, color="#6ab0ff"):
+def sparkline_pixmap(points, width=110, height=26, color="#6ab0ff",
+                     y_window=None):
     # @args: points - followup.list_points rows (dicts with mjd + mag),
-    #        width/height - target size in px, color - stroke accent
+    #        width/height - target size in px, color - stroke accent,
+    #        y_window - the magnitude window to draw in, or None to fit the
+    #        data. The project list passes the chart's own window
+    #        (core/lightcurve_data.mag_window), because a thumbnail that
+    #        stretches min-to-max shows a flat curve and a three-magnitude
+    #        one exactly the same (measured: a real project's curve spans
+    #        11.074 to 13.224 mag, one anomalous frame, while its chart's
+    #        window is 11.074 to 11.241)
     # @return: QPixmap with the magnitude trend (bright = up, the inverted
     #          magnitude axis honoured), or a null QPixmap when there is
     #          nothing to draw (<2 usable points — the caller hides the
@@ -48,7 +62,10 @@ def sparkline_pixmap(points, width=110, height=26, color="#6ab0ff"):
     xs = [u[0] for u in usable]
     ys = [u[1] for u in usable]
     x0, x1 = min(xs), max(xs)
-    y0, y1 = min(ys), max(ys)
+    if y_window is not None:
+        y0, y1 = float(y_window[0]), float(y_window[1])
+    else:
+        y0, y1 = min(ys), max(ys)
     # never divide by zero: a single night (x0 == x1) or a flat series
     # still draws — spread the span a touch
     if x1 - x0 < 1e-6:

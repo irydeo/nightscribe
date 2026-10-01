@@ -26,7 +26,8 @@ The data comes from `core/followup.list_points`; the template from
 import logging
 import math
 
-from PySide6.QtCore import QPointF, Qt, Signal
+from PySide6.QtCore import (QCoreApplication, QPointF, QT_TRANSLATE_NOOP, Qt,
+                            Signal)
 from PySide6.QtGui import (QBrush, QColor, QPen, QFont, QPolygonF)
 from PySide6.QtWidgets import (QWidget, QVBoxLayout,
                                 QGraphicsEllipseItem, QGraphicsLineItem,
@@ -35,7 +36,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout,
 
 import numpy as np
 
-from ...core import sn_templates, ticks
+from ...core import lightcurve_data, sn_templates, ticks
 from ...viz import palette
 from .base_chart import ChartView
 
@@ -95,9 +96,9 @@ _PAD_BOTTOM = 108.0
 # Robust window (quality plan, phase A): the magnitude scale is set by the
 # CORE of the data (median ± K robust sigmas), never by min/max, so one
 # anomalous frame or one badly calibrated night cannot flatten the curve
-# into a line. The points outside stay on the chart, anchored to the edge.
-_ROBUST_K = 6.0
-_MIN_WINDOW = 0.05          # mag: never a degenerate window
+# into a line. The rule itself lives in core/lightcurve_data.mag_window,
+# because the project list's thumbnail shows the same scale; the constants
+# below are what the widget needs for its own layout.
 _PAD = 0.10                 # 10 % of the window as air
 
 # How opaque a filled marker is: enough to read the band's colour, a hair
@@ -268,6 +269,46 @@ _FILTER_COLOURS = {
 }
 
 
+def _tr(text):
+    # @args: text - an English source string
+    # @return: it in the UI language, in the chart's own i18n context: the
+    #          labels below moved out of the class, so the context has to
+    #          travel with them or their translations would be orphaned
+    return QCoreApplication.translate("LightCurveChart", text)
+
+
+# The human name of a point's source, keyed by the source key. Each string
+# goes through QT_TRANSLATE_NOOP because lupdate does not look inside a
+# dynamic table (a plain dict made it mark the whole set as vanished, losing
+# the translations); at run time QCoreApplication.translate resolves it in
+# the chart's own context.
+_SOURCE_LABELS = {
+    "manual": QT_TRANSLATE_NOOP("LightCurveChart", "Manual entry"),
+    "measure": QT_TRANSLATE_NOOP("LightCurveChart", "Series · measured"),
+    "detrend": QT_TRANSLATE_NOOP("LightCurveChart", "Series · detrended"),
+    "exotic": QT_TRANSLATE_NOOP("LightCurveChart", "EXOTIC (NASA/JPL)"),
+    "paste": QT_TRANSLATE_NOOP("LightCurveChart", "Pasted data"),
+    "file": QT_TRANSLATE_NOOP("LightCurveChart", "From file"),
+    "quicklook": QT_TRANSLATE_NOOP("LightCurveChart",
+                                   "Quick-look · indicative"),
+    "survey": QT_TRANSLATE_NOOP("LightCurveChart", "Survey · ALeRCE/ZTF"),
+}
+
+
+def source_label(source):
+    # The human name of a point's source: the chart's legend and probe, and
+    # now the project list's thumbnail tooltip, from ONE map so they cannot
+    # drift.
+    # @args: source - measure|exotic|paste|file|quicklook|survey:ztf
+    # @return: the label. "exotic" was missing from the map: the curve
+    #          imported from EXOTIC (NASA/JPL) came out labelled "Manual
+    #          entry".
+    key = (source or "manual").lower()
+    if key.startswith("survey"):
+        key = "survey"
+    return _tr(_SOURCE_LABELS.get(key, _SOURCE_LABELS["manual"]))
+
+
 class LightCurveChart(ChartView):
     # A QGraphicsView that plots SN photometry points vs date with an
     # inverted magnitude axis, per-filter series, error bars and an
@@ -424,23 +465,10 @@ class LightCurveChart(ChartView):
         return filt
 
     def source_label(self, source):
-        # @args: source - the point's source (manual|paste|file|quicklook|
-        #        survey:ztf)
+        # @args: source - the point's source (measure|exotic|paste|file|
+        #        quicklook|survey:ztf)
         # @return: the human source label for the legend and the probe
-        source = source or "manual"
-        if source.startswith("survey"):
-            return self.tr("Survey · ALeRCE/ZTF")
-        if source == "quicklook":
-            return self.tr("Quick-look · indicative")
-        if source == "measure":
-            return self.tr("Series · measured")
-        if source == "detrend":
-            return self.tr("Series · detrended")
-        if source == "paste":
-            return self.tr("Pasted data")
-        if source == "file":
-            return self.tr("From file")
-        return self.tr("Manual entry")
+        return source_label(source)
 
     def set_template_visible(self, on):
         # @args: on - draw the template/schematic overlay or not
@@ -702,38 +730,13 @@ class LightCurveChart(ChartView):
             self._peak_mag = self._peak_mag or brightest["mag"]
 
     def _mag_window(self, mags):
-        # The magnitude window of the chart (quality plan, A1).
-        #
-        # Three things can decide it, in this order:
-        #   1. the observer, when the manual range is on (their eye knows
-        #      what they are looking for);
-        #   2. the robust core (median ± K robust sigmas), which keeps one
-        #      anomalous frame from flattening the whole curve;
-        #   3. the plain min/max, when robust mode is off or the scatter
-        #      is degenerate.
+        # The magnitude window of the chart (quality plan, A1): the rule
+        # lives in core/lightcurve_data.mag_window, because the project
+        # list's thumbnail shows the same scale and two copies would drift.
         # @args: mags - the finite magnitudes on the chart
-        # @return: (lo, hi) of the window, padded
-        if self._y_range is not None:
-            return float(self._y_range[0]), float(self._y_range[1])
-        vals = np.asarray(mags, dtype=float)
-        if not self._robust:
-            lo, hi = float(vals.min()), float(vals.max())
-        else:
-            med = float(np.median(vals))
-            mad = 1.4826 * float(np.median(np.abs(vals - med)))
-            if mad > 0.0:
-                lo, hi = med - _ROBUST_K * mad, med + _ROBUST_K * mad
-                # the core is intersected with the data: a robust window
-                # cannot be WIDER than the curve itself
-                lo = max(lo, float(vals.min()))
-                hi = min(hi, float(vals.max()))
-            else:
-                lo, hi = float(vals.min()), float(vals.max())
-        if hi - lo < _MIN_WINDOW:
-            centre = 0.5 * (lo + hi)
-            lo, hi = centre - _MIN_WINDOW / 2.0, centre + _MIN_WINDOW / 2.0
-        pad = (hi - lo) * _PAD
-        return lo - pad, hi + pad
+        # @return: (lo, hi) of the window, padded, or None with no data
+        return lightcurve_data.mag_window(mags, y_range=self._y_range,
+                                          robust=self._robust)
 
     def set_mag_mode(self, mode):
         # Switches what the axis shows. It is a real change of QUANTITY, so
@@ -946,7 +949,7 @@ class LightCurveChart(ChartView):
         if not xs or not mags:
             return None
         x_span = (max(xs) - min(xs)) or 1.0
-        y_span = (max(mags) - min(mags)) or _MIN_WINDOW
+        y_span = (max(mags) - min(mags)) or lightcurve_data.MIN_WINDOW
         return (x_span, y_span)
 
     def reset_view(self):

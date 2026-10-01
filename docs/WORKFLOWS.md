@@ -872,7 +872,10 @@ button landing on the exact section; calm/empty states; source: the new,
 purely-local, additive `core/attention.py`); **rich rows** in both tabs
 (kind band, next action in words, progress dots, "up tonight HH:MM–HH:MM"
 chip via `planner.safe_window_for`, activity age, **sparkline** of your
-own measurements for SN/variables, the "Needs you" order); the **Next
+own measurements for SN/variables, the "Needs you" order; since 2026-10-01
+the thumbnail is the project's **latest available curve** (the newest run,
+be it the series or an EXOTIC reduction), framed in the **chart's own
+magnitude window**); the **Next
 card as the step machine's command center** (Mark done/Skip beside Go →;
 sections keep only a discreet footer); **three-level action prominence**
 (primary visible / ⋯ menu / collapsed block with a plain-language title —

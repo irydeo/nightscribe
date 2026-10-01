@@ -1052,7 +1052,10 @@ fuente: el nuevo `core/attention.py`, math 100 % local y aditiva);
 **filas ricas** en ambas pestañas (banda de tipo, siguiente acción en
 palabras, puntos de progreso, chip «⊕ HH:MM–HH:MM esta noche» vía
 `planner.safe_window_for`, edad de actividad, **sparkline** de tus medidas
-en SN/variables, orden «Te necesita»); la **tarjeta Next como centro de
+en SN/variables, orden «Te necesita»; desde 2026-10-01 la miniatura es la
+**última curva disponible** del proyecto (la corrida más reciente, sea la
+serie o una reducción de EXOTIC), encuadrada en la **misma ventana de
+magnitudes del gráfico**); la **tarjeta Next como centro de
 mando** (Mark done/Skip junto a Go →; las secciones conservan solo un pie
 discreto); la **prominencia a tres niveles** (primario visible / menú ⋯ /
 bloque colapsable con título en lenguaje llano — Calibration y «Lo que

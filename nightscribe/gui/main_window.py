@@ -2921,18 +2921,37 @@ class MainWindow(QMainWindow):
             next_text = self.tr("archived")
         # urgency paints the next action (the row says WHY it floats up)
         urgency = (attn or {}).get("urgency")
-        # the curve thumbnail: ANY project that has one, whatever its kind
-        # (reported: a transit project with 1255 measured points showed no
-        # curve in the list, because the thumbnail was tied to the kind).
-        # The sparkline is null when there is nothing to draw (fewer than
-        # two usable points), so the row hides it by itself.
-        pts = _fu.list_points(db, p["id"])
-        spark = sparkline_pixmap(pts, color=kind_color)
+        # the curve thumbnail: the LAST available curve of the project, drawn
+        # in the SAME magnitude window the chart uses. Reported twice: it
+        # stretched min-to-max on its own, so a flat curve and a
+        # three-magnitude one looked exactly the same (a real project's
+        # curve spans 11.074 to 13.224 mag, one anomalous frame, while its
+        # chart's window is 11.074 to 11.241), and it showed the project's
+        # pile instead of the latest reduction. The sparkline is null when
+        # there is nothing to draw (fewer than two usable points), so the row
+        # hides it by itself.
+        from ..core import lightcurve_data
+        from .widgets.lightcurve_widget import source_label
+        run = _fu.latest_curve_run(db, p["id"])
+        pts = (_fu.list_points_for_run(db, run["id"]) if run is not None
+               else _fu.list_points(db, p["id"]))
+        window = lightcurve_data.mag_window(
+            [q["mag"] for q in pts if q.get("mag") is not None])
+        spark = sparkline_pixmap(pts, color=kind_color, y_window=window)
         spark_text = None
         if not spark.isNull():
             what = _fu.curve_summary(pts)
-            spark_text = self.tr("{0} nights · {1} points").format(
-                what["nights"], what["points"])
+            if run is not None:
+                # a run whose cfg carries no source is a series run (that is
+                # what the series engine writes), so it must not read
+                # "Manual entry"
+                src = (run.get("cfg") or {}).get("source") or "measure"
+                spark_text = self.tr(
+                    "Last curve: {0} · {1} points · the chart's scale"
+                ).format(source_label(src), what["points"])
+            else:
+                spark_text = self.tr("{0} nights · {1} points").format(
+                    what["nights"], what["points"])
         return {
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),

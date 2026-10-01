@@ -649,3 +649,46 @@ def test_migration_v15_adds_the_curve_column(tmp_path):
                      ).fetchone()
     assert row[0] == "2026-01-01" and row[1] is None
     db.close()
+
+
+# ---------------- the row's thumbnail: the latest curve ----------------
+
+def _pt(pid, sid, run, mjd, mag, source, filt=None):
+    # @return: one photometry_points row as the writers build it
+    return {"project_id": pid, "session_id": sid, "mjd": mjd, "filter": filt,
+            "mag": mag, "err": 0.01, "source": source, "flags": [],
+            "run_id": run}
+
+
+def test_latest_curve_run_is_the_newest_with_something_to_draw(tmp_db):
+    # What the project list's thumbnail shows. It is NOT list_points: that
+    # one keeps one point per frame from the series engine, so a curve
+    # imported from EXOTIC is not in it at all (measured on a real project:
+    # the 142 EXOTIC points were in no chart), and the thumbnail is where the
+    # last reduction shows up in the hub.
+    p = project.create(tmp_db, "transit", "HAT-P-32 b")
+    sid = followup.create_session(tmp_db, p["id"], obs_date="2017-12-20")
+    assert followup.latest_curve_run(tmp_db, p["id"]) is None
+    measured = followup.create_run(tmp_db, session_id=sid,
+                                   cfg={"series": {"band": "V"}})
+    followup.add_points(tmp_db, [
+        _pt(p["id"], sid, measured, 58107.1 + i, 11.1, "measure", "V")
+        for i in range(5)])
+    got = followup.latest_curve_run(tmp_db, p["id"])
+    assert got["id"] == measured and got["points"] == 5
+    # the imported curve is newer, and it is what has to be drawn: its
+    # magnitudes (~0, normalised flux) cannot share the measured axis
+    exotic = followup.create_run(tmp_db, session_id=sid,
+                                 cfg={"source": "exotic"})
+    followup.add_points(tmp_db, [
+        _pt(p["id"], sid, exotic, 58107.3 + i * 0.01, 0.01 * i, "exotic")
+        for i in range(30)])
+    got = followup.latest_curve_run(tmp_db, p["id"])
+    assert got["id"] == exotic and got["cfg"]["source"] == "exotic"
+    # a run with nothing to draw is skipped, never returned
+    followup.create_run(tmp_db, session_id=sid, cfg={"source": "exotic"})
+    assert followup.latest_curve_run(tmp_db, p["id"])["id"] == exotic
+    # and a project with no runs at all has no latest run (the row falls
+    # back to the project's curve)
+    other = project.create(tmp_db, "sn", "SN 2026zzz")
+    assert followup.latest_curve_run(tmp_db, other["id"]) is None

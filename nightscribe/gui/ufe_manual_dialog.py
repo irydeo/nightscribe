@@ -73,7 +73,22 @@ class UfeManualDialog(QDialog):
         # font, so 760 clears that and test_manual_window_cannot_squish_its_
         # buttons pins it. The HEIGHT now follows the content.
         self.setMinimumWidth(760)
+        self._fitted = False
         self._fit_to_content()
+
+    def showEvent(self, event):
+        # The metrics are the APPLIED font's, not the one the dialog was
+        # built with: on Windows the layout needs 8 px more than the floor
+        # computed in __init__, so the window could squish its own buttons
+        # (measured in CI, 2026-10-01: minimumHeight 147 against a hint of
+        # 155). The first show re-fits, once, so it does not fight a size the
+        # observer chose.
+        # @args: event - the show event
+        # @return: None
+        super().showEvent(event)
+        if not self._fitted:
+            self._fitted = True
+            self._fit_to_content()
 
     def _fit_to_content(self):
         # The window takes the height its CONTENT really needs, at the width

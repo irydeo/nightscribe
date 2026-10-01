@@ -1019,7 +1019,13 @@ def _band_strip(dlg):
     QTimer.singleShot(250, loop.quit)
     loop.exec()
     img = dlg.view.grab().toImage()
-    h = min(60, img.height())
+    # The crop is the BAND's own height, which the view keeps for the compass
+    # and the reticle that share the top (_title_h). A fixed 60 px left the
+    # band's text outside with a taller font, so two different magnitudes
+    # hashed the same (measured in CI, 2026-10-01); 60 stays as the fallback
+    # for a frame where nothing was painted.
+    band_h = int(getattr(dlg.view, "_title_h", 0) or 0) + 4
+    h = min(band_h if band_h > 4 else 60, img.height())
     return hashlib.sha1(bytes(img.copy(0, 0, img.width(), h).bits())
                         ).hexdigest()
 

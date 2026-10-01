@@ -575,12 +575,18 @@
           <property name="text">
            <string>Frames: 0</string>
           </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="lbl_series_cadence">
           <property name="text">
            <string>group 1 · cadence from the frames</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
           </property>
          </widget>
         </item>

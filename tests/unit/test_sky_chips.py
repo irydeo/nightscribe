@@ -71,7 +71,7 @@ def window(qapp):
 def _sky_chips(window):
     # @return: the sky chips currently in the Tonight header
     from PySide6.QtWidgets import QLabel
-    return window.tonight.findChildren(QLabel, "ns_skyevent_chip")
+    return window.findChildren(QLabel, "ns_skyevent_chip")
 
 
 def test_chips_big_first_and_one_per_family(window):
@@ -126,6 +126,17 @@ def test_no_events_means_no_chips(window):
     picks = window._skyevent_chips([])
     assert picks == []
     assert _sky_chips(window) == []
+
+
+def test_sky_band_lives_on_home_and_hides_when_empty(window):
+    # Interfaz 1.0: the chips have a band of their own on Home; it shows
+    # while there are chips and hides when there are none.
+    assert window._sky_band is not None
+    window._skyevent_chips([_ev("opposition", NOW_JD + 5, ["saturn"],
+                                mag=0.6)])
+    assert not window._sky_band.isHidden()
+    window._skyevent_chips([])
+    assert window._sky_band.isHidden()
 
 
 def test_real_list_chips_today(window):

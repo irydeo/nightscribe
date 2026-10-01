@@ -1536,7 +1536,7 @@ def test_cadence_hint_shows_for_stale_sn(window, panel):
     window._tonight_all = []
     window._show_cadence_hints()
     from PySide6.QtWidgets import QLabel
-    chips = [c for c in window.tonight.findChildren(QLabel)
+    chips = [c for c in window.findChildren(QLabel)
              if c.objectName() == "ns_cadence_chip"]
     assert len(chips) >= 1
 
@@ -1550,19 +1550,19 @@ def test_cadence_hint_no_active_projects(window, panel):
     window._show_cadence_hints()
     from PySide6.QtWidgets import QLabel
     # the stale-sn test may have left a chip; clean it explicitly
-    stale = window.tonight.findChild(QLabel, "ns_cadence_chip")
+    stale = window.findChild(QLabel, "ns_cadence_chip")
     if stale is not None:
         # deleteLater is async; the C++ object lingers. Force-remove.
         stale.setParent(None)
         stale.deleteLater()
     # look only for the named cadence chip (not any label with "follow")
     from PySide6.QtWidgets import QLabel
-    chip = window.tonight.findChild(QLabel, "ns_cadence_chip")
+    chip = window.findChild(QLabel, "ns_cadence_chip")
     # the chip may still exist as a C++ object pending deleteLater;
     # what matters is that it's no longer in the layout (parent = None)
     if chip is not None:
         chip.setParent(None)
-    assert window.tonight.findChild(QLabel, "ns_cadence_chip") is None or \
+    assert window.findChild(QLabel, "ns_cadence_chip") is None or \
         chip.parentWidget() is None
 
 
@@ -1946,7 +1946,7 @@ def test_cadence_chip_ignores_campaign_projects(window):
                       (time.time() - 9 * 86400, sid))
         mw.db.commit()
     window._show_cadence_hints()
-    chip = window.tonight.findChild(QLabel, "ns_cadence_chip")
+    chip = window.findChild(QLabel, "ns_cadence_chip")
     assert chip is not None
     assert "SN 2026zzz" in chip.text()
     assert "SN 2026yyy" not in chip.text()

@@ -312,7 +312,7 @@ def test_cadence_chip_navigates_to_followup(window):
                   (old, p["id"]))
     mw.db.commit()
     window._show_cadence_hints()
-    chips = window.tonight.findChildren(QLabel, "ns_cadence_chip")
+    chips = window.findChildren(QLabel, "ns_cadence_chip")
     assert chips, "no cadence chip was created"
     window._goto_project_followup(p["id"])
     cur = window.projects.lst_projects.currentItem()

@@ -555,12 +555,36 @@ class MainWindow(QMainWindow):
         hl = QVBoxLayout(home)
         hl.setContentsMargins(12, 12, 12, 12)
         hl.setSpacing(10)
+        # Interfaz 1.0: the alerts get a home of their own on Home. The
+        # sky-event chips used to fall to the bottom of Tonight by an
+        # accident of layout parenting; the SN cadence reminders join the
+        # "needs your attention" story.
+        from PySide6.QtWidgets import (QFrame, QLabel, QHBoxLayout,
+                                       QPushButton)
+        self._sky_band, self._sky_chips_row = self._chip_band(
+            self.tr("What's up in the sky"))
+        hl.addWidget(self._sky_band)
         dash = proj.page_dashboard
         proj.stack_detail.removeWidget(dash)
         hl.addWidget(dash)
+        self._cadence_band, self._cadence_row = self._chip_band(
+            self.tr("Due for a revisit"))
+        hl.addWidget(self._cadence_band)
         lst = proj.grp_list
         proj.layout().removeWidget(lst)
         hl.addWidget(lst, 1)
+        # campaigns, folded into the hub (Interfaz 1.0): a strip that opens
+        # the Campaigns view (its detail stays its own full-screen view)
+        camp_strip = QHBoxLayout()
+        camp_lbl = QLabel(self.tr("Campaigns"))
+        camp_lbl.setStyleSheet("color: %s; font-size: 11px; font-weight: 700;"
+                               % theme.C_TEXT_DIM)
+        camp_strip.addWidget(camp_lbl)
+        camp_btn = QPushButton(self.tr("Open campaigns →"))
+        camp_btn.clicked.connect(self._tools_campaigns)
+        camp_strip.addWidget(camp_btn)
+        camp_strip.addStretch(1)
+        hl.addLayout(camp_strip)
 
         # Detail: the project page (masthead, tab bar, Next, sections).
         detail = QWidget()
@@ -755,6 +779,33 @@ class MainWindow(QMainWindow):
     def _drawer_new_project(self):
         self._drawer_open(False)
         self._goto_tab(VIEW_TONIGHT)
+
+    def _chip_band(self, title):
+        # A slim Home band that hosts a row of clickable chips (sky events,
+        # SN cadence). Hidden while it has no chips.
+        # @args: title - the band's small header
+        # @return: (the band QFrame, its chips QHBoxLayout)
+        from PySide6.QtWidgets import (QFrame, QLabel, QHBoxLayout,
+                                       QVBoxLayout)
+        band = QFrame()
+        band.setObjectName("home_band")
+        band.setStyleSheet(
+            "QFrame#home_band { background: %s; border: 1px solid %s;"
+            " border-radius: 8px; }" % (theme.C_BASE, theme.C_LINE))
+        lay = QVBoxLayout(band)
+        lay.setContentsMargins(12, 8, 12, 8)
+        lay.setSpacing(6)
+        head = QLabel(title)
+        head.setStyleSheet(
+            "color: %s; font-size: 11px; font-weight: 700;"
+            " letter-spacing: 1px;" % theme.C_TEXT_DIM)
+        lay.addWidget(head)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addStretch(1)
+        lay.addLayout(row)
+        band.setVisible(False)
+        return band, row
 
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
@@ -1833,13 +1884,18 @@ class MainWindow(QMainWindow):
     def _show_cadence_hints(self):
         # B11: surface active SN projects that are due for a revisit ("hace
         # N noches que no la visitas"). Reads the follow-up cadence from the
-        # project_sessions table and shows a chip in the Tonight header.
+        # project_sessions table. Interfaz 1.0: the chips live in Home's
+        # "Due for a revisit" band, part of the needs-your-attention story.
         from ..core import followup as fu
-        # remove every previous cadence chip (several now, idempotent)
-        for old in self.tonight.findChildren(QLabel, "ns_cadence_chip"):
+        # remove every previous cadence chip (several now, idempotent).
+        # Detach NOW (setParent(None)): deleteLater alone leaves the C++
+        # object findable until the event loop turns, so findChild would
+        # hand back a corpse on the next call.
+        for old in self.findChildren(QLabel, "ns_cadence_chip"):
             parent = old.parentWidget()
             if parent and parent.layout():
                 parent.layout().removeWidget(old)
+            old.setParent(None)
             old.deleteLater()
         threshold = int(config.get("sn_cadence_days", 3))
         # campaign projects already surface in Tonight via the planner's
@@ -1854,22 +1910,18 @@ class MainWindow(QMainWindow):
             days = fu.days_since_last_session(db, pid)
             if days is not None and days >= threshold:
                 hints.append((pid, name, days))
+        band = getattr(self, "_cadence_band", None)
+        if band is not None:
+            band.setVisible(bool(hints))
         if not hints:
             return
-        # insert the chips in the tonight header's layout (the parent of
-        # lbl_context is a QWidget; find its containing layout)
-        parent = self.tonight.lbl_context.parentWidget()
-        header_layout = parent.layout() if parent else None
-        if header_layout is None:
-            p = parent
-            while p is not None:
-                if p.layout() is not None:
-                    header_layout = p.layout()
-                    break
-                p = p.parentWidget()
-        if not (header_layout and hasattr(header_layout, "addWidget")):
+        row = getattr(self, "_cadence_row", None)
+        if row is None:
+            parent = self.tonight.lbl_context.parentWidget()
+            row = parent.layout() if parent else None
+        if row is None or not hasattr(row, "insertWidget"):
             return
-        for pid, name, days in hints[:3]:
+        for i, (pid, name, days) in enumerate(hints[:3]):
             chip = _LinkChip(
                 self.tr("SN due: %1 (%2 d)").replace(
                     "%1", name).replace("%2", str(days)),
@@ -1878,12 +1930,12 @@ class MainWindow(QMainWindow):
             chip.setObjectName("ns_cadence_chip")
             chip.clicked.connect(
                 lambda _p=pid: self._goto_project_followup(_p))
-            header_layout.addWidget(chip)
+            row.insertWidget(i, chip)
         if len(hints) > 3:
             more = QLabel(f"+{len(hints) - 3}")
             more.setObjectName("ns_cadence_chip")
             more.setStyleSheet(theme.chip_style("#e0c060"))
-            header_layout.addWidget(more)
+            row.insertWidget(3, more)
 
     def _goto_project_followup(self, pid):
         # Opens the project's Follow-up tab (ADR-043: the multi-night
@@ -1897,11 +1949,13 @@ class MainWindow(QMainWindow):
 
     def _skyevent_chips(self, evs=None):
         # The solar system as an event source (SC2, ADR-040): up to three
-        # chips in the Tonight header, the big things first, one per
-        # family. Local maths, no network. A click opens the Sky calendar.
+        # chips, the big things first, one per family. Local maths, no
+        # network. A click opens the Sky calendar. Interfaz 1.0: their home
+        # is the Home band "What's up in the sky" (they used to fall to the
+        # bottom of Tonight by an accident of layout parenting).
         # @args: evs - optional precomputed list (tests inject fakes)
         # @return: the picked events (also handy for tests)
-        for old in self.tonight.findChildren(QLabel, "ns_skyevent_chip"):
+        for old in self.findChildren(QLabel, "ns_skyevent_chip"):
             parent = old.parentWidget()
             if parent and parent.layout():
                 parent.layout().removeWidget(old)
@@ -1931,28 +1985,25 @@ class MainWindow(QMainWindow):
             picks.append(e)
             if len(picks) == 3:
                 break
+        band = getattr(self, "_sky_band", None)
+        if band is not None:
+            band.setVisible(bool(picks))
         if not picks:
             return picks
-        # same header home as the cadence chips (the layout that hosts
-        # lbl_context; see _show_cadence_hints for the fallback walk)
-        parent = self.tonight.lbl_context.parentWidget()
-        header_layout = parent.layout() if parent else None
-        if header_layout is None:
-            p = parent
-            while p is not None:
-                if p.layout() is not None:
-                    header_layout = p.layout()
-                    break
-                p = p.parentWidget()
-        if not (header_layout and hasattr(header_layout, "addWidget")):
+        row = getattr(self, "_sky_chips_row", None)
+        if row is None:
+            # fallback (no shell Home): the old Tonight header home
+            parent = self.tonight.lbl_context.parentWidget()
+            row = parent.layout() if parent else None
+        if row is None or not hasattr(row, "insertWidget"):
             return picks
-        for e in picks:
+        for i, e in enumerate(picks):
             chip = _LinkChip(self._sky_chip_text(e), "#6ab0ff",
                              self.tr("From the solar-system calendar — "
                                      "click to open the Sky calendar"))
             chip.setObjectName("ns_skyevent_chip")
             chip.clicked.connect(self._tools_skycal)
-            header_layout.addWidget(chip)
+            row.insertWidget(i, chip)
         return picks
 
     def _sky_chip_text(self, e):
@@ -3067,6 +3118,10 @@ class MainWindow(QMainWindow):
         if getattr(self, "_drawer_list", None) is not None \
                 and self._drawer.isVisible():
             self._refresh_drawer()
+        # Interfaz 1.0: the Home "Due for a revisit" band is local-only
+        # (it reads project_sessions), so it can refresh on every visit.
+        if getattr(self, "_cadence_band", None) is not None:
+            self._show_cadence_hints()
 
     # ---------------- UX-PC (U2): rich rows + dashboard ----------------
 

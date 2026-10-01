@@ -55,7 +55,10 @@ jobs:
         # SERIAL: measured on this runner (2026-10-01), the suite does 1886
         # tests in 12 minutes serially (0,38 s each, so 2400+ fit in ~16),
         # while `-n auto` (8 workers for 2-4 cores) did not finish in 25.
-        timeout-minutes: 25
+        timeout-minutes: 45
+        # 45 minutes, measured: the suite takes 7m38s serially on this
+        # machine and that runner is about five times slower, so ~38
+        # minutes plus the install.
         run: python -m pytest tests/unit -v
 
       - name: Resolve the package version

@@ -65,7 +65,13 @@ jobs:
         # paying for the whole suite: `only` runs one or more files (also
         # serial) and `qpa` swaps QT_QPA_PLATFORM, which is how a platform
         # plugin's own bug is told apart from the app's.
-        timeout-minutes: 25
+        timeout-minutes: 45
+        # 45 minutes, measured: the suite takes 7m38s serially on this
+        # machine and that runner is about five times slower (the live
+        # session test alone is 30s, the workbench fixtures 24s each, the
+        # transit fits 17s), so ~38 minutes plus the install. A tighter
+        # bound does not fail faster, it fails later with the suite cut in
+        # half: the first runs did exactly that (66 % in 25 minutes).
         shell: pwsh
         run: |
           $only = "${{ github.event.inputs.only }}"

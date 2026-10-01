@@ -11,6 +11,7 @@
 #
 ############################################################
 
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -21,6 +22,8 @@ from PySide6.QtWidgets import (QDialog, QFileDialog, QLabel,
                                QScroller, QScrollArea)
 
 from .ui_loader import adopt_ui, drop_in
+
+logger = logging.getLogger("nightscribe.gui.chart_viewer")
 
 # characters that no sane file system keeps in a name (Windows + the
 # control range); the export dialog suggestion is sanitised through this.
@@ -278,16 +281,38 @@ class ChartViewer(QDialog):
         # Pixmap mode: the chart already lives on disk — a plain file copy.
         # Widget mode: render whatever is on the canvas to a fresh PNG
         # (zoom included), via the widget's own export.
+        #
+        # EVERYTHING IS SAID, which it was not: a source file that is no
+        # longer there (a chart the project saved, cleaned up or moved) made
+        # this raise with nobody listening, and the observer saw a button
+        # that did nothing at all (reported: "the PNG export of the chart
+        # does not work"). Success lands in the window title and in the log;
+        # a failure is said in a box, with the reason and what to do.
         out, _ = QFileDialog.getSaveFileName(
             self, self.tr("Export chart"),
             str(Path.home() / self._suggested_name()),
             "PNG (*.png);;All files (*)")
         if not out:
             return
-        if self._mode == "pixmap":
-            shutil.copyfile(self._path, out)
-        else:
-            self._widget.export_png(out)
+        try:
+            if self._mode == "pixmap":
+                if not Path(self._path).is_file():
+                    raise FileNotFoundError(self._path)
+                shutil.copyfile(self._path, out)
+            else:
+                self._widget.export_png(out)
+        except Exception as err:
+            logger.warning("chart export failed: %s", err)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self, self.tr("Export chart"),
+                self.tr("Could not write the chart: {0}").format(err)
+                + "\n\n" + self.tr(
+                    "If this chart came from a file of the project and that "
+                    "file is gone, rebuild the chart from its own window and "
+                    "export it again."))
+            return
+        logger.info("chart exported: %s", out)
         self.setWindowTitle(f"{self.windowTitle()} — {self.tr('exported')}")
 
 

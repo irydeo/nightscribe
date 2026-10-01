@@ -151,3 +151,108 @@ redraw the markers instantly: they apply on the next interaction or
 reopen (the boxes toggle is re-read at every show). In the blink, the
 PSc scale is the source plate's when the caller knows it (the UFE), and
 the work frame's on the legacy/CLI paths.
+
+**Revisión (2026-09-30): la placa dice lo suyo en una banda, no en cajas**. Se pidió
+repensar las cajas: el mismo estilo que la banda que ya encabeza la imagen (nombre,
+coordenadas, magnitud), con lo que faltaba (exposición, Stn, PSc, FOV) y **un color por
+dato**, para no copiar la estética de las cartas clásicas. Lo que cambia:
+
+- **El UFE deja de tener cajas de esquina**: `UfeImageView._paint_boxes` desaparece y
+  `core/chart_annotate.build_band` alimenta una **banda de dos líneas** en la parte
+  alta de la placa, dentro de la misma placa oscura. Línea 1 (identidad): objeto,
+  posición y magnitud. Línea 2 (contexto): fecha, exposición, filtro, equipo,
+  estación, escala y campo de visión. Las cajas de esquina **siguen existiendo** en las
+  otras cartas (el blink GIF/MP4 y la carta de secuencia), que no se tocan.
+- **Un color por rol**, decidido en el módulo puro y mapeado por el render
+  (`BAND_COLOURS`): `name` y `pos` en tinta (lo coloca la propia solución de esta
+  placa), `pos-cat` apagado y con la palabra `cat` (es la posición del catálogo, no la
+  de esta placa; el color no basta en un papel), y `context` apagado.
+- **La magnitud tiene escala propia, de tres estados más el catálogo** (revisión
+  2026-09-30, a petición del observador): **verde** (`palette.GOOD`) cuando la medida
+  está limpia: error ≤ 0,05, más de tres comparsas sosteniendo el punto cero,
+  estrella de chequeo que pasa, núcleo sin recortar y sin avisos; **naranja**
+  (`palette.FAIR`) cuando es usable pero no limpia: error ≤ 0,15, o exactamente tres
+  comparsas, o la magnitud derivada de un color, o la secuencia sin estrella de
+  chequeo, o un aviso del propio punto; **rojo** (`palette.DANGER`) cuando no es una
+  medida que se deba reportar sin mirarla: error > 0,15, menos de tres comparsas,
+  chequeo que dice que la noche no va, o núcleo recortado; y **blanco**
+  (`palette.CATALOG`) cuando es un valor de catálogo, que no es una medida de esta
+  placa. Las señales son las que la receta ya calcula; los umbrales (0,05 y 0,15) son
+  la línea entre «una placa suelta honrada» y «esto no se reporta sin mirar».
+- **La magnitud de la banda es la que se ha medido**, en este orden: el punto de la
+  curva de la visita **de esa toma** (el flujo normal: se mide la serie, no una placa),
+  después una medida de placa de esta placa, y solo entonces el catálogo, en blanco.
+  Así el color no miente por omisión cuando lo medido es una serie.
+- **Nunca se corta una palabra**: cuando el ancho no da, se sueltan campos enteros en
+  `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: lo menos necesario para
+  un reporte primero, la fecha la última) y, en el peor caso, la línea 2 entera; la
+  línea 1 pierde la magnitud y luego la posición, y solo se elide un nombre que no cabe
+  ni solo. La línea de contexto va un punto más pequeña y sin negrita: está para leerse,
+  no para competir con el nombre de la placa. El equipo se acota a **10 caracteres** (un
+  nombre de cámara puede ser un serial de 31 y se comía el FOV; 10 dicen SXV-H18,
+  ASI2600 o QHY42PRO, y el valor completo sigue en la cabecera y en las otras cartas), y
+  el fondo de la banda es opaco a propósito (205 de 255): sobre un campo brillante, la
+  primera versión se perdía.
+- **De dónde sale cada cosa**: el nombre del proyecto (o del fichero), la fecha, la
+  exposición, el filtro y el equipo **de la cabecera de la propia toma** (el equipo de
+  la toma gana al de Ajustes y no se mezclan: su cámara con mi telescopio sería una
+  mentira peor que cualquiera de las dos), la estación de Ajustes, la posición, la
+  escala y el FOV de la solución de la placa, y la magnitud solo de una medida de esta
+  sesión.
+- **Ajuste nuevo `chart_data`** (por defecto activado) para lo que dice la banda;
+  `chart_boxes` (por defecto desactivado) pasa a gobernar solo las cajas de las otras
+  cartas. La rosa de los vientos y la barra de escala vuelven a sus sitios clásicos
+  (arriba a la derecha bajo la banda, abajo a la izquierda): ya no hay esquinas que
+  liberar.
+
+**Revision (2026-09-30): the plate says its own thing in a band, not in boxes**. The
+boxes were to be rethought: the same style as the band that already heads the image
+(name, coordinates, magnitude), with what was missing (exposure, Stn, PSc, FOV) and
+**a colour per datum**, so as not to copy the classic charts' look. What changes:
+
+- **The UFE has no corner boxes any more**: `UfeImageView._paint_boxes` is gone and
+  `core/chart_annotate.build_band` feeds a **two-line band** at the top of the plate,
+  inside the same dark plaque. Line 1 (identity): object, position and magnitude. Line
+  2 (context): date, exposure, filter, equipment, station, scale and field of view.
+  The corner boxes **still exist** in the other charts (the blink GIF/MP4 and the
+  sequence chart), which are untouched.
+- **A colour per role**, decided in the pure module and mapped by the render
+  (`BAND_COLOURS`): `name` and `pos` in ink (this plate's own solution places it),
+  `pos-cat` dimmed and with the word `cat` (it is the catalogue's position, not this
+  plate's; colour alone is not enough on a printout), and `context` dimmed.
+- **The magnitude has a scale of its own: three states plus the catalogue** (revision
+  2026-09-30, asked for by the observer): **green** (`palette.GOOD`) when the
+  measurement is clean: error ≤ 0.05, more than three comparisons holding the zero
+  point, a check star that passes, a core that is not clipped and no flags;
+  **orange** (`palette.FAIR`) when it is usable but not clean: error ≤ 0.15, or exactly
+  three comparisons, or a magnitude derived from a colour, or a sequence with no check
+  star, or a flag on the point itself; **red** (`palette.DANGER`) when it is not a
+  measurement to report without looking: error > 0.15, fewer than three comparisons, a
+  check star that says the night is off, or a clipped core; and **white**
+  (`palette.CATALOG`) when it is a catalogue value, which is not a measurement of this
+  plate. The signals are the ones the recipe already computes; the thresholds (0.05 and
+  0.15) are the line between "a single plate's honest error" and "do not report this
+  without looking".
+- **The band's magnitude is the one that has been measured**, in this order: the visit
+  curve's point **for that frame** (the normal flow: a series is measured, not one
+  plate), then a single-plate measurement of this plate, and only then the catalogue,
+  in white. The colour cannot lie by omission when what was measured is a series.
+- **A word is never cut**: when the width runs out, whole fields are dropped in
+  `DROP_ORDER` (`fov`, `psc`, `equip`, `filter`, `stn`, `date`: the least needed for a
+  report first, the date last) and, in the worst case, line 2 entirely; line 1 loses
+  the magnitude and then the position, and only a name that does not fit even alone is
+  elided. The context line is a point smaller and not bold: it is there to be read, not
+  to compete with the plate's name. The equipment is capped at **10 characters** (a
+  camera name can be a 31-character serial and it was eating the FOV; 10 say SXV-H18,
+  ASI2600 or QHY42PRO, and the full value stays in the header and in the other charts),
+  and the band's plaque is opaque on purpose (205 of 255): over a bright field the first
+  version was lost.
+- **Where each datum comes from**: the name from the project (or the file), the date,
+  exposure, filter and equipment **from the plate's own header** (the frame's kit wins
+  over the Settings and the two are never mixed: his camera with my telescope would be
+  a worse lie than either), the station from the Settings, the position, scale and FOV
+  from the plate's solution, and the magnitude only from a measurement of this session.
+- **New `chart_data` setting** (on by default) for what the band says; `chart_boxes`
+  (off by default) now governs the other charts' boxes only. The compass and the scale
+  bar return to their classic spots (top right under the band, bottom left): there are
+  no corners to free any more.

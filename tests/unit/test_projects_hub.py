@@ -1665,6 +1665,12 @@ def test_fu_session_row_offers_measure_in_the_editor(window, monkeypatch):
         def set_object(self, obj):
             opened.append(obj)
 
+        def load_saved_sequence(self, seq):
+            return False
+
+        def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
+            pass
+
     def _ufe_open(tab_, hook_pid=None, obj=None, session_id=None, **_kw):
         opened.append((tab_, hook_pid, obj, session_id))
         return _D()
@@ -1807,6 +1813,20 @@ def _write_simple_fits(path, data):
     from pathlib import Path
     Path(path).write_bytes(hdr_bytes + body)
     return path
+
+
+def test_create_project_infers_kind_from_enriched_type(window):
+    # Ad-hoc Explore (Tools) has no planner target, so no kind: the
+    # enriched type decides it (exoplanet -> transit, transient -> sn).
+    for etype, want in (("exoplanet", "transit"), ("transient", "sn"),
+                        ("hads", "hads"), ("variable", "variable"),
+                        ("small_body", "neo"), ("comet", "comet")):
+        p = window._create_project({"name": f"Obj {etype}", "type": etype})
+        assert p is not None and p["kind"] == want
+
+
+def test_create_project_refuses_an_untyped_sun(window):
+    assert window._create_project({"name": "Sun", "type": "sun"}) is None
 
 
 def test_create_project_keeps_variable_and_campaign_context(window):
@@ -2540,3 +2560,168 @@ def test_detail_page_has_no_bare_wheel_hijackers(window, panel):
     bad += [type(w).__name__ for w in container.findChildren(QListWidget)
             if not isinstance(w, PassiveList)]
     assert not bad, f"bare wheel-hijacking controls on the detail page: {bad}"
+
+
+def test_every_kind_with_a_curve_shows_its_preview(window, panel):
+    # Reported: "todos los proyectos, sean del tipo que sean, que tengan una
+    # gráfica fotométrica asociada, deberían presentarlo en el listado". The
+    # thumbnail was tied to the follow-up kinds, so a transit project with
+    # 1255 measured points (HAT-P-32 b, on the observer's own database)
+    # showed nothing at all.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project
+    from PySide6.QtCore import Qt
+    p = project.create(dbmod.db, "transit", "HAT-P-32 b")
+    for i, m in enumerate((12.10, 12.12, 12.09, 12.11)):
+        followup.add_point(dbmod.db, p["id"], 60900.0 + i * 0.01, "V", m)
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    row = None
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            row = lst.itemWidget(lst.item(i))
+            break
+    assert row is not None
+    assert not row.lbl_spark.isHidden()          # a transit with a curve
+    assert "1" in row.lbl_spark.toolTip()        # one night
+    assert "4" in row.lbl_spark.toolTip()        # four points
+
+
+def test_a_project_without_a_curve_shows_no_preview(window, panel):
+    # The other half: no photometry, no squiggle (the row hides it itself,
+    # because the pixmap comes back null).
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import project
+    from PySide6.QtCore import Qt
+    p = project.create(dbmod.db, "neo", "2026 QK (no curve)")
+    window.on_refresh_projects()
+    lst = window.projects.lst_projects
+    row = None
+    for i in range(lst.count()):
+        if lst.item(i).data(Qt.UserRole) == p["id"]:
+            row = lst.itemWidget(lst.item(i))
+            break
+    assert row is not None
+    assert row.lbl_spark.isHidden()
+
+
+def test_the_analysis_curve_follows_the_selected_visit(window, panel):
+    # Reported: "La curva de luz que se muestre en Project details -> Analysis
+    # ha de ser la de la visita seleccionada, quizás la última". The chart
+    # drew the project's pile of points whatever visit was selected, and the
+    # panel opened with no visit selected at all.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup as fu
+    from PySide6.QtCore import Qt
+    p = _create_and_select(window, "variable", "V0526curva",
+                           {"kind": "variable"})
+    early = fu.create_session(dbmod.db, p["id"], obs_date="2026-09-28")
+    run1 = fu.create_run(dbmod.db, session_id=early, cfg={"series": {}})
+    fu.add_points(dbmod.db, [
+        {"project_id": p["id"], "session_id": early,
+         "mjd": 60297.80 + i * 0.001, "filter": "V", "mag": 12.70 + i * 0.01,
+         "err": 0.01, "source": "measure", "flags": [], "run_id": run1}
+        for i in range(2)])
+    last = fu.create_session(dbmod.db, p["id"], obs_date="2026-09-30")
+    run2 = fu.create_run(dbmod.db, session_id=last, cfg={"series": {}})
+    fu.add_points(dbmod.db, [
+        {"project_id": p["id"], "session_id": last,
+         "mjd": 60299.80 + i * 0.001, "filter": "V", "mag": 11.96 + i * 0.01,
+         "err": 0.01, "source": "measure", "flags": [], "run_id": run2}
+        for i in range(3)])
+    vp = _visits_panel(window)                  # builds the Analysis tab
+    w = window._project_widgets
+    # the newest visit is selected by itself (the list is newest first), and
+    # the chart draws ITS curve, saying which one it is
+    assert vp.current_session_id() == last
+    assert len(w["fu_curve"]._points) == 3
+    assert "2026-09-30" in w["fu_curve_what"].text()
+    # select the earlier visit: the chart follows it
+    for row in range(vp.lst.count()):
+        if vp.lst.item(row).data(Qt.UserRole) == early:
+            vp.lst.setCurrentRow(row)
+    assert len(w["fu_curve"]._points) == 2
+    assert "2026-09-28" in w["fu_curve_what"].text()
+    # and the switch to the whole project draws every night, once each
+    cmb = w["fu_curve_scope"]
+    cmb.setCurrentIndex(cmb.findData("project"))
+    assert len(w["fu_curve"]._points) == 5
+    assert "whole project" in w["fu_curve_what"].text()
+
+
+def test_the_analysis_curve_exists_for_every_kind_with_one(window, panel):
+    # Reported: "todos los proyectos, sean del tipo que sean, que tengan una
+    # gráfica fotométrica asociada, deberían presentarlo". The block was
+    # tied to sn/variable, so a transit with 1255 measured points (HAT-P-32
+    # b, on the observer's own database) had no curve in the Analysis tab.
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup as fu
+    p = _create_and_select(window, "transit", "HAT-P-32 curva",
+                           {"kind": "transit"})
+    fu.add_points(dbmod.db, [
+        {"project_id": p["id"], "session_id": None,
+         "mjd": 60940.5 + i * 0.001, "filter": "V", "mag": 12.10 + i * 0.01,
+         "err": 0.01, "source": "measure", "flags": []} for i in range(4)])
+    _visits_panel(window)
+    w = window._project_widgets
+    assert w["fu_curve"] is not None
+    assert len(w["fu_curve"]._points) == 4
+    # no template for a transit: the checkbox is hidden instead of lying
+    assert w["fu_curve_tpl"].isHidden()
+
+
+# ---------------- the row's thumbnail (2026-10-01) ----------------
+
+def test_the_row_thumbnail_is_the_latest_curve_in_the_charts_scale(window):
+    # Reported: the thumbnail stretched min-to-max on its own, so a flat
+    # curve and a three-magnitude one looked exactly the same, and it showed
+    # the project's pile instead of the latest available curve. It now draws
+    # the newest run in the same magnitude window the chart uses.
+    import nightscribe.gui.main_window as mw
+    from nightscribe.core import followup as fu
+    from nightscribe.core import lightcurve_data
+    from nightscribe.core import project as proj
+    from nightscribe.gui.widgets.lightcurve_widget import source_label
+    db = mw.db
+    p = proj.create(db, "transit", "HAT-P-32 b")
+    sid = fu.create_session(db, p["id"], obs_date="2017-12-20")
+    # a measured night: a flat curve with one anomalous frame
+    run_a = fu.create_run(db, session_id=sid, cfg={"series": {"band": "V"}})
+    rows = [{"project_id": p["id"], "session_id": sid,
+             "mjd": 58107.1 + i * 0.001, "filter": "V",
+             "mag": 11.1 + (0.005 if i % 2 else -0.005), "err": 0.01,
+             "source": "measure", "flags": [], "run_id": run_a}
+            for i in range(40)]
+    rows.append({"project_id": p["id"], "session_id": sid, "mjd": 58107.2,
+                 "filter": "V", "mag": 13.2, "err": 0.05,
+                 "source": "measure", "flags": [], "run_id": run_a})
+    fu.add_points(db, rows)
+    # and the imported curve, the newest run (mag ~0: another frame)
+    run_b = fu.create_run(db, session_id=sid, cfg={"source": "exotic"})
+    fu.add_points(db, [{"project_id": p["id"], "session_id": sid,
+                        "mjd": 58107.3 + i * 0.002, "filter": None,
+                        "mag": i * 0.001, "err": 0.01, "source": "exotic",
+                        "flags": [], "run_id": run_b} for i in range(30)])
+    payload = window._project_row_payload(proj.get(db, p["id"]), None, {})
+    assert not payload["sparkline"].isNull()
+    # the tooltip says WHICH curve it is (the latest one), not just "so far"
+    assert source_label("exotic") in payload["sparkline_text"]
+    # the scale is the chart's rule over THOSE points
+    pts = fu.list_points_for_run(db, run_b)
+    win = lightcurve_data.mag_window([q["mag"] for q in pts])
+    assert win is not None and win[0] <= 0.0 <= win[1]
+    # the measured curve's window is a different one (11.07-11.24): with it
+    # the imported curve would be off the box entirely, which is why the row
+    # frames the curve it draws
+    measured_win = lightcurve_data.mag_window(
+        [q["mag"] for q in fu.list_points(db, p["id"])])
+    assert measured_win[0] > 11.0
+    # a series run (its cfg carries no source) must not read "Manual entry"
+    run_c = fu.create_run(db, session_id=sid, cfg={"series": {"band": "V"}})
+    fu.add_points(db, [{"project_id": p["id"], "session_id": sid,
+                        "mjd": 58107.5 + i * 0.002, "filter": "V",
+                        "mag": 11.1 + i * 0.001, "err": 0.01,
+                        "source": "measure", "flags": [], "run_id": run_c}
+                       for i in range(10)])
+    payload = window._project_row_payload(proj.get(db, p["id"]), None, {})
+    assert source_label("measure") in payload["sparkline_text"]

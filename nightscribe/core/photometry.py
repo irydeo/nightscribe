@@ -34,10 +34,11 @@ language and says it the way the app already says things.
 
 import logging
 import math
+from dataclasses import dataclass, field
 
 import numpy as np
 
-from . import series
+from . import coords, fits_meta, series
 
 logger = logging.getLogger(__name__)
 
@@ -121,10 +122,67 @@ def _sigma_clipped_median(values, level=SIG_LEVEL, iters=SIG_ITERS):
     return float(np.median(arr)), int(arr.size)
 
 
+def pixel_coverage(shape, cx, cy, r, subsample=8):
+    # How much of each pixel lies inside the aperture circle.
+    #
+    # A star is a continuous thing and a sensor is a grid, so the honest
+    # question is not "is this pixel's CENTRE inside the circle?" but "how
+    # much of this pixel is?". Counting whole pixels is the staircase
+    # approximation: fine for a large aperture (the missing and the extra
+    # bits cancel along the circle), plainly wrong for a small one, where
+    # the boundary is a sizeable fraction of the area (r = 2 px: 13
+    # pixels counted against 12.57 of true area, a 3 % flux error that
+    # lands straight in the magnitude).
+    #
+    # Strategy: a pixel well inside is fully covered, a pixel well outside
+    # is not covered at all, and only the BOUNDARY pixels (about 2·pi·r of
+    # them) are measured by subsampling a grid inside the pixel. A few
+    # dozen small computations per star, not one per plate pixel.
+    #
+    # The answer is the PATCH the aperture needs, not the whole plate: a
+    # (h, w) array per star cost 38 of the 50 ms that measure_point spent
+    # on a 2048² plate (measured), and that price was paid for every
+    # candidate of a proposal and every frame of a series. A star is a few
+    # pixels wide; the plate is not.
+    # @args: shape - (h, w) of the plate (the bounds), cx/cy - the star's
+    #        centre (in float pixels), r - the aperture radius,
+    #        subsample - the grid per axis used on the boundary pixels
+    # @return: (cover, y0, x0): the coverages in 0..1 of the pixels around
+    #          the aperture, and the plate coordinates of the patch's
+    #          top-left corner (empty patch when the star is off-plate)
+    h, w = int(shape[0]), int(shape[1])
+    y0 = max(0, int(math.floor(cy - r - 1.0)))
+    y1 = min(h, int(math.ceil(cy + r + 1.0)) + 1)
+    x0 = max(0, int(math.floor(cx - r - 1.0)))
+    x1 = min(w, int(math.ceil(cx + r + 1.0)) + 1)
+    if x1 <= x0 or y1 <= y0:
+        return np.zeros((0, 0), dtype=np.float64), 0, 0
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    dist = np.hypot(xx - cx, yy - cy)
+    cover = np.zeros(dist.shape, dtype=np.float64)
+    cover[dist <= r - 0.8] = 1.0
+    maybe = (dist > r - 0.8) & (dist < r + 0.8)
+    if not np.any(maybe):
+        return cover, y0, x0
+    n = max(2, int(subsample))
+    offsets = (np.arange(n) + 0.5) / n - 0.5      # sub-pixel centres
+    rows, cols = np.nonzero(maybe)
+    for py, px in zip(rows, cols):
+        # the fraction of THIS pixel inside the circle: how many of the
+        # sub-samples fall within the radius. The sub-samples use the
+        # PLATE's coordinates (the patch's own indices are local: mixing
+        # them up answers about the wrong pixel)
+        sx = (px + x0) + offsets[:, None]
+        sy = (py + y0) + offsets[None, :]
+        inside = ((sx - cx) ** 2 + (sy - cy) ** 2) <= r * r
+        cover[py, px] = float(inside.sum()) / float(n * n)
+    return cover, y0, x0
+
+
 def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                   r_ann_out=R_ANN_OUT, sigma_clip=True, sat_adu=None,
-                  sky_mode="median", centroid_mode="gaussian",
-                  fwhm=None):
+                  linear_adu=None, sky_mode="median",
+                  centroid_mode="gaussian", fwhm=None, robust=True):
     # One click on one plate (decision D4): sub-pixel centroid, aperture
     # net flux, sky per pixel, peak, and honest guards. Never raises for
     # a bad star: the reason is the bilingual pair, the panel decides.
@@ -137,8 +195,9 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     #        sky_mode - "median" (flat sky) or "plane" (H2: a tilted sky
     #        plane fitted to the annulus, for galactic cores),
     #        centroid_mode - "gaussian" (matched-filter, parabola-fined;
-    #        the default), "refined" (sky-subtracted moment, two passes)
-    #        or "raw" (the legacy one-pass moment),
+    #        the default), "refined" (sky-subtracted moment, two passes),
+    #        "raw" (the legacy one-pass moment) or "none" (the observer's
+    #        hand-placed centre, used exactly: a faint SN is never dragged),
     #        fwhm - the plate's seeing in px when the caller knows it
     #        (the Measure tab's comps-based estimate): the centroid
     #        template then matches the stars instead of trusting a local
@@ -155,33 +214,68 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     if min(x, y, w - x, h - y) < r_ann_out:
         return _fail("demasiado cerca del borde", "too close to the edge")
     cen_ok = None                     # the raw mode carries no verdict
-    if centroid_mode == "raw":
+    if centroid_mode == "none":
+        # The observer placed the centre by hand (a very faint SN the
+        # algorithm would drag to a neighbour): use it EXACTLY, no search.
+        cx, cy = float(x), float(y)
+    elif centroid_mode == "raw":
         cx, cy = series._centroid(data, x, y)      # the legacy one-pass
     elif centroid_mode == "refined":
         cen = refined_centroid(data, x, y)
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
         cen_ok = cen["ok"]
     else:
-        cen = gaussian_centroid(data, x, y, fwhm=fwhm)
+        cen = gaussian_centroid(data, x, y, fwhm=fwhm, sky_pp=None,
+                                robust=robust)
         cx, cy = cen["x"], cen["y"]              # ok=False keeps the click
         cen_ok = cen["ok"]
-    yy, xx = np.ogrid[:h, :w]
+    # EVERYTHING BELOW HAPPENS IN A PATCH around the star (the aperture
+    # and the sky annulus need nothing else): the plate-wide arrays this
+    # used to build per star were 20 times the work of the arithmetic they
+    # fed (measured on a 2048² plate: 38 ms of `pixel_coverage` plus the
+    # full-frame radius grid).
+    pad = int(math.ceil(max(r_ann_out, r_ap))) + 2
+    py0 = max(0, int(math.floor(cy)) - pad)
+    py1 = min(h, int(math.ceil(cy)) + pad + 1)
+    px0 = max(0, int(math.floor(cx)) - pad)
+    px1 = min(w, int(math.ceil(cx)) + pad + 1)
+    sub = np.asarray(data[py0:py1, px0:px1], dtype=np.float64)
+    yy, xx = np.mgrid[py0:py1, px0:px1]
     r2 = (xx - cx) ** 2 + (yy - cy) ** 2
-    ap_pixels = data[r2 <= r_ap ** 2]
-    if ap_pixels.size == 0:
+    # the aperture, pixel by pixel: each pixel weighs the fraction of its
+    # area that falls inside the circle (see pixel_coverage). The effective
+    # AREA is the sum of those weights, and it is what the sky is scaled
+    # by: using the pixel COUNT here would subtract too much sky from a
+    # small aperture and too little from a big one.
+    cover, cy0, cx0 = pixel_coverage((h, w), cx, cy, r_ap)
+    weights = np.zeros(sub.shape, dtype=np.float64)
+    if cover.size:
+        weights[cy0 - py0:cy0 - py0 + cover.shape[0],
+                cx0 - px0:cx0 - px0 + cover.shape[1]] = cover
+    usable = weights > 0.0
+    if not np.any(usable):
         out = _fail("sin píxeles de apertura", "no aperture pixels")
         out.update(x=cx, y=cy)
         return out
-    n_pix = int(ap_pixels.size)
-    total = float(np.nansum(ap_pixels))
-    peak = float(np.nanmax(ap_pixels))
+    finite = np.isfinite(sub[usable])
+    w_eff = np.where(finite, weights[usable], 0.0)
+    values = np.where(finite, sub[usable], 0.0)
+    area = float(w_eff.sum())
+    if area <= 0.0:
+        out = _fail("sin píxeles finitos en la apertura",
+                    "no finite pixel in the aperture")
+        out.update(x=cx, y=cy)
+        return out
+    n_pix = area
+    total = float((values * w_eff).sum())
+    peak = float(np.nanmax(sub[usable]))
     ann_mask = (r2 >= r_ann_in ** 2) & (r2 <= r_ann_out ** 2)
-    ann_pixels = data[ann_mask]
+    ann_pixels = sub[ann_mask]
     if ann_pixels.size:
         iters = SIG_ITERS if sigma_clip else 0
         if sky_mode == "plane":
-            ann_x = np.broadcast_to(xx, data.shape)[ann_mask]
-            ann_y = np.broadcast_to(yy, data.shape)[ann_mask]
+            ann_x = np.broadcast_to(xx, sub.shape)[ann_mask]
+            ann_y = np.broadcast_to(yy, sub.shape)[ann_mask]
             sky_pp = _sky_plane_at(ann_x, ann_y,
                                    ann_pixels, cx, cy, iters=iters)
         else:
@@ -191,6 +285,7 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     else:
         sky_pp = 0.0
     flux = total - sky_pp * n_pix
+    n_sky = int(ann_pixels.size)
     frame_max = float(np.nanmax(data))
     # A star that clipped the detector leaves a plateau: many pixels
     # stuck at exactly the frame maximum (a gaussian core has one
@@ -202,14 +297,14 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
     if not saturated and frame_max > sky_pp:
         eps = 1e-6 * max(1.0, frame_max)
         plateau = int(np.count_nonzero(
-            (r2 <= r_ann_in ** 2) & (data > frame_max - eps)))
+            (r2 <= r_ann_in ** 2) & (sub > frame_max - eps)))
         saturated = plateau >= _CLIP_MIN_PIXELS
-    if not saturated and sat_adu is None:
-        # No ceiling anywhere (no SATURATE card, no setting): infer it
-        # from the plate itself. A soft CMOS roll-off compresses cores
-        # that never form a 25-px plateau, and those "almost saturated"
-        # stars poison a zero point just the same (the plateau test above
-        # stays blind to them).
+    if not saturated and sat_adu is None and linear_adu is None:
+        # No ceiling anywhere (no SATURATE card, no setting, no camera
+        # profile): infer it from the plate itself. A soft CMOS roll-off
+        # compresses cores that never form a 25-px plateau, and those
+        # "almost saturated" stars poison a zero point just the same (the
+        # plateau test above stays blind to them).
         ceiling = frame_ceiling(data, frame_max)
         if ceiling is not None and peak >= _INFERRED_CEILING_FRAC * ceiling:
             return _fail(f"comprimida: el pico llega al recorte de la "
@@ -217,38 +312,65 @@ def measure_point(data, x, y, r_ap=R_AP, r_ann_in=R_ANN_IN,
                          f"clipped: the peak reaches the plate ceiling "
                          f"(~{ceiling:.0f} ADU)") | {
                 "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-                "n_pix": n_pix, "saturated": True}
+                "n_pix": n_pix, "n_sky": n_sky, "saturated": True}
     if saturated:
         return _fail("saturada", "saturated") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-            "n_pix": n_pix, "saturated": True}
+            "n_pix": n_pix, "n_sky": n_sky, "saturated": True}
+    if linear_adu is not None and frame_max > 0.0 \
+            and peak >= SAT_FRAC * float(linear_adu):
+        # over the camera's linearity limit: the flux is no longer
+        # proportional (the star calibrates nothing), named distinctly from
+        # a hard saturation so the panel can say which limit was hit
+        return _fail("no lineal: el pico supera el límite de linealidad "
+                     "de tu cámara",
+                     "nonlinear: the peak is above your camera's linearity "
+                     "limit") | {
+            "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
+            "n_pix": n_pix, "n_sky": n_sky, "saturated": False, "nonlinear": True}
     if flux is None or not math.isfinite(flux) or flux <= 0.0:
         return _fail("sin señal medible", "no measurable signal") | {
             "x": cx, "y": cy, "sky_pp": sky_pp, "peak": peak,
-            "n_pix": n_pix}
+            "n_pix": n_pix, "n_sky": n_sky}
     return {"x": cx, "y": cy, "flux": flux, "sky_pp": sky_pp,
-            "peak": peak, "n_pix": n_pix, "saturated": False,
+            "peak": peak, "n_pix": n_pix, "n_sky": n_sky, "saturated": False,
             "ok": True, "reason": None, "cen_ok": cen_ok}
 
 
-def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None):
-    # Honest CCD equation for the net flux, everything anchored in gain:
-    #   sigma^2 (ADU^2) = flux/g + n*sky/g + n*ron^2/g^2
-    # (source and sky shot noise counted in electrons, RON per pixel;
-    # exptime stays for the dark current, not modelled yet).
+def ccd_flux_error(flux, sky_pp, n_pix, gain=None, ron=None, exptime=None,
+                   dark_e_s=None, n_sky=None):
+    # Honest CCD equation for the net flux (Merline & Howell, Handbook of
+    # CCD Astronomy), everything anchored in gain:
+    #   sigma^2 (ADU^2) = flux/g + n*(1 + n/n_sky)*(sky/g + ron^2/g^2
+    #                     + dark*t/g^2)
+    # The (1 + n/n_sky) factor prices the noise of the sky annulus
+    # itself: with a small annulus the sky estimate is noisy and the
+    # subtraction adds variance. Without n_sky the factor degrades to 1
+    # (the annulus is assumed infinitely fine), never below the truth.
     # @args: flux - net flux in ADU, sky_pp - sky in ADU per pixel,
-    #        n_pix - aperture pixels, gain - e-/ADU, ron - read noise in e-,
-    #        exptime - reserved for the dark (unused for now)
+    #        n_pix - aperture pixels, gain - e-/ADU, ron - read noise in
+    #        e-, exptime - exposure in s (for the dark), dark_e_s - dark
+    #        current in e-/pixel/s (camera profile), n_sky - annulus
+    #        pixels (all optional but the first three)
     # @return: sigma of the flux in ADU, or None when there is no usable
     #          gain: the caller then falls back to the comps' scatter
     if gain is None or gain <= 0.0 or flux is None or flux < 0.0:
         return None
     var = flux / gain
-    n = int(n_pix or 0)
+    # n_pix is the EFFECTIVE aperture area (a float when the aperture used
+    # fractional pixel coverage), so it stays a float here: rounding it
+    # would quietly change the noise of a small aperture.
+    n = float(n_pix or 0.0)
+    sky_factor = 1.0
+    if n_sky is not None and n_sky > 0 and n > 0:
+        sky_factor = 1.0 + n / float(n_sky)
     if sky_pp is not None and sky_pp >= 0.0:
-        var += n * sky_pp / gain
+        var += sky_factor * n * sky_pp / gain
     if ron is not None and ron >= 0.0 and n > 0:
-        var += n * (ron ** 2) / (gain ** 2)
+        var += sky_factor * n * (ron ** 2) / (gain ** 2)
+    if dark_e_s is not None and dark_e_s >= 0.0 and exptime and n > 0:
+        var += sky_factor * n * float(dark_e_s) * float(exptime) \
+            / (gain ** 2)
     return math.sqrt(var)
 
 
@@ -315,7 +437,9 @@ def calibrated_mag(inst_target, zp, zp_err=None, target_err=None):
 def header_instrument(header):
     # Instrument parameters straight out of the FITS header, numbers only
     # (decision D2): a card written as a string with units degrades to
-    # None instead of guessing. Keywords are matched case-insensitively.
+    # None instead of guessing. Keywords are matched case-insensitively,
+    # and the gain/read noise accept the names real cameras write (GAIN,
+    # EGAIN, CCDGAIN, GAIN1; RDNOISE, READNOIS, RON, ENF? no).
     # @args: header - the header dict from core/fits_io (or None)
     # @return: {"gain", "ron", "exptime"} with None for every absent or
     #          non-numeric key
@@ -324,22 +448,25 @@ def header_instrument(header):
         return out
     by_key = {str(k).upper(): v for k, v in header.items()}
 
-    def _num(key):
-        # @return: the value as float, or None (including non-numeric and
-        #          boolean cards, which are not instrument numbers)
-        v = by_key.get(key)
-        if v is None or isinstance(v, bool):
-            return None
-        if isinstance(v, (int, float)):
-            return float(v)
-        try:
-            return float(str(v).strip())
-        except ValueError:
-            return None
+    def _num(*keys):
+        # @args: keys - the card names to try, in order
+        # @return: the first present value as float, or None (including
+        #          non-numeric and boolean cards, which are not numbers)
+        for key in keys:
+            v = by_key.get(key)
+            if v is None or isinstance(v, bool):
+                continue
+            if isinstance(v, (int, float)):
+                return float(v)
+            try:
+                return float(str(v).strip())
+            except ValueError:
+                continue
+        return None
 
-    out["gain"] = _num("GAIN")
-    out["ron"] = _num("RDNOISE")
-    out["exptime"] = _num("EXPTIME")
+    out["gain"] = _num("GAIN", "EGAIN", "CCDGAIN", "GAIN1", "GAINX")
+    out["ron"] = _num("RDNOISE", "READNOIS", "RON", "READNOISE")
+    out["exptime"] = _num("EXPTIME", "EXP0TIME")
     return out
 
 
@@ -386,22 +513,180 @@ def _sky_plane_at(ann_x, ann_y, ann_v, x0, y0, iters=SIG_ITERS):
     return fit[0] if fit is not None else None
 
 
-def estimate_fwhm(data, positions, sat_adu=None):
-    # Median seeing FWHM from bright, unsaturated stars, by second
-    # moments on the sky-subtracted cutout (H3).
+def cutout_window(data, x, y, half):
+    # The pixel window around a star: clamped to the frame, and a real
+    # window or None.
+    #
+    # This looks like a one-liner with max/min and it is not. A star twenty
+    # pixels above the top edge gives `y1 = min(h, y + half + 1) = -19`, and
+    # `data[0:-19]` is a VALID, non-empty slice in numpy (a negative index
+    # counts from the end, so it silently reads the BOTTOM of the frame)
+    # while `np.mgrid[0:-19]` reads that same -19 as a negative SIZE and
+    # raises "negative dimensions are not allowed". That is not theory: it
+    # killed a real run (HAT-P-32 b, 142 frames, dead at frame ~18) because
+    # a comparison star of the sequence fell off the top of the frame.
+    #
+    # Clipping BOTH ends is the only honest way, and having one function do
+    # it means no reader of this module has to remember the trap.
+    #
+    # @args: data - 2D array, x/y - the star's centre in pixels (float),
+    #        half - the window's half-size
+    # @return: (y0, y1, x0, x1) with y1 > y0 and x1 > x0, or None when the
+    #          window has no pixels at all
+    if data is None or getattr(data, "size", 0) == 0:
+        return None
+    h, w = int(data.shape[0]), int(data.shape[1])
+    x0 = int(min(max(math.floor(x - half), 0), w))
+    x1 = int(min(max(math.ceil(x + half + 1), 0), w))
+    y0 = int(min(max(math.floor(y - half), 0), h))
+    y1 = int(min(max(math.ceil(y + half + 1), 0), h))
+    if x1 <= x0 or y1 <= y0:
+        return None
+    return y0, y1, x0, x1
+
+
+def fwhm_radial(data, x, y, rmax=None, level=None, bin_width=0.5):
+    # The seeing, measured as the radius of the HALF MAXIMUM.
+    #
+    # The alternative is the second moment (the variance of the light),
+    # which is a perfectly good definition on a clean, isolated star and a
+    # bad one on a real frame: a hot pixel inside the box or a neighbour's
+    # wing inflates the variance with a weight proportional to the SQUARE
+    # of its distance, and the "seeing" comes out of a night that never
+    # happened.
+    #
+    # This way is built on two robust pieces: each annulus contributes the
+    # MEDIAN of its pixels (a single bad pixel cannot move it), and the
+    # answer is where the averaged profile crosses half its central value
+    # (a wing from a neighbour raises the profile at large radii, but the
+    # half-maximum crossing sits well inside where it is still the star's
+    # own light).
+    #
+    # @args: data - 2D array, x/y - the star's centre (float pixels),
+    #        rmax - how far to look (default: 12 px), level - the sky
+    #        level to subtract (None: the median of the outer annuli),
+    #        bin_width - radial step in pixels
+    # @return: the FWHM in pixels, or None when no crossing is found
+    arr = np.asarray(data, dtype=np.float64)
+    rmax = float(rmax if rmax else 12.0)
+    win = cutout_window(arr, x, y, rmax + 1)
+    if win is None:
+        return None
+    y0, y1, x0, x1 = win
+    sub = arr[y0:y1, x0:x1]
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    dist = np.hypot(xx - x, yy - y)
+    inside = dist < rmax
+    if not np.any(inside):
+        return None
+    values = sub[inside]
+    radii = dist[inside]
+    if level is None:
+        # the outer half of the profile is sky: its median is the level
+        outer = values[radii >= 0.7 * rmax]
+        level = float(np.median(outer)) if outer.size else float(
+            np.median(values))
+    profile = values - float(level)
+    nbins = max(3, int(math.ceil(rmax / max(0.1, bin_width))))
+    radii_of_bin = np.full(nbins, np.nan)
+    heights = np.full(nbins, np.nan)
+    for i in range(nbins):
+        lo, hi = i * bin_width, (i + 1) * bin_width
+        sel = (radii >= lo) & (radii < hi)
+        if not np.any(sel):
+            continue
+        # The bin's radius is the MEDIAN RADIUS OF ITS OWN PIXELS, not the
+        # middle of the interval: on a narrow PSF the pixels of a ring sit
+        # at discrete radii (1, 1.41, 2, 2.24...) and their median value
+        # belongs to the median radius, not to the middle. Plotting it at
+        # the middle bends the profile and the half-maximum crossing comes
+        # out ~10 % early (measured on a sigma = 1.5 px star: 3.1 px
+        # instead of 3.5). With the median radius the same star reads 3.5.
+        radii_of_bin[i] = float(np.median(radii[sel]))
+        heights[i] = float(np.median(profile[sel]))
+    central = heights[0]
+    if not math.isfinite(central) or central <= 0.0:
+        # a plateau (a saturated core) or a hole: the first bin does not
+        # hold the maximum, so take the brightest bin as the centre value
+        good = heights[np.isfinite(heights)]
+        if good.size == 0:
+            return None
+        central = float(np.max(good))
+        if central <= 0.0:
+            return None
+    half = central / 2.0
+    for i in range(1, nbins):
+        prev_v, here_v = heights[i - 1], heights[i]
+        prev_r, here_r = radii_of_bin[i - 1], radii_of_bin[i]
+        if not (math.isfinite(prev_v) and math.isfinite(here_v)
+                and math.isfinite(prev_r) and math.isfinite(here_r)):
+            continue
+        if here_v < half <= prev_v:
+            # linear interpolation between the two profile points: the
+            # light falls smoothly through the half maximum
+            span = prev_v - here_v
+            frac = 0.0 if span <= 0.0 else (prev_v - half) / span
+            r_half = prev_r + frac * (here_r - prev_r)
+            return float(2.0 * r_half)
+    return None
+
+
+def estimate_fwhm(data, positions, sat_adu=None, method="moments",
+                  rmax=12.0):
+    # The median seeing of a frame, measured on several stars.
+    #
+    # Two definitions are available, and which one is right DEPENDS on the
+    # sampling. This is the measured table on a synthetic Gaussian sampled
+    # at the pixel centres, which is what a plate is:
+    #
+    #     sigma    true FWHM   "moments"   "radial"
+    #      1.0       2.35       2.35        2.79     (radial +18 %)
+    #      1.5       3.53       3.53        3.86     (radial  +9 %)
+    #      2.0       4.71       4.66        4.95     (radial  +5 %)
+    #      3.0       7.06       6.12        7.21     (moments -13 %)
+    #      5.0      11.77       6.92       10.88     (moments -41 %)
+    #
+    #   * a NARROW PSF (FWHM ~ 2-4 px) is under-sampled, so a profile drawn
+    #     from a handful of radii cannot resolve it; the moments, which are
+    #     an integral of the light, are exact. Hence the default;
+    #   * a BROAD PSF is truncated by the fixed 19x19 cutout of the
+    #     moments and reads far too small (6.9 against 11.8!); there the
+    #     radial profile is right, because it only needs to find where the
+    #     light has fallen to half, and it uses a median per annulus, so a
+    #     hot pixel cannot move it.
+    #
+    # So the caller picks: "moments" for the common case, "radial" when
+    # the frames are broad or the field is crowded. The engine's seeing
+    # features (the aperture scaling and the focus gate) work on RATIOS
+    # between frames, where either one is consistent.
+    #
     # @args: data - 2D array, positions - [(x, y)] star pixels,
-    #        sat_adu - ceiling in ADU, stars near it are skipped
+    #        sat_adu - ceiling in ADU, stars near it are skipped,
+    #        method - "moments" | "radial", rmax - radial reach (px)
     # @return: the median FWHM in px, or None when nothing is usable
     if data is None:
         return None
+    if method == "radial":
+        fwhms = []
+        for x, y in positions:
+            value = fwhm_radial(data, x, y, rmax=rmax)
+            if value is not None and 0.8 <= value <= 50.0:
+                fwhms.append(value)
+        if fwhms:
+            return float(np.median(fwhms))
+        # a frame where no profile crosses its half maximum (a plateau, a
+        # cosmic ray, an empty box): fall through to the moments rather
+        # than answering None and leaving the caller blind
     fwhms = []
     for x, y in positions:
         half = 9   # a 19x19 cutout: enough for any sane seeing disc
-        y0, y1 = max(0, int(y) - half), min(data.shape[0], int(y) + half + 1)
-        x0, x1 = max(0, int(x) - half), min(data.shape[1], int(x) + half + 1)
-        sub = data[y0:y1, x0:x1]
-        if sub.size == 0:
+        win = cutout_window(data, x, y, half)
+        if win is None:
+            # the star is off the frame (a comparison star of the sequence
+            # can be): it has no seeing to measure and it is not an error
             continue
+        y0, y1, x0, x1 = win
+        sub = data[y0:y1, x0:x1]
         peak = float(np.nanmax(sub))
         if sat_adu is not None and peak >= SAT_FRAC * float(sat_adu):
             continue
@@ -482,6 +767,43 @@ def saturation_ceiling(header, cfg=None):
         except (TypeError, ValueError, AttributeError):
             pass
     return None
+
+
+def linearity_ceiling(cfg):
+    # The camera profile's linearity limit in ADU (per the working gain),
+    # or None when the user has not set one.
+    # @args: cfg - a config-like object with .get (or None)
+    # @return: ADU (float) or None
+    if cfg is None:
+        return None
+    try:
+        v = cfg.get("cam_linearity_adu")
+        if v is not None and str(v).strip() != "":
+            return float(v)
+    except (TypeError, ValueError, AttributeError):
+        pass
+    return None
+
+
+def effective_ceiling(header, cfg=None, linear_adu=None):
+    # The single, honest ceiling the photometry obeys: the MINIMUM of the
+    # known limits. The camera profile's linearity is usually the strictest
+    # (a star above it calibrates nothing even if it is not clipped yet),
+    # then the detector saturation (SATURATE card / ccd_saturate); None
+    # when nobody knows (measure_point then infers it from the plate).
+    # @args: header - the plate's header, cfg - config-like or None,
+    #        linear_adu - an explicit linearity limit (overrides cfg)
+    # @return: the effective ceiling in ADU, or None
+    limits = []
+    lin = linear_adu
+    if lin is None:
+        lin = linearity_ceiling(cfg)
+    if lin is not None:
+        limits.append(float(lin))
+    sat = saturation_ceiling(header, cfg)
+    if sat is not None:
+        limits.append(float(sat))
+    return min(limits) if limits else None
 
 
 def calibrate_with_color(inst_mags, cat_mags, bvs, target_bv=None):
@@ -658,24 +980,133 @@ def lock_local_peak(data, x, y, max_dist=4.0, k=4.0):
     # wing inside its window (a neighbour star, a galaxy core); the matched
     # filter can only refine around its seed, so the seed must be the
     # source the observer MEANT, not the brightest thing nearby.
+    #
+    # The source finder runs with a small separation here (3 px) on
+    # purpose: this is not building a catalogue, it is answering "which
+    # source is under the cursor", and a star 6 px from a brighter one used
+    # to disappear under the catalogue rule (min_sep 6), leaving the
+    # centroid to work from the raw click and, worse, blind to the
+    # neighbour it should be protecting itself from.
     # @args: data - 2D array, x, y - the clicked pixel,
     #        max_dist - how far a peak may be to count as "under the click"
     # @return: (px, py) of the nearest local source, or None
     if data is None or data.size == 0:
         return None
-    h, w = data.shape
     half = int(max_dist) + 7
-    y0, y1 = max(0, int(round(y)) - half), min(h, int(round(y)) + half + 1)
-    x0, x1 = max(0, int(round(x)) - half), min(w, int(round(x)) + half + 1)
+    win = cutout_window(data, x, y, half)
+    if win is None:
+        return None
+    y0, y1, x0, x1 = win
     best, best_d = None, max_dist ** 2
-    for px, py, _pk in local_sources(data[y0:y1, x0:x1], k=k):
+    for px, py, _pk in local_sources(data[y0:y1, x0:x1], k=k, min_sep=3):
         d = (px + x0 - x) ** 2 + (py + y0 - y) ** 2
         if d < best_d:
             best, best_d = (px + x0, py + y0), d
     return best
 
 
-def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
+def local_neighbours(data, x, y, seed, reach=12.0, k=4.0,
+                     psf_frac=0.15):
+    # The OTHER significant sources that share the window of a star, with
+    # the distance to the star's own seed.
+    #
+    # The centroid needs them for two different reasons, and both come
+    # from the Photometrica tool of our group:
+    #
+    #   * a bright neighbour inside the correlation window borrows light
+    #     from the star and pulls the fit towards itself, so the WINDOW is
+    #     clamped by how close the neighbour is;
+    #   * and the pixels that sit closer to the neighbour than to the star
+    #     belong to the neighbour: they are masked out, the plain Voronoi
+    #     split between two stars.
+    #
+    # Only what LOOKS LIKE A STAR counts as a neighbour, and that detail
+    # is theirs too: a hot pixel or a cosmic ray is a spike, not a source,
+    # and treating it as a neighbour would cut the window in half for
+    # nothing (measured on the real V0526 Per series: the defence with
+    # spikes counted as neighbours cost 0.0026 of correlation for no gain;
+    # with the test below it costs nothing and still saves the two cases
+    # it is for). A real point spread function spreads: its neighbours
+    # hold a fair share of its light, a spike's neighbours do not.
+    #
+    # @args: data - 2D array, x, y - the clicked pixel, seed - the locked
+    #        peak (px, py), reach - how far to look for neighbours,
+    #        k - significance for the source finder, psf_frac - share of
+    #        the peak that its neighbours must hold for it to be a star
+    # @return: [(nx, ny, distance), ...] sorted by distance (nearest first)
+    if data is None or seed is None:
+        return []
+    sx, sy = seed
+    half = int(reach) + 7
+    win = cutout_window(data, sx, sy, half)
+    if win is None:
+        return []
+    y0, y1, x0, x1 = win
+    sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
+    background = float(np.median(sub))
+    out = []
+    for px, py, pk in local_sources(sub, k=k, min_sep=3):
+        ax, ay = px + x0, py + y0
+        d = math.hypot(ax - sx, ay - sy)
+        if d <= 0.5 or d > reach:
+            continue
+        if not _looks_like_a_star(sub, ax - x0, ay - y0, background,
+                                  psf_frac):
+            continue
+        out.append((float(ax), float(ay), float(d)))
+    out.sort(key=lambda item: item[2])
+    return out
+
+
+def _looks_like_a_star(sub, px, py, background, psf_frac):
+    # Is the pixel (px, py) the centre of a star, or an isolated spike?
+    #
+    # A star's core has neighbours carrying a good share of its light (the
+    # wings); a hot pixel or a cosmic ray stands alone over the sky. The
+    # seed's own finder uses the same test, so the two agree on what a
+    # source is.
+    # @args: sub - the cutout, px/py - the candidate (integer, in sub),
+    #        background - the level it stands on, psf_frac - the share
+    # @return: True when it has wings
+    h, w = sub.shape
+    ix, iy = int(round(px)), int(round(py))
+    peak = float(sub[iy, ix]) - float(background)
+    if peak <= 0.0:
+        return False
+    total, count = 0.0, 0
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            ny, nx = iy + dy, ix + dx
+            if not (0 <= ny < h and 0 <= nx < w):
+                continue
+            total += float(sub[ny, nx]) - float(background)
+            count += 1
+    if count == 0:
+        return False
+    return (total / count) >= psf_frac * peak
+
+
+def _core_cap(resid, sx, sy, x0, y0):
+    # The brightest value of the 3x3 around the star's centre: no pixel of
+    # a real point spread function can carry more light than its own core,
+    # so anything above it is a hot pixel or a cosmic ray, and letting it
+    # through would drag the centroid (the Gaussian template has weight
+    # out there, the spike does not).
+    # @args: resid - the sky-subtracted cutout, sx/sy - the seed (float
+    #        pixels), x0/y0 - the cutout's origin
+    # @return: the cap in ADU (>= 0)
+    h, w = resid.shape
+    cx = int(round(sx)) - x0
+    cy = int(round(sy)) - y0
+    box = resid[max(0, cy - 1):cy + 2, max(0, cx - 1):cx + 2]
+    if box.size == 0:
+        return float(np.nanmax(resid))
+    return max(0.0, float(np.nanmax(box)))
+
+
+def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None, robust=True):
     # The precision centroid: matched-filter correlation of the
     # sky-subtracted cutout with a gaussian template of the measured
     # seeing, on a 0.1 px grid, with parabolic refinement of the
@@ -684,9 +1115,22 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     # on faint sources. The observer's point is kept (with the bilingual
     # reason) when the fit is too weak to trust: below SNR ~4 there is
     # no centroid worth the name, and pretending otherwise is worse.
+    #
+    # Two defences are ported from our group's Photometrica tool, because
+    # an optimal estimator is only optimal when the data is what it
+    # thinks it is:
+    #
+    #   * DEBLENDING: if another significant source shares the window, the
+    #     window shrinks so its core stays out, and the pixels closer to
+    #     it than to us are masked out;
+    #   * the CORE CAP: a hot pixel or a cosmic ray inside the aperture is
+    #     clipped at the star's own core value, because no real point
+    #     spread function carries more light than its centre.
+    #
     # @args: data - 2D array, x, y - starting pixel, fwhm - seeing in px
     #        (estimated from the cutout when None), sky_pp - local sky
-    #        (cutout edge median when None)
+    #        (cutout edge median when None), robust - apply the two
+    #        defences above (False reproduces the historical behaviour)
     # @return: {"x", "y", "ok", "moved", "reason", "snr"} - ok=False
     #          keeps the start position
     if data is None or data.size == 0:
@@ -712,12 +1156,28 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     # and let the SNR gate below judge whatever is there.
     seed = lock_local_peak(data, x, y)
     sx, sy = seed if seed is not None else (float(x), float(y))
-    y0 = max(0, int(round(sy)) - half)
-    y1 = min(h, int(round(sy)) + half + 1)
-    x0 = max(0, int(round(sx)) - half)
-    x1 = min(w, int(round(sx)) + half + 1)
+    # the neighbours whose light could reach our window (photometry,
+    # phase A): they shrink it, and they take their own pixels back below.
+    # The reach is generous on purpose (two and a half windows): a
+    # neighbour can pull a centroid from well outside the aperture through
+    # its wing, which is the very case being defended against.
+    neighbours = local_neighbours(data, x, y, seed,
+                                  reach=max(6.0, 2.5 * half)) \
+        if robust and seed is not None else []
+    window = half
+    if neighbours:
+        # keep the neighbour's core and its bright wing out of the window:
+        # half of the distance is inside our own star for any sane PSF
+        window = int(max(3, min(half, math.floor(0.5 * neighbours[0][2]))))
+    win = cutout_window(data, sx, sy, window)
+    if win is None:
+        return {"x": float(x), "y": float(y), "ok": False,
+                "moved": False, "snr": None,
+                "reason": {"es": "sin píxeles utilizables",
+                           "en": "no usable pixels"}}
+    y0, y1, x0, x1 = win
     sub = np.asarray(data[y0:y1, x0:x1], dtype=np.float64)
-    if sub.size == 0 or not np.any(np.isfinite(sub)):
+    if not np.any(np.isfinite(sub)):
         return {"x": float(x), "y": float(y), "ok": False,
                 "moved": False, "snr": None,
                 "reason": {"es": "sin píxeles utilizables",
@@ -730,9 +1190,23 @@ def gaussian_centroid(data, x, y, fwhm=None, sky_pp=None):
     else:
         sky = float(sky_pp)
     resid = np.nan_to_num(sub - sky)
+    if robust:
+        # the core cap: nothing inside a real point spread function is
+        # brighter than its centre, so a spike above it is not starlight
+        cap = _core_cap(resid, sx, sy, x0, y0)
+        if cap > 0.0:
+            resid = np.minimum(resid, cap)
     mad = float(np.median(np.abs(resid - np.median(resid))))
     noise = max(1.4826 * mad, 1e-9)
     ys, xs = np.mgrid[y0:y1, x0:x1]
+    # the deblending mask: a pixel closer to the neighbour than to us is
+    # the neighbour's, and our template has no business integrating it
+    weights = np.ones_like(resid)
+    for nx, ny, _d in neighbours:
+        closer = ((xs - nx) ** 2 + (ys - ny) ** 2) < \
+            ((xs - sx) ** 2 + (ys - sy) ** 2)
+        weights = np.where(closer, 0.0, weights)
+    resid = resid * weights
     # matched-filter grid: correlate the residual with the seeing
     # gaussian on a 0.1 px lattice around the moment seed
     best = (None, -np.inf)
@@ -922,10 +1396,12 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
     peak_snr = snr_peak[2]
     # environment: nearest detected neighbour around the target
     cut = max(32, int(4 * R_ANN_OUT))
-    y0, y1 = max(0, int(cy) - cut), min(h, int(cy) + cut)
-    x0, x1 = max(0, int(cx) - cut), min(w, int(cx) + cut)
-    sub = np.ascontiguousarray(data[y0:y1, x0:x1])
-    sources = series.detect_sources(sub, k=5.0) if sub.size else []
+    win = cutout_window(data, cx, cy, cut)
+    sources = []
+    if win is not None:
+        y0, y1, x0, x1 = win
+        sub = np.ascontiguousarray(data[y0:y1, x0:x1])
+        sources = series.detect_sources(sub, k=5.0)
     nearest = None
     for sx, sy, _pk in sources:
         d = math.hypot(sx + x0 - cx, sy + y0 - cy)
@@ -1000,3 +1476,348 @@ def suggest_apertures(data, x, y, fwhm=None, sky_pp=None):
                      "snr_peak_r": snr_peak[0], "peak_snr": peak_snr,
                      "nearest": nearest, "gradient": gradient,
                      "sky_pp": sky_pp}}
+
+
+# ---------------- single-plate recipe extraction (series plan, phase 1) -
+#
+# The whole single-plate recipe (H3..H7) as one pure function so the UFE
+# Measure tab and the series engine can never drift apart: the GUI is a
+# facade that reads its widgets into a PlateConfig and paints the result.
+
+def band_of(star, band):
+    # The star's value in one photometric band.
+    # @args: star - a sequence star dict, band - a label like "V"
+    # @return: (value, derived), or (None, False) when the star lacks it
+    for item in star.get("bands", []):
+        if item.get("label") == band and item.get("value") is not None:
+            return item["value"], bool(item.get("derived"))
+    return None, False
+
+
+def available_bands(entries):
+    # @args: entries - the comparison sequence
+    # @return: the photometric bands present (colour indices like B-V are
+    #          not bands), V first
+    labels = []
+    for e in entries:
+        for item in e["star"].get("bands", []):
+            lab = item.get("label") or ""
+            if item.get("value") is None or "-" in lab:
+                continue
+            if lab not in labels:
+                labels.append(lab)
+    return sorted(labels, key=lambda l: (l != "V", l))
+
+
+def pick_band(entries, preferred=None, fallback="V"):
+    # The band this plate calibrates in: the observer's pick when the
+    # sequence carries it, else the first available band, else the
+    # fallback (a plate with no usable band still reports honestly).
+    # @return: (band, available bands)
+    bands = available_bands(entries)
+    band = preferred or fallback
+    if bands and band not in bands:
+        band = bands[0]
+    return band, bands
+
+
+@dataclass
+class PlateConfig:
+    # Every knob of the single-plate recipe, resolved by the caller (the
+    # GUI reads its widgets and Ajustes; the series engine its own cfg).
+    target_xy: tuple = (0.0, 0.0)   # the click, in plate pixels
+    targets: tuple = ()             # SEVERAL targets on the same plate, as
+                                    # ((label, x, y) | (label, x, y, bv), ...).
+                                    # The label travels with the curve; the
+                                    # optional B-V is that object's own
+                                    # colour, because the colour term is per
+                                    # target even when the comps are shared.
+                                    # Empty means "the one in target_xy"
+    entries: list = field(default_factory=list)
+    header: dict = field(default_factory=dict)
+    wcs: object = None
+    band: str = None                # the observer's pick, or None
+    fallback_band: str = "V"
+    radii: tuple = None             # (rap, rin, rout) or None for defaults
+    fwhm: float = None              # measured seeing (px), for the centroid
+    robust_centroid: bool = True    # the centroid's two defences against a
+                                    # hot pixel and a close neighbour (see
+                                    # gaussian_centroid); off reproduces the
+                                    # historical behaviour
+    centroid_mode: str = "gaussian"  # "gaussian" | "refined" | "raw" | "none"
+                                    # for the TARGET (the comps always
+                                    # centroid): "none" pins the hand-placed
+                                    # centre, for a very faint SN
+    sigmaclip: bool = True
+    sky_mode: str = "median"
+    color: bool = False
+    target_bv: float = 0.0
+    require_catalog: bool = True    # False = relative mode: comps count
+                                    # even without a catalog value
+    linear_adu: float = None        # the camera profile's linearity limit
+                                    # (per gain), or None when unset
+    # site (Ajustes, ADR-028): the same values the panel has always used
+    site_gain: float = None
+    site_ron: float = None
+    site_flat: float = 0.007
+    site_saturate: float = None
+    site_lon: float = None
+    site_lat: float = None
+    site_aperture_m: float = 0.254
+    site_height_m: float = 0.0
+    site_dark: float = None         # dark current e-/pixel/s (profile)
+    # host subtraction (H2b): the comps read on another frame, in the
+    # plate orientation, at comp_scale plate px per comp-image px
+    comp_image: object = None
+    comp_scale: float = 1.0
+
+
+@dataclass
+class PlateResult:
+    # The recipe's output: the target, its comps, the zero point, the
+    # honest error budget and the check verdict. Never raises.
+    ok: bool = False
+    reason: dict = None
+    target: dict = None
+    targets: list = field(default_factory=list)   # every target of the plate,
+                                    # each {"label", "target", "col", "row",
+                                    # "bv", "ok", "reason", "inst_t", "zp",
+                                    # "mag", "err_internal", "err_total",
+                                    # "scint", "check"}. The scalar fields
+                                    # above mirror the FIRST one, which is
+                                    # what a single-target caller reads
+    col: float = None               # measured centroid, in plate pixels
+    row: float = None
+    fwhm: float = None
+    radii: tuple = None
+    band: str = None
+    bands_avail: list = field(default_factory=list)
+    used: list = field(default_factory=list)   # [(entry, result), ...]
+    skipped: dict = field(default_factory=dict)
+    derived: bool = False
+    inst_t: float = None
+    zp: dict = None
+    mag: float = None
+    err_total: float = None
+    err_internal: float = None
+    scint: float = None
+    check: dict = None
+    sky_mode: str = "median"
+    sigma_clip: bool = True
+    gain: float = None
+
+
+def _check_verdict(entries, used_entries, band, zp, err_total):
+    # H6: measure the check star on this same plate and compare with its
+    # catalog value; beyond 2.5 sigma the night is not trusted.
+    # @args: zp - the calibration dict (with the colour term, when fitted:
+    #        the check's OWN B-V moves its zero point)
+    # @return: None or {"delta", "ok", "name", "mag", "catalog"}
+    check = next((e for e in entries if e["kind"] == "check"), None)
+    if check is None or zp.get("zp") is None or err_total is None:
+        return None
+    used = next((r for e, r in used_entries
+                 if e["star"] is check["star"]), None)
+    if used is None:
+        return None
+    catalog, _d = band_of(check["star"], band)
+    if catalog is None:
+        return None
+    zp_check = zp["zp"]
+    if zp.get("color_used") and zp.get("k") is not None \
+            and check["star"].get("bv") is not None:
+        zp_check = zp["zp"] + zp["k"] * check["star"]["bv"]
+    measured = -2.5 * math.log10(used["flux"]) + zp_check
+    delta = measured - catalog
+    return {"delta": delta, "ok": abs(delta) <= 2.5 * err_total,
+            "name": check["name"], "mag": measured, "catalog": catalog}
+
+
+def _plate_scintillation(cfg, col, row, exptime):
+    # H5: Young's formula with the site from Ajustes and the target's
+    # altitude from the plate's WCS + DATE-OBS. None when it cannot be
+    # computed (the combiner skips it).
+    meta = fits_meta.meta_from_header(cfg.header or {})
+    if meta["mjd"] is None or cfg.wcs is None:
+        return None
+    try:
+        ra, dec = cfg.wcs.pixel_to_sky(col, row)
+        jd = meta["mjd"] + 2400000.5
+        lst = coords.lst_degrees(jd, float(cfg.site_lon))
+        alt, _az = coords.altaz(ra, dec, float(cfg.site_lat), lst)
+        return scintillation_mag(alt, exptime, cfg.site_aperture_m,
+                                 cfg.site_height_m)
+    except Exception:
+        return None
+
+
+def measure_plate(image, cfg):
+    # The single-plate recipe as one pure function: target, comps on the
+    # same plate (or the paired work frame while subtracting the host),
+    # zero point with the colour term, honest error budget, check
+    # semaphore. No Qt, never raises: the guards become bilingual reasons.
+    # @args: image - the work frame the target reads on (the plate, or
+    #        the difference when cfg.comp_image is set), cfg - PlateConfig
+    # @return: a PlateResult
+    scale = float(cfg.comp_scale) if cfg.comp_image is not None else 1.0
+    radii = tuple(cfg.radii) if cfg.radii else (R_AP, R_ANN_IN, R_ANN_OUT)
+    fwhm = cfg.fwhm
+    sat = saturation_ceiling(cfg.header,
+                             {"ccd_saturate": cfg.site_saturate})
+    # the camera profile's linearity limit is in plate ADU; it does not
+    # apply to a resampled/downsampled work frame (host subtraction)
+    lin = cfg.linear_adu if scale == 1.0 else None
+    res = PlateResult(radii=radii, fwhm=fwhm, sky_mode=cfg.sky_mode,
+                      sigma_clip=cfg.sigmaclip)
+    # ---- the targets ------------------------------------------------
+    # One target is the historical case; several is the campaign pass, and
+    # the whole point is what is NOT repeated: the comparison stars are
+    # measured ONCE per plate and every target hangs from that same
+    # measurement. A project is one object and its curve is its own, so
+    # "several targets" never means several curves inside one project: it
+    # means one pass over the frames feeding several projects.
+    targets = [tuple(t) for t in (cfg.targets or ())]
+    if not targets:
+        targets = [("", cfg.target_xy[0], cfg.target_xy[1])]
+    measured = []
+    for entry in targets:
+        label, tx, ty = entry[0], float(entry[1]), float(entry[2])
+        bv = (float(entry[3]) if len(entry) > 3 and entry[3] is not None
+              else cfg.target_bv)
+        if cfg.comp_image is not None:
+            # H2b: the target on the difference, the comps on the work frame
+            target = measure_point(
+                image, tx / scale, ty / scale,
+                r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
+                r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
+                sat_adu=None, sky_mode=cfg.sky_mode,
+                centroid_mode=cfg.centroid_mode,
+                fwhm=(fwhm / scale if fwhm else None))
+        else:
+            target = measure_point(
+                image, tx, ty, r_ap=radii[0], r_ann_in=radii[1],
+                r_ann_out=radii[2], sigma_clip=cfg.sigmaclip, sat_adu=sat,
+                linear_adu=lin, sky_mode=cfg.sky_mode,
+                centroid_mode=cfg.centroid_mode, fwhm=fwhm,
+                robust=cfg.robust_centroid)
+        mx, my = target["x"], target["y"]
+        if cfg.comp_image is not None:
+            mx, my = mx * scale, my * scale
+        measured.append({
+            "label": label, "target": target, "col": mx, "row": my,
+            "bv": bv, "ok": bool(target["ok"]),
+            "reason": target.get("reason"),
+            "inst_t": (-2.5 * math.log10(target["flux"])
+                       if target["ok"] and target.get("flux") else None),
+            # calibrated further down; every key exists from here so a
+            # caller writing a curve always reads the same shape
+            "zp": None, "mag": None, "err_internal": None,
+            "err_total": None, "scint": None, "check": None})
+    res.targets = measured
+    # the scalar fields describe the FIRST target: a caller that asked for
+    # one keeps reading exactly what it always read
+    first = measured[0]
+    res.target, res.col, res.row = first["target"], first["col"], first["row"]
+    res.inst_t = first["inst_t"]
+    if not any(m["ok"] for m in measured):
+        # nothing could be measured: there is no light to calibrate
+        res.reason = first.get("reason")
+        return res
+    res.ok = True
+    band, bands = pick_band(cfg.entries, cfg.band, cfg.fallback_band)
+    res.band, res.bands_avail = band, bands
+    # the comps on the same plate (or the paired work frame); the ceiling
+    # applies to them too: a clipped comp poisons the zero point
+    inst, cat, bvs, used_entries = [], [], [], []
+    skipped = {}
+    for e in cfg.entries:
+        star = e["star"]
+        try:
+            ccol, crow = cfg.wcs.sky_to_pixel(star["ra"], star["dec"])
+        except Exception:
+            skipped["off"] = skipped.get("off", 0) + 1
+            continue
+        if cfg.comp_image is not None:
+            r = measure_point(
+                cfg.comp_image, ccol / scale, crow / scale,
+                r_ap=radii[0] / scale, r_ann_in=radii[1] / scale,
+                r_ann_out=radii[2] / scale, sigma_clip=cfg.sigmaclip,
+                sat_adu=None, sky_mode=cfg.sky_mode,
+                fwhm=(fwhm / scale if fwhm else None))
+        else:
+            r = measure_point(image, ccol, crow, r_ap=radii[0],
+                              r_ann_in=radii[1], r_ann_out=radii[2],
+                              sigma_clip=cfg.sigmaclip, sat_adu=sat,
+                              linear_adu=lin, sky_mode=cfg.sky_mode,
+                              fwhm=fwhm,
+                              robust=cfg.robust_centroid)
+        value, derived = band_of(star, band)
+        if not r["ok"]:
+            if r.get("saturated"):
+                key = "sat"
+            elif r.get("nonlinear"):
+                key = "nonlinear"
+            else:
+                key = "other"
+            skipped[key] = skipped.get(key, 0) + 1
+            continue
+        if value is None and cfg.require_catalog:
+            skipped["band"] = skipped.get("band", 0) + 1
+            continue
+        if value is not None:
+            inst.append(-2.5 * math.log10(r["flux"]))
+            cat.append(value)
+            bvs.append(star.get("bv"))
+        used_entries.append((e, r))
+    res.used = used_entries
+    res.skipped = skipped
+    res.derived = any(band_of(e["star"], band)[1]
+                      for e, _r in used_entries)
+    # error budget: CCD equation (gain from header or Ajustes) + the
+    # zero point + scintillation + the flat residual + the colour term.
+    # The gain and the comps are the frame's, so they are resolved once;
+    # the zero point is fitted per target only because the colour term
+    # hangs from the target's own B-V.
+    inst_header = header_instrument(cfg.header)
+    gain = (inst_header["gain"] if inst_header["gain"] is not None
+            else cfg.site_gain)
+    ron = (inst_header["ron"] if inst_header["ron"] is not None
+           else cfg.site_ron)
+    res.gain = gain
+    for m in measured:
+        if not m["ok"]:
+            continue
+        if cfg.color:
+            zp = calibrate_with_color(inst, cat, bvs, target_bv=m["bv"])
+        else:
+            zp = calibrate_zero_point(inst, cat)
+        zp.setdefault("color_used", False)   # the plain path carries none
+        m["zp"] = zp
+        target = m["target"]
+        flux_err = ccd_flux_error(target["flux"], target["sky_pp"],
+                                  target["n_pix"], gain=gain, ron=ron,
+                                  exptime=inst_header["exptime"],
+                                  dark_e_s=cfg.site_dark,
+                                  n_sky=target.get("n_sky"))
+        m["err_internal"] = mag_error(target["flux"], flux_err)
+        m["scint"] = _plate_scintillation(cfg, m["col"], m["row"],
+                                          inst_header["exptime"])
+        m["err_total"] = combine_errors(
+            m["err_internal"], zp["zp_err"], m["scint"], cfg.site_flat,
+            zp.get("target_color_err"))
+        zp_for_mag = zp["zp"]
+        if zp.get("color_used") and zp["k"] is not None:
+            # the fit's zero point is at B-V = 0: move the target onto it
+            zp_for_mag = zp["zp"] + zp["k"] * m["bv"]
+        m["mag"], _e = calibrated_mag(m["inst_t"], zp_for_mag)
+        m["check"] = _check_verdict(cfg.entries, used_entries, band, zp,
+                                    m["err_total"])
+    # the first target's own numbers are the plate's numbers (legacy view)
+    if first["ok"]:
+        res.zp = first.get("zp")
+        res.err_internal = first.get("err_internal")
+        res.scint = first.get("scint")
+        res.err_total = first.get("err_total")
+        res.mag = first.get("mag")
+        res.check = first.get("check")
+    return res

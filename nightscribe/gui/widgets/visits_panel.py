@@ -90,6 +90,7 @@ class VisitsPanel(QWidget):
 
     def __init__(self, db, lang="es", open_in_editor=None, on_change=None,
                  curve_kind=True, kind=None, on_measure_click=None,
+                 measure_series=None, phase=None, on_visit_selected=None,
                  parent=None):
         super().__init__(parent)
         self._db = db
@@ -97,6 +98,11 @@ class VisitsPanel(QWidget):
         self._open_in_editor = open_in_editor
         self._on_change = on_change
         self._on_measure_click = on_measure_click
+        self._measure_series = measure_series
+        self._phase = phase
+        # the host is told which visit is selected: the Analysis curve is
+        # the one of the visit you are looking at, not the project's pile
+        self._on_visit_selected = on_visit_selected
         # the project's kind drives what a visit carries: light-curve
         # kinds get the measurements block, MPC kinds the astrometry one
         self._kind = kind if kind is not None else (
@@ -155,9 +161,13 @@ class VisitsPanel(QWidget):
         self.lst.clear()
         sessions = fu.list_sessions(self._db, self._pid) \
             if self._pid is not None else []
+        # the project's curve ONCE, not once per visit: the chip count is
+        # the same query, and asking it inside the loop costed one full
+        # curve per visit on every refresh (a 20-visit project, 20 queries
+        # for a list that shows five words)
+        pts = fu.list_points(self._db, self._pid) if self._pid else []
         for s in sessions:
             n_img = len(fu.list_images(self._db, s["id"]))
-            pts = fu.list_points(self._db, self._pid)
             n_pts = sum(1 for p in pts if p.get("session_id") == s["id"])
             chips = []
             if n_img:
@@ -178,7 +188,15 @@ class VisitsPanel(QWidget):
                 if self.lst.item(row).data(Qt.UserRole) == sel:
                     self.lst.setCurrentRow(row)
                     break
+        elif n:
+            # A fresh open selects the newest visit (the list is newest
+            # first): "the visit you are looking at" has to be a real one,
+            # and the Analysis curve, the Open button and the report all
+            # hang from it. Measured: without it the panel opened with
+            # nothing selected and the curve had no night to show.
+            self.lst.setCurrentRow(0)
         self.btn_open.setEnabled(self.current_session_id() is not None)
+        self._tell_selection()
 
     def _show_empty(self, flag):
         # @args: flag - no visits exist
@@ -188,6 +206,20 @@ class VisitsPanel(QWidget):
 
     def _on_select(self):
         self.btn_open.setEnabled(self.current_session_id() is not None)
+        self._tell_selection()
+
+    def _tell_selection(self):
+        # The host follows the selection (the Analysis curve is the visit's).
+        # A callback that throws must never break the list.
+        # @return: None
+        if self._on_visit_selected is None:
+            return
+        try:
+            self._on_visit_selected(self.current_session_id())
+        except Exception as err:                # never kills the panel
+            import logging
+            logging.getLogger(__name__).warning(
+                "visit-selection callback failed: %s", err)
 
     # ------------------------------------------------- the visit window
 
@@ -221,6 +253,8 @@ class VisitsPanel(QWidget):
                                 kind=self._kind,
                                 open_in_editor=self._open_in_editor,
                                 on_measure_click=self._on_measure_click,
+                                measure_series=self._measure_series,
+                                phase=self._phase,
                                 data_changed=self._from_window_changed,
                                 parent=self)
         # WA_DeleteOnClose: the C++ object dies when the user closes the
@@ -274,7 +308,8 @@ class VisitWindow(QDialog):
 
     def __init__(self, db, pid, sid, lang="es", curve_kind=None,
                  kind=None, open_in_editor=None, data_changed=None,
-                 on_measure_click=None, parent=None):
+                 on_measure_click=None, measure_series=None, phase=None,
+                 parent=None):
         super().__init__(parent)
         self._db = db
         self._pid = pid
@@ -287,6 +322,8 @@ class VisitWindow(QDialog):
         self._open_in_editor = open_in_editor
         self._data_changed = data_changed
         self._on_measure_click = on_measure_click
+        self._measure_series = measure_series
+        self._phase = phase
         self.setWindowTitle(self.tr("Visit"))
         self.resize(640, 520)
         self.setAttribute(Qt.WA_DeleteOnClose)
@@ -321,6 +358,8 @@ class VisitWindow(QDialog):
 
         # ---- resources
         self._ui.vp_btn_attach.clicked.connect(self._on_attach)
+        self._ui.vp_btn_series.clicked.connect(self._on_measure_series)
+        self._ui.vp_btn_phase.clicked.connect(self._on_phase)
         self._ui.vp_btn_open.clicked.connect(self._on_open_resource)
         self._ui.vp_btn_remove.clicked.connect(self._on_remove_resource)
         self.lst_res = PassiveList()
@@ -428,13 +467,40 @@ class VisitWindow(QDialog):
 
     # ------------------------------------------------------- resources
 
+    def _kind_label(self, kind):
+        # How a resource's kind reads in the list. The registry keeps a
+        # stable English key, and showing it raw ("[exotic_figure]") made the
+        # list unreadable exactly where a visit now carries the reduction's
+        # own products. Each label is a literal self.tr() so lupdate sees it;
+        # an unknown kind still shows its key, never nothing.
+        # @args: kind - the registry kind of the file
+        # @return: the label
+        labels = {
+            "fits": self.tr("plate"),
+            "image": self.tr("image"),
+            "chart": self.tr("chart"),
+            "report": self.tr("report"),
+            "sequence": self.tr("sequence"),
+            "ephemeris": self.tr("ephemeris"),
+            "motion_gif": self.tr("motion (GIF)"),
+            "motion_mp4": self.tr("motion (MP4)"),
+            "evo_gif": self.tr("evolution (GIF)"),
+            "evo_mp4": self.tr("evolution (MP4)"),
+            "exotic_inits": self.tr("EXOTIC handoff"),
+            "exotic_figure": self.tr("EXOTIC figure"),
+            "exotic_aavso": self.tr("AAVSO report"),
+            "exotic_params": self.tr("EXOTIC parameters"),
+        }
+        return labels.get(kind, kind)
+
     def _populate_resources(self):
         # Refills the visit's resource list from the registry.
         from ...core import project as proj_mod
         self.lst_res.clear()
         for f in proj_mod.files_for_session(self._db, self._sid):
             meta = f.get("meta") or {}
-            bits = [f"[{f['kind']}]", Path(f["path"]).name]
+            bits = [f"[{self._kind_label(f['kind'])}]",
+                    Path(f["path"]).name]
             if meta.get("filter"):
                 bits.append(f"({meta['filter']})")
             if meta.get("date_obs"):
@@ -444,28 +510,114 @@ class VisitWindow(QDialog):
             item.setData(Qt.UserRole, f["id"])
             self.lst_res.addItem(item)
 
+    def _on_measure_series(self):
+        # D8/D36: the series starts from the visit (its frames), never a
+        # folder dialog. The host opens the editor's measure tab with the
+        # series block armed for this visit.
+        if callable(self._measure_series):
+            self._measure_series(self._sid)
+
+    def _on_phase(self):
+        # The period search works on the PROJECT's curve (every visit,
+        # every source), so it hangs from the visit window's resource
+        # block: the visit is where the observer already is.
+        if callable(self._phase):
+            self._phase(self._pid)
+
     def _on_attach(self):
-        # File picker (multi) -> per-FITS editable metadata confirmation
-        # -> registered to THIS visit. The rule of the redesign: nothing
-        # attaches without a visit, and this action only exists inside
-        # one.
+        # File picker (multi) -> ONE metadata confirmation for the whole
+        # batch (consensus from the headers; exceptions listed), never one
+        # dialog per file. The rule of the redesign: nothing attaches
+        # without a visit, and this action only exists inside one.
         from ...core import fits_meta, project as proj_mod
         paths, _sel = QFileDialog.getOpenFileNames(
             self, self.tr("Attach files to the visit"), "",
             self.tr("All files (*)"))
         if not paths:
             return
+        fits = [p for p in paths if _kind_for(p) == "fits"]
+        metas = {}
+        if fits:
+            metas = self._ask_batch_meta(fits)
+            if metas is None:
+                return        # the observer cancelled the whole batch
         for path in paths:
             kind = _kind_for(path)
-            meta = {}
-            if kind == "fits":
-                meta = self._ask_fits_meta(path)
-                if meta is None:
-                    continue        # the observer cancelled this one
+            meta = metas.get(path, {}) if kind == "fits" else {}
             proj_mod.add_file(self._db, self._pid, path, kind,
                               session_id=self._sid, meta=meta)
         self._populate_resources()
         self._emit_change()
+
+    def _ask_batch_meta(self, paths):
+        # One confirmation for a whole batch of FITS: the form carries the
+        # batch consensus (most common filter/date/exptime) and a list of
+        # the files whose header differs, each editable alone (double-click).
+        # @args: paths - the FITS paths just picked
+        # @return: {path: meta} or None when cancelled
+        from collections import Counter
+        from ...core import fits_meta
+        raw = []
+        for p in paths:
+            try:
+                meta = fits_meta.read_meta(p)
+            except Exception:
+                meta = {}
+            raw.append((p, meta))
+        keys = [((m.get("filter") or "Clear").strip() or "Clear",
+                 str(m.get("date_obs") or ""), m.get("exptime_s"))
+                for _p, m in raw]
+        consensus = Counter(keys).most_common(1)[0][0] if keys \
+            else ("Clear", "", None)
+        cfilter, cdate, cexp = consensus
+        excepts = [p for (p, _m), k in zip(raw, keys) if k != consensus]
+        dlg = QDialog(self)
+        dlg.setWindowTitle(self.tr("FITS details"))
+        ui = adopt_ui(dlg, "visit_files_meta")
+        ui.lbl_count.setText(self.tr("FITS files: {0}").format(len(paths)))
+        ui.vp_img_filter.addItems(_FILTERS)
+        ui.vp_img_filter.setCurrentText(cfilter)
+        ui.vp_img_date.setText(cdate)
+        ui.vp_img_exptime.setText("" if cexp in (None, "") else str(cexp))
+        ui.lbl_except_hint.setVisible(bool(excepts))
+        overrides = {}
+        meta_by_path = {p: m for p, m in raw}
+        for p in excepts:
+            m = meta_by_path[p]
+            item = QListWidgetItem(self.tr("{0}  ·  {1} · {2} · {3}s")
+                                   .format(Path(p).name,
+                                           m.get("filter") or "?",
+                                           m.get("date_obs") or "?",
+                                           m.get("exptime_s") or "?"))
+            item.setData(Qt.UserRole, p)
+            ui.lst_except.addItem(item)
+        ui.buttonBox.accepted.connect(dlg.accept)
+        ui.buttonBox.rejected.connect(dlg.reject)
+        ui.lst_except.itemDoubleClicked.connect(
+            lambda it: self._edit_batch_exception(dlg, ui, it, overrides))
+        if dlg.exec() != QDialog.Accepted:
+            return None
+        exp_txt = ui.vp_img_exptime.text().strip()
+        try:
+            exp = float(exp_txt) if exp_txt else None
+        except ValueError:
+            exp = None
+        cons = {"filter": ui.vp_img_filter.currentText().strip() or "Clear",
+                "date_obs": ui.vp_img_date.text().strip() or None,
+                "exptime_s": exp}
+        return {p: overrides.get(p, cons) for p in paths}
+
+    def _edit_batch_exception(self, dlg, ui, item, overrides):
+        # Edit one exception's meta alone (the batch consensus stands for
+        # the rest); the row's text then shows the new values.
+        path = item.data(Qt.UserRole)
+        meta = self._ask_fits_meta(path)
+        if meta is None:
+            return
+        overrides[path] = meta
+        item.setText(self.tr("{0}  ·  {1} · {2} · {3}s").format(
+            Path(path).name, meta.get("filter") or "?",
+            meta.get("date_obs") or "?", meta.get("exptime_s") or "?"))
 
     def _ask_fits_meta(self, path):
         # The FITS confirmation dialog, pre-filled from the header (a

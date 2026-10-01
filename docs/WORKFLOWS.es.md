@@ -38,7 +38,10 @@ trabaja el objeto es una visita y de ella cuelgan sus recursos — placas,
 reportes, importaciones — registrados en `project_files` con
 `session_id`; nada se adjunta sin visita. Revisión 2026-09-06 de ADR-019:
 el paso Captura se fundió en el Plan y gana el control real de CCDciel —
-ADR-030).
+ADR-030). El **cómo** de medir una serie desde la visita (fotometría de
+secuencias, detrend, multinoche, ExoClock y modo en vivo) está en
+[SEQUENCES.es.md](SEQUENCES.es.md); el cierre científico de un tránsito pasa por
+**orquestar EXOTIC** desde la app (ver SEQUENCES y ADR-052).
 
 ## 4. Flujo — supernova / transitorio
 
@@ -738,7 +741,7 @@ plan): leer la salida de EXOTIC (Mid-Transit Time → O-C, marca observed) —
 v2; monitor de flujo en vivo sobre `core/series.py` (horizonte: variables de
 corto periodo, condición *tremendamente simple*); lanzar EXOTIC como
 subproceso; validación del `MandatoryStartTime` y del `inits.json` contra el
-software real del observatorio (pendiente de una corrida del usuario).
+software real del observatorio (pendiente de una ejecución del usuario).
 
 ### 7terdecies. Carpeta contenedora de proyectos (2026-09-10, ADR-032)
 
@@ -1049,7 +1052,10 @@ fuente: el nuevo `core/attention.py`, math 100 % local y aditiva);
 **filas ricas** en ambas pestañas (banda de tipo, siguiente acción en
 palabras, puntos de progreso, chip «⊕ HH:MM–HH:MM esta noche» vía
 `planner.safe_window_for`, edad de actividad, **sparkline** de tus medidas
-en SN/variables, orden «Te necesita»); la **tarjeta Next como centro de
+en SN/variables, orden «Te necesita»; desde 2026-10-01 la miniatura es la
+**última curva disponible** del proyecto (la corrida más reciente, sea la
+serie o una reducción de EXOTIC), encuadrada en la **misma ventana de
+magnitudes del gráfico**); la **tarjeta Next como centro de
 mando** (Mark done/Skip junto a Go →; las secciones conservan solo un pie
 discreto); la **prominencia a tres niveles** (primario visible / menú ⋯ /
 bloque colapsable con título en lenguaje llano — Calibration y «Lo que
@@ -1184,3 +1190,65 @@ coordenadas.
 - La carta PNG del CLI (`--fits`) y la escena del widget comparten matemática
   (`core/field_math.py`): cualquier mejora visual va en ambos o en ninguno.
 - Suite unitaria verde: **1461**.
+
+
+---
+
+## Calidad de las secuencias fotométricas (2026-09-29)
+
+**Por qué**: una observación real del grupo ObSN (V0526 Per, 244 tomas de 40 s, sin
+WCS) salió **desastrosa** con el motor de serie: el campo derivó 134" en 2,9 h, la
+estrella salió de la apertura en menos de un minuto y la curva quedó en un rango de
+8 magnitudes con errores de 0,5 mag. El diagnóstico completo (con las medidas antes y
+después) está en `docs/PLANS/series-quality.md`.
+
+**Qué se ha hecho** (fases A, B y C del plan; ADR-048 revisado y ADR-054):
+
+- `core/register.py` reescrito: se quita el cielo, **las estrellas votan** la
+  transformación (traslación primero), la calidad es **física** (estrellas
+  emparejadas y rms en px) y una rotación sólo entra si reduce el residuo real. Un
+  frame que no se puede verificar hereda la anterior y se marca `align_failed`.
+- La **alineación está encendida por defecto** (`align="auto"` → `coords`: se mide en
+  la rejilla nativa, la PSF nunca se remuestrea) y se persiste en `cfg_json`.
+- El **punto cero se ata por comparada** (`_tie_comps`): una comp que entra y sale del
+  campo o que satura ya no mueve la curva. La check nunca entra en el punto cero.
+- La **apertura sigue el seeing** en serie y, para `variable`/`hads`, el detrend por
+  defecto es el mínimo de masa de aire.
+- El motor **dice lo que no sabe** en el panel: deriva, residuo de las estrellas,
+  comps que nunca entraron o están saturadas, y la ganancia que falta.
+- `core/periodogram.py` + `viz/phase_view.py` + `gui/phase_dialog.py`: búsqueda de
+  período (Lomb-Scargle generalizado + PDM + ventana espectral, FAP por bootstrap),
+  plegado y el informe de dos paneles, con ciclos cubiertos y avisos de alias. Se
+  abre desde la ventana de la visita y desde la pestaña Medir del editor.
+
+**Números**: 244/244 puntos medibles (antes 5), correlación **0.899** con la
+reducción independiente del observador (antes 0.32), residuo **0.0094 mag** (antes
+0.13), 0,23 s/frame (antes 4,6 s y sin converger), suite unitaria verde: **2105**.
+
+**Fases siguientes (hechas el mismo día, ver ADR-048 rev.)**:
+
+- **G1/G3 · La ganancia**: `core/gain.py` la mide en las propias tomas (0.772 ± 0.002
+  e-/ADU en la serie real) y Ajustes gana los dos campos que nadie podía rellenar. El
+  error interno de un punto pasa de inexistente a **0.0052 mag**.
+- **A · La gráfica**: escala robusta, zoom/paneo, barra = fotón y banda = sistemático
+  (`err_internal`, migración **v13**), banderas de dato separadas de los avisos de
+  calibración, y controles en el bloque de serie.
+- **B · Robustez**: la apertura sigue el seeing de verdad (los radios son los de la
+  FWHM de referencia), bandera **`seeing`** frente a `cloud`, y análisis robusto
+  (recorte sobre la curva plegada; el recorte sobre la serie temporal se midió y se
+  rechazó).
+- **C · Comparsas**: `validate_on_plate` mide cada candidata en la placa abierta
+  (saturación, linealidad, sensor, SNR) y el campo es el rectángulo real del sensor.
+- **D · La curva**: `fetch_lightcurve` de AAVSO, plegado conjunto, y la búsqueda
+  acotada para que una década de historia no congele la ventana (de 60 s a 3-4 s).
+
+**Punto de entrada (para quien retome)**:
+
+1. **G2**: el diálogo «Medir la ganancia…» (dos pares, con el ruido de lectura) sobre
+   `core/gain.py`, que ya hace el ajuste de dos niveles; sólo falta la ventana.
+2. **`seeing` en el análisis**: el desfase de punto cero por noche en el plegado
+   multinoche (D3 del plan) sigue abierto.
+3. **Deuda declarada**: el paquete AAVSO de la curva no tiene test de red; su parseo
+   (`_parse_curve`) sí está cubierto por los tests de la cadena de prioridad.
+4. La fixture `tests/data/v0526per/` (8 frames reales recortados, 4 MB) es la red de
+   seguridad: **no la sustituyas por datos sintéticos**.

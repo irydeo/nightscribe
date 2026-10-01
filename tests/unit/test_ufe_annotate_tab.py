@@ -90,16 +90,25 @@ def test_clicks_are_ignored_while_another_tab_is_current(dlg):
 def test_nudge_applies_and_clamps(dlg):
     from PySide6.QtCore import QPointF
     tab = dlg.tab_annotate
-    tab.spin_dx.setValue(10.0)
-    tab.spin_dy.setValue(-6.0)
-    tab.btn_nudge.click()
-    assert tab._marker == [1033.5, 1017.5]
+    before = list(tab._marker)
+    tab._ui.btn_right.click()                 # +0.5 px, instant feedback
+    assert tab._marker[0] == pytest.approx(before[0] + 0.5)
+    assert tab.lbl_nudge.text() == "(+0.5, +0.0)"
+    tab._nudge_step(9.5, -6.0)                # a bigger hand step
+    assert tab._marker == [before[0] + 10.0, before[1] - 6.0]
     # near the bottom edge (data row 5), a big downward nudge clamps
     dlg.view.scene_clicked.emit(QPointF(1023.0, 2047 - 1 - 5.0))
-    tab.spin_dx.setValue(0.0)
-    tab.spin_dy.setValue(-100.0)              # the spin's own floor
-    tab.btn_nudge.click()
+    tab._nudge_step(0.0, -100.0)
     assert tab._marker[1] == 0.0              # clamped at the plate edge
+
+
+def test_nudge_readout_resets_on_a_new_click(dlg):
+    from PySide6.QtCore import QPointF
+    tab = dlg.tab_annotate
+    tab._ui.btn_up.click()
+    assert tab.lbl_nudge.text() == "(+0.0, +0.5)"
+    dlg.view.scene_clicked.emit(QPointF(500.0, 500.0))
+    assert tab.lbl_nudge.text() == "(0.0, 0.0)"
 
 
 def test_marker_toggle_hides_overlay_but_keeps_position(dlg):
@@ -126,8 +135,7 @@ def test_save_writes_aij_cards_and_never_touches_the_source(dlg, tmp_path,
                                                             monkeypatch):
     from nightscribe.core import fits_io
     tab = dlg.tab_annotate
-    tab.spin_dx.setValue(10.0)
-    tab.btn_nudge.click()
+    tab._nudge_step(10.0, 0.0)
     tab.edit_label.setText("SN 2026zji")
     tab.edit_notes.setText("12x180s V")
     before_bytes = MONO.read_bytes()

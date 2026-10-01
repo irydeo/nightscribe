@@ -27,6 +27,100 @@ logger = logging.getLogger(__name__)
 CSV_HEADER = ("name", "hjd", "mag", "err", "filter", "comp_stars",
               "observer", "notes")
 
+# Every column a report can carry, in the order a reader expects them.
+# The Photometrica tool of our group lets the observer tick which ones go
+# into the file, and the reason is good: one colleague wants the curve,
+# another wants the quality controls (FWHM, sky, aperture), and a third
+# wants to reproduce the measurement. A fixed set of columns is always
+# either too much or too little.
+#
+# Each entry is (key, label_es, label_en). The values come from the point
+# dict plus the two magnitudes that are computed for the report (HJD and
+# the detrended one when the series carried it).
+REPORT_COLUMNS = (
+    ("name", "Nombre", "Name"),
+    ("hjd", "HJD", "HJD"),
+    ("mjd", "MJD (UT)", "MJD (UT)"),
+    ("mag", "Magnitud", "Magnitude"),
+    ("err", "Error", "Error"),
+    ("err_internal", "Error (fotones)", "Error (photons)"),
+    ("mag_raw", "Mag. instrumental", "Instrumental mag"),
+    ("filter", "Banda", "Band"),
+    ("fwhm", "FWHM (px)", "FWHM (px)"),
+    ("airmass", "Masa de aire", "Airmass"),
+    ("n_comps", "Comparsas usadas", "Comps used"),
+    ("zp", "Punto cero", "Zero point"),
+    ("flags", "Marcas", "Flags"),
+    ("source", "Origen", "Source"),
+    ("comp_stars", "Estrellas de comparación", "Comparison stars"),
+    ("observer", "Observador", "Observer"),
+    ("notes", "Notas", "Notes"),
+)
+
+# What a report carries when nobody chooses (the historical set, so an
+# existing script that reads our CSV keeps working).
+DEFAULT_COLUMNS = ("name", "hjd", "mag", "err", "filter", "comp_stars",
+                   "observer", "notes")
+
+
+def column_labels(lang="es"):
+    # @args: lang - "es"|"en"
+    # @return: [(key, label)] in the canonical order
+    idx = 1 if (lang or "es") != "en" else 2
+    return [(c[0], c[idx]) for c in REPORT_COLUMNS]
+
+
+def _cell(point, key, comps, observer, hjd):
+    # The value of one column for one point, already formatted for a
+    # spreadsheet: a missing value is an empty cell, never a zero (a zero
+    # magnitude is a real, extremely bright star).
+    # @return: the string for that cell
+    if key == "name":
+        return point.get("_name") or ""
+    if key == "hjd":
+        return f"{hjd:.5f}" if hjd is not None else ""
+    if key == "mjd":
+        mjd = point.get("mjd")
+        return f"{mjd:.5f}" if mjd is not None else ""
+    if key == "mag":
+        mag = point.get("mag")
+        return f"{mag:.3f}" if mag is not None else ""
+    if key == "err":
+        err = point.get("err")
+        return f"{err:.3f}" if err is not None else ""
+    if key == "err_internal":
+        err = point.get("err_internal")
+        return f"{err:.4f}" if err is not None else ""
+    if key == "mag_raw":
+        raw = point.get("mag_raw")
+        return f"{raw:.3f}" if raw is not None else ""
+    if key == "filter":
+        return point.get("filter") or ""
+    if key == "fwhm":
+        fwhm = point.get("fwhm")
+        return f"{fwhm:.2f}" if fwhm is not None else ""
+    if key == "airmass":
+        air = point.get("airmass")
+        return f"{air:.3f}" if air is not None else ""
+    if key == "n_comps":
+        n = point.get("n_comps")
+        return str(n) if n is not None else ""
+    if key == "zp":
+        zp = point.get("zp")
+        return f"{zp:.3f}" if zp is not None else ""
+    if key == "flags":
+        flags = point.get("flags") or []
+        return " ".join(str(f) for f in flags)
+    if key == "source":
+        return point.get("source") or ""
+    if key == "comp_stars":
+        return comps
+    if key == "observer":
+        return observer or ""
+    if key == "notes":
+        return point.get("_notes") or ""
+    return ""
+
 
 def collect_points(db, project_id, include_quicklook=False):
     # The exportable points of the project, MJD-ordered.
@@ -48,23 +142,42 @@ def hjd_of(point, ra_deg, dec_deg):
 
 
 def export_csv(points, out, name, ra_deg=None, dec_deg=None, observer="",
-               comp_stars=None):
-    # The documented group CSV (V-i): one row per point, dot decimal,
-    # comma-separated, comparison stars joined by "+" in one cell.
+               comp_stars=None, columns=None):
+    # One row per point, dot decimal, comma-separated.
+    #
+    # The columns are the observer's choice (REPORT_COLUMNS); the default
+    # set is the one the group has always exchanged, so an existing script
+    # that reads our CSV keeps working.
+    # The header is the CANONICAL key of each column, never a translated
+    # label: this file is a documented interchange format and a colleague's
+    # reader must not break because the app was in Spanish. The friendly
+    # labels belong to the dialog that chooses the columns.
+    # @args: points - the point dicts, out - path, name - the object's
+    #        name (the "name" column), ra_deg/dec_deg - for the HJD,
+    #        observer - free text, comp_stars - the comparison sequence,
+    #        columns - the keys to write (None: DEFAULT_COLUMNS)
     # @return: Path written
+    keys = list(columns or DEFAULT_COLUMNS)
+    known = {c[0] for c in REPORT_COLUMNS}
+    unknown = [k for k in keys if k not in known]
+    if unknown:
+        logger.warning("unknown report columns ignored: %s", unknown)
+        keys = [k for k in keys if k in known]
     comps = "+".join(comp_stars or [])
+    # a comment block says how the file was made, so a reader three months
+    # later (or a colleague) is not guessing
     lines = [f"# name: {name}",
-             "# generated by NightScribe — dates are HJD",
-             ",".join(CSV_HEADER)]
+             "# generated by NightScribe — dates are HJD (heliocentric)",
+             ",".join(keys)]
     for p in points:
         hjd = hjd_of(p, ra_deg, dec_deg)
-        err = f"{p['err']:.3f}" if p.get("err") is not None else ""
-        lines.append(",".join([
-            name, f"{hjd:.5f}" if hjd is not None else "",
-            f"{p['mag']:.3f}", err, p.get("filter") or "", comps,
-            observer, ""]))
+        row = dict(p)
+        row["_name"] = name
+        cells = [_cell(row, k, comps, observer, hjd) for k in keys]
+        lines.append(",".join(cell.replace(",", ";") for cell in cells))
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")
-    logger.info("photometry CSV written: %s (%d points)", out, len(points))
+    logger.info("photometry CSV written: %s (%d points, %d columns)",
+                out, len(points), len(keys))
     return Path(out)
 
 
@@ -109,8 +222,11 @@ def export_eff(points, out, name, ra_deg=None, dec_deg=None, obscode="",
             continue
         merr = f"{p['err']:.3f}" if p.get("err") is not None else "0.000"
         filt = p.get("filter") or "Clear"
+        # TRANS is WebObs' YES/NO transformation flag (anything else can be
+        # rejected on import): NightScribe never transforms to the standard
+        # system, so the honest value is "NO"
         lines.append(f"{name.upper()},{hjd:.5f},{p['mag']:.3f},{merr},"
-                     f"{filt},NA,STD,{cname},{cmag},{kname},{kmag},"
+                     f"{filt},NO,STD,{cname},{cmag},{kname},{kmag},"
                      "na,na,na,")
         n += 1
     Path(out).write_text("\n".join(lines) + "\n", encoding="utf-8")

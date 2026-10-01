@@ -25,10 +25,36 @@ logger = logging.getLogger(__name__)
 
 
 def _setup_logging(verbose):
+    # The log goes to the console AND to a rotating file. A GUI launched
+    # from a menu has no console at all, so before this a failure like "a
+    # dialog appears and disappears and I do not know what happens" left no
+    # trace anywhere (reported). Help > Open the log shows the file.
+    #
+    # The handlers are added by hand and marked, instead of basicConfig:
+    # basicConfig does nothing when anything else already configured the
+    # root logger, and the file is the half that matters here.
     # @args: verbose - bool
-    logging.basicConfig(
-        level=logging.DEBUG if verbose else logging.INFO,
-        format="%(levelname)s %(name)s: %(message)s")
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG if verbose else logging.INFO)
+    if any(getattr(h, "_nightscribe", False) for h in root.handlers):
+        return                       # already set up (a second call)
+    fmt = logging.Formatter(
+        "%(asctime)s %(levelname)s %(name)s: %(message)s")
+    console = logging.StreamHandler()
+    console.setFormatter(fmt)
+    console._nightscribe = True
+    root.addHandler(console)
+    try:
+        from logging.handlers import RotatingFileHandler
+        path = paths.log_path()
+        file_handler = RotatingFileHandler(
+            path, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    except OSError as err:           # a read-only home never stops the app
+        logger.warning("cannot write the log file: %s", err)
+        return
+    file_handler.setFormatter(fmt)
+    file_handler._nightscribe = True
+    root.addHandler(file_handler)
 
 
 def _no_site():

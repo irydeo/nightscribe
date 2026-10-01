@@ -26,6 +26,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from PySide6.QtWidgets import QPushButton
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -883,3 +884,1516 @@ def test_at2026acka_sn_centroid_locks_on_the_galaxy(dlg):
     # the faint bump's flux, not the bright neighbour's (~122k ADU)
     assert last["result"]["flux"] < 60000
     assert "no source could be locked" not in tab.lbl_result.toPlainText()
+
+
+# ---------------- series plan, phase 5 ----------------
+
+def _wait_series(tab, qapp, timeout=30.0):
+    import time
+    t0 = time.time()
+    while tab._series_worker is not None and time.time() - t0 < timeout:
+        qapp.processEvents()
+        time.sleep(0.02)
+    qapp.processEvents()
+
+
+def test_series_block_is_hidden_without_a_visit(dlg):
+    tab = dlg.tab_measure
+    assert not tab.grp_series.isVisible()      # ad-hoc open: no series
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab._on_measure_series()
+    assert "No visit" in tab.lbl_status.text()
+
+
+def test_series_block_shows_with_a_visit_and_runs(dlg, qapp, tmp_path):
+    tab = dlg.tab_measure
+    rows_seen = {}
+
+    def points_hook(rows, cfg):
+        rows_seen["rows"] = rows
+        rows_seen["cfg"] = cfg
+        return 55
+
+    def undo_hook(run_id):
+        rows_seen["undone"] = run_id
+        return 4
+
+    frames = []
+    for i in range(4):
+        frames.append(_write_plate(tmp_path / f"ser{i}.fits",
+                                   dlg.state.data))
+    entries = _sequence(dlg, dlg._test_comps)
+    assert entries
+    _click(dlg, *dlg._test_target)              # the series target
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    assert tab.grp_series.isVisible()
+    dlg.set_points_hook(points_hook)
+    dlg.set_run_undo_hook(undo_hook)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert tab._series_worker is None
+    assert len(rows_seen["rows"]) == 4          # one point per frame
+    assert rows_seen["cfg"]["group_n"] == 1
+    assert tab._series_run_id == 55
+    assert tab.btn_series_undo.isEnabled()
+    assert tab.chart_series._points              # the curve is drawn
+    # undo touches only this run
+    tab._on_series_undo()
+    assert rows_seen["undone"] == 55
+    assert not tab.btn_series_undo.isEnabled()
+    # detaching the visit hides the block again
+    dlg.set_series_hook(None)
+    assert not tab.grp_series.isVisible()
+
+
+def test_series_worker_offscreen_measures_a_synthetic_series(qapp, tmp_path):
+    from PySide6.QtWidgets import QApplication
+    from nightscribe.core import series_measure as sm
+    from nightscribe.gui.workers import SeriesWorker
+    from nightscribe.core import wcs as wcs_mod
+    from nightscribe.core import fits_io
+    data, target, comps = _plate()
+    plate = _write_plate(tmp_path / "ref.fits", data)
+    header, _d = fits_io.read_fits(plate)
+    wcs = wcs_mod.Wcs.from_header(header)
+    entries = []
+    for j, (cx, cy) in enumerate(comps):
+        r = __import__("nightscribe.core.photometry", fromlist=["x"]) \
+            .measure_point(data, cx, cy)
+        import math as _m
+        inst = -2.5 * _m.log10(r["flux"])
+        ra, dec = wcs.pixel_to_sky(cx, cy)
+        entries.append({"name": f"C{j}", "kind": "comp",
+                        "star": {"ra": ra, "dec": dec, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": inst + ZP_TRUE,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    paths = [_write_plate(tmp_path / f"w{i}.fits", data) for i in range(3)]
+    cfg = sm.SeriesConfig(wcs=wcs, target_xy=target, comp_set=tuple(entries),
+                          band="V", site_gain=2.0, site_ron=5.0)
+    got = {}
+    w = SeriesWorker(paths, cfg)
+    w.finished.connect(lambda res: got.update(res=res))
+    w.start()
+    assert w.wait(30000)
+    QApplication.processEvents()
+    assert got["res"].status == "complete"
+    assert len(got["res"].points) == 3
+
+
+# ---------------- worker lifecycle on close (P0 stability) ----------------
+
+def _spy_cancel(worker):
+    # @return: a list the worker's cancel() appends to; the real cancel
+    #          still runs, so the engine really stops
+    calls = []
+    real = worker.cancel
+    worker.cancel = lambda: (calls.append(True), real())[1]
+    return calls
+
+
+def test_dialog_close_cancels_a_running_series(dlg, qapp, tmp_path):
+    # Regression (P0): the tab's shutdown() was dead code, nothing called
+    # it; closing the editor mid-series cancelled nothing and the worker
+    # kept measuring. The closeEvent must shut the Measure tab down:
+    # cancel asked, thread waited on and finished, reference dropped.
+    tab = dlg.tab_measure
+    frames = [_write_plate(tmp_path / f"cl{i}.fits", dlg.state.data)
+              for i in range(60)]          # still running at close time
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 77)
+    tab._on_measure_series()
+    worker = tab._series_worker
+    assert worker is not None and worker.isRunning()
+    calls = _spy_cancel(worker)
+    dlg.close()
+    qapp.processEvents()
+    cancelled_by_close = bool(calls)
+    running_after_close = worker.isRunning()
+    # safety net: never hand a live thread to the teardown, whatever the
+    # close did or did not do
+    worker.cancel()
+    finished = worker.wait(10000)
+    assert cancelled_by_close              # the close asked it to stop
+    assert not running_after_close         # ... and waited for the thread
+    assert finished and not worker.isRunning()
+    assert tab._series_worker is None      # the reference is dropped
+
+
+def test_dialog_close_cancels_a_running_live_watch(dlg, qapp, tmp_path):
+    # Same regression, Live mode (the reported symptom: a Live watch left
+    # behind keeps writing runs into the DB forever). The closeEvent must
+    # cancel the live worker too and wait for its thread.
+    tab = dlg.tab_measure
+    frames = [_write_plate(tmp_path / f"lv{i}.fits", dlg.state.data)
+              for i in range(4)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 78)
+    tab.chk_series_live.setChecked(True)   # starts the folder watch
+    worker = tab._live_worker
+    assert worker is not None and worker.isRunning()
+    calls = _spy_cancel(worker)
+    dlg.close()
+    qapp.processEvents()
+    cancelled_by_close = bool(calls)
+    # safety net: the watch loop polls every 2 s, so give the thread a
+    # generous window; the teardown must never see it running
+    worker.cancel()
+    finished = worker.wait(10000)
+    assert cancelled_by_close              # the close asked it to stop
+    assert finished and not worker.isRunning()
+    assert tab._live_worker is None        # the reference is dropped
+
+
+# ---------------- the run button doubles as Cancel (P1 #12) ----------------
+
+def test_series_button_cancels_a_running_series(dlg, qapp, tmp_path):
+    # Regression (P1 #12): a long series had no way out, the button was
+    # disabled while the worker ran. The same button must become the
+    # Cancel: one click mid-run asks the worker to stop, the engine
+    # answers "incomplete" with the points measured so far (D18: they are
+    # kept as one undoable run) and the button comes back to its label.
+    import time
+    tab = dlg.tab_measure
+    label = tab.btn_series.text()              # the .ui's run label
+    rows_seen = []
+    echo_seen = []
+
+    def points_hook(rows, cfg):
+        rows_seen.append(rows)
+        echo_seen.append(cfg)
+        return 91
+
+    frames = [_write_plate(tmp_path / f"cn{i}.fits", dlg.state.data)
+              for i in range(60)]          # still running at click time
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(points_hook)
+    tab._on_measure_series()
+    worker = tab._series_worker
+    assert worker is not None and worker.isRunning()
+    assert tab.btn_series.text() == tab.tr("Cancel")   # it IS the Cancel
+    assert tab.btn_series.isEnabled()                  # ... and clickable
+    # mid-run: a few frames are already measured when the click lands
+    t0 = time.time()
+    while tab.prg_series.value() < 3 and time.time() - t0 < 30.0:
+        qapp.processEvents()
+        time.sleep(0.01)
+    assert tab.prg_series.value() >= 3
+    calls = _spy_cancel(worker)
+    tab.btn_series.click()                     # one click, mid-run
+    assert calls                               # the worker was asked to stop
+    assert "Cancelling" in tab.lbl_status.text()
+    _wait_series(tab, qapp)
+    assert tab._series_worker is None
+    result = tab._series_result
+    assert result.status == "incomplete"       # cancelled, not lost (D18)
+    assert 0 < len(result.points) < len(frames)
+    # the points measured so far are kept: one run, persisted and undoable
+    kept = [p for p in result.points if p.mjd is not None]
+    assert kept and rows_seen and len(rows_seen[0]) == len(kept)
+    # P2 #23a (D18): the run's real status rides in the echo, so the host
+    # stores the run "incomplete" instead of the column's "complete"
+    assert echo_seen and echo_seen[0]["status"] == "incomplete"
+    assert echo_seen[0]["group_n"] == 1          # the config echo survives
+    assert tab._series_run_id == 91
+    assert tab.btn_series_undo.isEnabled()
+    # and the button is the run button again
+    assert tab.btn_series.text() == label
+    assert tab.btn_series.isEnabled()
+    assert "Series cancelled" in tab.lbl_status.text()
+
+
+# ---------------- series plan, phase 8: ExoClock ----------------
+
+def test_exoclock_button_writes_files_and_records_outcome(
+        dlg, qapp, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtGui import QDesktopServices
+    tab = dlg.tab_measure
+    assert not tab.btn_series_exoclock.isEnabled()   # nothing measured yet
+    frames = [_write_plate(tmp_path / f"e{i}.fits", dlg.state.data,
+                           extra=[_card("EXPTIME", "10.0")])
+              for i in range(4)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 9)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert tab.btn_series_exoclock.isEnabled()
+    out = tmp_path / "HATP-32b.txt"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl",
+                        staticmethod(lambda url: opened.append(url.toString())))
+    seen = []
+    dlg.set_exoclock_hook(lambda payload: seen.append(payload))
+    tab._on_series_exoclock()
+    assert out.exists()
+    assert (tmp_path / "ExoClock_info.txt").exists()
+    assert "JD_UTC" in (tmp_path / "ExoClock_info.txt").read_text()
+    assert len(out.read_text().strip().splitlines()) == 4   # one per frame
+    assert opened and "exoclock.space/upload" in opened[0]
+    assert seen and seen[0]["points"] == 4
+
+
+# ------- P2 #19: live batches say their failures, and undo -------
+
+def _fast_live(monkeypatch):
+    # The tab builds its live worker with the watch's real 2 s poll; an
+    # offscreen test cannot wait for it, so the class it imports polls
+    # fast instead (same worker, same signals).
+    # @return: the replacement class (also patched into gui.workers)
+    from nightscribe.gui import workers
+
+    class _FastLive(workers.LiveSeriesWorker):
+        def __init__(self, folder, cfg, batch_n=5, batch_s=10.0):
+            super().__init__(folder, cfg, poll_s=0.05, batch_n=batch_n,
+                             batch_s=batch_s)
+
+    monkeypatch.setattr(workers, "LiveSeriesWorker", _FastLive)
+    return _FastLive
+
+
+def _stop_live(tab):
+    # The fixture never closes the dialog, so the test itself must not
+    # hand a running thread to the teardown.
+    # @return: the live worker, cancelled and waited on
+    worker = tab._live_worker
+    tab.chk_series_live.setChecked(False)
+    if worker is not None:
+        worker.cancel()
+        assert worker.wait(20000)
+    return worker
+
+
+def _wait_live_runs(tab, qapp, n, timeout=30.0):
+    import time
+    t0 = time.time()
+    while len(tab._live_run_ids) < n and time.time() - t0 < timeout:
+        qapp.processEvents()
+        time.sleep(0.02)
+    qapp.processEvents()
+
+
+def _arm_live(dlg, tmp_path, prefix, n=3):
+    # A visit with frames in tmp_path, a sequence and a measured target:
+    # everything Live mode asks for before it starts watching.
+    # @return: the visit's frame paths
+    frames = [_write_plate(tmp_path / f"{prefix}{i}.fits", dlg.state.data)
+              for i in range(n)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    return frames
+
+
+def test_live_batch_failure_reaches_the_status_line(
+        dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #19): a batch whose measure raised was logged and
+    # dropped, and the tab said nothing at all. The observer must read
+    # that those frames were not measured, in their own language.
+    import time
+    from nightscribe.core import series_measure as sm
+    tab = dlg.tab_measure
+    _arm_live(dlg, tmp_path, "lf")
+    dlg.set_points_hook(lambda rows, cfg: 78)
+
+    def boom(paths, cfg, progress=None, cancel=None):
+        raise RuntimeError("engine down")
+
+    monkeypatch.setattr(sm, "measure_series", boom)
+    _fast_live(monkeypatch)
+    tab.chk_series_live.setChecked(True)
+    t0 = time.time()
+    while "engine down" not in tab.lbl_status.text() \
+            and time.time() - t0 < 20.0:
+        qapp.processEvents()
+        time.sleep(0.02)
+    text = tab.lbl_status.text()
+    _stop_live(tab)
+    assert "engine down" in text
+    assert "were not measured" in text          # the tab's own wording
+    assert tab._live_run_ids == []              # nothing was persisted
+
+
+def test_live_session_is_one_undoable_run(dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #19 / ADR-050): the live batches were written and
+    # their run ids thrown away, so a live session could never be undone.
+    # Its batches pile up behind the same Undo button as a normal series.
+    #
+    # And since 2026-09-30 they pile up in ONE run, not one per batch: the
+    # tab tells the host to continue the run its session opened
+    # (`append_run`), which is what makes the curve reloaded from the
+    # project the WHOLE live session instead of its last batch.
+    tab = dlg.tab_measure
+    undone = []
+    echoes = []
+    _arm_live(dlg, tmp_path, "lu")
+
+    def fake_points(rows, cfg):
+        echoes.append(dict(cfg))
+        return 79
+
+    dlg.set_points_hook(fake_points)
+    dlg.set_run_undo_hook(lambda run_id: (undone.append(run_id), 2)[1])
+    _fast_live(monkeypatch)
+    tab.chk_series_live.setChecked(True)
+    _wait_live_runs(tab, qapp, 1)
+    # a second wave: the session keeps piling its batches into one run
+    for i in (3, 4):
+        _write_plate(tmp_path / f"lu{i}.fits", dlg.state.data)
+    _wait_live_runs(tab, qapp, 2)
+    _stop_live(tab)
+    ids = list(tab._live_run_ids)
+    assert ids == [79]                        # one run, whatever the batches
+    assert "append_run" not in echoes[0]      # the first batch opened it
+    assert all(e.get("append_run") == 79 for e in echoes[1:])
+    assert tab.btn_series_undo.isEnabled()
+    assert tab._live_points                    # the curve grew live
+    tab._on_series_undo()
+    assert undone == ids                       # every batch, one click
+    assert "Run undone" in tab.lbl_status.text()
+    assert not tab.btn_series_undo.isEnabled()
+    assert tab._live_run_ids == [] and tab._live_points == []
+    assert tab.chart_series._points == []
+
+
+# ---------------- P2 #20: the aperture sweep is reachable ----------------
+
+def test_auto_aperture_checkbox_hands_the_radii_to_the_engine(
+        dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #20): the tab always passed its spins as radii, so
+    # the engine's auto path (radii None) never ran even with the box
+    # checked. Checked, the engine owns the apertures and its chosen k per
+    # night reaches the panel; unchecked, the spins still rule.
+    from nightscribe.core import series_measure as sm
+    tab = dlg.tab_measure
+    seen = []
+
+    def fake(paths, cfg, progress=None, cancel=None):
+        seen.append(cfg)
+        return sm.SeriesResult(
+            points=[sm.SeriesPoint(index=0, path=str(paths[0]),
+                                   mjd=60900.5, mag=15.0, err=0.01,
+                                   inst=14.0, filter="V")],
+            apertures={"2026-09-20": {"k": 1.4, "rms": 0.0123,
+                                      "radii": (5.4, 9.0, 13.0),
+                                      "fwhm": 3.2}})
+
+    monkeypatch.setattr(sm, "measure_series", fake)
+    frames = [_write_plate(tmp_path / f"ap{i}.fits", dlg.state.data)
+              for i in range(2)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 31)
+    tab._advanced.chk_auto_aperture.setChecked(True)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert seen and seen[0].radii is None       # the sweep can run now
+    assert seen[0].auto_aperture is True
+    panel = tab.lbl_result.toPlainText()
+    assert "Night 2026-09-20: aperture k = 1.4" in panel
+    assert "seeing 3.2 px" in panel and "0.0123" in panel
+    # unchecked: the observer's spins are never stomped
+    tab._advanced.chk_auto_aperture.setChecked(False)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert seen[-1].auto_aperture is False
+    assert seen[-1].radii == (tab.spn_rap.value(), tab.spn_rin.value(),
+                              tab.spn_rout.value())
+
+
+# ---------------- P2 #22: nothing drops without a word ----------------
+
+def test_series_panel_names_the_frames_that_never_made_it(dlg, qapp, tmp_path):
+    # Regression (P2 #22): frames without DATE-OBS and frames the engine
+    # could not read were discarded in silence. The panel must name them.
+    tab = dlg.tab_measure
+    good = _write_plate(tmp_path / "ok0.fits", dlg.state.data)
+    nodate = _write_plate(tmp_path / "nodate0.fits", dlg.state.data,
+                          instrument=False)
+    broken = tmp_path / "broken0.fits"
+    broken.write_text("this is not a FITS file")
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": [good, nodate, broken]})
+    rows_seen = []
+    dlg.set_points_hook(lambda rows, cfg: (rows_seen.append(rows), 21)[1])
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    panel = tab.lbl_result.toPlainText()
+    assert "1 frame(s) had no DATE-OBS" in panel
+    assert "1 frame(s) could not be read" in panel
+    assert "broken0.fits" in panel
+    # the technical English of the engine is said in plain language
+    assert "truncated" in panel
+    assert "Truncated FITS header block" not in panel
+    # and the undated frame really stayed off the persisted run
+    assert rows_seen and all(r["mjd"] is not None for r in rows_seen[0])
+    assert len(rows_seen[0]) == 1
+
+
+# ---------------- P2 #23b: the ExoClock write is guarded ----------------
+
+def test_exoclock_write_failure_is_reported(dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P2 #23b): write_submission raises on a locked file, a
+    # full disk or a folder without write permission, and the tab let the
+    # exception escape. It must say why and stop there.
+    from PySide6.QtWidgets import QFileDialog
+    from PySide6.QtGui import QDesktopServices
+    from nightscribe.core import exoclock_export
+    tab = dlg.tab_measure
+    frames = [_write_plate(tmp_path / f"xf{i}.fits", dlg.state.data,
+                           extra=[_card("EXPTIME", "10.0")])
+              for i in range(2)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 9)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    assert tab.btn_series_exoclock.isEnabled()
+    out = tmp_path / "locked.txt"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    opened = []
+    monkeypatch.setattr(QDesktopServices, "openUrl",
+                        staticmethod(
+                            lambda url: opened.append(url.toString())))
+    saved = []
+    dlg.set_save_hook(lambda paths, kind, payload: saved.append(paths))
+    exo_seen = []
+    dlg.set_exoclock_hook(lambda payload: exo_seen.append(payload))
+
+    def boom(*args, **kwargs):
+        raise PermissionError(13, "Permission denied")
+
+    monkeypatch.setattr(exoclock_export, "write_submission", boom)
+    tab._on_series_exoclock()                  # must not raise
+    text = tab.lbl_status.text()
+    assert "could not be written" in text
+    assert "Permission denied" in text
+    assert opened == []                        # the upload page stays shut
+    assert saved == [] and exo_seen == []      # nothing is registered
+    assert not out.exists()
+
+
+# ---------------- P3: the series buttons on wide fonts ----------------
+
+def test_the_series_block_stays_narrow_and_keeps_its_actions_reachable(
+        dlg, qapp):
+    # Regression (P3) plus U6. P3 was about the four series buttons on one
+    # row escaping the dialog on Windows, where the fonts are wide. U6 has
+    # changed where they live: the block keeps ONE action (Measure/Cancel)
+    # and the six occasional ones moved into the "Series" menu, so the row
+    # cannot be dragged wide by them any more.
+    #
+    # What must hold now: the block stays narrow with a 1.5x font, and the
+    # six actions are still THERE, reachable behind their door.
+    tab = dlg.tab_measure
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+    assert tab.grp_series.isVisible()          # the block is armed
+    # the theme pins the font size in px through a stylesheet, so the
+    # 1.5x simulation goes through the same channel: 13px -> 20px
+    tab.grp_series.setStyleSheet("* { font-size: 20px; }")
+    qapp.processEvents()
+    assert tab.btn_series.font().pixelSize() == 20
+    assert _innermost_row_of(tab.grp_series, tab.btn_series) is not None
+    # the block's own width stays sane: the six moved ones cannot add to it
+    assert tab.grp_series.minimumSizeHint().width() <= 560
+    # and the door holds them all, as a real panel (not a dead list)
+    panel = tab.btn_series_more.menu().actions()[0].defaultWidget()
+    assert panel is not None
+    inside = {w.objectName() for w in panel.findChildren(QPushButton)}
+    for name in ("btn_series_undo", "btn_series_exoclock",
+                 "btn_series_night", "btn_series_sci", "btn_series_phase",
+                 "btn_series_help"):
+        assert name in inside, name
+
+
+# ---------------- P3: nights are named by their civil date ----------------
+
+def test_series_panel_names_nights_by_their_civil_date(
+        dlg, qapp, tmp_path, monkeypatch):
+    # Regression (P3): the per-night lines printed the engine's raw MJD
+    # night key ("Night 61303"), which no observer reads. The night
+    # boundary sits at noon (ADR-048), so the panel says the civil date
+    # of the evening, in the aperture-sweep and the detrend lines alike.
+    from nightscribe.core import series_measure as sm
+    tab = dlg.tab_measure
+
+    def fake(paths, cfg, progress=None, cancel=None):
+        return sm.SeriesResult(
+            points=[sm.SeriesPoint(index=0, path=str(paths[0]),
+                                   mjd=61303.98, mag=15.0, err=0.01,
+                                   inst=14.0, filter="V", airmass=1.2)],
+            apertures={61303: {"k": 1.4, "rms": 0.0123,
+                               "radii": (5.4, 9.0, 13.0), "fwhm": 3.2}},
+            detrend={"policy": "airmass",
+                     "nights": [{"night": 61303, "a1": 1.0, "a2": 0.1,
+                                 "a3": 0.0, "n": 1, "fallback": None,
+                                 "rms_before": 0.02, "rms_after": 0.01}]})
+
+    monkeypatch.setattr(sm, "measure_series", fake)
+    frames = [_write_plate(tmp_path / f"nd{i}.fits", dlg.state.data)
+              for i in range(2)]
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": frames})
+    dlg.set_points_hook(lambda rows, cfg: 41)
+    tab._on_measure_series()
+    _wait_series(tab, qapp)
+    panel = tab.lbl_result.toPlainText()
+    assert "Night 2026-09-20: aperture k = 1.4" in panel
+    assert "Night 2026-09-20: a1=1.000, a2=+0.100, a3=0.000" in panel
+    assert "Night 61303" not in panel           # the raw MJD is gone
+
+
+def test_series_lives_in_a_left_pane_shown_with_a_visit(dlg):
+    # The series block sits in its own pane at the left of the image
+    # (hidden unless a visit arms it), not cramped in the Measure tab.
+    tab = dlg.tab_measure
+    assert hasattr(dlg, "series_pane")
+    assert not dlg.series_pane.isVisible()
+    # the group is reparented into the pane
+    assert tab.grp_series.parent() is dlg.visit_panel
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2, "paths": []})
+    assert dlg.series_pane.isVisible()
+    assert tab.grp_series.isVisible()
+    dlg.set_series_hook(None)
+    assert not dlg.series_pane.isVisible()
+
+
+# ------------------------------------- the curve in the centre (ADR-051 rev.)
+
+def test_the_curve_lives_in_the_centre_of_the_window(dlg):
+    # V2: the measured curve is not a small box you have to click, nor a
+    # second copy in another window: it is the other page of the centre,
+    # beside the image, and it is the SAME chart the tab measures into.
+    tab = dlg.tab_measure
+    stack = dlg.stack_centre
+    assert stack.count() == 2
+    assert dlg.view is stack.widget(0).layout().itemAt(0).widget()
+    assert tab.chart_series is stack.widget(1).layout().itemAt(0).widget()
+    # the switch drives the pages
+    dlg.show_curve()
+    assert stack.currentIndex() == 1
+    assert dlg.btn_page_curve.isChecked()
+    dlg.show_image()
+    assert stack.currentIndex() == 0
+    assert dlg.btn_page_image.isChecked()
+
+
+def test_a_click_on_the_curve_brings_it_to_the_front(dlg):
+    # "Show me this properly" now means the centre's curve page: no second
+    # copy in another window to disagree with it (V2).
+    import nightscribe.gui.chart_viewer as cv
+    seen = []
+    orig = cv.open_chart_widget
+    cv.open_chart_widget = lambda *a, **k: seen.append(1)
+    try:
+        tab = dlg.tab_measure
+        dlg.show_image()
+        tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
+                                "filter": "V", "source": "measure",
+                                "flags": []}]
+        tab.chart_series.enlarge_requested.emit()
+        assert dlg.stack_centre.currentIndex() == 1
+        assert seen == []           # no window, ever
+    finally:
+        cv.open_chart_widget = orig
+
+
+def test_the_curve_page_does_not_open_without_data(dlg):
+    dlg.show_image()
+    dlg.tab_measure._series_payload = []
+    dlg.tab_measure.chart_series.enlarge_requested.emit()
+    assert dlg.stack_centre.currentIndex() == 0
+
+
+def test_lightcurve_double_click_asks_for_the_big_view(dlg):
+    from PySide6.QtCore import Qt
+    seen = []
+    dlg.tab_measure.chart_series.enlarge_requested.connect(
+        lambda: seen.append(1))
+
+    class _Ev:
+        def button(self):
+            return Qt.LeftButton
+
+        def accept(self):
+            pass
+
+    dlg.tab_measure.chart_series.mouseDoubleClickEvent(_Ev())
+    assert seen == [1]
+
+
+def test_group_frames_quick_mirrors_advanced(dlg):
+    # the series block's quick knob and the Advanced… one are the same
+    # value in two places
+    tab = dlg.tab_measure
+    tab.spn_group_quick.setValue(5)
+    assert tab._advanced.spn_group_n.value() == 5
+    tab._advanced.spn_group_n.setValue(3)
+    assert tab.spn_group_quick.value() == 3
+
+
+def test_a_plain_click_on_the_curve_does_not_hide_the_image(dlg):
+    # A click on a point selects it; on the empty space it brings the curve
+    # to the front, which is where it already is when you are looking at it.
+    # What it must never do is open a second copy or move the page: the
+    # observer's place is not to be taken away by a click.
+    from PySide6.QtCore import QPointF
+    tab = dlg.tab_measure
+    tab._series_payload = [{"mjd": 1.0, "mag": 12.0, "err": 0.05,
+                            "filter": "V", "source": "measure",
+                            "flags": []}]
+    dlg.show_curve()
+    tab.chart_series.scene_clicked.emit(QPointF(0.0, 0.0))
+    assert dlg.stack_centre.currentIndex() == 1
+
+
+def test_a_failed_series_does_not_leave_the_tab_looking_hung(dlg):
+    # What the observer actually saw: a 142-frame run died at frame ~18 and
+    # the tab kept the progress bar frozen there, which reads as a hang.
+    # The failure was real and had a reason (a comparison star off the
+    # frame); the UI must say so and put itself back.
+    tab = dlg.tab_measure
+    tab.prg_series.setRange(0, 142)
+    tab.prg_series.setValue(18)
+    tab._on_series_failed("negative dimensions are not allowed")
+    assert tab.prg_series.value() == 0            # not frozen at 13 %
+    assert tab.btn_series.text() == tab._btn_series_label   # not "Cancel"
+    assert tab._series_worker is None
+    assert "negative dimensions" in tab.lbl_status.text()
+
+
+# ---------------- the panel follows the chart (issue report) ----------
+
+def test_the_panel_always_describes_the_chart_on_screen(dlg, qapp):
+    # Reported: "if I mark outliers the messages stack on the chart and do
+    # not update". The chart does not accumulate anything (it rebuilds its
+    # scene), but the PANEL was written once per run: marking outliers, or
+    # hiding the flagged points, left it describing a chart that was no
+    # longer there. It is rebuilt now — summary plus the chart's own notes —
+    # on every change, and a full rewrite cannot accumulate.
+    tab = dlg.tab_measure
+    tab._panel_summary = ["Serie: 3 puntos"]
+    tab.chart_series.set_data([
+        {"mjd": 60600.0, "mag": 12.34, "err": 0.01, "err_internal": 0.008,
+         "filter": "V", "source": "measure", "flags": ["cosmic"]},
+        {"mjd": 60601.0, "mag": 12.36, "err": 0.01, "err_internal": 0.008,
+         "filter": "V", "source": "measure", "flags": []}])
+    tab._render_panel()
+    before = tab.lbl_result.toPlainText()
+    assert "Serie: 3 puntos" in before
+    # hiding the flagged points changes what the chart does: the panel must
+    # say it WITHOUT a new run
+    tab.btn_series_hideflags.setChecked(True)
+    qapp.processEvents()
+    after = tab.lbl_result.toPlainText()
+    assert after != before
+    assert "Serie: 3 puntos" in after            # the summary is not lost
+    assert after.count("Serie: 3 puntos") == 1   # and it never stacks
+    tab.btn_series_hideflags.setChecked(False)
+    qapp.processEvents()
+    assert "Serie: 3 puntos" in tab.lbl_result.toPlainText()
+
+
+def test_the_result_box_has_room_and_a_scrollbar(dlg):
+    # Reported twice: the "Photometric series" messages needed more height
+    # and a scrollbar "just in case". The summary of a night with four
+    # flags, a per-night detrend and two warnings is LONG, and with wide
+    # system fonts the box was cramped (the observer asked for more height
+    # again: 150 -> 240 px).
+    from PySide6.QtCore import Qt
+    box = dlg.tab_measure.lbl_result
+    assert box.minimumHeight() >= 240
+    assert box.verticalScrollBarPolicy() != Qt.ScrollBarAlwaysOff
+    assert box.horizontalScrollBarPolicy() == Qt.ScrollBarAlwaysOff
+    assert box.isReadOnly()
+
+
+# ---------------- D: the visit's curve is not regenerated ------------
+
+def _visit_points(n=5):
+    return [{"mjd": 60600.0 + 0.01 * i, "mag": 12.34 + 0.004 * i,
+             "err": 0.01, "err_internal": 0.008, "mag_raw": -9.5,
+             "filter": "V", "flags": [], "source": "measure"}
+            for i in range(n)]
+
+
+def test_the_visit_s_curve_is_drawn_without_measuring_anything(dlg):
+    # The observer's ask: a light curve that was generated must not have to
+    # be generated again. Opening the visit draws what the project already
+    # has, read from the database: no frame is touched.
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(5), None)
+    assert len(tab.chart_series._points) == 5
+    assert tab._curve_from_visit is True
+    assert "curve" in tab.lbl_result.toPlainText().lower()
+    assert "5" in tab.lbl_status.text()
+    # the curve is on the chart, not measured: nothing claims a run
+    assert tab._series_result is None
+
+
+def test_measuring_again_replaces_the_visit_s_curve(dlg):
+    # The loaded curve is a starting point, not a lock: a real run replaces
+    # it (and the panel goes back to describing the run).
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(5), None)
+    assert tab._curve_from_visit
+    tab._series_result = object()          # a run landed
+    assert tab.load_visit_curve() == 0     # the visit's copy is not redrawn
+    tab._series_result = None
+
+
+def test_discarding_the_visit_s_curve_clears_it_and_says_what_it_did(dlg,
+                                                                    monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    tab = dlg.tab_measure
+    calls = []
+    tab.set_visit_curve_hooks(
+        lambda: _visit_points(4),
+        lambda: (calls.append(True), (2, 4))[1])
+    assert tab.chart_series._points
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.Yes))
+    tab._on_discard_curve()
+    assert calls == [True]                 # the project undid the runs
+    assert tab.chart_series._points == []  # the chart starts from scratch
+    assert tab._curve_from_visit is False
+    assert "2" in tab.lbl_status.text() and "4" in tab.lbl_status.text()
+
+
+def test_discarding_asks_first_and_a_no_is_a_no(dlg, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+    tab = dlg.tab_measure
+    removed = []
+    tab.set_visit_curve_hooks(lambda: _visit_points(3),
+                              lambda: (removed.append(True), (1, 3))[1])
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.No))
+    tab._on_discard_curve()
+    assert removed == []                   # nothing was touched
+    assert tab.chart_series._points       # and the curve is still there
+
+
+def test_a_visit_without_points_opens_with_an_empty_chart(dlg):
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: [], None)
+    assert tab.chart_series._points == []
+    assert tab._curve_from_visit is False
+
+
+def test_the_trend_is_on_by_default(dlg):
+    # The observer's ask: the trend is the first thing to read on a curve.
+    # It comes on (window 5) and the raw points stay on the chart: nothing
+    # is hidden, and the panel's notes say the line is a guide.
+    tab = dlg.tab_measure
+    assert tab.chk_series_mean.isChecked()
+    assert tab.spn_series_meanwin.value() == 5
+
+
+# ---------------- the series doors, and the trend that was ticked ------
+
+def test_every_button_of_the_row_lands_in_the_series_menu(dlg, qapp):
+    # Reported: the "discard the visit's curve" button came out broken and
+    # totally out of place. The panel moves the row's buttons into the
+    # "Series" menu from a list of NAMES, and the new button was not on the
+    # list: it stayed inside the row while the row itself was removed from
+    # the panel, so it had no layout to place it. The row is read now, not
+    # guessed, so a button added to the Designer file cannot be orphaned:
+    # this test reads the .ui itself, which is where the row is defined.
+    import re
+    import xml.etree.ElementTree as ET
+    from pathlib import Path
+    from PySide6.QtWidgets import QPushButton
+    ui = Path(__file__).parents[2] / "nightscribe" / "gui" / "ui" \
+        / "ufe_measure_tab.ui"
+    text = ui.read_text(encoding="utf-8")
+    row = re.search(r'<layout class="QHBoxLayout" name="row_series_out">'
+                    r'(.*?)</layout>', text, re.S)
+    from_row = re.findall(r'name="(btn_[\w]+)"', row.group(1))
+    assert from_row, "la fila del Designer tenía botones"
+    tab = dlg.tab_measure
+    panel = tab.btn_series_more.menu().actions()[0].defaultWidget()
+    in_menu = {w.objectName() for w in panel.findChildren(QPushButton)}
+    for name in from_row:
+        assert name in in_menu, name
+    assert "btn_series_discard" in in_menu          # the one that was lost
+    assert "btn_series_undo" in in_menu             # the one from the run row
+    # and the panel keeps only the doors and the action (the invariant is
+    # about where each button LIVES, not about whether it is on screen)
+    outside = {w.objectName() for w in tab.grp_series.findChildren(QPushButton)
+               if w.parentWidget() is not panel}
+    assert outside == {"btn_series_chart", "btn_series"}
+
+
+def test_the_trend_is_painted_when_the_curve_is_generated(dlg, qapp):
+    # Reported: "the mean is ticked but it is not painted when the curve is
+    # generated". The controls are wired to their slots, but a slot only
+    # fires when the control CHANGES: their initial state was never pushed,
+    # so a fresh series came out with no trend, no errors and no binning.
+    tab = dlg.tab_measure
+    assert tab.chk_series_mean.isChecked()           # on by default
+    tab._series_result = None
+    tab._series_payload = list(_visit_points(12))
+    tab._draw_series(tab._series_result.points if tab._series_result else
+                     [])
+    # with a payload, drawing it must leave the chart saying what the
+    # controls say
+    tab._series_payload = list(_visit_points(12))
+    tab.chart_series.set_data(tab._series_payload)
+    tab._apply_chart_presentation()
+    assert tab.chart_series._mean_window == tab.spn_series_meanwin.value()
+    assert tab.chart_series._mean_window >= 2
+
+
+# ---------------- U5: the doors and what is inside them ---------------
+
+def test_the_export_door_follows_the_measurement(dlg):
+    # A door that opens onto two grey buttons is a lie, and one that stays
+    # lit with nothing to export is a trap: the door and its two contents
+    # are switched by ONE place, so they cannot drift apart.
+    tab = dlg.tab_measure
+    assert not tab.btn_export_more.isEnabled()      # nothing measured yet
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert tab.btn_export_more.isEnabled()
+    assert tab.btn_csv.isEnabled() and tab.btn_eff.isEnabled()
+    # a plate with no target measured takes it back
+    dlg.state.load(dlg.state.path)
+    assert not tab.btn_export_more.isEnabled()
+    assert not tab.btn_csv.isEnabled()
+
+
+def test_the_buttons_inside_the_doors_still_do_what_they_did(dlg, tmp_path,
+                                                              monkeypatch):
+    # The doors are a move, not a rewrite: clicking the CSV inside the
+    # "Export" panel writes the same file the old button wrote, and the
+    # reset inside "Reset" reaches the same handler.
+    from PySide6.QtWidgets import QFileDialog
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    out = tmp_path / "medida.csv"
+    monkeypatch.setattr(QFileDialog, "getSaveFileName",
+                        staticmethod(lambda *a, **k: (str(out), "")))
+    panel = tab.btn_export_more.menu().actions()[0].defaultWidget()
+    csv = [w for w in panel.findChildren(type(tab.btn_csv))
+           if w.objectName() == "btn_csv"][0]
+    csv.click()
+    assert out.exists() and out.read_text().count("\n") >= 3
+    # and the reset door's buttons are wired to their own handlers
+    seen = []
+    monkeypatch.setattr(tab, "_on_reset_state",
+                        lambda: seen.append("state"))
+    monkeypatch.setattr(tab, "_on_reset_points",
+                        lambda: seen.append("points"))
+    tab.btn_reset_state.click()
+    tab.btn_reset_points.click()
+    assert seen == ["state", "points"]
+
+
+# ---------------- the chart's PNG exports (reported) ------------------
+
+def test_the_visit_s_curve_can_be_exported_as_a_png(dlg, tmp_path,
+                                                    monkeypatch):
+    # Reported: "the PNG export of the chart does not work, the save dialog
+    # does not even appear". A curve loaded from the visit has no run of this
+    # session behind it, and the export demanded one: it returned BEFORE
+    # opening the dialog. The button saves the chart IN THE VISIT, which is
+    # exactly the curve on screen.
+    from PySide6.QtWidgets import QFileDialog
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(6), None)
+    assert tab._series_result is None and tab._series_payload
+    out = tmp_path / "curva.png"
+    asked = []
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName",
+        staticmethod(lambda *a, **k: (asked.append(True), (str(out), ""))[1]))
+    tab._on_series_sci()
+    assert asked                              # the dialog was reached
+    assert out.exists() and out.stat().st_size > 0
+    assert "written" in tab.lbl_status.text().lower()
+
+
+def test_the_night_figures_use_what_the_visit_s_curve_carries(
+        dlg, tmp_path, monkeypatch):
+    # The airmass and the measured position travel with the point now, so a
+    # curve read back from the database draws its own night without
+    # measuring anything again.
+    from nightscribe.viz import night_view
+    tab = dlg.tab_measure
+    points = [dict(p, airmass=1.2 + 0.01 * i, x=800.0 + i, y=600.0 + i)
+              for i, p in enumerate(_visit_points(6))]
+    tab.set_visit_curve_hooks(lambda: points, None)
+    written = []
+    monkeypatch.setattr(
+        night_view, "draw_airmass",
+        lambda pts, out=None, **k: (written.append("air"), out)[1])
+    monkeypatch.setattr(
+        night_view, "draw_drift",
+        lambda pts, out=None, **k: (written.append("drift"), out)[1])
+    monkeypatch.setattr("nightscribe.gui.chart_viewer.open_chart",
+                        lambda *a, **k: None)
+    tab._on_series_night()
+    assert written == ["air", "drift"]
+    assert "Night figures written" in tab.lbl_status.text()
+
+
+def test_the_night_figures_say_what_an_old_curve_cannot_give(dlg,
+                                                             monkeypatch):
+    # A curve measured before the app stored them carries neither the
+    # airmass nor the position: the button says it instead of going quiet.
+    from nightscribe.viz import night_view
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(lambda: _visit_points(4), None)
+    called = []
+    monkeypatch.setattr(night_view, "draw_airmass",
+                        lambda *a, **k: called.append("air"))
+    monkeypatch.setattr(night_view, "draw_drift",
+                        lambda *a, **k: called.append("drift"))
+    tab._on_series_night()
+    assert called == []
+    assert "neither the airmass nor the measured position" \
+        in tab.lbl_status.text()
+
+
+# ---------------- the band's magnitude comes from the curve -----------
+
+def test_the_band_takes_the_measured_point_of_this_frame(dlg):
+    # Reported: "the colour code for the photometric measurements in the top
+    # band is not being respected". Part of it was this: with a series
+    # measured (the normal flow) the band kept showing the CATALOGUE
+    # magnitude, in white, because it only read a single-plate measurement.
+    # The point of the curve IS the measurement of this plate.
+    tab = dlg.tab_measure
+    frame = str(dlg.state.path)
+    tab._series_payload = [
+        {"mjd": 60000.0, "mag": 12.0, "err": 0.3, "filter": "V",
+         "source": "measure", "path": "/otra/toma.fit", "comps": 5,
+         "flags": []},
+        {"mjd": 60001.0, "mag": 12.44, "err": 0.04, "filter": "V",
+         "source": "measure", "path": frame, "comps": 5, "flags": []}]
+    point = tab.series_point_for(frame)
+    assert point and point["mag"] == 12.44        # the one of THIS frame
+    # by time when the curve carries no paths (loaded from the database)
+    tab._series_payload = [{"mjd": 60001.0, "mag": 12.5, "err": 0.03,
+                            "filter": "V", "source": "measure",
+                            "comps": 4, "flags": []}]
+    assert tab.series_point_for(None, 60001.0, 40.0)["mag"] == 12.5
+    assert tab.series_point_for(None, 60005.0, 40.0) is None
+    # the detrended twin of a point is not "the measured magnitude"
+    tab._series_payload = [{"mjd": 60001.0, "mag": 12.5, "err": 0.03,
+                            "filter": "V", "source": "detrend",
+                            "comps": 4, "flags": []}]
+    assert tab.series_point_for(None, 60001.0, 40.0) is None
+
+
+def test_every_control_that_affects_the_measurement_measures_again(
+        dlg, monkeypatch):
+    # Reported: "if I measure again, changing the band for instance, the
+    # magnitude does not update". THREE controls were not wired (the band,
+    # the saturation ceiling and the sequence), and that is how such a thing
+    # appears: silently. This walks EVERY control that is part of the recipe,
+    # changes it and demands the measurement to run again, so a new knob
+    # cannot be left out without a red test.
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert tab._last is not None
+    runs = []
+    real = phot.measure_plate
+
+    def spy(*a, **k):
+        runs.append(True)
+        return real(*a, **k)
+    monkeypatch.setattr(phot, "measure_plate", spy)
+
+    def changed(label, act):
+        runs.clear()
+        act()
+        assert runs, label
+
+    if tab.cmb_band.count() < 2:
+        tab.cmb_band.addItem("R")
+    changed("band", lambda: tab.cmb_band.setCurrentIndex(1))
+    changed("aperture", lambda: tab.spn_rap.setValue(
+        tab.spn_rap.value() + 1.0))
+    changed("sky model", lambda: tab.cmb_sky.setCurrentIndex(
+        0 if tab.cmb_sky.currentIndex() else 1))
+    changed("sigma clip", tab.chk_sigmaclip.toggle)
+    changed("colour term", tab.chk_color.toggle)
+    changed("target B-V", lambda: tab.spn_target_bv.setValue(0.75))
+    changed("saturation ceiling", lambda: tab.spn_saturate.setValue(100000.0))
+
+    def edit_the_sequence():
+        # a real edit (the kind of a comp): it leaves the zero point. The
+        # table is filled from the sequence first, because the helper above
+        # sets the entries directly
+        compare = dlg.tab_compare
+        compare._reload_table()
+        combo = compare.table.cellWidget(0, 1)
+        combo.setCurrentIndex(1 if combo.currentIndex() == 0 else 0)
+    changed("the sequence", edit_the_sequence)
+    changed("another click on the plate", lambda: _click(
+        dlg, *dlg._test_target))
+
+
+def test_the_panel_paints_the_magnitude_with_the_colour_code(dlg):
+    # The colour code is not only the plate's band: the measurement's panel
+    # wears it too, from the same rule and the same palette, so the two
+    # cannot disagree about what the measurement says.
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.viz import palette
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    assert tab._last is not None
+    role = ca.magnitude_role(tab.measured_facts())
+    assert role in (ca.ROLE_MAG, ca.ROLE_MAG_FAIR, ca.ROLE_MAG_DOUBT)
+    assert palette.MEASURE_COLOURS[role] in tab.lbl_result.toHtml()
+    # and the panel's PLAIN text is what it always was (what the observer
+    # copies and the tests read)
+    assert "Magnitude:" in tab.lbl_result.toPlainText()
+    assert "<span" not in tab.lbl_result.toPlainText()
+
+
+def test_the_panel_paints_a_catalogue_magnitude_in_white(dlg):
+    # The cross-matched source's magnitude is NOT a measurement of this
+    # plate: it wears the catalogue's white, the same role the band gives it.
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.viz import palette
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab._last["match"] = ({"id": "J1234", "catalog": "Gaia EDR3",
+                           "mag": 12.4, "band": "G",
+                           "bands": [{"label": "G", "value": 12.4}]}, 1.2)
+    tab._fill_panel(tab._last["band"], 5, 4, {}, False, None)
+    html = tab.lbl_result.toHtml()
+    assert palette.MEASURE_COLOURS[ca.ROLE_MAG_CAT] in html
+
+
+def test_saturation_box_overrides_and_shows_what_auto_resolves(dlg,
+                                                               monkeypatch):
+    # one knob for measure and series: a positive value wins, 0 means the
+    # config (SATURATE card then ccd_saturate), and the line at its right
+    # says what 0 resolves to, so it never looks like it ignores the config
+    from nightscribe import config as cfgmod
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    seen = []
+    real = phot.measure_plate
+    monkeypatch.setattr(
+        phot, "measure_plate",
+        lambda image, cfg: (seen.append(cfg), real(image, cfg))[1])
+    # auto: the box is 0 and the config has no ccd_saturate
+    tab.spn_saturate.setValue(0.0)
+    _click(dlg, *dlg._test_target)
+    assert seen[-1].site_saturate is None
+    assert "auto" in tab._advanced.lbl_saturate_auto.text()
+    # the hint names the config value when there is one
+    monkeypatch.setitem(cfgmod.config._data, "ccd_saturate", 60000)
+    tab._update_saturate_hint()
+    assert "60000" in tab._advanced.lbl_saturate_auto.text()
+    # the override wins, for a single measurement too
+    tab.spn_saturate.setValue(45000.0)
+    _click(dlg, *dlg._test_target)
+    assert seen[-1].site_saturate == 45000.0
+    assert "override" in tab._advanced.lbl_saturate_auto.text()
+
+
+# ------------- one night, one curve: the passes door (asked) ----------
+#
+# The observer's own question: "why do we keep the old passes if there is
+# then no way to get them back?". A visit can hold several series runs and
+# only ONE is drawn (drawing them all at once was the reported corruption);
+# this door is where they are seen and where the drawn one is chosen.
+
+def _passes(curve_id=2, undone_empty=0):
+    # @args: curve_id - which pass the visit says it is showing,
+    #        undone_empty - the undone passes the host counted instead of
+    #        listing (they have no points left)
+    # @return: the payload the host hands the tab
+    return {"undone_empty": undone_empty, "runs": [
+        {"id": 1, "created": 1790750000.0, "band": "V", "points": 10,
+         "mjd0": 60297.77, "mjd1": 60297.79, "status": "complete"},
+        {"id": 2, "created": 1790751000.0, "band": "G", "points": 5,
+         "mjd0": 60297.77, "mjd1": 60297.79, "status": "complete"}],
+        "curve_run_id": curve_id}
+
+
+def test_the_panel_says_which_pass_is_drawn_and_that_others_exist(dlg):
+    # Nothing is hidden: the curve that came from the project says which
+    # pass it is AND that the visit holds others that are not drawn, naming
+    # the door where they are chosen.
+    tab = dlg.tab_measure
+    dlg.set_visit_passes_hooks(lambda: _passes(2), lambda run_id: None)
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(5), "zp_mode": "catalog"}, None)
+    panel = tab.lbl_result.toPlainText()
+    assert "earlier pass" in panel
+    assert "Passes of this visit" in panel
+    assert "10" in panel                       # the points of the other one
+
+
+def test_a_visit_with_one_pass_keeps_the_plain_line(dlg):
+    # With a single pass there is nothing to choose and nothing to warn
+    # about: the panel says what it always said.
+    tab = dlg.tab_measure
+    payload = _passes(1)
+    payload["runs"] = payload["runs"][:1]
+    dlg.set_visit_passes_hooks(lambda: payload, lambda run_id: None)
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(5), "zp_mode": "catalog"}, None)
+    panel = tab.lbl_result.toPlainText()
+    assert "earlier pass" not in panel
+    assert "already measured" in panel
+
+
+def test_the_passes_door_lists_them_and_going_back_redraws(dlg):
+    tab = dlg.tab_measure
+    chosen = []
+    # what the host answers with: the pass the visit is showing. The test
+    # moves it when it presses "Make this the curve", and the chart
+    # following it is the proof that the reload happened.
+    state = {"n": 5}
+
+    def load():
+        return {"points": _visit_points(state["n"]), "zp_mode": "catalog"}
+
+    dlg.set_visit_passes_hooks(lambda: _passes(2), chosen.append)
+    tab.set_visit_curve_hooks(load, None)
+    tab.load_visit_curve()
+    assert len(tab.chart_series._points) == 5
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert door.tbl_passes.rowCount() == 2
+    assert "The chart is showing" in door.lbl_passes_shown.text()
+    assert door.lbl_passes_trail.text() == ""      # nothing hidden
+    assert "the curve" in door.tbl_passes.item(1, 4).text()
+    assert door.btn_passes_use.isEnabled() is False   # row 1 IS the curve
+    door.tbl_passes.selectRow(0)
+    assert door.btn_passes_use.isEnabled() is True
+    state["n"] = 2                              # the pass it goes back to
+    door.btn_passes_use.click()
+    assert chosen == [1]                        # the visit was told
+    assert len(tab.chart_series._points) == 2   # and the chart followed
+    door.close()
+
+
+def test_the_door_counts_the_undone_passes_instead_of_listing_them(dlg):
+    # A real visit had 26 undone passes against 4 that mattered. They are
+    # counted, not listed, and the window says so: the trail keeps them and
+    # nothing was deleted.
+    tab = dlg.tab_measure
+    dlg.set_visit_passes_hooks(lambda: _passes(2, undone_empty=26),
+                               lambda run_id: None)
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert door.tbl_passes.rowCount() == 2          # only the ones with data
+    assert "26" in door.lbl_passes_trail.text()
+    assert "nothing was deleted" in door.lbl_passes_trail.text()
+    door.close()
+
+
+def test_undoing_a_pass_from_the_door_says_what_it_did(dlg):
+    tab = dlg.tab_measure
+    undone = []
+    dlg.set_visit_passes_hooks(lambda: _passes(2), lambda run_id: None)
+    dlg.set_run_undo_hook(lambda run_id: (undone.append(run_id), 7)[1])
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(3), "zp_mode": "catalog"}, None)
+    tab.load_visit_curve()
+    tab._undo_pass(2)
+    assert undone == [2]
+    assert "7" in tab.lbl_status.text()
+
+
+def test_the_door_needs_a_visit_and_says_so(dlg):
+    # An ad-hoc open (the Tools menu) has no visit: the door says why
+    # instead of showing an empty window.
+    tab = dlg.tab_measure
+    tab._open_passes()
+    assert "does not belong to a visit" in tab.lbl_status.text()
+    assert tab._passes_dlg.isVisible() is False
+
+
+def test_undoing_the_last_pass_brings_the_previous_one_back(dlg):
+    # The reason the visit remembers its pass: after undoing the run, the
+    # chart has to show the pass before it (a visit with a single pass
+    # simply ends up empty).
+    tab = dlg.tab_measure
+    state = {"n": 4}
+
+    def load():
+        return {"points": _visit_points(state["n"]), "zp_mode": "catalog"}
+
+    tab.set_visit_curve_hooks(load, None)
+    dlg.set_run_undo_hook(lambda run_id: 4)
+    assert len(tab.chart_series._points) == 4
+    state["n"] = 2                       # the pass before the undone one
+    tab._series_run_id = 9
+    tab._on_series_undo()
+    assert len(tab.chart_series._points) == 2      # the pass before it
+    assert tab._series_result is None
+    assert tab.btn_series_exoclock.isEnabled() is False
+
+
+def test_the_reloaded_curve_keeps_the_axis_it_was_measured_on(dlg):
+    # A relative run already gives differences: the chart has to come back
+    # on the differential axis it was drawn on, or the reload would show
+    # the same numbers on another scale.
+    from nightscribe.gui.widgets.lightcurve_widget import (MAG_CALIBRATED,
+                                                           MAG_DIFFERENTIAL)
+    tab = dlg.tab_measure
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(4), "zp_mode": "relative"}, None)
+    assert tab.chart_series._mag_mode == MAG_DIFFERENTIAL
+    tab._reload_visit_curve()
+    tab._series_result = None
+    tab.set_visit_curve_hooks(
+        lambda: {"points": _visit_points(4), "zp_mode": "catalog"}, None)
+    assert tab.chart_series._mag_mode == MAG_CALIBRATED
+
+
+def test_centre_nudge_moves_the_measurement(dlg, monkeypatch):
+    # like the blink's alignment: 0.5 px steps move the measurement centre
+    # and the point is measured again from there
+    from nightscribe.core import photometry as phot
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    seen = []
+    real = phot.measure_plate
+    monkeypatch.setattr(
+        phot, "measure_plate",
+        lambda image, cfg: (seen.append(cfg.target_xy), real(image, cfg))[1])
+    _click(dlg, *dlg._test_target)
+    click = tab._last["click"]
+    assert seen[-1] == pytest.approx(click)
+    tab._nudge_step(0.1, 0.0)
+    assert seen[-1][0] == pytest.approx(click[0] + 0.1)
+    assert seen[-1][1] == pytest.approx(click[1])
+    assert tab.lbl_nudge.text() == "(+0.1, +0.0)"
+    # the reset button goes back to the clicked centre and re-measures
+    tab._nudge_step(0.0, -0.1)
+    tab._on_nudge_reset()
+    assert tab._nudge == [0.0, 0.0]
+    assert seen[-1] == pytest.approx(click)
+    # a new click starts at (0, 0) too
+    tab._nudge_step(0.1, 0.1)
+    _click(dlg, *dlg._test_target)
+    assert tab._nudge == [0.0, 0.0]
+    assert seen[-1] == pytest.approx(click)
+
+
+def test_manual_centre_pins_the_measurement(dlg):
+    # "Manual centre": the measurement sits EXACTLY where the observer puts
+    # it, with no centroid search, for a very faint SN the algorithm would
+    # drag to a neighbour
+    tab = dlg.tab_measure
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab.chk_manual_centre.setChecked(True)
+    tab._nudge_step(0.1, 0.0)
+    click = tab._last["click"]
+    assert tab._last["col"] == pytest.approx(click[0] + 0.1, abs=1e-6)
+    assert tab._last["row"] == pytest.approx(click[1], abs=1e-6)
+    assert "manual centre" in tab.lbl_result.toPlainText()
+    # and the mode survives a capture/restore of the plate state
+    st = tab.capture_state()
+    assert st["manual_centre"] is True
+    tab.chk_manual_centre.setChecked(False)
+    tab.apply_state(st)
+    assert tab.chk_manual_centre.isChecked() is True
+
+
+# ------------- the multi-night scope (asked 2026-09-30) ---------------
+
+def test_the_scope_selector_is_always_there_and_explains_itself(dlg):
+    # "En las secuencias multi-noche se han de cargar las imágenes de todas
+    # las visitas": the scope is offered when the project really has more
+    # than one visit with frames (the host says how many).
+    #
+    # And it is ALWAYS in the block, on its own row: the observer asked
+    # "no veo lo del modo multinoche, ¿dónde está?", so with one visit it
+    # stays visible and DISABLED, saying why, instead of disappearing (a
+    # control that hides teaches nobody that the feature exists).
+    tab = dlg.tab_measure
+
+    def ctx(scope="visit"):
+        return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
+                "visits": 1, "scope": scope}
+
+    dlg.set_series_hook(ctx)
+    assert not tab.cmb_series_scope.isHidden()
+    assert not tab.lbl_series_scope.isHidden()
+    assert not tab.cmb_series_scope.isEnabled()
+    assert "one visit with frames" in tab.cmb_series_scope.toolTip()
+    # on its own row, and wide enough to read its options whole
+    row = tab.cmb_series_scope.parent().layout()
+    assert row is not None and row.indexOf(tab.lbl_series_frames) < 0
+    need = tab.cmb_series_scope.fontMetrics().horizontalAdvance("all visits")
+    assert tab.cmb_series_scope.minimumSizeHint().width() >= need
+
+    def ctx2(scope="visit"):
+        return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
+                "visits": 3, "scope": scope}
+
+    dlg.set_series_hook(ctx2)
+    assert tab.cmb_series_scope.isEnabled()
+    assert "all the visits" in tab.cmb_series_scope.toolTip().lower()
+
+
+def test_the_multi_night_scope_steps_aside_live_and_draws_the_project(dlg):
+    # With «all visits» the frames come from every night: live mode watches
+    # ONE folder, so it is turned off and disabled SAYING WHY, discarding is
+    # per visit (there is no single night to undo) and the chart reloads the
+    # project's curve.
+    tab = dlg.tab_measure
+
+    def ctx(scope="visit"):
+        return {"pid": 1, "session_id": 2, "paths": ["/tmp/a.fits"],
+                "visits": 2, "nights": 2, "scope": scope}
+
+    dlg.set_series_hook(ctx)
+    dlg.set_visit_curve_hooks(
+        lambda scope="visit": {
+            "points": _visit_points(5 if scope == "project" else 2),
+            "zp_mode": "catalog"}, None)
+    tab.cmb_series_scope.setCurrentIndex(
+        tab.cmb_series_scope.findData("project"))
+    assert not tab.chk_series_live.isEnabled()
+    assert "one visit" in tab.chk_series_live.toolTip().lower()
+    assert len(tab.chart_series._points) == 5      # the project's curve
+    assert not tab.btn_series_discard.isEnabled()
+    assert "per visit" in tab.btn_series_discard.toolTip()
+    # and back: the visit's own curve, live offered again
+    tab.cmb_series_scope.setCurrentIndex(0)
+    assert tab.chk_series_live.isEnabled()
+    assert len(tab.chart_series._points) == 2
+
+
+def test_the_passes_door_says_when_a_night_belongs_to_a_pass(dlg):
+    # A run of a multi-night pass says so: that is what "undo this pass"
+    # will take with it.
+    tab = dlg.tab_measure
+    payload = _passes(2)
+    payload["runs"][1]["cfg"] = {"series": {"pass": {"group": "abc",
+                                                     "nights": 3}}}
+    dlg.set_visit_passes_hooks(lambda: payload, lambda run_id: None)
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert "3-night pass" in door.tbl_passes.item(1, 4).text()
+    assert "3-night pass" not in door.tbl_passes.item(0, 4).text()
+    door.close()
+
+
+def test_manual_centre_dialog_follows_the_checkbox(dlg):
+    # the tab keeps only the checkbox; the pad lives in its own non-modal
+    # window, opened by checking and closed by unchecking
+    tab = dlg.tab_measure
+    assert not tab._centre.isVisible()
+    assert not tab._centre.isModal()
+    tab.chk_manual_centre.setChecked(True)
+    assert tab._centre.isVisible()
+    # the arrows live there now and still move the measurement centre
+    _sequence(dlg, dlg._test_comps)
+    _click(dlg, *dlg._test_target)
+    tab._centre.btn_right.click()
+    assert tab._nudge[0] == pytest.approx(0.1)
+    tab.chk_manual_centre.setChecked(False)
+    assert not tab._centre.isVisible()
+
+
+def test_the_block_header_is_never_cut(dlg, qapp):
+    # Reported: "haz más grande la caja de texto (más altura) del grupo, la
+    # que está al principio". The header of the block is a word-wrapped
+    # label, and Qt does not always ask for the height its text needs (the
+    # sizeHint is computed for a width that changes later: measured, 54 px
+    # for a text of four lines, so the last one came out half cut). The
+    # block refits it at its REAL width.
+    tab = dlg.tab_measure
+    dlg.set_series_hook(lambda: {"pid": 1, "session_id": 2,
+                                 "paths": ["/tmp/a.fits"], "visits": 1})
+    qapp.processEvents()
+    lbl = tab.lbl_series_hint
+    assert lbl.isVisible()
+    assert lbl.width() >= 50
+    assert lbl.height() >= lbl.heightForWidth(lbl.width())
+
+
+def test_the_night_figures_work_with_a_project_behind_them(dlg, tmp_path,
+                                                           monkeypatch):
+    # Reported: "el botón Night Conditions (PNG) no hace nada". With a VISIT
+    # context (a project behind the editor, which is the normal case) the
+    # handler called `project.get(db, pid)` and **`db` does not exist in this
+    # module**: the slot raised a NameError, Qt swallowed it and nothing
+    # happened at all (no figure, no message). The test above passed because
+    # its context had no pid, so the broken branch was never walked.
+    #
+    # The tab asks the HOST where to write now, like its sibling export does.
+    from nightscribe.viz import night_view
+    tab = dlg.tab_measure
+    dlg.set_series_hook(lambda scope="visit": {"pid": 7, "session_id": 2,
+                                               "paths": ["/tmp/a.fits"]})
+    dlg.set_export_folder_hook(lambda: str(tmp_path))
+    points = [dict(p, airmass=1.2 + 0.01 * i, x=800.0 + i, y=600.0 + i)
+              for i, p in enumerate(_visit_points(6))]
+    tab.set_visit_curve_hooks(lambda: points, None)
+    written = []
+    monkeypatch.setattr(
+        night_view, "draw_airmass",
+        lambda pts, out=None, **k: (written.append(out), out)[1])
+    monkeypatch.setattr(
+        night_view, "draw_drift",
+        lambda pts, out=None, **k: (written.append(out), out)[1])
+    monkeypatch.setattr("nightscribe.gui.chart_viewer.open_chart",
+                        lambda *a, **k: None)
+    tab._on_series_night()                     # must not raise
+    assert len(written) == 2                   # the two figures, not one
+    assert all(str(tmp_path) in str(out) for out in written)
+    assert "Night figures written" in tab.lbl_status.text()
+
+
+def test_the_passes_door_opens_with_room_to_read_it(dlg):
+    # Reported: "ajusta el tamaño de Passes of this visit, que al abrirlo
+    # apenas se ve nada". Measured with real data: 533 x 434, a table of
+    # 511 x 174 and a sizeHint of 660 wide, so the state column (which says
+    # "complete · the curve · part of a 3-night pass") fell outside the
+    # window and the useful rows were the ones you had to scroll to.
+    tab = dlg.tab_measure
+    dlg.set_visit_passes_hooks(lambda: _passes(2), lambda run_id: None)
+    tab._open_passes()
+    door = tab._passes_dlg
+    assert door.width() >= 880
+    assert door.tbl_passes.height() >= 200
+    assert door.tbl_passes.horizontalHeader().stretchLastSection()
+    door.close()

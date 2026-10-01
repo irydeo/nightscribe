@@ -55,7 +55,7 @@ def test_migration_v3_to_current_preserves_projects(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     # project survived
     row = db.execute(
         "SELECT kind, object_name FROM projects WHERE id=1").fetchone()
@@ -111,7 +111,7 @@ def test_migration_v9_moves_session_images_into_the_registry(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     row = db.execute(
         "SELECT path, kind, session_id, meta FROM project_files"
         " WHERE project_id=1").fetchone()
@@ -146,7 +146,7 @@ def test_migration_v5_is_idempotent(tmp_path):
 
     Database(str(file))  # 3 -> current
     db = Database(str(file))  # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
 
 
 # ---------------- sessions CRUD ----------------
@@ -300,7 +300,7 @@ def test_migration_v10_adds_the_pin_column(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(project_sessions)").fetchall()}
     assert "pinned" in cols
@@ -333,20 +333,23 @@ def test_migration_v10_gains_the_plate_link(tmp_path):
     db.close()
 
     db = Database(str(f))           # replays the v11 migration
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(photometry_points)").fetchall()}
     assert "file_id" in cols
     idx = {r[1] for r in db.execute(
         "PRAGMA index_list(photometry_points)").fetchall()}
     assert "idx_photo_points_file" in idx
-    assert db.execute("SELECT file_id FROM photometry_points").fetchone()[0] is None
+    row = db.execute("SELECT file_id FROM photometry_points").fetchone()
+    assert row[0] is None
     # the link is a real FK with the detach-on-plate-delete rule: the
     # point survives, its file_id simply goes NULL
     db.execute("DELETE FROM project_files WHERE id=?", (fid,))
     db.commit()
-    assert db.execute("SELECT COUNT(*) FROM photometry_points").fetchone()[0] == 1
-    assert db.execute("SELECT file_id FROM photometry_points").fetchone()[0] is None
+    row = db.execute("SELECT COUNT(*) FROM photometry_points").fetchone()
+    assert row[0] == 1
+    row = db.execute("SELECT file_id FROM photometry_points").fetchone()
+    assert row[0] is None
     db.close()
 
 
@@ -390,3 +393,302 @@ def test_delete_points_only_for_its_plate(tmp_db):
     assert followup.point_by_id(tmp_db, pid) is not None
     assert followup.delete_point(tmp_db, pid) is True
     assert followup.point_by_id(tmp_db, pid) is None
+
+
+# ---------------- the curve a visit holds (D) -------------------------
+
+def test_the_visit_knows_the_curve_it_holds(tmp_path):
+    # The curve of a visit is what the SERIES wrote there: a hand-entered
+    # or survey point in the same visit is context, not the measurement.
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu, project as proj
+    db = Database(str(tmp_path / "t.db"))
+    pid = proj.create(db, "variable", "V0526 Per")["id"]
+    sid = fu.create_session(db, pid, obs_date="2026-09-20")
+    run = fu.create_run(db, session_id=sid, cfg={"series": {"band": "V"}})
+    fu.add_points(db, [
+        {"project_id": pid, "session_id": sid, "mjd": 60000.10,
+         "filter": "V", "mag": 12.34, "err": 0.01, "err_internal": 0.005,
+         "mag_raw": -9.5, "source": "measure", "flags": [], "run_id": run},
+        {"project_id": pid, "session_id": sid, "mjd": 60000.11,
+         "filter": "V", "mag": 12.35, "err": 0.01, "err_internal": 0.005,
+         "mag_raw": -9.4, "source": "measure", "flags": [], "run_id": run},
+        {"project_id": pid, "session_id": sid, "mjd": 60000.12,
+         "filter": "V", "mag": 15.0, "err": 0.2, "source": "manual"}])
+    got = fu.points_for_session(db, sid)
+    assert [round(p["mag"], 2) for p in got] == [12.34, 12.35]     # mjd order
+    assert all(p["run_id"] == run for p in got)
+    # everything is still there for whoever asks for it
+    assert len(fu.points_for_session(db, sid, series_only=False)) == 3
+    assert len(fu.runs_for_session(db, sid)) == 1
+
+
+def test_discarding_the_curve_undoes_its_runs_and_leaves_the_trail(tmp_path):
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu, project as proj
+    db = Database(str(tmp_path / "t.db"))
+    pid = proj.create(db, "variable", "V0526 Per")["id"]
+    sid = fu.create_session(db, pid, obs_date="2026-09-20")
+    runs = []
+    for k in range(2):
+        run = fu.create_run(db, session_id=sid, cfg={"series": {"n": k}})
+        runs.append(run)
+        fu.add_points(db, [
+            {"project_id": pid, "session_id": sid, "mjd": 60000.1 + k,
+             "filter": "V", "mag": 12.3, "err": 0.01, "source": "measure",
+             "flags": [], "run_id": run}])
+    fu.add_point(db, pid, 60000.9, "V", 12.0, source="manual",
+                 session_id=sid)
+    undone, removed = fu.discard_session_curve(db, sid)
+    assert (undone, removed) == (2, 2)
+    assert fu.points_for_session(db, sid) == []          # the curve is gone
+    # the run rows stay, marked: the trail is never silent
+    assert [r["status"] for r in fu.runs_for_session(db, sid)] == \
+        ["undone", "undone"]
+    # and the hand-entered point was never part of the curve
+    assert len(fu.points_for_session(db, sid, series_only=False)) == 1
+
+
+# ---------------- v14: the night travels with the point ---------------
+
+def test_migration_v14_adds_the_night_fields(tmp_path):
+    # A database from before v14 has points without airmass or position:
+    # the migration adds them, and the guard is idempotent (the v9-v13
+    # pattern) because a hand-seeded old database may not have the table.
+    import sqlite3
+    from nightscribe.core.db import Database
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.execute("""CREATE TABLE photometry_points (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER,
+        session_id INTEGER, mjd REAL, filter TEXT, mag REAL, err REAL,
+        source TEXT, file_id INTEGER, mag_raw REAL, flags TEXT,
+        run_id INTEGER, err_internal REAL)""")
+    conn.execute("INSERT INTO photometry_points (mjd, mag)"
+                 " VALUES (60000.0, 12.0)")
+    conn.execute("PRAGMA user_version = 13")
+    conn.commit()
+    conn.close()
+    db = Database(path)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(photometry_points)")}
+    assert {"airmass", "x", "y", "fwhm", "sky"} <= cols
+    # the old point is still there, with its new fields empty
+    row = db.execute(
+        "SELECT mjd, airmass, x FROM photometry_points").fetchone()
+    assert row[0] == 60000.0 and row[1] is None and row[2] is None
+    db.close()
+
+
+def test_the_night_fields_survive_a_write_and_a_read(tmp_path):
+    # The whole point: a curve read back from the database (a visit's own
+    # curve) brings the airmass and the measured position, so its night
+    # figures can be drawn months later without measuring again.
+    import pytest
+    from nightscribe.core.db import Database
+    from nightscribe.core import followup as fu
+    db = Database(tmp_path / "p.db")
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    sid = fu.create_session(db, pid, "2026-09-30")
+    ids = fu.add_points(db, [{
+        "project_id": pid, "session_id": sid, "mjd": 60000.25,
+        "filter": "V", "mag": 12.34, "err": 0.05, "source": "measure",
+        "airmass": 1.42, "x": 831.5, "y": 620.25, "fwhm": 3.1, "sky": 420.0}])
+    assert ids
+    back = fu.points_for_session(db, sid)
+    assert len(back) == 1
+    assert back[0]["airmass"] == pytest.approx(1.42)
+    assert back[0]["x"] == pytest.approx(831.5)
+    assert back[0]["y"] == pytest.approx(620.25)
+    assert back[0]["fwhm"] == pytest.approx(3.1)
+    assert back[0]["sky"] == pytest.approx(420.0)
+    db.close()
+
+
+# ------------- one night, one curve (reported 2026-09-30) -------------
+#
+# The chart of a visit drew EVERY run of the visit at once, so a night
+# measured four times came back as 976 points at two levels joined by a
+# zigzag, while the live chart had drawn one run. These tests pin the rule:
+# the curve of a night is ONE run (the visit's choice, else the newest),
+# and every other run stays in the database for the trail and the undo.
+
+def _run_with_points(db, pid, sid, run, mags, mjd0=60000.1):
+    fu = followup
+    fu.add_points(db, [
+        {"project_id": pid, "session_id": sid, "mjd": mjd0 + i,
+         "filter": "V", "mag": m, "err": 0.01, "source": "measure",
+         "flags": [], "run_id": run} for i, m in enumerate(mags)])
+    return run
+
+
+def test_a_visit_measured_twice_has_one_curve(tmp_path):
+    from nightscribe.core.db import Database
+    db = Database(str(tmp_path / "t.db"))
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    sid = followup.create_session(db, pid, obs_date="2026-09-30")
+    first = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, first, [12.70, 12.71])
+    second = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, second, [11.96, 11.97])
+
+    # the curve is the run the observer just measured (what the live chart
+    # drew), not both of them
+    curve = followup.points_for_session(db, sid)
+    assert [round(p["mag"], 2) for p in curve] == [11.96, 11.97]
+    assert {p["run_id"] for p in curve} == {second}
+    # the project's curve follows the same rule
+    assert [round(p["mag"], 2) for p in followup.list_points(db, pid)] == \
+        [11.96, 11.97]
+    # and the first pass is still there for the trail and the undo
+    every = followup.points_for_session(db, sid, curve=False)
+    assert len(every) == 4
+    assert len(followup.list_points(db, pid, curve=False)) == 4
+
+
+def test_a_visit_can_choose_which_pass_is_the_curve(tmp_path):
+    from nightscribe.core.db import Database
+    db = Database(str(tmp_path / "t.db"))
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    sid = followup.create_session(db, pid, obs_date="2026-09-30")
+    first = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, first, [12.70])
+    second = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, second, [11.96])
+    # a new run becomes the curve by itself (measuring again is the truth)
+    assert followup.curve_run_for_session(db, sid) == second
+    # ... and the passes door can go back to the first one, without
+    # deleting anything
+    assert followup.set_session_curve_run(db, sid, first)
+    assert followup.curve_run_for_session(db, sid) == first
+    assert [round(p["mag"], 2) for p in followup.points_for_session(db, sid)] \
+        == [12.70]
+    assert len(followup.points_for_session(db, sid, curve=False)) == 2
+
+
+def test_undoing_the_last_pass_brings_the_previous_curve_back(tmp_path):
+    # The reason the choice is a column and not a rule about ids: an undone
+    # run has no points, so the curve falls back to the pass before it,
+    # which is what "undo this run" has to show.
+    from nightscribe.core.db import Database
+    db = Database(str(tmp_path / "t.db"))
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    sid = followup.create_session(db, pid, obs_date="2026-09-30")
+    first = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, first, [12.70])
+    second = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, second, [11.96])
+    assert followup.set_session_curve_run(db, sid, second)
+    followup.delete_points_for_run(db, second)
+    followup.set_run_status(db, second, "undone")
+    assert followup.curve_run_for_session(db, sid) == first
+    assert [round(p["mag"], 2) for p in followup.points_for_session(db, sid)] \
+        == [12.70]
+
+
+def test_the_night_groups_the_points_measured_without_a_visit(tmp_path):
+    # The legacy shape (a project measured before visits existed): no
+    # session at all, so the night of the mjd is what tells two curves
+    # apart. Re-measuring the SAME night must not double the curve, and
+    # two different nights are two curves.
+    from nightscribe.core.db import Database
+    db = Database(str(tmp_path / "t.db"))
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    a = followup.create_run(db, session_id=None, cfg={"series": {}})
+    _run_with_points(db, pid, None, a, [12.70, 12.71], mjd0=60000.10)
+    b = followup.create_run(db, session_id=None, cfg={"series": {}})
+    _run_with_points(db, pid, None, b, [11.96, 11.97], mjd0=60000.10)
+    assert [round(p["mag"], 2) for p in followup.list_points(db, pid)] == \
+        [11.96, 11.97]
+    other = followup.create_run(db, session_id=None, cfg={"series": {}})
+    _run_with_points(db, pid, None, other, [13.10, 13.11], mjd0=60200.10)
+    both = followup.list_points(db, pid)
+    assert [round(p["mag"], 2) for p in both] == [11.96, 11.97, 13.10, 13.11]
+    assert len(followup.list_points(db, pid, curve=False)) == 6
+
+
+def test_hand_points_always_belong_to_the_curve(tmp_path):
+    # A hand-entered or pasted point is not a re-measurement: it has no
+    # run, so no pass can replace it and the curve always carries it.
+    from nightscribe.core.db import Database
+    db = Database(str(tmp_path / "t.db"))
+    pid = project.create(db, "variable", "V0526 Per")["id"]
+    sid = followup.create_session(db, pid, obs_date="2026-09-30")
+    followup.add_point(db, pid, 60000.5, "V", 12.4, source="manual",
+                       session_id=sid)
+    run = followup.create_run(db, session_id=sid, cfg={"series": {}})
+    _run_with_points(db, pid, sid, run, [11.96])
+    # the series-only view is the curve: one run, and the hand point is not
+    # part of it (it is context)
+    assert len(followup.points_for_session(db, sid)) == 1
+    assert len(followup.points_for_session(db, sid, series_only=False)) == 2
+    # the project's curve, which is what the charts read, carries both
+    assert len(followup.list_points(db, pid)) == 2
+
+
+def test_migration_v15_adds_the_curve_column(tmp_path):
+    # A database from before v15 has no way to remember which pass a visit
+    # shows. The migration adds it, and the guard is idempotent (the
+    # v9-v14 pattern) because a hand-seeded old database may not have the
+    # table.
+    import sqlite3
+    from nightscribe.core.db import Database
+    path = tmp_path / "old.db"
+    conn = sqlite3.connect(path)
+    conn.execute("""CREATE TABLE project_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER,
+        obs_date TEXT, notes TEXT, created REAL, pinned INTEGER)""")
+    conn.execute("INSERT INTO project_sessions (obs_date)"
+                 " VALUES ('2026-01-01')")
+    conn.execute("PRAGMA user_version = 14")
+    conn.commit()
+    conn.close()
+    db = Database(path)
+    cols = {r[1] for r in db.execute("PRAGMA table_info(project_sessions)")}
+    assert "curve_run_id" in cols
+    row = db.execute("SELECT obs_date, curve_run_id FROM project_sessions"
+                     ).fetchone()
+    assert row[0] == "2026-01-01" and row[1] is None
+    db.close()
+
+
+# ---------------- the row's thumbnail: the latest curve ----------------
+
+def _pt(pid, sid, run, mjd, mag, source, filt=None):
+    # @return: one photometry_points row as the writers build it
+    return {"project_id": pid, "session_id": sid, "mjd": mjd, "filter": filt,
+            "mag": mag, "err": 0.01, "source": source, "flags": [],
+            "run_id": run}
+
+
+def test_latest_curve_run_is_the_newest_with_something_to_draw(tmp_db):
+    # What the project list's thumbnail shows. It is NOT list_points: that
+    # one keeps one point per frame from the series engine, so a curve
+    # imported from EXOTIC is not in it at all (measured on a real project:
+    # the 142 EXOTIC points were in no chart), and the thumbnail is where the
+    # last reduction shows up in the hub.
+    p = project.create(tmp_db, "transit", "HAT-P-32 b")
+    sid = followup.create_session(tmp_db, p["id"], obs_date="2017-12-20")
+    assert followup.latest_curve_run(tmp_db, p["id"]) is None
+    measured = followup.create_run(tmp_db, session_id=sid,
+                                   cfg={"series": {"band": "V"}})
+    followup.add_points(tmp_db, [
+        _pt(p["id"], sid, measured, 58107.1 + i, 11.1, "measure", "V")
+        for i in range(5)])
+    got = followup.latest_curve_run(tmp_db, p["id"])
+    assert got["id"] == measured and got["points"] == 5
+    # the imported curve is newer, and it is what has to be drawn: its
+    # magnitudes (~0, normalised flux) cannot share the measured axis
+    exotic = followup.create_run(tmp_db, session_id=sid,
+                                 cfg={"source": "exotic"})
+    followup.add_points(tmp_db, [
+        _pt(p["id"], sid, exotic, 58107.3 + i * 0.01, 0.01 * i, "exotic")
+        for i in range(30)])
+    got = followup.latest_curve_run(tmp_db, p["id"])
+    assert got["id"] == exotic and got["cfg"]["source"] == "exotic"
+    # a run with nothing to draw is skipped, never returned
+    followup.create_run(tmp_db, session_id=sid, cfg={"source": "exotic"})
+    assert followup.latest_curve_run(tmp_db, p["id"])["id"] == exotic
+    # and a project with no runs at all has no latest run (the row falls
+    # back to the project's curve)
+    other = project.create(tmp_db, "sn", "SN 2026zzz")
+    assert followup.latest_curve_run(tmp_db, other["id"]) is None

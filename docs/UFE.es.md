@@ -27,15 +27,34 @@ del survey (DSS2/PS1) como FITS con WCS y trabaja sobre él directamente.
 ## La ventana
 
 ```
-| Cargar · Exportar PNG · Fit 50 100 200 400 · %                      |
-|────────────────────────────────────────────|──────────────────────|
-|                                            | [Blink][Fotometría]  |
-|              IMAGEN                        | [Anotar]             |
-|                                            | (una pestaña por     |
-|                                            |  funcionalidad)      |
-|────────────────────────────────────────────|──────────────────────|
-| Histograma con tiradores + Negro/Blanco/Gamma + Auto + Invertir     |
+| [Abrir][Exportar][Resolver] | [Fit][100 %][Zoom ▾] 100 % | [Vista ▾] | Imagen|Curva |
+|───────────────────┬────────────────────────────────────────┬──────────────|
+|  visita / serie   |                                        |  pestaña     |
+|  (plegable)       |   IMAGEN  (o la curva)                 |  ────────    |
+|                   |   · el objeto, sobre la placa          |  primario    |
+|                   |                                        |  [Ajustes▸]  |
+|───────────────────┴────────────────────────────────────────┴──────────────|
+| Histograma ▸  (plegado: 24 px; abierto: ~110, dos filas de controles)    |
+|──────────────────────────────────────────────────────────────────────────|
+| ⓘ estado: una línea, altura fija, nunca crece                            |
 ```
+
+El marco de la ventana ocupa lo que NECESITA y el área de trabajo se queda
+con el resto: la placa es para lo que existe la ventana. La barra superior
+es estable (antes medía 25 px en una ventana baja y 69 en una alta: el
+`layoutStretch` del Designer no lo aplica el cargador), y la tira del
+histograma es compacta y se pliega recordando cómo la dejaste. El nombre,
+la posición y la magnitud del objeto se pintan SOBRE la placa (y viajan al
+PNG exportado), no en una fila propia.
+
+El bloque de serie del panel izquierdo conserva lo que se toca al medir
+(el navegador de tomas, la agrupación de tomas, **Medir la secuencia**, el
+modo en vivo y el progreso) y deja el resto detrás de dos puertas:
+**Gráfico y calidad…** abre la ventana propia del gráfico (no modal: escala,
+barras de error, agrupación, media, anómalos y exclusiones) y **Serie ▾**
+guarda las acciones ocasionales (deshacer, ExoClock, las figuras de la
+noche, guardar el gráfico, período y fase, la guía). Antes ese mismo panel
+mostraba una treintena de controles apilados.
 
 * **Imagen**: ocupa la mayor parte de la ventana. La rueda hace zoom
   anclado al cursor; arrastrar desplaza; doble clic vuelve al ajuste.
@@ -83,7 +102,50 @@ distribución, 2026-09-24).
 ### Secuencia (mitad superior)
 
 Construye la secuencia fotométrica sobre tu placa (necesita WCS; si
-falta, «Resolver astrometría…» lo consigue):
+falta, la resuelve sola con el solver configurado, ASTAP o nova):
+
+Con la visita abierta, el panel izquierdo lleva además el **navegador de
+tomas** (anterior/siguiente, `toma i/N`, «primera toma»: la toma abierta es la
+referencia) y, en proyectos de tránsito, el bloque **Reducción de tránsito
+(EXOTIC)**: los dos botones (reducir y exportar el `inits.json`), y debajo la
+**última reducción** de la visita en una línea (`T_mid … ± … · Rp/Rs … ± …` y
+cuándo corrió) con sus dos puertas: **«Ver el resultado…»** y **«Abrir la
+carpeta»**. El resultado abre en su propia ventana no modal (los números
+ajustados, la curva que dibujó EXOTIC y **todos** los ficheros de la corrida:
+figuras del campo con aperturas y comparadas, diagnósticos, CSV, JSON y el
+reporte AAVSO), cada uno a un doble clic del sistema; la ventana se abre sola
+al terminar la reducción. Sin reducción todavía, la línea está vacía y los
+botones apagados: nunca ceros.
+La secuencia ya guardada del proyecto se carga sola al abrir la visita.
+
+La **barra superior** lleva las dos astrometrías juntas, una al lado de la
+otra: **Resolver astrometría…** (esta placa) y **Resolver la visita…** (todas
+las tomas de la visita de una vez). El par se explica solo: la primera resuelve
+la placa que tienes delante, la segunda el campo entero de la noche.
+
+**Resolver la visita…** es preparación, no medida: resuelve
+de una vez todas las tomas de la visita, y lo que lo necesita son los
+**productos de la visita** (el informe de astrometría y la reducción EXOTIC de
+un tránsito), no la serie, que mide sobre la placa de referencia y registra el
+resto. Con la visita sin tomas el botón no aparece (no hay nada que resolver).
+Una visita es un solo campo y el proyecto sabe dónde está, así que cada toma
+tarda un momento en vez de un minuto de búsqueda a ciegas: las tomas que ya
+traen WCS se saltan, y cada solución se
+escribe en su propio FITS (necesita «Guardar la
+WCS resuelta en el FITS» en Ajustes; con eso apagado el botón lo explica en vez
+de dejar soluciones que morirían al cerrar). Si el proyecto no tiene
+coordenadas, la primera toma se resuelve a ciegas y las demás siguen su campo.
+Una toma que falla no para el lote: se cuenta y se nombra en la línea de estado.
+Una placa abierta desde un proyecto se resuelve también con su campo, así que el
+botón Resolver de la barra superior responde en un momento.
+
+**Construir la secuencia…** hace toda la cadena de un clic: si la placa no
+tiene WCS la resuelve primero (el campo del proyecto apunta al resolutor, así
+que es un momento), después consulta el catálogo (el campo) y propone. El
+**Proponer secuencia** de la ventana Manual rellena igual el paso que falte,
+así que el orden de los botones no hay que recordarlo. Una reconstrucción que
+no puede entregar (falla la consulta, no cae nada en esta placa, ninguna
+comparsa válida) mantiene la secuencia que ya tenías y dice por qué.
 
 * **Objetivo** y **magnitud del objetivo** precargan lo que el proyecto
   sabe; la magnitud aproximada sirve de guía a la propuesta.
@@ -100,7 +162,9 @@ falta, «Resolver astrometría…» lo consigue):
   variables de brillo parecido al objetivo.
 * **Secuencia (N)…** abre la *tabla* en una ventana pequeña y no modal
   (N son las estrellas que hay ahora mismo, y se actualiza sola):
-  renombra, cambia el tipo y quita filas, y se puede dejar abierta
+  renombra, cambia el tipo, **edita la banda y la magnitud a mano** (un
+  valor de catálogo dudoso se corrige ahí: la medida usa el valor
+  manual) y quita filas, y se puede dejar abierta
   mientras sigues eligiendo estrellas en la placa. La sonda al pasar el
   cursor cuenta catálogo, magnitud y color de cada estrella, también con
   la ventana abierta.
@@ -114,7 +178,7 @@ falta, «Resolver astrometría…» lo consigue):
 Convierte un clic en una magnitud calibrada de catálogo (fotometría de
 apertura diferencial de una placa):
 
-* Necesita la placa con WCS (si falta, «Resolver astrometría…») y una
+* Necesita la placa con WCS (si falta, la resuelve sola) y una
   secuencia en la mitad superior (si no la hay, un botón «Ir a la
   secuencia» te lleva).
 * **Clic** sobre la estrella o la SN: centroide sub-píxel, apertura y
@@ -129,6 +193,12 @@ apertura diferencial de una placa):
   apertura** (apertura, anillo interior y exterior): tocar un radio
   re-mide el punto al instante, y tu ajuste manual manda sobre el
   auto-seeing hasta que cargues otra placa (o rearms la casilla).
+* **Centro manual**: la casilla abre una ventana pequeña y no modal con
+  las flechas ↑ ← → ↓ (pasos de 0,1 px) y el botón **0** (vuelve al clic).
+  Con la casilla marcada la medida usa **exactamente** el centro que pones,
+  sin búsqueda de centroide, para objetos muy débiles o SNe que el
+  algoritmo arrastraría a un vecino; al desmarcarla se cierra la ventana y
+  vuelve el centroide automático. Un clic nuevo empieza en (0,0).
 * **Avanzado…** abre la receta completa en otra ventana pequeña y no
   modal (se puede dejar abierta mientras se mide): modelo de **cielo**
   (mediana plana o plano inclinado para núcleos galácticos),
@@ -159,31 +229,91 @@ trae tarjetas ANNOTATE, escritas por NightScribe o AstroImageJ, se
 dibujan al cargar con su tamaño en píxeles de placa y rótulos legibles
 en cualquier zoom), la **flecha de norte y barra de escala** (botones
 «N» y «Escala» de la barra superior, con WCS) y **Resolver
-astrometría…** (la resuelve a ciegas con Astrometry.net, requiere tu
-clave de API en Ajustes; la solución se aplica en memoria a la sesión y
-el archivo en disco nunca se modifica).
+astrometría…** (la resuelve a ciegas con el solver configurado, ASTAP o
+Astrometry.net; con un diálogo de progreso y Cancel que corta el solver;
+la solución se aplica en memoria y se guarda en el propio FITS de forma
+atómica, así la placa queda resuelta para cualquier programa).
 
 Para entender cómo se mide después la fotometría con estas secuencias:
 [docs/PHOTOMETRY.es.md](PHOTOMETRY.es.md).
 
-## Cajas de metadatos y estilo de marcador (ADR-046)
+## La curva de una visita: una noche, una pasada
 
-El botón **«Cajas»** de la barra superior muestra las cajas de metadatos
-en las esquinas, en pantalla y quemadas en el PNG exportado (y en los
-GIF/MP4 del blink y en la carta de secuencia), al estilo de las cartas
-de seguimiento clásicas:
+El bloque de serie mide **una visita** (una noche) por defecto. Cuando el
+proyecto tiene más de una visita con tomas, junto al contador aparece el
+selector **«this visit» / «all visits»**: con «all visits» el motor mide las
+tomas de **todas las visitas** en una sola pasada, cada noche se archiva en su
+visita (una ejecución por noche) y el gráfico enseña la curva del proyecto, la
+unión de las noches. El modo en vivo y «descartar la curva» son de una visita:
+con «all visits» se apagan y dicen por qué.
 
-* **Sup-izq**: el nombre del objeto (siempre).
-* **Sup-der**: fecha UT, AR/Dec sexagesimal del objetivo, su brillo
-  (solo cuando hay una medida calibrada en la sesión; una magnitud de
-  catálogo no vale) y la exposición.
-* **Inf-izq**: observador, medidor, estación MPC, telescopio y cámara
-  (lo que tengas en Ajustes → Sitio y equipo, grupo «Anotación de
-  cartas»), más la escala en ″/px y el FOV de lo que se ve cuando la
-  placa está resuelta.
-* Con las cajas activas, la rosa de los vientos baja al centro inferior
-  y gana la pata **E**, y la barra de escala se mueve a la derecha, para
-  dejar libres las esquinas.
+
+Cuando el editor se abre desde una visita, el gráfico del centro dibuja **la
+curva que la visita ya tiene**, leída del proyecto: no se mide nada otra vez.
+
+Una visita puede tener **varias pasadas** (mediste la serie otra vez con otra
+banda, con otra secuencia, o para comprobar algo). Cada una guarda sus puntos,
+pero **el gráfico dibuja una sola**, la que la visita tiene marcada. Volver a
+medir hace que la pasada nueva sea la curva; las anteriores no se dibujan, y el
+panel lo dice: cuántos puntos tiene la que ves y cuántas pasadas más guarda la
+visita. La puerta **Serie ▾ → Pasadas de esta visita…** las lista todas (hora,
+banda, puntos, tramo de noche, estado) y deja **que sea la curva** cualquiera de
+ellas sin borrar nada, o **deshacer** una pasada (sus puntos se van, la fila
+queda marcada, y la gráfica cae a la pasada anterior).
+
+La banda de la leyenda y del fichero AAVSO es **la banda con la que se
+calibró** (la que el motor usó en las comparsas), no un «V» inventado cuando la
+cabeza de las tomas no trae `FILTER`. Y la curva **detrended** se vuelve a
+ajustar al cargar (es determinista: los mismos puntos y la misma masa de aire
+dan los mismos coeficientes), así que el interruptor de detrended tiene qué
+enseñar también después de reabrir la visita.
+
+## La banda de la placa y el estilo de marcador (ADR-046)
+
+La placa cuenta lo que sabe en la **banda de la parte alta de la imagen**,
+en pantalla y quemada en el PNG exportado, en dos líneas:
+
+* **Línea 1, quién es**: el objeto, la AR/Dec sexagesimal del objetivo y
+  su brillo.
+* **Línea 2, el contexto**: fecha UT, exposición, filtro, el equipo que
+  tomó el frame (de su propia cabecera), la estación MPC, la escala en
+  ″/px y el FOV de lo que se ve (las dos últimas solo con la placa
+  resuelta).
+
+**El color de cada dato dice cuánto fiarse**, y ahí está la gracia de la
+banda:
+
+* la **posición** en tinta cuando la coloca la propia solución de esta
+  placa, y apagada con un `cat` cuando solo es la del catálogo (placa sin
+  resolver);
+* la **magnitud** con escala propia: **verde** cuando la medida está limpia
+  (error hasta 0,05, comparsas y estrella de chequeo en orden), **naranja**
+  cuando es usable pero no limpia (hasta 0,15, o un aviso leve: solo tres
+  comparsas, magnitud derivada de un color, la secuencia sin estrella de
+  chequeo, un aviso del propio punto), **rojo** cuando no es una medida que
+  se deba reportar sin mirarla (error por encima de 0,15, pocas comparsas,
+  chequeo que falla, núcleo recortado), y **blanca** con un `cat` cuando solo
+  es el valor del proyecto o del catálogo, que no es una medida de esta
+  placa. La magnitud que se enseña es la medida en ESA toma (la curva de la
+  visita cuando la hay), después una medida de placa, y solo entonces el
+  catálogo;
+* lo demás (fecha, exposición, filtro, equipo, estación, escala, FOV) en
+  el color discreto: es contexto, no un juicio.
+
+El mismo código está en los **puntos de la curva** (botón **Colores de
+calidad** de la ventana de la carta, activado por defecto) y en el **panel de la
+medida**: verde limpia, naranja usable pero no limpia, rojo dudosa, blanco para un
+valor de catálogo. Mira [la guía de la serie](SEQUENCES.es.md) para los umbrales y
+qué necesita cada figura.
+
+La banda nunca corta una palabra: si la ventana es estrecha suelta campos
+enteros (el FOV primero, la fecha la última) y, en el extremo, se va la
+línea de contexto y queda solo el nombre de la placa. El botón **«Datos»**
+de la barra superior la apaga (Ajustes → Sitio y equipo → «Banda de la
+placa» fija el valor por defecto), y la rosa de los vientos y la barra de
+escala conservan sus esquinas clásicas. El **GIF/MP4 del blink** y la
+**carta de secuencia** mantienen sus propias cajas de metadatos, con su
+conmutador («Otras cartas» en el mismo grupo de Ajustes).
 
 En el mismo grupo de Ajustes, **Marcador del objeto** elige la estética
 de la marca del objeto: anillo con ticks (clásica) o cruz a todo el
@@ -195,8 +325,9 @@ secuencia).
 La pestaña **Anotar** guarda copias FITS anotadas compatibles con
 AstroImageJ (el archivo original nunca se modifica):
 
-* **Clic** sobre la imagen coloca el marcador; **dx/dy + Ajustar** lo
-  mueven a décimas de píxel; tamaño y color a elegir.
+* **Clic** sobre la imagen coloca el marcador; las **flechas ↑ ← → ↓**
+  lo mueven en pasos de 0,5 px con feedback instantáneo (la lectura cuenta
+  el desplazamiento desde el último clic); tamaño y color a elegir.
 * **Etiqueta** y **notas** viajan en las tarjetas ANNOTATE y NS_NOTES;
   RA/Dec, escala y PA de norte se escriben desde el WCS de la placa
   (NS_RA, NS_DEC, NS_SCALE, NS_NORTH).
@@ -250,3 +381,15 @@ placa.
 marca de agua de NightScribe), listo para adjuntar. Las exportaciones de
 datos (FITS anotado, cartas) usan siempre el archivo original, nunca la
 imagen de pantalla.
+
+## Cuando algo no funciona
+
+La ventana tiene **una** línea de estado abajo, con el texto entero en su tooltip
+(el resultado de una medida se queda en su propio recuadro, junto a la acción que lo
+produjo). Una construcción que no puede entregar mantiene tu secuencia y dice por
+qué; una resolución que falla dice qué estaba haciendo.
+
+Y la aplicación **escribe lo que hace en un fichero** mientras funciona:
+**Ayuda > Abrir el log**. Una interfaz lanzada desde un menú no tiene consola, así
+que un aviso como «sale un diálogo, desaparece y no sé qué pasa» tiene ahí su
+respuesta.

@@ -316,8 +316,8 @@ Con las imágenes apiladas de varias noches registradas en el proyecto,
 el botón de análisis rápido ejecuta toda la cadena:
 
 1. Carga cada apilado y localiza la SN por su WCS (sin WCS, el veredicto
-   es `no_wcs`: resuelve la astrometría primero; el Editor FITS tiene el
-   botón «Resolver astrometría…» para eso).
+   es `no_wcs`; resuélvela y guarda la solución con el Editor FITS, que
+   además resuelve solo con el solver configurado).
 2. Construye el ensemble (sección 3.1).
 3. Mide la SN en cada frame: un punto por noche con
    `{HJD, Δmag, error}`, donde el error es la dispersión del ensemble en
@@ -332,6 +332,25 @@ Las fechas se guardan como **HJD** (día juliano heliocéntrico): el
 tiempo corregido a la posición del Sol, para que curvas de meses no
 lleven el vaivén de ±8 minutos de la órbita terrestre. Los puntos se
 guardan en el proyecto y alimentan la curva de luz y el post.
+
+**Escala de tiempo**: el HJD se calcula en **UTC**, la escala que lleva
+el `DATE-OBS` de tus frames, no en TT: NightScribe no suma los segundos
+intercalares (37 en 2026) más el desplazamiento fijo de 32,184 s, unos
+**69 s** (0,00080 d). Para fotometría diferencial, un informe de AAVSO o
+una curva de supernova esto queda muy por debajo del error propio de la
+medida; cuando compares el `T_mid` de un tránsito con una efeméride
+publicada en HJD(TT) o BJD_TT, suma tú el desplazamiento (en 2026,
++0,00080 d).
+
+**Aviso (2026-09-28)**: la revisión en profundidad del track de series
+encontró dos errores en las versiones hasta esa fecha. Las
+transformaciones de color Gaia a Johnson-Cousins se evaluaban con el
+orden de coeficientes al revés (toda magnitud derivada de los colores de
+una secuencia salía sesgada por color), y el signo del HJD estaba
+invertido (un error estacional de hasta ±16,6 min en los tiempos de los
+informes EFF). Las secuencias, magnitudes calibradas e informes
+AAVSO/ExoClock generados antes de esa fecha deben regenerarse desde los
+frames.
 
 ---
 
@@ -356,9 +375,10 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 
 * `DATE` es HJD (`#DATE=HJD` en la cabecera); los puntos sin HJD
   completo se omiten: el formato no tiene fecha vacía.
-* `TRANS` se escribe `NA` con honestidad: NightScribe no transforma tu
-  medida al sistema fotométrico estándar (eso requeriría conocer los
-  coeficientes de color y extinción de tu equipo).
+* `TRANS` se escribe `NO` con honestidad (WebObs espera `YES`/`NO`:
+  cualquier otro valor puede rechazarse al importar): NightScribe no
+  transforma tu medida al sistema fotométrico estándar (eso requeriría
+  conocer los coeficientes de color y extinción de tu equipo).
 * `CNAME`/`CMAG` y `KNAME`/`KMAG` se rellenan desde la secuencia de
   comparación guardada en el proyecto (pestaña Fotometría / carta);
   `na` cuando no la hay.
@@ -369,7 +389,7 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 diferencial instrumental (Δmag contra el ensemble), no una magnitud
 calibrada de catálogo. En la medida de la pestaña Fotometría sí es una
 magnitud calibrada al catálogo vía el punto cero (TRANS sigue siendo
-`NA` con honestidad: no hay transformación de color al sistema
+`NO` con honestidad: no hay transformación de color al sistema
 estándar). Los puntos importados de fuera (medidos con otra
 herramienta) conservan la magnitud con la que vinieron. Léelo siempre
 con el filtro y el origen del punto a la vista.
@@ -463,6 +483,42 @@ y con apéndice técnico de implementación:
 * [ ] Repite la medida por noche: dos puntos por sesión detectan
       problemas que uno solo esconde.
 
+### 8.1 Prácticas para el milimagnitud (T8)
+
+Para una serie de tránsitos que baje al nivel de mmag, la receta de campo:
+
+* **Flats a nivel mmag**: un flat con 1 % de error deja estructura que se ve a
+  0,01 mag en la curva; llévalo por debajo del 0,1 % (varios flats combinados
+  y sin clipping).
+* **Dithering**: desplaza unos píxeles entre tomas; reparte los defectos del
+  detector y el patrón de flat en la medida.
+* **Desenfoque leve deliberado**: una PSF algo mayor que la nominal usa más
+  píxeles por estrella (mejor SNR y menos sensibilidad al guiado) sin saturar;
+  nunca hasta confundir estrellas cercanas.
+* **Cadencia constante**: misma exposición y mismo hueco entre tomas; una
+  cadencia irregular contamina la fase y el detrend.
+* **Nada saturado**: ni el objetivo ni las comparaciones; una comp comprimida
+  miente el punto cero (y la check no lo ve).
+
+### 8.2 Perfil de cámara y límite de linealidad
+
+En **Ajustes → Perfil de cámara fotométrica** eliges un preset (IMX455, IMX571,
+IMX533, IMX294, IMX183, GSENSE400/QHY42Pro, KAF-8300/16803/09000) que rellena el
+tamaño de píxel, el full well, la corriente de oscuridad y un **valor sugerido de
+linealidad**. La **linealidad y el tope de exposición son por ganancia**: mídelos
+tú; el sugerido es solo un punto de partida.
+
+El límite de linealidad es el techo que de verdad manda: el techo efectivo toma
+el **mínimo** entre tu linealidad, la tarjeta SATURATE, el ajuste y el recorte
+inferido. Por encima de él una estrella **no calibra nada** aunque no esté
+saturada, así que la app **excluye esas comps/check** con el motivo explícito
+(«por encima del límite de linealidad de tu cámara») y lo cuenta en el panel y
+en el CSV. En sensores muy sensibles (GSENSE400) es lo que impide usar las
+estrellas más brillantes del campo.
+
+Referencia rápida: `full well / ganancia` da la saturación en ADU, y la
+linealidad suele quedar por debajo. **Si cambias de ganancia, remide.**
+
 ---
 
 ## 9. Glosario mínimo
@@ -489,7 +545,18 @@ y con apéndice técnico de implementación:
 
 ---
 
+**Medir una serie** (una toma detrás de otra, con alineación por frame, punto cero
+atado por comparada y puertas de calidad) es otra cosa que medir una placa, y tiene
+su propia guía: `SEQUENCES`. Cuando la curva ya está, **buscar el período y plegarla**
+(periodograma de Lomb-Scargle y PDM, FAP, informe de dos paneles) vive en
+`SEQUENCES` §9 y en ADR-054.
+
+---
+
 *Detalles de implementación y decisiones: `core/series.py`,
-`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`;
+`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`,
+`core/series_measure.py`, `core/register.py`, `core/periodogram.py`,
+`core/gain.py`;
 ADR-018 (FITS/WCS propio), ADR-042 (secuencias fotométricas), ADR-044
-(Editor FITS unificado).*
+(Editor FITS unificado), ADR-048 (la serie frame a frame y su alineación),
+ADR-054 (búsqueda de período).*

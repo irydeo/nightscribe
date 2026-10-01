@@ -22,6 +22,7 @@ All SQL goes through db.execute (ADR-002). The module mirrors the
 pragmatic style of core/project.py: short functions, no ORM, no magic.
 """
 
+import json
 import logging
 import time
 
@@ -53,20 +54,23 @@ def list_sessions(db, project_id):
     # @return: list of session dicts: pinned visits first, then newest
     #          first by observing date (ADR-045)
     rows = db.execute(
-        "SELECT id, project_id, obs_date, notes, created, pinned"
+        "SELECT id, project_id, obs_date, notes, created, pinned,"
+        " curve_run_id"
         " FROM project_sessions WHERE project_id=?"
         " ORDER BY pinned DESC, obs_date DESC",
         (project_id,),
     ).fetchall()
     return [{"id": r[0], "project_id": r[1], "obs_date": r[2],
-             "notes": r[3] or "", "created": r[4], "pinned": bool(r[5])}
+             "notes": r[3] or "", "created": r[4], "pinned": bool(r[5]),
+             "curve_run_id": r[6]}
             for r in rows]
 
 
 def get_session(db, session_id):
     # @return: session dict or None
     row = db.execute(
-        "SELECT id, project_id, obs_date, notes, created, pinned"
+        "SELECT id, project_id, obs_date, notes, created, pinned,"
+        " curve_run_id"
         " FROM project_sessions WHERE id=?",
         (session_id,),
     ).fetchone()
@@ -74,7 +78,7 @@ def get_session(db, session_id):
         return None
     return {"id": row[0], "project_id": row[1], "obs_date": row[2],
             "notes": row[3] or "", "created": row[4],
-            "pinned": bool(row[5])}
+            "pinned": bool(row[5]), "curve_run_id": row[6]}
 
 
 def update_session_notes(db, session_id, notes):
@@ -199,12 +203,251 @@ def add_point(db, project_id, mjd, filter_name, mag, err=None, source="manual",
     return cur.lastrowid
 
 
-def list_points(db, project_id, filter_name=None):
-    # @args: filter_name - filter to select, or None for all
+# ---------------- the curve: one night, one run ----------------
+#
+# A visit can hold SEVERAL series runs: the observer measures again with
+# another band, with another sequence, or just to check something, and
+# every run keeps its own points ("undo this run" undoes exactly one, and
+# the trail is never silent). But the CURVE of the night is ONE of them.
+#
+# What went wrong without this (reported 2026-09-30, "the chart of a visit
+# gets corrupted when you close and reopen the app"): the chart of a visit
+# drew EVERY run of the visit at once. Measured on the real one (V0526
+# Per): four runs, 976 points at two different levels (11.96-12.07
+# calibrated in G and 12.70-12.81 in V) joined by a zigzag, while the live
+# chart had drawn only the last run. The live chart is the truth: it is
+# what the observer just measured, so the reloaded one has to draw the
+# same. What you see is what you get.
+#
+# The rule, in the code and in the docs: the curve of a night is the run
+# the visit CHOSE (the door "Series > Passes of this visit") and, if it
+# never chose, the run of its newest series point. Points with no run
+# (hand-entered, pasted, survey context) are never a re-measurement: they
+# always belong to the curve.
+
+def _curve_night(mjd):
+    # The observing night of an mjd: the engine's own boundary (local noon),
+    # imported and not copied so the two cannot drift.
+    # @args: mjd - Modified Julian Date
+    # @return: the night key
+    from . import series_measure
+    return series_measure._night_of(mjd)
+
+
+def _series_point_rows(db, project_id=None, session_id=None):
+    # The series points, in INSERTION order: the last row of a group is
+    # the last thing that was measured for it, which is the whole point.
+    #
+    # The frame comes back as its PATH, not as its registry id: the same
+    # file registered in two visits is two rows (the observer's own project
+    # has the same 244 frames in three visits), and a frame is one frame.
+    # @return: rows of (id, session_id, run_id, mjd, frame path or None)
+    sql = ("SELECT p.id, p.session_id, p.run_id, p.mjd, f.path"
+           " FROM photometry_points p"
+           " LEFT JOIN project_files f ON f.id = p.file_id"
+           " WHERE p.source='measure' AND p.run_id IS NOT NULL")
+    params = []
+    if project_id is not None:
+        sql += " AND p.project_id=?"
+        params.append(project_id)
+    if session_id is not None:
+        sql += " AND p.session_id=?"
+        params.append(session_id)
+    sql += " ORDER BY p.id"
+    return db.execute(sql, tuple(params)).fetchall()
+
+
+def _frame_key(row):
+    # What makes two series points the SAME measurement: the frame they
+    # were measured on (a frame is measured once per pass, and re-measuring
+    # it replaces it). A point whose frame was never registered has no
+    # path, so its time is the only key there is.
+    # @args: row - (id, session_id, run_id, mjd, frame path or None)
+    # @return: the key of the frame
+    night = _curve_night(row[3])
+    if row[4]:
+        return (night, "frame", str(row[4]))
+    return (night, "time", round(float(row[3]), 6))
+
+
+def curve_point_ids(db, project_id=None, session_id=None, use_choice=False):
+    # THE POINTS A CURVE IS MADE OF: ONE PER FRAME.
+    #
+    # This is the invariant the observer reported twice ("la gráfica se
+    # corrompe, esto no puede ocurrir jamás"). A night measured again shows
+    # the newest measurement of each frame, never the same frame twice at
+    # two different levels. Measured on his own database: the 244 frames of
+    # visit 18 were measured again as visits 20 (35 frames) and 21 (3),
+    # every one of them a SUBSET of the 244, so the project's curve held
+    # 282 points with 38 of them duplicated.
+    #
+    # `use_choice` is for the VISIT's own chart: the pass the visit chose
+    # (the passes door) answers for the frames IT covers, and the frames it
+    # does not cover keep their newest measurement. The project's curve
+    # never uses the choice: it is the objective union of the nights, and a
+    # per-visit choice would depend on which visit was asked last.
+    # @args: db - Database, project_id / session_id - what to look at,
+    #        use_choice - honour the visit's chosen pass
+    # @return: the set of point ids
+    rows = _series_point_rows(db, project_id=project_id,
+                              session_id=session_id)
+    keep = {}
+    for r in rows:                      # id order: the newest wins
+        keep[_frame_key(r)] = r[0]
+    if use_choice:
+        chosen = _chosen_runs(db, project_id=project_id,
+                              session_id=session_id)
+        with_points = {r[2] for r in rows}
+        for r in rows:
+            if r[1] is not None and chosen.get(r[1]) == r[2] \
+                    and r[2] in with_points:
+                keep[_frame_key(r)] = r[0]
+    return set(keep.values())
+
+
+def _chosen_runs(db, project_id=None, session_id=None):
+    # @return: {session_id: run_id} of the visits that said which of
+    #          their runs the chart shows
+    sql = ("SELECT id, curve_run_id FROM project_sessions"
+           " WHERE curve_run_id IS NOT NULL")
+    params = []
+    if project_id is not None:
+        sql += " AND project_id=?"
+        params.append(project_id)
+    if session_id is not None:
+        sql += " AND id=?"
+        params.append(session_id)
+    return {r[0]: r[1] for r in db.execute(sql, tuple(params)).fetchall()}
+
+
+def curve_run_ids(db, project_id=None, session_id=None):
+    # The runs a curve is made of (the passes it shows points from).
+    # @args: db - Database, project_id - limit to one project or None,
+    #        session_id - limit to one visit or None
+    # @return: the set of run ids the curve's points belong to
+    rows = _series_point_rows(db, project_id=project_id,
+                              session_id=session_id)
+    keep = curve_point_ids(db, project_id=project_id, session_id=session_id,
+                           use_choice=True)
+    return {r[2] for r in rows if r[0] in keep}
+
+
+def run_pass_group(db, run_id):
+    # A multi-night pass writes ONE run per visit (each night's points belong
+    # to the visit that night is) and every one of them carries the same
+    # group id in its cfg. This says which group a run belongs to, so
+    # "undo this pass" can undo the whole pass and not just one night.
+    # @args: db - Database, run_id - the run
+    # @return: the group id, or None (a single-night run has none)
+    run = get_run(db, run_id)
+    if not run:
+        return None
+    series = (run.get("cfg") or {}).get("series") or {}
+    return (series.get("pass") or {}).get("group")
+
+
+def runs_in_pass(db, group):
+    # Every run of a multi-night pass, oldest first.
+    # @args: group - the pass group id (see run_pass_group)
+    # @return: [run dicts, as runs_for_session]
+    if not group:
+        return []
+    rows = db.execute(
+        "SELECT id FROM measurement_runs WHERE cfg_json LIKE ?"
+        " ORDER BY id", ("%\"group\": \"" + str(group) + "\"%",)).fetchall()
+    out = []
+    for r in rows:
+        run = get_run(db, r[0])
+        if run is not None and run_pass_group(db, r[0]) == group:
+            out.append(run)
+    return out
+
+
+def curve_run_for_session(db, session_id):
+    # The run the visit's chart SHOWS: the pass the visit chose, or the
+    # newest one measured.
+    #
+    # It is NOT "the single run the curve is made of": a visit's curve takes
+    # the frames its chosen pass does not cover from their own newest
+    # measurement (a night measured in two passes is one curve), so the
+    # curve can span two runs while the visit still shows ONE pass.
+    # @return: the run id, or None when the visit has no series points
+    rows = _series_point_rows(db, session_id=session_id)
+    with_points = {r[2] for r in rows}
+    chosen = _chosen_runs(db, session_id=session_id).get(session_id)
+    if chosen is not None and chosen in with_points:
+        return chosen
+    return max(with_points) if with_points else None
+
+
+def latest_curve_run(db, project_id, min_points=2):
+    # The project's newest run with something to draw: what the project
+    # list's thumbnail shows ("the latest available curve of the project").
+    # It is NOT the project's curve (list_points): that one keeps one point
+    # per frame from the series engine, so a curve imported from EXOTIC is
+    # not in it at all (measured: the 142 EXOTIC points of a real project
+    # were in no chart), and the thumbnail is where the last reduction shows
+    # up in the hub.
+    # @args: db - Database, project_id - the project, min_points - how many
+    #        points a run needs to be worth drawing
+    # @return: {id, session_id, created, cfg, points} or None
+    row = db.execute(
+        "SELECT r.id, r.session_id, r.created, r.cfg_json,"
+        " (SELECT COUNT(*) FROM photometry_points p WHERE p.run_id = r.id)"
+        " FROM measurement_runs r"
+        " WHERE r.id IN (SELECT run_id FROM photometry_points"
+        "                WHERE project_id=? AND run_id IS NOT NULL)"
+        " ORDER BY r.created DESC, r.id DESC",
+        (project_id,)).fetchall()
+    for r in row:
+        if (r[4] or 0) >= min_points:
+            cfg = json.loads(r[3] or "{}")
+            return {"id": r[0], "session_id": r[1], "created": r[2],
+                    "cfg": cfg, "points": r[4]}
+    return None
+
+
+def curve_summary(points):
+    # What a curve is, in the two numbers a list row shows (the project
+    # list's thumbnail and its tooltip). "Nights" counts the observing
+    # nights of the points (the unit of a curve), never the visits: a night
+    # filed in three visits is still one night.
+    # @args: points - the rows of a curve (list_points)
+    # @return: {"points": usable points, "nights": observing nights}
+    nights = set()
+    n = 0
+    for p in points or []:
+        if p.get("mjd") is None or p.get("mag") is None:
+            continue
+        n += 1
+        nights.add(_curve_night(p["mjd"]))
+    return {"points": n, "nights": len(nights)}
+
+
+def set_session_curve_run(db, session_id, run_id):
+    # "Make this pass the curve" (the passes door). Nothing is deleted and
+    # nothing is re-measured: the visit remembers which of its runs the
+    # chart shows, and every reader follows.
+    # @return: True when the visit was found
+    cur = db.execute(
+        "UPDATE project_sessions SET curve_run_id=? WHERE id=?",
+        (run_id, session_id))
+    db.commit()
+    return cur.rowcount > 0
+
+
+def list_points(db, project_id, filter_name=None, curve=True):
+    # @args: filter_name - filter to select, or None for all, curve - True
+    #        (default) for the project's CURVE: one run per night, so a
+    #        night measured several times counts once; False for every
+    #        point the project holds (the audit path, and the tests that
+    #        check the trail)
     # @return: list of point dicts ordered by mjd (file_id: the plate it
-    #          was measured on, or None)
+    #          was measured on, or None; mag_raw/flags/run_id carry the
+    #          series data when the point came from one, ADR-048)
     col = ("id, project_id, session_id, mjd, filter, mag, err, source,"
-           " file_id")
+           " file_id, mag_raw, flags, run_id, err_internal,"
+           " airmass, x, y, fwhm, sky")
     if filter_name:
         rows = db.execute(
             f"SELECT {col} FROM photometry_points WHERE project_id=?"
@@ -217,9 +460,47 @@ def list_points(db, project_id, filter_name=None):
             " ORDER BY mjd",
             (project_id,),
         ).fetchall()
-    return [{"id": r[0], "project_id": r[1], "session_id": r[2],
-             "mjd": r[3], "filter": r[4], "mag": r[5], "err": r[6],
-             "source": r[7], "file_id": r[8]} for r in rows]
+    points = [_point_dict(r) for r in rows]
+    if not curve:
+        return points
+    # the project's curve is the objective union: one point per frame, its
+    # newest measurement, with no per-visit choice in the middle (a choice
+    # made in one visit would depend on which visit was asked last)
+    keep = curve_point_ids(db, project_id=project_id)
+    return [p for p in points
+            if p["run_id"] is None or p["id"] in keep]
+
+
+def _point_dict(row):
+    # @args: row - a photometry_points row in the list_points column order
+    # @return: the point dict the callers use (flags parsed from JSON)
+    def at(i):
+        # @return: the column when the query carries it, else None (the
+        #          pattern err_internal started: an old query keeps working)
+        return row[i] if len(row) > i else None
+    return {"id": row[0], "project_id": row[1], "session_id": row[2],
+            "mjd": row[3], "filter": row[4], "mag": row[5], "err": row[6],
+            "source": row[7], "file_id": row[8], "mag_raw": row[9],
+            "flags": _flags_in(row[10]), "run_id": row[11],
+            "err_internal": at(12),
+            # what the NIGHT figures are made of (the airmass and the
+            # measured position): with them stored, a curve read back from
+            # the database explains its own night months later instead of
+            # demanding a new run
+            "airmass": at(13), "x": at(14), "y": at(15),
+            "fwhm": at(16), "sky": at(17)}
+
+
+def _flags_in(raw):
+    # @args: raw - the stored flags TEXT (JSON list) or None
+    # @return: a list of flags, tolerating legacy/blank values
+    if not raw:
+        return []
+    try:
+        val = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    return val if isinstance(val, list) else []
 
 
 def point_by_id(db, point_id):
@@ -228,13 +509,319 @@ def point_by_id(db, point_id):
     # @return: point dict (as list_points), or None
     row = db.execute(
         "SELECT id, project_id, session_id, mjd, filter, mag, err,"
-        " source, file_id FROM photometry_points WHERE id=?",
-        (point_id,)).fetchone()
+        " source, file_id, mag_raw, flags, run_id, err_internal,"
+        " airmass, x, y, fwhm, sky"
+        " FROM photometry_points WHERE id=?", (point_id,)).fetchone()
+    return _point_dict(row) if row else None
+
+
+def create_run(db, session_id=None, cfg=None, status="complete"):
+    # ADR-048: one "Measure" is a run (D9). Its config and status are
+    # stored so the run survives a restart and "incomplete" is visible.
+    # @args: cfg - dict stored as JSON (may be None), status - complete |
+    #        incomplete | undone
+    # @return: the new run id
+    cur = db.execute(
+        "INSERT INTO measurement_runs (session_id, created, cfg_json,"
+        " status) VALUES (?, ?, ?, ?)",
+        (session_id, time.time(),
+         json.dumps(cfg or {}, ensure_ascii=False), status))
+    db.commit()
+    run_id = cur.lastrowid
+    # A NEW series run IS the visit's curve: the observer just measured it,
+    # and that is what the live chart shows, so the reloaded one must show
+    # it too. The door "Series > Passes of this visit" is what goes back to
+    # an earlier pass, and that choice survives until the next run.
+    if session_id is not None and isinstance(cfg, dict) and "series" in cfg:
+        set_session_curve_run(db, session_id, run_id)
+    return run_id
+
+
+def set_run_status(db, run_id, status):
+    # @return: True if the run was found and updated
+    cur = db.execute("UPDATE measurement_runs SET status=? WHERE id=?",
+                     (status, run_id))
+    db.commit()
+    return cur.rowcount > 0
+
+
+def save_pass(db, entries, cfg=None):
+    # A campaign pass writes ONE run per project (E5c).
+    #
+    # The frames, the comparison stars and the zero point were measured a
+    # single time; each project still receives its own run and its own
+    # points, because a project is one object and "undo this run" must
+    # undo exactly that object's curve. The shared facts (which pass this
+    # was, which other objects were measured with it) ride in the run's
+    # cfg echo, so the journal can say so without a schema change.
+    # @args: db - Database, entries - [{"project_id", "session_id", "rows",
+    #        "label"}], cfg - JSON-safe echo of the shared configuration
+    #        (it gets a "pass" block with the labels of the whole pass)
+    # @return: [{"project_id", "label", "run_id", "session_id", "points"}]
+    labels = [e.get("label") or "" for e in entries]
+    out = []
+    for entry in entries:
+        rows = list(entry.get("rows") or [])
+        echo = dict(cfg or {})
+        echo["pass"] = {"labels": [l for l in labels if l],
+                        "target": entry.get("label") or "",
+                        "campaign": echo.get("campaign")}
+        run_id = create_run(db, session_id=entry.get("session_id"),
+                            cfg=echo, status=entry.get("status")
+                            or "complete")
+        for r in rows:
+            r["project_id"] = entry["project_id"]
+            r["session_id"] = entry.get("session_id")
+            r["run_id"] = run_id
+        ids = add_points(db, rows) if rows else []
+        out.append({"project_id": entry["project_id"],
+                    "label": entry.get("label") or "",
+                    "run_id": run_id,
+                    "session_id": entry.get("session_id"),
+                    "points": len(ids)})
+    return out
+
+
+def share_frames(db, paths, projects, obs_date=None, notes="", meta=None):
+    # The same frames in every project of a pass (E5c).
+    #
+    # A pass measures one set of files for several objects, and a visit is
+    # a night of ONE project: so each of those projects gets its own visit
+    # that night, holding those very files. Nothing is copied: the paths
+    # are registered, exactly as if the observer had attached them by hand
+    # in each project.
+    #
+    # A project that already has a visit with those frames reuses it (that
+    # is the point of a pass: measuring what was already filed).
+    # @args: db - Database, paths - the frames of the pass, projects -
+    #        [{"project_id"} | {"id"}] of the projects that will hold them,
+    #        obs_date - the night (ISO date) for the visits it creates,
+    #        notes - the visit's note, meta - plate facts per path or None
+    # @return: {project_id: session_id}
+    from . import project as project_mod
+    out = {}
+    for p in projects or []:
+        pid = p.get("project_id") or p.get("id")
+        if pid is None:
+            continue
+        have = {}
+        for s in list_sessions(db, pid):
+            for f in project_mod.files_for_session(db, s["id"]):
+                if f.get("kind") == "fits" and f.get("path"):
+                    have[str(f["path"])] = s["id"]
+        wanted = [str(x) for x in paths or []]
+        session_id = next((have[w] for w in wanted if w in have), None)
+        if session_id is None:
+            session_id = create_session(db, pid, obs_date=obs_date,
+                                        notes=notes or "")
+        already = set()
+        for f in project_mod.files_for_session(db, session_id):
+            if f.get("kind") == "fits" and f.get("path"):
+                already.add(str(f["path"]))
+        facts = meta if isinstance(meta, dict) else {}
+        for path in wanted:
+            if path in already:
+                continue
+            project_mod.add_file(db, pid, path, "fits",
+                                 session_id=session_id,
+                                 meta=facts.get(path))
+        out[pid] = session_id
+    return out
+
+
+def add_points(db, rows):
+    # Batch write of series points (ADR-048, D9/D18): one transaction for
+    # a whole run. Each row is a dict with project_id, session_id, mjd,
+    # filter, mag, err, source, file_id, mag_raw, flags, run_id, airmass,
+    # x, y, fwhm, sky; missing keys become NULL (the legacy single-point
+    # contract is unchanged);
+    # err_internal is the point's OWN photon error, apart from the
+    # calibration systematic that `err` (the total) carries (quality plan,
+    # phase A).
+    # @return: the list of new point ids
+    ids = []
+    for r in rows:
+        flags = r.get("flags")
+        if isinstance(flags, (list, tuple)):
+            flags = json.dumps(list(flags), ensure_ascii=False)
+        cur = db.execute(
+            "INSERT INTO photometry_points (project_id, session_id, mjd,"
+            " filter, mag, err, source, file_id, mag_raw, flags, run_id,"
+            " err_internal, airmass, x, y, fwhm, sky)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (r.get("project_id"), r.get("session_id"), r.get("mjd"),
+             r.get("filter"), r.get("mag"), r.get("err"),
+             r.get("source") or "measure", r.get("file_id"),
+             r.get("mag_raw"), flags, r.get("run_id"),
+             r.get("err_internal"), r.get("airmass"), r.get("x"),
+             r.get("y"), r.get("fwhm"), r.get("sky")))
+        ids.append(cur.lastrowid)
+    db.commit()
+    return ids
+
+
+def list_points_for_run(db, run_id):
+    # @return: the points of one run, mjd-ordered
+    rows = db.execute(
+        "SELECT id, project_id, session_id, mjd, filter, mag, err, source,"
+        " file_id, mag_raw, flags, run_id, err_internal,"
+        " airmass, x, y, fwhm, sky"
+        " FROM photometry_points WHERE run_id=? ORDER BY mjd",
+        (run_id,)).fetchall()
+    return [_point_dict(r) for r in rows]
+
+
+def points_for_session(db, session_id, series_only=True, curve=True):
+    # The points a VISIT holds, oldest first.
+    #
+    # `series_only` keeps the ones the series engine wrote (source
+    # "measure"): they are the curve. A hand-entered or survey point in the
+    # same visit is context, not the night's measurement, and it is not
+    # touched by the visit's curve nor by discarding it.
+    #
+    # `curve` keeps ONE run (the visit's curve, see curve_run_ids): the
+    # visit may hold several passes and drawing all of them at once is the
+    # corruption this file's "one night, one run" section explains. False
+    # returns every series point of the visit (the trail).
+    # @args: db - Database, session_id - the visit, series_only - the
+    #        curve's own points only, curve - the visit's curve, not every
+    #        pass it holds
+    # @return: [{id, project_id, session_id, mjd, filter, mag, err, source,
+    #           file_id, mag_raw, flags, run_id, err_internal, airmass, x,
+    #           y, fwhm, sky}, ...]
+    sql = ("SELECT id, project_id, session_id, mjd, filter, mag, err, source,"
+           " file_id, mag_raw, flags, run_id, err_internal,"
+           " airmass, x, y, fwhm, sky"
+           " FROM photometry_points WHERE session_id=?")
+    params = [session_id]
+    if series_only:
+        sql += " AND source=?"
+        params.append("measure")
+    sql += " ORDER BY mjd"
+    points = [_point_dict(r) for r in db.execute(sql, tuple(params))]
+    if not curve:
+        return points
+    # the visit's own chart: the pass it chose answers for the frames it
+    # covers, and the frames it does not cover keep their newest
+    # measurement (a night measured in two passes is one curve)
+    keep = curve_point_ids(db, session_id=session_id, use_choice=True)
+    return [p for p in points
+            if p["run_id"] is None or p["id"] in keep]
+
+
+def get_run(db, run_id):
+    # One run by id, in the same shape runs_for_session hands out (the
+    # curve's reader needs its band and its detrend choice: they are what
+    # the stored points no longer carry).
+    # @return: the run dict, or None
+    if run_id is None:
+        return None
+    row = db.execute(
+        "SELECT r.id, r.session_id, r.created, r.cfg_json, r.status,"
+        " (SELECT COUNT(*) FROM photometry_points p WHERE p.run_id = r.id),"
+        " (SELECT MIN(p.mjd) FROM photometry_points p WHERE p.run_id = r.id),"
+        " (SELECT MAX(p.mjd) FROM photometry_points p WHERE p.run_id = r.id)"
+        " FROM measurement_runs r WHERE r.id=?", (run_id,)).fetchone()
     if not row:
         return None
-    return {"id": row[0], "project_id": row[1], "session_id": row[2],
-            "mjd": row[3], "filter": row[4], "mag": row[5], "err": row[6],
-            "source": row[7], "file_id": row[8]}
+    cfg = json.loads(row[3] or "{}")
+    series = cfg.get("series") or {}
+    return {"id": row[0], "session_id": row[1], "created": row[2],
+            "cfg": cfg, "status": row[4], "points": row[5] or 0,
+            "mjd0": row[6], "mjd1": row[7], "band": series.get("band")}
+
+
+def reusable_run(db, run_id, session_id=None):
+    # A live session writes its batches into ONE run ("the whole live
+    # session is undone as one run", ADR-050 P2 #19), so a batch asks
+    # whether the run it wants to continue is still usable: it exists, it
+    # is not undone and it belongs to the same visit.
+    #
+    # Measured why it matters for the curve too: one run per batch left a
+    # visit with 49 runs for a single night, so the curve reloaded from the
+    # project was the LAST BATCH (a few frames) instead of the live curve
+    # the observer had just watched grow.
+    # @args: db - Database, run_id - the run the batch wants to continue
+    #        (or None), session_id - the visit of the batch
+    # @return: the run id, or None (a run that is gone is never an error:
+    #          the batch opens a new one)
+    if run_id is None:
+        return None
+    row = db.execute("SELECT id, session_id, status FROM measurement_runs"
+                     " WHERE id=?", (run_id,)).fetchone()
+    if not row or (row[2] or "") == "undone":
+        return None
+    if session_id is not None and row[1] is not None and row[1] != session_id:
+        return None
+    return row[0]
+
+
+def runs_for_session(db, session_id, series_only=True):
+    # The runs a visit holds, oldest first, with what the passes door needs
+    # to show them: how many points each one holds and the stretch of night
+    # it covers (so the observer can tell a full pass from the stub a
+    # cancelled run leaves).
+    # @return: [{id, session_id, created, cfg, status, points, mjd0, mjd1,
+    #           band}, ...]
+    rows = db.execute(
+        "SELECT r.id, r.session_id, r.created, r.cfg_json, r.status,"
+        " COUNT(p.id), MIN(p.mjd), MAX(p.mjd)"
+        " FROM measurement_runs r"
+        " LEFT JOIN photometry_points p ON p.run_id = r.id"
+        " WHERE r.session_id=? GROUP BY r.id ORDER BY r.id",
+        (session_id,)).fetchall()
+    out = []
+    for r in rows:
+        cfg = json.loads(r[3] or "{}")
+        if series_only and "series" not in cfg:
+            continue
+        series = cfg.get("series") or {}
+        out.append({"id": r[0], "session_id": r[1], "created": r[2],
+                    "cfg": cfg, "status": r[4], "points": r[5] or 0,
+                    "mjd0": r[6], "mjd1": r[7],
+                    "band": series.get("band")})
+    return out
+
+
+def discard_session_curve(db, session_id):
+    # "Discard this visit's curve, and build it again from scratch": every
+    # SERIES run of the visit is undone the way the per-run undo does it
+    # (its points go, its run row stays marked undone, so the trail is never
+    # silent). The visit's other points (hand-entered, survey) are not part
+    # of the curve and are left alone.
+    # @args: db - Database, session_id - the visit
+    # @return: (runs undone, points removed)
+    runs = runs_for_session(db, session_id)
+    removed = 0
+    for run in runs:
+        removed += delete_points_for_run(db, run["id"])
+        set_run_status(db, run["id"], "undone")
+    # the visit has no curve left to show: the choice goes with it (and a
+    # new run will set it again)
+    set_session_curve_run(db, session_id, None)
+    return len(runs), removed
+
+
+def delete_points(db, ids):
+    # Undo by explicit id list (ADR-048): never touches another run.
+    # @return: the number of points deleted
+    if not ids:
+        return 0
+    marks = ",".join("?" for _ in ids)
+    cur = db.execute(f"DELETE FROM photometry_points WHERE id IN ({marks})",
+                     tuple(ids))
+    db.commit()
+    return cur.rowcount
+
+
+def delete_points_for_run(db, run_id):
+    # "Undo this run" (D6): the run's points go; the run row stays for
+    # the audit trail.
+    # @return: the number of points deleted
+    cur = db.execute("DELETE FROM photometry_points WHERE run_id=?",
+                     (run_id,))
+    db.commit()
+    return cur.rowcount
 
 
 def delete_point(db, point_id):

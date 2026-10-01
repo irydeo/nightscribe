@@ -34,10 +34,16 @@ POLL_S = 3.0          # seconds between job status checks
 # seen longer under load). Re-solving the same file is a cache hit and instant,
 # so the budget can be generous without any cost (ADR-018).
 TIMEOUT_S = 900.0     # give up on a solve after this
+# The radius that goes with a pointing hint (center_ra/center_dec/radius in
+# degrees): the same 5 degrees ASTAP gets (see astap.SEARCH_RADIUS_DEG).
+# Without it nova searches the whole sky.
+SEARCH_RADIUS_DEG = 5.0
 
-# WCS cards we keep from the solved wcs.fits (NAXIS stays from the user image;
-# SIP polynomial cards A_*/B_* are dropped on purpose: our WCS is plain TAN)
-_WCS_KEYS = ("CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2", "CTYPE1", "CTYPE2",
+# WCS cards we keep from a solved wcs.fits (NAXIS stays from the user image;
+# SIP polynomial cards A_*/B_* are dropped on purpose: our WCS is plain TAN).
+# Public because the whole app means the same thing by "the plate is solved":
+# the ASTAP client, the cache and the visit's batch all use this list.
+WCS_KEYS = ("CRVAL1", "CRVAL2", "CRPIX1", "CRPIX2", "CTYPE1", "CTYPE2",
              "CUNIT1", "CUNIT2", "CD1_1", "CD1_2", "CD2_1", "CD2_2",
              "CDELT1", "CDELT2", "CROTA2", "PC1_1", "PC1_2", "PC2_1",
              "PC2_2", "IMAGEW", "IMAGEH", "EQUINOX", "RADESYS")
@@ -57,11 +63,51 @@ def _login(api_key):
     return out["session"]
 
 
-def _upload(session, path):
-    # @args: session - login session, path - FITS file to upload
+def _hints(path, pointing=None):
+    # What the upload tells nova about the plate: where it looks and how big
+    # it is. Nova's default is a blind solve over the whole sky, which takes
+    # minutes and fails often on a plate like the V0526 Per frames (no
+    # position and no scale of their own: FOCALLEN=0, no RA/DEC); with the
+    # project's field it searches a small box instead (ADR-051: the same
+    # hint took ASTAP from 66 s to 0.13 s, and nova follows the same
+    # physics).
+    #
+    # The scale goes as a width in degrees with a 25 % window: the header's
+    # own scale is a good number, the observer's Settings are a guess, and
+    # nova only needs to be told the neighbourhood.
+    # @args: path - FITS Path, pointing - (ra_deg, dec_deg) or None
+    # @return: dict of request-json fields ({} when nothing is known)
+    out = {}
+    if pointing:
+        try:
+            out["center_ra"] = float(pointing[0])
+            out["center_dec"] = float(pointing[1])
+            out["radius"] = SEARCH_RADIUS_DEG
+        except (TypeError, ValueError, IndexError):
+            logger.info("astrometry: unusable pointing %r", pointing)
+            out = {}
+    try:
+        from .. import fits_io
+        from .astap import fov_hint
+        header, _data = fits_io.read_fits(path)
+        fov = fov_hint(header)
+    except Exception as err:        # a header we cannot read: no scale hint
+        logger.warning("astrometry: no scale hint (%s)", err)
+        fov = None
+    if fov and fov > 0:
+        out["scale_units"] = "degwidth"
+        out["scale_lower"] = round(fov * 0.8, 4)
+        out["scale_upper"] = round(fov * 1.25, 4)
+    return out
+
+
+def _upload(session, path, hints=None):
+    # @args: session - login session, path - FITS file to upload,
+    #        hints - the request-json fields from _hints (or None)
     # @return: submission id; raises on network error
     req = {"session": session, "publicly_visible": "n",
            "allow_modifications": "n", "allow_commercial_use": "n"}
+    req.update(hints or {})
     with open(path, "rb") as fh:
         r = requests.post(f"{API}/upload", data={"request-json": json.dumps(req)},
                           files={"file": (path.name, fh)}, timeout=180)
@@ -112,14 +158,17 @@ def _fetch_wcs(job_id):
     r = requests.get(f"{WCS_URL}/{job_id}", timeout=60)
     r.raise_for_status()
     header = fits_io.read_header(io.BytesIO(r.content))
-    cards = {k: header[k] for k in _WCS_KEYS if k in header}
+    cards = {k: header[k] for k in WCS_KEYS if k in header}
     return cards or None
 
 
-def solve(path, progress=None):
+def solve(path, progress=None, pointing=None):
     # Blind-solves a FITS image with Astrometry.net and returns the WCS cards.
     # Results are cached by content hash: the same file never gets re-solved.
-    # @args: path - FITS Path, progress - optional callable(stage_text)
+    # @args: path - FITS Path, progress - optional callable(stage_text),
+    #        pointing - (ra_deg, dec_deg) of the field when the app knows it
+    #        (the project's target): it turns the whole-sky search into a
+    #        small one
     # @return: dict of WCS header cards, or None (offline / failed / no key)
     from ...config import config
     api_key = (config.get("astrometry_key") or "").strip()
@@ -140,7 +189,7 @@ def solve(path, progress=None):
             return None
         if progress:
             progress("upload")
-        subid = _upload(session, path)
+        subid = _upload(session, path, _hints(path, pointing))
         if subid is None:
             return None
         if progress:

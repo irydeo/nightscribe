@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Single-document dialog (ADR-005, ADR-053): one curated markdown page
+  (Guide, What's new, Data sources), no tree. Loaded by gui/doc_dialog.py
+  through gui/ui_loader.py. The page style is the doc browser's, applied
+  in code; the window title is set per document in code.
+-->
+<ui version="4.0">
+ <class>DocDialog</class>
+ <widget class="QDialog" name="DocDialog">
+  <layout class="QVBoxLayout" name="vbox_doc"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item>
+    <widget class="QTextBrowser" name="view">
+     <property name="openExternalLinks"><bool>false</bool></property>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

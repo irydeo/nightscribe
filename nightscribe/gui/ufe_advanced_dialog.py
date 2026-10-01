@@ -49,3 +49,26 @@ class UfeAdvancedDialog(QDialog):
         self.chk_color = self._ui.chk_color
         self.spn_target_bv = self._ui.spn_target_bv
         self.chk_subtract = self._ui.chk_subtract
+        # series knobs (series plan, phase 5): group_n, detrend policy,
+        # per-night aperture sweep and the saturation ceiling
+        self.spn_group_n = self._ui.spn_group_n
+        self.cmb_align = self._ui.cmb_align
+        # Auto is the honest default: a visit's frames rarely sit on the
+        # same pixels, and measuring them as if they did is how a series
+        # is lost (see the V0526 Per case in docs/PLANS/series-quality.md)
+        self.cmb_align.addItem(self.tr("Auto (recommended)"), "auto")
+        self.cmb_align.addItem(self.tr("Off (frames already aligned)"),
+                               "off")
+        self.cmb_align.addItem(self.tr("Translation only"), "translation")
+        self.cmb_align.addItem(self.tr("Rotation and translation"),
+                               "similarity")
+        self.cmb_detrend = self._ui.cmb_detrend
+        self.cmb_detrend.addItem(self.tr("Off (raw curve)"), "off")
+        self.cmb_detrend.addItem(self.tr("Airmass (minimum)"), "airmass")
+        self.cmb_detrend.addItem(self.tr("Auto (FWHM, sky, x-y)"), "auto")
+        self.chk_auto_aperture = self._ui.chk_auto_aperture
+        self.spn_saturate = self._ui.spn_saturate
+        # the line that says what "0 = auto" resolves to (header card,
+        # Ajustes or the camera profile's linearity)
+        self.lbl_saturate_auto = self._ui.lbl_saturate_auto
+        self.btn_restore = self._ui.btn_restore

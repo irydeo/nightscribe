@@ -14,8 +14,10 @@ the Measure section, right under the three apertures);
 phase I.5 raised the centroid to the **gaussian matched filter**
 (`gaussian_centroid`: the seeing template on a 0.1 px lattice with
 parabolic refinement, ~0.01 px with decent signal, honest guards on the
-faint) with the **reticle snapping to the centroid** on hover; only the
-exoplanet-transit regime is pending a decision (ADR-015).
+faint) with the **reticle snapping to the centroid** on hover; the
+exoplanet-transit regime now runs on the signed ADR-015 reopening
+(2026-09-27), directed by `docs/PLANS/series-photometry.md` (pieces T1–T8,
+thirteen phases).
 
 Documentation of the base photometric process:
 [PHOTOMETRY.md](PHOTOMETRY.md). This document is its quality sequel.
@@ -59,7 +61,7 @@ H):
 | Your camera's real saturation level | Photometry tab (H4: SATURATE card or `ccd_saturate` setting) | no clipped star sneaks in as a good one |
 | Colour term fitted with the comps | Photometry tab (H1) | your equipment's response stops biasing the zero |
 | Host-galaxy subtraction (SNe) | Photometry tab (H2b) | on galactic cores: from 0.05–0.15 to 0.03–0.05 mag |
-| Per-frame normalization + detrending (series) | pending (ADR-015) | the transits' requirement: 0.001–0.005 mag relative |
+| Per-frame normalization + detrending (series) | Done (2026-09-27): T1–T7 and the fit (T8) in `core/series_measure.py`, `core/transit_fit.py` and `core/exoclock_export.py`; model parity D27 closed (1e-5 vs batman) and the EXOTIC end-to-end gate open on the real photometry. See `docs/SEQUENCES.md` and `docs/PLANS/series-photometry.md` | the transits' requirement: 0.001–0.005 mag relative |
 
 ### 3. Three scenarios, honest figures
 
@@ -83,9 +85,10 @@ H):
   star's scatter, and the curve is detrended against air mass always
   showing the raw one beside it. With that and good practices, an
   amateur reaches 0.001–0.005 mag per binned point: enough for
-  publishable transit curves. Today EXOTIC does that reduction (signed
-  decision, ADR-015); doing it in-house is possible but is the major
-  work item left.
+  publishable transit curves. Today EXOTIC does that reduction (original
+  ADR-015); since the signed reopening (2026-09-27) it is done in-house,
+  with EXOTIC as the quality mirror: that is the major work item of
+  `docs/PLANS/series-photometry.md`.
 
 ### 4. When to trust a number
 
@@ -113,7 +116,7 @@ H):
 | Calibrated measurement on one plate (zero point from comps) | Exists (the Measure half of the FITS editor's Photometry tab, phase G) |
 | Colour term, gradient sky, FWHM aperture, real saturation, total error, check semaphore | Exists (phase H, 2026-09-23: `core/photometry.py` + Photometry tab) |
 | Host-galaxy subtraction | Exists (phase H: the blink's aligned PS1 reference, comp-scaled) |
-| Per-frame normalized series + detrending for transits | Missing: pieces T1–T8; ADR-015 decision to revisit or scope |
+| Per-frame normalized series + detrending for transits | In progress: pieces T1–T8 in `docs/PLANS/series-photometry.md` (ADR-015 reopened 2026-09-27; ADR-048 to ADR-051) |
 
 ---
 
@@ -123,8 +126,9 @@ H):
 `core/photometry.py` and `gui/ufe_measure_tab.py`, with tests in
 `tests/unit/test_photometry.py` and `test_ufe_measure_tab.py`; phase G
 (calibrated single-plate measurement) lives in
-`docs/PLANS/ufe-photometry.md`. Pieces T1–T8 (transits) remain pending
-the ADR-015 decision. This appendix stays as the reference specification
+`docs/PLANS/ufe-photometry.md`. Pieces T1–T8 (transits) are in progress in
+`docs/PLANS/series-photometry.md` (ADR-015 reopened and signed 2026-09-27).
+This appendix stays as the reference specification
 for future extensions.
 
 House rules: the project header on every `.py`; code in English with
@@ -203,11 +207,12 @@ the Photometry tab's panel; nothing touches the legacy flows.
 
 ### B. Exoplanet transits: pieces T1–T8
 
-**Decision note (read first)**: ADR-015 signed that transit reduction is
-100 % EXOTIC (the `inits.json` handoff; EXOTIC needs astropy and Python
-≤3.10, vetoed by ADR-004). Implementing T1–T8 requires reopening ADR-015
-or scoping the work as "high-precision calibrated series" while EXOTIC
-keeps the transit fitting. Sign it with the user before writing code.
+**Decision note (read first)**: **signed 2026-09-27**. ADR-015 is reopened:
+transit reduction happens in-house (pure numpy; no scipy, no astropy per
+ADR-004), with EXOTIC as the quality mirror and its `inits.json` handoff
+untouched as the expert path for the heavy stack. T1–T8 live in
+`docs/PLANS/series-photometry.md` (register D1–D39, thirteen phases, EXOTIC
+parity gate in phase 7, fixed thresholds).
 
 * **T1. Per-frame zero-point series**: every image is normalized with
   the comps measured on THAT image (extinction and thin clouds stop
@@ -243,7 +248,7 @@ star's rms inside what the noise model predicts.
 
 1. Every piece arrives with seeded unit tests and the full suite green
    (`.venv/bin/python -m pytest tests/unit`).
-2. The user docs (PHOTOMETRY + PRECISION, both languages) explain the
+2. The user docs (PHOTOMETRY + PRECISION + SEQUENCES, both languages) explain the
    new piece with an example; i18n with no `unfinished` strings.
 3. The legacy flows (series quick-look, blink, legacy chart, EXOTIC
    handoff) stay green untouched.

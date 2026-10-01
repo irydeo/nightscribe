@@ -1,4 +1,9 @@
 # NightScribe development dependencies
 -r requirements.txt
 pytest>=8.0
+# parallel unit runs: `pytest -n auto --dist loadfile tests/unit`
+pytest-xdist>=3.0
 pyinstaller>=6.0
+# test-only reference for the transit model parity (D27): the production
+# code is pure numpy and never imports it (tests use importorskip)
+batman-package>=2.5

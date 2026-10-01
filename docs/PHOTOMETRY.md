@@ -319,8 +319,8 @@ With the stacked images of several nights registered in the project,
 the quick-look button runs the whole chain:
 
 1. It loads each stack and locates the SN through its WCS (without a
-   WCS the verdict is `no_wcs`: solve the astrometry first; the FITS
-   editor has the "Solve astrometry…" button for that).
+   WCS the verdict is `no_wcs`; solve it and store the solution with the
+   FITS editor, which also solves by itself with the configured solver).
 2. It builds the ensemble (section 3.1).
 3. It measures the SN in every frame: one point per night with
    `{HJD, Δmag, error}`, where the error is the ensemble's scatter in
@@ -334,6 +334,22 @@ Dates are stored as **HJD** (heliocentric Julian date): the time
 corrected to the Sun's position, so month-long curves do not carry the
 ±8-minute swing of the Earth's orbit. The points are saved into the
 project and feed the light curve and the post.
+
+**Timescale**: the HJD is computed on **UTC**, the timescale your frames'
+`DATE-OBS` carries, not on TT: NightScribe does not add the leap seconds
+(37 in 2026) plus the 32.184 s fixed offset, about **69 s** (0.00080 d).
+For differential photometry, an AAVSO report or a supernova curve this
+sits far below the measurement's own error; when you compare a transit
+`T_mid` against an ephemeris published in HJD(TT) or BJD_TT, add the
+offset yourself (in 2026, +0.00080 d).
+
+**Notice (2026-09-28)**: the deep review of the series track found two
+bugs in versions up to that date. The Gaia to Johnson-Cousins colour
+transformations were evaluated in the wrong coefficient order (any
+magnitude derived from a sequence's colours was colour-biased), and the
+HJD sign was inverted (a seasonal error of up to ±16.6 min in the times
+of the EFF reports). Sequences, calibrated magnitudes and AAVSO/ExoClock
+files generated before this date should be regenerated from the frames.
 
 ---
 
@@ -358,7 +374,8 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 
 * `DATE` is HJD (`#DATE=HJD` in the header); points without a full HJD
   are skipped: the format has no empty-date concept.
-* `TRANS` is honestly written `NA`: NightScribe does not transform your
+* `TRANS` is honestly written `NO` (WebObs expects `YES`/`NO`: any other
+  value can be rejected on import): NightScribe does not transform your
   measurement to the standard photometric system (that would require
   knowing your equipment's colour and extinction coefficients).
 * `CNAME`/`CMAG` and `KNAME`/`KMAG` are filled from the comparison
@@ -370,7 +387,7 @@ NAME,DATE,MAG,MERR,FILT,TRANS,MTYPE,CNAME,CMAG,KNAME,KMAG,AMASS,GROUP,CHART,NOTE
 **What MAG means here**: for quick-look points it is the differential
 instrumental magnitude (Δmag against the ensemble), not a
 catalog-calibrated magnitude. In the Photometry tab's measurement it IS a
-catalog-calibrated magnitude via the zero point (TRANS stays `NA`, in
+catalog-calibrated magnitude via the zero point (TRANS stays `NO`, in
 all honesty: there is no colour transformation to the standard system).
 Imported points (measured with another tool) keep the magnitude they
 arrived with. Always read it with the point's filter and origin in
@@ -465,6 +482,42 @@ implementation appendix: [docs/PRECISION.md](PRECISION.md).
 * [ ] Repeat the measurement each night: two points per session catch
       problems a single one hides.
 
+### 8.1 Practices for the millimagnitude (T8)
+
+For a transit series that reaches the mmag level, the field recipe:
+
+* **Flats at the mmag level**: a flat with 1 % error leaves structure visible
+  at 0.01 mag on the curve; bring it below 0.1 % (several combined flats, no
+  clipping).
+* **Dithering**: shift a few pixels between frames; it spreads the detector
+  defects and the flat pattern through the measurement.
+* **Deliberate slight defocus**: a PSF a bit larger than the nominal one uses
+  more pixels per star (better SNR and less sensitivity to guiding) without
+  saturating; never enough to blend nearby stars.
+* **Constant cadence**: same exposure and same gap between frames; an
+  irregular cadence pollutes the phase and the detrend.
+* **Nothing saturated**: neither the target nor the comparisons; a compressed
+  comp lies about the zero point (and the check does not see it).
+
+### 8.2 Camera profile and linearity limit
+
+In **Settings → Photometric camera profile** you pick a preset (IMX455, IMX571,
+IMX533, IMX294, IMX183, GSENSE400/QHY42Pro, KAF-8300/16803/09000) that fills the
+pixel size, the full well, the dark current and a **suggested linearity**. The
+**linearity and the working max exposure are per gain**: measure yours; the
+suggestion is only a starting point.
+
+The linearity limit is the ceiling that really rules: the effective ceiling is
+the **minimum** of your linearity, the SATURATE card, the setting and the
+inferred clip. Above it a star **calibrates nothing** even if it is not
+saturated, so the app **excludes those comps/check** with the explicit reason
+("above your camera's linearity limit") and reports it in the panel and the CSV.
+On very sensitive sensors (GSENSE400) this is what keeps the brightest stars of
+the field out.
+
+Quick reference: `full well / gain` gives the saturation in ADU, and linearity
+usually sits below it. **If you change gain, measure it again.**
+
 ---
 
 ## 9. The minimal glossary
@@ -491,7 +544,18 @@ implementation appendix: [docs/PRECISION.md](PRECISION.md).
 
 ---
 
+**Measuring a series** (one frame after another, with per-frame alignment, a
+zero point tied per comparison star and quality gates) is a different job from
+measuring one plate and has its own guide: `SEQUENCES`. Once the curve is there,
+**finding the period and folding it** (Lomb-Scargle and PDM periodograms, FAP,
+two-panel report) lives in `SEQUENCES` §9 and ADR-054.
+
+---
+
 *Implementation details and decisions: `core/series.py`,
-`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`;
+`core/compstars.py`, `core/phototrans.py`, `core/photometry_export.py`,
+`core/series_measure.py`, `core/register.py`, `core/periodogram.py`,
+`core/gain.py`;
 ADR-018 (own FITS/WCS), ADR-042 (photometric sequences), ADR-044
-(unified FITS editor).*
+(unified FITS editor), ADR-048 (the frame-by-frame series and its alignment),
+ADR-054 (period search).*

@@ -394,3 +394,104 @@ def test_save_and_close_reverts_an_invalid_date(panel, qapp):
     assert fu.get_session(vp._db, sid)["obs_date"] == stored
     qapp.processEvents()
     assert vp._win is None
+
+
+def test_visit_window_measure_series_action(qapp, tmp_path):
+    # ADR-048 (D8/D36): the visit window carries a "Measure the sequence"
+    # action that hands the visit id to the host (which opens the editor's
+    # series block). The action exists only with a callback armed.
+    from nightscribe.core.db import Database
+    from nightscribe.core import project, followup as fu
+    from nightscribe.gui.widgets.visits_panel import VisitWindow
+    db = Database(tmp_path / "v.db")
+    p = project.create(db, "transit", "HAT-P-32 b")
+    sid = fu.create_session(db, p["id"], obs_date="2026-09-20")
+    seen = []
+    w = VisitWindow(db, p["id"], sid, lang="en", kind="transit",
+                    measure_series=lambda s: seen.append(s))
+    w._ui.vp_btn_series.click()
+    assert seen == [sid]
+    w.close()
+    db.close()
+
+
+# ---------------- batch FITS attach (review: one dialog, not N) -------
+
+def _fits(path, filt="V", date="2026-09-20T23:30:00", exp=10.0):
+    # a minimal header-only FITS (fits_meta only reads the header)
+    def card(k, v):
+        s = k.ljust(8) if v is None else f"{k.ljust(8)}= {v}"
+        return s[:80].ljust(80)
+    cards = [card("SIMPLE", "T"), card("BITPIX", "-32"), card("NAXIS", "0"),
+             card("FILTER", f"'{filt}'"), card("DATE-OBS", f"'{date}'"),
+             card("EXPTIME", str(exp)), card("END", None)]
+    data = "".join(cards).encode("latin-1")
+    data += b" " * ((2880 - len(data) % 2880) % 2880)
+    from pathlib import Path
+    Path(path).write_bytes(data)
+    return str(path)
+
+
+def test_attach_fits_asks_once_and_registers_all(panel, monkeypatch,
+                                                 tmp_path):
+    from PySide6.QtWidgets import QFileDialog, QDialog
+    from nightscribe.core import project as proj_mod
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    w = vp._win
+    files = [_fits(tmp_path / f"seq{i}.fits") for i in range(5)]
+    calls = []
+
+    class _Cnt:
+        def __call__(self):
+            calls.append(1)
+            return QDialog.Accepted
+
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames",
+                        staticmethod(lambda *a, **k: (files, "")))
+    monkeypatch.setattr(QDialog, "exec", _Cnt())
+    w._on_attach()
+    rows = proj_mod.files_for_session(vp._db, w._sid)
+    assert len(rows) == 5
+    assert len(calls) == 1                    # ONE dialog for the batch
+    assert all((r.get("meta") or {}).get("filter") == "V" for r in rows)
+
+
+def test_attach_fits_cancel_registers_nothing(panel, monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QFileDialog, QDialog
+    from nightscribe.core import project as proj_mod
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    w = vp._win
+    files = [_fits(tmp_path / f"x{i}.fits") for i in range(3)]
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames",
+                        staticmethod(lambda *a, **k: (files, "")))
+    monkeypatch.setattr(QDialog, "exec", lambda self: QDialog.Rejected)
+    w._on_attach()
+    assert proj_mod.files_for_session(vp._db, w._sid) == []
+
+
+def test_attach_fits_lists_the_exception(panel, monkeypatch, tmp_path):
+    from PySide6.QtWidgets import QFileDialog, QDialog
+    vp, pid, _o = panel
+    vp.btn_new.click()
+    w = vp._win
+    files = [_fits(tmp_path / f"a{i}.fits") for i in range(3)]
+    files.append(_fits(tmp_path / "odd.fits", filt="R"))   # one off-filter
+    monkeypatch.setattr(QFileDialog, "getOpenFileNames",
+                        staticmethod(lambda *a, **k: (files, "")))
+    seen = {}
+    monkeypatch.setattr(QDialog, "exec",
+                        lambda self: QDialog.Accepted)
+    # capture the dialog's exceptions list via the build step
+    import nightscribe.gui.widgets.visits_panel as vp_mod
+    orig = vp_mod.adopt_ui
+
+    def _spy(host, name):
+        ui = orig(host, name)
+        if name == "visit_files_meta":
+            seen["ui"] = ui
+        return ui
+    monkeypatch.setattr(vp_mod, "adopt_ui", _spy)
+    w._on_attach()
+    assert seen["ui"].lst_except.count() == 1

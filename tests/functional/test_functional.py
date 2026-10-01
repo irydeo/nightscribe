@@ -1009,3 +1009,16 @@ def test_ccdciel_jsonrpc_ping():
     assert isinstance(dash, dict)
     devs = dash.get("devices") or {}
     assert "connected" in devs or "camera" in dash
+
+
+# ---------------- local plate solving (ASTAP, needs the binary) --------
+
+def test_astap_solves_the_sample_plate():
+    # the MicroObservatory sample: ASTAP must solve it fast from the
+    # header's own scale (a wrong -fov used to loop on "Found 0 references")
+    from nightscribe.core.sources import astap
+    if astap.resolve_binary() is None:
+        pytest.skip("ASTAP not installed")
+    plate = Path(__file__).parents[1] / "fixtures" / "hatp32_sample.fits"
+    cards = astap.solve(plate)
+    assert cards and 30.0 < float(cards["CRVAL1"]) < 32.0

@@ -59,3 +59,28 @@ def test_feasible_true_and_false():
     assert exposure.feasible(a, b, 3600) is True
     assert exposure.feasible(a, b, 999999) is False
     assert exposure.feasible(None, b, 60) is False
+
+
+def test_transit_exposure_respects_the_camera_cap():
+    # an sCMOS caps the recommended exposure (the rest comes from grouping)
+    from nightscribe.core import exposure
+    assert exposure.recommended_transit_exposure(14.0) == 120
+    assert exposure.recommended_transit_exposure(14.0, max_exposure_s=30) \
+        == 30
+    assert exposure.recommended_transit_exposure(9.0, max_exposure_s=30) == 15
+
+
+def test_sn_exposure_respects_the_camera_cap():
+    from nightscribe.core import exposure
+    assert exposure.recommended_sn_exposure(20.0) == 300
+    assert exposure.recommended_sn_exposure(20.0, max_exposure_s=10) == 10
+
+
+def test_group_n_for_span():
+    from nightscribe.core import exposure
+    # 5 s frames grouped to reach a ~60 s effective point
+    assert exposure.group_n_for_span(60, 5) == 12
+    assert exposure.group_n_for_span(60, 10) == 6
+    assert exposure.group_n_for_span(3, 10) == 1     # never below one
+    assert exposure.group_n_for_span(0, 5) == 1
+    assert exposure.group_n_for_span(None, 5) == 1

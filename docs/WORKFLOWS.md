@@ -37,7 +37,11 @@ around the **visits manager** for every kind — every day you work the
 object is a visit, and its resources (plates, reports, imports) hang from
 it, registered in `project_files` with `session_id`; nothing attaches
 without a visit. ADR-019's 2026-09-06 review merged the Capture step into
-Plan and added real CCDciel control — ADR-030).
+Plan and added real CCDciel control — ADR-030). The **how** of measuring a
+series from the visit (photometric sequences, detrend, multi-night, ExoClock
+and live mode) lives in [SEQUENCES.md](SEQUENCES.md); a transit's scientific
+close goes through **orchestrating EXOTIC** from the app (see SEQUENCES and
+ADR-052).
 
 ## 4. Flow — supernova / transient
 
@@ -868,7 +872,10 @@ button landing on the exact section; calm/empty states; source: the new,
 purely-local, additive `core/attention.py`); **rich rows** in both tabs
 (kind band, next action in words, progress dots, "up tonight HH:MM–HH:MM"
 chip via `planner.safe_window_for`, activity age, **sparkline** of your
-own measurements for SN/variables, the "Needs you" order); the **Next
+own measurements for SN/variables, the "Needs you" order; since 2026-10-01
+the thumbnail is the project's **latest available curve** (the newest run,
+be it the series or an EXOTIC reduction), framed in the **chart's own
+magnitude window**); the **Next
 card as the step machine's command center** (Mark done/Skip beside Go →;
 sections keep only a discreet footer); **three-level action prominence**
 (primary visible / ⋯ menu / collapsed block with a plain-language title —
@@ -935,3 +942,65 @@ visible. Titan is documented as out of season (~2040). In Tonight, up to 3
 Horizons refinement of satellite phenomena (~1 min, spike first); eclipse
 contact times; stellar occultations; the "impact" line still reads only
 Moon+Kp (events could feed it in v2).
+
+
+---
+
+## Photometric series quality (2026-09-29)
+
+**Why**: a real observation from the ObSN group (V0526 Per, 244 frames of 40 s, no
+WCS) came out **catastrophic** with the series engine: the field drifted 134" in
+2.9 h, the star left the aperture in under a minute and the curve came out across 8
+magnitudes with 0.5 mag errors. The full diagnosis (with the before/after numbers)
+is in `docs/PLANS/series-quality.md`.
+
+**What was done** (phases A, B and C of the plan; ADR-048 revised and ADR-054):
+
+- `core/register.py` rewritten: the sky is removed, **the stars vote** the transform
+  (translation first), quality is **physical** (matched stars and rms in px) and a
+  rotation only enters when it removes real residual. A frame that cannot be verified
+  inherits the previous one and is flagged `align_failed`.
+- **Alignment is on by default** (`align="auto"` -> `coords`: measured on the native
+  grid, the PSF is never resampled) and is persisted in `cfg_json`.
+- The **zero point is tied per comparison star** (`_tie_comps`): a comp that comes in
+  and out of the frame, or that saturates, no longer moves the curve. The check star
+  never enters the zero point.
+- The **aperture follows the seeing** in a series and, for `variable`/`hads`, the
+  default detrend is the airmass minimum.
+- The engine **says what it does not know** in the panel: drift, star residual, comps
+  that never entered or are saturated, and the missing gain.
+- `core/periodogram.py` + `viz/phase_view.py` + `gui/phase_dialog.py`: period search
+  (generalised Lomb-Scargle + PDM + spectral window, bootstrap FAP), folding and the
+  two-panel report, with cycles covered and alias warnings. Reachable from the visit
+  window and from the editor's Measure tab.
+
+**Numbers**: 244/244 measurable points (was 5), **0.899** correlation with the
+observer's independent reduction (was 0.32), **0.0094 mag** residual (was 0.13),
+0.23 s/frame (was 4.6 s and not converging), unit suite green: **2105**.
+
+**Following phases (done the same day, see ADR-048 rev.)**:
+
+- **G1/G3 · The gain**: `core/gain.py` measures it on the frames themselves (0.772 ±
+  0.002 e-/ADU on the real series) and Settings gains the two fields nobody could
+  fill. A point's internal error goes from non-existent to **0.0052 mag**.
+- **A · The chart**: robust scale, zoom/pan, bar = photon and band = systematic
+  (`err_internal`, migration **v13**), data flags separated from calibration
+  caveats, and controls in the series block.
+- **B · Robustness**: the aperture really follows the seeing (the radii belong to the
+  reference FWHM), a **`seeing`** flag against `cloud`, and a robust analysis (clip on
+  the folded curve; the clip on the time series was measured and rejected).
+- **C · Comps**: `validate_on_plate` measures every candidate on the open plate
+  (saturation, linearity, sensor, SNR) and the field is the sensor's real rectangle.
+- **D · The curve**: AAVSO's `fetch_lightcurve`, joint folding, and a bounded search
+  so a decade of history cannot freeze the window (from 60 s to 3-4 s).
+
+**Entry point (for whoever picks this up)**:
+
+1. **G2**: the "Measure the gain…" dialog (two pairs, with the read noise) on top of
+   `core/gain.py`, which already does the two-level fit; only the window is missing.
+2. **`seeing` in the analysis**: the per-night zero-point offset in the multi-night
+   fold (the plan's D3) is still open.
+3. **Declared debt**: the AAVSO curve package has no network test; its parsing
+   (`_parse_curve`) is covered by the priority-chain tests.
+4. The fixture `tests/data/v0526per/` (8 cropped real frames, 4 MB) is the safety
+   net: **do not replace it with synthetic data**.

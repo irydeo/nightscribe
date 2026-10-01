@@ -19,8 +19,14 @@ EXOTIC file-name convention. No network anywhere.
 
 import datetime
 import json
+from pathlib import Path
+
+import pytest
 
 from nightscribe.core import exotic
+
+_FIXTURES = Path(__file__).parents[1] / "fixtures"
+_HATP32 = _FIXTURES / "hatp32_sample.fits"    # MicroObservatory crop
 
 _MID = datetime.datetime(2026, 8, 22, 0, 20, tzinfo=datetime.timezone.utc)
 
@@ -93,9 +99,18 @@ def test_structure_matches_exotic_schema():
     # the wizard fields stay null (the user marks stars in EXOTIC)
     assert ui["Target Star X & Y Pixel"] is None
     assert ui["Comparison Star(s) X & Y Pixel"] is None
-    # plate solve on, AAVSO comp-star fetch on (first-timer friendly)
-    assert ui["Plate Solution? (y/n)"] == "y"
+    # plate solve off (astrometry.net is never asked: it cost minutes and
+    # failed; EXOTIC uses the frame's own WCS or astroalign), AAVSO comp-star
+    # fetch on (first-timer friendly)
+    assert ui["Plate Solution? (y/n)"] == "n"
     assert ui["Add Comparison Stars from AAVSO? (y/n)"] == "y"
+
+
+def test_plate_solution_can_still_be_asked_for():
+    # the escape hatch: a caller may still want astrometry.net's solution
+    ui = exotic.make_inits(_ctx(), _d(), _Cfg(),
+                           plate_solution=True)["user_info"]
+    assert ui["Plate Solution? (y/n)"] == "y"
 
 
 def test_user_info_values():
@@ -208,6 +223,94 @@ def test_sexagesimal_coordinates():
     assert pp["Host Star Name"] == "WASP-999"
 
 
+# ---------------- observation date (2026-09-30) ----------------
+
+def test_frame_jd_reads_the_observation_date():
+    # MJD-OBS first: the MicroObservatory crop carries 58107.065
+    assert exotic.frame_jd(_HATP32) == pytest.approx(2458107.565)
+    # an unreadable frame is not fatal: the caller falls back to its own date
+    assert exotic.frame_jd(_HATP32.parent / "nope.fits") is None
+
+
+def test_visit_inits_dates_the_handoff_from_the_frames():
+    # Regression (2026-09-30): a December 2017 visit was handed over dated
+    # "today" (30-September-2026) and EXOTIC named every output, figure and
+    # AAVSO report that way. The frames know the night.
+    inits = exotic.make_inits_for_visit(
+        _ctx(), _d(), _Cfg(), [_HATP32], target_xy=(424, 286), comps_xy=[])
+    assert inits["user_info"]["Observation date"] == "20-December-2017"
+
+
+def test_make_inits_takes_an_explicit_observation_date():
+    inits = exotic.make_inits(_ctx(), _d(), _Cfg(), obs_jd=2458107.565)
+    assert inits["user_info"]["Observation date"] == "20-December-2017"
+
+
+def test_make_inits_without_a_date_keeps_the_transit_snapshot():
+    # no frames and no obs_jd: the project's transit snapshot still rules
+    inits = exotic.make_inits(_ctx(), _d(), _Cfg())
+    assert inits["user_info"]["Observation date"] == "22-August-2026"
+
+
+# ---------------- uncertainties (2026-09-30) ----------------
+
+def _d_hatp32():
+    # the real pscomppars row of the reference transit run (HAT-P-32 b)
+    return {"pl_name": "HAT-P-32 b", "hostname": "HAT-P-32",
+            "ra": 31.0427614, "dec": 46.6878512,
+            "pl_orbper": 2.1500082, "pl_orbpererr1": 1.3e-07,
+            "pl_radj": 1.98, "pl_radjerr1": 0.045,
+            "st_rad": 1.367, "st_raderr1": 0.031,
+            "pl_orbsmax": 0.03397, "pl_orbsmaxerr1": 0.00051,
+            "pl_orbincl": 88.98, "pl_orbinclerr1": 0.68,
+            "pl_orbeccen": 0.159, "pl_orblper": 50.0,
+            "pl_tranmid": 2455867.402743, "pl_tranmiderr1": 4.9e-05,
+            "st_teff": 6001.0, "st_tefferr1": 88.0, "st_tefferr2": -88.0,
+            "st_met": -0.16, "st_meterr1": 0.08, "st_meterr2": -0.08,
+            "st_logg": 4.22, "st_loggerr1": 0.04, "st_loggerr2": -0.04,
+            "sy_dist": 289.205, "sy_pmra": -9.82484, "sy_pmdec": 3.47654}
+
+
+def test_uncertainties_travel_with_the_planet():
+    # Without them EXOTIC replaces each one with 1 (exotic.py:1996-2002), and
+    # its transit-time window is then so wide that the aperture/comparison
+    # search cannot fit the time at all
+    pp = exotic.make_inits(_ctx(), _d_hatp32(), _Cfg())["planetary_parameters"]
+    assert pp["Mid-Transit Time Uncertainty"] == pytest.approx(4.9e-05)
+    assert pp["Orbital Period Uncertainty"] == pytest.approx(1.3e-07)
+    assert pp["Orbital Inclination (deg) Uncertainty"] == pytest.approx(0.68)
+    assert pp["Star Effective Temperature (+) Uncertainty"] == 88.0
+    # the "(+)/(-)" pair is a pair of magnitudes: the archive's -88 becomes 88
+    assert pp["Star Effective Temperature (-) Uncertainty"] == 88.0
+    assert pp["Star Metallicity (-) Uncertainty"] == pytest.approx(0.08)
+    assert pp["Star Surface Gravity (-) Uncertainty"] == pytest.approx(0.04)
+    # the periastron, which EXOTIC otherwise models as omega = 0
+    assert pp["Argument of Periastron (deg)"] == 50.0
+
+
+def test_the_ratio_uncertainties_are_propagated():
+    # Rp/Rs = 1.98*0.10045/1.367 and a/Rs = 0.03397/(1.367*0.00465047):
+    # their relative uncertainty is the quadrature sum of the two relative
+    # ones, which is the only honest way to get it from the archive
+    pp = exotic.make_inits(_ctx(), _d_hatp32(), _Cfg())["planetary_parameters"]
+    assert pp["Ratio of Planet to Stellar Radius (Rp/Rs)"] == \
+        pytest.approx(0.14549, abs=1e-4)
+    assert pp["Ratio of Planet to Stellar Radius (Rp/Rs) Uncertainty"] == \
+        pytest.approx(0.00467, abs=1e-4)
+    assert pp["Ratio of Distance to Stellar Radius (a/Rs)"] == \
+        pytest.approx(5.3436, abs=1e-3)
+    assert pp["Ratio of Distance to Stellar Radius (a/Rs) Uncertainty"] == \
+        pytest.approx(0.1454, abs=1e-3)
+
+
+def test_a_missing_uncertainty_stays_null():
+    # a row cached before the v3 fields (or an incomplete one) carries no
+    # uncertainties: the inits must not invent a number
+    pp = exotic.make_inits(_ctx(), _d(), _Cfg())["planetary_parameters"]
+    assert pp["Mid-Transit Time Uncertainty"] is None
+    assert pp["Ratio of Planet to Stellar Radius (Rp/Rs) Uncertainty"] is None
+
+
 # ---------------- output file ----------------
 
 def test_suggested_name_convention():
@@ -221,3 +324,49 @@ def test_export_inits_writes_parseable_json(tmp_path):
     data = json.loads(open(out, encoding="utf-8").read())
     assert data["planetary_parameters"]["Planet Name"] == "WASP-999 b"
     assert data["user_info"]["Directory to Save Plots"] == str(tmp_path)
+
+
+# ---------------- visit inits (orchestration phase B) ----------------
+
+def test_make_inits_for_visit_points_at_the_frames(tmp_path):
+    frames = [tmp_path / "a.fits", tmp_path / "b.fits"]
+    inits = exotic.make_inits_for_visit(
+        _ctx(), _d(), _Cfg(), frames, target_xy=(424, 286),
+        comps_xy=[(465, 183), (512, 263)], plan={"filter": "R"})
+    ui = inits["user_info"]
+    assert ui["Directory with FITS files"] == str(tmp_path)
+    assert ui["Directory to Save Plots"] == str(tmp_path)
+    # EXOTIC's sample writes these as strings
+    assert ui["Target Star X & Y Pixel"] == "[424, 286]"
+    assert ui["Comparison Star(s) X & Y Pixel"].startswith(
+        "[[465, 183], [512, 263]")
+    # padded to EXOTIC's ten slots
+    assert ui["Comparison Star(s) X & Y Pixel"].count("[]") == 8
+    # headless: comps in pixels, no AAVSO fetch, no astrometry.net round trip
+    assert ui["Add Comparison Stars from AAVSO? (y/n)"] == "n"
+    assert ui["Plate Solution? (y/n)"] == "n"
+    # the manual note ("set the FITS folder yourself") is wrong here
+    assert "Directory with FITS files' to your reduced" not in \
+        ui["Observing Notes"]
+    assert "set by NightScribe" in ui["Observing Notes"]
+
+
+def test_make_inits_for_visit_out_dir_and_prereduced(tmp_path):
+    frames = [tmp_path / "a.fits"]
+    plots = tmp_path / "plots"
+    inits = exotic.make_inits_for_visit(
+        _ctx(), _d(), _Cfg(), frames, target_xy=(1, 2), comps_xy=[],
+        out_dir=str(plots), pre_reduced="/data/curve.txt")
+    ui = inits["user_info"]
+    assert ui["Directory to Save Plots"] == str(plots)
+    assert inits["optional_info"]["Pre-reduced File:"] == "/data/curve.txt"
+
+
+def test_export_inits_creates_its_folder(tmp_path):
+    # regression: the visit handoff writes into a fresh <project>/exotic
+    # folder that does not exist yet; the write used to raise
+    # FileNotFoundError (the reduce dialog flashed and nothing happened)
+    out = tmp_path / "project" / "exotic" / "inits.json"
+    exotic.export_inits({"user_info": {}}, out)
+    assert out.is_file()
+    assert json.loads(out.read_text(encoding="utf-8"))["user_info"] == {}

@@ -458,6 +458,21 @@ def add_file(db, project_id, path, kind, session_id=None, meta=None):
     return cur.lastrowid
 
 
+def add_file_once(db, project_id, path, kind, session_id=None, meta=None):
+    # Like add_file, but the same path is not registered twice for the same
+    # visit: re-importing a reduction (or saving its products again from the
+    # result window) must not pile duplicates in the visit's resources.
+    # @args: as add_file
+    # @return: (file id, created) - created is False when it was already there
+    existing = (files_for_session(db, session_id) if session_id is not None
+                else list_files(db, project_id))
+    for f in existing:
+        if f["path"] == str(path):
+            return f["id"], False
+    return add_file(db, project_id, path, kind, session_id=session_id,
+                    meta=meta), True
+
+
 def list_files(db, project_id):
     # @return: list of file dicts
     rows = db.execute(

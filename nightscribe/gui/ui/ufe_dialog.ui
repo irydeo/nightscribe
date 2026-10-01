@@ -23,9 +23,11 @@
      <item><widget class="QPushButton" name="btn_north"><property name="text"><string>N</string></property><property name="toolTip"><string>North arrow (needs a WCS)</string></property><property name="enabled"><bool>false</bool></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
      <item><widget class="QPushButton" name="btn_scale"><property name="text"><string>Scale</string></property><property name="toolTip"><string>Scale bar (needs a WCS)</string></property><property name="enabled"><bool>false</bool></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
      <item><widget class="QPushButton" name="btn_annot"><property name="text"><string>A</string></property><property name="toolTip"><string>Saved annotations (the marks stored on this plate)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
-      <item><widget class="QPushButton" name="btn_boxes"><property name="text"><string>Boxes</string></property><property name="toolTip"><string>Metadata corner boxes: object, date, position, brightness, observer, equipment and plate scale (on screen and in the exported PNG)</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>false</bool></property></widget></item>
+      <item><widget class="QPushButton" name="btn_boxes"><property name="text"><string>Data</string></property><property name="toolTip"><string>What the plate's band says about it: position, magnitude, date, exposure, filter, equipment, station, plate scale and field of view (on screen and in the exported PNG). The colour of each datum says how much to trust it: the position in ink when this plate's own solution places it and dimmed when it is only the catalogue's, and the magnitude in a scale of its own: GREEN when the measurement is clean (error up to 0.05, comparisons and check star in order), ORANGE when it is usable but not clean (error up to 0.15, or a light caveat), RED when it is not worth reporting without looking (error above 0.15, too few comparisons, a check star that fails or a clipped core) and WHITE when it is only the catalogue's value, which is not a measurement of this plate</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
       <item><widget class="QPushButton" name="btn_mark"><property name="text"><string>Mark</string></property><property name="toolTip"><string>Object mark: where the attached object sits on the plate (needs a WCS; on screen and in the exported PNG)</string></property><property name="enabled"><bool>false</bool></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property></widget></item>
      <item><widget class="QPushButton" name="btn_solve"><property name="text"><string>Solve astrometry…</string></property><property name="toolTip"><string>Blind-solve the plate with Astrometry.net (the file on disk is never modified)</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_solve_visit"><property name="visible"><bool>false</bool></property><property name="text"><string>Solve the visit…</string></property><property name="toolTip"><string>The astrometry of EVERY frame of the visit, in one go: it is what the visit's products need (the astrometry report and the EXOTIC reduction of a transit), not the series, which measures on the reference plate and registers the rest. A visit is one field, so the project's own coordinates point the solver at it: each frame takes a moment instead of a minute of searching the sky. Frames that already carry a WCS are skipped, and the solution is written into each FITS (needs “Save the solved WCS in the FITS” in Settings)</string></property></widget></item>
+     <item><widget class="QToolButton" name="btn_view"><property name="toolTip"><string>What is drawn over the plate: the north arrow, the scale bar, the saved annotations, the metadata boxes and the object's mark. They are view switches, not actions, so they live together</string></property><property name="text"><string>View</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
       <item><spacer name="hsp_bar2"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeType"><enum>QSizePolicy::Fixed</enum></property><property name="sizeHint" stdset="0"><size><width>16</width><height>20</height></size></property></spacer></item>
      <item><widget class="QLabel" name="lbl_zoom_hint"><property name="text"><string>Zoom:</string></property></widget></item>
      <item><widget class="QPushButton" name="btn_zoom_fit"><property name="text"><string/></property></widget></item>
@@ -33,21 +35,44 @@
      <item><widget class="QPushButton" name="btn_zoom_100"><property name="text"><string/></property></widget></item>
      <item><widget class="QPushButton" name="btn_zoom_200"><property name="text"><string/></property></widget></item>
      <item><widget class="QPushButton" name="btn_zoom_400"><property name="text"><string/></property></widget></item>
+     <item><widget class="QToolButton" name="btn_zoom_more"><property name="toolTip"><string>The other zoom factors (50 %, 200 %, 400 %). Fit and 100 % stay in the bar because they are the two that are used all the time; the wheel and the presets zoom further</string></property><property name="text"><string>Zoom</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
      <item><widget class="QLabel" name="lbl_zoom"><property name="text"><string/></property><property name="toolTip"><string>Current zoom: 100 % is one plate pixel per screen pixel</string></property><property name="minimumSize"><size><width>44</width><height>0</height></size></property></widget></item>
      <item><spacer name="hsp_bar_end"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QWidget" name="ph_badge"/></item>
     </layout>
    </item>
-   <item><widget class="QLabel" name="lbl_object"><property name="text"><string/></property><property name="toolTip"><string>The object this editor was opened from</string></property><property name="visible"><bool>false</bool></property></widget></item>
    <item>
     <widget class="QSplitter" name="splitter">
      <property name="orientation"><enum>Qt::Horizontal</enum></property>
-     <widget class="QWidget" name="ph_view"/>
+     <widget class="QWidget" name="ph_series"/>
+      <widget class="QWidget" name="centre">
+       <layout class="QVBoxLayout" name="vbox_centre">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="row_centre_switch">
+          <item><widget class="QPushButton" name="btn_page_image"><property name="text"><string>Image</string></property><property name="checkable"><bool>true</bool></property><property name="checked"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The plate, with its marks, its annotations and the measurement overlay</string></property></widget></item>
+          <item><widget class="QPushButton" name="btn_page_curve"><property name="text"><string>Light curve</string></property><property name="checkable"><bool>true</bool></property><property name="autoExclusive"><bool>true</bool></property><property name="toolTip"><string>The measured series at full size, in the same place as the image. It opens by itself the moment a run ends; the wheel zooms and the drag moves the window</string></property></widget></item>
+          <item><spacer name="hsp_centre_switch"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QStackedWidget" name="stack_centre">
+          <widget class="QWidget" name="ph_centre_image"/>
+          <widget class="QWidget" name="ph_centre_curve"/>
+         </widget>
+        </item>
+       </layout>
+      </widget>
      <widget class="QTabWidget" name="tabs">
       <property name="minimumSize"><size><width>280</width><height>0</height></size></property>
      </widget>
     </widget>
    </item>
    <item><widget class="QWidget" name="ph_histogram"/></item>
+   <item><widget class="QLabel" name="lbl_status_bar"><property name="text"><string/></property><property name="toolTip"><string>What just happened, in one line. The result of a measurement stays in its own box, next to the action that produced it</string></property></widget></item>
   </layout>
  </widget>
  <resources/>

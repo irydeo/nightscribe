@@ -172,6 +172,9 @@ def test_routing_visit_plate_opens_the_editor(window, monkeypatch):
 
         def open_plate(self, path):
             return True
+
+        def load_saved_sequence(self, seq):
+            return False
     monkeypatch.setattr(window, "_ufe_open",
                         lambda tab, hook_pid=None, obj=None,
                         session_id=None: (
@@ -411,6 +414,27 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
         def set_reset_hooks(self, state_fn, points_fn):
             pass
 
+        def set_series_hook(self, fn):
+            pass
+
+        def set_points_hook(self, fn):
+            pass
+
+        def set_run_undo_hook(self, fn):
+            pass
+
+        def set_exoclock_hook(self, fn):
+            pass
+
+        def set_sequence_hook(self, fn):
+            pass
+
+        def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
+            pass
+
+        def load_saved_sequence(self, seq):
+            return False
+
         def show_tab(self, tab):
             pass
 
@@ -451,11 +475,17 @@ def test_save_hook_persists_the_target_magnitude(window, monkeypatch):
 def test_set_object_fills_everything(dlg):
     obj = {"name": "T CrB", "ra": 238.08392, "dec": 25.92,
            "mag": 10.5, "bv": 0.62}
+    # the plate first (its load prefills the tab fields), then the object:
+    # the band heads a PLATE, and it carries the object (ADR-046 rev.):
+    # name, position and the catalogue magnitude, which says it is one
+    dlg.state.load(MONO)
     dlg.set_object(obj)
-    assert dlg.windowTitle() == "NightScribe Image Workbench · T CrB"
-    line = dlg.lbl_object.text()
-    assert "T CrB" in line and "RA" in line and "mag 10.50" in line
-    assert dlg.lbl_object.isVisible()
+    assert dlg.windowTitle().startswith(
+        "NightScribe Image Workbench · T CrB")
+    first = dlg.view.band_lines()["lines"][0]
+    text = " · ".join(seg["text"] for seg in first)
+    assert "T CrB" in text and "RA" in text and "10.50 cat" in text
+    assert dlg.view.band_lines()["lines"][0]
     assert dlg.tab_blink.edt_name.text() == "T CrB"
     assert dlg.tab_blink.chk_manual.isChecked()
     assert dlg.tab_compare.edt_target.text() == "T CrB"
@@ -470,10 +500,13 @@ def test_object_survives_a_plate_load_and_clears_adhoc(dlg):
     dlg.open_plate(str(MONO))
     assert "T CrB" in dlg.windowTitle()          # the object stays
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
-    assert dlg.lbl_object.isVisible()
+    assert dlg.view.band_lines()["lines"][0]
     dlg.set_object(None)                          # the ad-hoc open
     assert dlg.object() is None
-    assert not dlg.lbl_object.isVisible()
+    # the band is the PLATE's heading: without an object it names the plate
+    text = " · ".join(seg["text"]
+                      for seg in dlg.view.band_lines()["lines"][0])
+    assert "sn2026zji_new_image" in text
     assert "T CrB" not in dlg.windowTitle()
     assert "sn2026zji_new_image.fits" in dlg.windowTitle()
 
@@ -540,3 +573,76 @@ def test_files_window_opens_ufe_for_a_project_plate(window):
                    for f in files)
     finally:
         proj.delete(dbmod.db, p["id"])
+
+
+def test_ufe_sequence_hook_stores_the_sequence(window, monkeypatch):
+    # the editor's sequence lands in the project context (plus the target
+    # magnitude), ready for the next open
+    import nightscribe.gui.main_window as mw
+    seen = {}
+    monkeypatch.setattr(mw.project, "update_context",
+                        lambda db_, pid, ctx: seen.update(pid=pid, ctx=ctx))
+    entries = [{"name": "A", "kind": "comp",
+                "star": {"ra": 1.0, "dec": 2.0, "mag": 12.0}}]
+    window._ufe_sequence_hook(7, {"catalog": "gaia",
+                                  "catalog_name": "Gaia EDR3",
+                                  "fov_arcmin": 36.0, "target_mag": 12.0,
+                                  "entries": entries})
+    assert seen["pid"] == 7
+    assert seen["ctx"]["sequence"]["entries"] == entries
+    assert seen["ctx"]["sequence"]["catalog"] == "gaia"
+    assert seen["ctx"]["mag"] == 12.0
+
+
+def test_load_editor_sequence_falls_back_to_the_project(window, monkeypatch):
+    # a plate state saved without a sequence must not block the project's
+    # saved sequence from filling the Compare tab
+    import nightscribe.gui.main_window as mw
+    monkeypatch.setattr(
+        mw.project, "find_file",
+        lambda db_, pid, path: {"meta": {"ufe": {"stretch": {}}}})
+    seq = {"catalog": "gaia", "catalog_name": "Gaia EDR3",
+           "entries": [{"name": "A", "kind": "comp",
+                        "star": {"ra": 1.0, "dec": 2.0}}]}
+    monkeypatch.setattr(mw.project, "get",
+                        lambda db_, pid: {"context": {"sequence": seq}})
+    calls = {"applied": 0, "loaded": []}
+
+    class _D:
+        def apply_plate_state(self, st):
+            calls["applied"] += 1
+
+        def load_saved_sequence(self, s):
+            calls["loaded"].append(s)
+
+    window._load_editor_sequence(_D(), 1, "/x.fits")
+    assert calls["applied"] == 1
+    assert calls["loaded"] == [seq]
+
+
+# ---------------- the workbench is one session at a time (issue) ------
+
+def test_another_project_does_not_inherit_the_previous_session(dlg):
+    # Reported: switching project kept the previous one's plate, sequence
+    # and target in the workbench, and it did the same when opening it
+    # from the Tools menu. The dialog is persistent on purpose (the plate
+    # and the stretch survive a close), which is exactly why it has to
+    # know when the SESSION changed.
+    dlg.begin_session((1, 10))
+    dlg.set_object({"name": "T CrB", "ra": 238.0, "dec": 25.9})
+    dlg.state.load(MONO)
+    dlg.tab_compare.edt_target.setText("T CrB")
+    assert dlg.state.has_image and dlg.view.band_lines()["lines"][0]
+    # the same session again: nothing is thrown away
+    assert dlg.begin_session((1, 10)) is False
+    assert dlg.state.has_image
+    # another project: a clean workbench, and nothing is lost (the plate,
+    # the sequence and the points live in their own project)
+    assert dlg.begin_session((2, 20)) is True
+    assert not dlg.state.has_image
+    assert not dlg.view.band_lines()["lines"]
+    assert dlg.tab_compare.edt_target.text() == ""
+    # the ad-hoc open from Tools is its own session too
+    dlg.state.load(MONO)
+    assert dlg.begin_session(None) is True
+    assert not dlg.state.has_image

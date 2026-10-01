@@ -128,7 +128,7 @@
     </layout>
    </item>
    <item>
-    <widget class="QLabel" name="lbl_status">
+    <widget class="QLabel" name="lbl_status"><property name="visible"><bool>false</bool></property>
      <property name="text">
       <string/>
      </property>

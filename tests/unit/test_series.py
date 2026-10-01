@@ -24,15 +24,19 @@ from nightscribe.core.series import (
 # ---------------- helpers: synthetic frames ----------------
 
 def _make_frame(w, h, stars, sky=100.0, noise=2.0, mjd=60000.0,
-               filt="Clear", wcs=None):
-    # @args: stars - list of (x, y, flux) tuples
+               filt="Clear", wcs=None, seed=7):
+    # @args: stars - list of (x, y, flux) tuples; seed - the noise is drawn
+    #        from a seeded generator: an unseeded one made the noise tests
+    #        flaky (a 5 sigma peak appears by chance in 10,000 pixels about
+    #        once in 300 runs, measured 2026-10-01)
     # @return: 2D numpy array with Gaussian PSF stars planted
     data = np.full((h, w), sky, dtype=np.float32)
     yy, xx = np.ogrid[:h, :w]
     for x, y, flux in stars:
         data += flux * np.exp(-((xx - x) ** 2 + (yy - y) ** 2) / (2 * 3 ** 2))
     if noise > 0:
-        data += np.random.normal(0, noise, (h, w)).astype(np.float32)
+        data += np.random.default_rng(seed).normal(
+            0, noise, (h, w)).astype(np.float32)
     f = Frame(data, wcs, mjd, filt, "/synthetic.fits")
     return f
 
@@ -97,7 +101,8 @@ def test_detect_sources_finds_bright():
 
 def test_detect_sources_ignores_noise():
     data = np.full((100, 100), 100.0, dtype=np.float32)
-    data += np.random.normal(0, 1.0, (100, 100)).astype(np.float32)
+    data += np.random.default_rng(11).normal(0, 1.0,
+                                             (100, 100)).astype(np.float32)
     src = detect_sources(data, k=5.0)
     assert len(src) == 0
 
@@ -260,3 +265,26 @@ def test_quicklook_auto_peak():
     ]
     s = analyze_campaign(points, sn_type="SN Ia")
     assert s["delta_from_peak"] is not None
+
+
+def test_analyze_campaign_ignores_points_without_magnitude():
+    # regression: a saved point may carry mag=None (rejected measure,
+    # imported row); comparing it with a float used to break the Analysis
+    # tab on its first open
+    points = [
+        {"mjd": 60000.0, "mag": None, "err": 0.02, "filter": "Clear"},
+        {"mjd": 60002.0, "mag": "16.40", "err": 0.02, "filter": "Clear"},
+        {"mjd": 60004.0, "mag": 16.90, "err": 0.02, "filter": "Clear"},
+        {"mjd": None, "mag": 16.0, "err": 0.02, "filter": "Clear"},
+    ]
+    s = analyze_campaign(points, sn_type="SN Ia")
+    assert s["verdict"] != "no_data"
+    assert s["nights"] == 2
+    assert s["points"] == 2
+    assert s["slope_mag_per_day"] > 0
+
+
+def test_analyze_campaign_all_without_magnitude_is_no_data():
+    s = analyze_campaign([{"mjd": 1.0, "mag": None},
+                          {"mjd": 2.0, "mag": "x"}])
+    assert s["verdict"] == "no_data" and s["points"] == 0

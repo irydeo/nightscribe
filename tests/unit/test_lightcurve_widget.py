@@ -319,3 +319,843 @@ def test_widget_unfolded_unchanged():
     chart.set_data(_POINTS, sn_type="SN Ia")
     assert chart._fold_p is None
     assert chart._xs(_POINTS[0]) == (60600.0,)
+
+
+# ---------------- quality plan, phase A1: the chart's decisions --------
+
+import math  # noqa: E402
+
+import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+from PySide6.QtCore import QPointF  # noqa: E402
+
+from nightscribe.gui.widgets.lightcurve_widget import _HALF  # noqa: E402
+
+
+def _points(n=60, seed=5):
+    rng = np.random.default_rng(seed)
+    return [{"mjd": 60297.77 + i * 0.0005,
+             "mag": 12.58 + 0.05 * math.sin(i / 9.0)
+             + rng.normal(0, 0.004),
+             "err": 0.02, "err_internal": 0.004, "filter": "V",
+             "source": "measure", "flags": []}
+            for i in range(n)]
+
+
+def test_the_observer_can_fix_the_magnitude_axis():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    auto = c._bounds[3] - c._bounds[2]
+    assert c.set_y_range(12.55, 12.60) is True
+    assert c.is_y_range_fixed() == (12.55, 12.60)
+    assert (c._bounds[3] - c._bounds[2]) == pytest.approx(0.05)
+    assert c._bounds[3] - c._bounds[2] < auto
+    # an impossible range is refused, not silently accepted
+    assert c.set_y_range(12.60, 12.55) is False
+    assert c.set_y_range("x", 1.0) is False
+    assert c.is_y_range_fixed() == (12.55, 12.60)
+    c.clear_y_range()
+    assert c.is_y_range_fixed() is None
+
+
+def test_a_click_on_a_point_selects_it_and_on_air_asks_for_the_big_view():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    picked, enlarged = [], []
+    c.point_clicked.connect(picked.append)
+    c.enlarge_requested.connect(lambda: enlarged.append(True))
+    p = c._points[10]
+    c._on_scene_click(QPointF(c._map_x(p["mjd"]), c._map_y(p["mag"])))
+    assert picked == [10] and c.selected() == [10]
+    assert enlarged == []
+    # a click far from every point asks for the big view instead
+    c._on_scene_click(QPointF(-_HALF + 1.0, -_HALF + 1.0))
+    assert enlarged == [True]
+    # and clicking the same point again unselects it
+    c._on_scene_click(QPointF(c._map_x(p["mjd"]), c._map_y(p["mag"])))
+    assert c.selected() == []
+
+
+def test_excluded_points_are_never_hidden():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    c.set_excluded([3, 4])
+    assert c.excluded() == [3, 4]
+    # they stay in the chart's data: an exclusion is a decision, not a
+    # deletion (ADR-048, T7)
+    assert len(c._points) == 60
+    c.set_excluded([])
+    assert c.excluded() == []
+
+
+def test_binning_and_mean_curve_are_presentation_only():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    c.set_bin_mode("frames", 5)
+    series = [{"mjd": p["mjd"], "mag": p["mag"]}
+              for p in c._points]
+    binned = c._binned(list(enumerate(c._points)))
+    assert len(binned) == 12               # 60 points / 5 per bin
+    assert binned[0]["n"] == 5
+    # the mean of a group is the mean of its members
+    assert binned[0]["mag"] == pytest.approx(
+        float(np.mean([p["mag"] for p in c._points[:5]])))
+    smooth = c._moving_average(series)
+    assert len(smooth) == len(series)
+    # the moving average is smoother than the curve itself
+    raw = np.array([p["mag"] for p in c._points])
+    sm = np.array([m for _t, m in smooth])
+    assert sm.std() < raw.std()
+    c.set_bin_mode("minutes", 2)
+    assert c._bin_mode == "minutes"
+    c.set_bin_mode("nonsense")
+    assert c._bin_mode == "off"
+
+
+def test_the_hit_test_respects_the_exclusion():
+    _app()
+    c = LightCurveChart()
+    c.set_data(_points())
+    p = c._points[7]
+    x, y = c._map_x(p["mjd"]), c._map_y(p["mag"])
+    assert c.point_at(x, y) == 7
+    c.set_excluded([7])
+    assert c.point_at(x, y) is None
+
+
+# ---------------- V1: one axis, one kind of magnitude ----------------
+
+def _series_payload():
+    # What a measured series hands the chart: the calibrated magnitudes of
+    # the night plus the detrended curve, which is "mag - trend" and
+    # therefore lives around ZERO. That mix is exactly what gave a curve of
+    # hundredths an axis from 2 to 14.
+    raw = [{"mjd": 60600.0 + 0.01 * i, "mag": 12.34 + 0.004 * i,
+            "err": 0.01, "err_internal": 0.008, "filter": "V",
+            "source": "measure", "flags": []} for i in range(6)]
+    det = [{"mjd": 60600.0 + 0.01 * i, "mag": 0.002 * i,
+            "err": 0.01, "err_internal": 0.008, "filter": "V",
+            "source": "detrend", "flags": []} for i in range(6)]
+    return raw + det
+
+
+def test_a_measured_curve_and_a_detrended_one_never_share_the_axis():
+    # The bug this fixes, as a test: absolute magnitudes (12.3x) and
+    # differences (around 0) on one axis made the window 12 magnitudes
+    # wide, the ticks read 2, 4, 6 ... 14, and a variation of hundredths
+    # was a straight line. The calibrated axis must ignore the curve that
+    # belongs to another level.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    lo, hi = chart._bounds[2], chart._bounds[3]
+    assert hi - lo < 0.2          # a curve of hundredths, not of 12 mag
+    assert 12.3 < lo and hi < 12.4
+    # and the detrended points are simply not on this axis
+    assert all(p["source"] != "detrend" for p in chart.axis_points())
+    assert len(chart.axis_points()) == 6
+
+
+def test_the_differential_axis_counts_from_the_measured_level():
+    # The other view: everything referred to a level that is SAID, so a
+    # tenth of a magnitude fills the chart and both curves travel
+    # together, because both are differences now.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert chart.set_mag_mode("differential") is True
+    assert chart.mag_mode() == "differential"
+    lo, hi = chart._bounds[2], chart._bounds[3]
+    assert hi - lo < 0.2
+    assert lo < 0 < hi            # a difference axis straddles zero
+    # the reference is the MEASURED series' level, never zero: a median of
+    # everything would be dragged to zero by the differences themselves
+    ref = chart.mag_reference()
+    assert ref == pytest.approx(12.35, abs=0.01)
+    # and both series are drawn now
+    got = chart.axis_points()
+    assert len(got) == 12
+    raws = [p["mag"] for p in got if p["source"] == "measure"]
+    assert max(raws) < 0.02       # a measured 12.35 shows as ~0.00
+
+
+def test_the_scale_can_be_switched_both_ways():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert chart.mag_mode() == "calibrated"
+    chart.set_mag_mode("differential")
+    assert chart.mag_mode() == "differential"
+    chart.set_mag_mode("calibrated")
+    assert chart.mag_mode() == "calibrated"
+    # a mode the chart does not know is refused, never silently obeyed
+    assert chart.set_mag_mode("absolute-ish") is False
+    assert chart.mag_mode() == "calibrated"
+
+
+def test_switching_the_scale_drops_a_range_written_in_the_old_units():
+    # "12.3 to 12.4" means nothing on a difference axis: keeping it would
+    # rescale the chart into nonsense, so it is dropped rather than
+    # silently reinterpreted.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert chart.set_y_range(12.33, 12.37) is True
+    assert chart.is_y_range_fixed() is not None
+    chart.set_mag_mode("differential")
+    assert chart.is_y_range_fixed() is None
+
+
+def _scene_texts(chart):
+    # @return: every text drawn on the scene (the axis' own words included)
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    return [it.text() for it in chart.scene().items()
+            if isinstance(it, QGraphicsSimpleTextItem)]
+
+
+def test_the_axis_says_which_magnitude_it_shows():
+    # A reader must never have to guess whether 12.34 is a star's
+    # magnitude or a difference.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    assert any("Calibrated" in t for t in _scene_texts(chart))
+    chart.set_mag_mode("differential")
+    texts = _scene_texts(chart)
+    assert any("magnitude from" in t for t in texts)
+    assert any("12.35" in t for t in texts)      # the level, in the figure
+
+
+def test_the_legend_does_not_promise_a_series_that_is_not_drawn():
+    # In calibrated mode the detrended curve is not on the axis: the legend
+    # must not list it as if it were, and the chart must SAY where to find
+    # it (in the notes the panel shows now, not over the curve).
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    texts = _scene_texts(chart)
+    assert not any("detrended" in t.lower() for t in texts)
+    assert any("Δ magnitude view" in n for n in chart.notes())
+    chart.set_mag_mode("differential")
+    assert not any("Δ magnitude view" in n for n in chart.notes())
+    assert any("detrended" in t.lower() for t in _scene_texts(chart))
+
+
+def test_the_legend_is_a_footnote_and_the_caveats_go_to_the_notes():
+    # The observer asked twice: the legend shouted and ate a corner of the
+    # plot. It now carries one line per series (plus the template, which
+    # must not be mistaken for data) and everything else is information
+    # that belongs beside the other warnings, not over the science.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_series_payload())
+    texts = _scene_texts(chart)
+    # the series are still named on the chart...
+    assert any("measured" in t for t in texts)
+    # ...and nothing else is written over the curve
+    for noise in ("flagged", "clipped", "off scale", "calibration",
+                  "mean curve", "hidden"):
+        assert not any(noise in t for t in texts)
+    # the little font and the muted colour are the point, not decoration
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    from nightscribe.gui.widgets.lightcurve_widget import _FONT_LEGEND_PX
+    legend = [it for it in chart.scene().items()
+              if isinstance(it, QGraphicsSimpleTextItem)
+              and "measured" in it.text()]
+    assert legend
+    # the font is sized so that it RENDERS at _FONT_LEGEND_PX pixels
+    assert legend[0].font().pixelSize() == pytest.approx(
+        _FONT_LEGEND_PX / chart._scale, rel=0.15)
+
+
+# ---------------- V3: the window, the wheel and the export ----------------
+
+def _curve(n=40, base=12.34):
+    return [{"mjd": 60600.0 + 0.01 * i, "mag": base + 0.004 * i,
+             "err": 0.01, "err_internal": 0.008, "filter": "V",
+             "source": "measure", "flags": []} for i in range(n)]
+
+
+def test_the_window_narrows_and_still_covers_the_data():
+    # Zooming is a change of WHAT PIECE of the curve is on screen, not a
+    # magnifying glass over the drawing: the frame and the labels stay put
+    # and the axis re-rounds its ticks.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    full = chart._bounds
+    scale_before = chart.transform().m11()
+    assert chart.zoom_window(2.0) is True
+    zoomed = chart._bounds
+    assert zoomed[1] - zoomed[0] < full[1] - full[0]
+    assert zoomed[3] - zoomed[2] < full[3] - full[2]
+    # the view is not magnified: the drawing keeps its size
+    assert chart.transform().m11() == scale_before
+    # the centre of the window stayed where it was (zoom about the middle)
+    assert (zoomed[0] + zoomed[1]) / 2 == pytest.approx(
+        (full[0] + full[1]) / 2, abs=1e-9)
+    assert chart.window() is not None
+
+
+def test_the_zoom_is_limited_so_the_curve_is_never_lost():
+    # The limits exist to keep the chart alive, not to decide for the
+    # observer: past them the window is refused and the chart stays as it
+    # was, instead of showing a piece of nothing.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    before = chart._bounds
+    assert chart.zoom_window(1e6) is False
+    assert chart._bounds == before
+    assert chart.zoom_window(0.0) is False
+    assert chart.zoom_window(-3.0) is False
+
+
+def test_a_fixed_magnitude_range_is_never_zoomed_away():
+    # The observer's own scale is a decision, not a view: the wheel takes
+    # the time axis and leaves the magnitudes where they were put.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    chart.set_y_range(12.34, 12.44)
+    chart.zoom_window(2.0)
+    assert chart._bounds[2] == pytest.approx(12.34)
+    assert chart._bounds[3] == pytest.approx(12.44)
+    assert chart._bounds[1] - chart._bounds[0] < 0.39      # time did zoom
+
+
+def test_the_wheel_and_the_drag_move_the_window():
+    # The two gestures of the group's tool: the wheel narrows around the
+    # cursor, the drag slides the window under the frame.
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtCore import Qt
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    full = chart._bounds
+    press = QMouseEvent(QEvent.MouseButtonPress, QPointF(400.0, 200.0),
+                        QPointF(400.0, 200.0), Qt.LeftButton,
+                        Qt.LeftButton, Qt.NoModifier)
+    chart.mousePressEvent(press)
+    move = QMouseEvent(QEvent.MouseMove, QPointF(460.0, 200.0),
+                       QPointF(460.0, 200.0), Qt.NoButton,
+                       Qt.LeftButton, Qt.NoModifier)
+    chart.mouseMoveEvent(move)
+    release = QMouseEvent(QEvent.MouseButtonRelease, QPointF(460.0, 200.0),
+                          QPointF(460.0, 200.0), Qt.LeftButton,
+                          Qt.NoButton, Qt.NoModifier)
+    chart.mouseReleaseEvent(release)
+    assert chart.window() is not None
+    # dragging right takes the window back in time
+    assert chart._bounds[0] < full[0]
+
+
+def test_a_double_click_frames_the_whole_curve_again():
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from PySide6.QtGui import QMouseEvent
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    full = chart._bounds
+    chart.zoom_window(3.0)
+    assert chart.window() is not None
+    event = QMouseEvent(QEvent.MouseButtonDblClick, QPointF(450.0, 250.0),
+                        QPointF(450.0, 250.0), Qt.LeftButton,
+                        Qt.LeftButton, Qt.NoModifier)
+    chart.mouseDoubleClickEvent(event)
+    assert chart.window() is None
+    assert chart._bounds == full
+
+
+def test_a_new_series_gets_a_fresh_window_and_a_live_one_keeps_it():
+    # A different series deserves a fresh look; the live curve growing is
+    # the SAME series continuing, and resetting the zoom at every batch
+    # would take the observer's place away once a minute.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    chart.zoom_window(2.0)
+    win = chart.window()
+    assert win is not None
+    chart.set_data(_curve(45), keep_window=True)
+    assert chart.window() == win
+    chart.set_data(_curve(50))
+    assert chart.window() is None
+
+
+def test_the_export_carries_the_window_you_framed(tmp_path):
+    # "Save what you see" has to be true even zoomed in: the file is the
+    # chart's own visible view, marks and fixed range included.
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    whole = chart.export_png(tmp_path / "whole.png")
+    assert chart.zoom_window(4.0) is True
+    framed = chart.export_png(tmp_path / "framed.png")
+    assert whole.read_bytes() != framed.read_bytes()
+    # the axis in the file belongs to the FRAMED window: its ticks are the
+    # ones that window calls for, not the whole curve's. The expected ones
+    # come from the same planner the chart uses, so this checks that the
+    # export and the screen agree, not that a string looks a given way
+    # (values far from zero have their constant factored out and written
+    # once, which is the didactic style of core/ticks).
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    from nightscribe.core import ticks as ticks_mod
+    win = chart.window()
+    assert win[3] - win[2] < 0.05          # a four-times zoom of 0.14 mag
+    plan = ticks_mod.axis_plan(win[2], win[3], target=5)
+    labels = [it.text() for it in chart.scene().items()
+              if isinstance(it, QGraphicsSimpleTextItem)]
+    assert plan["labels"]
+    for lbl in plan["labels"]:
+        assert lbl in labels
+
+
+def test_the_magnitude_axis_is_the_astronomical_way_up():
+    # The faintest at the BOTTOM, the brightest at the top: the convention
+    # of every published light curve and of the group's own tool. The sign
+    # of _map_y is the whole direction of the chart, and it was backwards
+    # (a curve of a variable star read upside down).
+    _app()
+    chart = LightCurveChart()
+    bright, faint = 12.50, 12.63
+    chart.set_data([
+        {"mjd": 60600.0, "mag": bright, "err": 0.01, "filter": "V",
+         "source": "measure", "flags": []},
+        {"mjd": 60600.5, "mag": faint, "err": 0.01, "filter": "V",
+         "source": "measure", "flags": []}])
+    y_bright = chart._map_y(bright)
+    y_faint = chart._map_y(faint)
+    assert y_bright < y_faint          # smaller scene y is higher up
+    # and the axis' own ticks follow the same rule: the brightest value of
+    # the window is labelled at the top
+    labels = _scene_texts(chart)
+    from nightscribe.core import ticks as ticks_mod
+    plan = ticks_mod.axis_plan(*chart._bounds[2:], target=5)
+    assert plan["labels"]
+    # the first label of the plan is the smallest magnitude: it must sit
+    # above the last one on screen
+    first = plan["labels"][0]
+    last = plan["labels"][-1]
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    pos = {}
+    for it in chart.scene().items():
+        if isinstance(it, QGraphicsSimpleTextItem) and it.text() in (first,
+                                                                    last):
+            pos[it.text()] = it.pos().y()
+    assert pos[first] < pos[last]
+    assert labels                     # the labels are there at all
+
+
+def test_the_wheel_zooms_around_the_cursor_the_same_way_up_or_down():
+    # The inverse mapping must follow the axis: a wheel over the top of the
+    # plot narrows towards the bright end, and over the bottom towards the
+    # faint end. Getting this wrong zooms somewhere else entirely.
+    from PySide6.QtCore import QEvent, QPointF, QPoint, Qt
+    from PySide6.QtGui import QWheelEvent
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve())
+    chart.fit_to_scene()
+    vp = chart.viewport().rect()
+    # a point near the top of the plot and one near the bottom
+    top = chart.mapFromScene(QPointF(0.0, -_scene_half()))
+    bottom = chart.mapFromScene(QPointF(0.0, _scene_half()))
+    before = chart._bounds
+    wheel = QWheelEvent(QPointF(float(top.x()), float(top.y())),
+                        QPointF(0.0, 0.0), QPoint(0, 0), QPoint(0, 120),
+                        Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+    chart.wheelEvent(wheel)
+    after_top = chart._bounds
+    # the window got narrower towards the TOP of the screen, which on this
+    # axis is the bright end (smaller magnitudes)
+    assert after_top[3] - after_top[2] < before[3] - before[2]
+    chart.reset_view()
+    wheel2 = QWheelEvent(QPointF(float(bottom.x()), float(bottom.y())),
+                         QPointF(0.0, 0.0), QPoint(0, 0), QPoint(0, 120),
+                         Qt.NoButton, Qt.NoModifier, Qt.ScrollUpdate, False)
+    chart.wheelEvent(wheel2)
+    after_bottom = chart._bounds
+    # zooming at the bottom keeps more of the bright end than zooming at
+    # the top does: the two windows are genuinely different pieces
+    assert abs(after_top[2] - after_bottom[2]) > 1e-4
+    assert vp.width() > 0
+
+
+def _scene_half():
+    from nightscribe.gui.widgets.lightcurve_widget import _HALF
+    return _HALF * 0.6
+
+
+# ---------------- A3: the axis in the observer's units, and the look ----
+
+def test_the_x_axis_speaks_in_civil_time_for_one_night():
+    # A night is read in hours and a campaign's curve in dates: the span
+    # decides the shape, the same way the tick's step decides its decimals.
+    _app()
+    chart = LightCurveChart()
+    chart.set_data([{"mjd": 60297.63 + 0.004 * i, "mag": 12.35,
+                     "err": 0.01, "filter": "V", "source": "measure",
+                     "flags": []} for i in range(20)])
+    texts = _scene_texts(chart)
+    ticks_txt = [t for t in texts if len(t) == 5 and t[2] == ":"]
+    assert len(ticks_txt) >= 2                 # HH:MM on the axis
+    note = [t for t in texts if "MJD" in t]
+    assert note and "UTC" in note[0]
+    # the note carries the civil date AND the Julian number a report wants
+    assert "60297.6" in note[0]
+
+
+def test_the_x_axis_speaks_in_dates_when_the_curve_spans_months():
+    _app()
+    chart = LightCurveChart()
+    chart.set_data([{"mjd": 60297.6 + 40.0 * i, "mag": 12.35,
+                     "err": 0.01, "filter": "V", "source": "measure",
+                     "flags": []} for i in range(20)])
+    texts = _scene_texts(chart)
+    # months and years, never a bare Julian number
+    assert any(t.endswith("2024") or t.endswith("2025") for t in texts)
+    assert not any(len(t) == 5 and t[2] == ":" for t in texts)
+
+
+def test_the_month_name_follows_the_application_language(monkeypatch):
+    # strftime follows the SYSTEM locale: a Spanish machine would print
+    # "dic" inside an English interface, and a figure that mixes languages
+    # is a figure nobody trusts.
+    _app()
+    import nightscribe.gui.pretty as pretty
+    for lang, expected in (("es", "dic"), ("en", "Dec")):
+        monkeypatch.setattr(pretty, "ui_lang", lambda lang=lang: lang)
+        chart = LightCurveChart()
+        chart.set_data([{"mjd": 60297.63, "mag": 12.35, "err": 0.01,
+                         "filter": "V", "source": "measure",
+                         "flags": []}])
+        assert any(expected in t for t in _scene_texts(chart))
+
+
+def test_the_plot_has_a_frame_and_not_just_a_floating_grid():
+    # A measured figure says where its scale starts: two axis lines with
+    # their short marks, over a fainter grid.
+    _app()
+    from PySide6.QtWidgets import QGraphicsLineItem
+    chart = LightCurveChart()
+    chart.set_data(_curve())
+    lines = [it for it in chart.scene().items()
+             if isinstance(it, QGraphicsLineItem)]
+    # the two axes run the whole frame, and there are mark strokes
+    long_h = [l for l in lines
+              if abs(l.line().x2() - l.line().x1()) > 900]
+    long_v = [l for l in lines
+              if abs(l.line().y2() - l.line().y1()) > 900]
+    short = [l for l in lines
+             if 5.0 <= max(abs(l.line().x2() - l.line().x1()),
+                           abs(l.line().y2() - l.line().y1())) <= 8.0]
+    assert long_h and long_v and len(short) >= 3
+
+
+# ---------------- the plot takes the shape of its window (A4) ----------
+
+def _shown(width=1200, height=520):
+    # A chart with a REAL viewport: the plot's shape follows the window, so
+    # a test without one would measure the default 640x480 stand-in.
+    _app()
+    chart = LightCurveChart()
+    chart.show()
+    chart.resize(width, height)
+    QApplication.processEvents()
+    chart._do_fit()
+    return chart
+
+
+def test_the_plot_is_not_a_square_in_a_wide_window():
+    # The observer's ask, and the reason the time axis had no room: a fixed
+    # square fitted into a wide panel leaves two dead margins and squeezes
+    # the labels. A light curve is horizontal; the plot stretches with it.
+    chart = _shown(1200, 520)
+    from nightscribe.gui.widgets.lightcurve_widget import _HALF
+    assert chart._hx > 1.5 * _HALF          # clearly wider than tall
+    # and the whole scene takes the window's proportions, so the fit FILLS
+    # the panel instead of letterboxing
+    r = chart.sceneRect()
+    vp = chart.viewport()
+    assert (r.width() / r.height()) == pytest.approx(
+        vp.width() / float(vp.height()), rel=0.02)
+
+
+def test_a_narrow_window_gets_a_narrow_plot_but_never_a_square():
+    # Never narrower than a square: a tall, narrow panel would otherwise
+    # ask for a plot with no width at all.
+    chart = _shown(360, 700)
+    from nightscribe.gui.widgets.lightcurve_widget import _HALF
+    assert chart._hx == pytest.approx(_HALF)
+
+
+def test_the_time_axis_can_be_zoomed_on_its_own():
+    # "the X axis should be zoomable too": the wheel zooms both, Shift the
+    # time only and Ctrl the magnitudes only.
+    chart = _shown()
+    chart.set_data(_curve(40))
+    before = chart._bounds
+    assert chart.zoom_window(2.0, axes="x") is True
+    after = chart._bounds
+    assert after[1] - after[0] < before[1] - before[0]      # time narrowed
+    assert after[3] - after[2] == pytest.approx(before[3] - before[2])
+    # and the other way round
+    chart.reset_view()
+    before = chart._bounds
+    chart.zoom_window(2.0, axes="y")
+    after = chart._bounds
+    assert after[1] - after[0] == pytest.approx(before[1] - before[0])
+    assert after[3] - after[2] < before[3] - before[2]
+
+
+def test_the_labels_are_sized_in_pixels_and_do_not_grow_with_the_window():
+    # A size in scene units grows and shrinks with the panel: a maximized
+    # window would come out with giant labels. The reader's own size is in
+    # pixels, and the conversion is exactly this.
+    small = _shown(700, 380)
+    big = _shown(1600, 900)
+    assert small._scale != big._scale
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    for chart in (small, big):
+        texts = [it for it in chart.scene().items()
+                 if isinstance(it, QGraphicsSimpleTextItem)]
+        assert texts
+        for item in texts:
+            rendered = item.font().pixelSize() * chart._scale
+            # every label renders at its own size, within a pixel
+            assert 9.0 <= rendered <= 14.0
+
+
+def test_the_time_labels_get_room_to_breathe():
+    # A date like "20 Sep 2026" takes twice the room of a "21:30", so the
+    # axis asks for fewer ticks instead of letting them collide. The scene
+    # units are roughly the tick font's own units, so this is an honest
+    # measure of what the reader sees.
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    from PySide6.QtGui import QFontMetricsF
+    chart = _shown(1200, 520)
+    chart.set_data(_curve(40))                      # a night: 0.39 d
+    items = [it for it in chart.scene().items()
+             if isinstance(it, QGraphicsSimpleTextItem)
+             and len(it.text()) == 5 and it.text()[2] == ":"]
+    assert len(items) >= 3
+    widths = [QFontMetricsF(it.font()).horizontalAdvance(it.text())
+              for it in items]
+    gaps = sorted(i.pos().x() for i in items)
+    spacing = [b - a for a, b in zip(gaps, gaps[1:])]
+    if spacing:
+        assert min(spacing) > max(widths)      # never overlapping
+
+
+# ---------------- the tooltip must not be left behind (report) --------
+
+def _tooltip_items(chart):
+    # @return: the hover bubbles still in the scene. They are the only
+    #          MULTI-LINE text items on the chart (the axis note also says
+    #          "MJD", so the line break is what tells them apart).
+    from PySide6.QtWidgets import QGraphicsSimpleTextItem
+    return [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsSimpleTextItem)
+            and "\n" in it.text() and "MJD" in it.text()]
+
+
+def test_a_clicking_session_never_leaves_bubbles_behind():
+    # Reported: "if I click a point an annotation with its MJD and mag gets
+    # pinned, and clicking again piles another one up, with no way to remove
+    # them". It was the hover bubble: `clear()` (which runs on EVERY rebuild,
+    # i.e. on every click) dropped its reference without taking it out of
+    # the scene, because the bubble is added straight to the scene and not
+    # through the registered add_item. Measured before the fix: one orphan
+    # per click (1 -> 2 -> 3 -> 4).
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve(30))
+    for n in range(4):
+        chart._show_tooltip(QPointF(200.0, 200.0),
+                            ["MJD 60600.%02d · mag 12.34" % n, "V · Series"])
+        chart._build_scene()             # what a click does
+    assert _tooltip_items(chart) == []   # nothing was left behind
+
+
+def test_a_click_takes_the_bubble_away():
+    # A click is a DECISION (select this point); leaving the bubble pinned
+    # over the curve makes a decision look like a note stuck there.
+    from PySide6.QtCore import QEvent, Qt
+    from PySide6.QtGui import QMouseEvent
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve(30))
+    chart._show_tooltip(QPointF(150.0, 150.0), ["MJD 60600.01 · mag 12.34"])
+    assert chart._tooltip is not None
+    press = QMouseEvent(QEvent.MouseButtonPress, QPointF(400.0, 200.0),
+                        QPointF(400.0, 200.0), Qt.LeftButton,
+                        Qt.LeftButton, Qt.NoModifier)
+    chart.mousePressEvent(press)
+    assert chart._tooltip is None
+    assert _tooltip_items(chart) == []
+
+
+def test_clearing_a_chart_takes_the_bubble_out_of_the_scene():
+    # The base class contract: clear() leaves no item behind, registered or
+    # not.
+    _app()
+    chart = LightCurveChart()
+    chart.resize(900, 500)
+    chart.set_data(_curve(5))
+    chart._show_tooltip(QPointF(100.0, 100.0), ["MJD 1 · mag 2"])
+    assert chart._tooltip is not None
+    chart.clear()
+    assert chart._tooltip is None
+    assert chart._tip_panel is None
+    assert _tooltip_items(chart) == []
+
+
+# ---------------- F: the chart's reading order (report)---------------
+
+def _items_by_z(chart, z):
+    from PySide6.QtWidgets import QGraphicsLineItem
+    return [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsLineItem)
+            and abs(it.zValue() - z) < 1e-6]
+
+
+def test_the_trend_is_the_one_bright_line():
+    # Reported: "everything is monotonous and the same colour". The trend
+    # used to be painted in the BAND's colour, 1.6 px, UNDER the points
+    # (z 1.9 against the data's 2.0). Now it is the app's ink, wider, and
+    # above every measurement.
+    from nightscribe.gui.widgets.lightcurve_widget import _Z_DATA, _Z_MEAN
+    from nightscribe.viz import palette
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve(20))
+    chart.set_mean_curve(5)
+    assert _Z_MEAN > _Z_DATA                     # the reading order
+    trend = _items_by_z(chart, _Z_MEAN)
+    assert trend
+    pales = {it.pen().color().name() for it in trend}
+    # the ink and its dark halo, and nothing else in the band's colour
+    assert palette.FG.lower() in pales
+    assert pales <= {palette.FG.lower(), palette.BG.lower()}
+    # thick on purpose: it is the line the eye must follow
+    assert any(it.pen().color().name() == palette.FG.lower()
+               and it.pen().widthF() >= 3.0 for it in trend)
+
+
+def test_the_error_bars_are_quiet_and_behind_the_points():
+    # A fence of bars in the series colour was painted ON TOP of the
+    # measurements (z 3.0 against the data's 2.0). The error is context: it
+    # goes grey, thin, and behind.
+    from nightscribe.gui.widgets.lightcurve_widget import _Z_DATA, _Z_ERROR
+    from nightscribe.viz import palette
+    _app()
+    chart = LightCurveChart()
+    chart.set_data([{"mjd": 60600.0 + 0.01 * i, "mag": 12.34,
+                     "err": 0.08, "err_internal": 0.2, "filter": "V",
+                     "source": "measure", "flags": []} for i in range(8)])
+    chart.set_errors_visible(True)
+    assert _Z_ERROR < _Z_DATA
+    bars = _items_by_z(chart, _Z_ERROR)
+    assert bars
+    for it in bars:
+        assert it.pen().color().name() == palette.MUTED.lower()
+        assert it.pen().color().alpha() < 140        # quiet
+        assert it.pen().widthF() <= 0.7
+
+
+def test_the_links_are_rounded_and_faint():
+    # "Soften the joins": the line between measurements guides the eye and
+    # never competes with them.
+    from PySide6.QtCore import Qt
+    _app()
+    chart = LightCurveChart()
+    chart.set_data(_curve(10))
+    pen = chart._link_pen("measure", "V")
+    assert pen.joinStyle() == Qt.RoundJoin
+    assert pen.capStyle() == Qt.RoundCap
+    assert 100 <= pen.color().alpha() <= 180
+    assert pen.widthF() <= 1.0
+
+
+def test_the_smoothed_trend_never_invents_a_peak():
+    # A guide that overshoots is a guide that lies: a monotone cubic stays
+    # between the values it interpolates, so a step does not become a spike.
+    from nightscribe.gui.widgets.lightcurve_widget import _monotone_points
+    pts = [(0.0, 100.0), (1.0, 100.0), (2.0, 40.0), (3.0, 40.0), (4.0, 40.0)]
+    ys = [y for _x, y in _monotone_points(pts)]
+    assert min(ys) >= 40.0 - 1e-9
+    assert max(ys) <= 100.0 + 1e-9
+    # and a two-point trend is left alone (nothing to smooth)
+    assert _monotone_points([(0.0, 1.0), (1.0, 2.0)]) == [(0.0, 1.0),
+                                                          (1.0, 2.0)]
+
+
+def test_the_points_are_subtle_not_shrill():
+    # Reported: "make the points more subtle (less shrill yellow)". The
+    # marker is a touch smaller and a hair transparent, so a dense night
+    # keeps its texture, and the amber that flags a thin comparison set is
+    # calmer: a flagged night reads as a note, not as an alarm.
+    from PySide6.QtWidgets import QGraphicsEllipseItem
+    from nightscribe.gui.widgets.lightcurve_widget import (FLAG_COLOUR,
+                                                           _POINT_ALPHA)
+    _app()
+    assert FLAG_COLOUR != "#e0a030"          # not the old shrill amber
+    chart = LightCurveChart()
+    chart.set_data(_curve(6))
+    dots = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsEllipseItem)]
+    assert dots
+    radius = max(it.rect().width() for it in dots) / 2.0
+    assert radius <= 4.0
+    alphas = {it.brush().color().alpha() for it in dots
+              if it.brush().color().alpha() > 0}
+    assert alphas
+    assert max(alphas) <= int(255 * _POINT_ALPHA) + 1
+
+
+def test_the_points_wear_the_quality_colour_code():
+    # The observer asked for the same code on the curve's points: green when
+    # the point is clean, orange when it is usable but not clean, red when
+    # its data is in doubt. The SHAPES keep saying which decision was taken
+    # (the diamond, the faint edge, the cross of an excluded point).
+    from PySide6.QtWidgets import (QGraphicsEllipseItem,
+                                   QGraphicsPolygonItem)
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.viz import palette
+    _app()
+    chart = LightCurveChart()
+    pts = [{"mjd": 60000.0 + i * 0.01, "mag": 12.0 + i * 0.01, "err": 0.02,
+            "filter": "V", "source": "measure", "comps": 5, "flags": []}
+           for i in range(6)]
+    pts[3]["flags"] = ["few_comps"]           # a calibration caveat
+    pts[4]["flags"] = ["saturated"]           # the data itself is in doubt
+    chart.set_data(pts)
+    dots = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsEllipseItem)]
+    diamonds = [it for it in chart.scene().items()
+                if isinstance(it, QGraphicsPolygonItem)]
+    good = palette.MEASURE_COLOURS[ca.ROLE_MAG]
+    fair = palette.MEASURE_COLOURS[ca.ROLE_MAG_FAIR]
+    doubt = palette.MEASURE_COLOURS[ca.ROLE_MAG_DOUBT]
+    assert good in {it.brush().color().name() for it in dots}
+    assert fair in {it.brush().color().name() for it in dots}
+    assert any(it.pen().color().name() == doubt for it in diamonds)
+    # and turning it off gives the filter colours back (the chart's own
+    # button, for whoever wants the old look)
+    chart.set_quality_colours(False)
+    dots = [it for it in chart.scene().items()
+            if isinstance(it, QGraphicsEllipseItem)]
+    assert good not in {it.brush().color().name() for it in dots}
+    chart.set_quality_colours(True)

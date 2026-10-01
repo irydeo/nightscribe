@@ -158,3 +158,143 @@ def test_full_box_layout():
         "Obs: F. Calvo", "Msr: F. Calvo", "Stn: Z41",
         "Tel: 0.43-m f/4.9 reflector", "Cam: ASI 2600MM",
         "PSc: 1.07″/px", "FOV: 6.8 × 6.8′"]
+
+
+# ------------------------------------------------------------- the band
+# The plate's heading (ADR-046 rev.): two lines, a colour per role and a
+# documented drop order. The roles are decided here, so the same datum
+# cannot come out in two colours in the render.
+
+_META = {"date_obs": "2023-12-19T18:42:06", "exptime_s": 40.0,
+         "filter": "Clear"}
+_WCS = {"ra_deg": 49.9938, "dec_deg": 49.7803, "scale_arcsec_px": 1.55,
+        "fov_arcmin": (42.96, 32.34)}
+# A CLEAN measurement of this plate, in the shape both a single plate and a
+# point of a series arrive in (see magnitude_role)
+_GOOD_MAG = {"mag": 12.34, "err": 0.04, "band": "V", "comps": 5,
+             "check_ok": True}
+
+
+def _roles(line):
+    # @return: [(text, role)] of one band line
+    return [(s["text"], s["role"]) for s in line]
+
+
+def test_the_band_says_identity_then_context():
+    # Line 1: who and where and how bright. Line 2: when, with what and how
+    # the plate is scaled. Nothing wears a label it does not need: the
+    # magnitude is what comes after the position.
+    band = ca.build_band(name="V0526 Per", meta=_META, wcs_info=_WCS,
+                         measured=_GOOD_MAG, equipment="SXV-H18",
+                         site={"station": "Z41"})
+    first, second = band["lines"]
+    assert _roles(first) == [
+        ("V0526 Per", ca.ROLE_NAME),
+        ("RA 03 19 58.5 · Dec +49 46 49.1", ca.ROLE_POS),
+        ("12.34 ± 0.04 (V)", ca.ROLE_MAG)]
+    assert _roles(second) == [
+        ("2023-12-19 18:42 UT", ca.ROLE_CONTEXT),
+        ("40.0 s", ca.ROLE_CONTEXT),
+        ("Clear", ca.ROLE_CONTEXT),
+        ("SXV-H18", ca.ROLE_CONTEXT),
+        ("Stn Z41", ca.ROLE_CONTEXT),
+        ("1.55″/px", ca.ROLE_CONTEXT),
+        ("43.0 × 32.3′", ca.ROLE_CONTEXT)]
+    # the fields the drop order uses are named, one per segment
+    assert [s["field"] for s in second] == [
+        "date", "exp", "filter", "equip", "stn", "psc", "fov"]
+    assert [s["field"] for s in first] == ["name", "pos", "mag"]
+
+
+def test_a_plate_without_a_solution_says_what_it_cannot_say():
+    # No WCS: the position is the catalogue's (and it says so, because the
+    # colour is not enough on a printout) and the scale and the field are
+    # not there at all: they belong to the plate's own solution.
+    band = ca.build_band(name="V0526 Per", meta=_META, wcs_info=None,
+                         catalog_mag=12.0, target=(49.99038, 49.86875),
+                         site={"station": "Z41"})
+    first, second = band["lines"]
+    assert first[1]["role"] == ca.ROLE_POS_CAT
+    assert first[1]["text"].endswith(" (cat)")
+    assert first[2] == {"text": "12.00 cat", "role": ca.ROLE_MAG_CAT,
+                        "field": "mag"}
+    assert [s["field"] for s in second] == ["date", "exp", "filter", "stn"]
+
+
+def test_the_magnitude_wears_the_colour_its_numbers_deserve():
+    # THE SCALE THE OBSERVER ASKED FOR: green when the measurement is clean,
+    # orange when it is usable but not clean, red when it is not worth
+    # reporting without looking, and white when it is not a measurement of
+    # this plate at all. Everything comes from the measurement's own numbers.
+    assert ca.magnitude_role(_GOOD_MAG) == ca.ROLE_MAG
+
+    # the error's two lines, with their edges (0.05 and 0.15)
+    assert ca.magnitude_role({**_GOOD_MAG, "err": ca.ERR_GOOD}) == ca.ROLE_MAG
+    assert ca.magnitude_role({**_GOOD_MAG, "err": 0.06}) == ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "err": ca.ERR_BAD}) == \
+        ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "err": 0.16}) == \
+        ca.ROLE_MAG_DOUBT
+
+    # the serious caveats, which a small error does not soften
+    assert ca.magnitude_role({**_GOOD_MAG, "comps": 2}) == ca.ROLE_MAG_DOUBT
+    assert ca.magnitude_role({**_GOOD_MAG, "check_ok": False}) == \
+        ca.ROLE_MAG_DOUBT
+    assert ca.magnitude_role({**_GOOD_MAG, "clipped": True}) == \
+        ca.ROLE_MAG_DOUBT
+
+    # the light ones, which cost one step and not the measurement
+    assert ca.magnitude_role({**_GOOD_MAG, "comps": 3}) == ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "derived": True}) == \
+        ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "no_check": True}) == \
+        ca.ROLE_MAG_FAIR
+    assert ca.magnitude_role({**_GOOD_MAG, "flags": ["cloud"]}) == \
+        ca.ROLE_MAG_FAIR
+
+    # nothing measured is nothing to colour
+    assert ca.magnitude_role(None) is None
+    assert ca.magnitude_role({"mag": None}) is None
+    # a measurement beats the catalogue, always: a poor measurement is red,
+    # never white (white is for the value that is not a measurement)
+    band = ca.build_band(name="X", measured={**_GOOD_MAG, "err": 0.3},
+                         catalog_mag=11.0)
+    assert band["lines"][0][1]["role"] == ca.ROLE_MAG_DOUBT
+
+
+def test_the_drop_order_goes_from_the_least_to_the_most_needed():
+    # The renderer walks this list: the field of view first, the date last
+    # (a chart without a date is not a chart), and never half a field.
+    assert ca.DROP_ORDER == ("fov", "psc", "equip", "filter", "stn", "date")
+    assert ca.DROP_ORDER_NAME == ("mag", "pos")
+
+
+def test_the_equipment_comes_from_the_plate_not_from_my_settings():
+    # A colleague's frame says SXV-H18: stamping the observer's own camera
+    # on it would be a lie, and MIXING the two (his camera with my
+    # telescope) would be a worse one. If the header names any of it, the
+    # header is the whole answer; the Settings are only for a frame that
+    # says nothing at all.
+    cfg = {"camera_model": "ASI2600", "telescope_desc": "0.25 m"}
+    assert ca.equipment_from_header({"INSTRUME": "SXV-H18"}, cfg) == \
+        "SXV-H18"
+    assert ca.equipment_from_header({}, {}) is None
+    # the field is capped: a chart needs the rig, not its serial number, and
+    # a 31-character camera name was eating the field of view out of the
+    # band. A name that fits stays whole; a longer one is cut, never leaving
+    # a dangling separator. The full value stays in the header.
+    assert ca.equipment_from_header({}, cfg) == "ASI2600…"
+    assert ca.equipment_from_header({"INSTRUME": "SXV-H18",
+                                     "TELESCOP": "0.2 m SCT"}, cfg) == \
+        "SXV-H18…"
+    long_name = ca.equipment_from_header(
+        {"INSTRUME": "QHY42PRO-1d74db4888698d84c-QHYCCD"}, {})
+    assert long_name == "QHY42PRO-…"
+    assert len(long_name) <= ca.MAX_EQUIP_CHARS
+
+
+def test_a_band_with_nothing_to_say_is_an_empty_identity_line():
+    # No name, no position, no magnitude: nothing to draw (the view skips
+    # the band entirely), and the context line is simply empty.
+    band = ca.build_band()
+    assert band["lines"] == [[], []]

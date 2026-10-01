@@ -26,15 +26,34 @@ the survey field (DSS2/PS1) as a FITS with WCS and works on it directly.
 ## The window
 
 ```
-| Load · Export PNG · Fit 50 100 200 400 · %                         |
-|────────────────────────────────────────────|──────────────────────|
-|                                            | [Blink][Photometry]  |
-|              IMAGE                         | [Annotate]           |
-|                                            | (one tab per         |
-|                                            |  feature)            |
-|────────────────────────────────────────────|──────────────────────|
-| Histogram with handles + Black/White/Gamma + Auto + Invert          |
+| [Open][Export][Solve] | [Fit][100 %][Zoom ▾] 100 % | [View ▾] | Image|Curve |
+|───────────────────┬────────────────────────────────────────┬──────────────|
+|  visit / series   |                                        |  tab         |
+|  (foldable)       |   IMAGE  (or the curve)                |  ────────    |
+|                   |   · the object, over the plate          |  primary     |
+|                   |                                        |  [Settings▸] |
+|───────────────────┴────────────────────────────────────────┴──────────────|
+| Histogram ▸  (folded: 24 px; open: ~110 px, two rows of controls)         |
+|──────────────────────────────────────────────────────────────────────────|
+| ⓘ status: one line, fixed height, never grows                            |
 ```
+
+The chrome takes what it NEEDS and the work area gets everything else: the
+plate is what the window is for. The top bar is stable (it measured 25 px
+in a short window and 69 px in a tall one before: the layout's stretch was
+never applied by the loader), and the histogram strip is compact and folds
+with its state remembered. The object's name, position and magnitude are
+painted OVER the plate (and into the exported PNG), not in a row of their
+own.
+
+The series block in the left panel keeps what an observer touches while
+measuring (the frame navigator, the grouping of frames, **Measure the
+sequence**, live mode and the progress) and puts the rest behind two
+doors: **Chart and quality…** opens the chart's own non-modal window
+(scale, error bars, binning, mean curve, outliers and exclusions) and
+**Series ▾** holds the occasional actions (undo, ExoClock, the night's
+figures, save the chart, period and phase, the guide). Before this the
+same panel showed some thirty controls stacked in a column.
 
 * **Image**: takes up most of the window. The wheel zooms anchored at
   the cursor; dragging pans; double-click returns to the fit. Hovering
@@ -81,7 +100,50 @@ layout revision, 2026-09-24).
 ### Sequence (top half)
 
 Builds the photometric sequence on your plate (a WCS is needed; if it
-is missing, "Solve astrometry..." gets you one):
+is missing, the configured solver gets you one, ASTAP or nova):
+
+With the visit open, the left panel also carries the **frame navigator**
+(previous/next, `frame i/N`, "first frame": the open frame is the reference)
+and, in transit projects, the **Transit reduction (EXOTIC)** block: the two
+buttons (reduce, and export the `inits.json`), and under them the visit's
+**last reduction** in one line (`T_mid ... +/- ... · Rp/Rs ... +/- ...` and
+when it ran) with its two doors: **"See the result..."** and **"Open the
+folder"**. The result opens in its own non-modal window (the fitted numbers,
+the light curve EXOTIC drew and **every** file the run wrote: field figures
+with the apertures and the comparisons, diagnostics, CSV, JSON and the AAVSO
+report), each one a double click from the system; the window opens by itself
+when the reduction lands. With no reduction yet the line is empty and the
+buttons are off: never zeros.
+The project's saved sequence loads by itself when the visit opens.
+
+The **top bar** carries the two astrometries together, side by side: **Solve
+astrometry...** (this plate) and **Solve the visit...** (every frame of the
+visit in one go). The pair explains itself: the first solves the plate in
+front of you, the second the whole night's field.
+
+**Solve the visit...** is preparation, not measurement: it
+solves every frame of the visit in one go, and what needs it are the visit's
+**products** (the astrometry report and the EXOTIC reduction of a transit),
+not the series, which measures on the reference plate and registers the rest.
+With no frames in the visit the button is not shown at all (there is nothing
+to solve). A visit is
+one field, and the project knows where it is, so each frame takes a moment
+instead of a minute of blind search: frames that already carry a WCS are
+skipped, and each solution is written into its own FITS (it needs "Save the
+solved WCS in the FITS" in Settings; with it off the button explains instead
+of leaving solutions that would die with the session). If the project has no
+coordinates, the first frame is solved blind and the rest follow its field.
+One frame that fails does not stop the batch: it is counted and named in the
+status line. A plate opened from a project is also solved with its field, so
+the Solve button of the top bar answers in a moment.
+
+**Build the sequence...** does the whole pipeline in one click: if the plate
+has no WCS it solves it first (the project's field points the solver, so it
+is a moment), then it queries the catalogue (the field) and proposes. The
+manual window's **Propose sequence** fills in the missing step the same way,
+so the order of the buttons is never something to remember. A rebuild that
+cannot deliver (the query fails, nothing lands on this plate, no usable
+comparison star) keeps the sequence you already had and says why.
 
 * **Target** and **Target mag** pre-fill what the project knows; the
   approximate magnitude guides the proposal.
@@ -98,7 +160,9 @@ is missing, "Solve astrometry..." gets you one):
   matched to the target's brightness.
 * **Sequence (N)...** opens the *table* in a small non-modal window (N
   is the current number of stars, and it updates itself): you can
-  rename, retype and remove rows, and leave it open while you keep
+  rename, retype, **edit the band and the magnitude by hand** (a doubtful
+  catalog value is fixed there: the measurement uses the manual value) and
+  remove rows, and leave it open while you keep
   picking stars on the plate. Hovering tells you each star's catalog,
   magnitude and colour, with the window open too.
 * **Remove all** empties the sequence and **Export CSV...** writes it
@@ -111,7 +175,7 @@ is missing, "Solve astrometry..." gets you one):
 Turns one click into a catalog-calibrated magnitude (single-plate
 differential aperture photometry):
 
-* It needs the plate with a WCS (if missing, "Solve astrometry...") and
+* It needs the plate with a WCS (if missing, it solves it by itself) and
   a sequence in the top half (if there is none, a "Go to the sequence"
   button takes you there).
 * **Click** on the star or the SN: sub-pixel centroid, aperture and sky
@@ -126,6 +190,12 @@ differential aperture photometry):
   re-measures the point at once, and your hand edit wins over the
   seeing auto-scale until you load another plate (or re-arm the
   checkbox).
+* **Manual centre**: the checkbox opens a small non-modal window with the
+  arrows ↑ ← → ↓ (0.1 px steps) and the **0** button (back to the click).
+  With it checked the measurement uses **exactly** the centre you place,
+  with no centroid search, for very faint objects or SNe the algorithm
+  would drag to a neighbour; unchecking closes the window and the
+  automatic centroid returns. A new click starts at (0,0).
 * **Advanced...** opens the full recipe in another small non-modal
   window (you can leave it open while measuring): the **sky** model
   (flat median or a tilted plane for galactic cores), **sigma-clip** of
@@ -156,30 +226,89 @@ carries ANNOTATE cards, written by NightScribe or AstroImageJ, they are
 drawn on load with their plate-pixel sizes and labels readable at any
 zoom), the **north arrow and scale bar** (the "N" and "Scale" buttons
 in the top bar, with a WCS) and **Solve astrometry...** (blind-solves
-with Astrometry.net, your API key from Settings required; the solution
-applies in memory for the session and the file on disk is never
-modified).
+with the configured solver, ASTAP or Astrometry.net; a progress dialog with
+a Cancel that stops the solver; the solution lands in memory and is stored
+into the FITS itself, atomically, so the plate stays solved for any other
+program).
 
 To understand how photometry is then measured with these sequences:
 [docs/PHOTOMETRY.md](PHOTOMETRY.md).
 
-## Metadata boxes and marker style (ADR-046)
+## A visit's curve: one night, one pass
 
-The top bar's **"Boxes"** button shows the metadata corner boxes, on
-screen and burned into the exported PNG (and into the blink GIF/MP4 and
-the sequence chart), in the spirit of the classic tracker charts:
+The series block measures **one visit** (one night) by default. When the
+project has more than one visit with frames, the **"this visit" / "all
+visits"** selector appears next to the frame counter: with "all visits" the
+engine measures the frames of **every visit** in one pass, each night is filed
+in its visit (one run per night) and the chart shows the project's curve, the
+union of the nights. Live mode and "discard the curve" are per visit: with
+"all visits" they step aside and say why.
 
-* **Top-left**: the object name (always).
-* **Top-right**: UT date, the target's sexagesimal RA/Dec, its
-  brightness (only when a calibrated measurement exists in the session;
-  a catalog magnitude does not count) and the exposure.
-* **Bottom-left**: observer, measurer, MPC station, telescope and camera
-  (whatever you set in Settings → Site & equipment, "Chart annotations"
-  group), plus the plate scale in ″/px and the FOV of what is shown when
-  the plate is solved.
-* With the boxes on, the compass moves to the bottom centre and gains
-  the **E** leg, and the scale bar moves right, keeping the corners
-  free.
+
+When the editor is opened from a visit, the chart in the centre draws **the
+curve the visit already has**, read from the project: nothing is measured
+again.
+
+A visit can hold **several passes** (you measured the series again with another
+band, with another sequence, or to check something). Every one keeps its points,
+but **the chart draws only one**, the one the visit has marked. Measuring again
+makes the new pass the curve; the earlier ones are not drawn, and the panel says
+so: how many points the one you see has and how many more passes the visit
+holds. The door **Series ▾ → Passes of this visit…** lists them all (time, band,
+points, stretch of night, state) and lets any of them **be the curve** without
+deleting anything, or **undo** a pass (its points go, its row stays marked, and
+the chart falls back to the pass before it).
+
+The band in the legend and in the AAVSO file is **the band it was calibrated
+with** (the one the engine used on the comparisons), not an invented "V" when
+the frames' header carries no `FILTER`. And the **detrended** curve is refitted
+on load (it is deterministic: the same points with the same airmass give the
+same coefficients), so the detrended switch has something to show after
+reopening the visit too.
+
+## The plate's band and the marker style (ADR-046)
+
+The plate says what it knows in the **band at the top of the image**, on
+screen and burned into the exported PNG, in two lines:
+
+* **Line 1, who it is**: the object, the target's sexagesimal RA/Dec and
+  its brightness.
+* **Line 2, the context**: UT date, exposure, filter, the kit that took
+  the frame (from its own header), the MPC station, the plate scale in
+  ″/px and the FOV of what is shown (the last two only when the plate is
+  solved).
+
+**The colour of each datum says how much to trust it**, and that is the
+point of the band:
+
+* the **position** in ink when this plate's own solution places it, and
+  dimmed with a `cat` when it is only the catalogue's (an unsolved plate);
+* the **magnitude** in a scale of its own: **green** when the measurement
+  is clean (error up to 0.05, comparisons and check star in order),
+  **orange** when it is usable but not clean (up to 0.15, or a light
+  caveat: only three comparisons, a magnitude derived from a colour, no
+  check star in the sequence, a flag on the point), **red** when it is not
+  worth reporting without looking (error above 0.15, too few comparisons, a
+  check star that fails, a clipped core), and **white** with a `cat` when it
+  is only the project's or the catalogue's value, which is not a measurement
+  of this plate. The magnitude shown is the one measured on THAT frame (the
+  visit's curve when there is one), then a single-plate measurement, and
+  only then the catalogue;
+* everything else (date, exposure, filter, kit, station, scale, FOV) in
+  the quiet colour: it is context, not a judgement.
+
+The same code is on the **curve's points** (the chart's **Quality colours**
+button, on by default) and on the measurement's **panel**: green clean, orange
+usable but not clean, red doubtful, white for a catalogue value. See
+[the series guide](SEQUENCES.md) for the thresholds and what each figure needs.
+
+The band never cuts a word: when the window is narrow it drops whole
+fields (the FOV first, the date last) and, in the extreme, the context
+line goes and only the plate's name is left. The top bar's **"Data"**
+button turns it off (Settings → Site & equipment → "Plate band" sets the
+default), and the compass and the scale bar keep their classic corners.
+The **blink GIF/MP4** and the **sequence chart** keep their own metadata
+boxes, with their own switch ("Other charts" in the same Settings group).
 
 In the same Settings group, **Object marker** picks the look of the
 object's mark: ring with ticks (classic) or full-frame cross with a box
@@ -190,8 +319,9 @@ object's mark: ring with ticks (classic) or full-frame cross with a box
 The **Annotate** tab saves AstroImageJ-compatible annotated FITS copies
 (the original file is never modified):
 
-* **Click** on the image drops the marker; **dx/dy + Nudge** move it by
-  tenths of a pixel; size and colour are yours.
+* **Click** on the image drops the marker; the **arrows ↑ ← → ↓** move it
+  in 0.5 px steps with instant feedback (the readout counts the offset
+  since the last click); size and colour are yours.
 * **Label** and **notes** travel in the ANNOTATE and NS_NOTES cards;
   RA/Dec, plate scale and north PA are written from the plate's WCS
   (NS_RA, NS_DEC, NS_SCALE, NS_NORTH).
@@ -240,3 +370,15 @@ pans 25 % past the plate edge.
 **Export PNG…** saves exactly what is on screen (with the NightScribe
 watermark), ready to attach. Data exports (annotated FITS, charts)
 always use the original file, never the screen pixmap.
+
+## When something does not work
+
+The window has **one** status line at the bottom, with the whole text in its
+tooltip (the result of a measurement stays in its own box, next to the action
+that produced it). A build that cannot deliver keeps your sequence and says
+why; a solve that fails says what it was doing.
+
+And the application **writes what it does to a file** while it runs:
+**Help > Open the log**. A GUI launched from a menu has no console at all, so
+a report like "a dialog appears and disappears and I do not know what happens"
+has its answer in there.

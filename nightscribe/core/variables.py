@@ -91,8 +91,11 @@ def jd_to_hjd(jd, ra_deg, dec_deg):
     # travel time between Earth and Sun (at most +/-499 s). AAVSO reports
     # are filed in HJD. The Sun position is Schlyter's (ephem_minor,
     # ADR-009), good to ~1 arcmin -> <0.2 s here, far below photometric
-    # needs. Convention (checked): a star in the Sun's direction is seen
-    # EARLIER from Earth, so HJD = JD + (n . s) * r * tau.
+    # needs. Convention (Eastman et al. 2010, PASP 122, 935): a star in
+    # the Sun's direction is seen LATER from Earth (the light passes the
+    # Sun first and travels 1 AU more), so HJD = JD - (n . s) * r * tau.
+    # Timescale: UTC in, UTC out; the ~69 s that separate UTC from TT
+    # (leap seconds + 32.184 s) are NOT added (docs/PHOTOMETRY.md).
     # @args: jd - Julian date (UTC), ra_deg/dec_deg - target (degrees)
     # @return: HJD (float)
     from . import ephem_minor
@@ -102,7 +105,7 @@ def jd_to_hjd(jd, ra_deg, dec_deg):
     dot = (math.cos(dec) * math.cos(ra) * math.cos(sdec) * math.cos(sra)
            + math.cos(dec) * math.sin(ra) * math.cos(sdec) * math.sin(sra)
            + math.sin(dec) * math.sin(sdec))
-    return jd + dot * r * _LIGHT_TIME_S_PER_AU / 86400.0
+    return jd - dot * r * _LIGHT_TIME_S_PER_AU / 86400.0
 
 
 # ---------------- brightness-event advisor (V-h) ----------------

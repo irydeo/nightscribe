@@ -97,3 +97,18 @@ def test_meta_exptime_fortran_d_notation():
     h = {"EXPTIME": 300.0, "DATE-OBS": "2026-09-09"}
     m = meta_from_header(h)
     assert m["exptime_s"] == 300.0
+
+
+def test_meta_mjd_obs_fallback():
+    # MicroObservatory (and several amateur rigs) write the numeric UTC
+    # MJD instead of a DATE-OBS with a numeric zone offset.
+    h = {"DATE-OBS": "2017-12-19T18:33:43.317-0700", "MJD-OBS": 58107.065,
+         "EXPTIME": 60.0}
+    m = meta_from_header(h)
+    assert m["mjd"] == 58107.065
+
+
+def test_meta_mjd_card_wins_over_unparseable_date():
+    h = {"DATE-OBS": "garbage", "MJD": "58107.5"}
+    m = meta_from_header(h)
+    assert m["mjd"] == 58107.5

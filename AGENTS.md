@@ -44,6 +44,11 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
 - **Voz humana**: comentarios cortos sobre cada método con `# @args:` / `# @return:`,
   como en el proyecto hermano `saas/`. Nada de docstrings robóticos ni sobre-ingeniería.
   Los TODOs se escriben como `# TODO: ...` donde apliquen.
+- **Código didáctico (regla permanente)**: quien lo lea tiene que entender **por qué**,
+  no sólo qué. Cada bloque no obvio explica el motivo, la física o el fallo que evita;
+  los números medidos se escriben en el comentario (lo que se ganó, lo que costó), y
+  nada se deja «porque sí». Un comentario que no enseña nada sobra, y una decisión que
+  no se explica es una decisión que se perderá: el código es también documentación.
 - **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
   «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
 - **Mantenible por personas**: funciones cortas, dependencias mínimas, sin magia.
@@ -93,6 +98,48 @@ nightscribe/
                       #   campo: saturan), CSV (ADR-042)
     field_math.py     # proyección TAN de la carta, ticks de borde, escala,
                       #   anti-colisión de rótulos (compartido viz/widget, ADR-042)
+    cameras.py        # presets de cámaras (perfil fotométrico): píxel, full well,
+                      #   RON, oscuridad, régimen short/normal y linealidad
+                      #   sugerida (datasheet; linealidad y tope de exposición
+                      #   se miden por ganancia)
+    series_measure.py # motor de serie (ADR-048): punto por frame con ZP por
+                      #   frame atado por comparada, ensemble con veto MAD,
+                      #   puertas que marcan y nunca borran, tiempo a media
+                      #   exposición (MJD/HJD), agrupación en el dominio de la
+                      #   medida, apertura óptima por noche (T3) y detrend
+                      #   honesto multinoche a1·exp(a2·X)+a3 (T5)
+    register.py      # registro de frames sin WCS/alineación (D44, por defecto
+                      #   encendido): se quita el cielo, las estrellas votan la
+                      #   transformación (traslación primero) y la calidad es
+                      #   física (estrellas emparejadas + rms en px), numpy puro
+    periodogram.py   # búsqueda de período (ADR-054): Lomb-Scargle generalizado
+                      #   con media flotante + PDM + ventana espectral, FAP por
+                      #   bootstrap con presupuesto de trabajo, ciclos cubiertos
+                      #   y notas honestas
+    gain.py          # ganancia y ruido de lectura medidos en las propias tomas
+                      #   (par a la misma exposición: var(F1-F2) = 2·nivel/g +
+                      #   2·RON²/g²; cajas de cielo robustas) y la cadena de
+                      #   prioridad Ajustes → cabecera → medida (ADR-048 rev.)
+    transit_fit.py   # modelo de tránsito con limb darkening cuadrático (numpy,
+                      #   paridad <1e-5 vs batman) + ajuste LM con detrend
+                      #   conjunto y errores OOT (plan fase 7; compuerta abierta)
+    exoclock_export.py # envío manual a ExoClock (ADR-049): archivo HOPS de
+                      #   3 columnas (JD_UTC de arranque + flujo + error) y
+                      #   ExoClock_info.txt con Comments relleno (plan fase 8)
+    solve.py          # dispatcher de resolución de placa: auto|astap|astrometry
+                      #   (auto prueba ASTAP local y cae a nova; ADR-051)
+    wcs_store.py      # persiste la WCS resuelta en la cabecera del FITS, atómica
+                      #   (solve_save, por defecto sí; ADR-051 rev.)
+    live.py           # modo en vivo (ADR-050): sondeo de carpeta, estabilidad
+                      #   de tamaño, lotes por N tomas/T s por el mismo motor
+                      #   (plan fase 10; opt-in, apagado por defecto)
+    exotic_env.py     # entorno EXOTIC externo (orquestación, fase A): detectar
+                      #   Python <=3.10, probar el import y crear el venv
+    exotic_run.py     # ejecución headless de EXOTIC (fase C): `exotic -red
+                      #   inits.json -ov`, log fusionado, cancelación y timeout;
+                      #   localiza sus salidas (curva, parámetros, figura)
+    exotic_import.py  # importa la salida de EXOTIC (fase D): curva a puntos
+                      #   source="exotic" y parámetros T_mid/Rp/Rs al proyecto
     solar.py         # estado del Sol agregado
     transits.py      # tránsitos de exoplanetas (t0 + n*P, visibilidad, ventana de captura)
     exotic.py        # handoff EXOTIC: inits.json pre-rellenado (Track D; nunca embebido)
@@ -119,6 +166,8 @@ nightscribe/
                       #   APASS DR9, VSX B/vsx; TTL 30 d; ADR-042)
                       # + surveys.py: contexto ALeRCE/ZTF en curvas (TTL 30 d; ADR-035)
                       #   y última magnitud para vigilias (claves "vigils:", TTL 12 h)
+                      # + astap.py: solver local de placa (binario del usuario,
+                      #   -wcs en memoria, caché por hash; ADR-051)
                       # + aavso.py: canal editorial AAVSO — alertas del foro (JSON
                       #   Discourse) + campañas activas (TTL 12 h; ADR-037 SC4b)
                      #   + fotometría de la comunidad con token (vigilias brillantes)
@@ -137,6 +186,8 @@ nightscribe/
                       #   la "prueba de fuego", Track C)
                       # + finder_view (carta de comparación: secuencia fotométrica
                       #   sobre DSS2 o el FITS del usuario — ADR-042)
+                      # + phase_view (informe período+fase: periodograma con FAP
+                      #   y curva plegada por noche — ADR-054)
     gui/               # app, main_window, workers (QThread), wizard, ui_loader,
                        #   ui/ (*.ui Designer);
                        # cuatro pestañas: Tonight, Projects, Campaigns, Observatory
@@ -145,7 +196,12 @@ nightscribe/
                        # **Editor FITS unificado** (ufe_dialog.py + ufe_state.py +
                        # widgets/ufe_image_view.py + widgets/histogram_widget.py +
                        # ufe_annotate_tab.py + ufe_blink_tab.py + ufe_compare_tab.py +
-                       # ufe_measure_tab.py, ADR-044) viven en
+                       # ufe_measure_tab.py, ADR-044; phase_dialog.py: período
+                       # y fase del proyecto, ADR-054; el panel izquierdo de la
+                       # visita (ufe_visit_panel.ui: navegador de tomas + bloque
+                       # EXOTIC de tránsito + el bloque de serie, ADR-048 rev.)
+                       # vive a la izquierda de la imagen, visible solo con visita)
+                       # viven en
                        # el menú Herramientas; los chips de eventos del cielo viven en
                        # la cabecera de Tonight (clic → diálogo)
                        # ADR-038: la app habla primero — dashboard «Necesita tu atención»,
@@ -185,13 +241,14 @@ installer/           # nightscribe.spec (PyInstaller) y nightscribe.iss (Inno Se
 python3 -m venv --system-site-packages .venv
 .venv/bin/pip install -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m pytest tests/unit     # rápido, sin red
+.venv/bin/python -m pytest -n auto --dist loadfile tests/unit  # en paralelo (xdist)
 .venv/bin/python -m pytest tests/functional  # con red, verifica funcionalidades
 .venv/bin/python -m nightscribe gui    # arranca la GUI
 ```
 
 ### Decisiones
 
-Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-046, bilingües).
+Toda decisión de arquitectura/diseño está en `docs/adr/` (ADR-000 a ADR-052, bilingües).
 Antes de cambiar una decisión, lee el ADR; si la cambias, actualiza el ADR.
 
 **Rediseño activo (2026-08-24)**: la app migra a un flujo centrado en proyectos
@@ -216,6 +273,12 @@ drafts + tweet + ready-to-attach PNG charts).
 - **The header block above goes in EVERY `.py` file** (adjust module name).
 - **Human voice**: short `# @args:` / `# @return:` comments above each method, in the
   spirit of the sibling project `saas/`. No robotic docstrings, no over-engineering.
+- **Didactic code (permanent rule)**: whoever reads it must understand **why**, not just
+  what. Every non-obvious block explains its reason, the physics, or the failure it
+  prevents; measured numbers go in the comment (what was gained, what it cost), and
+  nothing is left as "just because". A comment that teaches nothing is noise, and a
+  decision that is not explained is a decision that will be lost: the code is
+  documentation too.
 - **Docs in natural language**: never use the em dash ("—"); we write with ":", ","
   and ";". The en dash ("–") stays reserved for numeric ranges (0–100).
 - **The interface is defined in `gui/ui/*.ui` (ADR-005)**: every window, dialog or tab
@@ -231,7 +294,7 @@ drafts + tweet + ready-to-attach PNG charts).
 ### Layout, workflow, decisions
 
 See the Spanish section above (structure and commands are identical). All design
-decisions live in `docs/adr/` (ADR-000 to ADR-046, bilingual). Read the ADR before
+decisions live in `docs/adr/` (ADR-000 to ADR-052, bilingual). Read the ADR before
 changing a decision; update it if you do.
 
 **Active redesign (2026-08-24)**: the app is migrating to a project-centric workflow

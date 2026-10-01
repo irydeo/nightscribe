@@ -12,6 +12,7 @@
 ############################################################
 
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
@@ -169,24 +170,130 @@ class BlinkWorker(QThread):
 
 
 class UfeSolveWorker(QThread):
-    # Blind-solves the UFE's current plate with Astrometry.net in the
-    # background (ADR-044: astrometric solving is a common UFE feature).
+    # Blind-solves a plate in the background (ADR-044: astrometric solving
+    # is a common UFE feature; the dialog and the EXOTIC handoff share it).
+    # The solution comes back as cards; the caller merges them in memory
+    # and persists them into the FITS (ADR-051 rev), never the solver.
+    # cancel() kills the running solver (the busy dialog's Cancel).
     finished = Signal(dict)         # solved WCS cards, or {} on failure
     progress = Signal(str)          # stage text for the solve button
 
-    def __init__(self, path):
+    def __init__(self, path, pointing=None):
         super().__init__()
         self._path = path
+        # (ra_deg, dec_deg) when the app knows where the plate looks (the
+        # project's target): ASTAP answers in a tenth of a second with it
+        # and sweeps the sky for a minute without it (ADR-051, measured)
+        self._pointing = pointing
+        self._cancel = None
+
+    def cancel(self):
+        # @return: None. Kills ASTAP now and stops the run.
+        if self._cancel is not None:
+            self._cancel.set()
+
+    def cancelled(self):
+        # @return: True when the dialog's Cancel was pressed
+        return self._cancel is not None and self._cancel.is_set()
 
     def run(self):
-        from ..core.sources import astrometry
+        from ..core import solve as solve_mod
+        self._cancel = solve_mod.SolveCancel()
         try:
-            cards = astrometry.solve(self._path,
-                                     progress=self.progress.emit)
+            cards = solve_mod.solve(
+                self._path, progress=self.progress.emit,
+                cancel=self._cancel, pointing=self._pointing)
         except Exception as err:    # never crash the GUI on solve problems
             logger.exception("ufe solve worker failed: %s", err)
             cards = None
         self.finished.emit(cards or {})
+
+
+class VisitSolveWorker(QThread):
+    # Solves a whole visit's frames off the GUI thread (ADR-051).
+    #
+    # A visit is ONE field: the 35 frames of the real V0526 Per visit are the
+    # same pointing, and none of them carries a position or a scale of its
+    # own (FOCALLEN=0, no RA/DEC). Solved one by one by hand that was 35 x
+    # 66 s (measured: the sky sweep); with the field known it is 35 x 0.13 s.
+    #
+    # The batch SKIPS what is already done (a frame whose header carries a
+    # WCS, or one the app solved before and has cached) and, when nothing
+    # knows where the field is, solves the FIRST frame blind and lets the
+    # rest follow its field: one minute once instead of an hour.
+    progress = Signal(int, int, str)     # (done, total, file name)
+    finished = Signal(object)            # the summary dict (see run)
+    failed = Signal(str)                 # an unexpected error, in English
+
+    def __init__(self, paths, pointing=None, open_path=None):
+        super().__init__()
+        self._paths = list(paths)
+        self._pointing = pointing
+        self._open_path = str(open_path) if open_path else None
+        self._cancel = False
+        self._frame_cancel = None
+
+    def cancel(self):
+        # Asked by the dialog: the batch stops between frames, and the frame
+        # being solved right now is killed through the same SolveCancel the
+        # single solve uses.
+        # @return: None
+        self._cancel = True
+        if self._frame_cancel is not None:
+            self._frame_cancel.set()
+
+    def run(self):
+        from ..core import solve as solve_mod
+        from ..core import wcs_store
+        out = {"solved": 0, "skipped": 0, "failed": 0, "not_written": 0,
+               "failures": [], "cancelled": False, "cards": None}
+        total = len(self._paths)
+        pointing = self._pointing
+        for i, path in enumerate(self._paths):
+            if self._cancel:
+                out["cancelled"] = True
+                break
+            self.progress.emit(i, total, Path(path).name)
+            cards = solve_mod.solved_cards(path)
+            if cards is not None:
+                out["skipped"] += 1
+            else:
+                cancel = solve_mod.SolveCancel()
+                self._frame_cancel = cancel
+                if self._cancel:
+                    cancel.set()
+                try:
+                    cards = solve_mod.solve(path, pointing=pointing,
+                                            cancel=cancel)
+                except Exception as err:   # never crash the GUI thread
+                    logger.exception("visit solve failed on %s: %s", path, err)
+                    cards = None
+                self._frame_cancel = None
+                if cards:
+                    done, err = wcs_store.persist_solution(path, cards)
+                    if not done and err:
+                        # solved but not saved: the observer must know, or
+                        # the visit would look solved and be forgotten
+                        logger.warning("visit solve: cannot write %s: %s",
+                                       Path(path).name, err)
+                        out["not_written"] += 1
+                    out["solved"] += 1
+                else:
+                    out["failed"] += 1
+                    out["failures"].append(Path(path).name)
+            if pointing is None and cards:
+                # the field, learned from the first frame that worked: the
+                # pilot solve, or a frame that arrived already solved
+                ra, dec = cards.get("CRVAL1"), cards.get("CRVAL2")
+                if ra is not None and dec is not None:
+                    pointing = (ra, dec)
+            if self._open_path and str(path) == self._open_path and cards:
+                out["cards"] = cards
+            if self._cancel:
+                out["cancelled"] = True
+                break
+        self.progress.emit(total, total, "")
+        self.finished.emit(out)
 
 
 class UfeFieldWorker(QThread):
@@ -197,23 +304,103 @@ class UfeFieldWorker(QThread):
     finished = Signal(object)       # compstars.load_field result or {}
     progress = Signal(dict)         # stage {"es", "en"} for the status line
 
-    def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin):
+    def __init__(self, catalog, ra_deg, dec_deg, fov_arcmin, naxis=None,
+                 margin_arcsec=0.0):
         super().__init__()
         self._catalog = catalog
         self._ra = ra_deg
         self._dec = dec_deg
         self._fov = fov_arcmin
+        # the field is the REAL sensor rectangle, shrunk by a safety ring
+        # (quality plan, C2): a 43' square on a 43'x32' camera proposes
+        # stars the sensor never shows, and the drift finishes the job
+        self._naxis = naxis
+        self._margin = margin_arcsec
 
     def run(self):
         from ..core import compstars
         try:
             field = compstars.load_field(self._catalog, self._ra,
                                          self._dec, self._fov,
-                                         progress=self.progress.emit)
+                                         progress=self.progress.emit,
+                                         naxis=self._naxis,
+                                         margin_arcsec=self._margin)
         except Exception as err:    # never crash the GUI on data problems
             logger.exception("ufe field worker failed: %s", err)
             field = None
         self.finished.emit(field or {})
+
+
+class UfeProposeWorker(QThread):
+    # Proposes the comparison sequence off the GUI thread (H2).
+    #
+    # The proposal itself is arithmetic, but it asks the OBSERVER'S PLATE
+    # about every candidate (does this star saturate? is it above the
+    # linearity? is it measurable at all?), and that measurement is the
+    # expensive part. It used to run on the GUI thread under a modal
+    # dialog: the window could not repaint, and the observer read a frozen
+    # app with no word about what it was doing (reported). Here it runs
+    # where it belongs, the window stays alive, and the dialog can say
+    # where the work is and offer a way out.
+    #
+    # The validator reads the plate array and never writes it, so handing
+    # it to this thread is safe; the cancellation flag is checked inside
+    # the validator wrapper (compstars has no cancellation of its own, and
+    # adding one there would tie the core to the GUI's lifecycle).
+    finished = Signal(object)       # the compstars result, or None
+    progress = Signal(dict)         # stage {"es", "en"} for the status line
+    cancelled = Signal()
+
+    def __init__(self, stars, target_mag, validator, n=8,
+                 spread_arcmin=0.0, margin_arcsec=0.0):
+        super().__init__()
+        self._stars = list(stars)
+        self._target_mag = target_mag
+        self._validator = validator
+        self._n = n
+        self._spread = spread_arcmin
+        self._margin = margin_arcsec
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the tab (the Cancel button): the wrapper below stops at
+        # the next candidate and the partial work is thrown away (a half
+        # sequence is worse than none).
+        # @return: None
+        self._cancel = True
+
+    def run(self):
+        from ..core import compstars
+        self.progress.emit({"es": "Comprobando las candidatas en tu placa…",
+                            "en": "Checking the candidates on your plate…"})
+
+        def guarded(star, role="comp"):
+            if self._cancel:
+                raise _Cancelled()
+            if self._validator is None:
+                return None
+            return self._validator(star, role)
+
+        try:
+            result = compstars.propose_comps(
+                self._stars, self._target_mag, n=self._n,
+                spread_arcmin=self._spread, validator=guarded,
+                margin_arcsec=self._margin)
+        except _Cancelled:
+            self.cancelled.emit()
+            return
+        except Exception as err:    # never crash the GUI on data problems
+            logger.exception("propose worker failed: %s", err)
+            self.finished.emit(None)
+            return
+        self.finished.emit(result)
+
+
+class _Cancelled(Exception):
+    # Raised inside the validator wrapper to stop the proposal: a plain
+    # exception is the only way out of a function that does not know about
+    # cancellation, and it never leaves this module.
+    pass
 
 
 class UfeCutoutWorker(QThread):
@@ -498,3 +685,205 @@ class SequenceWorker(QThread):
                    fov_arcmin=field["fov_arcmin"],
                    n_variables=len(field["variables"]))
         self.finished.emit(out)
+
+
+class SeriesWorker(QThread):
+    # Measures a photometric series off the GUI thread (series plan,
+    # phase 5): the same core/series_measure.measure_series the tests and
+    # the CLI use, wrapped with progress and cancellation. The result is
+    # a SeriesResult (signal(object) passes it through untouched); the
+    # tab persists its points and paints the curve.
+
+    progress = Signal(int, int)      # (done, total)
+    finished = Signal(object)        # SeriesResult
+    failed = Signal(str)             # an unexpected error, in English
+
+    def __init__(self, paths, cfg):
+        super().__init__()
+        self._paths = list(paths)
+        self._cfg = cfg
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the tab (the Cancel button or a tab shutdown): the
+        # engine stops between frames and returns status "incomplete".
+        self._cancel = True
+
+    def run(self):
+        from ..core import series_measure
+        try:
+            result = series_measure.measure_series(
+                self._paths, self._cfg,
+                progress=lambda done, total: self.progress.emit(done, total),
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("series worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(result)
+
+
+class PassWorker(QThread):
+    # Measures a campaign pass off the GUI thread (E5c): the same
+    # core/series_measure.measure_pass the tests use, wrapped with progress
+    # and cancellation. The result is a PassResult (signal(object) passes
+    # it through untouched), and the window files each curve in its own
+    # project.
+
+    progress = Signal(int, int)      # (done, total)
+    finished = Signal(object)        # PassResult
+    failed = Signal(str)             # an unexpected error, in English
+
+    def __init__(self, paths, cfg):
+        super().__init__()
+        self._paths = list(paths)
+        self._cfg = cfg
+        self._cancel = False
+
+    def cancel(self):
+        # Asked by the window (the Cancel button): the engine stops between
+        # frames and comes back with status "incomplete".
+        self._cancel = True
+
+    def run(self):
+        from ..core import series_measure
+        try:
+            result = series_measure.measure_pass(
+                self._paths, self._cfg,
+                progress=lambda done, total: self.progress.emit(done, total),
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("pass worker failed: %s", err)
+            self.failed.emit(str(err))
+            return
+        self.finished.emit(result)
+
+
+class LiveSeriesWorker(QThread):
+    # Live mode off the GUI thread (series plan, phase 10 / D21): watches
+    # the session folder and measures each new stable batch through the
+    # same core engine. Signals a SeriesResult per committed batch.
+
+    progress = Signal(str, int)     # (stage key, frames): added | stopped
+    batch = Signal(object)          # SeriesResult of a committed batch
+    batch_failed = Signal(str, int)  # (error, frames) of a batch the engine
+                                     # refused: the frames are lost and the
+                                     # watch goes on (P2 #19)
+    failed = Signal(str)
+
+    def __init__(self, folder, cfg, poll_s=2.0, batch_n=5, batch_s=10.0):
+        super().__init__()
+        self._folder = folder
+        self._cfg = cfg
+        self._poll_s = poll_s
+        self._batch_n = batch_n
+        self._batch_s = batch_s
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import live
+        try:
+            driver = live.LiveDriver(
+                self._folder, self._cfg, poll_s=self._poll_s,
+                batch_n=self._batch_n, batch_s=self._batch_s,
+                on_points=self.batch.emit, on_error=self.batch_failed.emit,
+                progress=self.progress.emit, cancel=lambda: self._cancel)
+            driver.run()
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("live worker failed: %s", err)
+            self.failed.emit(str(err))
+
+
+class PrepareExoticWorker(QThread):
+    # Builds the external EXOTIC environment in the background
+    # (orchestration phase A): a private venv with EXOTIC installed.
+
+    progress = Signal(str)          # stage key: venv | pip | exotic | done
+    finished = Signal(bool, str)    # (ok, log tail)
+
+    def __init__(self, install_dir, base_python):
+        super().__init__()
+        self._install = install_dir
+        self._base = base_python
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import exotic_env
+        try:
+            ok, log = exotic_env.prepare(
+                self._install, self._base,
+                progress=self.progress.emit,
+                cancel=lambda: self._cancel)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("prepare exotic failed: %s", err)
+            ok, log = False, str(err)
+        self.finished.emit(bool(ok), log or "")
+
+
+class ProbeExoticWorker(QThread):
+    # Detects and probes the EXOTIC interpreter off the GUI thread:
+    # detect_python spawns subprocesses and the cold import of exotic
+    # can take minutes, which used to freeze the app for the whole
+    # probe. Not cancellable (each subprocess carries its own timeout);
+    # one report out, like its siblings.
+
+    finished = Signal(dict)         # {"ok", "version", "message", "python"}
+
+    def __init__(self, preferred=None):
+        super().__init__()
+        self._preferred = preferred
+
+    def run(self):
+        from ..core import exotic_env
+        python = None
+        try:
+            python = exotic_env.detect_python(self._preferred)
+            rep = exotic_env.probe(python)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("exotic probe worker failed: %s", err)
+            rep = {"ok": False, "version": None, "message": str(err)}
+        rep["python"] = python or ""
+        self.finished.emit(rep)
+
+
+class ExoticRunWorker(QThread):
+    # Runs EXOTIC headless off the GUI thread (orchestration phase C):
+    # merged log streamed as progress, cancellable, killed on timeout.
+
+    progress = Signal(str)          # a log line
+    finished = Signal(dict)         # exotic_run.run result
+
+    def __init__(self, python_path, work_dir, inits_path, mode="red",
+                 timeout_s=None):
+        super().__init__()
+        self._python = python_path
+        self._dir = work_dir
+        self._inits = inits_path
+        self._mode = mode
+        self._timeout = timeout_s
+        self._cancel = False
+
+    def cancel(self):
+        self._cancel = True
+
+    def run(self):
+        from ..core import exotic_run
+        kwargs = {}
+        if self._timeout is not None:
+            kwargs["timeout_s"] = self._timeout
+        try:
+            res = exotic_run.run(
+                self._python, self._dir, self._inits, mode=self._mode,
+                progress=self.progress.emit,
+                cancel=lambda: self._cancel, **kwargs)
+        except Exception as err:      # never crash the GUI thread
+            logger.exception("EXOTIC run worker failed: %s", err)
+            res = {"ok": False, "returncode": None, "log_path": None,
+                   "out_dir": str(self._dir), "cancelled": False}
+        self.finished.emit(res)

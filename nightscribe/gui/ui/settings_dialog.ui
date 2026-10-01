@@ -157,6 +157,47 @@
          </widget>
         </item>
         <item>
+         <widget class="QGroupBox" name="grp_camprofile">
+          <property name="title"><string>Photometric camera profile</string></property>
+          <layout class="QVBoxLayout" name="vbox_camera">
+           <item>
+            <layout class="QHBoxLayout" name="row_campreset">
+             <item><widget class="QLabel" name="lbl_campreset"><property name="text"><string>Preset:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QComboBox" name="cmb_cam_preset"/></item>
+             <item><spacer name="hsp_campreset"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lblH_campreset"><property name="text"><string>Fills the pixel size and a starting profile. Linearity and the working max exposure are per gain: measure yours (the suggested value is only a starting point)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           <item>
+            <layout class="QHBoxLayout" name="row_camprofile">
+             <item><widget class="QLabel" name="lbl_camfull"><property name="text"><string>Full well (e-):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_full_well"><property name="maximum"><double>10000000.000000000000000</double></property><property name="decimals"><number>0</number></property></widget></item>
+             <item><widget class="QLabel" name="lbl_camlin"><property name="text"><string>Linearity (ADU):</string></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_linearity"><property name="toolTip"><string>Peak ADU below which the sensor is linear (per gain). Above it a star calibrates nothing and the app excludes those comps. 0 = use SATURATE/settings</string></property><property name="maximum"><double>1000000.000000000000000</double></property><property name="decimals"><number>0</number></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="row_camgain">
+             <item><widget class="QLabel" name="lbl_camgain"><property name="text"><string>System gain (e-/ADU):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_gain"><property name="toolTip"><string>Electrons per ADU of YOUR camera at YOUR gain setting. It is what turns the error bar into an honest CCD equation instead of the scatter of the comparison stars, and it is per unit: measure it (0 = unknown)</string></property><property name="maximum"><double>100.000000000000000</double></property><property name="decimals"><number>3</number></property><property name="singleStep"><double>0.010000000000000</double></property></widget></item>
+             <item><widget class="QLabel" name="lbl_camron"><property name="text"><string>Read noise (e-):</string></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_ron"><property name="toolTip"><string>Read noise in electrons at the same gain. Usually a datasheet value (the preset fills it); 0 = unknown</string></property><property name="maximum"><double>200.000000000000000</double></property><property name="decimals"><number>2</number></property></widget></item>
+            </layout>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="row_camprofile2">
+             <item><widget class="QLabel" name="lbl_camdark"><property name="text"><string>Dark (e-/pix/s):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_dark"><property name="maximum"><double>1000.000000000000000</double></property><property name="decimals"><number>4</number></property></widget></item>
+             <item><widget class="QLabel" name="lbl_camax"><property name="text"><string>Max exposure (s):</string></property></widget></item>
+             <item><widget class="QDoubleSpinBox" name="spn_cam_max_exp"><property name="toolTip"><string>Working maximum exposure (per gain). 0 = no cap. For an sCMOS (GSENSE400) it is a few seconds and grouping adds the rest</string></property><property name="maximum"><double>36000.000000000000000</double></property><property name="decimals"><number>0</number></property></widget></item>
+            </layout>
+           </item>
+           <item><widget class="QLabel" name="lbl_cam_ref"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+           <item><widget class="QLabel" name="lbl_cam_gain_note"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
          <widget class="QGroupBox" name="grp_chartann">
           <property name="title"><string>Chart annotations</string></property>
           <layout class="QVBoxLayout" name="vbox_chartann">
@@ -201,9 +242,16 @@
            </item>
            <item><widget class="QLabel" name="lblH_marker_style"><property name="text"><string>How the object is marked on the charts: a ring with ticks (classic) or a full-frame cross with a box</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
            <item>
+            <layout class="QHBoxLayout" name="row_chart_data">
+             <item><widget class="QLabel" name="lbl_chart_data"><property name="text"><string>Plate band:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_chart_data"><property name="text"><string>Say what the plate knows (position, magnitude, date, exposure, kit, station, scale, field)</string></property><property name="toolTip"><string>The plate's band, over the image: what the corner boxes used to say, with a colour per datum. The colour says how much to trust it: ink for what this plate's own solution places, dimmed for what is only the catalogue's, and for the magnitude a scale of its own: GREEN clean (error up to 0.05), ORANGE usable but not clean (up to 0.15 or a light caveat), RED not worth reporting without looking, and WHITE for a catalogue value. Off, the band keeps the object's name only</string></property></widget></item>
+             <item><spacer name="hsp_chart_data"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout>
+           </item>
+           <item>
             <layout class="QHBoxLayout" name="row_chart_boxes">
-             <item><widget class="QLabel" name="lbl_chart_boxes"><property name="text"><string>Corner boxes:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
-             <item><widget class="QCheckBox" name="chk_chart_boxes"><property name="text"><string>Stamp the metadata boxes on the charts</string></property></widget></item>
+             <item><widget class="QLabel" name="lbl_chart_boxes"><property name="text"><string>Other charts:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QCheckBox" name="chk_chart_boxes"><property name="text"><string>Stamp the metadata boxes on the blink and the finder chart</string></property><property name="toolTip"><string>The corner boxes of the OTHER charts (the blink GIF/MP4 and the photometric sequence chart). The plate's own band in the editor is the setting above</string></property></widget></item>
              <item><spacer name="hsp_chart_boxes"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
             </layout>
            </item>
@@ -482,6 +530,40 @@
            </layout>
           </item>
           <item><widget class="QLabel" name="lblH_astrokey"><property name="text"><string>Optional: blind-solve FITS without WCS in the Blink tab (free key from nova.astrometry.net)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+          <item><widget class="QGroupBox" name="grp_solver"><property name="title"><string>Plate solver</string></property>
+           <layout class="QVBoxLayout" name="vbox_solver">
+            <item><layout class="QHBoxLayout" name="row_solver">
+             <item><widget class="QLabel" name="lbl_solver"><property name="text"><string>Solver:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QComboBox" name="cmb_solver"/></item>
+             <item><spacer name="hsp_solver"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+            </layout></item>
+            <item><layout class="QHBoxLayout" name="row_astap">
+             <item><widget class="QLabel" name="lbl_astap"><property name="text"><string>ASTAP binary:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_astap_path"/></item>
+             <item><widget class="QPushButton" name="btn_astap_browse"><property name="text"><string>…</string></property></widget></item>
+             <item><widget class="QPushButton" name="btn_astap_test"><property name="text"><string>Test</string></property></widget></item>
+            </layout></item>
+            <item><widget class="QCheckBox" name="chk_solve_save"><property name="text"><string>Save the solved WCS into the FITS header</string></property><property name="toolTip"><string>When on (default), a solved plate is stored solved: the WCS cards are written into the FITS, atomically, so any program sees it. The pixel data is never touched. Turn it off to keep the solution in memory only</string></property></widget></item>
+            <item><widget class="QLabel" name="lblH_astap"><property name="text"><string>Optional: solve plates locally with ASTAP. Auto uses ASTAP first and nova.astrometry.net as fallback; an empty path looks for "astap" on PATH</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           </layout></widget></item>
+          <item><widget class="QGroupBox" name="grp_exotic"><property name="title"><string>EXOTIC (transit reduction)</string></property>
+           <layout class="QVBoxLayout" name="vbox_exotic">
+            <item><layout class="QHBoxLayout" name="row_exotic_py">
+             <item><widget class="QLabel" name="lbl_exotic_py"><property name="text"><string>Python &lt;= 3.10:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_exotic_python"/></item>
+             <item><widget class="QPushButton" name="btn_exotic_py_browse"><property name="text"><string>…</string></property></widget></item>
+            </layout></item>
+            <item><layout class="QHBoxLayout" name="row_exotic_dir">
+             <item><widget class="QLabel" name="lbl_exotic_dir"><property name="text"><string>EXOTIC environment (optional):</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+             <item><widget class="QLineEdit" name="edt_exotic_install"/></item>
+             <item><widget class="QPushButton" name="btn_exotic_dir_browse"><property name="text"><string>…</string></property></widget></item>
+            </layout></item>
+            <item><layout class="QHBoxLayout" name="row_exotic_actions">
+             <item><widget class="QPushButton" name="btn_exotic_prepare"><property name="text"><string>Prepare environment</string></property><property name="toolTip"><string>Create a private Python 3.10 environment and install EXOTIC in it (needs network the first time; a few minutes)</string></property></widget></item>
+             <item><widget class="QPushButton" name="btn_exotic_test"><property name="text"><string>Test</string></property><property name="toolTip"><string>Check that the interpreter can import EXOTIC and report its version</string></property></widget></item>
+            </layout></item>
+            <item><widget class="QLabel" name="lblH_exotic"><property name="text"><string>Optional. Simplest on Windows: install Python 3.10 from python.org (tick the "py launcher") and run "pip install exotic" in it, then point the field above to that interpreter. "Prepare environment" builds a private environment for you instead (needs network the first time)</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+           </layout></widget></item>
           <item>
            <layout class="QHBoxLayout" name="row_tnsbot">
             <item><widget class="QLabel" name="lbl_tnsbot"><property name="text"><string>TNS bot name:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>

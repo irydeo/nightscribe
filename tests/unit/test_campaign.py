@@ -321,3 +321,221 @@ def test_signals_report_excludes_archived_project(db):
     project.set_status(db, pid, "archived")
     rep = campaign.signals_report(db)
     assert rep["members"] == 0 and rep["signals"] == []
+
+
+# ---------------- the shared sequence of a campaign (E5b) --------------
+
+def _sequence(n=3):
+    # The shape a project's context stores: the FULL entries, with the
+    # star's RA/Dec and bands, not just a list of names.
+    entries = []
+    for j in range(n):
+        entries.append({"name": f"C{j + 1}", "kind": "comp",
+                        "star": {"ra": 40.0 + j, "dec": 20.0 + j,
+                                 "mag": 12.0 + 0.1 * j, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": 12.0 + 0.1 * j,
+                                            "err": 0.02,
+                                            "derived": False}]}})
+    return {"catalog": "APASS DR9", "entries": entries,
+            "csv": "/tmp/seq.csv", "png": "/tmp/seq.png"}
+
+
+def test_a_campaign_can_carry_a_shared_sequence(tmp_path):
+    from nightscribe.core.db import Database
+    from nightscribe.core import campaign as camp_mod
+    db = Database(tmp_path / "t.sqlite")
+    cid = camp_mod.create(db, "PCCP watch")
+    assert camp_mod.sequence_of(camp_mod.get(db, cid)) is None
+    assert camp_mod.set_sequence(db, cid, _sequence(4)) is True
+    seq = camp_mod.sequence_of(camp_mod.get(db, cid))
+    assert seq is not None
+    assert len(seq["entries"]) == 4
+    assert seq["catalog"] == "APASS DR9"
+    # and it can be cleared without touching the rest of the protocol
+    camp_mod.update(db, cid, protocol={"cadence_nights": 3, "notes": "x"})
+    assert camp_mod.sequence_of(camp_mod.get(db, cid)) is None
+    assert camp_mod.protocol_get(camp_mod.get(db, cid),
+                                 "cadence_nights") == 3
+
+
+def test_the_project_sequence_wins_and_the_panel_knows_which_one(tmp_path):
+    # Precedence: a project that built its own sequence measures with it
+    # (it was made for that object and that field); the campaign's is the
+    # fallback, and the caller is TOLD which one it got.
+    from nightscribe.core import campaign as camp_mod
+    camp = {"protocol": {"sequence": _sequence(5)}}
+    own = {"sequence": _sequence(2)}
+    got, source = camp_mod.sequence_for_project(own, camp)
+    assert source == "project" and len(got["entries"]) == 2
+    got, source = camp_mod.sequence_for_project({}, camp)
+    assert source == "campaign" and len(got["entries"]) == 5
+    got, source = camp_mod.sequence_for_project({}, {})
+    assert got is None and source is None
+    # a project context with a sequence dict but no entries is not a
+    # sequence: it must not shadow the campaign's
+    got, source = camp_mod.sequence_for_project({"sequence": {"entries": []}},
+                                                camp)
+    assert source == "campaign"
+
+
+def test_editing_a_campaign_does_not_lose_its_shared_sequence(tmp_path):
+    # The editor writes its own protocol keys; the sequence lives in the
+    # same dict and must survive the round trip (this is a real loss that
+    # was there before E5b: the editor replaced the whole protocol).
+    from nightscribe.core.db import Database
+    from nightscribe.core import campaign as camp_mod
+    db = Database(tmp_path / "t.sqlite")
+    cid = camp_mod.create(db, "Watch")
+    camp_mod.set_sequence(db, cid, _sequence(3))
+    # what the editor does now: merge
+    prot = dict((camp_mod.get(db, cid).get("protocol") or {}))
+    prot.update({"cadence_nights": 7, "filters": ["V"],
+                 "comp_stars": ["C1"], "notes": "edited"})
+    camp_mod.update(db, cid, protocol=prot)
+    after = camp_mod.get(db, cid)
+    assert camp_mod.sequence_of(after) is not None
+    assert len(camp_mod.sequence_of(after)["entries"]) == 3
+    assert camp_mod.protocol_get(after, "cadence_nights") == 7
+
+
+# ---------------- which projects travel together (E5c) ----------------
+
+def _proj(pid, name, ra=None, dec=None):
+    ctx = {}
+    if ra is not None:
+        ctx = {"ra_deg": ra, "dec_deg": dec}
+    return {"id": pid, "object_name": name, "context": ctx}
+
+
+def test_the_pass_groups_the_projects_by_field_and_says_who_is_left_out():
+    # A pass measures every target on the SAME frames, so only the objects
+    # that fit in one field travel together. The rule is their separation
+    # against the field of view the sequence was built for, and whoever
+    # does not fit is REPORTED, never dropped in silence.
+    from nightscribe.core import campaign as camp_mod
+    projects = [_proj(1, "Central", 10.0, 20.0),
+                _proj(2, "Vecina", 10.0, 20.02),      # 1.2' away
+                _proj(3, "Lejana", 10.5, 20.0),       # 28' away
+                _proj(4, "Sin posición")]
+    got = camp_mod.group_by_field(projects, fov_arcmin=30.0)
+    assert got["reference"]["object_name"] == "Central"
+    assert [p["object_name"] for p in got["targets"]] == ["Central", "Vecina"]
+    reasons = {e["project"]["object_name"]: e["reason"]
+               for e in got["left_out"]}
+    assert "posición" in reasons["Sin posición"]["es"]
+    assert "fuera del campo" in reasons["Lejana"]["es"]
+    assert "30" not in reasons["Lejana"]["es"]     # the half-FOV limit
+    assert "15" in reasons["Lejana"]["es"]
+
+
+def test_an_explicit_centre_is_respected():
+    from nightscribe.core import campaign as camp_mod
+    projects = [_proj(1, "A", 10.0, 20.0), _proj(2, "B", 10.0, 20.02)]
+    got = camp_mod.group_by_field(projects, fov_arcmin=30.0, reference_id=2)
+    assert got["reference"]["object_name"] == "B"
+    assert {p["object_name"] for p in got["targets"]} == {"A", "B"}
+
+
+def test_without_a_field_of_view_nobody_is_left_out_for_distance():
+    # No known field: the grouping cannot be answered, and inventing a
+    # limit would silently exclude a real sibling. The pass is then what
+    # the observer selected.
+    from nightscribe.core import campaign as camp_mod
+    projects = [_proj(1, "A", 10.0, 20.0), _proj(2, "B", 12.0, 25.0)]
+    got = camp_mod.group_by_field(projects, fov_arcmin=None)
+    assert [p["object_name"] for p in got["targets"]] == ["A", "B"]
+    assert got["left_out"] == []
+
+
+def test_no_project_with_a_position_means_no_pass():
+    from nightscribe.core import campaign as camp_mod
+    got = camp_mod.group_by_field([_proj(1, "Sin posición")],
+                                  fov_arcmin=30.0)
+    assert got["reference"] is None
+    assert got["targets"] == []
+    assert len(got["left_out"]) == 1
+
+
+# ---------------- writing a pass: one run per project (E5c) ----------
+
+def _mk_project(db, name):
+    from nightscribe.core import project as project_mod
+    p = project_mod.create(db, "variable", name,
+                           {"ra_deg": 10.0, "dec_deg": 20.0})
+    return p["id"]
+
+
+def test_sharing_the_frames_gives_every_project_its_own_visit(db):
+    # A visit is a night of ONE project, and a pass measures one set of
+    # files for several objects: so each project gets its own visit that
+    # night, holding those very files. Nothing is copied.
+    from nightscribe.core import followup as fu, project as project_mod
+    pid_a = _mk_project(db, "A")
+    pid_b = _mk_project(db, "B")
+    paths = ["/data/f001.fits", "/data/f002.fits"]
+    got = fu.share_frames(db, paths, [{"project_id": pid_a},
+                                      {"project_id": pid_b}],
+                          obs_date="2026-09-20",
+                          notes="Pasada de campaña")
+    assert set(got) == {pid_a, pid_b}
+    for pid in (pid_a, pid_b):
+        files = project_mod.files_for_session(db, got[pid])
+        assert sorted(f["path"] for f in files) == sorted(paths)
+        assert files[0]["project_id"] == pid
+
+
+def test_sharing_the_frames_twice_reuses_the_visit(db):
+    # Measuring what was already filed must not create a second visit:
+    # that is the whole point of a pass.
+    from nightscribe.core import followup as fu, project as project_mod
+    pid = _mk_project(db, "A")
+    paths = ["/data/f001.fits", "/data/f002.fits"]
+    first = fu.share_frames(db, paths, [{"project_id": pid}],
+                            obs_date="2026-09-20")
+    second = fu.share_frames(db, paths, [{"project_id": pid}],
+                             obs_date="2026-09-20")
+    assert first[pid] == second[pid]
+    assert len(fu.list_sessions(db, pid)) == 1
+    assert len(project_mod.files_for_session(db, first[pid])) == 2
+
+
+def test_a_pass_writes_one_run_per_project_and_says_which_it_was(db):
+    # Each project receives its own run (so "undo this run" undoes exactly
+    # that object's curve), and the run's echo carries the pass: what it
+    # was, which object, and who travelled with it. No schema change.
+    from nightscribe.core import followup as fu, project as project_mod
+    pid_a = _mk_project(db, "A")
+    pid_b = _mk_project(db, "B")
+    sessions = fu.share_frames(db, ["/data/f001.fits"],
+                               [{"project_id": pid_a},
+                                {"project_id": pid_b}],
+                               obs_date="2026-09-20")
+    rows_a = [{"mjd": 60000.1, "filter": "V", "mag": 12.3, "err": 0.02,
+               "err_internal": 0.01, "mag_raw": -9.7, "path": "/data/f001.fits",
+               "flags": [], "source": "measure"}]
+    rows_b = [dict(rows_a[0], mag=13.1)]
+    out = fu.save_pass(db, [
+        {"project_id": pid_a, "session_id": sessions[pid_a], "rows": rows_a,
+         "label": "A"},
+        {"project_id": pid_b, "session_id": sessions[pid_b], "rows": rows_b,
+         "label": "B"}], cfg={"campaign": "Watch", "band": "V"})
+    assert [e["label"] for e in out] == ["A", "B"]
+    assert out[0]["run_id"] != out[1]["run_id"]
+    assert out[0]["points"] == 1
+    for entry in out:
+        pts = fu.list_points_for_run(db, entry["run_id"])
+        assert len(pts) == 1
+        assert pts[0]["project_id"] == entry["project_id"]
+        assert pts[0]["session_id"] == entry["session_id"]
+    # "undo this run" must undo exactly one object's curve
+    assert fu.set_run_status(db, out[0]["run_id"], "undone") is True
+    assert len(fu.list_points_for_run(db, out[0]["run_id"])) == 1
+    # and the echo says which pass it was and who travelled along
+    row = db.execute("SELECT cfg_json FROM measurement_runs WHERE id=?",
+                     (out[0]["run_id"],)).fetchone()
+    import json as _json
+    echo = _json.loads(row[0])
+    assert echo["pass"]["labels"] == ["A", "B"]
+    assert echo["pass"]["target"] == "A"
+    assert echo["campaign"] == "Watch"

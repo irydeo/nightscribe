@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Period + phase dialog (quality plan, phase C). The structure lives in
+  Designer, the behaviour in gui/phase_dialog.py (ADR-005). The chart is
+  a PNG rendered by viz/phase_view.py and shown in the placeholder label
+  `lbl_chart`, never built inside Qt.
+-->
+<ui version="4.0">
+ <class>PhaseDialog</class>
+ <widget class="QWidget" name="PhaseWindow">
+  <layout class="QVBoxLayout" name="vbox_phase">
+   <item>
+    <widget class="QLabel" name="lbl_title"><property name="text"><string>Period and phase</string></property></widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_subtitle"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_controls">
+     <item><widget class="QLabel" name="lbl_method"><property name="text"><string>Method:</string></property></widget></item>
+     <item><widget class="QComboBox" name="cmb_method"><property name="toolTip"><string>Lomb-Scargle fits a sinusoid and gives a false-alarm probability; the PDM makes no assumption about the shape and is the right cross-check for an eclipse. «Both» runs each and tells you whether they agree</string></property></widget></item>
+     <item><widget class="QLabel" name="lbl_minp"><property name="text"><string>Min period (d):</string></property></widget></item>
+     <item><widget class="QDoubleSpinBox" name="spn_minp"><property name="toolTip"><string>Shortest period to try; the default is twice the typical spacing between frames</string></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>1000.0</double></property><property name="decimals"><number>5</number></property><property name="value"><double>0.0</double></property><property name="keyboardTracking"><bool>false</bool></property></widget></item>
+     <item><widget class="QLabel" name="lbl_maxp"><property name="text"><string>Max period (d):</string></property></widget></item>
+     <item><widget class="QDoubleSpinBox" name="spn_maxp"><property name="toolTip"><string>Longest period to try; periods longer than the baseline cannot be fixed by the data and the search says so</string></property><property name="minimum"><double>0.0</double></property><property name="maximum"><double>10000.0</double></property><property name="decimals"><number>5</number></property><property name="value"><double>0.0</double></property><property name="keyboardTracking"><bool>false</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_community"><property name="text"><string>Add the community curve…</string></property><property name="toolTip"><string>Fetch the AAVSO community's own observations of this star (needs the API token in Settings) and search the period with them: one night cannot fix a period, and this is how the reference report did it. They are drawn in grey and never mixed with yours</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_search"><property name="text"><string>Search</string></property><property name="toolTip"><string>Run the search on the points of this project (the curve as measured, flags included)</string></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_robust">
+     <item><widget class="QCheckBox" name="chk_skip_flags"><property name="text"><string>Leave out the flagged points</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>A point whose data is in doubt (saturated, a cosmic ray, a focus excursion, a cloud, an unaligned frame) must not steer the periodogram. The calibration caveats (few comps) are not in doubt and stay</string></property></widget></item>
+     <item><widget class="QCheckBox" name="chk_clip"><property name="text"><string>Reject outliers (robust clip)</string></property><property name="toolTip"><string>An iterative MAD clip on the curve itself before the search: what leaves the robust scatter goes, and the number is said in the result. Leave it on when the curve has a point that does not belong</string></property></widget></item>
+     <item><spacer name="hsp_robust"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_chart"><property name="text"><string/></property><property name="alignment"><set>Qt::AlignCenter</set></property><property name="minimumSize"><size><width>640</width><height>360</height></size></property></widget>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="txt_result"><property name="readOnly"><bool>true</bool></property><property name="toolTip"><string>What was found and, above all, what the data cannot say: cycles covered, false-alarm probability, aliases</string></property></widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_buttons">
+     <item><widget class="QCheckBox" name="chk_save"><property name="text"><string>Save the period to the project</string></property><property name="toolTip"><string>Writes the period into the project so the light curve of the project folds by it from now on</string></property><property name="checked"><bool>true</bool></property></widget></item>
+     <item><widget class="QPushButton" name="btn_export"><property name="text"><string>Export the report…</string></property><property name="toolTip"><string>Write the PNG and a CSV of the periodogram and the folded curve</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_close"><property name="text"><string>Close</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

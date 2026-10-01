@@ -23,10 +23,49 @@ the GUI widget lives in gui/widgets/lightcurve_widget.py (ADR-029).
 
 import logging
 
+import numpy as np
+
 from . import style
 from ..core import sn_templates
 
 logger = logging.getLogger(__name__)
+
+# The magnitude window follows the core of the curve: median ± K robust
+# sigmas, never min/max (quality plan, phase A). A systematic wider than
+# this share of the window is NOT drawn as a band (it would fill the
+# panel): the caption says the number instead.
+_ROBUST_K = 6.0
+_SYSTEM_BAND_MAX_FRAC = 0.5
+
+
+def _bar_error(p):
+    # @args: p - a point dict
+    # @return: the sigma its bar should draw: its OWN error when the CCD
+    #          equation could be evaluated, else the total (or None)
+    if p.get("err_internal") is not None:
+        return float(p["err_internal"])
+    return None if p.get("err") is None else float(p["err"])
+
+
+def _systematic(p):
+    # @args: p - a point dict
+    # @return: the part of the error that is NOT the point's own photons
+    #          (the zero point, the flat), or None
+    total = p.get("err")
+    inner = p.get("err_internal")
+    if total is None:
+        return None
+    if inner is None:
+        return float(total)
+    var = float(total) ** 2 - float(inner) ** 2
+    return float(np.sqrt(var)) if var > 0.0 else 0.0
+
+
+def _mag_span(mags):
+    # @return: the span of the magnitudes, or 0
+    if not mags:
+        return 0.0
+    return float(np.max(mags) - np.min(mags))
 
 # Distinct colours per filter (theme accents). "Clear"/"None" is the default
 # no-filter path (B-f) and gets the primary accent.
@@ -156,13 +195,21 @@ def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
                                   "Typical template (schematic)"))
 
     # data series per (filter, source)
+    systematic = None
     for (filt, src_class) in sorted(by_series):
         pts = sorted(by_series[(filt, src_class)], key=lambda p: p["mjd"])
         xs = [p["mjd"] for p in pts]
         ys = [p["mag"] for p in pts]
-        errs = [p.get("err") for p in pts]
-        # matplotlib rejects None in yerr; use NaN to skip a bar
+        # the BAR is the point's own error (its photons): the zero-point
+        # systematic is common to the whole night and belongs in a band,
+        # not in N bars that hide the curve (quality plan, phase A)
+        errs = [_bar_error(p) for p in pts]
         errs = [e if e is not None else float("nan") for e in errs]
+        syss = [_systematic(p) for p in pts]
+        syss = [s for s in syss if s is not None]
+        if syss:
+            sys = float(np.median(syss))
+            systematic = sys if systematic is None else max(systematic, sys)
         colour, face, linest = _series_style(src_class)
         if colour is None:
             colour = _filter_colour(filt)
@@ -173,6 +220,18 @@ def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
                     ls=linest,
                     capsize=0, label=_series_label(filt, src_class, lang),
                     zorder=3)
+        # the calibration band of this series, behind the points
+        if syss and systematic and sys <= _SYSTEM_BAND_MAX_FRAC * _mag_span(
+                ys):
+            med = float(np.median(ys))
+            ax.axhspan(med - sys, med + sys, color=style.MUTED, alpha=0.10,
+                       zorder=1, lw=0)
+    if systematic and systematic >= 0.005:
+        ax.text(0.01, 0.02, style.pick(
+            lang, "Sistema de calibración ±{0:.3f} mag",
+            "Calibration systematic ±{0:.3f} mag").format(systematic),
+            transform=ax.transAxes, color=style.MUTED, fontsize=8,
+            va="bottom", ha="left")
 
     ax.set_title(style.pick(lang, "Curva de luz", "Light curve"), loc="left")
     if fold_period_d:
@@ -182,6 +241,21 @@ def draw_lightcurve(points, out=None, fmt="facebook", watermark="NightScribe",
         ax.set_xlabel(style.pick(lang, "Fecha (MJD)", "Date (MJD)"))
     ax.set_ylabel(style.pick(lang, "Magnitud", "Magnitude"))
     ax.invert_yaxis()   # brighter (lower mag) at the bottom — standard
+    # the magnitude window follows the CORE of the curve, so one
+    # anomalous point cannot flatten the rest (quality plan, phase A)
+    all_mags = [p["mag"] for pts in by_series.values() for p in pts]
+    if fold_period_d and schematic:
+        all_mags += [m for _ph, m in schematic]
+    if all_mags:
+        med = float(np.median(all_mags))
+        mad = 1.4826 * float(np.median(np.abs(np.asarray(all_mags) - med)))
+        if mad > 0.0:
+            lo = max(med - _ROBUST_K * mad, float(np.min(all_mags)))
+            hi = min(med + _ROBUST_K * mad, float(np.max(all_mags)))
+            if hi - lo < 0.05:
+                hi, lo = med + 0.025, med - 0.025
+            pad = (hi - lo) * 0.10
+            ax.set_ylim(hi + pad, lo - pad)
     ax.grid(True, alpha=0.2)
     if by_series or tpl or (fold_period_d and schematic):
         ax.legend(fontsize=9, loc="best")

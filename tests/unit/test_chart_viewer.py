@@ -317,3 +317,23 @@ def test_export_writes_object_named_file(qapp, tmp_path, monkeypatch):
     assert data[:8] == b"\x89PNG\r\n\x1a\n"
     assert len(data) > 1000
     v.close()
+
+
+def test_a_chart_whose_file_is_gone_says_so(qapp, tmp_path, monkeypatch):
+    # Reported: "the PNG export of the chart does not work". When the chart
+    # came from a file the project saved and that file is gone (cleaned up,
+    # moved, another machine), the copy raised with nobody listening and the
+    # button did nothing at all. It says it now, with what to do.
+    from PySide6.QtWidgets import QFileDialog, QMessageBox
+    from nightscribe.gui.chart_viewer import ChartViewer
+    view = ChartViewer(str(tmp_path / "no_existe.png"), title="prueba")
+    said = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **k: said.append(a[2]))
+    monkeypatch.setattr(
+        QFileDialog, "getSaveFileName",
+        staticmethod(lambda *a, **k: (str(tmp_path / "out.png"), "")))
+    view._export()
+    assert said and "Could not write the chart" in said[0]
+    assert not (tmp_path / "out.png").exists()
+    view.close()

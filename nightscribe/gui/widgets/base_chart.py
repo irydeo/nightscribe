@@ -131,6 +131,16 @@ class ChartView(QGraphicsView):
         for it in reversed(self._items_registered):
             self._scene.removeItem(it)
         self._items_registered = []
+        # The hover tooltip is NOT registered with add_item (it is added
+        # straight to the scene, because it lives above everything and no
+        # subclass should ever clear it by accident). Forgetting its
+        # reference without taking it out of the scene left an ORPHAN: a
+        # chart that rebuilds on every click grew one frozen tooltip per
+        # click, with no way to remove them (measured: 1 -> 5 in four
+        # clicks). It is removed here, and then forgotten.
+        for it in (self._tooltip, self._tip_panel):
+            if it is not None and it.scene() is self._scene:
+                self._scene.removeItem(it)
         self._tooltip = None
         self._tip_panel = None
         self._scene_rect_hint = None
@@ -220,6 +230,12 @@ class ChartView(QGraphicsView):
         #        or "" / None to drop it. Mirrors the matplotlib exports'
         #        watermark param (viz/style.watermark).
         self._watermark = text or ""
+
+    def export_flip(self):
+        # Does this view mirror what it shows? (the UFE's flip, E6). An
+        # ordinary chart never does.
+        # @return: (horizontal, vertical) booleans
+        return (False, False)
 
     def _paint_watermark(self, painter, w, h):
         # @args: painter - a QPainter in DEVICE coordinates (viewport or
@@ -390,6 +406,16 @@ class ChartView(QGraphicsView):
         # @return: (x, y) scene coordinates
         scale = max(self.transform().m11(), 1e-3)
         cursor = self.mapToScene(viewport_pos.toPoint())
+        if getattr(self, "_tooltip_anchor", "cursor") == "bottom_left":
+            # A CALM READOUT (the UFE's plate): the bubble used to chase the
+            # cursor, covering the very pixels being inspected and moving
+            # under the eye (reported). Anchored to the bottom-left corner
+            # of the viewport it reads like a status line and never hides
+            # the plate.
+            vp_h = self.viewport().height()
+            corner = self.mapToScene(0, vp_h - 4)
+            return corner.x() + 8.0 / scale, corner.y() - br.height()
+
         # approximate the visible scene width to decide the flip
         edge = self.mapToScene(self.viewport().width(), 0).x()
         gap = 14.0 / scale
@@ -444,9 +470,14 @@ class ChartView(QGraphicsView):
         # sceneRect: the visible rect (the union of what's on screen).
         # Using scene().itemsBoundingRect() would export "everything" —
         # including zoomed-out content the user has scrolled away from.
-        left, top = self.mapToScene(0, 0).toPoint().x(), self.mapToScene(0, 0).toPoint().y()
-        w = self.mapToScene(vw, 0).x() - left
-        h = self.mapToScene(0, vh).y() - top
+        # It is NORMALIZED on purpose: a view that mirrors what it shows
+        # (the UFE's flip, E6) hands back its corners swapped, and the
+        # differences would come out negative (an empty PNG).
+        x0, x1 = sorted((self.mapToScene(0, 0).x(),
+                         self.mapToScene(vw, 0).x()))
+        y0, y1 = sorted((self.mapToScene(0, 0).y(),
+                         self.mapToScene(0, vh).y()))
+        left, top, w, h = x0, y0, x1 - x0, y1 - y0
         # target:  the destination rect in the pixmap (0,0,pw,ph)
         # source:  the scene rect to render (what the user was looking at)
         # Passing only one rect to QGraphicsScene.render() treats it as the
@@ -456,9 +487,18 @@ class ChartView(QGraphicsView):
         self._scene.render(painter, target=QRectF(0, 0, pw, ph),
                            source=QRectF(left, top, w, h))
         painter.restore()
-        # QGraphicsScene.render() paints only the scene items — the view's
-        # drawForeground watermark is not drawn into the pixmap, so stamp it
-        # again here (same device-space signature, bottom-right).
+        painter.end()
+        # QGraphicsScene.render() draws the scene, not the VIEW: a view
+        # that mirrors itself asks for the pixmap to be mirrored too, so
+        # "what you see is what you save" keeps being true.
+        flip_h, flip_v = self.export_flip()
+        if flip_h or flip_v:
+            pix = QPixmap.fromImage(pix.toImage().mirrored(flip_h, flip_v))
+        # the drawForeground watermark is not drawn into the pixmap, so
+        # stamp it again here (same device-space signature, bottom-right);
+        # it is stamped AFTER the mirror, because a signature is not part
+        # of the picture and reads the same either way
+        painter = QPainter(pix)
         self._paint_watermark(painter, pw, ph)
         painter.end()
         pix.save(str(path))

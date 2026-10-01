@@ -222,3 +222,58 @@ def test_set_wcs_cards_brings_a_solution(state, tmp_path):
 def test_set_wcs_cards_without_a_plate_is_a_noop(state):
     assert not state.set_wcs_cards(_FAKE_CARDS)
     assert state.wcs is None
+
+
+# ---------------- a solved plate stays solved across frame switches ----
+
+def _fake_cache(cards_by_key):
+    class _Cache:
+        def cache_get(self, key):
+            return cards_by_key.get(key)
+
+    return _Cache()
+
+
+def test_load_reuses_a_cached_solution(state, tmp_path, monkeypatch):
+    # solve_save off leaves the FITS untouched, but the app cached the
+    # solution: loading the plate again (a frame switch) must reuse it,
+    # or the sequence lands on an unsolved plate
+    import hashlib
+    import json
+    import nightscribe.core.db as dbmod
+    from test_fits_annotate import _make_fits
+    plate = _make_fits(tmp_path / "plain.fits")
+    cards = {"CRVAL1": 300.0, "CRVAL2": 60.0, "CRPIX1": 8.0, "CRPIX2": 8.0,
+             "CTYPE1": "RA---TAN", "CTYPE2": "DEC--TAN",
+             "CD1_1": -0.001, "CD1_2": 0.0, "CD2_1": 0.0, "CD2_2": 0.001}
+    digest = hashlib.sha256(plate.read_bytes()).hexdigest()
+    monkeypatch.setattr(dbmod, "db", _fake_cache(
+        {f"astap:wcs:{digest}": (json.dumps(cards).encode(), "json")}))
+    state.load(plate)
+    assert state.wcs is not None
+
+
+def test_load_without_a_cached_solution_stays_unsolved(state, tmp_path,
+                                                       monkeypatch):
+    import nightscribe.core.db as dbmod
+    from test_fits_annotate import _make_fits
+    plate = _make_fits(tmp_path / "plain.fits")
+    monkeypatch.setattr(dbmod, "db", _fake_cache({}))
+    state.load(plate)
+    assert state.wcs is None
+
+
+def test_cached_reads_the_solver_cache(tmp_path, monkeypatch):
+    import hashlib
+    import json
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import solve as solve_mod
+    from test_fits_annotate import _make_fits
+    plate = _make_fits(tmp_path / "plain.fits")
+    cards = {"CRVAL1": 1.0}
+    digest = hashlib.sha256(plate.read_bytes()).hexdigest()
+    monkeypatch.setattr(dbmod, "db", _fake_cache(
+        {f"astrometry:wcs:{digest}":
+         (json.dumps(cards).encode(), "json")}))
+    assert solve_mod.cached(plate) == cards
+    assert solve_mod.cached(tmp_path / "missing.fits") is None

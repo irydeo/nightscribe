@@ -57,6 +57,26 @@ def image_cache_dir():
     return p
 
 
+def astap_dir():
+    # @return: the folder of the local ASTAP solver's outputs (the `-o`
+    #          base: the solver's .ini/.wcs/.log land here instead of next
+    #          to the observer's images, ADR-051)
+    p = data_dir() / "astap"
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def log_path():
+    # @return: Path of the application log. It lives in the app's own data
+    #          folder (the same place as the database) and it exists because
+    #          a GUI launched from a menu has NO console: a report like "a
+    #          dialog appears and disappears and I do not know what happens"
+    #          left no trace anywhere. Help > Open the log shows this file.
+    p = data_dir()
+    p.mkdir(parents=True, exist_ok=True)
+    return p / "nightscribe.log"
+
+
 def docs_dir():
     # @return: Path to the documentation folder (docs/ bundled by the
     # PyInstaller spec, or the repository one when running from source)

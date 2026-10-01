@@ -21,6 +21,7 @@ import os
 from pathlib import Path
 
 import pytest
+from PySide6.QtCore import QPointF
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -241,24 +242,22 @@ def test_pick_cursor_survives_a_pan_drag(view, qapp):
     assert view.viewport().cursor().shape() == Qt.OpenHandCursor
 
 
-def test_pick_mode_pins_the_probe_panel_to_the_corner(view):
-    # While picking, the probe panel sits at the viewport's top-left
-    # corner (≈12 device px in) instead of hovering next to the cursor;
-    # out of pick mode it keeps following the cursor
+def test_the_probe_readout_is_anchored_to_the_corner(view):
+    # Reported: the readout chased the cursor and covered the coordinates /
+    # the pixels being looked at. It is a status line now: anchored to the
+    # bottom-left, in picking mode and out of it, and it never follows the
+    # mouse.
     from PySide6.QtCore import QPointF
     factor = view.current_factor()
-    view.set_pick_cursor(True)
-    view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
-    pos = view._tooltip.pos()
-    tl = view.mapToScene(0, 0)
-    assert 0 < (pos.x() - tl.x()) * factor < 20
-    assert 0 < (pos.y() - tl.y()) * factor < 20
-    view.set_pick_cursor(False)
-    view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
-    pos = view._tooltip.pos()
-    cursor = view.mapToScene(400, 300)
-    assert (pos.x() - cursor.x()) * factor == pytest.approx(14.0, abs=2.0)
-    assert pos.y() < cursor.y()          # above the cursor, as always
+    for picking in (True, False):
+        view.set_pick_cursor(picking)
+        view._show_tooltip(QPointF(400, 300), ["(10, 10)  DN 800.0"])
+        pos = view._tooltip.pos()
+        bl = view.mapToScene(0, view.viewport().height() - 6)
+        assert (pos.x() - bl.x()) * factor == pytest.approx(10.0, abs=2.0)
+        assert pos.y() < bl.y()              # its bottom sits at the corner
+        assert (pos.y() + view._tooltip.boundingRect().height()) * factor == \
+            pytest.approx(bl.y() * factor, abs=4.0)
     view._hide_tooltip()
 
 
@@ -315,12 +314,17 @@ def test_snap_locks_faint_sources_on_structure(view, qapp):
 
 # ------------------------------------------------- chart boxes (ADR-046)
 
-def _boxes_sample():
-    return {"top_left": ["AT 2026acka"],
-            "top_right": ["Date: 2026-09-20 21:06 UT", "RA: 22 02 16.4",
-                          "Dec: +39 49 46.6", "Mag: 17.10 (G)"],
-            "bottom_left": ["Obs: F. Calvo", "Stn: Z41",
-                            "PSc: 1.07″/px", "FOV: 6.8 × 6.8′"]}
+def _band_sample():
+    # the plate's heading, as core/chart_annotate decides it: two lines of
+    # segments, each with its role and the field the drop order uses
+    return {"lines": [
+        [{"text": "AT 2026acka", "role": "name", "field": "name"},
+         {"text": "RA 22 02 16.4 · Dec +39 49 46.6", "role": "pos",
+          "field": "pos"},
+         {"text": "17.10 (G)", "role": "mag", "field": "mag"}],
+        [{"text": "2026-09-20 21:06 UT", "role": "context", "field": "date"},
+         {"text": "Stn Z41", "role": "context", "field": "stn"},
+         {"text": "1.07″/px", "role": "context", "field": "psc"}]]}
 
 
 def test_cross_marker_items_span_the_plate(view):
@@ -341,56 +345,93 @@ def test_cross_marker_items_span_the_plate(view):
     assert all(it.pen().isCosmetic() for it in items)
 
 
-def test_boxes_follow_the_toggle_on_export(view, tmp_path):
+def test_the_band_follows_the_toggle_on_export(view, tmp_path):
+    # The band burns into the exported PNG (what you see is what lands in
+    # the file) and the toggle governs what it says: with the data off it
+    # keeps the object's name, which is the plate's name.
     view._state.load(MONO)
-    view.set_boxes_provider(_boxes_sample)
-    a = view.export_png(tmp_path / "off.png").read_bytes()    # boxes off
-    view.set_hud(boxes=True)
-    b = view.export_png(tmp_path / "on.png").read_bytes()
-    assert a != b                         # the boxes burn into the file
-    view.set_hud(boxes=False)
-    assert view.export_png(tmp_path / "off2.png").read_bytes() == a
-    view.set_boxes_provider(None)
-    assert view.export_png(tmp_path / "off3.png").read_bytes() == a
+    view.set_band_provider(_band_sample)
+    full = view.export_png(tmp_path / "full.png").read_bytes()
+    view.set_hud(data=False)                  # only the name
+    name_only = view.export_png(tmp_path / "name.png").read_bytes()
+    assert full != name_only
+    view.set_hud(data=True)
+    assert view.export_png(tmp_path / "full2.png").read_bytes() == full
+    view.set_band_provider(None)              # no band at all
+    assert view.export_png(tmp_path / "none.png").read_bytes() != full
 
 
-def test_boxes_paint_needs_no_wcs(view, tmp_path):
-    # the name and the site lines paint even on an unsolved plate
+def test_the_band_paints_without_a_solution(view, tmp_path):
+    # The object's name, the frame's date and its exposure do not need a
+    # WCS: the band is there on an unsolved plate too (and the position it
+    # shows is marked as the catalogue's).
+    from nightscribe.core import chart_annotate as ca
     from test_fits_annotate import _make_fits
     view._state.load(_make_fits(tmp_path / "plain.fits"))
-    view.set_boxes_provider(lambda: {"top_left": ["Thing"]})
-    a = view.export_png(tmp_path / "off.png").read_bytes()
-    view.set_hud(boxes=True)
-    b = view.export_png(tmp_path / "on.png").read_bytes()
-    assert a != b
+    view.set_band_provider(lambda: ca.build_band(
+        name="Thing", meta={"date_obs": "2026-09-30T21:06:00",
+                            "exptime_s": 30.0}))
+    with_band = view.export_png(tmp_path / "with.png").read_bytes()
+    view.set_band_provider(None)
+    without = view.export_png(tmp_path / "without.png").read_bytes()
+    assert with_band != without
 
 
-def test_boxes_provider_hiccup_never_breaks_the_paint(view, tmp_path):
+def test_a_band_provider_hiccup_never_breaks_the_paint(view, tmp_path):
     view._state.load(MONO)
 
     def boom():
-        raise RuntimeError("no boxes today")
-    view.set_boxes_provider(boom)
-    view.set_hud(boxes=True)
+        raise RuntimeError("no band today")
+    view.set_band_provider(boom)
     out = view.export_png(tmp_path / "fine.png")
     assert out.exists() and out.stat().st_size > 0
     view.viewport().repaint()                 # the screen paint survives
 
 
-def test_boxes_duck_the_probe_anchor(view, tmp_path):
+def test_the_readout_sits_low_and_the_scale_bar_steps_aside(view, tmp_path):
+    # The readout is anchored to the bottom-left (see
+    # test_the_probe_readout_is_anchored_to_the_corner) and the band lives
+    # at the top, so the two cannot meet. What shares the bottom with the
+    # readout is the scale bar, and IT steps up while the readout shows.
     from PySide6.QtCore import QPointF, QRectF
     view._state.load(MONO)
     view.set_pick_cursor(True)
     _x, y_plain = view._tooltip_anchor_pos(QPointF(3, 3),
                                            QRectF(0, 0, 50, 20))
-    view.set_boxes_provider(_boxes_sample)
-    view.set_hud(boxes=True)
-    # the export runs the HUD paint (offscreen repaints are not a thing)
-    view.export_png(tmp_path / "boxes.png")
-    assert view._boxes_tl_h > 0
-    _x, y_boxed = view._tooltip_anchor_pos(QPointF(3, 3),
-                                           QRectF(0, 0, 50, 20))
-    assert y_boxed > y_plain                  # the probe ducks the box
+    view.set_band_provider(_band_sample)
+    view.export_png(tmp_path / "band.png")
+    assert view._title_h > 0                      # the band is up there
+    _x, y_banded = view._tooltip_anchor_pos(QPointF(3, 3),
+                                            QRectF(0, 0, 50, 20))
+    assert y_banded == pytest.approx(y_plain)     # the band does not move it
+    # the scale bar, though, steps up by the readout's own height
+    class _Spy:
+        def __init__(self):
+            self.lines = []
+
+        def setPen(self, *_a):
+            pass
+
+        def setFont(self, *_a):
+            pass
+
+        def drawLine(self, a, b):
+            self.lines.append((a.y(), b.y()))
+
+        def drawText(self, *_a):
+            pass
+
+    spy = _Spy()
+    view._tooltip = type("T", (), {"boundingRect": lambda self: QRectF(
+        0, 0, 80, 24)})()
+    view._paint_scale(spy, 600, 400, 1.0)
+    ducked = min(y for line in spy.lines for y in line)
+    spy2 = _Spy()
+    view._tooltip = None
+    view._paint_scale(spy2, 600, 400, 1.0)
+    plain = min(y for line in spy2.lines for y in line)
+    assert ducked < plain                         # the bar moved UP
+    assert plain - ducked >= 24                   # by the readout's height
     view.set_pick_cursor(False)
 
 
@@ -438,3 +479,152 @@ def test_object_mark_burns_into_the_export_when_visible(view, tmp_path):
     assert a != b                               # visible: it burns in
     view.set_object_mark_visible(False)
     assert view.export_png(tmp_path / "off2.png").read_bytes() == a
+
+
+# ---------------- the display mirror (E6) ----------------
+
+def _flip(view, axis, state_ready=True):
+    # Toggles the mirror and applies it the way the app does (the state
+    # emits stretch_changed -> the view coalesces a render).
+    view._state.toggle_flip(axis)
+    view._render()
+
+
+def test_the_mirror_turns_the_picture_not_the_scene(view):
+    # The invariant that keeps the science safe: the scene stays in
+    # original plate pixels, so mirroring the plate to compare it with
+    # someone else's chart cannot move a click, a saved mark or a
+    # measured centroid.
+    view._state.load(MONO)
+    view.fit_to_scene()
+    before = view.transform()
+    scene_box = view.sceneRect()
+    _flip(view, "h")
+    after = view.transform()
+    assert after.m11() == pytest.approx(-before.m11(), rel=1e-9)
+    assert after.m22() == pytest.approx(before.m22(), rel=1e-9)
+    # the scene is untouched: same rect, same plate shape
+    assert view.sceneRect() == scene_box
+    assert view._state.plate_shape is not None
+    # and the mapping is still a bijection: a click lands where it looks
+    q = view.viewportTransform()
+    inv, ok = q.inverted()
+    assert ok
+    for vp in (QPointF(10.0, 20.0), QPointF(300.0, 150.0)):
+        scene_pt = inv.map(vp)
+        back = q.map(scene_pt)
+        assert back.x() == pytest.approx(vp.x(), abs=1e-6)
+        assert back.y() == pytest.approx(vp.y(), abs=1e-6)
+
+
+def test_the_mirror_is_about_the_centre_of_the_view(view):
+    # Qt applies the view transform around the viewport's own centre, so
+    # pre-multiplying a mirror keeps the picture where it was instead of
+    # pushing it off screen. Checked empirically, because that is the part
+    # a reader would doubt.
+    view._state.load(MONO)
+    view.fit_to_scene()
+    vw = view.viewport().width()
+    vh = view.viewport().height()
+    left = view.mapToScene(vw // 4, vh // 2)
+    middle = view.mapToScene(vw // 2, vh // 2)
+    _flip(view, "h")
+    assert view.mapToScene(vw - vw // 4, vh // 2).x() == \
+        pytest.approx(left.x(), abs=1e-6)
+    # the centre is on the mirror axis: what is in the middle stays there
+    assert view.mapToScene(vw // 2, vh // 2).x() == \
+        pytest.approx(middle.x(), abs=1e-6)
+
+
+def test_mirroring_twice_returns_to_the_same_view(view):
+    view._state.load(MONO)
+    view.fit_to_scene()
+    before = view.transform()
+    _flip(view, "h")
+    _flip(view, "h")
+    assert view.transform() == before
+
+
+def test_both_mirrors_are_the_180_turn(view):
+    view._state.load(MONO)
+    view.fit_to_scene()
+    before = view.transform()
+    _flip(view, "h")
+    _flip(view, "v")
+    after = view.transform()
+    assert after.m11() == pytest.approx(-before.m11(), rel=1e-9)
+    assert after.m22() == pytest.approx(-before.m22(), rel=1e-9)
+
+
+def test_the_mirror_survives_a_fit(view):
+    # fit_to_scene/fit_to_factor reset the transform; the mirror must be
+    # re-applied or the orientation would silently jump back
+    view._state.load(MONO)
+    _flip(view, "v")
+    view.fit_to_scene()
+    assert view.transform().m22() < 0
+    view.fit_to_factor(1.0)
+    assert view.transform().m22() < 0
+    assert view.transform().m11() == pytest.approx(1.0)
+
+
+def test_the_export_saves_what_you_see_mirrored(view, tmp_path):
+    # "Export PNG…" promises the visible scene, and a mirror is part of how
+    # the observer is looking at the plate.
+    from PySide6.QtGui import QImage
+    view._state.load(MONO)
+    view.fit_to_scene()
+    plain = view.export_png(tmp_path / "plain.png")
+    _flip(view, "v")
+    flipped = view.export_png(tmp_path / "flip.png")
+    a = QImage(str(plain))
+    b = QImage(str(flipped))
+    assert a.size() == b.size()
+    # row 0 of the mirrored file is the original's last row
+    top = b.pixelColor(a.width() // 2, 0)
+    bottom = a.pixelColor(a.width() // 2, a.height() - 1)
+    assert top == bottom
+
+
+def test_the_mirror_is_undone_by_a_state_reset(view):
+    # Back to first sight of a plate (ADR-047): no inversion, no mirror.
+    view._state.load(MONO)
+    _flip(view, "h")
+    assert view._state.flip_h is True
+    view._state.reset_stretch()
+    assert view._state.flip_h is False
+    assert view._state.flip_v is False
+    assert "flip_h" in view._state.stretch_state()
+
+
+def test_the_compass_follows_the_mirror(view):
+    # The compass is painted in viewport coordinates: if it did not follow
+    # the mirror it would keep pointing at the old north while the sky on
+    # screen has turned around.
+    assert view._flip_angle(10.0) == pytest.approx(10.0)
+    view._state.flip_h = True
+    assert view._flip_angle(10.0) == pytest.approx(-10.0)
+    view._state.flip_v = True
+    assert view._flip_angle(10.0) == pytest.approx(190.0)   # -10 -> 180+10
+    assert view._flip_angle(0.0) == pytest.approx(180.0)
+
+
+def test_every_role_of_the_band_has_its_colour(qapp):
+    # A role without a colour is painted with the fallback (the ink), which is
+    # exactly how a colour code stops being respected.
+    from nightscribe.core import chart_annotate as ca
+    from nightscribe.gui.widgets.ufe_image_view import BAND_COLOURS
+    for role in (ca.ROLE_NAME, ca.ROLE_POS, ca.ROLE_POS_CAT, ca.ROLE_MAG,
+                 ca.ROLE_MAG_FAIR, ca.ROLE_MAG_DOUBT, ca.ROLE_MAG_CAT,
+                 ca.ROLE_CONTEXT):
+        assert role in BAND_COLOURS, role
+    # and the magnitude's scale is FOUR different colours (green, orange,
+    # red and the catalogue's white): it has to be readable at a glance
+    mags = {BAND_COLOURS[r] for r in (ca.ROLE_MAG, ca.ROLE_MAG_FAIR,
+                                      ca.ROLE_MAG_DOUBT, ca.ROLE_MAG_CAT)}
+    assert len(mags) == 4
+    from nightscribe.viz import palette
+    assert BAND_COLOURS[ca.ROLE_MAG] == palette.GOOD
+    assert BAND_COLOURS[ca.ROLE_MAG_FAIR] == palette.FAIR
+    assert BAND_COLOURS[ca.ROLE_MAG_DOUBT] == palette.DANGER
+    assert BAND_COLOURS[ca.ROLE_MAG_CAT] == palette.CATALOG

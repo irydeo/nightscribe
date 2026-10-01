@@ -11,6 +11,8 @@
 #
 ############################################################
 
+import math
+
 import pytest
 
 from nightscribe.core import variables
@@ -63,18 +65,44 @@ def test_next_extremum_real_mira_ephemeris():
     assert out["mjd"] == pytest.approx(epoch_mjd + 9 * 331.3, abs=1e-6)
 
 
+def _hjd_independent(jd, ra_deg, dec_deg):
+    # External anchor: low-precision Sun (Meeus, Astronomical Algorithms
+    # ch. 25) written from scratch here, NOT via ephem_minor, so the
+    # frozen references below are not self-referential. Convention:
+    # HJD = JD - (n . s) * r * tau (Eastman et al. 2010, PASP 122, 935).
+    n = jd - 2451545.0
+    mean_lon = math.radians((280.460 + 0.9856474 * n) % 360)
+    g = math.radians((357.528 + 0.9856003 * n) % 360)
+    lam = (mean_lon + math.radians(1.915) * math.sin(g)
+           + math.radians(0.020) * math.sin(2 * g))
+    eps = math.radians(23.439)
+    r = 1.00014 - 0.01671 * math.cos(g) - 0.00014 * math.cos(2 * g)
+    sx, sy, sz = (math.cos(lam), math.sin(lam) * math.cos(eps),
+                  math.sin(lam) * math.sin(eps))
+    ra, dec = math.radians(ra_deg), math.radians(dec_deg)
+    dot = (math.cos(dec) * math.cos(ra) * sx
+           + math.cos(dec) * math.sin(ra) * sy
+           + math.sin(dec) * sz)
+    return jd - dot * r * 499.004784 / 86400.0
+
+
 def test_hjd_frozen_reference_wesb1():
-    # Frozen 2026-09-11 against the project Sun (Schlyter): +250.09 s
+    # Independent Meeus anchor (see _hjd_independent): -250.07 s;
+    # the old code gave +250.09 s with the sign inverted
     jd = 2459653.44800
     hjd = variables.jd_to_hjd(jd, 15.2254, 55.0667)
-    assert (hjd - jd) * 86400 == pytest.approx(250.09, abs=30.0)
+    assert (hjd - jd) * 86400 == pytest.approx(-250.09, abs=30.0)
+    assert (hjd - _hjd_independent(jd, 15.2254, 55.0667)) * 86400 == \
+        pytest.approx(0.0, abs=1.0)
 
 
 def test_hjd_frozen_reference_tcrb():
-    # Frozen 2026-09-11 against the project Sun (Schlyter): -196.45 s
+    # Independent Meeus anchor: +196.43 s; the old code gave -196.45 s
     jd = 2459653.44800
     hjd = variables.jd_to_hjd(jd, 239.87567, 25.92017)
-    assert (hjd - jd) * 86400 == pytest.approx(-196.45, abs=30.0)
+    assert (hjd - jd) * 86400 == pytest.approx(196.45, abs=30.0)
+    assert (hjd - _hjd_independent(jd, 239.87567, 25.92017)) * 86400 == \
+        pytest.approx(0.0, abs=1.0)
 
 
 def test_hjd_is_bounded_by_the_light_time_across_the_earth_sun_distance():
@@ -99,8 +127,10 @@ def test_hjd_sign_towards_and_away_from_the_sun():
     sra, sdec, r = ephem_minor.sun_ra_dec(jd)
     towards = (variables.jd_to_hjd(jd, sra, sdec) - jd) * 86400
     away = (variables.jd_to_hjd(jd, (sra + 180) % 360, -sdec) - jd) * 86400
-    assert towards == pytest.approx(r * 499.004784, rel=1e-3)
-    assert away == pytest.approx(-r * 499.004784, rel=1e-3)
+    # A star in the Sun's direction is seen LATER from Earth, so its
+    # HJD correction is negative (Eastman et al. 2010, PASP 122, 935)
+    assert towards == pytest.approx(-r * 499.004784, rel=1e-3)
+    assert away == pytest.approx(r * 499.004784, rel=1e-3)
 
 
 def _pts(mags, filt="V", source="manual"):

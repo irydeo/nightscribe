@@ -24,6 +24,8 @@ import json
 import logging
 import time
 
+from . import coords
+
 logger = logging.getLogger(__name__)
 
 CAMPAIGN_ACTIVE = "active"
@@ -151,9 +153,154 @@ def delete(db, campaign_id):
 
 def protocol_get(camp, key, default=None):
     # @args: camp - campaign dict, key - cadence_nights | filters |
-    #        comp_stars | notes, default - when absent
+    #        comp_stars | notes | sequence, default - when absent
     # @return: the protocol value
     return (camp.get("protocol") or {}).get(key, default)
+
+
+# ---------------- the shared photometric sequence (E5b) ----------------
+#
+# A campaign is several projects observed together, and the projects of the
+# same field share the comparison stars: measuring them one by one would
+# measure the SAME stars once per project. The campaign therefore keeps one
+# full sequence (the entries with RA/Dec and bands, exactly the shape a
+# project's context holds) that its projects can measure with.
+#
+# What it is NOT: a position. Two projects of one campaign may live in
+# different fields; the sequence says WHICH stars to compare against, not
+# where the objects are. Grouping the projects by field is the pass's job
+# (E5c), and the panel always says which sequence it used.
+
+
+def sequence_of(camp):
+    # The campaign's shared sequence, or None when it has none.
+    # @args: camp - campaign dict
+    # @return: {"catalog", "entries", ...} or None
+    seq = protocol_get(camp or {}, "sequence")
+    if not isinstance(seq, dict) or not seq.get("entries"):
+        return None
+    return seq
+
+
+def set_sequence(db, campaign_id, sequence):
+    # Stores (or clears, with None) the campaign's shared sequence. The
+    # rest of the protocol is preserved: the campaign editor keeps its own
+    # keys, and losing the sequence because someone edited the notes would
+    # be exactly the kind of silent loss this project refuses.
+    # @args: sequence - a project-context sequence dict, or None
+    # @return: True when the campaign was found
+    camp = get(db, campaign_id)
+    if camp is None:
+        return False
+    prot = dict(camp.get("protocol") or {})
+    if sequence:
+        prot["sequence"] = sequence
+    else:
+        prot.pop("sequence", None)
+    return update(db, campaign_id, protocol=prot)
+
+
+def sequence_for_project(project_ctx, camp):
+    # Which sequence a project measures with, and where it came from.
+    #
+    # The PROJECT's own sequence wins: it was built for that object, on
+    # that field, with that brightness window. The campaign's is the shared
+    # fallback for a project that never built one (a NEO project planned
+    # from the ephemeris, a campaign run by a colleague). The caller is
+    # told which one it got, because the panel must say it: an observer
+    # measuring with someone else's comparison stars has the right to know.
+    # @args: project_ctx - the project's context dict, camp - campaign dict
+    # @return: (sequence or None, "project" | "campaign" | None)
+    own = (project_ctx or {}).get("sequence")
+    if isinstance(own, dict) and own.get("entries"):
+        return own, "project"
+    shared = sequence_of(camp)
+    if shared:
+        return shared, "campaign"
+    return None, None
+
+
+# ---------------- which projects travel together (E5c) ----------------
+
+def group_by_field(projects, fov_arcmin=None, reference_id=None,
+                   fraction=0.5):
+    # Which projects of a campaign can be measured in ONE pass.
+    #
+    # A pass measures every target on the SAME frames, so two objects only
+    # travel together if they fit in the same field. The rule is their
+    # separation against the sequence's own field of view (half of it by
+    # default: both objects sit comfortably inside, not on the edge where
+    # the aperture falls off the frame at the first drift).
+    #
+    # What does not fit is never dropped in silence: it comes back as "left
+    # out" with its reason, because a project that quietly vanished from a
+    # campaign pass is exactly the kind of loss this app refuses.
+    #
+    # @args: projects - [{"id", "object_name", "context"}], fov_arcmin -
+    #        the field of view the sequence was built for (None: the
+    #        grouping cannot be answered and nothing is left out),
+    #        reference_id - which project is the pass's centre (the first
+    #        one with a position when None), fraction - how much of the
+    #        field the separation may take
+    # @return: {"reference": project or None, "targets": [project, ...],
+    #          "left_out": [{"project", "reason"}]}
+    with_pos, without = [], []
+    for p in projects or []:
+        ctx = p.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        if ra is None or dec is None:
+            without.append(p)
+        else:
+            with_pos.append(p)
+    left_out = [{"project": p,
+                 "reason": _msg_out(
+                     "el proyecto no tiene posición guardada",
+                     "the project has no saved position")}
+                for p in without]
+    reference = None
+    if with_pos:
+        reference = next((p for p in with_pos if p["id"] == reference_id),
+                         with_pos[0])
+    if reference is None:
+        return {"reference": None, "targets": [], "left_out": left_out}
+    if not fov_arcmin:
+        # no field of view to reason with: the pass is what the observer
+        # selected, and nothing is attributed to a field we do not know
+        return {"reference": reference, "targets": list(with_pos),
+                "left_out": left_out}
+    limit = abs(float(fov_arcmin)) * float(fraction)
+    rctx = reference.get("context") or {}
+    targets = [reference]
+    for p in with_pos:
+        if p["id"] == reference["id"]:
+            continue
+        ctx = p.get("context") or {}
+        sep = 60.0 * coords.angular_separation(
+            float(rctx["ra_deg"]), float(rctx["dec_deg"]),
+            float(ctx["ra_deg"]), float(ctx["dec_deg"]))
+        if sep <= limit:
+            targets.append(p)
+        else:
+            left_out.append({"project": p, "reason": _msg_out(
+                "está a %s′ del centro, fuera del campo de %s′"
+                % (_num(sep), _num(limit)),
+                "is %s′ from the centre, outside the %s′ field"
+                % (_num(sep), _num(limit)))})
+    return {"reference": reference, "targets": targets,
+            "left_out": left_out}
+
+
+def _num(value):
+    # @args: value - arcminutes
+    # @return: the number with one decimal, without trailing ".0"
+    text = "%.1f" % float(value)
+    return text[:-2] if text.endswith(".0") else text
+
+
+def _msg_out(es, en):
+    # @args: es/en - the reason in both languages
+    # @return: {"es", "en"}
+    return {"es": es, "en": en}
 
 
 def projects_of(db, campaign_id, status="active"):

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Campaign pass dialog (E5c). Loaded by gui/pass_dialog.py through
+  gui/ui_loader.py (ADR-005). The campaign's name, its visits, the
+  sequence choices and the target rows are DATA and stay in code; the
+  structure and the labels live here.
+-->
+<ui version="4.0">
+ <class>PassDialog</class>
+ <widget class="QDialog" name="PassDialog">
+  <layout class="QVBoxLayout" name="vbox_pass"><property name="leftMargin"><number>11</number></property><property name="topMargin"><number>11</number></property><property name="rightMargin"><number>11</number></property><property name="bottomMargin"><number>11</number></property>
+   <item><widget class="QLabel" name="lbl_intro"><property name="text"><string>Several objects of this campaign share one field: measure them in ONE pass, with the same comparison stars and the same zero point. The frames are read once.</string></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item>
+    <layout class="QFormLayout" name="form_pass">
+     <item row="0" column="0"><widget class="QLabel" name="lbl_visit"><property name="text"><string>Frames from:</string></property></widget></item>
+     <item row="0" column="1"><widget class="QComboBox" name="cmb_visit"/></item>
+     <item row="1" column="0"><widget class="QLabel" name="lbl_seq"><property name="text"><string>Comparison sequence:</string></property></widget></item>
+     <item row="1" column="1"><widget class="QComboBox" name="cmb_sequence"/></item>
+     <item row="2" column="0"><widget class="QLabel" name="lbl_band"><property name="text"><string>Band:</string></property></widget></item>
+     <item row="2" column="1"><widget class="QComboBox" name="cmb_band"/></item>
+    </layout>
+   </item>
+   <item><widget class="QLabel" name="lbl_wcs"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QLabel" name="lbl_targets"><property name="text"><string>Objects measured in this pass:</string></property></widget></item>
+   <item><widget class="QListWidget" name="lst_targets"><property name="minimumSize"><size><width>0</width><height>120</height></size></property></widget></item>
+   <item><widget class="QLabel" name="lbl_left"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
+   <item><widget class="QDialogButtonBox" name="buttonBox"><property name="standardButtons"><set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set></property></widget></item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

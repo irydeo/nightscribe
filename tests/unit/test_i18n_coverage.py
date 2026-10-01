@@ -101,3 +101,46 @@ def test_pretty_tables_es_en():
     assert pretty.day("en", day) == "3 Sep"
     assert pretty.day("es", day, year=True) == "3 sep 2026"
     assert pretty.day("en", day, year=True) == "3 Sep 2026"
+
+
+def test_the_series_window_and_the_measure_doors_translate_es():
+    # The series window's strings were translated in the WRONG context:
+    # lupdate reads a Designer file's <class> (UfeSeriesDialog), and the
+    # entries sat under UfeMeasureTab, so the .ts looked complete while the
+    # window came out in English inside the Spanish app. These are looked up
+    # the way the widgets do it: through the compiled .qm and the class's
+    # own context.
+    import os
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtCore import QCoreApplication, QTranslator
+    from PySide6.QtWidgets import QApplication
+    app = QApplication.instance() or QApplication([])
+    tr = QTranslator(app)
+    assert tr.load(str(I18N / "nightscribe_es.qm"))
+    app.installTranslator(tr)
+    try:
+        for ctx, src, want in (
+                ("UfeSeriesDialog", "Robust", "Robusta"),
+                ("UfeSeriesDialog", "Fix range", "Fijar rango"),
+                ("UfeSeriesDialog", "Mean curve", "Curva media"),
+                ("UfeSeriesDialog", "Restore all", "Restaurar todos"),
+                ("UfeMeasureTab", "Export", "Exportar"),
+                ("UfeMeasureTab", "Reset", "Restablecer"),
+                # the solver's stages, which the observer reads while a
+                # plate is being solved (ADR-051)
+                ("UfeDialog", "ASTAP is solving at the project's field",
+                 "ASTAP resuelve en el campo del proyecto"),
+                ("UfeDialog", "this plate carries no position, so ASTAP is "
+                 "sweeping the sky (this can take a minute)",
+                 "esta placa no trae posición, así que ASTAP está barriendo "
+                 "el cielo (esto puede tardar un minuto)"),
+                # and the visit's batch, which the observer reads in the
+                # left panel and in the status line
+                ("UfeDialog", "Solve the visit…", "Resolver la visita…"),
+                ("UfeDialog", "Visit solved: {0} frames solved, {1} already "
+                 "had a WCS",
+                 "Visita resuelta: {0} tomas resueltas, {1} ya tenían WCS")):
+            got = QCoreApplication.translate(ctx, src)
+            assert got == want, (ctx, src, got)
+    finally:
+        app.removeTranslator(tr)

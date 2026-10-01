@@ -193,6 +193,27 @@ def test_ccd_flux_error_equation():
         == pytest.approx(full, rel=1e-12)
 
 
+def test_ccd_flux_error_prices_the_sky_annulus():
+    # Merline & Howell (Handbook of CCD Astronomy): the sky/read/dark
+    # terms carry (1 + n_pix/n_sky). With n_pix = n_sky the sky term
+    # doubles; without n_sky the equation degrades to the classic form.
+    g, ron, n, sky = 2.0, 5.0, 100, 10.0
+    flux = 5000.0
+    classic = phot.ccd_flux_error(flux, sky, n, gain=g, ron=ron)
+    with_sky = phot.ccd_flux_error(flux, sky, n, gain=g, ron=ron,
+                                   n_sky=n)
+    expected = math.sqrt(flux / g + 2.0 * (n * sky / g
+                                           + n * ron ** 2 / g ** 2))
+    assert with_sky == pytest.approx(expected, rel=1e-9)
+    assert with_sky > classic
+    # a measure_point result carries the annulus size for the caller
+    data = np.full((60, 60), 100.0)
+    yy, xx = np.ogrid[:60, :60]
+    data += 5000.0 * np.exp(-((xx - 30) ** 2 + (yy - 30) ** 2) / 8.0)
+    r = phot.measure_point(data, 30, 30)
+    assert r["ok"] and r["n_sky"] > r["n_pix"]
+
+
 def test_mag_error():
     flux, ferr = 1000.0, 10.0
     assert phot.mag_error(flux, ferr) == pytest.approx(0.01086, rel=1e-9)
@@ -712,3 +733,497 @@ def test_lock_local_peak_nearest_and_honest():
     assert phot.lock_local_peak(plate, 103.4, 100.6) == (103.0, 101.0)
     # nothing significant within reach: the honest answer is None
     assert phot.lock_local_peak(plate, 40.0, 40.0, max_dist=3.0) is None
+
+
+# ---------------- single-plate recipe (series plan, phase 1) ----------
+
+class _FlatWcs:
+    # Pixel <-> sky identity: measure_plate only needs the mapping, the
+    # plate math lives elsewhere (the GUI tests bring a real TAN WCS).
+
+    def sky_to_pixel(self, ra, dec):
+        return ra, dec
+
+    def pixel_to_sky(self, x, y):
+        return x, y
+
+
+ZP_CONTRACT = 22.0
+_CONTRACT_TARGET = (100.0, 100.0)
+_CONTRACT_COMPS = [(40, 40), (160, 40), (40, 160), (160, 160), (100, 170)]
+_CONTRACT_CHECK = (60, 100)
+
+
+def _contract_plate():
+    # Fixed seed, fixed stars: the frozen reference plate of the recipe
+    # contract test.
+    stars = [(_CONTRACT_TARGET[0], _CONTRACT_TARGET[1], 8000.0)]
+    stars += [(x, y, a) for (x, y), a in
+              zip(_CONTRACT_COMPS, (12000, 11000, 10500, 11500, 10800))]
+    stars.append((_CONTRACT_CHECK[0], _CONTRACT_CHECK[1], 9000.0))
+    return _plate(200, 200, stars, sky=100.0, noise=1.0, seed=7)
+
+
+def _contract_entries(data):
+    # Catalog values bootstrapped from the plate itself at the known
+    # zero point (the wiring contract; the physics has its own tests).
+    entries = []
+    for j, (x, y) in enumerate(_CONTRACT_COMPS):
+        r = phot.measure_point(data, x, y)
+        inst = -2.5 * math.log10(r["flux"])
+        entries.append({"name": f"C{j + 1}", "kind": "comp",
+                        "star": {"ra": x, "dec": y, "mag": inst
+                                 + ZP_CONTRACT, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": inst + ZP_CONTRACT,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    r = phot.measure_point(data, *_CONTRACT_CHECK)
+    inst = -2.5 * math.log10(r["flux"])
+    entries.append({"name": "CHK", "kind": "check",
+                    "star": {"ra": _CONTRACT_CHECK[0],
+                             "dec": _CONTRACT_CHECK[1], "mag": inst
+                             + ZP_CONTRACT, "band": "V",
+                             "bands": [{"label": "V",
+                                        "value": inst + ZP_CONTRACT,
+                                        "err": 0.01, "derived": False}],
+                             "bv": 0.6}})
+    return entries
+
+
+def test_measure_plate_frozen_reference():
+    # The phase-1 contract: same inputs, same outputs as the GUI recipe
+    # before its extraction (frozen synthetic plate, fixed seed).
+    data = _contract_plate()
+    cfg = phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, entries=_contract_entries(data),
+        wcs=_FlatWcs(), band="V", radii=(6.0, 10.0, 15.0), fwhm=None,
+        site_gain=2.0, site_ron=5.0, site_flat=0.007,
+        site_lat=40.0, site_lon=-3.0, site_aperture_m=0.254,
+        site_height_m=650.0)
+    res = phot.measure_plate(data, cfg)
+    assert res.ok and res.reason is None
+    # The aperture now weighs each pixel by the fraction of its area
+    # inside the circle (phase A: pixel_coverage), so this flux is 0.26 %
+    # larger than the old staircase count: the boundary pixels that carry
+    # the star's wings were being thrown away. The magnitude follows by
+    # -0.0029 and the error by a hair. This is the honest value, and a
+    # frozen reference exists precisely to make such a change visible.
+    assert res.target["flux"] == pytest.approx(389575.98, rel=1e-3)
+    assert res.target["n_pix"] == pytest.approx(113.0, abs=0.2)
+    assert res.col == pytest.approx(100.0002, abs=0.05)
+    assert res.row == pytest.approx(100.0, abs=0.05)
+    assert res.zp["zp"] == pytest.approx(ZP_CONTRACT, abs=1e-6)
+    assert res.zp["n"] == 6
+    assert res.mag == pytest.approx(8.0235, abs=1e-3)
+    assert res.err_total == pytest.approx(0.007112, abs=5e-4)
+    assert res.err_internal == pytest.approx(0.001256, abs=5e-4)
+    assert res.err_total >= res.err_internal
+    assert res.band == "V" and res.bands_avail == ["V"]
+    assert len(res.used) == 6 and res.skipped == {}
+    assert res.check is not None and res.check["ok"]
+    assert res.check["delta"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_measure_plate_guards_become_reason_pairs():
+    # A saturated target is refused, never raised, and the reason is the
+    # bilingual pair the panel already knows how to say.
+    data = _contract_plate()
+    entries = _contract_entries(data)   # catalog values from the clean plate
+    # a SATURATE card below the target's peak: the recipe refuses it
+    res = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, entries=entries,
+        wcs=_FlatWcs(), band="V", header={"SATURATE": 5000.0}))
+    assert res.ok is False
+    assert res.reason == {"es": "saturada", "en": "saturated"}
+
+
+def test_band_helpers():
+    entries = [{"star": {"bands": [
+        {"label": "B-V", "value": 0.6, "derived": False},
+        {"label": "G", "value": 14.0, "derived": True}]}},
+        {"star": {"bands": [
+            {"label": "V", "value": 13.0, "derived": False},
+            {"label": "G", "value": 14.1, "derived": True}]}}]
+    assert phot.available_bands(entries) == ["V", "G"]
+    assert phot.band_of(entries[1]["star"], "G") == (14.1, True)
+    assert phot.band_of(entries[1]["star"], "R") == (None, False)
+    assert phot.pick_band(entries, "G") == ("G", ["V", "G"])
+    assert phot.pick_band(entries, "R") == ("V", ["V", "G"])
+    assert phot.pick_band([], None) == ("V", [])
+
+
+# ---------------- camera profile: linearity ceiling ----------------
+
+def test_effective_ceiling_takes_the_minimum():
+    # the profile's linearity (usually stricter) wins over SATURATE
+    hdr = {"SATURATE": 60000.0}
+    cfg = {"cam_linearity_adu": 50000.0, "ccd_saturate": None}
+    assert phot.effective_ceiling(hdr, cfg) == 50000.0
+    # only a SATURATE card
+    assert phot.effective_ceiling(hdr, {}) == 60000.0
+    # only the profile
+    assert phot.effective_ceiling({}, cfg) == 50000.0
+    # nothing known
+    assert phot.effective_ceiling({}, {}) is None
+    # an explicit override wins the minimum too
+    assert phot.effective_ceiling(hdr, cfg, linear_adu=45000.0) == 45000.0
+
+
+def test_measure_point_flags_nonlinear_not_saturated():
+    # a peak above the camera's linearity limit (but below any SATURATE)
+    plate = _plate(200, 200, [(100.0, 100.0, 8000.0)], noise=0.0)
+    r = phot.measure_point(plate, 100.0, 100.0, linear_adu=1000.0)
+    assert not r["ok"] and r.get("nonlinear") is True
+    assert r["saturated"] is False
+    assert r["reason"]["en"].startswith("nonlinear")
+    # a hard saturation still reads as saturated
+    r2 = phot.measure_point(plate, 100.0, 100.0, sat_adu=1000.0)
+    assert r2["reason"] == {"es": "saturada", "en": "saturated"}
+
+
+def test_flux_error_includes_the_dark_current():
+    base = phot.ccd_flux_error(1000.0, 100.0, 50, gain=2.0, ron=5.0,
+                               exptime=60.0)
+    dark = phot.ccd_flux_error(1000.0, 100.0, 50, gain=2.0, ron=5.0,
+                               exptime=60.0, dark_e_s=2.2)
+    assert dark > base
+    # the dark term needs both exposure and current
+    assert phot.ccd_flux_error(1000.0, 100.0, 50, gain=2.0, ron=5.0,
+                               dark_e_s=2.2) == base
+
+
+def test_measure_plate_skips_a_nonlinear_comp():
+    # a comp far above the linearity limit is excluded, named explicitly
+    data = _plate(200, 200, [(100.0, 100.0, 8000.0),
+                             (40.0, 40.0, 30000.0),   # too bright
+                             (160.0, 40.0, 8000.0),
+                             (40.0, 160.0, 8000.0)], noise=0.0)
+    entries = []
+    for j, (x, y) in enumerate([(40, 40), (160, 40), (40, 160)]):
+        r = phot.measure_point(data, x, y)
+        inst = -2.5 * math.log10(r["flux"])
+        entries.append({"name": f"C{j}", "kind": "comp",
+                        "star": {"ra": x, "dec": y, "band": "V",
+                                 "bands": [{"label": "V",
+                                            "value": inst + 22.0,
+                                            "err": 0.01, "derived": False}],
+                                 "bv": 0.6}})
+    res = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=(100.0, 100.0), entries=entries, wcs=_FlatWcs(),
+        band="V", radii=(6.0, 10.0, 15.0), linear_adu=20000.0))
+    assert res.skipped.get("nonlinear") == 1
+    assert res.zp["n"] == 2                # only the linear comps calibrate
+
+
+def test_pixel_coverage_is_the_true_area():
+    # Phase A: the aperture weighs each pixel by how much of it lies
+    # inside the circle. Three properties matter, and they are the ones a
+    # reader would check by hand:
+    #   * a big aperture sums to pi r^2 (the staircase cancels out);
+    #   * a small one does NOT (that is exactly the error it fixes);
+    #   * a pixel entirely inside weighs 1 and one entirely outside 0.
+    # the coverage comes as a PATCH around the aperture (with the plate
+    # coordinates of its corner): building the whole plate was 38 ms per
+    # star on a real 2048² frame, and a star is a few pixels wide
+    for r in (2.0, 3.0, 6.0, 12.0):
+        cover, _y0, _x0 = phot.pixel_coverage((80, 80), 40.0, 40.0, r)
+        area = float(cover.sum())
+        true_area = math.pi * r * r
+        assert area == pytest.approx(true_area, rel=0.02), (r, area)
+    # the small aperture: whole pixels would count 13 against 12.57
+    cover, _y0, _x0 = phot.pixel_coverage((20, 20), 10.0, 10.0, 2.0)
+    assert float(cover.sum()) == pytest.approx(math.pi * 4, rel=0.02)
+    whole = int(np.count_nonzero(
+        np.hypot(*np.mgrid[0:20, 0:20] - 10.0) <= 2.0))
+    assert whole != pytest.approx(math.pi * 4, rel=0.02)
+    # the extremes: the centre weighs one, the patch's corner (outside the
+    # circle) weighs nothing
+    cover, y0, x0 = phot.pixel_coverage((40, 40), 20.0, 20.0, 5.0)
+    assert cover[20 - y0, 20 - x0] == 1.0
+    assert cover[0, 0] == 0.0
+    # and a star off the plate comes back as an empty patch, never a crash
+    empty, _y0, _x0 = phot.pixel_coverage((40, 40), -60.0, 20.0, 5.0)
+    assert empty.size == 0
+
+
+def test_a_small_aperture_recovers_the_flux_a_star_really_has():
+    # A synthetic star whose total flux is known: measured with a SMALL
+    # aperture, the fractional coverage must get closer to the truth than
+    # the whole-pixel count, because that is the whole reason it exists.
+    yy, xx = np.ogrid[0:60, 0:60]
+    amp, sigma, sky = 5000.0, 1.2, 100.0
+    data = sky + amp * np.exp(-((xx - 30.0) ** 2 + (yy - 30.0) ** 2)
+                              / (2 * sigma ** 2))
+    truth = 2 * math.pi * sigma * sigma * amp        # the gaussian's flux
+    r = phot.measure_point(data, 30.0, 30.0, r_ap=3.0, r_ann_in=6.0,
+                           r_ann_out=10.0)
+    assert r["ok"]
+    # the aperture holds the gaussian inside r = 3: 1 - exp(-r^2/2s^2)
+    inside = 1.0 - math.exp(-(3.0 ** 2) / (2 * sigma ** 2))
+    assert r["flux"] == pytest.approx(truth * inside, rel=0.05)
+
+
+def test_the_radial_fwhm_is_right_on_a_broad_psf():
+    # Phase A: the radial profile (the radius of the half maximum, with a
+    # median per annulus) is the measure that survives a broad PSF and a
+    # hot pixel. The moments are better on a narrow one; the table of the
+    # trade-off is in estimate_fwhm's comment, and these are its anchors.
+    yy, xx = np.ogrid[0:80, 0:80]
+    amp, sky = 5000.0, 100.0
+    for sigma in (2.0, 3.0):
+        data = sky + amp * np.exp(-((xx - 40.0) ** 2 + (yy - 40.0) ** 2)
+                                  / (2 * sigma ** 2))
+        true = 2.3548 * sigma
+        radial = phot.fwhm_radial(data, 40.0, 40.0)
+        moments = phot.estimate_fwhm(data, [(40.0, 40.0)], method="moments")
+        assert radial == pytest.approx(true, rel=0.12)
+        # and the radial one is the better of the two once the disc is
+        # broader than the moments' cutout can hold
+        if sigma >= 3.0:
+            assert abs(radial - true) < abs(moments - true)
+
+
+def test_a_hot_pixel_does_not_move_the_radial_fwhm():
+    # The whole reason the annulus uses a MEDIAN: one wild pixel inside a
+    # ring changes nothing. This is what a cosmic ray does to a night.
+    yy, xx = np.ogrid[0:60, 0:60]
+    data = 100.0 + 5000.0 * np.exp(-((xx - 30.0) ** 2 + (yy - 30.0) ** 2)
+                                   / (2 * 2.5 ** 2))
+    clean = phot.fwhm_radial(data, 30.0, 30.0)
+    dirty = np.copy(data)
+    dirty[30, 33] += 40000.0                   # a cosmic ray, 3 px away
+    hurt = phot.fwhm_radial(dirty, 30.0, 30.0)
+    assert hurt == pytest.approx(clean, rel=0.05)
+    # and the moments, which weight every pixel by the square of its
+    # distance, feel it more: that is the whole difference
+    m_clean = phot.estimate_fwhm(data, [(30.0, 30.0)], method="moments")
+    m_dirty = phot.estimate_fwhm(dirty, [(30.0, 30.0)], method="moments")
+    assert abs(m_dirty - m_clean) > abs(hurt - clean)
+
+
+# ---------------- phase A: the centroid's two defences ----------------
+
+def _field(neighbour_px=9.0, hot_pixel=False, sigma=2.0, n=80):
+    # A star at (40, 40) with a brighter neighbour to its right (the
+    # classic pull) and, optionally, a hot pixel.
+    #
+    # The separation matters and it is physics, not a knob: at 6 px on a
+    # 4.7 px seeing disc the two stars form ONE local maximum and no
+    # finder can tell them apart; at 9 px each keeps its own peak with a
+    # dip between them, which is the case deblending is for.
+    yy, xx = np.ogrid[0:n, 0:n]
+    rng = np.random.default_rng(11)
+    data = 100.0 + rng.normal(0, 1.5, (n, n))
+    data += 4000.0 * np.exp(-((xx - 40.0) ** 2 + (yy - 40.0) ** 2)
+                            / (2 * sigma ** 2))
+    data += 30000.0 * np.exp(-((xx - (40.0 + neighbour_px)) ** 2
+                               + (yy - 40.0) ** 2) / (2 * sigma ** 2))
+    if hot_pixel:
+        data[40, 44] += 25000.0
+    return data
+
+
+def test_the_deblending_keeps_the_centroid_on_its_own_star():
+    # A neighbour 6 px away, four times brighter: without the masked
+    # pixels and the shrunken window the matched filter integrates part of
+    # the neighbour and the star lands to the right of where it is.
+    data = _field(neighbour_px=9.0)
+    plain = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7, robust=False)
+    robust = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7, robust=True)
+    assert plain["ok"] and robust["ok"]
+    err_plain = abs(plain["x"] - 40.0)
+    err_robust = abs(robust["x"] - 40.0)
+    # measured: 0.384 px without the defences, 0.187 with them. The
+    # remaining pull is the neighbour's WING, which no mask removes (you
+    # would have to model the neighbour); what the defence stops is its
+    # CORE swallowing our star, which is the difference between a halved
+    # error and a centroid that walks off.
+    assert err_robust < 0.5 * err_plain
+    assert err_robust < 0.25
+    # the y axis is not disturbed by the horizontal neighbour
+    assert abs(robust["y"] - 40.0) < 0.1
+
+
+def test_the_core_cap_ignores_a_hot_pixel():
+    # A cosmic ray two pixels away, brighter than the star's core: no real
+    # point spread function carries more light than its centre.
+    data = _field(neighbour_px=30.0, hot_pixel=True)
+    plain = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                   robust=False)
+    robust = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                    robust=True)
+    # measured: 1.094 px away without the cap, 0.047 with it. One hot
+    # pixel two pixels from the core is worth a whole pixel of centroid,
+    # and a whole pixel of centroid is a wrong magnitude.
+    assert abs(plain["x"] - 40.0) > 1.0
+    assert abs(robust["x"] - 40.0) < 0.1
+
+
+def test_the_neighbours_are_reported_for_the_centroid():
+    data = _field(neighbour_px=9.0)
+    seed = phot.lock_local_peak(data, 40.0, 40.0)
+    assert seed is not None
+    neigh = phot.local_neighbours(data, 40.0, 40.0, seed)
+    assert neigh
+    # the nearest one is the bright neighbour, at about 9 px
+    assert neigh[0][2] == pytest.approx(9.0, abs=0.5)
+
+
+def test_a_lonely_star_is_untouched_by_the_defences():
+    # No neighbour and no hot pixel: the two defences must change nothing,
+    # or they would be a different estimator rather than a safer one.
+    yy, xx = np.ogrid[0:80, 0:80]
+    rng = np.random.default_rng(3)
+    data = 100.0 + rng.normal(0, 1.5, (80, 80))
+    data += 4000.0 * np.exp(-((xx - 40.3) ** 2 + (yy - 39.7) ** 2)
+                            / (2 * 2.0 ** 2))
+    plain = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                   robust=False)
+    robust = phot.gaussian_centroid(data, 40.0, 40.0, fwhm=4.7,
+                                    robust=True)
+    assert robust["x"] == pytest.approx(plain["x"], abs=0.02)
+    assert robust["y"] == pytest.approx(plain["y"], abs=0.02)
+
+
+# ---------------- several targets, one set of comps (E5a) --------------
+
+_SECOND_TARGET = (140.3, 100.2)
+
+
+def _two_target_plate():
+    # The campaign case on a synthetic plate: two objects of the same field
+    # (the frozen contract star and a second one well clear of the comp
+    # ring), the same comparison stars for both.
+    stars = [(_CONTRACT_TARGET[0], _CONTRACT_TARGET[1], 8000.0)]
+    stars += [(x, y, a) for (x, y), a in
+              zip(_CONTRACT_COMPS, (12000, 11000, 10500, 11500, 10800))]
+    stars.append((_CONTRACT_CHECK[0], _CONTRACT_CHECK[1], 9000.0))
+    stars.append((_SECOND_TARGET[0], _SECOND_TARGET[1], 5000.0))
+    return _plate(200, 200, stars, sky=100.0, noise=1.0, seed=7)
+
+
+def _plate_kwargs(entries):
+    return dict(entries=entries, wcs=_FlatWcs(), band="V",
+                radii=(6.0, 10.0, 15.0), fwhm=None, site_gain=2.0,
+                site_ron=5.0, site_flat=0.007, site_lat=40.0,
+                site_lon=-3.0, site_aperture_m=0.254, site_height_m=650.0)
+
+
+def test_every_target_of_a_plate_is_measured_like_it_was_alone():
+    # Parity is the acceptance of the whole feature: measuring two objects
+    # in one pass must give each of them exactly the numbers a solo
+    # measurement gives. Otherwise the saving would be paid in science.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    both = phot.measure_plate(data, phot.PlateConfig(
+        targets=(("A", _CONTRACT_TARGET[0], _CONTRACT_TARGET[1]),
+                 ("B", _SECOND_TARGET[0], _SECOND_TARGET[1])), **base))
+    solo_a = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, **base))
+    solo_b = phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_SECOND_TARGET, **base))
+    assert both.ok
+    assert [t["label"] for t in both.targets] == ["A", "B"]
+    assert both.targets[0]["mag"] == pytest.approx(solo_a.mag, abs=1e-9)
+    assert both.targets[1]["mag"] == pytest.approx(solo_b.mag, abs=1e-9)
+    assert both.targets[0]["err_total"] == pytest.approx(solo_a.err_total,
+                                                         abs=1e-12)
+    assert both.targets[1]["err_total"] == pytest.approx(solo_b.err_total,
+                                                         abs=1e-12)
+    # the scalar fields are the first target's, exactly as before
+    assert both.mag == pytest.approx(solo_a.mag, abs=1e-9)
+    assert both.col == pytest.approx(solo_a.col, abs=1e-9)
+    assert both.check["delta"] == pytest.approx(solo_a.check["delta"],
+                                                abs=1e-12)
+
+
+def test_the_comparison_stars_are_measured_once_for_every_target(monkeypatch):
+    # The whole point of the feature: the comps are the same stars for all
+    # the targets, so the second target costs ONE measurement per plate,
+    # not a whole new set of comps. That is the saving of a campaign pass.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    calls = []
+    real = phot.measure_point
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(phot, "measure_point", counting)
+    phot.measure_plate(data, phot.PlateConfig(
+        target_xy=_CONTRACT_TARGET, **base))
+    one = len(calls)
+    calls.clear()
+    phot.measure_plate(data, phot.PlateConfig(
+        targets=(("A", _CONTRACT_TARGET[0], _CONTRACT_TARGET[1]),
+                 ("B", _SECOND_TARGET[0], _SECOND_TARGET[1])), **base))
+    two = len(calls)
+    # five comps plus the check are the shared six; only the target moves
+    assert one == 1 + 6
+    assert two == 2 + 6
+    assert two < 2 * one
+
+
+def test_a_refused_target_does_not_refuse_the_others():
+    # One object lands on empty sky (a wrong coordinate, a satellite trail):
+    # it is refused, and the other one is still measured and calibrated.
+    data = _two_target_plate()
+    base = _plate_kwargs(_contract_entries(data))
+    both = phot.measure_plate(data, phot.PlateConfig(
+        targets=(("A", _CONTRACT_TARGET[0], _CONTRACT_TARGET[1]),
+                 ("sky", 3.0, 3.0)), **base))
+    assert both.ok and both.mag is not None
+    assert both.targets[0]["ok"] and both.targets[0]["mag"] is not None
+    assert not both.targets[1]["ok"]
+    assert both.targets[1]["mag"] is None
+    assert both.targets[1]["reason"]
+
+
+# ---------------- a star off the frame is not a crash (HAT-P-32 b) ------
+
+def test_a_cutout_outside_the_frame_is_refused_never_a_negative_size():
+    # The bug that killed a real run: a star ABOVE the top edge gives
+    # y1 = min(h, y + half + 1) < 0, and `data[0:-19]` is a valid, non-empty
+    # slice in numpy (a negative index counts from the end) while
+    # np.mgrid[0:-19] reads that -19 as a negative SIZE and raises
+    # "negative dimensions are not allowed". Clipping both ends is the only
+    # honest answer: the window is inside the frame or it does not exist.
+    data = np.full((100, 100), 100.0)
+    for spot in ((-20.0, -20.0), (5.0, -20.0), (150.0, 50.0),
+                 (50.0, -11.0), (50.0, 120.0)):
+        assert phot.cutout_window(data, *spot, 9) is None
+    # a star just past the edge is a REAL window, clamped: its light leaks
+    # into the frame and that is worth measuring
+    for spot in ((-1.0, 50.0), (-5.0, 50.0), (102.0, 50.0)):
+        assert phot.cutout_window(data, *spot, 9) is not None
+    win = phot.cutout_window(data, -5.0, 50.0, 9)
+    assert win is not None
+    y0, y1, x0, x1 = win
+    assert x0 == 0 and x1 > x0 and y1 > y0      # clipped, and usable
+
+
+def test_the_seeing_is_measured_on_the_stars_that_are_there():
+    # One comparison star of the sequence fell off the top of the frame:
+    # that is not an error, it is a star that is not there, and the seeing
+    # of the frame must come from the ones that are.
+    data = _plate(120, 120, [(60.0, 60.0, 8000.0)], noise=1.0)
+    off = (-30.0, 60.0)
+    assert phot.estimate_fwhm(data, [off]) is None
+    assert phot.fwhm_radial(data, *off) is None
+    # with a real star in the list, the frame still gets its seeing
+    got = phot.estimate_fwhm(data, [off, (60.0, 60.0)])
+    assert got is not None and 1.0 < got < 10.0
+
+
+def test_the_crash_that_killed_the_run_does_not_come_back():
+    # The exact call from the traceback, with the exact shape of the bug:
+    # a spot twenty pixels above the top edge of a 160x160 frame. Before
+    # the fix this raised ValueError from np.mgrid.
+    data = np.full((160, 160), 100.0)
+    assert phot.estimate_fwhm(data, [(-20.0, -20.0)]) is None
+    # and the same frame with a star 20 px above the top edge: no star, no
+    # seeing, and above all no exception
+    assert phot.estimate_fwhm(data, [(80.0, -20.0)]) is None
+    assert phot.estimate_fwhm(data, [(80.0, 80.0), (80.0, -20.0)]) is None

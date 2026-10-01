@@ -34,7 +34,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QLabel" name="lbl_status">
+    <widget class="QLabel" name="lbl_status"><property name="visible"><bool>false</bool></property>
      <property name="text">
       <string/>
      </property>
@@ -147,6 +147,33 @@
     </layout>
    </item>
    <item>
+    <layout class="QHBoxLayout" name="row_nudge">
+     <item>
+      <widget class="QCheckBox" name="chk_manual_centre">
+       <property name="text">
+        <string>Manual centre (no centroid)</string>
+       </property>
+       <property name="toolTip">
+        <string>Checking it opens a small window with the arrows: the measurement then uses EXACTLY the centre you place (no centroid search at all), so a very faint SN or a galaxy core cannot drag it. Unchecking closes it and the centroid refines the click again</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="hsp_nudge">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
     <layout class="QHBoxLayout" name="row_suggest">
      <item>
       <spacer name="hsp_suggest">
@@ -188,19 +215,73 @@
      <property name="minimumSize">
       <size>
        <width>0</width>
-       <height>120</height>
+       <height>240</height>
       </size>
      </property>
      <property name="readOnly">
       <bool>true</bool>
+     </property>
+     <property name="verticalScrollBarPolicy">
+      <enum>Qt::ScrollBarAsNeeded</enum>
+     </property>
+     <property name="horizontalScrollBarPolicy">
+      <enum>Qt::ScrollBarAlwaysOff</enum>
      </property>
      <property name="plainText">
       <string notr="true">–</string>
      </property>
     </widget>
    </item>
+   <!-- U5: the ways out of a measurement. Two doors hold the four buttons
+        that used to take two rows (the CSV and the AAVSO EFF report in
+        "Export", the plate's two resets in "Reset"); the code moves them
+        into the panels, one by one, so their names, texts and tooltips are
+        the same ones (ADR-005). The row keeps the doors and the project's
+        save. -->
    <item>
-    <layout class="QHBoxLayout" name="row_export">
+    <layout class="QHBoxLayout" name="row_result_actions">
+     <item>
+      <widget class="QToolButton" name="btn_export_more">
+       <property name="toolTip">
+        <string>What leaves this measurement: the CSV of the measured points and the AAVSO EFF report. They are the same two buttons as always, one click away</string>
+       </property>
+       <property name="text">
+        <string>Export</string>
+       </property>
+       <property name="popupMode">
+        <enum>QToolButton::InstantPopup</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btn_reset_more">
+       <property name="toolTip">
+        <string>The two plate resets: bring this plate back to the editor defaults (stretch, recipe, sequence field) and remove the points registered in this plate. Both ask for confirmation, and neither touches other plates</string>
+       </property>
+       <property name="text">
+        <string>Reset</string>
+       </property>
+       <property name="popupMode">
+        <enum>QToolButton::InstantPopup</enum>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_save_project">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="visible">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</string>
+       </property>
+       <property name="text">
+        <string>Save…</string>
+       </property>
+      </widget>
+     </item>
      <item>
       <widget class="QPushButton" name="btn_csv">
        <property name="enabled">
@@ -218,26 +299,6 @@
        </property>
        <property name="text">
         <string>AAVSO EFF…</string>
-       </property>
-      </widget>
-     </item>
-     </layout>
-   </item>
-   <item>
-     <layout class="QHBoxLayout" name="row_project">
-     <item>
-      <widget class="QPushButton" name="btn_save_project">
-       <property name="enabled">
-        <bool>false</bool>
-       </property>
-       <property name="visible">
-        <bool>false</bool>
-       </property>
-       <property name="toolTip">
-        <string>Register this calibrated point in the project that opened the editor: it lands on the light curve and feeds the campaign summary (source “measure”)</string>
-       </property>
-       <property name="text">
-        <string>Save…</string>
        </property>
       </widget>
      </item>
@@ -267,7 +328,273 @@
        </property>
       </widget>
      </item>
+     <item>
+      <spacer name="hsp_result_actions">
+       <property name="orientation">
+        <enum>Qt::Orientation::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_series">
+     <property name="title">
+      <string>Photometric series</string>
+     </property>
+     <property name="visible">
+      <bool>false</bool>
+     </property>
+     <layout class="QVBoxLayout" name="vbox_series">
+      <item>
+       <widget class="QLabel" name="lbl_series_hint">
+        <property name="text">
+         <string>Measure every frame of the visit(s) chosen below as one series (the same plate recipe per frame, zero point per frame, quality flags).</string>
+        </property>
+        <property name="wordWrap">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+       <item>
+        <layout class="QHBoxLayout" name="row_series_group">
+         <item>
+          <widget class="QLabel" name="lbl_series_group">
+           <property name="text">
+            <string>Group frames:</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QSpinBox" name="spn_group_n_quick">
+           <property name="toolTip">
+            <string>Combine N frames per point in the measurement domain (fluxes with 1/σ² weights), never pixel stacking. 1 = one point per frame (the default for transits and variables). The same knob as Advanced… → Group frames</string>
+           </property>
+           <property name="minimum">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <number>100</number>
+           </property>
+           <property name="value">
+            <number>1</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="hsp_series_group">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>10</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+
+      <item>
+       <layout class="QHBoxLayout" name="row_series_doors">
+        <item><widget class="QPushButton" name="btn_series_chart"><property name="toolTip"><string>How the curve is drawn (scale, error bars, binning, mean) and which points you leave out. Opens in its own window, so you can watch the curve while changing it</string></property><property name="text"><string>Chart and quality…</string></property></widget></item>
+        <item><widget class="QToolButton" name="btn_series_more"><property name="toolTip"><string>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</string></property><property name="text"><string>Series</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
+        <item><spacer name="hsp_series_doors"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+       </layout>
+      </item>
+       <item>
+        <layout class="QVBoxLayout" name="vbox_series_actions">
+         <item>
+          <layout class="QHBoxLayout" name="row_series_run">
+           <item>
+            <widget class="QPushButton" name="btn_series">
+             <property name="toolTip">
+              <string>Measure the frames of this visit as a series: per-frame zero point, quality flags, honest errors. A new run starts; "Undo this run" removes only its points</string>
+             </property>
+             <property name="text">
+              <string>Measure the sequence</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_undo">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="toolTip">
+              <string>Delete the points of the last series run of this visit, without touching any other run</string>
+             </property>
+             <property name="text">
+              <string>Undo this run</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <layout class="QHBoxLayout" name="row_series_out">
+           <item>
+            <widget class="QPushButton" name="btn_series_passes">
+             <property name="toolTip">
+              <string>Every pass you measured on this visit, oldest first, with the one the chart is showing marked. Measuring again makes the new pass the curve; here you can go back to an earlier one WITHOUT deleting anything (the points of the others stay in the project), or undo a pass so its points go (the row stays, marked undone, and the chart falls back to the pass before it)</string>
+             </property>
+             <property name="text">
+              <string>Passes of this visit…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_exoclock">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+             <property name="toolTip">
+              <string>Prepare the ExoClock submission (three-column JD_UTC/flux file + ExoClock_info.txt), open the upload page and record the reported outcome</string>
+             </property>
+             <property name="text">
+              <string>ExoClock…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_night">
+             <property name="toolTip">
+              <string>Write the two figures that explain the night: the airmass of every point (a curve that fades and comes back is often the sky) and the position of the target (with the alignment on, this is the guide residual: the frame that jumped shows as a spike). Both are scientific figures, ready for the report</string>
+             </property>
+             <property name="text">
+              <string>Night conditions (PNG)…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_sci">
+             <property name="toolTip">
+              <string>Save the curve exactly as you see it, INTO THIS VISIT: the window you zoomed to, the points you selected or excluded, the fixed range if you set one. The chart joins the visit's resources, next to its frames and its reports</string>
+             </property>
+             <property name="text">
+              <string>Save the chart in the visit (PNG)…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_phase">
+             <property name="toolTip">
+              <string>Search the project's curve for its period (Lomb-Scargle and PDM) and fold it into the two-panel report, with what the baseline can and cannot say</string>
+             </property>
+             <property name="text">
+              <string>Period and phase…</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_help">
+             <property name="toolTip">
+              <string>Open the sequences guide (SEQUENCES) in the documentation browser</string>
+             </property>
+             <property name="text">
+              <string>?</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="btn_series_discard">
+             <property name="toolTip">
+              <string>Undo every series run of this visit and start the curve from scratch: its points go and the runs stay marked as undone. The frames are never touched, so measuring again is one click</string>
+             </property>
+             <property name="text">
+              <string>Discard this visit's curve…</string>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+        </layout>
+       </item>
+      <item>
+       <widget class="QCheckBox" name="chk_series_live">
+        <property name="toolTip">
+         <string>Live mode (opt-in): watch this visit's folder and measure each new frame as it lands, updating the curve every few frames. Off by default</string>
+        </property>
+        <property name="text">
+         <string>Live (watch the folder)</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_series_scope">
+        <item>
+         <widget class="QLabel" name="lbl_series_scope">
+          <property name="text">
+           <string>Frames of:</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="cmb_series_scope">
+          <property name="toolTip">
+           <string>Which frames the series measures. THIS VISIT is the night you have open (the normal way). ALL THE VISITS measures every night of the project in ONE pass: each night's points are filed in its own visit, the whole pass is undone with one click, and the curve shows all the nights together (one pass per night). It needs a project with more than one visit with frames: with only one, this stays off and says why</string>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>190</width>
+            <height>0</height>
+           </size>
+          </property>
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <item>
+           <property name="text">
+            <string>this visit</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>all visits</string>
+           </property>
+          </item>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="row_series_info">
+        <item>
+         <widget class="QLabel" name="lbl_series_frames">
+          <property name="text">
+           <string>Frames: 0</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lbl_series_cadence">
+          <property name="text">
+           <string>group 1 · cadence from the frames</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <widget class="QProgressBar" name="prg_series">
+        <property name="value">
+         <number>0</number>
+        </property>
+       </widget>
+      </item>
      </layout>
+    </widget>
    </item>
    <item>
     <spacer name="vsp_measure">

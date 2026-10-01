@@ -32,7 +32,9 @@ import logging
 import math
 from pathlib import Path
 
-from . import coords, phototrans
+import numpy as np
+
+from . import coords, photometry, phototrans
 from .sources import vizier
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,16 @@ logger = logging.getLogger(__name__)
 VSX_MATCH_ARCSEC = 5.0     # a catalog star this close to a VSX entry is
                            # considered the same object (SecFot's value)
 DEFAULT_MARGIN = 0.5       # comps should beat the target by this much
+# A comp needs this much clear around it at the field edges (arcsec): the
+# drift of a night moves the field across the sky, so a star at the very
+# edge is a star you will lose (quality plan, C2).
+COMP_MARGIN_ARCSEC = 90.0
+# The peak of a comp must clear the sky noise by this many sigmas for the
+# centroid (and the photometry) to mean anything (C1).
+MIN_COMP_PEAK_SNR = 12.0
+# And the flux in the aperture must be this many times its own noise:
+# below it, the comp is noise with a catalogue value attached.
+MIN_COMP_FLUX_SNR = 30.0
 BRIGHT_WINDOW = 2.0        # ...but by not much more than this: a comp
                            # many magnitudes brighter saturates real
                            # plates and calibrates nothing
@@ -66,18 +78,38 @@ def separation_arcsec(first, second):
     return math.degrees(math.acos(max(-1.0, min(1.0, cos_d)))) * 3600.0
 
 
-def inside_field(ra, dec, center, field_deg):
+def inside_field(ra, dec, center, field_deg, field_dec_deg=None):
     # @args: ra, dec - degrees, center - (ra, dec) degrees,
-    #        field_deg - square side in degrees
-    # @return: True when the point falls inside the square field
+    #        field_deg - square side in degrees (RA axis),
+    #        field_dec_deg - the declination side when the sensor is NOT
+    #        square (quality plan, C2): a 1663 x 1252 camera sees 43' x 32',
+    #        and treating that as a 43' square proposes stars the sensor
+    #        never shows
+    # @return: True when the point falls inside the field
     dra = ra - center[0]
+    height = field_dec_deg if field_dec_deg else field_deg
     if dra > 180.0:
         dra -= 360.0
     elif dra < -180.0:
         dra += 360.0
     x_deg = dra * math.cos(math.radians(center[1]))
     return (abs(x_deg) <= field_deg / 2.0
-            and abs(dec - center[1]) <= field_deg / 2.0)
+            and abs(dec - center[1]) <= height / 2.0)
+
+
+def field_sides_deg(fov_arcmin, naxis1=None, naxis2=None):
+    # The REAL rectangle of the sensor (quality plan, C2): with the frame
+    # size in pixels and the field's long side, the short side follows the
+    # pixel ratio. A square camera (or no frame size) keeps the old square.
+    # @args: fov_arcmin - the field's long side in arcmin (the panel's
+    #        FOV), naxis1/naxis2 - the frame size in pixels
+    # @return: (ra_side_deg, dec_side_deg)
+    long_deg = float(fov_arcmin) / 60.0
+    if not naxis1 or not naxis2:
+        return long_deg, long_deg
+    if naxis1 >= naxis2:
+        return long_deg, long_deg * float(naxis2) / float(naxis1)
+    return long_deg * float(naxis1) / float(naxis2), long_deg
 
 
 # --------------------------- band reading ---------------------------
@@ -176,10 +208,11 @@ _DESCRIBERS = {"gaia": describe_gaia, "apass": describe_apass}
 
 # --------------------------- field building ---------------------------
 
-def build_stars(rows, center, field_deg, catalog):
+def build_stars(rows, center, field_deg, catalog, field_dec_deg=None):
     # Builds the sorted star list of a field from raw VizieR rows.
     # @args: rows - vizier.cone_search rows, center - (ra, dec) degrees,
-    #        field_deg - square side in degrees, catalog - "gaia"|"apass"
+    #        field_deg - the RA side in degrees, catalog - "gaia"|"apass",
+    #        field_dec_deg - the declination side when it differs
     # @return: list of star dicts sorted by label-band magnitude
     spec = vizier.CATALOGS[catalog]
     describe = _DESCRIBERS[catalog]
@@ -189,7 +222,7 @@ def build_stars(rows, center, field_deg, catalog):
         dec = _num(row.get(spec["dec"]))
         if ra is None or dec is None:
             continue
-        if not inside_field(ra, dec, center, field_deg):
+        if not inside_field(ra, dec, center, field_deg, field_dec_deg):
             continue
         mag = _num(row.get(spec["mag"]))
         if mag is None:
@@ -280,16 +313,19 @@ def _stage(progress, es, en):
 
 
 def load_field(catalog, ra_deg, dec_deg, fov_arcmin, max_rows=12000,
-               force=False, progress=None):
+               force=False, progress=None, naxis=None, margin_arcsec=0.0):
     # Full field around a target: catalog stars + VSX variables matched.
     # The query radius covers the field corners plus a small margin
     # (SecFot's fov*sqrt(1/2) + 0.8').
     # @args: catalog - "gaia"|"apass", ra_deg/dec_deg - target J2000,
-    #        fov_arcmin - square field side, max_rows - row cap,
-    #        force - bypass the cache read,
-    #        progress - optional stage callback ({"es", "en"} per stage)
+    #        fov_arcmin - the field's LONG side in arcmin, max_rows - row
+    #        cap, force - bypass the cache read, progress - optional stage
+    #        callback, naxis - the frame size (naxis1, naxis2) in pixels so
+    #        the field is the REAL sensor rectangle and not a square (C2),
+    #        margin_arcsec - a safety ring shrunk from every side (the
+    #        drift of a night, a dithering) that no comp may sit in
     # @return: {"stars", "variables", "catalog", "center", "fov_arcmin",
-    #          "vsx_warning"} or None when the catalog query failed
+    #          "sides_deg", "vsx_warning"} or None when the query failed
     center = (float(ra_deg), float(dec_deg))
     radius = fov_arcmin * math.sqrt(0.5) + 0.8
     name = vizier.CATALOGS[catalog]["name"]
@@ -299,32 +335,77 @@ def load_field(catalog, ra_deg, dec_deg, fov_arcmin, max_rows=12000,
                              max_rows=max_rows, force=force)
     if res is None:
         return None
-    stars = build_stars(res[1], center, fov_arcmin / 60.0, catalog)
+    naxis1, naxis2 = (naxis or (None, None))
+    ra_side, dec_side = field_sides_deg(fov_arcmin, naxis1, naxis2)
+    # the safety ring: shrink BOTH sides (a drift moves the field, and the
+    # original 43' square already proposed stars the sensor never saw)
+    shrink = 2.0 * float(margin_arcsec or 0.0) / 3600.0
+    ra_side = max(ra_side - shrink, ra_side * 0.2)
+    dec_side = max(dec_side - shrink, dec_side * 0.2)
+    stars = build_stars(res[1], center, ra_side, catalog,
+                        field_dec_deg=dec_side)
     _stage(progress, "Comprobando variables conocidas (VSX)…",
            "Checking known variables (VSX)…")
     vsx_res = vizier.cone_search("vsx", center[0], center[1], radius,
                                  max_rows=4000, force=force)
     variables = []
     if vsx_res is not None:
-        variables = build_variables(vsx_res[1], center,
-                                    fov_arcmin / 60.0)
+        variables = build_variables(vsx_res[1], center, ra_side)
         match_vsx(stars, variables)
     return {"stars": stars, "variables": variables, "catalog": catalog,
             "catalog_name": vizier.CATALOGS[catalog]["name"],
             "band": vizier.CATALOGS[catalog]["band"],
             "center": center, "fov_arcmin": float(fov_arcmin),
+            "sides_deg": (ra_side, dec_side),
             "vsx_warning": vsx_res is None}
 
 
 # --------------------------- sequence proposal ---------------------------
 
-def _is_isolated(star, stars, tol_arcsec):
-    # @return: True when no other catalog star sits within tol_arcsec
-    for other in stars:
-        if other is star:
-            continue
-        if separation_arcsec(star, other) < tol_arcsec:
-            return False
+def _neighbour_grid(stars, cell_deg):
+    # Buckets the field's stars in a grid, so "is any other star within N
+    # arcseconds?" is asked of the few stars that can possibly be near
+    # instead of every other star in the field.
+    #
+    # Measured on the real V0526 Per field (5157 catalog stars, the app's
+    # own cached Gaia answer): asking every star about every other one spent
+    # 22 020 050 separations and 59.3 s inside propose_comps, and the
+    # question is only ever "is there ANY star within 10 arcsec?".
+    #
+    # The x axis is the RA scaled by the field's own cos(dec): over one
+    # field that is exact enough, and the cell is FOUR times the tolerance
+    # (a whole cell of slack), so the prune cannot miss a real neighbour
+    # even on a wide field at a high declination.
+    # @args: stars - the catalog stars, cell_deg - the grid's cell size
+    # @return: (cells, key_of): the buckets and the function that says which
+    #          bucket a (ra_deg, dec_deg) falls in
+    decs = [s["dec"] for s in stars] or [0.0]
+    cos_ref = max(0.05, math.cos(math.radians(sum(decs) / len(decs))))
+
+    def key_of(ra_deg, dec_deg):
+        # @return: (ix, iy) of the cell that position falls in
+        return (int(math.floor(ra_deg * cos_ref / cell_deg)),
+                int(math.floor(dec_deg / cell_deg)))
+
+    cells = {}
+    for s in stars:
+        cells.setdefault(key_of(s["ra"], s["dec"]), []).append(s)
+    return cells, key_of
+
+
+def _isolated(star, cells, key_of, tol_arcsec):
+    # @args: star - the candidate, cells/key_of - the field's grid,
+    #        tol_arcsec - the isolation radius
+    # @return: True when no other catalog star sits within tol_arcsec (the
+    #          cell and the eight around it are all that can hold one)
+    ix, iy = key_of(star["ra"], star["dec"])
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for other in cells.get((ix + dx, iy + dy), ()):
+                if other is star:
+                    continue
+                if separation_arcsec(star, other) < tol_arcsec:
+                    return False
     return True
 
 
@@ -366,10 +447,126 @@ def _why(star, target_mag, target_bv, min_margin, color_tol,
     return {"es": " · ".join(parts_es), "en": " · ".join(parts_en)}
 
 
+def local_sky_sigma(plate, x, y, r_ap):
+    # The local sky noise around a point, from pixel-to-pixel differences
+    # (a smooth gradient barely moves it): the same recipe the series
+    # engine uses, kept here so validating a candidate touches only its
+    # own cutout and not the whole frame.
+    # @args: plate - 2D ADU array, x/y - the star, r_ap - aperture radius
+    # @return: sigma in ADU, or None when the cutout is too small
+    h, w = plate.shape
+    x0 = max(0, int(x - r_ap - 6))
+    x1 = min(w, int(x + r_ap + 7))
+    y0 = max(0, int(y - r_ap - 6))
+    y1 = min(h, int(y + r_ap + 7))
+    sub = np.asarray(plate[y0:y1, x0:x1], dtype=np.float64)
+    if sub.size < 16:
+        return None
+    diffs = np.concatenate([np.diff(sub, axis=1).ravel(),
+                            np.diff(sub, axis=0).ravel()])
+    return 1.4826 * float(np.median(np.abs(diffs - np.median(diffs)))) \
+        / math.sqrt(2.0)
+
+
+def validate_on_plate(star, plate, wcs, radii=None, sat_adu=None,
+                      linear_adu=None, gain=None, ron=None, shape=None,
+                      margin_px=0.0, centroid_mode="raw"):
+    # Measures ONE candidate on the observer's own plate and says whether
+    # it is usable (quality plan, C1). The catalogue cannot know this: it
+    # does not see a saturated core, a sensor that stops being linear at
+    # 53 000 ADU, a star sitting outside the frame, or one so faint that
+    # its flux is noise.
+    #
+    # The 4 of 9 saturated and 1 off-sensor comps of the real V0526 Per
+    # sequence are exactly what this returns.
+    #
+    # @args: star - {"ra", "dec"}, plate - the 2D ADU array, wcs - the
+    #        plate's Wcs, radii - the aperture triple, sat_adu - the
+    #        detector ceiling in ADU, linear_adu - the linearity limit,
+    #        gain/ron - e-/ADU and e- (a real SNR when known, a proxy when
+    #        not), shape - the frame's (h, w), margin_px - the ring kept
+    #        clear at the edges
+    #    centroid_mode - how the aperture is centred: "raw" (the
+    #        catalogue's own position, the default here) or "gaussian"
+    #        (the matched filter). A VERDICT needs a peak and a flux, not a
+    #        0.01 px centroid: the matched filter costs ten milliseconds of
+    #        the fourteen and cannot change a yes/no about saturation, so
+    #        the cheap centring is the honest default for a validation
+    #        (measured: 13.8 ms -> 4.2 ms per candidate).
+    # @return: None when the star is fine, else {"key", "es", "en"}
+    if plate is None or wcs is None:
+        return None
+    try:
+        x, y = wcs.sky_to_pixel(star["ra"], star["dec"])
+    except Exception:
+        return {"key": "off", "es": "no se puede situar en la placa",
+                "en": "it cannot be placed on the plate"}
+    h, w = shape if shape else plate.shape
+    m = float(margin_px or 0.0)
+    if not (m <= x <= w - 1 - m and m <= y <= h - 1 - m):
+        return {"key": "outside",
+                "es": "fuera del sensor (con el margen de seguridad)",
+                "en": "outside the sensor (with the safety margin)"}
+    r_ap, r_in, r_out = radii or (photometry.R_AP, photometry.R_ANN_IN,
+                                  photometry.R_ANN_OUT)
+    if x - r_out < 0 or x + r_out > w - 1 or y - r_out < 0 \
+            or y + r_out > h - 1:
+        return {"key": "edge",
+                "es": "el anillo de cielo se sale del marco",
+                "en": "its sky annulus falls off the frame"}
+    r = photometry.measure_point(plate, x, y, r_ap=r_ap, r_ann_in=r_in,
+                                 r_ann_out=r_out, sat_adu=None,
+                                 centroid_mode=centroid_mode)
+    if not r.get("ok"):
+        return {"key": "unmeasurable",
+                "es": "no se puede medir en esta placa",
+                "en": "it cannot be measured on this plate"}
+    peak = r.get("peak")
+    if sat_adu and peak is not None and peak >= float(sat_adu):
+        return {"key": "saturated",
+                "es": "satura ({0:.0f} de {1:.0f} ADU)".format(
+                    peak, float(sat_adu)),
+                "en": "saturated ({0:.0f} of {1:.0f} ADU)".format(
+                    peak, float(sat_adu))}
+    if linear_adu and peak is not None and peak >= float(linear_adu):
+        return {"key": "nonlinear",
+                "es": "por encima de la linealidad ({0:.0f} de {1:.0f} "
+                      "ADU)".format(peak, float(linear_adu)),
+                "en": "above the linearity limit ({0:.0f} of {1:.0f} "
+                      "ADU)".format(peak, float(linear_adu))}
+    sky_pp = r.get("sky_pp")
+    noise = local_sky_sigma(plate, x, y, r_ap)
+    if noise and peak is not None and sky_pp is not None:
+        snr_peak = (float(peak) - float(sky_pp)) / noise
+        if snr_peak < MIN_COMP_PEAK_SNR:
+            return {"key": "faint",
+                    "es": "demasiado débil: el pico es {0:.1f}× el ruido "
+                          "del cielo".format(snr_peak),
+                    "en": "too faint: its peak is {0:.1f}x the sky "
+                          "noise".format(snr_peak)}
+    flux = r.get("flux")
+    if flux is not None and flux > 0 and noise:
+        n = max(1, int(r.get("n_pix") or 1))
+        n_sky = max(1, int(r.get("n_sky") or 1))
+        var = n * noise ** 2 * (1.0 + n / float(n_sky))
+        if gain and ron is not None:
+            var += float(sky_pp or 0.0) * n / float(gain)
+            var += n * (float(ron) ** 2) / (float(gain) ** 2)
+        snr_flux = float(flux) / math.sqrt(max(var, 1e-9))
+        if snr_flux < MIN_COMP_FLUX_SNR:
+            return {"key": "faint",
+                    "es": "SNR {0:.0f} en la apertura: no calibra".format(
+                        snr_flux),
+                    "en": "SNR {0:.0f} in the aperture: it does not "
+                          "calibrate".format(snr_flux)}
+    return None
+
+
 def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
                   min_margin=DEFAULT_MARGIN, color_tol=COLOR_TOL,
                   isolation_arcsec=ISOLATION_ARCSEC, spread_arcmin=0.0,
-                  bright_window=BRIGHT_WINDOW):
+                  bright_window=BRIGHT_WINDOW, validator=None,
+                  margin_arcsec=0.0):
     # Proposes a photometric sequence automatically. Criteria, in order:
     # not a known VSX variable, isolated in the catalog, brighter than
     # the target by min_margin but CLOSE to it (a comp much brighter than
@@ -379,17 +576,31 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
     # rules relax in tiers so the sequence never comes back empty.
     # Picked comps keep a spread_arcmin minimum mutual separation so the
     # sequence covers the field.
+    #
+    # Quality plan, C1: the catalogue alone cannot know whether a star
+    # saturates, sits below the camera's linearity or falls outside the
+    # real sensor. A `validator` is the observer's own plate saying so:
+    # it is called per candidate with (star, role) and returns None (fine)
+    # or {"key", "es", "en"} with the reason it is not usable. The core
+    # stays free of Qt and of the plate; the caller owns the measuring.
     # @args: stars - build_stars list, target_mag - target magnitude in
     #        the label band, target_bv - target B−V or None, n - comps,
     #        check - also pick one check star, spread_arcmin - minimum
     #        separation between comps (0 disables), bright_window - how
     #        far brighter than (target - min_margin) a comp may sit and
-    #        still be a first-class choice
+    #        still be a first-class choice, validator - optional callable
+    #        (star, role) -> None | {"key","es","en"}, margin_arcsec - a
+    #        safety ring kept clear on every side (drift, dithering)
     # @return: {"comps": [{"name", "kind", "star", "why"}...],
-    #          "check": entry or None}
+    #          "check": entry or None, "rejected": [{name, key, es, en}]}
+    # The isolation screen, with the field bucketed ONCE (O(n), not O(n²):
+    # see _neighbour_grid for the 59 s that the pairwise version spent on a
+    # real 5157-star field).
+    cells, key_of = _neighbour_grid(stars, 4.0 * isolation_arcsec / 3600.0)
     pool = [s for s in stars
             if s.get("vsx") is None
-            and _is_isolated(s, stars, isolation_arcsec)]
+            and _isolated(s, cells, key_of, isolation_arcsec)]
+    rejected = []
 
     def color_rank(s):
         # @return: (colour outside tolerance?, |ΔB−V| or worst-case)
@@ -422,6 +633,35 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
                        - bright_window),
                       key=lambda s: (color_rank(s), close(s)))
     ordered = near + fainter + brighter
+    # The plate is asked ONCE per candidate, whatever role it plays: the
+    # same answer applies to a star considered as a comp and then as the
+    # check, and asking twice both wastes the expensive measurement and
+    # reports the same refusal twice. The memo lives for this call only:
+    # the caller owns the plate and may ask again with another one.
+    validated = {}
+    reported = set()
+
+    def note_refusal(cand, verdict):
+        # @args: cand - the star, verdict - the plate's verdict
+        # @return: None. Each refusal is reported ONCE, whatever role the
+        #          star was playing when it was refused
+        if id(cand) in reported:
+            return
+        reported.add(id(cand))
+        rejected.append({"name": cand.get("name") or cand.get("id"),
+                         "key": verdict.get("key"),
+                         "es": verdict.get("es"),
+                         "en": verdict.get("en")})
+
+    def verdict_of(cand, role):
+        # @args: cand - the star, role - "comp" | "check"
+        # @return: the plate's verdict (None when the star is fine)
+        key = id(cand)
+        if key not in validated:
+            validated[key] = (validator(cand, role)
+                              if validator is not None else None)
+        return validated[key]
+
     picked = []
     for cand in ordered:
         if len(picked) >= n:
@@ -430,14 +670,31 @@ def propose_comps(stars, target_mag, target_bv=None, n=8, check=True,
                 separation_arcsec(cand, p["star"]) < spread_arcmin * 60.0
                 for p in picked):
             continue
+        # THE EXPENSIVE QUESTION IS ASKED ONLY HERE. Measuring the plate per
+        # candidate is what costs (58 ms on a real field): it was asked of
+        # EVERY isolated star in the field, including the ones that were
+        # never going to be chosen because they are far too faint or too
+        # bright (the tiers below decide that for free). It is asked now
+        # about the stars that are actually being picked, in ranked order,
+        # which is what the check star already did.
+        if validator is not None:
+            verdict = verdict_of(cand, "comp")
+            if verdict is not None:
+                note_refusal(cand, verdict)
+                continue
         picked.append(entry(cand, f"Comp{len(picked) + 1}", "comp"))
     check_entry = None
     if check:
         for cand in ordered:
             if all(p["star"] is not cand for p in picked):
+                if validator is not None:
+                    verdict = verdict_of(cand, "check")
+                    if verdict is not None:
+                        note_refusal(cand, verdict)
+                        continue
                 check_entry = entry(cand, "Check", "check")
                 break
-    return {"comps": picked, "check": check_entry}
+    return {"comps": picked, "check": check_entry, "rejected": rejected}
 
 
 # --------------------------- CSV export ---------------------------

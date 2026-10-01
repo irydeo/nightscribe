@@ -51,17 +51,6 @@ class UfeManualDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(self.tr("Manual tweak"))
-        # the sizing lives here, not in the .ui: adopt_ui's hidden shell
-        # is what would receive the root's size properties there, so
-        # this file deliberately carries none.
-        # 760x380 stays generous: the actions row (field plus proposal
-        # buttons) measures 292 locally but 691 with the wide Windows
-        # CI font, so the width must clear that; test_manual_window_
-        # cannot_squish_its_buttons pins the floor honestly and is the
-        # honest guard for a font this wide. The sequence button wears
-        # a row of its own, and 820x400 opens with a little air
-        self.setMinimumSize(760, 380)
-        self.resize(820, 400)
         # the structure is the Designer file's (ADR-005); this class
         # only dresses the window and exposes the widgets the tab
         # aliases
@@ -74,6 +63,63 @@ class UfeManualDialog(QDialog):
         self.btn_seq_open = self._ui.btn_seq_open
         self.btn_field = self._ui.btn_field
         self.btn_propose = self._ui.btn_propose
+        # THE SIZE, once the layout exists. It used to open at a fixed
+        # 820x400 while the content ends around 330: a dead strip under the
+        # last row, because the stretch below it is not part of any size
+        # hint (reported: "ajusta también el diálogo Manual Tweak").
+        #
+        # The WIDTH keeps its floor: the actions row (field plus proposal
+        # buttons) measures 292 locally but 691 with the wide Windows CI
+        # font, so 760 clears that and test_manual_window_cannot_squish_its_
+        # buttons pins it. The HEIGHT now follows the content.
+        self.setMinimumWidth(760)
+        self._fit_to_content()
+
+    def _fit_to_content(self):
+        # The window takes the height its CONTENT really needs, at the width
+        # it opens with: no dead strip and nothing cut.
+        #
+        # The size hints lie here, which is why this measures the rows
+        # themselves: measured on the real window, it opened at 400 px with
+        # the content ending at 278 (a dead strip of 111 under the last row)
+        # while `sizeHint` said 177 and the layout's `heightForWidth` said
+        # 161. The extra space is spread over the rows, so only the laid-out
+        # geometry tells the truth.
+        # @return: None
+        width = max(820, self.minimumWidth())
+        layout = self.layout()
+        if layout is None:
+            return
+        self.resize(width, 600)             # room to lay the content out
+        layout.activate()
+        bottom = 0
+        for i in range(layout.count()):
+            item = layout.itemAt(i)
+            widget = item.widget() if item is not None else None
+            if widget is None or not widget.isVisible():
+                continue
+            bottom = max(bottom, widget.geometry().bottom() + 1)
+        margin = layout.contentsMargins().bottom()
+        if bottom <= 0:
+            bottom = self.sizeHint().height()
+        self.setMinimumHeight(int(self.minimumSizeHint().height()))
+        # the content plus a little air: flush against the frame looks
+        # broken, and the strip this replaces was 111 px of nothing
+        self.resize(width,
+                    max(int(bottom) + margin + 12, self.minimumHeight()))
+
+    def resizeEvent(self, ev):
+        # A word-wrapped hint label does not always ask for the height its
+        # text needs (the sizeHint is computed for a width that changes
+        # later): refit it at the REAL width, the same fix the series
+        # block's header carries.
+        # @args: ev - the resize event, passed on
+        super().resizeEvent(ev)
+        lbl = getattr(self, "lbl_hint", None)
+        if lbl is not None and lbl.width() >= 50:
+            need = lbl.heightForWidth(lbl.width())
+            if need > 0:
+                lbl.setMinimumHeight(int(need))
 
     def showEvent(self, ev):
         # @args: ev - the show event, passed on

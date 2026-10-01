@@ -338,8 +338,11 @@ def test_wheel_getcurrent_filter(client, fake_post):
 def qapp():
     import os
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtCore import QCoreApplication
-    return QCoreApplication.instance() or QCoreApplication([])
+    # A QApplication, not QCoreApplication: under xdist a worker may run
+    # this module before any widget one, and a QCoreApplication created
+    # here would make the next Qt widget test crash (no QApplication).
+    from PySide6.QtWidgets import QApplication
+    return QApplication.instance() or QApplication([])
 
 
 def _pump(qapp, iters=300):

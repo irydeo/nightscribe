@@ -130,6 +130,28 @@ def test_add_and_list_files(tmp_db):
     assert files[1]["kind"] == "fits"
 
 
+def test_add_file_once_does_not_pile_duplicates(tmp_db):
+    # A reduction re-imported (or saved again from its result window) must
+    # not fill the visit's resource list with the same path over and over:
+    # the manual handoff used to leave the inits.json five times in a row.
+    from nightscribe.core import followup as fu
+    p = project.create(tmp_db, "transit", "HAT-P-32 b")
+    sid = fu.create_session(tmp_db, p["id"], obs_date="2017-12-20")
+    fid, created = project.add_file_once(tmp_db, p["id"], "/tmp/a.png",
+                                        "exotic_figure", session_id=sid)
+    assert created
+    again, created = project.add_file_once(tmp_db, p["id"], "/tmp/a.png",
+                                          "exotic_figure", session_id=sid)
+    assert not created and again == fid
+    assert len(project.files_for_session(tmp_db, sid)) == 1
+    # a different visit keeps its own link to the same file
+    other = fu.create_session(tmp_db, p["id"], obs_date="2017-12-21")
+    _fid, created = project.add_file_once(tmp_db, p["id"], "/tmp/a.png",
+                                         "exotic_figure", session_id=other)
+    assert created
+    assert len(project.files_for_session(tmp_db, sid)) == 1
+
+
 def test_find_file_locates_the_plate_row(tmp_db):
     # The ADR-047 save hooks resolve the open image to its registry row.
     p = project.create(tmp_db, "sn", "SN 2026find")
@@ -193,7 +215,7 @@ def test_delete_cascades(tmp_db):
 
 def test_migration_user_version_is_current(tmp_db):
     v = tmp_db.execute("PRAGMA user_version").fetchone()[0]
-    assert v == 11
+    assert v == 15
 
 
 def test_migration_v1_drops_analyse_step(tmp_path):
@@ -228,8 +250,8 @@ def test_migration_v1_drops_analyse_step(tmp_path):
 
     # reopen: the Database constructor applies the pending migrations
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     steps = db.execute(
         "SELECT step, status FROM project_steps WHERE project_id=? ORDER BY id",
         (pid,)).fetchall()
@@ -278,8 +300,8 @@ def test_migration_v2_merges_capture_into_plan(tmp_path):
     conn.close()
 
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     steps = db.execute(
         "SELECT step, status, data FROM project_steps WHERE project_id=?"
         " ORDER BY id",
@@ -358,7 +380,7 @@ def test_migration_v3_to_v4_preserves_projects(tmp_path):
 
     file, pid = _build_v3_db(tmp_path / "v3.db")
     db = Database(str(file))
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
 
     # the project itself is intact (kind/name/status/context unchanged)
     row = db.execute(
@@ -393,7 +415,7 @@ def test_migration_v4_is_idempotent(tmp_path):
     file, _pid = _build_v3_db(tmp_path / "v3.db")
     Database(str(file))               # migrates 3 -> 4
     db = Database(str(file))          # re-open: no-op
-    assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+    assert db.execute("PRAGMA user_version").fetchone()[0] == 15
     cols = {r[1] for r in db.execute(
         "PRAGMA table_info(projects)").fetchall()}
     assert {"closed_at", "outcome", "tags", "favorite"} <= cols

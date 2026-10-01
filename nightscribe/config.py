@@ -39,6 +39,15 @@ DEFAULTS = {
     "tns_bot_name": "",     # optional, to show TNS discovery images
     "tns_bot_key": "",
     "astrometry_key": "",   # optional, blind-solving unsolved FITS (blink)
+    "solver": "auto",       # auto | astap | astrometry (ADR-051)
+    "astap_path": "",       # local ASTAP binary; empty = look on PATH
+    # ADR-051 rev: a solved plate is saved solved (the WCS cards go into
+    # the FITS header, atomically). On by default; off keeps it in memory.
+    "solve_save": True,
+    # EXOTIC orchestration (series plan option A): the external Python <=3.10
+    # used to run EXOTIC and the venv it lives in. Empty = autodetect.
+    "exotic_python_path": "",
+    "exotic_install_dir": "",
     # Container root for the projects: empty -> platformdirs data dir's
     # projects/ folder (the legacy location, see ADR-032)
     "projects_root": "",
@@ -94,6 +103,17 @@ DEFAULTS = {
     "ccd_read_noise": None,     # e-
     "ccd_saturate": None,       # ADU ceiling
     "flat_resid_mag": 0.007,    # flat-field residual floor in the error
+    # Camera profile (core/cameras.py presets): the sensor template and the
+    # photometric limits the preset fills (all editable; the linearity and
+    # the working max exposure are per gain and must be measured/set by the
+    # user). regime: "short" (sCMOS, group many short frames) | "normal".
+    "cam_preset": "",
+    "cam_full_well_e": None,    # e-
+    "cam_linearity_adu": None,  # ADU where linearity is lost (per gain)
+    "cam_dark_current_e_s": None,   # e-/pixel/s at cam_dark_temp_c
+    "cam_dark_temp_c": None,
+    "cam_max_exposure_s": None,     # working max exposure (per gain)
+    "cam_regime": "normal",
     # UFE (ADR-044): open Blink / comparison chart / annotated FITS in the
     # unified editor by default; the classic dialogs stay reachable for
     # the review period (Settings → Development)
@@ -113,7 +133,10 @@ DEFAULTS = {
     "telescope_desc": "",     # free text, e.g. "0.43-m f/4.9 reflector"
     "camera_model": "",
     "marker_style": "ring",   # ring | cross (the object marker)
-    "chart_boxes": False,     # metadata corner boxes on the charts
+    "chart_boxes": False,     # metadata corner boxes on the OTHER charts
+                              # (the blink GIF/MP4 and the finder chart);
+                              # the UFE's plate band is chart_data
+    "chart_data": True,       # what the plate's band says (ADR-046 rev.)
 }
 
 

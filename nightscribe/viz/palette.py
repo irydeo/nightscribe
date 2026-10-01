@@ -28,6 +28,9 @@ ACCENT2 = "#6ec1ff"  # cool blue — Earth, dark-spawn tints
 MUTED  = "#8a90a6"   # planet rings, the 1 AU ruler, grids, watermarks
 SUN    = "#ffd76e"   # the Sun marker
 DANGER = "#ff6b6b"   # safety warnings (does-not-fit, moon interference)
+GOOD   = "#46a758"   # a measurement you can trust (the plate's band)
+FAIR = "#ff9e4d"     # usable but not clean: the band's orange (see GOOD)
+CATALOG = "#ffffff"  # a value that is NOT a measurement of this plate
 
 # Per-planet marker rings (kept distinct from the theme above so a chart
 # can tell Earth / Mercury / Venus / Mars apart at a glance).
@@ -61,3 +64,19 @@ def color(name):
     if name not in keys:
         raise KeyError(f"unknown chart colour: {name!r}")
     return QColor(name)
+
+
+# Which colour each ROLE of a measurement wears. The roles are decided in
+# core/chart_annotate (pure, testable: see magnitude_role) and the colour is
+# here, so the plate's band, the measurement's panel and the curve's points
+# cannot disagree about what "green" means.
+MEASURE_COLOURS = {
+    "name": FG,           # the object: whose plate this is
+    "pos": FG,            # placed by this plate's own solution
+    "pos-cat": MUTED,     # the catalogue's position, not this plate's
+    "mag": GOOD,          # a clean measurement
+    "mag-fair": FAIR,     # usable, but not clean
+    "mag-doubt": DANGER,  # not worth reporting without looking
+    "mag-cat": CATALOG,   # a catalogue value: not a measurement
+    "context": MUTED,     # date, exposure, filter, kit, Stn, PSc, FOV
+}

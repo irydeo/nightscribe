@@ -64,10 +64,12 @@ def test_csv_columns_and_hjd(db, tmp_path):
     row = lines[3].split(",")
     assert row[0] == "WeSb 1"
     # frozen reference: MJD 59650.94800 -> JD 2459651.448 -> HJD corr known
-    # within 30 s of +250.09 s at JD 2459653.448 (same geometry, 2 d apart)
+    # within 30 s of -250.09 s at JD 2459653.448 (same geometry, 2 d apart;
+    # negative: WeSb 1 sits roughly towards the Sun on that date, so the
+    # event is seen later from Earth, Eastman et al. 2010)
     hjd = float(row[1])
     corr_s = (hjd - (59650.94800 + 2400000.5)) * 86400
-    assert corr_s == pytest.approx(250.09, abs=30.0)
+    assert corr_s == pytest.approx(-250.09, abs=30.0)
     assert row[2] == "15.100" and row[3] == "0.020" and row[4] == "V"
     assert row[5] == "C1+C2" and row[6] == "ZABC"
 
@@ -95,7 +97,7 @@ def test_eff_header_and_rows(db, tmp_path):
     row = lines[7].split(",")
     assert row[0] == "WESB 1"                    # upper-cased
     assert row[2] == "15.100" and row[3] == "0.020" and row[4] == "V"
-    assert row[5] == "NA" and row[6] == "STD"
+    assert row[5] == "NO" and row[6] == "STD"    # TRANS: WebObs wants NO
     assert len(row) == 15
     assert len(lines) == 10                       # 7 header + 3 rows
 
@@ -146,3 +148,61 @@ def test_eff_without_sequence_keeps_na(db, tmp_path):
         comp={"name": "Comp1", "mag": None})
     row = out.read_text().splitlines()[7].split(",")
     assert row[7] == "Comp1" and row[8] == "na"
+
+
+# ---------------- the observer chooses the columns (phase A2) ----------
+
+def test_the_report_carries_the_columns_asked_for(tmp_path):
+    # The Photometrica tool of our group lets the observer tick which
+    # columns go into the file, and the reason is good: one colleague
+    # wants the curve, another wants the quality controls.
+    from nightscribe.core import photometry_export as ex
+    pts = [{"mjd": 60000.0, "mag": 12.34, "err": 0.05,
+            "err_internal": 0.004, "mag_raw": -9.5, "filter": "V",
+            "fwhm": 3.31, "airmass": 1.12, "n_comps": 5, "zp": 22.1,
+            "flags": ["few_comps"], "source": "measure"}]
+    out = tmp_path / "cols.csv"
+    ex.export_csv(pts, out, "X", ra_deg=10.0, dec_deg=20.0,
+                  columns=("name", "mag", "err_internal", "fwhm",
+                           "airmass", "n_comps", "flags"))
+    lines = out.read_text().splitlines()
+    # the header is the canonical key, never a translated label: this is a
+    # documented interchange format
+    assert lines[2] == "name,mag,err_internal,fwhm,airmass,n_comps,flags"
+    cells = lines[3].split(",")
+    assert cells[2] == "0.0040"
+    assert cells[3] == "3.31"
+    assert cells[4] == "1.120"
+    assert cells[5] == "5"
+    assert cells[6] == "few_comps"
+
+
+def test_a_missing_value_is_an_empty_cell_and_never_a_zero(tmp_path):
+    # A zero magnitude is a real, extremely bright star: writing one where
+    # the value is unknown would be a lie a reader cannot see.
+    from nightscribe.core import photometry_export as ex
+    pts = [{"mjd": 60000.0, "mag": 12.34, "err": None, "fwhm": None,
+            "airmass": None, "n_comps": None, "flags": []}]
+    out = tmp_path / "empty.csv"
+    ex.export_csv(pts, out, "X",
+                  columns=("name", "mag", "err", "fwhm", "airmass",
+                           "n_comps", "flags"))
+    cells = out.read_text().splitlines()[3].split(",")
+    assert cells[1] == "12.340"          # what is known
+    assert cells[2] == "" and cells[3] == "" and cells[4] == ""
+    assert cells[6] == ""                # no flags: an empty cell, not "[]"
+
+
+def test_the_default_set_is_the_documented_one(tmp_path):
+    # An existing script that reads our CSV must keep working: the default
+    # columns and their order are the ones the group has always exchanged.
+    from nightscribe.core import photometry_export as ex
+    pts = [{"mjd": 60000.0, "mag": 12.34, "err": 0.05, "filter": "V"}]
+    out = tmp_path / "default.csv"
+    ex.export_csv(pts, out, "X", ra_deg=10.0, dec_deg=20.0,
+                  observer="JL", comp_stars=["C1", "C2"])
+    lines = out.read_text().splitlines()
+    assert lines[2] == ",".join(ex.DEFAULT_COLUMNS)
+    assert lines[2] == "name,hjd,mag,err,filter,comp_stars,observer,notes"
+    assert lines[3].split(",")[5] == "C1+C2"
+    assert lines[3].split(",")[6] == "JL"

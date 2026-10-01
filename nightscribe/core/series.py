@@ -43,6 +43,16 @@ from . import wcs as wcs_mod
 
 logger = logging.getLogger(__name__)
 
+
+def _num(value):
+    # @args: value - anything from a DB row
+    # @return: float, or None when it is not a usable number (a stored
+    #          point may carry a NULL magnitude)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
 # Default aperture radii (pixels). The SN is a point source on a stacked
 # image: a moderate aperture captures most of the PSF; the annulus
 # estimates the local sky without being so wide it hits a neighbour.
@@ -64,10 +74,16 @@ MIN_N = 3
 def _centroid(data, x, y, half=5):
     # @args: data - 2D numpy array, x, y - float pixel, half - box half-size
     # @return: (cx, cy) refined to sub-pixel (intensity-weighted centroid)
-    y0, y1 = max(0, int(y) - half), min(data.shape[0], int(y) + half + 1)
-    x0, x1 = max(0, int(x) - half), min(data.shape[1], int(x) + half + 1)
+    # the same window rule as everywhere else (photometry.cutout_window,
+    # imported here to keep the module graph acyclic): a star off the frame
+    # gets its click back instead of a crash
+    from .photometry import cutout_window
+    win = cutout_window(data, x, y, half)
+    if win is None:
+        return float(x), float(y)
+    y0, y1, x0, x1 = win
     sub = data[y0:y1, x0:x1]
-    if sub.size == 0 or not np.any(np.isfinite(sub)):
+    if not np.any(np.isfinite(sub)):
         return float(x), float(y)
     total = float(np.nansum(sub))
     if total <= 0:
@@ -340,10 +356,24 @@ def analyze_campaign(points, sn_type=None, peak_mjd=None, peak_mag=None):
     # @args: points - list of {mjd, mag, err, filter} (differential or imported),
     #        sn_type - for the template verdict,
     #        peak_mjd/mag - to compute Δmag-from-peak; auto if None
-    # @return: dict {slope_mag_per_day, delta_from_peak, nights, verdict}
+    # @return: dict {slope_mag_per_day, delta_from_peak, nights, points, verdict}
+    # A saved point may carry no magnitude (a rejected measure, an imported
+    # row, a hand entry): comparing None with a float would raise, and the
+    # campaign line lives in the Analysis tab, so one bad row used to break
+    # the whole page. Keep only the usable points and report the rest away.
+    usable = []
+    for p in points or []:
+        mjd = _num(p.get("mjd"))
+        mag = _num(p.get("mag"))
+        if mjd is None or mag is None:
+            continue
+        q = dict(p)
+        q["mjd"], q["mag"] = mjd, mag
+        usable.append(q)
+    points = usable
     if not points:
         return {"slope_mag_per_day": None, "delta_from_peak": None,
-                "nights": 0, "verdict": "no_data"}
+                "nights": 0, "points": 0, "verdict": "no_data"}
     # auto-peak: brightest (lowest mag) point
     if peak_mjd is None or peak_mag is None:
         brightest = min(points, key=lambda p: p["mag"])
@@ -386,6 +416,7 @@ def analyze_campaign(points, sn_type=None, peak_mjd=None, peak_mag=None):
     return {"slope_mag_per_day": float(slope),
             "delta_from_peak": delta_from_peak,
             "nights": nights,
+            "points": len(points),
             "verdict": verdict,
             "filter": main_filt}
 

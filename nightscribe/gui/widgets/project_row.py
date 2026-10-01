@@ -109,12 +109,14 @@ class ProjectRow(QFrame):
 
     def set_project(self, *, kind_label, kind_color, name, favorite,
                     campaign_name, progress_text, next_text,
-                    activity_text, window_text, sparkline, icon=None):
+                    activity_text, window_text, sparkline, icon=None,
+                    sparkline_text=None):
         # @args: everything already rendered to words by the caller
         #        (kind_label/chips are plain text; sparkline is a QPixmap,
         #        null when there is nothing to draw; icon is the kind's
         #        QPixmap drawn by the caller — None leaves a flat colour wash
-        #        that still anchors the hue)
+        #        that still anchors the hue; sparkline_text is the
+        #        thumbnail's tooltip: what the curve is, in words)
         # @return: None
         self._kind_color = kind_color
         self.lbl_kind.setText(kind_label)
@@ -146,6 +148,10 @@ class ProjectRow(QFrame):
         self.lbl_spark.setVisible(has_spark)
         if has_spark:
             self.lbl_spark.setPixmap(sparkline)
+            # the thumbnail says WHAT it is: a curve of a project without a
+            # tooltip is a squiggle
+            self.lbl_spark.setToolTip(
+                sparkline_text or self.tr("Your measurements so far"))
         self._restyle()
 
     # ---------------- selection ----------------

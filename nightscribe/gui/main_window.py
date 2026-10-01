@@ -13,6 +13,8 @@
 
 import datetime
 import logging
+import re
+import uuid
 from pathlib import Path
 
 from PySide6 import Shiboken
@@ -44,8 +46,8 @@ from .widgets.campaign_row import CampaignRow
 from .widgets.project_row import ProjectRow
 from .widgets.sparkline import sparkline_pixmap
 from .workers import (BlinkExportWorker, BlinkWorker, CcdcielWorker,
-                      ExploreWorker, MpcResolveWorker, PostWorker, SunWorker,
-                      TonightWorker)
+                      ExploreWorker, MpcResolveWorker, PassWorker, PostWorker,
+                      SunWorker, TonightWorker)
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +183,37 @@ def _settings_two_columns(dlg):
         c[0].setMinimumWidth(col_w[0])
         c[1].setMinimumWidth(col_w[1])
         old.addLayout(cols)
+
+
+# How much of an EXOTIC run log is read to report a failure (P2 #21): the
+# tail is where the error is, and a two-hour log can be big.
+_LOG_TAIL_BYTES = 64 * 1024
+
+
+def _exotic_log_tail(path, lines=8, chars=1200):
+    # What EXOTIC actually said when a run failed (P2 #21). The log is
+    # written line by line while the run streams, so its last lines are
+    # the error; reporting the file's PATH instead left the user with
+    # nothing to act on.
+    # @args: path - the run log (None or missing is tolerated), lines -
+    #        trailing non-empty lines to keep, chars - cap for the box
+    # @return: the tail as one string, "" when there is nothing to read
+    if not path:
+        return ""
+    try:
+        p = Path(path)
+        size = p.stat().st_size
+        with p.open("rb") as fh:
+            if size > _LOG_TAIL_BYTES:
+                fh.seek(size - _LOG_TAIL_BYTES)
+            raw = fh.read()
+    except OSError:
+        return ""
+    tail = [ln.rstrip() for ln in raw.decode("utf-8", "replace").splitlines()]
+    if size > _LOG_TAIL_BYTES and tail:
+        tail = tail[1:]              # the chunk cut its first line in half
+    tail = [ln for ln in tail if ln.strip()][-lines:]
+    return "\n".join(tail)[-chars:]
 
 
 # Per-kind table columns for the full (collapsed) table
@@ -538,6 +571,7 @@ class MainWindow(QMainWindow):
         self._menus.action_about.triggered.connect(self.on_about)
         self._menus.action_sources.triggered.connect(self.on_sources)
         self._menus.action_docs.triggered.connect(self.on_docs)
+        self._menus.action_log.triggered.connect(self.on_open_log)
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_campaigns.triggered.connect(
@@ -700,6 +734,201 @@ class MainWindow(QMainWindow):
 
     # ---------------- menu: settings / help ----------------
 
+    def _pick_astap(self, dlg):
+        # Browse for the ASTAP executable (ADR-051).
+        from PySide6.QtWidgets import QFileDialog
+        path, _sel = QFileDialog.getOpenFileName(
+            dlg, self.tr("Select the ASTAP executable"), "",
+            self.tr("Executables (*)"))
+        if path:
+            dlg.edt_astap_path.setText(path)
+
+    def _test_astap(self, dlg):
+        # Probe the configured binary: does it exist and where (ADR-051).
+        from PySide6.QtWidgets import QMessageBox
+        from ..core.sources import astap
+        rep = astap.probe(dlg.edt_astap_path.text().strip())
+        QMessageBox.information(dlg, self.tr("ASTAP"), rep["message"])
+
+    def _pick_exotic_python(self, dlg):
+        # Browse for the Python <=3.10 interpreter that will host EXOTIC.
+        from PySide6.QtWidgets import QFileDialog
+        path, _sel = QFileDialog.getOpenFileName(
+            dlg, self.tr("Select the Python 3.10 interpreter"), "",
+            self.tr("Executables (*)"))
+        if path:
+            dlg.edt_exotic_python.setText(path)
+
+    def _pick_exotic_dir(self, dlg):
+        # Browse for the folder the EXOTIC environment will live in.
+        from PySide6.QtWidgets import QFileDialog
+        path = QFileDialog.getExistingDirectory(
+            dlg, self.tr("Select the EXOTIC environment folder"))
+        if path:
+            dlg.edt_exotic_install.setText(path)
+
+    def _cam_preset_selected(self, dlg):
+        # Fill the datasheet template from the chosen camera preset,
+        # without stomping a value the user set by hand.
+        from ..core import cameras
+        p = cameras.preset(dlg.cmb_cam_preset.currentData())
+        if p is not None:
+            dlg.spn_pixel_um.setValue(float(p["pixel_um"]))
+            if dlg.spn_cam_full_well.value() == 0 and p.get("full_well_e"):
+                dlg.spn_cam_full_well.setValue(float(p["full_well_e"]))
+            if dlg.spn_cam_linearity.value() == 0 and p.get("linearity_adu"):
+                dlg.spn_cam_linearity.setValue(float(p["linearity_adu"]))
+            # the read noise is a datasheet fact, so the preset may fill it
+            # (the GAIN never: it is per unit and per gain setting, and the
+            # preset itself says so)
+            if dlg.spn_cam_ron.value() == 0 and p.get("read_noise_e"):
+                dlg.spn_cam_ron.setValue(float(p["read_noise_e"]))
+            if dlg.spn_cam_dark.value() == 0 and p.get("dark_current_e_s"):
+                dlg.spn_cam_dark.setValue(float(p["dark_current_e_s"]))
+            if dlg.spn_cam_max_exp.value() == 0 and p.get("regime") == "short" \
+                    and p.get("exp_max_s"):
+                dlg.spn_cam_max_exp.setValue(round(float(p["exp_max_s"])))
+        self._cam_ref_update(dlg)
+
+    def _cam_ref_update(self, dlg):
+        # The full-well-in-ADU cross-check plus the sensor facts, so the
+        # linearity suggestion can be sanity-checked at a glance.
+        from ..core import cameras
+        p = cameras.preset(dlg.cmb_cam_preset.currentData())
+        bits = []
+        if p is not None:
+            bits.append(self.tr("Sensor: {0}").replace("{0}", p["sensor"]))
+            if p.get("dark_current_e_s") is not None \
+                    and p.get("dark_temp_c") is not None:
+                bits.append(self.tr("dark {0} e-/pix/s @ {1} °C")
+                            .replace("{0}", f"{p['dark_current_e_s']:g}")
+                            .replace("{1}", f"{p['dark_temp_c']:g}"))
+            bits.append(self.tr("regime: {0}").replace(
+                "{0}", self.tr("short (group frames)")
+                if p["regime"] == "short" else self.tr("normal")))
+            fw = cameras.full_well_adu(p, config.get("ccd_gain"))
+            if fw:
+                bits.append(self.tr("full well ≈ {0:.0f} ADU at your gain")
+                            .format(fw))
+            if p.get("linearity_note"):
+                bits.append(p["linearity_note"])
+        dlg.lbl_cam_ref.setText(" · ".join(bits))
+        self._cam_gain_note(dlg)
+
+    def _cam_gain_note(self, dlg):
+        # The consequence of the gain, live (quality plan, phase G): with
+        # one, the error bar is the CCD equation; without one it is only
+        # the scatter of the comparison stars, and the observer must know
+        # before wondering why a 0.06 mag curve has 0.2 mag error bars.
+        gain = dlg.spn_cam_gain.value() or None
+        ron = dlg.spn_cam_ron.value() or None
+        if gain:
+            bits = [self.tr("gain {0:.3g} e-/ADU").format(gain)]
+            if ron:
+                bits.append(self.tr("read noise {0:.3g} e-").format(ron))
+            bits.append(self.tr(
+                "the error bar is the CCD equation"))
+            dlg.lbl_cam_gain_note.setText(" · ".join(bits))
+        else:
+            dlg.lbl_cam_gain_note.setText(self.tr(
+                "No gain: the error bar of every point is the scatter of "
+                "the comparison stars, not the CCD equation. Measure it on "
+                "your own frames, or set it here."))
+
+    def _exotic_python(self, dlg):
+        # @return: the interpreter to use (configured, else detected)
+        from ..core import exotic_env
+        return exotic_env.detect_python(
+            dlg.edt_exotic_python.text().strip())
+
+    def _test_exotic(self, dlg):
+        # Probes the interpreter for a working EXOTIC import off the GUI
+        # thread: detect_python spawns subprocesses and the cold import
+        # of exotic can take minutes, which used to freeze the app for
+        # the whole probe. The button stays disabled while it runs.
+        # @args: dlg - the settings dialog
+        if getattr(self, "_exotic_probe", None) is not None:
+            return
+        from .workers import ProbeExoticWorker
+        dlg.btn_exotic_test.setEnabled(False)
+        self.statusBar().showMessage(
+            self.tr("Checking the EXOTIC environment…"), 0)
+        worker = ProbeExoticWorker(dlg.edt_exotic_python.text().strip())
+        worker.finished.connect(
+            lambda rep: self._exotic_test_done(dlg, rep))
+        self._exotic_probe = worker
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_test_done(self, dlg, rep):
+        # The probe landed: re-arm the button and report. The probe
+        # takes minutes, so the dialog may be closed and destroyed by
+        # now: never touch a destroyed dialog's widgets; the status bar
+        # carries the report when it is gone.
+        # @args: dlg - the settings dialog (maybe already destroyed),
+        #        rep - the probe report {"ok","version","message","python"}
+        from PySide6.QtWidgets import QMessageBox
+        self._exotic_probe = None
+        self.statusBar().clearMessage()
+        if not Shiboken.isValid(dlg):
+            self.statusBar().showMessage(rep.get("message", ""), 8000)
+            return
+        dlg.btn_exotic_test.setEnabled(True)
+        QMessageBox.information(dlg, self.tr("EXOTIC"),
+                                rep.get("message", ""))
+
+    def _prepare_exotic(self, dlg):
+        # Build the external EXOTIC environment in the background.
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_env
+        from .workers import PrepareExoticWorker
+        python = self._exotic_python(dlg)
+        if not python:
+            QMessageBox.warning(dlg, self.tr("EXOTIC"), self.tr(
+                "No Python 3.10 interpreter found: install it or point to "
+                "one above."))
+            return
+        install = dlg.edt_exotic_install.text().strip() or str(
+            paths.data_dir() / "exotic-venv")
+        self._exotic_worker = PrepareExoticWorker(install, python)
+        self._exotic_worker.progress.connect(
+            lambda stage: self.statusBar().showMessage(
+                self.tr("Preparing EXOTIC: {0}").format(stage), 0))
+        self._exotic_worker.finished.connect(
+            lambda ok, log: self._exotic_prepared(dlg, install, ok, log))
+        self._exotic_worker.start()
+        self.statusBar().showMessage(
+            self.tr("Preparing the EXOTIC environment…"), 0)
+
+    def _exotic_prepared(self, dlg, install, ok, log):
+        # The environment build finished: report and point the setting at
+        # the new venv interpreter. The build takes minutes, so the modal
+        # dialog may be long closed and destroyed when this lands: guard
+        # every widget write (writing into a destroyed dialog crashed the
+        # app) and let the status bar carry the report when it is gone.
+        # @args: dlg - the settings dialog (maybe already destroyed),
+        #        install - the venv folder, ok - the build succeeded,
+        #        log - the build log
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_env
+        self._exotic_worker = None
+        self.statusBar().clearMessage()
+        if not Shiboken.isValid(dlg):
+            lines = [ln for ln in (log or "").splitlines() if ln.strip()]
+            self.statusBar().showMessage(
+                self.tr("EXOTIC environment ready.") if ok else
+                self.tr("Could not prepare EXOTIC: {0}").format(
+                    lines[-1] if lines else ""), 10000)
+            return
+        if ok:
+            dlg.edt_exotic_install.setText(install)
+            dlg.edt_exotic_python.setText(str(exotic_env.venv_python(install)))
+            QMessageBox.information(dlg, self.tr("EXOTIC"), self.tr(
+                "EXOTIC environment ready."))
+        else:
+            QMessageBox.warning(dlg, self.tr("EXOTIC"), self.tr(
+                "Could not prepare EXOTIC:\n{0}").format(log[-600:]))
+
     def on_open_settings(self):
         dlg = _load_ui("settings_dialog")
         # 3-tab layout with per-field help labels BELOW each widget —
@@ -739,6 +968,56 @@ class MainWindow(QMainWindow):
         dlg.spn_min_alt.setValue(float(config.get("min_alt", 30)))
         dlg.edt_neofixer_key.setText(config.get("neofixer_key", ""))
         dlg.edt_astrometry_key.setText(config.get("astrometry_key", ""))
+        # plate solver (ADR-051): auto | astap | astrometry
+        dlg.cmb_solver.addItem(self.tr("Auto (ASTAP, then nova)"), "auto")
+        dlg.cmb_solver.addItem(self.tr("ASTAP (local)"), "astap")
+        dlg.cmb_solver.addItem(self.tr("Astrometry.net (nova)"), "astrometry")
+        _si = dlg.cmb_solver.findData(config.get("solver", "auto"))
+        dlg.cmb_solver.setCurrentIndex(_si if _si >= 0 else 0)
+        dlg.edt_astap_path.setText(config.get("astap_path", ""))
+        dlg.chk_solve_save.setChecked(
+            bool(config.get("solve_save", True)))
+        dlg.btn_astap_browse.clicked.connect(
+            lambda: self._pick_astap(dlg))
+        dlg.btn_astap_test.clicked.connect(lambda: self._test_astap(dlg))
+        # EXOTIC orchestration (plan phase A): the external Python <=3.10
+        # and its private environment
+        dlg.edt_exotic_python.setText(config.get("exotic_python_path", ""))
+        dlg.edt_exotic_install.setText(config.get("exotic_install_dir", ""))
+        dlg.btn_exotic_py_browse.clicked.connect(
+            lambda: self._pick_exotic_python(dlg))
+        dlg.btn_exotic_dir_browse.clicked.connect(
+            lambda: self._pick_exotic_dir(dlg))
+        dlg.btn_exotic_prepare.clicked.connect(
+            lambda: self._prepare_exotic(dlg))
+        dlg.btn_exotic_test.clicked.connect(lambda: self._test_exotic(dlg))
+        # photometric camera profile (core/cameras.py presets)
+        from ..core import cameras
+        dlg.cmb_cam_preset.addItem(self.tr("None"), "")
+        for _p in cameras.PRESETS:
+            dlg.cmb_cam_preset.addItem(cameras.label(_p), _p["key"])
+        _ci = dlg.cmb_cam_preset.findData(config.get("cam_preset", ""))
+        dlg.cmb_cam_preset.setCurrentIndex(_ci if _ci >= 0 else 0)
+        dlg.spn_cam_full_well.setValue(
+            float(config.get("cam_full_well_e") or 0))
+        dlg.spn_cam_linearity.setValue(
+            float(config.get("cam_linearity_adu") or 0))
+        # the system gain and the read noise: the two numbers the CCD
+        # equation needs and that nothing used to be able to set (quality
+        # plan, phase G). 0 in the spins means "unknown".
+        dlg.spn_cam_gain.setValue(float(config.get("ccd_gain") or 0))
+        dlg.spn_cam_ron.setValue(float(config.get("ccd_read_noise") or 0))
+        dlg.spn_cam_gain.valueChanged.connect(
+            lambda _v: self._cam_ref_update(dlg))
+        dlg.spn_cam_ron.valueChanged.connect(
+            lambda _v: self._cam_ref_update(dlg))
+        dlg.spn_cam_dark.setValue(
+            float(config.get("cam_dark_current_e_s") or 0))
+        dlg.spn_cam_max_exp.setValue(
+            float(config.get("cam_max_exposure_s") or 0))
+        dlg.cmb_cam_preset.currentIndexChanged.connect(
+            lambda _i: self._cam_preset_selected(dlg))
+        self._cam_ref_update(dlg)
         dlg.spn_pixel_um.setValue(float(config.get("pixel_um", 3.76)))
         dlg.spn_focal_mm.setValue(float(config.get("focal_mm", 2000)))
         # Track D (EXOTIC handoff): AAVSO code, camera type and binning
@@ -760,6 +1039,8 @@ class MainWindow(QMainWindow):
                                      "cross")
         dlg.cmb_marker_style.setCurrentIndex(
             1 if config.get("marker_style", "ring") == "cross" else 0)
+        dlg.chk_chart_data.setChecked(
+            bool(config.get("chart_data", True)))
         dlg.chk_chart_boxes.setChecked(
             bool(config.get("chart_boxes", False)))
         dlg.edt_horizon_file.setText(config.get("horizon_file", ""))
@@ -840,6 +1121,24 @@ class MainWindow(QMainWindow):
         config.set("min_alt", dlg.spn_min_alt.value())
         config.set("neofixer_key", dlg.edt_neofixer_key.text().strip())
         config.set("astrometry_key", dlg.edt_astrometry_key.text().strip())
+        config.set("solver", dlg.cmb_solver.currentData() or "auto")
+        config.set("astap_path", dlg.edt_astap_path.text().strip())
+        config.set("solve_save", dlg.chk_solve_save.isChecked())
+        config.set("exotic_python_path",
+                   dlg.edt_exotic_python.text().strip())
+        config.set("exotic_install_dir",
+                   dlg.edt_exotic_install.text().strip())
+        config.set("ccd_gain", dlg.spn_cam_gain.value() or None)
+        config.set("ccd_read_noise", dlg.spn_cam_ron.value() or None)
+        config.set("cam_preset", dlg.cmb_cam_preset.currentData() or "")
+        config.set("cam_full_well_e", dlg.spn_cam_full_well.value() or None)
+        config.set("cam_linearity_adu",
+                   dlg.spn_cam_linearity.value() or None)
+        config.set("cam_dark_current_e_s", dlg.spn_cam_dark.value() or None)
+        config.set("cam_max_exposure_s",
+                   dlg.spn_cam_max_exp.value() or None)
+        _cp = cameras.preset(dlg.cmb_cam_preset.currentData())
+        config.set("cam_regime", _cp["regime"] if _cp else "normal")
         config.set("pixel_um", dlg.spn_pixel_um.value())
         config.set("focal_mm", dlg.spn_focal_mm.value())
         config.set("aavso_code", dlg.edt_aavso_code.text().strip().upper())
@@ -854,6 +1153,7 @@ class MainWindow(QMainWindow):
         config.set("camera_model", dlg.edt_camera_model.text().strip())
         config.set("marker_style",
                    dlg.cmb_marker_style.currentData() or "ring")
+        config.set("chart_data", dlg.chk_chart_data.isChecked())
         config.set("chart_boxes", dlg.chk_chart_boxes.isChecked())
         config.set("horizon_file", dlg.edt_horizon_file.text().strip())
         config.set("horizon_margin_deg", dlg.spn_horizon_margin.value())
@@ -1007,6 +1307,22 @@ class MainWindow(QMainWindow):
                     "COBS · Rochester Astronomy · SIMBAD · ExoClock · NASA "
                     "Exoplanet Archive · NOAA SWPC · SILSO · NASA SDO · DESI "
                     "Legacy Survey · CDS hips2fits"))
+
+    def on_open_log(self):
+        # Help > Open the log: the file the app writes while it runs, so a
+        # report like "a dialog appeared and nothing happened" can be
+        # answered with what really happened. Opening it is the OS's job;
+        # the path also lands in the status bar (for a file manager).
+        # @return: None
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        path = paths.log_path()
+        if not path.exists():
+            self.statusBar().showMessage(
+                self.tr("No log yet: %1").replace("%1", str(path)), 8000)
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+        self.statusBar().showMessage(str(path), 8000)
 
     def on_docs(self):
         # Opens the in-GUI documentation browser (Help > Documentation):
@@ -2350,6 +2666,14 @@ class MainWindow(QMainWindow):
         if prot.get("comp_stars"):
             lines.append(self.tr("Comparison stars: %1").replace(
                 "%1", ", ".join(prot["comp_stars"])))
+        seq = _camp.sequence_of(c)
+        if seq:
+            # the shared sequence of a pass (E5b): saying it here is the
+            # point, because a project measuring with the campaign's stars
+            # instead of its own must be able to see it
+            lines.append(self.tr("Shared sequence: %1 comparison stars"
+                                 ).replace("%1",
+                                           str(len(seq.get("entries") or []))))
         if prot.get("notes"):
             lines.append(prot["notes"])
         w.lbl_protocol.setText("\n".join(lines))
@@ -2597,12 +2921,37 @@ class MainWindow(QMainWindow):
             next_text = self.tr("archived")
         # urgency paints the next action (the row says WHY it floats up)
         urgency = (attn or {}).get("urgency")
-        spark = None
-        if kind in FOLLOWUP_KINDS:
-            # sparkline stroked in the row's kind hue (the anchor the chip
-            # and the icon tile already carry)
-            spark = sparkline_pixmap(
-                _fu.list_points(db, p["id"]), color=kind_color)
+        # the curve thumbnail: the LAST available curve of the project, drawn
+        # in the SAME magnitude window the chart uses. Reported twice: it
+        # stretched min-to-max on its own, so a flat curve and a
+        # three-magnitude one looked exactly the same (a real project's
+        # curve spans 11.074 to 13.224 mag, one anomalous frame, while its
+        # chart's window is 11.074 to 11.241), and it showed the project's
+        # pile instead of the latest reduction. The sparkline is null when
+        # there is nothing to draw (fewer than two usable points), so the row
+        # hides it by itself.
+        from ..core import lightcurve_data
+        from .widgets.lightcurve_widget import source_label
+        run = _fu.latest_curve_run(db, p["id"])
+        pts = (_fu.list_points_for_run(db, run["id"]) if run is not None
+               else _fu.list_points(db, p["id"]))
+        window = lightcurve_data.mag_window(
+            [q["mag"] for q in pts if q.get("mag") is not None])
+        spark = sparkline_pixmap(pts, color=kind_color, y_window=window)
+        spark_text = None
+        if not spark.isNull():
+            what = _fu.curve_summary(pts)
+            if run is not None:
+                # a run whose cfg carries no source is a series run (that is
+                # what the series engine writes), so it must not read
+                # "Manual entry"
+                src = (run.get("cfg") or {}).get("source") or "measure"
+                spark_text = self.tr(
+                    "Last curve: {0} · {1} points · the chart's scale"
+                ).format(source_label(src), what["points"])
+            else:
+                spark_text = self.tr("{0} nights · {1} points").format(
+                    what["nights"], what["points"])
         return {
             "kind_label": kind_label, "kind_color": kind_color,
             "name": p["object_name"], "favorite": bool(p.get("favorite")),
@@ -2611,6 +2960,7 @@ class MainWindow(QMainWindow):
             "activity_text": self._activity_words(p),
             "window_text": self._project_window_chip(p, full),
             "sparkline": spark,
+            "sparkline_text": spark_text,
             # the icon tile's glyph, drawn by the caller (unknown kinds
             # render a flat tint tile instead)
             "icon": self._type_pixmap(kind, size=28),
@@ -4230,13 +4580,29 @@ class MainWindow(QMainWindow):
                 self._visit_open_in_editor(pid, path, sid),
             # ADR-047: a measurement row is a shortcut to its plate
             on_measure_click=self._visit_open_measure,
+            # ADR-048: the visit's "Measure the sequence" opens the
+            # editor's series block for this visit (D8/D36)
+            measure_series=lambda sid:
+                self._visit_measure_series(pid, sid),
+            # quality plan (C): the period search works on the project's
+            # curve, from the visit window where the observer already is
+            phase=lambda pid_: self._open_phase_dialog(pid_),
             on_change=lambda: self._visit_data_changed(pid),
+            # the curve below is the one of the visit you are looking at
+            # (reported), so the list has to say which one that is
+            on_visit_selected=lambda _sid: self._fu_curve_refresh(pid),
             kind=kind)
         panel.set_project(pid)
         layout.addWidget(panel, 1)
         self._project_widgets["visits_panel"] = panel
+        # The curve, right under the visits it belongs to and for EVERY
+        # kind that has one (a transit project with 1255 measured points
+        # had no chart here at all: the block was tied to the follow-up
+        # kinds). The switch inside decides between this visit and the
+        # whole project.
+        self._analysis_curve_block(layout, p, pid)
         if kind == "transit":
-            self._analysis_transit_block(layout)
+            self._analysis_transit_block(layout, pid)
         elif kind == "hads":
             self._analysis_hads_block(layout)
         if kind in ("neo", "pccp", "comet"):
@@ -4252,31 +4618,192 @@ class MainWindow(QMainWindow):
         panel = self._project_widgets.get("visits_panel")
         return panel.current_session_id() if panel is not None else None
 
+    # ------------- the Analysis curve: the selected visit (reported) ----
+
+    def _analysis_curve_block(self, layout, p, pid):
+        # The light curve of the Analysis tab: THE VISIT YOU SELECTED, with
+        # a switch to the whole project.
+        #
+        # Reported: the chart drew the project's pile of points whatever
+        # visit was selected, and it only existed for the follow-up kinds
+        # (sn, variable), so a transit with 1255 measured points showed no
+        # curve here at all. The curve of a night is ONE pass (2026-09-30),
+        # and that is what this draws by default; "all the nights" is the
+        # project's curve, which is what folding a period needs.
+        # @args: layout - the Analysis column, p - the project row, pid -
+        #        the project id
+        # @return: None
+        from .widgets.lightcurve_widget import LightCurveChart
+        grp = QGroupBox(self.tr("Light curve"))
+        glc = QVBoxLayout(grp)
+        row = QHBoxLayout()
+        row.addWidget(QLabel(self.tr("Show:")))
+        cmb = QComboBox()
+        cmb.addItem(self.tr("This visit"), "visit")
+        cmb.addItem(self.tr("All the nights"), "project")
+        cmb.setToolTip(self.tr(
+            "Which curve the chart draws: the one of the visit selected "
+            "above (its own pass of the night, the normal way to look at "
+            "one night) or the whole project, which is the curve of every "
+            "night together, one pass per night (that is the one a period "
+            "search needs)"))
+        row.addWidget(cmb)
+        lbl_what = QLabel("")
+        lbl_what.setWordWrap(True)
+        lbl_what.setStyleSheet("color: #8a90a6; font-size: 12px;")
+        row.addWidget(lbl_what, 1)
+        chk_tpl = QCheckBox(self.tr("Show template"))
+        chk_tpl.setChecked(True)
+        row.addWidget(chk_tpl)
+        glc.addLayout(row)
+        chart = LightCurveChart()
+        chart.setMinimumHeight(220)
+        glc.addWidget(chart, stretch=1)
+        chk_tpl.toggled.connect(chart.set_template_visible)
+        layout.addWidget(grp)
+        w = self._project_widgets
+        w["fu_curve"] = chart
+        w["fu_curve_scope"] = cmb
+        w["fu_curve_what"] = lbl_what
+        w["fu_curve_tpl"] = chk_tpl
+        cmb.currentIndexChanged.connect(
+            lambda _i: self._fu_curve_refresh(pid))
+        self._fu_curve_refresh(pid)
+
+    def _fu_curve_points(self, pid):
+        # The points the Analysis curve draws, and the words that say which
+        # curve it is (a chart of "some" points is a chart nobody trusts).
+        # @args: pid - the project
+        # @return: (points, what)
+        from ..core import followup as fu
+        w = self._project_widgets
+        cmb = w.get("fu_curve_scope")
+        scope = cmb.currentData() if cmb is not None else "visit"
+        if scope == "project":
+            pts = fu.list_points(db, pid)
+            summary = fu.curve_summary(pts)
+            return pts, self.tr(
+                "The whole project: {0} night(s), {1} points").format(
+                    summary["nights"], summary["points"])
+        sid = self._selected_visit_id()
+        if sid is None:
+            pts = fu.list_points(db, pid)
+            return pts, self.tr(
+                "No visit selected: the whole project ({0} points).").format(
+                    len(pts))
+        # the visit's own points: its pass of the series plus whatever was
+        # entered by hand in that visit (never another night's)
+        pts = fu.points_for_session(db, sid, series_only=False)
+        session = fu.get_session(db, sid) or {}
+        return pts, self.tr("Visit {0}: {1} points").format(
+            session.get("obs_date") or "?", len(pts))
+
+    def _fu_curve_refresh(self, pid):
+        # Rebuilds the Analysis curve in place (the selection changed, the
+        # scope changed, or a measurement was saved). The chart's own
+        # template/fold follows the kind, and the checkbox that toggles it
+        # is hidden when there is no template to show.
+        # @args: pid - the project
+        # @return: None
+        w = self._project_widgets
+        chart = w.get("fu_curve")
+        if chart is None:
+            return
+        p = project.get(db, pid)
+        if p is None:
+            return
+        from ..core import lightcurve_data
+        ctx = p.get("context") or {}
+        pts, what = self._fu_curve_points(pid)
+        payload = lightcurve_data.build_payload(
+            {"points": pts, "sn_type": ctx.get("sn_type")},
+            sn_type_fallback=ctx.get("sn_type") or ctx.get("otype"),
+            variable=ctx.get("variable"))
+        chart.set_data(
+            payload["points"],
+            sn_type=payload.get("sn_type"),
+            peak_mjd=payload.get("peak_mjd"),
+            peak_mag=payload.get("peak_mag"),
+            fold_period_d=payload.get("fold_period_d"),
+            epoch_mjd=payload.get("epoch_mjd"),
+            schematic=payload.get("schematic"))
+        lbl = w.get("fu_curve_what")
+        if lbl is not None:
+            lbl.setText(what)
+        chk = w.get("fu_curve_tpl")
+        if chk is not None:
+            has_overlay = bool(payload.get("sn_type")
+                               or payload.get("schematic"))
+            chk.setVisible(has_overlay)
+
     # ------------- the per-kind analysis blocks (ADR-045; absorbed from
     # the retired Process tab; the SN FITS-import/blink block is gone for
     # good: a visit's plate opens in the editor, which owns blink,
     # measure and annotate) -------------
 
-    def _analysis_transit_block(self, layout):
+    def _analysis_transit_block(self, layout, pid):
         # Track D (subplan 4d): the reduction is 100% external (EXOTIC,
-        # NASA/JPL); NightScribe hands over a pre-filled inits.json and
-        # then guides the closing of the scientific loop.
+        # NASA/JPL). The reduce itself lives in the editor next to the
+        # sequence it needs (ADR-048 follow-up), so here is the door in.
+        # @args: layout - the Analysis column, pid - the project id
         layout.addWidget(QLabel(self.tr(
             "Reduce the photometry with EXOTIC (NASA/JPL), in your own "
             "Python ≤3.10 environment.")))
+        btn_reduce = QPushButton(
+            self.tr("Open the visit in the editor (reduce with EXOTIC)…"))
+        btn_reduce.setToolTip(self.tr(
+            "Open this project's visit in the editor: build the comparison "
+            "sequence there and run «Reduce and fit with EXOTIC…» next to it"))
+        btn_reduce.clicked.connect(
+            lambda: self._open_transit_visit_editor(pid))
+        layout.addWidget(btn_reduce)
         btn_exotic = QPushButton(
             self.tr("Export to EXOTIC (inits.json)…"))
         btn_exotic.setToolTip(self.tr(
             "Pre-filled EXOTIC initialization file: planet, observatory, "
             "camera and filter — EXOTIC skips its wizard where it can"))
-        btn_exotic.clicked.connect(self._transit_export_exotic)
+        btn_exotic.clicked.connect(lambda: self._transit_export_exotic(pid))
         layout.addWidget(btn_exotic)
+        # the last reduction, if there is one: its numbers here and the whole
+        # result (light curve + every file) one click away, so the door does
+        # not need the editor
+        last = self._exotic_result_text(pid)
+        if last:
+            lbl_last = QLabel(last)
+            lbl_last.setWordWrap(True)
+            lbl_last.setStyleSheet("color: #8a90a6; font-size: 12px;")
+            layout.addWidget(lbl_last)
+            btn_result = QPushButton(
+                self.tr("See the last reduction…"))
+            btn_result.setToolTip(self.tr(
+                "The fitted parameters, the light curve EXOTIC drew and "
+                "every file the reduction wrote, each one a double click "
+                "from the system"))
+            btn_result.clicked.connect(
+                lambda: self._open_exotic_result(pid))
+            layout.addWidget(btn_result)
         lbl_exotic = QLabel(self.tr(
             "After the reduction, upload EXOTIC's output file to "
             "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
             "Database — and tell the story when you publish."))
         lbl_exotic.setWordWrap(True)
         layout.addWidget(lbl_exotic)
+
+    def _open_transit_visit_editor(self, pid):
+        # The selected visit (or the newest) opens in the editor with the
+        # series and the EXOTIC block armed.
+        # @args: pid - the project id
+        sid = self._selected_visit_id()
+        if sid is None:
+            from ..core import followup as fu
+            sessions = fu.list_sessions(db, pid)
+            sid = sessions[0]["id"] if sessions else None
+        if sid is None:
+            self.statusBar().showMessage(self.tr(
+                "This project has no visit yet: attach the frames first."),
+                8000)
+            return
+        self._visit_measure_series(pid, sid)
 
     def _analysis_hads_block(self, layout):
         # ADR-034 (D.3): publication photometry is external — FotoDif
@@ -4314,6 +4841,36 @@ class MainWindow(QMainWindow):
         lbl_imp.setWordWrap(True)
         layout.addWidget(lbl_imp)
 
+    def _load_editor_sequence(self, dlg, pid, path):
+        # ADR-047/048: restore a plate's saved working state when it has
+        # one; whatever it leaves empty is filled with the project's saved
+        # sequence (so a series or an EXOTIC reduction finds the comps
+        # already built, never the bare "no comparison stars"). A plate
+        # state saved without a sequence no longer blocks the project one.
+        # @args: dlg - the UfeDialog, pid - project id, path - open plate
+        row = project.find_file(db, pid, path) if path else None
+        meta = (row or {}).get("meta") or {}
+        if meta.get("ufe"):
+            dlg.apply_plate_state(meta["ufe"])
+        p = project.get(db, pid) or {}
+        dlg.load_saved_sequence((p.get("context") or {}).get("sequence"))
+
+    def _ufe_sequence_hook(self, pid, state):
+        # The editor's sequence changed by the observer: keep it in the
+        # project context (and its target magnitude), so reopening the
+        # visit brings the comparison stars back instead of rebuilding them.
+        # @args: pid - project id, state - the Compare tab's sequence dict
+        entries = (state or {}).get("entries") or []
+        ctx_update = {"sequence": {
+            "catalog": state.get("catalog"),
+            "catalog_name": state.get("catalog_name"),
+            "fov_arcmin": state.get("fov_arcmin"),
+            "target_mag": state.get("target_mag"),
+            "entries": entries}}
+        if state.get("target_mag") is not None:
+            ctx_update["mag"] = state["target_mag"]
+        project.update_context(db, pid, ctx_update)
+
     def _visit_open_in_editor(self, pid, path, sid):
         # A visit's plate opens in the UFE with everything attached: the
         # object context, and both hooks land on THIS visit (ADR-045:
@@ -4335,11 +4892,62 @@ class MainWindow(QMainWindow):
         dlg.set_object(obj)
         # ADR-047: the plate's saved working state comes back with it:
         # stretch, the measure recipe, the sequence field, when there
-        # is one (nothing was saved, or the plate predates it, and the
-        # fresh defaults stand)
-        row = project.find_file(db, pid, path)
-        if row is not None and (row.get("meta") or {}).get("ufe"):
-            dlg.apply_plate_state(row["meta"]["ufe"])
+        # is one; without it, the project's saved sequence fills the
+        # Compare tab (ADR-048 follow-up: EXOTIC finds the comps)
+        self._load_editor_sequence(dlg, pid, path)
+
+    def _open_phase_dialog(self, pid):
+        # The period + phase window (quality plan, C): it takes the
+        # project's own curve, whatever measured it, and remembers the
+        # period in the project when the observer says so.
+        # @args: pid - the project id
+        # @return: the dialog, or None when there are no points yet
+        from .phase_dialog import collect_project_points, open_phase
+        pts = collect_project_points(db, pid)
+        if not pts:
+            self.statusBar().showMessage(self.tr(
+                "This project has no measured points yet: measure the "
+                "series (or import a curve) first."), 8000)
+            return None
+        p = project.get(db, pid) or {}
+        kind = p.get("kind")
+        if kind not in ("sn", "hads", "variable", "transit"):
+            self.statusBar().showMessage(self.tr(
+                "The period search is for light-curve projects (a "
+                "variable, a HADS star, a supernova)."), 8000)
+            return None
+        return open_phase(self, pts,
+                          title=p.get("object_name") or "",
+                          lang=self._lang(), db=db, project_id=pid)
+
+    def _visit_measure_series(self, pid, session_id):
+        # ADR-048 (D8/D36): the visit's frames become a series. The
+        # editor opens on the visit's first plate (the reference WCS) with
+        # the series block armed; a visit with no FITS says so.
+        # @args: pid - project id, session_id - the visit
+        if not self._use_ufe():
+            self.statusBar().showMessage(
+                self.tr("Enable the unified editor in Settings → Development "
+                        "to measure from the editor"), 8000)
+            return
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            self.statusBar().showMessage(
+                self.tr("This visit has no FITS frames to measure."), 8000)
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        dlg = self._ufe_open("measure", hook_pid=pid, obj=obj,
+                             session_id=session_id)
+        dlg.open_plate(paths[0])
+        dlg.set_object(obj)
+        # ADR-048 follow-up: the series/EXOTIC flow starts from the
+        # sequence already built (plate state first, project second)
+        self._load_editor_sequence(dlg, pid, paths[0])
 
     def _visit_open_measure(self, point_id):
         # ADR-047: a measured point in the visit window is a shortcut
@@ -4380,9 +4988,9 @@ class MainWindow(QMainWindow):
         if not dlg.open_plate(row["path"]):
             return
         dlg.set_object(obj)
-        # the same restore as "restore in the editor"
-        if (row.get("meta") or {}).get("ufe"):
-            dlg.apply_plate_state(row["meta"]["ufe"])
+        # the same restore as "restore in the editor" (and, without a
+        # saved plate state, the project's sequence: ADR-048 follow-up)
+        self._load_editor_sequence(dlg, pid, row["path"])
 
     def _visit_data_changed(self, pid):
         # A visit or its contents changed (the panel owns the edit): the
@@ -4392,7 +5000,6 @@ class MainWindow(QMainWindow):
         p = project.get(db, pid)
         if p is None:
             return
-        from ..core import followup as fu
         lbl = w.get("fu_cadence")
         if lbl is not None:
             text, colour = self._fu_cadence_state(p, pid)
@@ -4405,21 +5012,8 @@ class MainWindow(QMainWindow):
                 lbl.setVisible(True)
         chart = w.get("fu_curve")
         if chart is not None:
-            from ..core import lightcurve_data
-            pts = fu.list_points(db, pid)
-            payload = lightcurve_data.build_payload(
-                {"points": pts,
-                 "sn_type": (p["context"].get("sn_type"))},
-                sn_type_fallback=p["context"].get("sn_type")
-                or p["context"].get("otype"),
-                variable=p["context"].get("variable"))
-            chart.set_data(
-                payload["points"], sn_type=payload.get("sn_type"),
-                peak_mjd=payload.get("peak_mjd"),
-                peak_mag=payload.get("peak_mag"),
-                fold_period_d=payload.get("fold_period_d"),
-                epoch_mjd=payload.get("epoch_mjd"),
-                schematic=payload.get("schematic"))
+            # the curve follows the visit and the scope the observer chose
+            self._fu_curve_refresh(pid)
         camp = w.get("fu_campaign_text")
         if camp is not None:
             camp.setText(self._fu_campaign_text(p, pid))
@@ -5047,11 +5641,15 @@ class MainWindow(QMainWindow):
                 db, pid, "plan",
                 {"checklist": [bool(cb.isChecked()) for cb in cbs]})
 
-    def _transit_export_exotic(self):
+    def _transit_export_exotic(self, pid=None):
         # 4d: enrich the planet (worker — the GUI never blocks on the
         # network; the Archive row is cached from the Details tab anyway),
         # then write the pre-filled inits.json next to a user-chosen path.
-        p = self._current_project
+        # @args: pid - the project id (None: the project in the main tab)
+        pid = pid or (self._current_project or {}).get("id")
+        if pid is None:
+            return
+        p = project.get(db, pid)
         if not p:
             return
         from .workers import ExploreWorker
@@ -5059,9 +5657,52 @@ class MainWindow(QMainWindow):
             self.tr("Gathering planet data for EXOTIC…"), 4000)
         worker = ExploreWorker(config, p["object_name"],
                                fallback_target=p.get("context") or {})
-        worker.finished.connect(lambda e: self._exotic_write(p["id"], e))
+        worker.finished.connect(lambda e: self._exotic_write(pid, e))
         self._keep(worker)
         worker.start()
+
+    # -------------------- the UFE's EXOTIC block (ADR-048 follow-up)
+
+    def _ufe_exotic_reduce(self, pid, session_id):
+        # The reduce button in the editor: the open frame is the reference
+        # and the loaded sequence the comparison stars, so the reduction
+        # never fails for a sequence the project has not saved yet.
+        dlg = getattr(self, "_ufe", None)
+        ref = None
+        entries = []
+        if dlg is not None and getattr(dlg, "state", None) is not None:
+            ref = dlg.state.path if dlg.state.has_image else None
+            entries = list(dlg.tab_compare.entries())
+        self._exotic_overrides = {"ref": ref, "entries": entries,
+                                  "session_id": session_id}
+        self._transit_reduce_exotic(pid)
+
+    def _ufe_exotic_export(self, pid, session_id):
+        # The handoff file (the wizard-style inits.json); the loaded
+        # sequence is registered first so the project carries it.
+        dlg = getattr(self, "_ufe", None)
+        if dlg is not None and getattr(dlg, "state", None) is not None \
+                and dlg.state.has_image:
+            self._register_editor_sequence(pid, session_id, dlg)
+        self._transit_export_exotic(pid)
+
+    def _register_editor_sequence(self, pid, session_id, dlg):
+        # Persists the editor's current sequence into the project context
+        # (and the open plate's saved state), so the export/handoff never
+        # works from an unsaved one.
+        entries = dlg.tab_compare.entries()
+        if not entries:
+            return
+        state = dlg.tab_compare.capture_state() or {}
+        ctx_update = {"sequence": {
+            "catalog": state.get("catalog"),
+            "catalog_name": state.get("catalog_name"),
+            "fov_arcmin": state.get("fov_arcmin"),
+            "target_mag": state.get("target_mag"),
+            "entries": state.get("entries") or []}}
+        if state.get("target_mag") is not None:
+            ctx_update["mag"] = state["target_mag"]
+        project.update_context(db, pid, ctx_update)
 
     def _exotic_write(self, pid, e):
         # @args: pid - project id, e - enrich result ({} on failure)
@@ -5090,11 +5731,627 @@ class MainWindow(QMainWindow):
         inits = exotic.make_inits(ctx, e["data"], config, plan=plan,
                                   out_dir=str(Path(out).parent))
         path = exotic.export_inits(inits, out)
-        project.add_file(db, pid, path, "exotic_inits")
+        project.add_file_once(db, pid, path, "exotic_inits")
         self._populate_project_files(pid)
         self.statusBar().showMessage(
             self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
                     "environment"), 10000)
+
+    def _transit_reduce_exotic(self, pid=None):
+        # Gather the planet data (worker), then run the orchestration.
+        # @args: pid - the project id (None: the project in the main tab)
+        pid = pid or (self._current_project or {}).get("id")
+        if pid is None:
+            return
+        p = project.get(db, pid)
+        if not p:
+            return
+        from .workers import ExploreWorker
+        self.statusBar().showMessage(
+            self.tr("Gathering planet data for EXOTIC…"), 4000)
+        self._show_exotic_prep(self.tr("Gathering planet data for EXOTIC…"))
+        worker = ExploreWorker(config, p["object_name"],
+                               fallback_target=p.get("context") or {})
+        self._exotic_gather_worker = worker
+        worker.finished.connect(lambda e: self._exotic_reduce(pid, e))
+        self._keep(worker)
+        worker.start()
+
+    def _show_exotic_prep(self, text):
+        # One visible dialog across the gather / probe / inits steps, so
+        # «Reduce and fit with EXOTIC…» is never a silent wait (ADR-052).
+        if getattr(self, "_exotic_prep", None) is None:
+            wait = QProgressDialog(text, self.tr("Cancel"), 0, 0, self)
+            wait.setWindowTitle(self.tr("EXOTIC"))
+            wait.setWindowModality(Qt.NonModal)
+            wait.setMinimumDuration(0)
+            wait.setAutoClose(False)
+            wait.setAutoReset(False)
+            wait.canceled.connect(self._cancel_exotic_prep)
+            wait.show()
+            self._exotic_prep = wait
+        else:
+            self._exotic_prep.setLabelText(text)
+        return self._exotic_prep
+
+    def _close_exotic_prep(self):
+        wait = getattr(self, "_exotic_prep", None)
+        if wait is not None:
+            wait.blockSignals(True)     # close() emits canceled()
+            wait.close()
+            wait.deleteLater()
+            self._exotic_prep = None
+
+    def _cancel_exotic_prep(self):
+        # The dialog's Cancel: stop whichever worker is in flight.
+        for name in ("_exotic_gather_worker", "_exotic_probe_worker",
+                     "_solve_worker"):
+            w = getattr(self, name, None)
+            if w is not None and hasattr(w, "cancel"):
+                try:
+                    w.cancel()
+                except Exception:
+                    pass
+        self._close_exotic_prep()
+        self.statusBar().showMessage(self.tr("EXOTIC cancelled"), 4000)
+
+    def _exotic_reduce(self, pid, e):
+        # Gather the planet data (worker), check the environment and run
+        # EXOTIC headless; the result is imported on finish (phase E).
+        # The interpreter check runs off the GUI thread: detect_python
+        # spawns subprocesses and the cold import of exotic can take
+        # minutes, which used to freeze the app for the whole probe. The
+        # visible dialog covers the check; the flow resumes on the report.
+        # @args: pid - the project id, e - the ExploreWorker's enriched
+        #        dict
+        p = project.get(db, pid)
+        if not p:
+            self._close_exotic_prep()
+            return
+        if not e or not e.get("data"):
+            from PySide6.QtWidgets import QMessageBox
+            self._close_exotic_prep()
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No planet data was found for «{0}»: check the name or "
+                "the connection and retry.").format(
+                    (p or {}).get("object_name") or ""))
+            return
+        # the interpreter that has EXOTIC: the user's own Python 3.10 (the
+        # cleanest on Windows) or the venv the app prepared
+        from .workers import ProbeExoticWorker
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        self.statusBar().showMessage(
+            self.tr("Checking the EXOTIC environment…"), 0)
+        self._show_exotic_prep(self.tr("Checking the EXOTIC environment…"))
+        worker = ProbeExoticWorker(config.get("exotic_python_path") or None)
+        self._exotic_probe_worker = worker
+        worker.finished.connect(
+            lambda rep: self._exotic_reduce_go(pid, e, rep))
+        self._keep(worker)
+        worker.start()
+
+    def _exotic_reduce_go(self, pid, e, rep):
+        # The environment check landed: warn and stop, or run the
+        # orchestration on the interpreter the probe validated.
+        # @args: pid - the project id, e - the enriched planet data,
+        #        rep - the probe report {"ok","version","message","python"}
+        QApplication.restoreOverrideCursor()
+        self.statusBar().clearMessage()
+        self._close_exotic_prep()
+        self._exotic_probe_worker = None
+        python = rep.get("python") or ""
+        if not python:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No Python 3.10 found. Install it (python.org, ticking the "
+                "py launcher) and run «pip install exotic» in it, or use "
+                "«Prepare environment» in Settings → EXOTIC."))
+            return
+        if not rep.get("ok"):
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "This Python has no EXOTIC installed: run «pip install "
+                "exotic» in it, or use «Prepare environment» in Settings → "
+                "EXOTIC."))
+            return
+        self._exotic_launch(pid, e, python)
+
+    def _exotic_launch(self, pid, e, python):
+        # Guarded entry: an exception anywhere in the handoff (a read-only
+        # folder, a bad header) must land in a box, never vanish in the
+        # console while the observer stares at a flashed dialog.
+        try:
+            self._exotic_launch_impl(pid, e, python)
+        except Exception as err:
+            logger.exception("EXOTIC launch failed: %s", err)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "The EXOTIC reduction could not be prepared:\n\n{0}")
+                .format(err))
+
+    def _exotic_launch_impl(self, pid, e, python):
+        # Generate the visit's inits.json and run EXOTIC headless; the
+        # result is imported on finish (phase E).
+        # @args: pid - the project id, e - the enriched planet data,
+        #        python - the interpreter the probe validated
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic, fits_io, wcs as wcs_mod
+        p = project.get(db, pid)
+        if not p:
+            return
+        # the visit's frames: the UFE hook names its session (ADR-048
+        # follow-up); the Analysis route takes the latest visit with FITS
+        from ..core import followup as fu
+        over = getattr(self, "_exotic_overrides", None) or {}
+        want_sid = over.get("session_id")
+        sessions = fu.list_sessions(db, pid)
+        if want_sid is not None:
+            sessions = [s for s in sessions if s["id"] == want_sid] or sessions
+        session_id, frame_paths = None, []
+        for s in sessions:
+            fs = [f["path"] for f in project.files_for_session(db, s["id"])
+                  if f.get("kind") == "fits"]
+            if fs:
+                session_id, frame_paths = s["id"], fs
+                break
+        if not frame_paths:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "This project has no FITS frames in a visit yet."))
+            return
+        # the UFE hook selects the open frame as the reference and passes
+        # the sequence it has loaded; the Analysis route falls back to the
+        # first frame and the project's saved sequence
+        ref = over.get("ref")
+        if ref not in frame_paths:
+            ref = frame_paths[0]
+        entries = over.get("entries") or None
+        self._exotic_overrides = None
+        try:
+            header, _data = fits_io.read_fits(ref)
+        except Exception:
+            header = {}
+        wcs = wcs_mod.Wcs.from_header(header)
+        if wcs is None:
+            # ADR-051: the reference frame is solved with the configured
+            # solver and the reduction continues with that WCS; never ask
+            # the observer for pixel coordinates
+            self._exotic_solve_first(pid, e, python, frame_paths,
+                                     session_id, header, ref, entries)
+            return
+        self._exotic_launch_final(pid, e, python, frame_paths, session_id,
+                                  wcs, ref, entries)
+
+    def _exotic_solve_first(self, pid, e, python, frame_paths, session_id,
+                            header, ref=None, entries=None):
+        # No WCS on the reference frame: blind-solve it off the GUI thread
+        # (the ADR-051 dispatcher honours the configured solver), then
+        # continue the reduction with the solved WCS. The solution is
+        # persisted into the FITS (ADR-051 rev).
+        from PySide6.QtWidgets import QMessageBox, QProgressDialog
+        from ..core import blink, wcs as wcs_mod
+        from .workers import UfeSolveWorker
+        ref = ref or frame_paths[0]
+        self.statusBar().showMessage(
+            self.tr("The first frame has no WCS: solving it…"), 0)
+        # the project's own coordinates go with the solve: they are what
+        # keeps ASTAP from sweeping the sky (0.1 s against a minute)
+        proj = project.get(db, pid) or {}
+        ctx = proj.get("context") or {}
+        ra, dec = ctx.get("ra_deg"), ctx.get("dec_deg")
+        pointing = (ra, dec) if ra is not None and dec is not None else None
+        worker = UfeSolveWorker(Path(ref), pointing=pointing)
+        # the same feedback as the editor (ADR-051 rev.): an indeterminate
+        # dialog with a Cancel that kills the solver
+        wait = QProgressDialog(
+            self.tr("The first frame has no WCS: solving it…"),
+            self.tr("Cancel"), 0, 0, self)
+        wait.setWindowTitle(self.tr("EXOTIC"))
+        wait.setWindowModality(Qt.NonModal)
+        wait.setMinimumDuration(0)
+        wait.setAutoClose(False)
+        wait.setAutoReset(False)
+        wait.canceled.connect(worker.cancel)
+        wait.show()
+        worker.progress.connect(
+            lambda s: wait.setLabelText(
+                self.tr("Solving: {0}…").format((s or "")[:70])))
+
+        def done(cards):
+            # closing a QProgressDialog emits canceled(): block it, this is
+            # the solve landing, not the observer cancelling
+            wait.blockSignals(True)
+            wait.close()
+            wait.deleteLater()
+            self.statusBar().clearMessage()
+            if worker.cancelled():
+                return
+            if not cards:
+                QMessageBox.warning(
+                    self, self.tr("EXOTIC"),
+                    self.tr("The first frame has no WCS and it could not be "
+                            "solved. Check the solver in Settings: ASTAP "
+                            "path or Astrometry.net key."))
+                return
+            self._persist_solution(ref, cards)
+            wcs = wcs_mod.Wcs.from_header(
+                blink.merge_solved_wcs(header, cards))
+            if wcs is None:
+                QMessageBox.warning(
+                    self, self.tr("EXOTIC"),
+                    self.tr("The solution of the first frame is not usable "
+                            "(non-TAN WCS)."))
+                return
+            self._exotic_launch_final(pid, e, python, frame_paths,
+                                      session_id, wcs, ref, entries)
+        worker.finished.connect(done)
+        self._keep(worker)
+        worker.start()
+
+    def _persist_solution(self, path, cards):
+        # ADR-051 rev: store the solved WCS in the FITS so the frame is
+        # solved everywhere; a write problem is reported, never fatal.
+        # @args: path - the solved FITS, cards - solved WCS cards
+        from ..core import wcs_store
+        _done, err = wcs_store.persist_solution(path, cards)
+        if err:
+            self.statusBar().showMessage(
+                self.tr("The solved WCS could not be written into the file "
+                        "({0}); it stays in memory for this session.")
+                .format(err), 8000)
+        return err == ""
+
+    def _exotic_launch_final(self, pid, e, python, frame_paths, session_id,
+                             wcs, ref=None, entries=None):
+        # Guarded: the handoff write runs right after the prep dialog
+        # closes, so any error must be shown, not swallowed.
+        try:
+            self._exotic_launch_final_impl(pid, e, python, frame_paths,
+                                           session_id, wcs, ref, entries)
+        except Exception as err:
+            logger.exception("EXOTIC handoff failed: %s", err)
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "The EXOTIC reduction could not be prepared:\n\n{0}")
+                .format(err))
+
+    def _exotic_launch_final_impl(self, pid, e, python, frame_paths,
+                                  session_id, wcs, ref=None, entries=None):
+        # The reference WCS is in hand: target and comparison pixels come
+        # from it (never hand-entered); without a sequence the observer is
+        # sent to build it in the editor.
+        # @args: wcs - the reference frame's usable WCS, ref - the
+        #        reference frame (defaults to the first), entries - the
+        #        sequence from the UFE (None: the project's saved one)
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic
+        p = project.get(db, pid)
+        if not p:
+            return
+        obj = self._ufe_object_from_project(p)
+        ctx = p.get("context") or {}
+        if entries is None:
+            entries = (ctx.get("sequence") or {}).get("entries") or []
+        tx = ty = None
+        if (obj or {}).get("ra") is not None:
+            try:
+                tx, ty = wcs.sky_to_pixel(obj["ra"], obj["dec"])
+            except Exception:
+                tx = ty = None
+        comps = []
+        for ent in entries:
+            star = ent.get("star") or {}
+            if star.get("ra") is None:
+                continue
+            try:
+                comps.append(wcs.sky_to_pixel(star["ra"], star["dec"]))
+            except Exception:
+                continue
+        if tx is None:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "The target position is unknown: attach the object to the "
+                "project or set its coordinates."))
+            return
+        if not comps:
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "No comparison stars: build the sequence in the editor "
+                "(Photometry, «Build the sequence…») before reducing with "
+                "EXOTIC."))
+            return
+        plan_data = next((s["data"] for s in p["steps"]
+                          if s["step"] == "plan"), {})
+        plan = {"filter": plan_data.get("filter", "L"),
+                "exp_s": plan_data.get("exp_s")}
+        work = Path(project.storage_dir(p)) / "exotic"
+        work.mkdir(parents=True, exist_ok=True)   # EXOTIC writes here too
+        inits = exotic.make_inits_for_visit(
+            ctx, e["data"], config, frame_paths, (tx, ty), comps,
+            plan=plan, out_dir=str(work))
+        inits_path = work / "inits.json"
+        exotic.export_inits(inits, inits_path)
+        project.add_file_once(db, pid, str(inits_path), "exotic_inits",
+                              session_id=session_id)
+        self._populate_project_files(pid)
+        self._exotic_pid = pid
+        self._exotic_session = session_id
+        basis = plan.get("filter") or "V"
+        self._exotic_filter = "V" if basis in ("L", "CV", None) else basis
+        from .workers import ExoticRunWorker
+        self._exotic_worker = ExoticRunWorker(python, str(work),
+                                              str(inits_path))
+        self._exotic_progress_dialog()
+        self._exotic_worker.progress.connect(self._exotic_progress_line)
+        self._exotic_worker.finished.connect(
+            lambda res: self._exotic_done(res))
+        self._exotic_worker.start()
+        self.statusBar().showMessage(
+            self.tr("Running EXOTIC (this can take a while)…"), 0)
+
+    def _exotic_progress_dialog(self):
+        # P2 #21: a run takes up to hours, so it gets a progress dialog
+        # with a Cancel that really stops it (the worker kills EXOTIC's
+        # whole process tree). Non-modal, unlike the house's WindowModal
+        # busy dialogs: those cover seconds of network work, and freezing
+        # the window for two hours is not an option. Indeterminate:
+        # EXOTIC's log gives no percentage, only the line it is on.
+        # @args: none
+        # @return: the shown dialog, kept on self._exotic_wait
+        wait = QProgressDialog(
+            self.tr("Running EXOTIC (this can take a while)…"),
+            self.tr("Cancel"), 0, 0, self)
+        wait.setWindowTitle(self.tr("EXOTIC"))
+        wait.setWindowModality(Qt.NonModal)
+        wait.setMinimumDuration(0)
+        # only _exotic_reap_wait closes it: the run's end is the report,
+        # not a value the bar ever reaches
+        wait.setAutoClose(False)
+        wait.setAutoReset(False)
+        wait.canceled.connect(self._exotic_cancel)
+        wait.show()
+        self._exotic_wait = wait
+        return wait
+
+    def _exotic_progress_line(self, line):
+        # A log line from the worker: the dialog's label and the status
+        # bar both say where EXOTIC is (a silent two-hour run reads as a
+        # hung app).
+        # @args: line - one log line, already stripped
+        # @return: nothing
+        stage = self._exotic_stage(line)
+        if not stage:
+            return
+        wait = getattr(self, "_exotic_wait", None)
+        if wait is not None and Shiboken.isValid(wait):
+            wait.setLabelText(stage[-120:])
+        self.statusBar().showMessage(stage[-120:], 0)
+
+    def _exotic_stage(self, line):
+        # Turns one raw log line into something the observer can read, and
+        # drops the noise. EXOTIC's spinner ("Thinking | ...") repeats the
+        # same text for minutes and reads as a hang: it is exactly what the
+        # astrometry.net wait looked like (2026-09-30, the run that never
+        # moved). "Finding transformation i of N" is its real per-frame
+        # progress, so it becomes a plain counter.
+        # @args: line - one raw log line
+        # @return: the readable stage, or "" when the line is only noise
+        # EXOTIC colours its warnings, and the raw escapes ended up in the
+        # label ("[33m  Warning: ..."): drop them before showing the text.
+        text = re.sub(r"\x1b\[[0-9;]*m", "", line or "").strip()
+        if not text or text.startswith("Thinking"):
+            return ""
+        m = re.match(r"Finding transformation (\d+) of (\d+)", text)
+        if m:
+            return self.tr("Reducing frame {0} of {1}…").format(
+                m.group(1), m.group(2))
+        # EXOTIC prints this once per aperture / comparison-star combination
+        # whose frames do not straddle the transit: 1143 times in a 142-frame
+        # run (measured 2026-09-30), and the observer read it as a failure. It
+        # is its own diagnostic about that one combination, not about the
+        # reduction (the fit of the whole night is unaffected), so the label
+        # says what is really happening instead of repeating it.
+        if "not within the observations" in text:
+            return self.tr("Comparing apertures and comparison stars…")
+        return text
+
+    def _exotic_cancel(self):
+        # The dialog's Cancel: ask the worker to stop (it takes EXOTIC's
+        # process tree down and reports "cancelled" when it lands) and
+        # say so where the user is looking; the dialog goes on the report.
+        # @args: none
+        # @return: nothing
+        worker = getattr(self, "_exotic_worker", None)
+        if worker is not None:
+            worker.cancel()
+        wait = getattr(self, "_exotic_wait", None)
+        if wait is not None and Shiboken.isValid(wait):
+            wait.setLabelText(self.tr("Cancelling EXOTIC…"))
+        self.statusBar().showMessage(self.tr("Cancelling EXOTIC…"), 0)
+
+    def _exotic_reap_wait(self):
+        # The run ended (finished, failed or cancelled): the dialog is
+        # closed and reaped BEFORE anything else runs, so no box lands on
+        # top of it (close() + deleteLater(), the discipline of e31f394).
+        # @args: none
+        # @return: nothing
+        wait = getattr(self, "_exotic_wait", None)
+        self._exotic_wait = None
+        if wait is not None and Shiboken.isValid(wait):
+            wait.close()
+            wait.deleteLater()
+
+    def _exotic_done(self, res):
+        # EXOTIC finished: import its curve and parameters into the project.
+        from PySide6.QtWidgets import QMessageBox
+        from ..core import exotic_import
+        self._exotic_worker = None
+        self._exotic_reap_wait()
+        self.statusBar().clearMessage()
+        pid = getattr(self, "_exotic_pid", None)
+        if res.get("cancelled"):
+            # the user stopped it: no error box, just the plain outcome
+            self.statusBar().showMessage(
+                self.tr("EXOTIC cancelled: nothing was imported."), 8000)
+            return
+        if res.get("timed_out"):
+            # it ran past the limit and was killed: say that, not "did not
+            # finish", which would send the observer hunting a crash
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "EXOTIC ran past its time limit and was stopped. The last "
+                "lines of its log:\n\n{0}"
+            ).format(_exotic_log_tail(res.get("log_path"))
+                     or self.tr("(the log is empty)")))
+            return
+        if not res.get("ok") or pid is None:
+            # P2 #21: the user reads what EXOTIC said, not where its log
+            # lives: the last lines of the log, in plain language.
+            QMessageBox.warning(self, self.tr("EXOTIC"), self.tr(
+                "EXOTIC did not finish. The last lines of its log:\n\n{0}"
+            ).format(_exotic_log_tail(res.get("log_path"))
+                     or self.tr("(the log is empty)")))
+            return
+        result = exotic_import.load_result(res["out_dir"])
+        sid = getattr(self, "_exotic_session", None)
+        _run_id, n = exotic_import.persist(
+            db, pid, sid, result,
+            filter_name=getattr(self, "_exotic_filter", None))
+        # the products are the visit's resources from now on (they open from
+        # its window, ADR-045)
+        self._register_exotic_products(pid, sid, res["out_dir"])
+        par = result.get("params") or {}
+        msg = self.tr(
+            "EXOTIC finished: {0} points imported.\n"
+            "T_mid = {1} (BJD_TDB)\nRp/Rs = {2}").format(
+                n,
+                f"{par.get('tmid'):.5f} ± {par.get('tmid_err'):.5f}"
+                if par.get("tmid") else "?",
+                f"{par.get('rprs'):.4f} ± {par.get('rprs_err'):.4f}"
+                if par.get("rprs") else "?")
+        QMessageBox.information(self, self.tr("EXOTIC"), msg)
+        self._project_selected()
+        # ... and the result itself lands on screen: the numbers, the light
+        # curve EXOTIC drew and every file it wrote, instead of a box that
+        # says them once and a folder nobody knows about
+        self._open_exotic_result(pid, sid, out_dir=res["out_dir"],
+                                 params=result.get("params"),
+                                 when=datetime.datetime.now())
+
+    def _exotic_last_run(self, pid, session_id=None):
+        # The newest EXOTIC reduction of a project (or of one visit), with
+        # what the result window needs: its fitted parameters and its work
+        # folder. The parameters live in the run (they were saved and nobody
+        # read them back); the folder is deterministic.
+        # @args: pid - the project, session_id - the visit, or None for any
+        # @return: {"params", "created", "session_id", "out_dir"} or None
+        from ..core import followup as fu
+        sessions = ([fu.get_session(db, session_id)] if session_id is not None
+                    else fu.list_sessions(db, pid))
+        runs = []
+        for s in sessions:
+            if not s:
+                continue
+            runs += fu.runs_for_session(db, s["id"], series_only=False)
+        exotic = [r for r in runs
+                  if (r.get("cfg") or {}).get("source") == "exotic"]
+        if not exotic:
+            return None
+        run = max(exotic, key=lambda r: r.get("created") or 0)
+        p = project.get(db, pid) or {}
+        return {"params": (run["cfg"] or {}).get("params") or {},
+                "created": run.get("created"),
+                "session_id": run.get("session_id"),
+                "out_dir": str(Path(project.storage_dir(p)) / "exotic")}
+
+    def _exotic_result_text(self, pid, session_id=None):
+        # The one line the editor's EXOTIC block shows about the last
+        # reduction: the two numbers an observer looks for first.
+        # @args: pid - the project, session_id - the visit, or None
+        # @return: the text, or "" when the visit has no reduction yet
+        last = self._exotic_last_run(pid, session_id)
+        if not last:
+            return ""
+        par = last.get("params") or {}
+        if par.get("tmid") is None:
+            return self.tr("EXOTIC ran, but left no fitted result.")
+        stamp = ""
+        if last.get("created"):
+            stamp = datetime.datetime.fromtimestamp(
+                last["created"]).strftime("%d %b %Y %H:%M")
+        bits = [self.tr("T_mid {0} ± {1}").format(
+                    f"{par['tmid']:.5f}", f"{par.get('tmid_err') or 0:.5f}")]
+        if par.get("rprs") is not None:
+            bits.append(self.tr("Rp/Rs {0} ± {1}").format(
+                f"{par['rprs']:.4f}", f"{par.get('rprs_err') or 0:.4f}"))
+        if stamp:
+            bits.append(stamp)
+        return " · ".join(bits)
+
+    def _register_exotic_products(self, pid, session_id, out_dir):
+        # The reduction's products become resources of the visit (ADR-045):
+        # the light curve, the AAVSO report and the parameters then show up
+        # in the visit's window and open from there, so nobody has to go
+        # digging in the work folder. One entry per path, however many times
+        # the result is imported or saved.
+        # @args: pid - the project, session_id - the visit, out_dir - the
+        #        work folder the reduction wrote into
+        # @return: how many were registered now (0 when they were there)
+        from ..core import exotic_import
+        kinds = {"figure": "exotic_figure", "aavso": "exotic_aavso",
+                 "params": "exotic_params"}
+        n = 0
+        for role, path in exotic_import.find_products(out_dir):
+            kind = kinds.get(role)
+            if kind is None or not path.lower().endswith((".png", ".txt",
+                                                          ".json")):
+                continue
+            _fid, created = project.add_file_once(
+                db, pid, path, kind, session_id=session_id)
+            if created:
+                n += 1
+        if n:
+            self._populate_project_files(pid)
+        return n
+
+    def _open_exotic_result(self, pid, session_id=None, out_dir=None,
+                            params=None, when=None):
+        # The result window: the numbers, the light curve EXOTIC drew and
+        # every file the reduction wrote. Non-modal, like the period window,
+        # so the observer keeps working with it open.
+        # @args: pid - the project, session_id - the visit, out_dir/params/
+        #        when - the run just finished (None: the last one on record)
+        # @return: the dialog, or None when there is nothing to show
+        from .exotic_result_dialog import open_exotic_result
+        last = self._exotic_last_run(pid, session_id) or {}
+        out_dir = out_dir or last.get("out_dir")
+        if not out_dir:
+            return None
+        sid = session_id or last.get("session_id")
+        p = project.get(db, pid) or {}
+        return open_exotic_result(
+            self, out_dir,
+            params=params if params is not None else last.get("params"),
+            # the window's title is the project's identity, in the list's own
+            # language: the same payload the workbench's badge gets
+            badge=self._ufe_project_badge_payload(pid),
+            title=p.get("object_name") or "",
+            when=when or (datetime.datetime.fromtimestamp(last["created"])
+                          if last.get("created") else None),
+            save_fn=(lambda: self._register_exotic_products(pid, sid,
+                                                            out_dir))
+            if sid is not None else None)
+
+    def _exotic_open_folder(self, pid):
+        # The reduction's work folder, with the file manager: opening it is
+        # the OS's job (the pattern of Help > Open the log), and the path
+        # lands in the status bar for whoever prefers a terminal.
+        # @args: pid - the project
+        # @return: nothing
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        p = project.get(db, pid) or {}
+        folder = Path(project.storage_dir(p)) / "exotic"
+        if not folder.is_dir():
+            self.statusBar().showMessage(self.tr(
+                "No EXOTIC folder yet: run a reduction first."), 8000)
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        self.statusBar().showMessage(str(folder), 8000)
 
     def _build_publish_tab(self, p, kind, ctx):
         layout = self._step_section("publish")
@@ -5205,8 +6462,12 @@ class MainWindow(QMainWindow):
         ctx = p["context"]
         camp = _series.analyze_campaign(
             camp_pts, sn_type=ctx.get("sn_type") or ctx.get("otype"))
+        used = camp.get("points", len(camp_pts))
         text = self.tr("{n} nights · {p} points").format(
-            n=camp.get("nights", 0), p=len(camp_pts))
+            n=camp.get("nights", 0), p=used)
+        skipped = len(camp_pts) - used
+        if skipped > 0:
+            text += self.tr(" · {0} without magnitude ignored").format(skipped)
         slope = camp.get("slope_mag_per_day")
         if slope is not None:
             text += self.tr(" · {:.2f} mag/day").format(slope)
@@ -5227,9 +6488,9 @@ class MainWindow(QMainWindow):
     def _fu_science_blocks(self, layout, p, ctx, pid):
         # The photometry science blocks under the visits manager
         # (ADR-045): the comparison-chart action and the bulk tools menu,
-        # the sequence status line, the light curve, the campaign
-        # summary and the SN-only animation block.
-        from ..core import followup as fu
+        # the sequence status line, the campaign summary and the SN-only
+        # animation block (the light curve moved up, under the visits:
+        # _analysis_curve_block).
         kind = p["kind"]
         act_row = QHBoxLayout()
         # ADR-042: the photometry prerequisite, «with what do I compare?»,
@@ -5278,40 +6539,11 @@ class MainWindow(QMainWindow):
         layout.addWidget(lbl_seq)
         self._project_widgets["fu_sequence"] = lbl_seq
 
-        # Inline light curve (2026-09-17): all the project's photometry —
-        # manual, pasted, file, measured, survey — with the SN template
-        # or the folded sawtooth. Live in the tab, no dialog, no rebuild;
-        # the template is toggleable without the axis moving.
+        # Inline light curve: it lives right under the visits manager now
+        # (see _analysis_curve_block), for EVERY kind with a curve and
+        # following the selected visit. Here stays what is kind-specific:
+        # the campaign summary and, for an SN, the animation block.
         if kind in ("sn", "variable"):
-            from .widgets.lightcurve_widget import LightCurveChart
-            from ..core import lightcurve_data
-            grp_lc = QGroupBox(self.tr("Light curve"))
-            glc = QVBoxLayout(grp_lc)
-            chk_tpl = QCheckBox(self.tr("Show template"))
-            chk_tpl.setChecked(True)
-            glc.addWidget(chk_tpl)
-            lchart = LightCurveChart()
-            lchart.setMinimumHeight(220)
-            glc.addWidget(lchart, stretch=1)
-            lcurve_pts = fu.list_points(db, pid)
-            if lcurve_pts:
-                payload = lightcurve_data.build_payload(
-                    {"points": lcurve_pts,
-                     "sn_type": ctx.get("sn_type")},
-                    sn_type_fallback=ctx.get("sn_type") or ctx.get("otype"),
-                    variable=ctx.get("variable"))
-                lchart.set_data(
-                    payload["points"],
-                    sn_type=payload.get("sn_type"),
-                    peak_mjd=payload.get("peak_mjd"),
-                    peak_mag=payload.get("peak_mag"),
-                    fold_period_d=payload.get("fold_period_d"),
-                    epoch_mjd=payload.get("epoch_mjd"),
-                    schematic=payload.get("schematic"))
-            chk_tpl.toggled.connect(lchart.set_template_visible)
-            layout.addWidget(grp_lc)
-            self._project_widgets["fu_curve"] = lchart
-
             # campaign summary over the saved points (ADR-044): the series
             # engine reports how the campaign goes so far, rebuilt on tab
             # open and refreshed in place after each saved point
@@ -5619,6 +6851,9 @@ class MainWindow(QMainWindow):
         if fits_path and not dlg.open_plate(fits_path):
             return
         dlg.set_object(obj)              # re-apply on the fresh plate
+        # ADR-048 follow-up: the sequence already built comes back (plate
+        # state first, project second), so the Compare tab is not empty
+        self._load_editor_sequence(dlg, pid, fits_path)
 
     def _fu_sequence_dialog(self, pid):
         if self._use_ufe():
@@ -5836,6 +7071,26 @@ class MainWindow(QMainWindow):
         form.addRow(self.tr("Format:"), cmb_fmt)
         chk_ql = QCheckBox(self.tr("Include quick-look (indicative) points"))
         form.addRow(chk_ql)
+        # the report's columns are the observer's choice (quality plan, A2):
+        # one colleague wants the curve, another wants the quality controls
+        lst_cols = QListWidget()
+        lst_cols.setSelectionMode(QListWidget.NoSelection)
+        lst_cols.setMaximumHeight(190)
+        for key, label in photometry_export.column_labels(self._lang()):
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, key)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked
+                               if key in photometry_export.DEFAULT_COLUMNS
+                               else Qt.Unchecked)
+            lst_cols.addItem(item)
+        lvl_cols = QLabel(self.tr(
+            "The columns of the file. The header always carries the "
+            "canonical name of each column, so a colleague's reader does "
+            "not break because of the language."))
+        lvl_cols.setWordWrap(True)
+        form.addRow(lvl_cols)
+        form.addRow(lst_cols)
         box = QDialogButtonBox(QDialogButtonBox.Save
                                | QDialogButtonBox.Cancel)
         box.accepted.connect(dlg.accept)
@@ -5843,6 +7098,9 @@ class MainWindow(QMainWindow):
         form.addRow(box)
         if dlg.exec() != QDialog.Accepted:
             return
+        columns = [lst_cols.item(i).data(Qt.UserRole)
+                   for i in range(lst_cols.count())
+                   if lst_cols.item(i).checkState() == Qt.Checked]
         pts = photometry_export.collect_points(db, pid,
                                                include_quicklook=
                                                chk_ql.isChecked())
@@ -5887,7 +7145,9 @@ class MainWindow(QMainWindow):
                                                 **meta)
         else:
             path = photometry_export.export_csv(pts, out, observer=observer,
-                                                comp_stars=comps, **meta)
+                                                comp_stars=comps,
+                                                columns=columns or None,
+                                                **meta)
         project.add_file(db, pid, str(path), "report")
         self.statusBar().showMessage(
             self.tr("Written to %1").replace("%1", str(path)), 8000)
@@ -6325,6 +7585,11 @@ class MainWindow(QMainWindow):
         #          Explore dialog uses this to decide whether to close
         kind = target.get("kind")
         name = target.get("name") or target.get("id")
+        if kind not in project.VALID_KINDS:
+            # an ad-hoc Explore (Tools) has no planner target, so no kind:
+            # infer it from the enriched object type (exoplanet -> transit...)
+            from ..core import kinds as kinds_mod
+            kind = kinds_mod.project_kind(target)
         if kind not in project.VALID_KINDS or not name:
             self.statusBar().showMessage(
                 self.tr("Cannot create a project for this target"), 6000)
@@ -6568,6 +7833,8 @@ class MainWindow(QMainWindow):
                 self.tr("(no campaign selected)")).setEnabled(False)
             return
         for label, slot in (
+                (self.tr("Measure the campaign pass…"), self._camp_pass),
+                ("SEP", None),
                 (self.tr("New project in this campaign…"),
                  self._camp_new_project),
                 (self.tr("Attach project…"), self._camp_attach),
@@ -6718,6 +7985,18 @@ class MainWindow(QMainWindow):
             # the planner fallback (if any) plus the explored name
             t = dict(fb or {})
             t["name"] = nm
+            # an ad-hoc Explore has no planner target: borrow the kind and
+            # the coordinates the enriched panel already knows, so the
+            # project layer can create it (exoplanet -> transit, ...)
+            e = getattr(panel, "_e", None) or {}
+            if e.get("type") and not t.get("kind"):
+                t["type"] = e["type"]
+            data = e.get("data") or {}
+            for src, dst in (("ra", "ra_deg"), ("ra_deg", "ra_deg"),
+                             ("dec", "dec_deg"), ("dec_deg", "dec_deg"),
+                             ("mag", "mag"), ("vmag", "mag")):
+                if t.get(dst) is None and data.get(src) is not None:
+                    t[dst] = data[src]
             return t
 
         def _on_create(nm, fb):
@@ -6725,9 +8004,16 @@ class MainWindow(QMainWindow):
             # is the planner target (Tonight) or None for an ad-hoc
             # Tools-menu name. PySide6 passes only the declared args.
             # Only close the dialog when the project was really created
-            # (UX, U0.2): otherwise the status-bar error would be lost.
+            # (UX, U0.2); on failure the reason is shown IN the dialog
+            # (the main status bar is hidden behind this modal).
+            from PySide6.QtWidgets import QMessageBox
             if self._create_project(_target(nm, fb)) is not None:
                 dlg.accept()
+            else:
+                QMessageBox.warning(dlg, self.tr("Create project"),
+                                    self.tr("Could not create the project: "
+                                            "the object kind could not be "
+                                            "determined."))
 
         def _on_continue(nm, fb):
             # the CTA said "resume the active project". When nothing
@@ -7621,9 +8907,26 @@ class MainWindow(QMainWindow):
         self._ufe = UfeDialog(lang=self._lang(), parent=self)
         return self._ufe
 
+    def _ufe_project_badge_payload(self, pid):
+        # The badge's payload, built by the SAME function the project list
+        # rows use (G): same kind chip, same hue, same words.
+        # @args: pid - the project this window is open for
+        # @return: the kwargs of ProjectRow.set_project, or None
+        from ..core import campaign as _camp
+        row = project.get(db, pid)
+        if not row:
+            return None
+        camp_names = {c["id"]: c["name"] for c in _camp.list_campaigns(db)}
+        payload = self._project_row_payload(row, None, camp_names)
+        payload.pop("_urgency", None)
+        return payload
+
     def _tools_ufe(self):
         # Menu Tools → FITS editor… (ADR-044)
         dlg = self._ufe_build()
+        begin = getattr(dlg, "begin_session", None)
+        if callable(begin):
+            begin(None)              # ad-hoc: its own session (issue report)
         dlg.set_save_hook(None)      # ad-hoc: no project registration
         dlg.set_point_hook(None)     # and no project to save points to
         dlg.set_reset_hooks(None, None)   # and nothing to reset (ADR-047)
@@ -7671,6 +8974,13 @@ class MainWindow(QMainWindow):
         #        session_id - the visit a saved point belongs to, or None
         # @return: the UfeDialog
         dlg = self._ufe_build()
+        # a different project (or visit) is a different SESSION: the
+        # persistent dialog must not carry the previous one's plate,
+        # sequence or series into it (issue report). Asked defensively: a
+        # double in a test (or a future host) need not have the method.
+        begin = getattr(dlg, "begin_session", None)
+        if callable(begin):
+            begin((hook_pid, session_id))
         dlg.set_save_hook(None)
         dlg.set_object(obj)
         if hook_pid is not None:
@@ -7686,9 +8996,88 @@ class MainWindow(QMainWindow):
             dlg.set_reset_hooks(
                 lambda: self._ufe_reset_state(dlg, hook_pid),
                 lambda: self._ufe_reset_points(dlg, hook_pid))
+            # ADR-048: the visit context (its frames), the batch writer
+            # for a series run and the per-run undo (D8/D9)
+            dlg.set_series_hook(
+                lambda scope="visit":
+                self._ufe_series_context(hook_pid, session_id, scope))
+            dlg.set_points_hook(
+                lambda rows, cfg: self._ufe_points_hook(
+                    hook_pid, session_id, rows, cfg))
+            dlg.set_run_undo_hook(self._ufe_run_undo)
+            dlg.set_exoclock_hook(
+                lambda payload: self._ufe_exoclock_hook(hook_pid, payload))
+            # the sequence is kept in the project: reopening the visit
+            # must not mean rebuilding the comparison stars
+            dlg.set_sequence_hook(
+                lambda state: self._ufe_sequence_hook(hook_pid, state))
+            # D: the visit's curve. Reading it asks nobody to measure again
+            # (the points are already in the project); discarding it undoes
+            # its series runs, keeping their rows marked. Asked defensively,
+            # like every other hook: a host double need not have the method.
+            #
+            # The PASSES go first, on purpose: loading the curve tells the
+            # panel how many other passes the visit holds, and that count
+            # comes from this list (one night, one curve, 2026-09-30).
+            passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
+            if callable(passes_hooks):
+                passes_hooks(
+                    lambda: self._ufe_visit_passes(hook_pid, session_id),
+                    lambda run_id: self._ufe_choose_curve(
+                        hook_pid, session_id, run_id))
+            # where the series figures are written: the project's own folder
+            # (the Measure tab never touches the database)
+            folder_hook = getattr(dlg, "set_export_folder_hook", None)
+            if callable(folder_hook):
+                folder_hook(
+                    lambda: self._ufe_export_folder(hook_pid))
+            curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
+            if callable(curve_hooks):
+                curve_hooks(
+                    lambda scope="visit":
+                    self._ufe_visit_curve(hook_pid, session_id, scope),
+                    lambda: self._ufe_discard_curve(hook_pid, session_id))
+            # G: the project, in the list's OWN language: the badge is fed
+            # by the same builder the project rows use, so the two cannot
+            # drift (a badge with its own words would be a second truth).
+            badge = getattr(dlg, "set_project_badge", None)
+            if callable(badge):
+                badge(self._ufe_project_badge_payload(hook_pid))
+            # ADR-048 follow-up: a transit project's reduce/export live in
+            # the editor, next to the sequence they need
+            proj = project.get(db, hook_pid) or {}
+            if proj.get("kind") == "transit":
+                dlg.set_exotic_hooks(
+                    lambda: self._ufe_exotic_reduce(hook_pid, session_id),
+                    lambda: self._ufe_exotic_export(hook_pid, session_id),
+                    result_fn=lambda: self._open_exotic_result(
+                        hook_pid, session_id),
+                    folder_fn=lambda: self._exotic_open_folder(hook_pid),
+                    result_text=self._exotic_result_text(hook_pid,
+                                                         session_id))
+            else:
+                dlg.set_exotic_hooks(None, None)
         else:
             dlg.set_point_hook(None)
             dlg.set_reset_hooks(None, None)
+            dlg.set_series_hook(None)
+            dlg.set_points_hook(None)
+            dlg.set_run_undo_hook(None)
+            dlg.set_exoclock_hook(None)
+            dlg.set_exotic_hooks(None, None)
+            dlg.set_sequence_hook(None)
+            passes_hooks = getattr(dlg, "set_visit_passes_hooks", None)
+            if callable(passes_hooks):
+                passes_hooks(None, None)
+            folder_hook = getattr(dlg, "set_export_folder_hook", None)
+            if callable(folder_hook):
+                folder_hook(None)
+            curve_hooks = getattr(dlg, "set_visit_curve_hooks", None)
+            if callable(curve_hooks):
+                curve_hooks(None, None)
+            badge = getattr(dlg, "set_project_badge", None)
+            if callable(badge):
+                badge(None)              # ad-hoc: no project behind it
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
@@ -7819,7 +9208,512 @@ class MainWindow(QMainWindow):
         # refresh the panel: light curve, visits and campaign summary update
         self._project_selected()
 
+    # ---------------- E5c: the campaign pass ----------------
+
+    def _camp_pass(self):
+        # One read of the frames for every sibling project of the campaign
+        # that shares the field. The dialog decides who travels (and
+        # core.campaign says why the others do not), the engine measures
+        # them in ONE pass — comps and zero point measured once per frame —
+        # and each curve is filed in its own project, with its own run.
+        from ..core import campaign as _camp
+        from .pass_dialog import PassDialog
+        cid = self._selected_campaign_id()
+        if cid is None:
+            return
+        camp = _camp.get(db, cid)
+        if camp is None:
+            return
+        if getattr(self, "_pass_worker", None) is not None:
+            self.statusBar().showMessage(
+                self.tr("A pass is already running."), 6000)
+            return
+        dlg = PassDialog(self, db_obj=db, camp=camp, lang=self._lang())
+        if dlg.exec() != QDialog.Accepted:
+            return
+        source = dlg.source()
+        seq, seq_source = dlg.sequence()
+        targets = dlg.targets()
+        if source is None or not targets or not seq:
+            return
+        self._pass_wcs = dlg.wcs()
+        self._pass_camp = camp
+        self._pass_start(source, targets, seq, seq_source, dlg.band(),
+                         dlg.left_out())
+
+    def _pass_start(self, source, targets, seq, seq_source, band, left):
+        # Everything the dialog decided, put to work: the frames of the
+        # source visit, the shared sequence, the objects and the band. The
+        # measurement runs off the GUI thread; the frames are read once.
+        cfg = self._pass_config(targets, seq, band)
+        if cfg is None:
+            return
+        self._pass_source = source
+        self._pass_targets = list(targets)
+        self._pass_band = band
+        self._pass_left = list(left or [])
+        self._pass_worker = PassWorker(source["paths"], cfg)
+        self._pass_worker.progress.connect(self._pass_progress)
+        self._pass_worker.finished.connect(self._pass_done)
+        self._pass_worker.failed.connect(self._pass_failed)
+        self._pass_wait = QProgressDialog(
+            self.tr("Measuring the pass: {0} objects").format(len(targets)),
+            self.tr("Cancel"), 0, len(source["paths"]), self)
+        self._pass_wait.setWindowTitle(self.tr("Campaign pass"))
+        self._pass_wait.setAutoClose(False)
+        self._pass_wait.setAutoReset(False)
+        self._pass_wait.canceled.connect(self._pass_cancel)
+        self._pass_wait.show()
+        # the sequence's origin is said out loud: an observer measuring
+        # with someone else's comparison stars must be able to see it
+        self.statusBar().showMessage(self.tr(
+            "Pass over {0} frames with the {1}").format(
+                len(source["paths"]),
+                self.tr("campaign's shared sequence")
+                if seq_source == "campaign"
+                else self.tr("project's own sequence")), 8000)
+        self._pass_worker.start()
+
+    def _pass_config(self, targets, seq, band):
+        # The engine's configuration for a pass, from the dialog and
+        # Ajustes. It needs the reference pointing: without it the dialog
+        # does not accept, and this is the last honest check.
+        from ..core import photometry, series_measure
+        from ..config import config
+        if getattr(self, "_pass_wcs", None) is None:
+            return None
+        wanted = tuple((t["label"], float(t["xy"][0]), float(t["xy"][1]))
+                       for t in targets)
+        entries = tuple(seq.get("entries") or ())
+        # catalog mode needs the sequence to carry the catalogue's own
+        # values; without them the honest measurement is the differential
+        # one (D40), and the choice is not left to chance
+        zp_mode = "catalog" if any(
+            photometry.band_of((e.get("star") or {}), band)[0] is not None
+            for e in entries) else "relative"
+        return series_measure.SeriesConfig(
+            wcs=self._pass_wcs, targets=wanted,
+            target_xy=(wanted[0][1], wanted[0][2]),
+            comp_set=entries, band=band, fallback_band="V",
+            zp_mode=zp_mode, align="coords", seeing_aperture=True,
+            site_gain=config.get("ccd_gain"),
+            site_ron=config.get("ccd_read_noise"),
+            site_flat=config.get("flat_resid_mag", 0.007) or 0.007,
+            site_saturate=config.get("ccd_saturate"),
+            site_lon=config.get("lon"), site_lat=config.get("lat"),
+            site_aperture_m=float(config.get("aperture_inches", 10.0))
+            * 0.0254,
+            site_height_m=float(config.get("height", 0) or 0.0),
+            site_linear=config.get("cam_linearity_adu"),
+            site_dark=config.get("cam_dark_current_e_s"))
+
+    def _pass_progress(self, done, total):
+        if getattr(self, "_pass_wait", None) is not None:
+            self._pass_wait.setMaximum(max(1, total))
+            self._pass_wait.setValue(done)
+
+    def _pass_cancel(self):
+        worker = getattr(self, "_pass_worker", None)
+        if worker is not None:
+            worker.cancel()
+            self.statusBar().showMessage(
+                self.tr("Cancelling the pass… the frames already measured "
+                        "are kept."), 6000)
+
+    def _pass_failed(self, message):
+        self._pass_close_wait()
+        self._pass_worker = None
+        QMessageBox.warning(
+            self, self.tr("Campaign pass"),
+            self.tr("The pass failed: {0}").format(message))
+
+    def _pass_close_wait(self):
+        wait = getattr(self, "_pass_wait", None)
+        if wait is not None:
+            wait.blockSignals(True)
+            wait.close()
+            self._pass_wait = None
+
+    def _pass_done(self, result):
+        # The frames are filed in every measured project, and each curve
+        # goes to its own project with its own run. The pass is recorded
+        # in each run's echo, so the journal can say what it was.
+        from ..core import followup as fu
+        from ..core import project as project_mod, series_measure
+        self._pass_close_wait()
+        self._pass_worker = None
+        if result is None:
+            return
+        source = self._pass_source
+        targets = list(self._pass_targets)
+        wanted = [t for t in targets]
+        sessions = fu.share_frames(
+            db, source["paths"],
+            [{"project_id": t["pid"]} for t in wanted],
+            obs_date=source.get("obs_date"),
+            notes=self.tr("Campaign pass: shared frames"))
+        entries = []
+        measured = 0
+        for t, got in zip(wanted, result.targets):
+            rows = series_measure.series_rows(got["result"].points)
+            if rows:
+                measured += 1
+            by_path = {f["path"]: f["id"]
+                       for f in project_mod.list_files(db, t["pid"])
+                       if f.get("kind") == "fits"}
+            for r in rows:
+                r["file_id"] = by_path.get(r.get("path"))
+            entries.append({"project_id": t["pid"],
+                            "session_id": sessions.get(t["pid"]),
+                            "rows": rows, "label": t["label"],
+                            "status": result.status})
+        fu.save_pass(db, entries, cfg={
+            "campaign": (self._pass_camp or {}).get("name"),
+            "band": self._pass_band})
+        self.statusBar().showMessage(self.tr(
+            "Pass saved: {0} objects, {1} frames, {2} points").format(
+                measured, len(source["paths"]),
+                sum(len(e["rows"]) for e in entries)), 10000)
+        left = getattr(self, "_pass_left", None) or []
+        if left:
+            self.statusBar().showMessage(
+                self.tr("Pass saved. {0} project(s) stayed out of it: see "
+                        "the dialog.").format(len(left)), 10000)
+        self._campaign_selected()
+
     # ---------------- UFE plate resets (ADR-047) ----------------
+
+    def _ufe_series_context(self, pid, session_id, scope="visit"):
+        # ADR-048 (D8): the series works from a visit's frames, never a
+        # folder dialog. No visit (or no FITS in it): no series block.
+        #
+        # MULTI-NIGHT (2026-09-30, the observer's ask): a series that runs
+        # over several nights is measured in ONE pass, so the scope
+        # "project" hands the frames of EVERY visit of the project (ordered
+        # by time). Each frame's point is then filed in its own visit: a
+        # visit is one night, and the project's curve is the union of the
+        # nights (one pass each), which is what the period search needs.
+        # @args: pid - project id, session_id - the visit or None, scope -
+        #        "visit" | "project"
+        # @return: {"pid", "session_id", "paths", "kind", "context",
+        #           "scope", "nights"} or None
+        if session_id is None:
+            return None
+        p = project.get(db, pid) or {}
+        if scope == "project":
+            files = [f for f in project.list_files(db, pid)
+                     if f.get("kind") == "fits" and f.get("path")
+                     and f.get("session_id") is not None]
+            # the frames in time order: the engine sorts them by their own
+            # mjd too, but the reference frame is the one on stage
+            paths = sorted({f["path"] for f in files})
+            nights = {f["session_id"] for f in files}
+            if not paths:
+                return None
+            return {"pid": pid, "session_id": session_id, "paths": paths,
+                    "kind": p.get("kind"), "context": p.get("context") or {},
+                    "scope": "project", "nights": len(nights),
+                    "path_sessions": {f["path"]: f["session_id"]
+                                      for f in files}}
+        files = project.files_for_session(db, session_id)
+        paths = sorted(f["path"] for f in files
+                       if f.get("kind") == "fits" and f.get("path"))
+        if not paths:
+            return None
+        # how many visits of this project hold frames: the tab offers the
+        # multi-night scope only when there is more than one (one visit is
+        # the same thing under another name)
+        visits = {f.get("session_id") for f in project.list_files(db, pid)
+                  if f.get("kind") == "fits" and f.get("path")
+                  and f.get("session_id") is not None}
+        return {"pid": pid, "session_id": session_id, "paths": paths,
+                "kind": p.get("kind"), "context": p.get("context") or {},
+                "scope": "visit", "nights": 1,
+                "visits": len(visits),
+                "path_sessions": {path: session_id for path in paths}}
+
+    def _ufe_points_hook(self, pid, session_id, rows, cfg):
+        # ADR-048 (D9): one series run = one measurement_runs row; its
+        # points go in a single batch with the run id, so "Undo this run"
+        # removes exactly them. A point keeps its plate link when the
+        # frame is registered (ADR-047). D18: the run keeps its REAL
+        # status, so a series the user cancelled is stored "incomplete"
+        # and stays visible as such; the Measure tab sends the status in
+        # the run echo and it lands in its own column, not in cfg_json.
+        # @args: rows - point dicts, cfg - JSON-safe run echo (it may
+        #        carry the run's "status")
+        # @return: the new run id
+        from ..core import followup as fu
+        echo = dict(cfg or {})
+        status = echo.pop("status", None) or "complete"
+        # the frames of the project, by (path, visit) and by path: the
+        # first is exact when the same frame is registered in two visits
+        files = [f for f in project.list_files(db, pid)
+                 if f.get("kind") == "fits"]
+        by_path = {(f["path"], f.get("session_id")): f for f in files}
+        by_path.update({f["path"]: f for f in files})
+        # a live batch continues the run its session opened (one live
+        # session, one run): the points pile into it, so the curve reloaded
+        # from the project is the whole session and "undo" is one click
+        append = echo.pop("append_run", None)
+        run_id = fu.reusable_run(db, append, session_id)
+        if run_id is not None:
+            for r in rows:
+                sid = r.get("session_id") or session_id
+                f = by_path.get((r.get("path"), sid)) \
+                    or by_path.get(r.get("path")) or {}
+                r["project_id"] = pid
+                r["session_id"] = sid
+                r["run_id"] = run_id
+                r["file_id"] = f.get("id")
+            if rows:
+                fu.add_points(db, rows)
+            self.statusBar().showMessage(
+                self.tr("Series saved: {} points").format(len(rows)), 8000)
+            self._project_selected()
+            return run_id
+        # ONE PASS, ONE RUN PER VISIT. A multi-night pass measures the
+        # frames of several visits in one go, and each frame's points are
+        # filed in ITS OWN visit: a visit is one night, so the visit's
+        # curve and the project's (the union of the nights) both read
+        # right, and the whole pass shares a group id so "undo" takes it
+        # all. A single-visit run resolves to one group and is exactly
+        # what it always was.
+        groups = {}
+        for r in rows:
+            # the visit the FRAME belongs to: the row says it (the tab took
+            # it from the context), and a frame registered in two visits
+            # would otherwise land in whichever row came last (measured on
+            # the observer's database: the same 244 frames in three visits)
+            sid = r.get("session_id") or session_id
+            f = by_path.get((r.get("path"), sid)) \
+                or by_path.get(r.get("path")) or {}
+            r["project_id"] = pid
+            r["session_id"] = sid
+            r["file_id"] = f.get("id")
+            groups.setdefault(sid, []).append(r)
+        group = uuid.uuid4().hex if len(groups) > 1 else None
+        run_id = None
+        for sid, own in groups.items():
+            run_echo = dict(echo)
+            if group:
+                run_echo["pass"] = {"group": group, "nights": len(groups)}
+            run_id = fu.create_run(db, session_id=sid,
+                                   cfg={"series": run_echo}, status=status)
+            for r in own:
+                r["run_id"] = run_id
+            fu.add_points(db, own)
+        if group:
+            self.statusBar().showMessage(
+                self.tr("Series saved: {} points over {} nights, one run "
+                        "each").format(len(rows), len(groups)), 8000)
+        else:
+            self.statusBar().showMessage(
+                self.tr("Series saved: {} points").format(len(rows)), 8000)
+        self._project_selected()
+        return run_id
+
+    def _ufe_exoclock_hook(self, pid, payload):
+        # ADR-049 (D30): the ExoClock files were written and the browser
+        # opened; the project outcome is recorded as reported_exoclock.
+        # @args: pid - project id, payload - {"planet", "points"}
+        try:
+            project.close(db, pid, "reported_exoclock")
+        except Exception as err:
+            logger.warning("exoclock outcome failed: %s", err)
+            return False
+        self.statusBar().showMessage(
+            self.tr("ExoClock submission prepared; outcome recorded."), 8000)
+        self._project_selected()
+        return True
+
+    def _ufe_run_undo(self, run_id):
+        # ADR-048 (D6): undo one run's points, keep the run row for the
+        # audit trail, and refresh the project view.
+        #
+        # A run that belongs to a MULTI-NIGHT pass (2026-09-30) takes its
+        # whole pass with it: the observer measured one series in one go,
+        # so "undo" has to undo the series and not one of its nights.
+        # @args: run_id - the run to undo
+        # @return: the number of points deleted
+        from ..core import followup as fu
+        group = fu.run_pass_group(db, run_id)
+        if group:
+            runs = fu.runs_in_pass(db, group)
+            count = 0
+            for run in runs:
+                count += fu.delete_points_for_run(db, run["id"])
+                fu.set_run_status(db, run["id"], "undone")
+            self.statusBar().showMessage(
+                self.tr("Pass undone: {} points over {} nights").format(
+                    count, len(runs)), 8000)
+            self._project_selected()
+            return count
+        count = fu.delete_points_for_run(db, run_id)
+        fu.set_run_status(db, run_id, "undone")
+        self.statusBar().showMessage(
+            self.tr("Run undone: {} points removed").format(count), 8000)
+        self._project_selected()
+        return count
+
+    def _curve_payload(self, points):
+        # The stored rows shaped for the chart: the band each point's run
+        # was calibrated in, the plate it was measured on (so the image's
+        # band matches it by PATH) and, when that run asked for it, the
+        # detrended curve (refitted here: the same points with the same
+        # airmass give the same coefficients).
+        #
+        # The detrend is applied RUN BY RUN on purpose: one run is one
+        # night, and a multi-night curve has one policy per night. Fitting
+        # the whole curve with one policy would smear a night into another.
+        # @args: points - followup rows (a visit's curve, or the project's)
+        # @return: [point dicts] raw + detrended, as the chart reads them
+        from ..core import followup as fu, project as project_mod
+        from ..core import series_measure
+        runs, paths = {}, {}
+        for p in points:
+            rid = p.get("run_id")
+            if rid is not None and rid not in runs:
+                runs[rid] = fu.get_run(db, rid) or {}
+            fid = p.get("file_id")
+            if fid is not None and fid not in paths:
+                paths[fid] = (project_mod.get_file(db, fid) or {}).get("path")
+        raw, by_run = [], {}
+        for p in points:
+            if p.get("mjd") is None or p.get("mag") is None:
+                continue
+            cfg = (runs.get(p.get("run_id")) or {}).get("cfg") or {}
+            band = (cfg.get("series") or {}).get("band")
+            shaped = {"mjd": p["mjd"], "mag": p["mag"], "err": p.get("err"),
+                      "err_internal": p.get("err_internal"),
+                      "mag_raw": p.get("mag_raw"),
+                      "filter": p.get("filter") or band,
+                      "flags": list(p.get("flags") or []),
+                      "path": paths.get(p.get("file_id")),
+                      # the NIGHT travels with the point (v14): the night
+                      # figures are drawn from these, so a curve read back
+                      # from the visit explains its night without measuring
+                      "airmass": p.get("airmass"), "x": p.get("x"),
+                      "y": p.get("y"), "fwhm": p.get("fwhm"),
+                      "sky": p.get("sky"),
+                      "source": "measure"}
+            raw.append(shaped)
+            by_run.setdefault(p.get("run_id"), []).append(shaped)
+        out = list(raw)
+        for rid, own in by_run.items():
+            cfg = (runs.get(rid) or {}).get("cfg") or {}
+            policy = (cfg.get("series") or {}).get("detrend_policy")
+            if policy and policy != "off":
+                out += series_measure.detrend_stored(own, policy)
+        return out
+
+    def _ufe_visit_curve(self, pid, session_id, scope="visit"):
+        # The curve a visit already holds (D): the series points saved in
+        # the project for THAT visit, shaped for the chart. No frame is
+        # read and nothing is asked of the observer.
+        #
+        # ONE NIGHT, ONE RUN (2026-09-30): the visit may hold several
+        # passes, and the chart draws the one the visit shows (its choice,
+        # else the last one measured). Drawing all of them at once is the
+        # reported corruption: 976 points at two levels joined by a zigzag.
+        #
+        # MULTI-NIGHT (the same day): with the scope "project" the chart
+        # draws the PROJECT's curve, which is the union of its nights, one
+        # pass per night: that is what a series measured across several
+        # nights has to show, and what the period search reads.
+        # @args: pid - project id, session_id - the visit or None, scope -
+        #        "visit" | "project"
+        # @return: {"points": [point dicts], "zp_mode": "catalog" |
+        #          "relative"}, or {} when there is no curve
+        from ..core import followup as fu
+        if session_id is None:
+            return {}
+        if scope == "project":
+            points = fu.list_points(db, pid)
+            # a project curve is on the differential axis only when EVERY
+            # night it holds was measured that way (mixing the two is not
+            # a curve, it is two)
+            modes = set()
+            for p in points:
+                run = fu.get_run(db, p.get("run_id")) or {}
+                cfg = (run.get("cfg") or {}).get("series") or {}
+                modes.add(cfg.get("zp_mode") or "catalog")
+            mode = "relative" if modes == {"relative"} else "catalog"
+            return {"points": self._curve_payload(points), "zp_mode": mode}
+        run = fu.get_run(db, fu.curve_run_for_session(db, session_id)) or {}
+        series_cfg = (run.get("cfg") or {}).get("series") or {}
+        points = fu.points_for_session(db, session_id)
+        return {"points": self._curve_payload(points),
+                "zp_mode": ("relative" if series_cfg.get("zp_mode")
+                            == "relative" else "catalog")}
+
+    def _ufe_export_folder(self, pid):
+        # Where this project's own files live: the folder the observer sees
+        # in the project's Details (ADR-045), so a figure written from the
+        # editor lands next to the rest of the project.
+        # @args: pid - project id
+        # @return: the folder (str), or None
+        from .. import paths as paths_mod
+        row = project.get(db, pid)
+        if not row:
+            return None
+        return str(paths_mod.project_dir(
+            pid, row.get("object_name") or "", row.get("root_dir") or ""))
+
+    def _ufe_visit_passes(self, pid, session_id):
+        # The passes of a visit (2026-09-30): one row per series run, oldest
+        # first, with the one the chart shows. This is what the "Passes of
+        # this visit" door reads, and the count the panel's line uses.
+        #
+        # A visit can hold several passes (measuring again with another band
+        # is normal) and every one keeps its points; only one is DRAWN, and
+        # drawing them all at once was the reported corruption.
+        #
+        # The passes ALREADY UNDONE are counted, not listed: on a real visit
+        # there were 26 of them against 4 that mattered, and a wall of empty
+        # rows hides the ones you can choose. They are not deleted (the trail
+        # keeps them) and the window says so.
+        # @args: pid - project id, session_id - the visit or None
+        # @return: {"runs": [...], "curve_run_id": int|None, "undone_empty": n}
+        from ..core import followup as fu
+        if session_id is None:
+            return {}
+        runs = fu.runs_for_session(db, session_id)
+        listed = [r for r in runs
+                  if (r.get("status") or "") != "undone" or r.get("points")]
+        return {"runs": listed,
+                "curve_run_id": fu.curve_run_for_session(db, session_id),
+                "undone_empty": len(runs) - len(listed)}
+
+    def _ufe_choose_curve(self, pid, session_id, run_id):
+        # "Make this the curve": the visit remembers which pass it shows.
+        # Nothing is deleted and nothing is measured again: the points of
+        # the other passes stay in the project, and the chart follows.
+        # @args: run_id - the pass to draw
+        # @return: True when the visit was found
+        from ..core import followup as fu
+        if session_id is None:
+            return False
+        ok = fu.set_session_curve_run(db, session_id, run_id)
+        if ok:
+            self.statusBar().showMessage(
+                self.tr("The chart will show that pass of the visit."), 6000)
+        return ok
+
+    def _ufe_discard_curve(self, pid, session_id):
+        # "Start the curve from scratch": every series run of the visit is
+        # undone (its points go, its run row stays marked undone: the trail
+        # is never silent) and the project view refreshes.
+        # @return: (runs undone, points removed)
+        from ..core import followup as fu
+        if session_id is None:
+            return 0, 0
+        runs, points = fu.discard_session_curve(db, session_id)
+        self.statusBar().showMessage(
+            self.tr("Curve discarded: {0} run(s) undone, {1} points removed"
+                    ).format(runs, points), 8000)
+        self._project_selected()
+        return runs, points
 
     def _ufe_reset_state(self, dlg, pid):
         # The tab already restored the editor's defaults locally (and
@@ -7879,3 +9773,30 @@ class MainWindow(QMainWindow):
     def _drop(self, worker):
         if worker in self._workers:
             self._workers.remove(worker)
+
+    def closeEvent(self, event):
+        # Quitting with live threads must not end in «QThread destroyed
+        # while running», nor cut a SQLite write mid-way: cancel every
+        # worker the window tracks (the _keep list plus the EXOTIC
+        # prepare/run attribute) and give each a bounded wait. The
+        # series/live workers of the Measure tab belong to the non-modal
+        # UFE dialog: closing it first runs its own closeEvent, which
+        # shuts them down.
+        # @args: event - the QCloseEvent
+        from PySide6.QtCore import QThread
+        ufe = getattr(self, "_ufe", None)
+        if ufe is not None and Shiboken.isValid(ufe):
+            ufe.close()
+        tracked = list(self._workers)
+        exotic = getattr(self, "_exotic_worker", None)
+        if exotic is not None:
+            tracked.append(exotic)
+        threads = [w for w in tracked
+                   if isinstance(w, QThread) and Shiboken.isValid(w)]
+        for w in threads:
+            if callable(getattr(w, "cancel", None)):
+                w.cancel()
+        for w in threads:
+            if w.isRunning():
+                w.wait(3000)
+        super().closeEvent(event)

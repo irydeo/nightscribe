@@ -13,6 +13,9 @@
 
 from pathlib import Path
 
+import time
+
+import numpy as np
 import pytest
 
 from nightscribe.core import compstars
@@ -71,8 +74,9 @@ def test_build_stars_gaia():
     assert first["id"] == "2100000000000004"
     assert first["mag"] == pytest.approx(11.05)
     # B-V estimated from BP-RP (0.55 for star 4: BP 11.30 - RP 10.75;
-    # hand-computed through the Riello 2021 polynomials)
-    assert first["bv"] == pytest.approx(0.0867, abs=1e-3)
+    # hand-computed through the Riello 2021 polynomials: G-B = -0.461989,
+    # G-V = -0.082054, so B-V = 0.379935; mid-F star, physically sound)
+    assert first["bv"] == pytest.approx(0.379935, abs=1e-3)
     assert first["color_origin"] == "estimated"
     labels = [b["label"] for b in first["bands"]]
     assert labels[:4] == ["G", "BP", "RP", "BP-RP"]
@@ -356,3 +360,241 @@ def test_export_sequence_csv_derived_columns(tmp_path):
     row = lines[4].split(",")
     assert row[header.index("G")] == "12.340"
     assert row[header.index("V (est.)")] == "12.44"
+
+
+# ---------------- quality plan, phase C: the plate has the last word ----
+
+import math  # noqa: E402
+
+from nightscribe.core import wcs as wcs_mod  # noqa: E402
+
+
+def _plate(n=240, sky=1000.0, noise=2.0, seed=3):
+    rng = np.random.default_rng(seed)
+    data = np.full((n, n), sky) + rng.normal(0.0, noise, (n, n))
+    return data
+
+
+def _add_star(data, x, y, peak, sigma=2.0):
+    yy, xx = np.ogrid[:data.shape[0], :data.shape[1]]
+    data += peak * np.exp(-((xx - x) ** 2 + (yy - y) ** 2)
+                          / (2.0 * sigma ** 2))
+    return data
+
+
+def _wcs(n=240):
+    # one pixel = 0.001 deg, centre of the frame at (0, 0)
+    return wcs_mod.Wcs(0.0, 0.0, n / 2.0, n / 2.0,
+                       [[0.001, 0.0], [0.0, 0.001]], n, n)
+
+
+def _sky_of(wcs, n=240):
+    # @return: the sky position of a pixel
+    return wcs.pixel_to_sky
+
+
+def test_validate_accepts_a_good_comparison():
+    n = 240
+    w = _wcs(n)
+    data = _plate(n)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    data = _add_star(data, 120.0, 120.0, 8000.0)
+    verdict = compstars.validate_on_plate(
+        {"ra": ra, "dec": dec}, data, w, sat_adu=60000.0,
+        linear_adu=53000.0, gain=0.8, ron=8.0, shape=(n, n),
+        margin_px=10.0)
+    assert verdict is None
+
+
+def test_validate_rejects_a_saturated_comparison():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n), 120.0, 120.0, 70000.0)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    sat_adu=60000.0, shape=(n, n))
+    assert v and v["key"] == "saturated"
+    assert "ADU" in v["es"] and "ADU" in v["en"]
+
+
+def test_validate_rejects_a_comparison_above_the_linearity():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n), 120.0, 120.0, 20000.0)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    sat_adu=60000.0, linear_adu=15000.0,
+                                    shape=(n, n))
+    assert v and v["key"] == "nonlinear"
+
+
+def test_validate_rejects_a_comparison_outside_the_sensor():
+    # the real V0526 Per case: a comp at x = 1617 on a 1663 px sensor
+    n = 240
+    w = _wcs(n)
+    data = _plate(n)
+    ra, dec = w.pixel_to_sky(232.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    shape=(n, n), margin_px=15.0)
+    assert v and v["key"] == "outside"
+
+
+def test_validate_rejects_a_comparison_whose_annulus_leaves_the_frame():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n), 4.0, 120.0, 8000.0)
+    ra, dec = w.pixel_to_sky(4.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    shape=(n, n), margin_px=0.0)
+    assert v and v["key"] == "edge"
+
+
+def test_validate_rejects_a_comparison_too_faint_to_calibrate():
+    n = 240
+    w = _wcs(n)
+    data = _add_star(_plate(n, noise=6.0), 120.0, 120.0, 40.0)
+    ra, dec = w.pixel_to_sky(120.0, 120.0)
+    v = compstars.validate_on_plate({"ra": ra, "dec": dec}, data, w,
+                                    gain=0.8, ron=8.0, shape=(n, n))
+    assert v and v["key"] == "faint"
+
+
+def test_the_real_sensor_rectangle_is_not_a_square():
+    # 43' on a 1663 x 1252 sensor: 43' x 32', not 43' x 43'
+    ra_side, dec_side = compstars.field_sides_deg(43.0, 1663, 1252)
+    assert ra_side == pytest.approx(43.0 / 60.0, rel=1e-6)
+    assert dec_side == pytest.approx(43.0 / 60.0 * 1252 / 1663, rel=1e-6)
+    # a square camera keeps the square
+    assert compstars.field_sides_deg(43.0) == (43.0 / 60.0, 43.0 / 60.0)
+
+
+def test_inside_field_knows_the_short_side():
+    center = (0.0, 0.0)
+    # 0.30 deg north is inside a 43' square (half side 0.358) and OUTSIDE
+    # a 43' x 32' sensor (half side 0.267): the star the sensor never sees
+    assert compstars.inside_field(0.0, 0.30, center, 43.0 / 60.0,
+                                  field_dec_deg=32.0 / 60.0) is False
+    assert compstars.inside_field(0.0, 0.30, center, 43.0 / 60.0) is True
+
+
+def test_propose_comps_reports_what_the_plate_rejected():
+    # spread in the sky: stars piled on one pixel are not isolated (the
+    # isolation rule would reject them all, which is another test)
+    stars = [{"id": f"S{i}", "name": None, "ra": i * 0.02, "dec": 0.0,
+              "mag": 12.0 + i * 0.1, "band": "V", "catalog": "Gaia",
+              "bands": [{"label": "V", "value": 12.0 + i * 0.1,
+                         "err": 0.01, "derived": False}],
+              "bv": 1.0, "color_origin": "catalog", "vsx": None}
+             for i in range(6)]
+
+    def validator(star, _role="comp"):
+        if star["id"] == "S3":
+            return {"key": "saturated", "es": "satura", "en": "saturated"}
+        return None
+    seq = compstars.propose_comps(stars, 12.5, validator=validator)
+    assert len(seq["comps"]) == 5
+    assert seq["rejected"] == [{"name": "S3", "key": "saturated",
+                                "es": "satura", "en": "saturated"}]
+
+
+# ---------------- the expensive question is asked late (H1) ----------
+
+def test_the_plate_is_asked_only_about_the_candidates_being_picked():
+    # Measuring the plate per candidate is what costs (58.8 ms on a real
+    # 2048² frame). It used to be asked of EVERY isolated star in the
+    # field, including the ones the brightness tiers discard for free:
+    # measured, 200 checks and 10.4 s for a 200-star field. It is asked now
+    # about the stars actually being picked, in ranked order, and each one
+    # ONCE (the memo), which is what the check star already did.
+    stars = []
+    for i in range(60):
+        stars.append(_star(10.0 + i * 0.02, 20.0, 12.0 + i * 0.05, bv=0.8))
+    asked = []
+
+    def validator(star, role="comp"):
+        asked.append(star["id"])
+        return None
+
+    seq = compstars.propose_comps(stars, 12.5, validator=validator)
+    assert len(seq["comps"]) == 8
+    # one question per picked candidate (plus the check), never one per star
+    assert len(asked) <= 12, len(asked)
+    assert len(asked) == len(set(asked))          # and never twice
+    assert seq["rejected"] == []                  # nothing was refused
+    # parity: the sequence is the one a field with no plate check gives
+    plain = compstars.propose_comps(stars, 12.5)
+    assert [e["name"][-1] for e in seq["comps"]] == \
+        [e["name"][-1] for e in plain["comps"]]
+    assert [e["star"]["id"] for e in seq["comps"]] == \
+        [e["star"]["id"] for e in plain["comps"]]
+
+
+def test_a_refused_candidate_is_reported_once_and_the_next_one_takes_its_place():
+    # A refusal is not a hole: the next candidate in the ranked order comes
+    # in, and the refusal is counted once (it was counted twice: once as a
+    # comp candidate and once as a check candidate).
+    stars = [_star(10.0 + i * 0.05, 20.0, 12.0 + i * 0.1, bv=0.8)
+             for i in range(12)]
+    victim = stars[3]["id"]
+
+    def validator(star, role="comp"):
+        if star["id"] == victim:
+            return {"key": "saturated", "es": "satura", "en": "saturated"}
+        return None
+
+    seq = compstars.propose_comps(stars, 12.5, validator=validator)
+    assert [r["name"] for r in seq["rejected"]] == [victim] * 1
+    assert len(seq["comps"]) == 8
+    assert victim not in [e["star"]["id"] for e in seq["comps"]]
+
+
+# ---------------- the isolation screen, O(n) (measured) --------------
+
+def test_the_grid_finds_a_neighbour_in_the_next_cell():
+    # The classic trap of any grid: two stars five arcseconds apart that
+    # fall in DIFFERENT cells. A prune that only looked at the star's own
+    # cell would call them isolated and put a companion in the sequence.
+    # Measured on the real V0526 Per field: the pairwise version spent
+    # 22 020 050 separations and 59.3 s; this one asks about nine cells.
+    cell_deg = 4.0 * compstars.ISOLATION_ARCSEC / 3600.0
+    # a star one arcsecond before a cell boundary and another four after it
+    boundary = 30.0 * cell_deg
+    a = _star(10.0 + (boundary - 1.0 / 3600.0), 20.0, 12.0, bv=0.8)
+    b = _star(10.0 + (boundary + 4.0 / 3600.0), 20.0, 12.0, bv=0.8)
+    cells, key_of = compstars._neighbour_grid([a, b], cell_deg)
+    assert key_of(a["ra"], a["dec"]) != key_of(b["ra"], b["dec"])
+    assert not compstars._isolated(a, cells, key_of,
+                                   compstars.ISOLATION_ARCSEC)
+    # ... and the far one is isolated: the prune is not "never isolated"
+    c = _star(a["ra"] + 30.0 / 3600.0, 20.0, 12.0, bv=0.8)
+    cells, key_of = compstars._neighbour_grid([a, c], cell_deg)
+    assert compstars._isolated(a, cells, key_of, compstars.ISOLATION_ARCSEC)
+
+
+def test_the_isolation_screen_matches_the_pairwise_answer():
+    # Parity with the honest definition, on a random field: a star is
+    # isolated when no other star is within the tolerance.
+    rng = np.random.default_rng(11)
+    stars = [_star(10.0 + rng.uniform(0, 0.3), 20.0 + rng.uniform(0, 0.3),
+                   12.0 + rng.uniform(0, 3), bv=0.8) for _ in range(400)]
+    cells, key_of = compstars._neighbour_grid(
+        stars, 4.0 * compstars.ISOLATION_ARCSEC / 3600.0)
+    for s in stars:
+        pairwise = all(
+            o is s or compstars.separation_arcsec(s, o)
+            >= compstars.ISOLATION_ARCSEC for o in stars)
+        assert compstars._isolated(
+            s, cells, key_of, compstars.ISOLATION_ARCSEC) == pairwise
+
+
+def test_a_crowded_field_proposes_in_a_moment():
+    # The budget that makes "Build the sequence" feel like a button and not
+    # like a hang: 4500 stars, which is the size of the real visit's field.
+    rng = np.random.default_rng(7)
+    stars = [_star(10.0 + rng.uniform(0, 0.7), 20.0 + rng.uniform(0, 0.5),
+                   11.0 + rng.uniform(0, 5), bv=0.8) for _ in range(4500)]
+    t0 = time.monotonic()
+    seq = compstars.propose_comps(stars, 12.5)
+    took = time.monotonic() - t0
+    assert seq["comps"], "la propuesta tiene que salir"
+    assert took < 0.5, f"{took:.2f} s para 4500 estrellas"

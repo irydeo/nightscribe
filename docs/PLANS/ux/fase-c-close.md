@@ -127,7 +127,7 @@ ya iban traduciendo al vuelo; el pase completa a 780/780; suite 1146 verde)
       ```
        · **rev. 2026-09-13+ (Track UX)**: la decisión 9 queda **superseded**
       — el gestor modal se sustituye por la pestaña Campaigns; ver
-      [docs/PLANS/ux-variables-campaigns.md](../PLANS/ux-variables-campaigns.md)
+      [docs/PLANS/ux-variables-campaigns.md](../ux-variables-campaigns.md)
       ```
       (una sola línea física, fecha real del commit).
    b. Decisión 9 ES (:69-73): insértale al inicio:

@@ -351,6 +351,101 @@ def _migrate(conn):
                 "CREATE INDEX IF NOT EXISTS idx_photo_points_file"
                 " ON photometry_points(file_id)")
         conn.execute("PRAGMA user_version = 11")
+    if v < 12:
+        # ADR-048 (series photometry, plan phase 4): a series point keeps
+        # its raw (uncalibrated) magnitude, its quality flags and the run
+        # it came from, and a runs table stores the config and the status
+        # so "undo this run" and the "incomplete series" state survive
+        # restarts. The table/column guards mirror v9/v10/v11: a
+        # hand-seeded old database may not have photometry_points.
+        conn.executescript("""
+        CREATE TABLE IF NOT EXISTS measurement_runs (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id  INTEGER REFERENCES project_sessions(id)
+                        ON DELETE SET NULL,
+            created     REAL NOT NULL,
+            cfg_json    TEXT DEFAULT '{}',
+            status      TEXT NOT NULL DEFAULT 'complete'
+        );
+        """)
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            if "mag_raw" not in cols:
+                conn.execute("ALTER TABLE photometry_points ADD COLUMN"
+                             " mag_raw REAL")
+            if "flags" not in cols:
+                conn.execute("ALTER TABLE photometry_points ADD COLUMN"
+                             " flags TEXT")
+            if "run_id" not in cols:
+                conn.execute(
+                    "ALTER TABLE photometry_points ADD COLUMN run_id INTEGER"
+                    " REFERENCES measurement_runs(id) ON DELETE SET NULL")
+            conn.execute(
+                "CREATE INDEX IF NOT EXISTS idx_photo_points_run"
+                " ON photometry_points(run_id)")
+        conn.execute("PRAGMA user_version = 12")
+    if v < 13:
+        # Quality plan, phase A: a point now separates its own random
+        # error (the photons, the CCD equation) from the systematic one
+        # (the zero point, the flat). The total stays in `err`, which is
+        # what goes to AAVSO and to the CSV; `err_internal` is what a
+        # chart can draw as a bar without the night's calibration
+        # swamping every point.
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            if "err_internal" not in cols:
+                conn.execute("ALTER TABLE photometry_points ADD COLUMN"
+                             " err_internal REAL")
+        conn.execute("PRAGMA user_version = 13")
+    if v < 14:
+        # The NIGHT figures (airmass and the measured position) travel with
+        # the point: a curve read back from the database, like a visit's
+        # own, must be able to explain its night instead of asking for the
+        # frames again. Same idempotent guard as v9-v13: a hand-seeded old
+        # database may not have the table at all.
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "photometry_points" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(photometry_points)")}
+            for name, kind in (("airmass", "REAL"), ("x", "REAL"),
+                               ("y", "REAL"), ("fwhm", "REAL"),
+                               ("sky", "REAL")):
+                if name not in cols:
+                    conn.execute(
+                        "ALTER TABLE photometry_points ADD COLUMN"
+                        f" {name} {kind}")
+        conn.execute("PRAGMA user_version = 14")
+    if v < 15:
+        # ONE NIGHT IS ONE CURVE (2026-09-30). A visit can hold several
+        # series runs: the observer measures again with another band, with
+        # another sequence, or just to check something, and each run keeps
+        # its own points (that is what "undo this run" undoes, and the
+        # trail is never silent). But the visit's CURVE is ONE of them,
+        # and this column remembers which one, so a chart reloaded from
+        # the database draws the same curve the live chart drew.
+        #
+        # The failure it fixes, measured on a real visit (V0526 Per,
+        # 2026-09-30): four runs, 976 points at two different levels
+        # (11.96-12.07 in G and 12.70-12.81 in V) joined by a zigzag, which
+        # is what "the chart is corrupted after a restart" looked like.
+        # Same idempotent guard as v9-v14: a hand-seeded old database may
+        # not have the table at all.
+        tables = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+        if "project_sessions" in tables:
+            cols = {r[1] for r in conn.execute(
+                "PRAGMA table_info(project_sessions)")}
+            if "curve_run_id" not in cols:
+                conn.execute("ALTER TABLE project_sessions ADD COLUMN"
+                             " curve_run_id INTEGER")
+        conn.execute("PRAGMA user_version = 15")
     conn.commit()
 
 
@@ -396,6 +491,23 @@ MIGRATION_NOTES = {
         "Measurements remember the plate they were taken on: reopening "
         "that plate in the unified editor restores its stretch, the "
         "measurement recipe and the comparison sequence."),
+    12: QT_TRANSLATE_NOOP("NSMigrations",
+        "Photometric series: each point keeps its raw magnitude, its "
+        "quality flags and the run it belongs to, so a bad run can be "
+        "undone without touching the rest of the visit."),
+    13: QT_TRANSLATE_NOOP("NSMigrations",
+        "Each photometric point now keeps its own photon error apart from "
+        "the calibration systematic, so a light curve can be drawn (and "
+        "judged) without the night's zero point swamping it."),
+    14: QT_TRANSLATE_NOOP("NSMigrations",
+        "Every point remembers the night it was measured on (its airmass "
+        "and its position on the plate), so a curve read back from your "
+        "project can explain that night without measuring again."),
+    15: QT_TRANSLATE_NOOP("NSMigrations",
+        "A visit's chart is one curve again: if you measured the same "
+        "night several times, the visit remembers which pass it shows, "
+        "and you can pick any other from \"Series > Passes of this "
+        "visit\"."),
 }
 
 

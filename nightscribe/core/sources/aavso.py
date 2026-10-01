@@ -209,6 +209,85 @@ def latest_community_mag_cached(name, days=30, db_obj=None):
     return _parse_latest_obs(body[0])
 
 
+def _parse_curve(body, bands=None, min_points=1):
+    # The whole photometry answer as a light curve (quality plan, D1):
+    # every observation with a usable magnitude, its error when the
+    # observer gave one, the band and whether it is a visual estimate
+    # (which is a different animal from a CCD measurement).
+    # @args: body - the raw HTTP body, bands - band labels to keep
+    #        (None: all), min_points - give up below this many
+    # @return: [{"mjd", "mag", "err", "filter", "kind", "observer"}]
+    try:
+        data = json.loads(body.decode("utf-8", "replace"))
+    except (ValueError, AttributeError):
+        return []
+    rows = data.get("results") if isinstance(data, dict) else data
+    if not isinstance(rows, list):
+        return []
+    keep = {b.upper() for b in bands} if bands else None
+    out = []
+    for r in rows:
+        try:
+            jd = float(r.get("jd_dbl") or r.get("jd"))
+            mag = float(r.get("magnitude"))
+        except (TypeError, ValueError):
+            continue
+        band = str(r.get("band") or "?").strip()
+        if keep is not None and band.upper() not in keep:
+            continue
+        err = None
+        for key in ("uncertainty", "error", "mag_err"):
+            try:
+                if r.get(key) is not None:
+                    err = abs(float(r.get(key)))
+                    break
+            except (TypeError, ValueError):
+                continue
+        kind = str(r.get("obs_type") or "").lower()
+        visual = "visual" in kind or "estimate" in kind or \
+            r.get("visual") is True
+        out.append({"mjd": jd - 2400000.5, "mag": mag, "err": err,
+                    "filter": band, "kind": "visual" if visual else "ccd",
+                    "observer": (r.get("observer") or "").strip()})
+    out.sort(key=lambda p: p["mjd"])
+    return out if len(out) >= min_points else out
+
+
+def fetch_lightcurve(name, token, days=3650, bands=None, force=False):
+    # The AAVSO community light curve of a star (quality plan, D1): the
+    # way a single observing night stops being the whole story — the
+    # reference report of the V0526 Per case was made exactly like this,
+    # with the community's past observations fixing the period.
+    #
+    # It needs the observer's API token (the same one the bright-vigil
+    # channel uses) because the AAVSO API refuses anonymous reads, and it
+    # is cached like everything else (source "aavso", 12 h).
+    #
+    # @args: name - the star as AAVSO knows it ("V0526 Per", "T CrB"),
+    #        token - API token, days - look-back window (default 10 years),
+    #        bands - band labels to keep (None: all of them), force -
+    #        bypass the cache reads
+    # @return: {"points": [...], "n": int, "bands": {band: n}} - or None
+    #          when there is no token, no connection or no answer
+    if not token or not name:
+        return None
+    end = time.strftime("%Y-%m-%d", time.gmtime())
+    start = time.strftime("%Y-%m-%d", time.gmtime(time.time()
+                                                  - float(days) * 86400))
+    body = _get_auth(PHOTOMETRY_URL,
+                     {"target": name, "start_date": start,
+                      "end_date": end},
+                     f"aavso:curve:{name}:{int(days)}", token, force=force)
+    if body is None:
+        return None
+    points = _parse_curve(body, bands=bands)
+    counts = {}
+    for p in points:
+        counts[p["filter"]] = counts.get(p["filter"], 0) + 1
+    return {"points": points, "n": len(points), "bands": counts,
+            "start": start, "end": end}
+
+
 def extract_star_name(title):
     # The star a free-text alert/campaign title is about, or None.
     # "Photometry requested for GK Per" -> "GK Per"; "T CRB Johnson V

@@ -88,15 +88,14 @@ def test_diag_band(dlg, qapp):
     import hashlib
     qapp.processEvents()
 
-    def probe(tag):
-        img = dlg.view.grab().toImage()
+    def probe(tag, widget=None):
+        img = (widget or dlg.view).grab().toImage()
         h = int(getattr(dlg.view, "_title_h", 0) or 0)
         bits = bytes(img.bits())
         row = img.width() * 4
-        print("   %-10s %sx%s title_h=%s strip=%s mid=%s full=%s" % (
+        print("   %-14s %sx%s title_h=%s strip=%s full=%s" % (
             tag, img.width(), img.height(), h,
             hashlib.sha1(bits[:row * 42]).hexdigest()[:8],
-            hashlib.sha1(bits[row * 200:row * 260]).hexdigest()[:8],
             hashlib.sha1(bits).hexdigest()[:8]), flush=True)
 
     print("\nband: view %s | _title_h=%s | show_data=%s" % (
@@ -132,11 +131,13 @@ def test_diag_band(dlg, qapp):
     band = dlg._chart_band()["lines"][0]
     print("   band lines:", [(s["field"], s["text"]) for s in band],
           flush=True)
-    # ¿es el recorte por anchura? ensanchamos la vista y repetimos
-    dlg.view.resize(1600, 700)
+    # ¿repintado? forzamos de tres maneras y volvemos a mirar
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 15.0})
+    probe("15.00")
+    dlg.view.viewport().repaint()
+    probe("+vp.repaint")
+    dlg.view.refresh_frame()
     qapp.processEvents()
-    print("   -- vista ensanchada: %s --" % dlg.view.size(), flush=True)
-    for mag in (17.1, 15.0):
-        dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
-                        "mag": mag})
-        probe("ancha %.2f" % mag)
+    probe("+refresh_frame")
+    probe("viewport.grab", dlg.view.viewport())

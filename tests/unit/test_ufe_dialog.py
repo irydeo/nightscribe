@@ -1042,12 +1042,77 @@ def _band_mag(dlg):
     return next(seg for seg in first if seg["field"] == "mag")
 
 
-def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
+def test_the_band_shows_every_source_of_the_magnitude(dlg, tmp_path):
     # Asked: "check that every time the object's magnitude changes, it shows
-    # in the band". The content is read WHEN IT PAINTS (no cache), so the
-    # only thing that can go wrong is a missing repaint, and that is
-    # invisible in the code: this compares the top strip of the painted plate
-    # for every source of the magnitude, through the app's own paths.
+    # in the band". The band's content is read WHEN IT PAINTS (no cache), so
+    # this walks every source of the magnitude through the app's own paths
+    # and reads what the paint would draw. The PIXELS are the other half of
+    # the same promise and live in
+    # test_the_band_repaints_whenever_the_magnitude_changes.
+    from nightscribe.core import fits_meta
+    from nightscribe.core.series_measure import SeriesPoint, SeriesResult
+    dlg.state.load(MONO)
+    tab = dlg.tab_measure
+    meta = fits_meta.meta_from_header(dlg.state.header or {})
+
+    # 1 · the object's magnitude (the catalogue's value, in white)
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 17.1})
+    assert _band_mag(dlg)["role"] == "mag-cat"
+    assert "17.10" in _band_mag(dlg)["text"]
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 15.0})
+    assert "15.00" in _band_mag(dlg)["text"]
+
+    # 2 · a series measured HERE (what a run does when it lands)
+    point = SeriesPoint(index=0, path=str(MONO), mjd=meta["mjd"], mag=11.11,
+                        err=0.03, exptime=10.0, n_comps=6, filter="V",
+                        flags=[])
+    tab._series_result = SeriesResult(points=[point])
+    tab._draw_series([point])
+    assert "11.11" in _band_mag(dlg)["text"]
+
+    # 3 · the visit's curve loaded from the project (the same value, another
+    # way in): the band follows the payload
+    tab._series_result = None
+    tab._series_payload = []
+    tab.set_visit_curve_hooks(lambda: [{"mjd": meta["mjd"], "mag": 12.99,
+                                        "err": 0.05, "filter": "V",
+                                        "source": "measure", "comps": 5,
+                                        "flags": []}], None)
+    tab.load_visit_curve()
+    assert "12.99" in _band_mag(dlg)["text"]
+
+    # 4 · another plate (the same field, the same header): the visit's curve
+    # still answers for that frame by time, so the band follows it
+    import shutil
+    # the copy goes to tmp_path: writing it beside the fixture left a
+    # second_plate.fits inside the repository (found in the working tree)
+    second = tmp_path / "second_plate.fits"
+    shutil.copyfile(dlg.state.path, second)
+    dlg.open_plate(str(second))
+    assert "12.99" in _band_mag(dlg)["text"]
+
+    # 5 · and with nothing measured at all the catalogue comes back, in white
+    tab._series_payload = []
+    tab._curve_from_visit = False
+    dlg.view.viewport().update()
+    assert _band_mag(dlg)["role"] == "mag-cat"
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="the Windows offscreen backing store does not refresh grab() on "
+           "a widget-only repaint. Measured on the runner (2026-10-01) with "
+           "a spy on _paint_band: the paint DOES run with the new magnitude "
+           "('15.00 cat', w=869), and grab() returns the previous pixels "
+           "anyway, strip and full-image hash identical, with "
+           "viewport().repaint() changing nothing. The band is fine; the "
+           "measurement cannot see it there.")
+def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
+    # The pixel half of the promise above: the same five steps, comparing the
+    # top strip of the painted plate. A missing repaint is invisible in the
+    # code, and this is what catches it.
     from nightscribe.core import fits_meta
     from nightscribe.core.series_measure import SeriesPoint, SeriesResult
     dlg.state.load(MONO)

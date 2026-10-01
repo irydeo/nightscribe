@@ -389,7 +389,10 @@ def test_a_long_message_is_elided_and_never_eats_the_plate():
     d.set_status(long_text)
     _settle(d)
     bar = d._ui.lbl_status_bar
-    assert bar.height() <= 22
+    # ONE line: the height is the font's own line, not a magic 22 (Windows
+    # measures a taller line and the assertion failed with the design intact,
+    # measured 2026-10-01)
+    assert bar.height() <= bar.fontMetrics().height() + 6, bar.height()
     assert d.status_text() == long_text          # kept whole for the reader
     assert bar.toolTip() == long_text            # and reachable
     assert len(bar.text()) < len(long_text)      # elided, not wrapped

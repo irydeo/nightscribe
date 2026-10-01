@@ -1199,6 +1199,13 @@ class UfeMeasureTab(QWidget):
             # which scopes this project offers (one visit, or all of them)
             self._sync_series_scope()
             self._fit_series_hint()
+            # ... and once more when the layout has placed the block: the
+            # width the label has at this instant is the one it had while
+            # hidden, and a word-wrapped label asked for its height at the
+            # wrong width comes out cut (measured in CI, 2026-10-01: 58 px
+            # against the 118 its text needs).
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self._fit_series_hint)
             self._update_series_counter(self._series_context() or {})
         if not self._series_attached and self._series_worker is not None:
             self._series_worker.cancel()

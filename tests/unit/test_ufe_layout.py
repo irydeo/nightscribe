@@ -396,10 +396,11 @@ def test_a_long_message_is_elided_and_never_eats_the_plate():
     assert d.status_text() == long_text          # kept whole for the reader
     assert bar.toolTip() == long_text            # and reachable
     assert len(bar.text()) < len(long_text)      # elided, not wrapped
-    # the plate did not move: a re-elide can reflow the layout by a pixel,
-    # and one pixel is not "eating the plate" (a wrapping message would
-    # move it by tens)
-    assert abs(d.splitter.height() - work_before) <= 2
+    # the plate did not move: a re-elide can reflow the layout by a pixel
+    # or two, and a couple of pixels is not "eating the plate" (a wrapping
+    # message would move it by tens). Four, not two: with a wider font the
+    # reflow measured 3 px (2026-10-01).
+    assert abs(d.splitter.height() - work_before) <= 4
     d.close()
 
 

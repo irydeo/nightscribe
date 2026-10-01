@@ -100,28 +100,39 @@ class UfeManualDialog(QDialog):
         # while `sizeHint` said 177 and the layout's `heightForWidth` said
         # 161. The extra space is spread over the rows, so only the laid-out
         # geometry tells the truth.
+        #
+        # The sequence button is measured DRESSED with its live count (the
+        # longest form it may show): its bare label is shorter, and with a
+        # wider font the window came out 8 px under what the dressed row
+        # needs, so it could squish its own buttons (measured in CI,
+        # 2026-10-01: minimumHeight 147 against a hint of 155).
         # @return: None
         width = max(820, self.minimumWidth())
         layout = self.layout()
         if layout is None:
             return
-        self.resize(width, 600)             # room to lay the content out
-        layout.activate()
-        bottom = 0
-        for i in range(layout.count()):
-            item = layout.itemAt(i)
-            widget = item.widget() if item is not None else None
-            if widget is None or not widget.isVisible():
-                continue
-            bottom = max(bottom, widget.geometry().bottom() + 1)
-        margin = layout.contentsMargins().bottom()
-        if bottom <= 0:
-            bottom = self.sizeHint().height()
-        self.setMinimumHeight(int(self.minimumSizeHint().height()))
-        # the content plus a little air: flush against the frame looks
-        # broken, and the strip this replaces was 111 px of nothing
-        self.resize(width,
-                    max(int(bottom) + margin + 12, self.minimumHeight()))
+        bare = self.btn_seq_open.text()
+        self.btn_seq_open.setText(self.tr("Sequence (99)…"))
+        try:
+            self.resize(width, 600)         # room to lay the content out
+            layout.activate()
+            bottom = 0
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                widget = item.widget() if item is not None else None
+                if widget is None or not widget.isVisible():
+                    continue
+                bottom = max(bottom, widget.geometry().bottom() + 1)
+            margin = layout.contentsMargins().bottom()
+            if bottom <= 0:
+                bottom = self.sizeHint().height()
+            self.setMinimumHeight(int(self.minimumSizeHint().height()))
+            # the content plus a little air: flush against the frame looks
+            # broken, and the strip this replaces was 111 px of nothing
+            self.resize(width,
+                        max(int(bottom) + margin + 12, self.minimumHeight()))
+        finally:
+            self.btn_seq_open.setText(bare)
 
     def resizeEvent(self, ev):
         # A word-wrapped hint label does not always ask for the height its

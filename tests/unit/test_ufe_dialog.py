@@ -532,6 +532,11 @@ def test_request_wcs_queues_and_drains_on_solve(dlg, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
     from test_fits_annotate import _make_fits
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    # the QUEUED path needs a solver to exist: with none (the CI has no
+    # ASTAP and no nova key) the pending action fails at once instead, which
+    # is right in production and not what this test is about (measured
+    # 2026-10-01)
+    monkeypatch.setattr(dlg, "_nova_key_needed", lambda: False)
     dlg.state.load(_make_fits(tmp_path / "plain.fits"))
     ran = []
     dlg.request_wcs(lambda: ran.append("after"),

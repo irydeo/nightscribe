@@ -369,6 +369,10 @@ class MainWindow(QMainWindow):
         self._snapshot = snapshot
         self._welcome = None
         self._welcome_gate = False   # True while an update is unacknowledged
+        # Interfaz 1.0: Tonight is computed on demand, when the new-project
+        # view is first opened (never at start).
+        self._tonight_loaded = False
+        self._tonight_running = False
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
@@ -559,6 +563,13 @@ class MainWindow(QMainWindow):
         stack.addWidget(self.campaigns)  # VIEW_CAMPAIGNS
         stack.addWidget(detail)          # VIEW_DETAIL
         stack.setCurrentIndex(VIEW_HOME)
+        # Interfaz 1.0: the new-project search bar sits at the top of the
+        # Tonight view (the manual search moved out of Tools). Tonight's
+        # own .ui is untouched: the bar is a shell widget inserted above it.
+        from .widgets.new_project_bar import NewProjectBar
+        self._newbar = NewProjectBar()
+        self._newbar.create_target.connect(self._new_project_from_target)
+        self.tonight.layout().insertWidget(0, self._newbar)
         # the Tonight full table starts collapsed
         self.tonight.grp_list.setVisible(False)
         self._prepare_table()
@@ -1633,6 +1644,7 @@ class MainWindow(QMainWindow):
         return pix
 
     def on_compute_tonight(self):
+        self._tonight_running = True
         self.tonight.btn_compute.setEnabled(False)
         self._show_loading_state()
         self.statusBar().showMessage(self.tr("Computing tonight…"))
@@ -1641,6 +1653,19 @@ class MainWindow(QMainWindow):
         w.finished.connect(self._tonight_done)
         self._keep(w)
         w.start()
+
+    def _maybe_compute_tonight(self):
+        # Interfaz 1.0: the new-project view triggers the first compute on
+        # demand (the app itself never computes at start). A manual ↻
+        # still forces a fresh run through on_compute_tonight().
+        if self._tonight_loaded or self._tonight_running:
+            return
+        if not config.is_configured():
+            self.tonight.lbl_context.setText(
+                self.tr("Set your observatory in Welcome to get tonight's "
+                        "targets"))
+            return
+        self.on_compute_tonight()
 
     def _tonight_progress(self, msg):
         # One load phase arrived (see workers.TonightWorker). The human label
@@ -1707,6 +1732,8 @@ class MainWindow(QMainWindow):
         self.tonight.lbl_moon.setToolTip(self.tr("Computing…"))
 
     def _tonight_done(self, top, all_scored, error=""):
+        self._tonight_running = False
+        self._tonight_loaded = True
         self.tonight.btn_compute.setEnabled(True)
         self._stop_skeleton()
         self._bar_anim.stop()
@@ -2569,6 +2596,9 @@ class MainWindow(QMainWindow):
             self.on_refresh_projects()
         elif index == TAB_CAMPAIGNS:
             self._refresh_campaigns_tab()
+        elif index == VIEW_TONIGHT:
+            # Interfaz 1.0: the new-project view computes tonight on demand
+            self._maybe_compute_tonight()
 
     def _rebuild_campaign_filter(self):
         # Refills the hub's campaign combo, keeping the current selection.
@@ -7790,7 +7820,7 @@ class MainWindow(QMainWindow):
                  "rate_arcsec_min", "nobs", "moid", "h",
                  "nf_score", "nf_priority", "neocp", "pccp_score",
                   "perihelion_date", "transit", "approach", "hads",
-                  "variable", "campaign", "project_id")
+                  "variable", "campaign", "project_id", "notes")
                  if target.get(k) is not None}
         p = project.create(db, kind, name, ctx)
         if p:
@@ -7799,6 +7829,16 @@ class MainWindow(QMainWindow):
             self._select_project_row(p["id"])
             self.statusBar().showMessage(
                 self.tr("Project created: %1").replace("%1", name), 8000)
+        return p
+
+    def _new_project_from_target(self, target):
+        # The new-project bar (search or manual form) built a target dict:
+        # create the project and clear the bar on success (the creation
+        # path itself navigates to the project).
+        # @args: target - a planner-target dict from the bar
+        p = self._create_project(target)
+        if p is not None and getattr(self, "_newbar", None) is not None:
+            self._newbar.reset()
         return p
 
     def _select_project_row(self, pid):

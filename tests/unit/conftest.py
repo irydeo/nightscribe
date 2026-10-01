@@ -27,6 +27,28 @@ import os
 import pytest
 import requests
 
+# A hung test must NAME itself and stop, not eat the gate's whole budget: the
+# Windows run of 2026-10-01 sat at 81 % for 45 minutes with nothing in the
+# log to point at. pytest's own faulthandler_timeout dumps after two minutes
+# (see pyproject.toml) and this one, per test, dumps and EXITS after five,
+# which turns a hang into a three-minute failure with the traceback of every
+# thread in the log. Five minutes because the slowest test here (the live
+# session) is 30 s on this machine and that runner is about five times
+# slower.
+_HANG_S = float(os.environ.get("NIGHTSCRIBE_TEST_HANG_S") or 300)
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    # @args: item - the test about to run, nextitem - pytest's own argument
+    # @return: nothing (the hook is a wrapper)
+    import faulthandler
+    faulthandler.dump_traceback_later(_HANG_S, exit=True)
+    try:
+        yield
+    finally:
+        faulthandler.cancel_dump_traceback_later()
+
 # Every worker (and the plain run) creates a QApplication: offscreen keeps it
 # headless without depending on a display, set before any Qt import.
 #

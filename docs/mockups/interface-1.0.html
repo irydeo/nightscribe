@@ -108,7 +108,10 @@
   #view-home .plist{flex:1;min-height:0;overflow:auto}
   #view-new .sugg{flex:1;min-height:0;overflow:auto}
   #view-detail .placeholder{flex:1;display:flex;align-items:center;justify-content:center}
-  #view-welcome .hero{flex:1;display:flex;flex-direction:column;justify-content:center}
+  /* flex:1 0 auto: el hero crece si sobra alto pero nunca se encoge por debajo
+     de su contenido (la página de Bienvenida es larga). align-items:center para
+     que el CTA NO se estire a lo ancho (se veía a ancho completo, horrible). */
+  #view-welcome .hero{flex:1 0 auto;display:flex;flex-direction:column;align-items:center;justify-content:center}
 
   /* ---- piezas comunes ---- */
   .row{display:flex;align-items:center;gap:10px}
@@ -151,6 +154,7 @@
   .hero p.lead{max-width:640px;margin:0 auto 22px;color:#c7cbd9}
   .bigcta{
     display:inline-flex;flex-direction:column;gap:2px;align-items:center;
+    align-self:center;width:fit-content;
     background:linear-gradient(180deg,#2f6fd0,#2559a8);
     border:1px solid #4d86e0;border-radius:12px;padding:16px 34px;color:#fff;
     box-shadow:0 10px 28px rgba(47,111,208,.30);
@@ -167,6 +171,41 @@
   .steps{display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap}
   .step{border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;color:var(--dim)}
   .step b{color:var(--accent)}
+
+  /* Stepper de Bienvenida: Observatorio -> Objetivos -> Datos. Reemplaza al
+     QWizard modal; el paso Datos es el único bloqueante (una vez por versión). */
+  .stepper{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;margin:0 0 16px}
+  .st{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+      border-radius:999px;padding:5px 14px;color:var(--dim);font-size:12px;cursor:pointer}
+  .st .n{width:18px;height:18px;border-radius:50%;background:var(--line);color:var(--text);
+         display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700}
+  .st.on{border-color:var(--accent);color:var(--text)}
+  .st.on .n{background:var(--accent);color:#11141d}
+  .st.done .n{background:var(--good);color:#0d1a10}
+  .st-arrow{color:var(--line)}
+  .setup{border:1px solid var(--line);border-radius:10px;background:var(--base);padding:16px 18px;text-align:left}
+  .setup .sh{display:flex;align-items:center;gap:10px;margin-bottom:3px}
+  .setup .sh b{font-size:14px}
+  .setup .sub{color:var(--dim);font-size:12px;margin-bottom:14px}
+  .setup .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .setup .grid.two{grid-template-columns:repeat(2,1fr)}
+  .setup label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+  .setup input,.setup select{background:var(--bg);border:1px solid var(--edge);border-radius:4px;padding:6px 8px;color:var(--text);font:inherit;font-size:12px}
+  .setup .statusline{color:var(--dim);font-size:11px;margin-top:10px}
+  .kindrow{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+  .kindrow:last-child{border-bottom:0}
+  .kindrow input[type=checkbox]{margin-top:3px}
+  .kindrow .kb{flex:1}
+  .kindrow .kt{font-weight:700}
+  .kindrow .kd{color:#c7cbd9;font-size:12px}
+  .kindrow .ks{color:var(--dim);font-size:11px}
+  .newbadge{background:var(--accent);color:#11141d;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:6px}
+  .datareport{display:flex;flex-direction:column;gap:6px;color:var(--dim);font-size:12px}
+  .datareport .warn{color:var(--warn)}
+  .gate{margin-top:14px;display:flex;align-items:center;gap:10px}
+  .setup-panel{display:none}
+  .setup-panel.on{display:block}
+  .welc-cta{margin-top:18px;display:flex;justify-content:center}
 
   /* ---- home ---- */
   .home-head{display:flex;align-items:center;gap:14px;margin-bottom:12px}
@@ -288,7 +327,7 @@
   <button data-state="new">Nuevo proyecto</button>
   <button data-state="detail">Detalle</button>
   <button data-state="ufe">UFE embebido</button>
-  <span class="muted">· cada vista ocupa toda el área de contenido · la pestaña vertical «PROYECTOS» abre el drawer · Tonight y UFE sin rediseño interno ·</span>
+  <span class="muted">· cada vista ocupa toda el área de contenido · la pestaña vertical «PROYECTOS» abre el drawer · Bienvenida = asistente (stepper) · Tonight y UFE sin rediseño interno ·</span>
 </div>
 
 <div class="app">
@@ -330,12 +369,79 @@
     <main class="content" id="content">
 
       <!-- ============ A. BIENVENIDA ============ -->
+      <!-- Sustituye al QWizard modal: los tres pasos del asistente viven aquí
+           como stepper. Bienvenida se muestra solo cuando hace falta (primera
+           ejecución, actualización pendiente o sin proyectos). El paso Datos
+           es el único bloqueante (una vez por versión). -->
       <section class="view" id="view-welcome">
         <div class="hero">
           <h1 class="wordmark">NIGHT<span>SCRIBE</span></h1>
           <p class="tag">Planifica · Comprende · Cuenta tu noche de observación</p>
-          <p class="lead">Aún no tienes proyectos. Un proyecto nace de un objeto que quieres observar
-            y guía todo lo demás: ficha, captura, análisis y publicación.</p>
+          <p class="lead">Configura tu observatorio y tus objetivos en tres pasos; luego crea tu
+            primer proyecto y la app te guía: ficha, captura, análisis y publicación.</p>
+        </div>
+
+        <div class="stepper">
+          <button class="st on" data-step="obs"><span class="n">1</span> Tu observatorio</button>
+          <span class="st-arrow">→</span>
+          <button class="st" data-step="kinds"><span class="n">2</span> Tus objetivos</button>
+          <span class="st-arrow">→</span>
+          <button class="st" data-step="data"><span class="n">3</span> Tus datos, a salvo</button>
+        </div>
+
+        <div class="setup-panel on" id="step-obs">
+          <div class="setup">
+            <div class="sh"><b>Tu observatorio</b></div>
+            <div class="sub">Dinos desde dónde miras el cielo: NightScribe calcula salida, puesta, airmass y visibilidad para ese sitio exacto.</div>
+            <div class="row" style="gap:10px;margin-bottom:12px">
+              <button class="cta" style="padding:7px 14px">Detectar mi ubicación</button>
+              <span class="muted small">Solo al pulsar: la búsqueda usa tu IP para la ciudad y nada más.</span>
+            </div>
+            <div class="grid">
+              <label>Latitud (°)<input value="40.41678"></label>
+              <label>Longitud (° E)<input value="-3.70379"></label>
+              <label>Altura (m)<input value="650"></label>
+              <label>Nombre<input value="Observatorio Irydeo"></label>
+              <label>Código MPC<input placeholder="p. ej. Z41"></label>
+              <label>&nbsp;<button class="ghost" style="margin-top:0">Resolver MPC</button></label>
+            </div>
+            <div class="statusline">Ubicación encontrada: Madrid (40.41678, -3.70379). Ajusta los números si no cuadran.</div>
+          </div>
+        </div>
+
+        <div class="setup-panel" id="step-kinds">
+          <div class="setup">
+            <div class="sh"><b>Tus objetivos</b></div>
+            <div class="sub">Cada tipo es un flujo completo en NightScribe. Deja marcados los que quieras seguir: guían Tonight, los proyectos y los informes.</div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Objetos cercanos a la Tierra (NEO)</div><div class="kd">Asteroides y cometas que pasan cerca, con prioridad, ritmo aparente y banderas.</div><div class="ks">Fuente: NEOfixer + NEOCP (MPC) + NASA Horizons</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Supernovas</div><div class="kd">Descubrimientos nuevos con blink de confirmación, curva de luz y avisos de cadencia.</div><div class="ks">Fuente: Rochester Astronomy + PanSTARRS (MAST)</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Cometas</div><div class="kd">Visibles esta noche con su magnitud observada en vivo y fecha de perihelio.</div><div class="ks">Fuente: COBS (MPC) + NASA Horizons</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Candidatos a cometa (PCCP)</div><div class="kd">Objetos reportados como asteroides que podrían ser cometas; llegar primero importa.</div><div class="ks">Fuente: MPC PCCP + NASA Horizons</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Tránsitos de exoplanetas</div><div class="kd">Cuándo cruza el planeta, deriva O-C, encaje en tu noche y export pre-rellenado.</div><div class="ks">Fuente: ExoClock + NASA Exoplanet Archive</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Aproximaciones y alertas</div><div class="kd">Próximas aproximaciones de ESA NEOCC y el canal editorial de AAVSO.</div><div class="ks">Fuente: ESA NEOCC + AAVSO</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Estrellas HADS</div><div class="kd">Variables delta Scuti de gran amplitud, plegables por fase en una sola sesión.</div><div class="ks">Fuente: catálogo vivo de P. Wils</div></div></div>
+            <div class="kindrow"><input type="checkbox" checked><div class="kb"><div class="kt">Variables y deberes<span class="newbadge">nuevo</span></div><div class="kd">Miembros de campaña por cadencia, eventos en curso, extremos y vigilias.</div><div class="ks">Fuente: AAVSO VSX + fotometría de la comunidad + ZTF</div></div></div>
+          </div>
+        </div>
+
+        <div class="setup-panel" id="step-data">
+          <div class="setup">
+            <div class="sh"><b>Tus datos, a salvo</b></div>
+            <div class="sub">Antes de tocar nada, NightScribe copia tu base de datos y te cuenta en palabras qué cambia esta versión.</div>
+            <div class="datareport">
+              <span>Ejecutando NightScribe 0.1.0.</span>
+              <span>Copia de seguridad escrita y verificada: nightscribe-2026-10-01.db (36.5 MB).</span>
+              <span>Esta versión mueve tu base de datos del formato 12 al 13. Todo lo guardado (observaciones, proyectos, campañas, caché) se conserva. Pasos aplicados:</span>
+              <span>v13: banderas de dato separadas de los avisos de calibración.</span>
+            </div>
+            <div class="gate">
+              <button class="cta" style="padding:7px 16px">Entendido, continuar</button>
+              <span class="muted small">Obligatorio una sola vez por versión.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="welc-cta">
           <button class="bigcta" data-goto="new">
             <b>✦ CREAR MI PRIMER PROYECTO</b>
             <small>elige entre los mejores objetos de esta noche</small>
@@ -343,11 +449,6 @@
         </div>
 
         <div class="infogrid">
-          <div class="card">
-            <h4>Antes de empezar</h4>
-            <p class="muted small">Configura tu observatorio: lat/lon, horizonte real y equipo.</p>
-            <button class="link">Abrir ajustes →</button>
-          </div>
           <div class="card">
             <h4>¿Qué puedes observar?</h4>
             <ul>
@@ -361,6 +462,11 @@
             <h4>¿Cómo funciona?</h4>
             <div class="steps"><span class="step"><b>1</b> Ficha</span><span class="step"><b>2</b> Captura</span><span class="step"><b>3</b> Análisis</span><span class="step"><b>4</b> Publicación</span></div>
             <button class="link">Ver la guía completa →</button>
+          </div>
+          <div class="card">
+            <h4>Explora el cielo</h4>
+            <p class="muted small">Calendario de eventos, diario de observación y campañas.</p>
+            <button class="link">Calendario del cielo →</button>
           </div>
         </div>
       </section>
@@ -713,6 +819,16 @@
     manualForm.hidden = true;
   });
   mfKind.addEventListener("change", ()=>mfShowType(mfKind.value));
+
+  // Stepper de Bienvenida: cambia el panel del paso activo. Solo maqueta.
+  const stepBtns = document.querySelectorAll(".st");
+  function showStep(key){
+    document.querySelectorAll(".setup-panel").forEach(p=>{
+      p.classList.toggle("on", p.id === "step-" + key);
+    });
+    stepBtns.forEach(b=>b.classList.toggle("on", b.dataset.step === key));
+  }
+  stepBtns.forEach(b=>b.addEventListener("click", ()=>showStep(b.dataset.step)));
 
   show("welcome");
 </script>

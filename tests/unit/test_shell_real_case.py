@@ -78,6 +78,28 @@ def test_detail_page_is_visible(window):
     assert window.projects.page_detail.isVisible()
 
 
+def test_drawer_shows_the_same_rich_rows_as_home(window):
+    # Interfaz 1.1: the overlay drawer reuses ProjectRow, the SAME rich
+    # rows as the hub list (not the plain "[SN] name" text it used to).
+    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import Qt
+    from nightscribe.gui.widgets.project_row import ProjectRow
+    window._drawer_open(True)
+    for _ in range(3):
+        QApplication.processEvents()
+    dl = window._drawer_list
+    assert dl.count() >= 1
+    rows = [dl.itemWidget(dl.item(i)) for i in range(dl.count())]
+    assert all(isinstance(r, ProjectRow) for r in rows)
+    home_ids = {window.projects.lst_projects.item(i).data(Qt.UserRole)
+                for i in range(window.projects.lst_projects.count())
+                if window.projects.lst_projects.item(i).data(
+                    Qt.UserRole) is not None}
+    drawer_ids = {dl.item(i).data(Qt.UserRole) for i in range(dl.count())}
+    assert drawer_ids == home_ids
+    assert "SN shell" in {r.lbl_name.text() for r in rows}
+
+
 def test_workbench_has_a_fixed_index_and_shows(window):
     # the bug: with no Welcome the UFE was appended at index 4 while
     # VIEW_UFE was 5, so it never showed.

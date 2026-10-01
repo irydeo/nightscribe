@@ -1013,22 +1013,36 @@ class MainWindow(QMainWindow):
         vw = vw.width() if vw is not None else 28
         rect = cw.rect()
         self._scrim.setGeometry(vw, 0, rect.width() - vw, rect.height())
+        # 430 px: enough for the rich project row (icon + name + sparkline)
         self._drawer.setGeometry(vw, 0,
-                                 min(380, rect.width() - vw), rect.height())
+                                 min(430, rect.width() - vw), rect.height())
 
     def _refresh_drawer(self):
-        # Mirrors the hub list into the compact drawer (same rows, same
-        # project ids; section headers are skipped).
+        # Interfaz 1.1: the overlay drawer shows the SAME rich rows as the
+        # hub list (same ProjectRow, same payload), built from the data of
+        # the last refresh so the two cannot drift.
         self._drawer_list.clear()
-        src = self.projects.lst_projects
-        for i in range(src.count()):
-            it = src.item(i)
-            pid = it.data(Qt.UserRole)
-            if pid is None:
-                continue
-            row = QListWidgetItem(it.text())
-            row.setData(Qt.UserRole, pid)
-            self._drawer_list.addItem(row)
+        projects_list = getattr(self, "_last_projects_list", None)
+        if projects_list is None:
+            return
+        attn_map = getattr(self, "_last_attn_map", {}) or {}
+        camp_names = getattr(self, "_last_camp_names", {}) or {}
+        current_id = (self._current_project or {}).get("id")
+        for p in projects_list:
+            item = QListWidgetItem(f"[{p['kind']}] {p['object_name']}")
+            item.setData(Qt.UserRole, p["id"])
+            # the item's height must carry the row's fixed 74 px
+            item.setSizeHint(QSize(0, 74))
+            self._drawer_list.addItem(item)
+            row = self._project_row_widget(p, attn_map.get(p["id"]),
+                                           camp_names)
+            row.clicked.connect(
+                lambda it=item: self._drawer_row_clicked(it))
+            row.double_clicked.connect(
+                lambda it=item: self._drawer_row_clicked(it))
+            self._drawer_list.setItemWidget(item, row)
+            if p["id"] == current_id:
+                row.set_selected(True)
 
     def _drawer_row_clicked(self, item):
         pid = item.data(Qt.UserRole)
@@ -3329,6 +3343,11 @@ class MainWindow(QMainWindow):
                 if p["id"] in attn_map else 3)
         from ..core import campaign as _camp
         camp_names = {c["id"]: c["name"] for c in _camp.list_campaigns(db)}
+        # Interfaz 1.1: keep the last rows' data so the overlay drawer can
+        # rebuild the SAME rich rows without recomputing them
+        self._last_projects_list = projects_list
+        self._last_attn_map = attn_map
+        self._last_camp_names = camp_names
         lst = self.projects.lst_projects
         # preserve the selected project across the refresh (the list reloads
         # on every visit to the tab and at startup, so we must not drop the
@@ -3382,17 +3401,8 @@ class MainWindow(QMainWindow):
             lst.addItem(item)
             # UX-PC (U2): the rich row — the plain text above stays as the
             # accessible/searchable fallback under the widget
-            row = ProjectRow()
-            payload = self._project_row_payload(
-                p, attn_map.get(p["id"]), camp_names)
-            urgency = payload.pop("_urgency", None)
-            row.set_project(**payload)
-            if urgency == "event":
-                row.lbl_next.setStyleSheet(
-                    f"color: {theme.C_EVENT}; font-weight: bold;")
-            elif urgency == "due":
-                row.lbl_next.setStyleSheet(
-                    f"color: {theme.C_WARN}; font-weight: bold;")
+            row = self._project_row_widget(p, attn_map.get(p["id"]),
+                                           camp_names)
             row.clicked.connect(
                 lambda it=item: self.projects.lst_projects
                 .setCurrentItem(it))
@@ -3543,6 +3553,24 @@ class MainWindow(QMainWindow):
             # not a widget field: the urgency tint is applied after
             "_urgency": urgency,
         }
+
+    def _project_row_widget(self, p, attn, camp_names):
+        # The single builder of a rich project row, shared by the hub list
+        # and the overlay drawer (Interfaz 1.1) so their look cannot drift.
+        # @args: p - the list row, attn - its attention entry or None,
+        #        camp_names - {campaign id: name}
+        # @return: a configured ProjectRow (payload + urgency tint)
+        row = ProjectRow()
+        payload = self._project_row_payload(p, attn, camp_names)
+        urgency = payload.pop("_urgency", None)
+        row.set_project(**payload)
+        if urgency == "event":
+            row.lbl_next.setStyleSheet(
+                f"color: {theme.C_EVENT}; font-weight: bold;")
+        elif urgency == "due":
+            row.lbl_next.setStyleSheet(
+                f"color: {theme.C_WARN}; font-weight: bold;")
+        return row
 
     def _project_row_selection_sync(self, current, _previous):
         # Paints the selection on the rich rows (the item widget covers the

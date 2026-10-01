@@ -113,7 +113,7 @@
   }
   .scrim.on{opacity:1;pointer-events:auto}
   .drawer{
-    position:absolute;top:0;bottom:0;left:28px;width:340px;z-index:20;
+    position:absolute;top:0;bottom:0;left:28px;width:430px;z-index:20;
     background:var(--base);border-right:1px solid var(--line);
     transform:translateX(-105%);transition:transform .18s ease;
     display:flex;flex-direction:column;
@@ -411,18 +411,35 @@
       </div>
       <div class="drawer-body">
         <div class="search" style="margin-bottom:10px">⌕ <input placeholder="Buscar…" readonly></div>
+        <!-- Mismas filas ricas que en «Proyectos» (misma estética): el
+             drawer reutiliza ProjectRow en la app. -->
         <div class="plist" style="border-radius:6px">
-          <div class="prow" data-goto="detail" style="padding:9px 10px">
+          <div class="prow" data-goto="detail">
+            <span class="fav on">★</span>
             <span class="kind" style="background:var(--sn)"></span>
-            <div><div class="name small">SN 2026abc</div><div class="meta" style="font-size:11px">Supernova · activo</div></div>
+            <div><div class="name">SN 2026abc</div><div class="meta">Supernova · activo · NGC 1234 · mag 14.2</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,16 12,13 22,15 32,9 42,11 52,6 62,8" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--sn)">82%</span>
+            </div>
           </div>
-          <div class="prow" data-goto="detail" style="padding:9px 10px">
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
             <span class="kind" style="background:var(--comet)"></span>
-            <div><div class="name small">C/2025 K1</div><div class="meta" style="font-size:11px">Cometa · activo</div></div>
+            <div><div class="name">C/2025 K1 (ATLAS)</div><div class="meta">Cometa · activo · mag 9.8</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,18 12,15 22,16 32,12 42,14 52,10 62,11" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--comet)">64%</span>
+            </div>
           </div>
-          <div class="prow" data-goto="detail" style="padding:9px 10px">
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
             <span class="kind" style="background:var(--variable)"></span>
-            <div><div class="name small">V CrB</div><div class="meta" style="font-size:11px">Variable · activo</div></div>
+            <div><div class="name">V CrB (variable)</div><div class="meta">Variable · activo · 5 visitas</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,17 12,17 22,14 32,8 42,6 52,9 62,7" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--variable)">71%</span>
+            </div>
           </div>
         </div>
         <button class="newtile" data-goto="new" style="margin-top:10px;width:100%"><b>+ NUEVO PROYECTO</b><small>desde esta noche</small></button>

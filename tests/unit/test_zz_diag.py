@@ -103,8 +103,11 @@ def test_diag_band(dlg, qapp):
         dlg.view.size(), getattr(dlg.view, "_title_h", "?"),
         getattr(dlg.view, "show_data", "?")), flush=True)
     from PySide6.QtGui import QFont, QFontMetricsF
+    lf = getattr(dlg.view, "_label_font", None)
+    print("   _label_font:", lf, "->", lf.pointSizeF() if lf else None,
+          flush=True)
     band = dlg._chart_band()
-    f = QFont(dlg.view._label_font)
+    f = QFont(lf) if lf is not None else QFont()
     f.setPointSizeF((f.pointSizeF() or 9.0) + 1.0)
     f.setBold(True)
     fm = QFontMetricsF(f)
@@ -129,3 +132,11 @@ def test_diag_band(dlg, qapp):
     band = dlg._chart_band()["lines"][0]
     print("   band lines:", [(s["field"], s["text"]) for s in band],
           flush=True)
+    # ¿es el recorte por anchura? ensanchamos la vista y repetimos
+    dlg.view.resize(1600, 700)
+    qapp.processEvents()
+    print("   -- vista ensanchada: %s --" % dlg.view.size(), flush=True)
+    for mag in (17.1, 15.0):
+        dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                        "mag": mag})
+        probe("ancha %.2f" % mag)

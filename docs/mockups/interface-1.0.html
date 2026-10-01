@@ -53,16 +53,45 @@
 
   /* ---- app shell ---- */
   .app{display:flex;flex-direction:column;height:calc(100vh - 34px);min-height:560px}
-  .menubar{
-    display:flex;align-items:center;gap:16px;
-    padding:0 12px;height:36px;flex:0 0 36px;
-    background:var(--panel);border-bottom:1px solid var(--line);
-  }
-  .brand{font-weight:700;letter-spacing:.02em}
-  .brand .dot{color:var(--accent)}
-  .site{color:var(--dim);font-size:12px}
-  .menus{margin-left:auto;display:flex;gap:14px;color:var(--dim);font-size:12px}
-  .menus span:hover{color:var(--text);cursor:default}
+
+  /* Barra de título (nativa en la app: icono + "NightScribe <versión>") */
+  .titlebar{display:flex;align-items:center;gap:8px;height:30px;flex:0 0 30px;
+    background:var(--panel);border-bottom:1px solid var(--line);padding:0 10px;font-size:12px}
+  .titlebar .logo{width:18px;height:18px;border-radius:4px;
+    background:linear-gradient(180deg,#1b2134,#0e1119);
+    display:flex;align-items:center;justify-content:center}
+  .titlebar .logo::after{content:"✦";color:#ecc15f;font-size:11px;line-height:1}
+  .titlebar .title{color:var(--text);font-weight:600}
+  .titlebar .title span{color:var(--dim);font-weight:400}
+  .titlebar .win{margin-left:auto;display:flex;gap:14px;color:var(--dim)}
+  .titlebar .win span{width:12px;text-align:center;cursor:default}
+
+  /* Barra de menú nativa (File · Tools · Help) con los ítems reales */
+  .menubar{display:flex;align-items:center;gap:4px;height:26px;flex:0 0 26px;
+    background:var(--panel);border-bottom:1px solid var(--line);padding:0 8px;font-size:12px;color:var(--text)}
+  .menubar .m{position:relative;padding:4px 10px;border-radius:4px;cursor:default}
+  .menubar .m:hover{background:var(--hover);color:var(--accent)}
+  .menubar .dd{display:none;position:absolute;top:24px;left:0;min-width:250px;
+    background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 0;
+    box-shadow:0 10px 28px rgba(0,0,0,.45);z-index:60}
+  .menubar .m:hover .dd{display:block}
+  .menubar .dd span{display:block;padding:5px 14px;color:var(--text)}
+  .menubar .dd span:hover{background:var(--hover)}
+  .menubar .dd .hr{height:1px;background:var(--line);margin:5px 0;padding:0}
+
+  /* Barra de navegación: atrás/adelante/home + migas + contexto */
+  .navbar{display:flex;align-items:center;gap:8px;height:34px;flex:0 0 34px;
+    background:var(--base);border-bottom:1px solid var(--line);padding:0 10px;font-size:12px}
+  .navbar .navbtn{background:var(--panel);border:1px solid var(--edge);border-radius:5px;
+    padding:3px 9px;color:var(--text);font-size:12px}
+  .navbar .navbtn:hover{background:var(--hover)}
+  .navbar .navbtn.off{color:var(--line)}
+  .navbar .crumbs{display:flex;align-items:center;gap:6px;margin-left:6px;color:var(--dim)}
+  .navbar .crumbs a{color:var(--accent);text-decoration:none;cursor:pointer}
+  .navbar .crumbs a:hover{text-decoration:underline}
+  .navbar .crumbs .sep{color:var(--line)}
+  .navbar .crumbs .here{color:var(--text);font-weight:600}
+  .navbar .ctx{margin-left:auto;color:var(--dim)}
 
   .shell{display:flex;flex:1;position:relative;overflow:hidden}
 
@@ -327,14 +356,48 @@
   <button data-state="new">Nuevo proyecto</button>
   <button data-state="detail">Detalle</button>
   <button data-state="ufe">UFE embebido</button>
-  <span class="muted">· cada vista ocupa toda el área de contenido · la pestaña vertical «PROYECTOS» abre el drawer · Bienvenida = asistente (stepper) · Tonight y UFE sin rediseño interno ·</span>
+  <span class="muted">· barra de título + menú reales · barra de navegación con migas (← → ⌂ ⓘ Bienvenida, Alt+←/→) · pestaña vertical «PROYECTOS» abre el drawer · cada vista ocupa todo el área ·</span>
 </div>
 
 <div class="app">
+  <div class="titlebar">
+    <span class="logo"></span>
+    <span class="title">NightScribe <span>0.1.0</span></span>
+    <span class="win"><span>—</span><span>▢</span><span>✕</span></span>
+  </div>
+
   <div class="menubar">
-    <div class="brand">Night<span class="dot">Scribe</span></div>
-    <div class="site">Irydeo (MPC Z41) · sáb 3 oct · Luna 62%</div>
-    <div class="menus"><span>File</span><span>Tools</span><span>Help</span></div>
+    <div class="m">File
+      <div class="dd"><span>Quit</span></div>
+    </div>
+    <div class="m">Tools
+      <div class="dd">
+        <span>Settings…</span><span class="hr"></span>
+        <span>Sky calendar…</span>
+        <span>Explore object…</span>
+        <span>Blink (ad-hoc)…</span>
+        <span>Observing journal…</span>
+        <span>Campaigns…</span>
+        <span>NightScribe Image Workbench…</span>
+      </div>
+    </div>
+    <div class="m">Help
+      <div class="dd">
+        <span>Technical Documentation</span><span class="hr"></span>
+        <span>About NightScribe</span>
+        <span>Data sources</span>
+        <span>Open the log…</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="navbar">
+    <button class="navbtn" id="navBack" title="Atrás (Alt+←)">←</button>
+    <button class="navbtn off" id="navFwd" title="Adelante (Alt+→)">→</button>
+    <button class="navbtn" data-goto="home" title="Home (Alt+Home)">⌂</button>
+    <button class="navbtn" data-goto="welcome" title="Bienvenida / Guía de inicio">ⓘ Bienvenida</button>
+    <div class="crumbs" id="crumbs"></div>
+    <div class="ctx">Irydeo (MPC Z41) · sáb 3 oct · Luna 62%</div>
   </div>
 
   <div class="shell">
@@ -775,14 +838,44 @@
   const drawer = document.getElementById("drawer");
   const scrim = document.getElementById("scrim");
 
-  function show(state){
+  // Migas por estado (Home › proyecto › pestaña) y una mini-historia para
+  // que Atrás/Adelante se comporten como en la app.
+  const CRUMBS = {
+    welcome: '<span class="here">Bienvenida</span>',
+    home: '<span class="here">Home</span>',
+    new: '<a data-goto="home">Home</a><span class="sep">›</span><span class="here">Nuevo proyecto</span>',
+    detail: '<a data-goto="home">Home</a><span class="sep">›</span><a data-goto="detail">SN 2026abc</a><span class="sep">›</span><span class="here">Análisis</span>',
+    ufe: '<a data-goto="home">Home</a><span class="sep">›</span><a data-goto="detail">SN 2026abc</a><span class="sep">›</span><span class="here">Image Workbench</span>',
+  };
+  let hist = [], fwd = [];
+  const current = ()=>views.find(v=>document.getElementById("view-"+v).classList.contains("on"));
+
+  function show(state, record=true){
+    const cur = current();
+    if (record && cur && cur !== state){ hist.push(cur); fwd = []; }
     views.forEach(v=>{
       document.getElementById("view-"+v).classList.toggle("on", v===state);
     });
     document.querySelectorAll(".mockbar button").forEach(b=>{
       b.classList.toggle("on", b.dataset.state===state);
     });
+    document.getElementById("crumbs").innerHTML = CRUMBS[state] || "";
+    document.querySelectorAll("#crumbs a[data-goto]").forEach(a=>
+      a.addEventListener("click", ()=>show(a.dataset.goto)));
+    document.getElementById("navBack").classList.toggle("off", hist.length===0);
+    document.getElementById("navFwd").classList.toggle("off", fwd.length===0);
     content.scrollTop = 0;
+  }
+
+  function back(){
+    if (!hist.length) return;
+    fwd.push(current());
+    show(hist.pop(), false);
+  }
+  function forward(){
+    if (!fwd.length) return;
+    hist.push(current());
+    show(fwd.pop(), false);
   }
 
   function drawerOpen(on){
@@ -793,7 +886,13 @@
   document.getElementById("vtab").addEventListener("click", ()=>drawerOpen(!drawer.classList.contains("on")));
   document.getElementById("drawerClose").addEventListener("click", ()=>drawerOpen(false));
   scrim.addEventListener("click", ()=>drawerOpen(false));
-  document.addEventListener("keydown", e=>{ if(e.key==="Escape") drawerOpen(false); });
+  document.getElementById("navBack").addEventListener("click", back);
+  document.getElementById("navFwd").addEventListener("click", forward);
+  document.addEventListener("keydown", e=>{
+    if (e.key==="Escape") drawerOpen(false);
+    if (e.altKey && e.key==="ArrowLeft"){ back(); }
+    if (e.altKey && e.key==="ArrowRight"){ forward(); }
+  });
 
   document.querySelectorAll("[data-state]").forEach(b=>b.addEventListener("click", ()=>show(b.dataset.state)));
   document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click", ()=>{

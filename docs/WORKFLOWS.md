@@ -1004,3 +1004,25 @@ observer's independent reduction (was 0.32), **0.0094 mag** residual (was 0.13),
    (`_parse_curve`) is covered by the priority-chain tests.
 4. The fixture `tests/data/v0526per/` (8 cropped real frames, 4 MB) is the safety
    net: **do not replace it with synthetic data**.
+
+### 7novies. Interfaz 1.0: the project hub (2026-10-01, ADR-055)
+
+Motivation: the app was born Tonight-first and grew into a project manager;
+the order had inverted. Interfaz 1.0 puts the project at the centre without
+touching any widget's interior.
+
+| Phase | Deliverable | Status |
+|---|---|---|
+| 0 | Navigable mockup `docs/mockups/interface-1.0.html` (validated) | **Done (2026-10-01)** |
+| 1 | Shell: vertical "PROJECTS" tab + `QStackedWidget` (Home · Tonight · Campaigns · Detail), overlay drawer, Home startup offline | **Done** (`bdb69cc`) |
+| 2 | Welcome = inline wizard (`welcome_tab.ui` + `welcome_setup.py`), start-view decision, blocking Data step once per version | **Done** (`18fd38b`) |
+| 3 | Tonight on demand (`_maybe_compute_tonight`), embedded search (`new_project_bar.py`) and manual form (`manual_object_panel.ui`) | **Done** (`a256ffe`) |
+| 4 | Embedded UFE: `UfeDialog` from `QDialog` to `QWidget`, shell page with a back bar and `shutdown()` on leave | **Done** (`bf3082e`) |
+| 5 | Home alerts: "What's up in the sky" and "Due for a revisit" bands; campaigns as a hub strip | **Done** (`3b51ba5`) |
+| 6 | ADR-055, amendments to ADR-019/044, i18n ES/EN (2058, 0 unfinished), docs | **Done** |
+
+**Entry point**: `gui/main_window.py` (`_build_shell`, `_show_welcome`,
+`_ufe_page`) and `gui/widgets/` (`welcome_setup.py`, `new_project_bar.py`,
+`manual_object_panel.py`). Still to polish: campaigns keep their own view
+(the Home strip only links); the other dialogs (Settings, Sky calendar,
+Journal) are still windows.

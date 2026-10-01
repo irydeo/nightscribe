@@ -1252,3 +1252,26 @@ reducción independiente del observador (antes 0.32), residuo **0.0094 mag** (an
    (`_parse_curve`) sí está cubierto por los tests de la cadena de prioridad.
 4. La fixture `tests/data/v0526per/` (8 frames reales recortados, 4 MB) es la red de
    seguridad: **no la sustituyas por datos sintéticos**.
+
+### 7novies. Interfaz 1.0: el hub de proyectos (2026-10-01, ADR-055)
+
+Motivación: la app nació con Tonight como raíz y creció hasta ser un gestor
+de proyectos; el orden se había invertido. Interfaz 1.0 pone el proyecto en
+el centro, sin tocar el interior de ningún widget.
+
+| Fase | Entregable | Estado |
+|---|---|---|
+| 0 | Mockup navegable `docs/mockups/interface-1.0.html` (validado) | **Hecho (2026-10-01)** |
+| 1 | Shell: pestaña vertical «PROYECTOS» + `QStackedWidget` (Home · Tonight · Campaigns · Detalle), drawer superpuesto, arranque en Home sin red | **Hecho** (`bdb69cc`) |
+| 2 | Bienvenida = asistente en línea (`welcome_tab.ui` + `welcome_setup.py`), decisión de vista inicial, gate bloqueante del paso Datos una vez por versión | **Hecho** (`18fd38b`) |
+| 3 | Tonight bajo demanda (`_maybe_compute_tonight`), buscador embebido (`new_project_bar.py`) y formulario manual (`manual_object_panel.ui`) | **Hecho** (`a256ffe`) |
+| 4 | UFE embebido: `UfeDialog` de `QDialog` a `QWidget`, página del shell con barra de retorno y `shutdown()` al salir | **Hecho** (`bf3082e`) |
+| 5 | Avisos en Home: bandas «Qué pasa en el cielo» y «Toca revisitar»; campañas como tira del hub | **Hecho** (`3b51ba5`) |
+| 6 | ADR-055, enmiendas a ADR-019/044, i18n ES/EN (2058, 0 sin terminar), docs | **Hecho** |
+
+**Punto de entrada (para quien retome)**: `gui/main_window.py`
+(`_build_shell`, `_show_welcome`, `_ufe_page`) y `gui/widgets/`
+(`welcome_setup.py`, `new_project_bar.py`, `manual_object_panel.py`).
+Pendiente de pulir: las campañas aún conservan su vista propia (la tira de
+Home solo enlaza); el resto de diálogos (Ajustes, Calendario del cielo,
+Diario) siguen siendo ventanas.

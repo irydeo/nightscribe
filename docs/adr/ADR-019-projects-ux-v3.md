@@ -1,6 +1,6 @@
 # ADR-019: UX v3 — project-centric workflow
 
-**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06, 2026-09 (Track UX), 2026-09-16
+**Estado / Status**: Accepted · **Fecha / Date**: 2026-08-24 · **Revisión / Review**: 2026-08-28, 2026-09-02, 2026-09-06, 2026-09 (Track UX), 2026-09-16 · **Enmendado / Amended**: 2026-10-01 (Interfaz 1.0, ADR-055: el modelo de navegación «pestañas libres + wizard» pasa a «Home + Bienvenida condicional»; el arranque es la lista de proyectos, no Tonight)
 
 ## Español
 

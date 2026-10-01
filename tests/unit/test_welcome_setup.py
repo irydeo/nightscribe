@@ -52,6 +52,18 @@ def make_window(monkeypatch):
         w.close()
 
 
+def test_welcome_is_branded_and_has_the_onboarding_cards(make_window):
+    # Interfaz 1.2: the app logo, the accented wordmark and the three
+    # onboarding cards of the mock.
+    w = make_window(snapshot=None)
+    u = w._welcome.ui
+    assert not u.lbl_logo.pixmap().isNull()
+    assert "SCRIBE" in u.welcomeWordmark.text()
+    for name in ("wcard1", "wcard2", "wcard3",
+                 "btn_card2_guide", "btn_card3_skycal"):
+        assert hasattr(u, name)
+
+
 def test_first_run_shows_welcome(make_window):
     from nightscribe.gui.main_window import VIEW_WELCOME
     w = make_window(snapshot=None)

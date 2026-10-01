@@ -727,7 +727,10 @@ class MainWindow(QMainWindow):
                     '<a href="%s" style="color:%s;text-decoration:none">%s</a>'
                     % (self._crumb_href(view, pid, tab, cid), theme.C_ACCENT,
                        _html.escape(str(label))))
-        sep = ' <span style="color:%s">›</span> ' % theme.C_LINE
+        # the tree reads with arrows: Home → project → tab. The separator
+        # is the dim text colour, not the border line: on the dark bar the
+        # line colour made the arrows almost invisible.
+        sep = ' <span style="color:%s">→</span> ' % theme.C_TEXT_DIM
         return sep.join(parts)
 
     def _crumb_clicked(self, url):
@@ -767,44 +770,65 @@ class MainWindow(QMainWindow):
         proj = self.projects
         stack = self._shell_stack()
 
-        # Home: the attention dashboard on top, the project list below.
+        # Home (Interfaz 1.2, matching the mock): header with the new
+        # project tile, the sky band, the attention block, the list and the
+        # campaigns strip.
         home = QWidget()
         hl = QVBoxLayout(home)
         hl.setContentsMargins(12, 12, 12, 12)
         hl.setSpacing(10)
-        # Interfaz 1.0: the alerts get a home of their own on Home. The
-        # sky-event chips used to fall to the bottom of Tonight by an
-        # accident of layout parenting; the SN cadence reminders join the
-        # "needs your attention" story.
         from PySide6.QtWidgets import (QFrame, QLabel, QHBoxLayout,
                                        QPushButton)
+        # header: "My projects" + the prominent new-project tile
+        head = QFrame()
+        head.setObjectName("homeHead")
+        hlay = QHBoxLayout(head)
+        hlay.setContentsMargins(0, 0, 0, 0)
+        title = QLabel(self.tr("My projects"))
+        title.setObjectName("homeTitle")
+        hlay.addWidget(title)
+        hlay.addStretch(1)
+        newtile = QPushButton(self.tr("+ NEW PROJECT"))
+        newtile.setObjectName("newTile")
+        newtile.setCursor(Qt.PointingHandCursor)
+        newtile.setToolTip(self.tr("Create a project from tonight's targets"))
+        newtile.clicked.connect(self._new_project_view)
+        hlay.addWidget(newtile)
+        hl.addWidget(head)
+        # the sky-event band, with a link to the Sky calendar
         self._sky_band, self._sky_chips_row = self._chip_band(
-            self.tr("What's up in the sky"))
+            self.tr("What's up in the sky"), variant="sky",
+            link=(self.tr("Sky calendar →"), self._tools_skycal))
         hl.addWidget(self._sky_band)
-        dash = proj.page_dashboard
-        proj.stack_detail.removeWidget(dash)
-        hl.addWidget(dash)
-        # removeWidget() HID the page (QStackedWidget semantics): adding it
-        # to a layout does not un-hide it, so the dashboard would be blank.
-        dash.show()
-        self._cadence_band, self._cadence_row = self._chip_band(
-            self.tr("Due for a revisit"))
-        hl.addWidget(self._cadence_band)
+        # Interfaz 1.3: the "needs your attention" panel and the cadence band
+        # are GONE: every one of those signals (next action, urgency, days
+        # since the last visit, due-for-revisit) already lives in the project
+        # row itself, so a second surface was redundant.
         lst = proj.grp_list
         proj.layout().removeWidget(lst)
+        # the header already says "My projects": drop the group's own title
+        # and the plain new-project button (the header tile replaces it)
+        lst.setTitle("")
+        self.projects.btn_new_project.setVisible(False)
         hl.addWidget(lst, 1)
-        # campaigns, folded into the hub (Interfaz 1.0): a strip that opens
-        # the Campaigns view (its detail stays its own full-screen view)
-        camp_strip = QHBoxLayout()
+        # campaigns, folded into the hub: a strip that opens the view
+        strip = QFrame()
+        strip.setObjectName("campaignStrip")
+        slay = QHBoxLayout(strip)
+        slay.setContentsMargins(12, 6, 12, 6)
         camp_lbl = QLabel(self.tr("Campaigns"))
-        camp_lbl.setStyleSheet("color: %s; font-size: 11px; font-weight: 700;"
+        camp_lbl.setStyleSheet("color: %s; font-weight: 700;"
                                % theme.C_TEXT_DIM)
-        camp_strip.addWidget(camp_lbl)
-        camp_btn = QPushButton(self.tr("Open campaigns →"))
+        slay.addWidget(camp_lbl)
+        slay.addStretch(1)
+        camp_btn = QPushButton(self.tr("See all →"))
+        camp_btn.setFlat(True)
+        camp_btn.setStyleSheet(
+            "color: %s; padding: 0; border: none;" % theme.C_ACCENT)
+        camp_btn.setCursor(Qt.PointingHandCursor)
         camp_btn.clicked.connect(self._tools_campaigns)
-        camp_strip.addWidget(camp_btn)
-        camp_strip.addStretch(1)
-        hl.addLayout(camp_strip)
+        slay.addWidget(camp_btn)
+        hl.addWidget(strip)
 
         # Detail: the project page (masthead, tab bar, Next, sections).
         detail = QWidget()
@@ -890,6 +914,8 @@ class MainWindow(QMainWindow):
         self._welcome = WelcomeSetup(snapshot=self._snapshot)
         self._welcome.create_project.connect(self._welcome_create)
         self._welcome.finished.connect(self._welcome_finished)
+        self._welcome.open_guide.connect(self.on_docs)
+        self._welcome.open_skycal.connect(self._tools_skycal)
         lay = QVBoxLayout(self._welcome_page)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self._welcome)
@@ -904,15 +930,8 @@ class MainWindow(QMainWindow):
                                   and self._snapshot is not None)
         if self._update_due:
             self._welcome.show_step("data")
-        self._set_vtab_enabled(not self._welcome_gate)
         self._shell_stack().setCurrentIndex(VIEW_WELCOME)
-
-    def _set_vtab_enabled(self, on):
-        # @args: on - enable/disable the vertical PROJECTS tab (the gate
-        #        blocks it while an update is unacknowledged)
-        btn = getattr(self._menus, "btn_vtab", None)
-        if btn is not None:
-            btn.setEnabled(on)
+        self._update_vtab_visibility()
 
     def _welcome_finished(self):
         # "Got it" on the Data step. Only a REAL update seals the version
@@ -922,7 +941,6 @@ class MainWindow(QMainWindow):
                 self._welcome.ack_data()
             self._update_due = False
             self._welcome_gate = False
-            self._set_vtab_enabled(True)
             self.on_refresh_projects()
             self.navigate(VIEW_HOME, replace=True)
             return
@@ -938,7 +956,6 @@ class MainWindow(QMainWindow):
             self._welcome.ack_data()
             self._update_due = False
             self._welcome_gate = False
-            self._set_vtab_enabled(True)
         self.navigate(VIEW_TONIGHT, replace=True)
 
     def _build_drawer(self):
@@ -994,6 +1011,10 @@ class MainWindow(QMainWindow):
 
     def _drawer_open(self, on):
         # @args: on - show (True) or hide (False) the overlay drawer
+        # Interfaz 1.3: on Home the list IS the screen, so the drawer is
+        # not available there (the vertical tab is hidden too).
+        if on and self._shell_stack().currentIndex() == VIEW_HOME:
+            return
         if on:
             self._refresh_drawer()
             self._position_overlay()
@@ -1071,26 +1092,38 @@ class MainWindow(QMainWindow):
         if bar is not None:
             bar.edt_search.setFocus()
 
-    def _chip_band(self, title):
+    def _chip_band(self, title, variant="sky", link=None):
         # A slim Home band that hosts a row of clickable chips (sky events,
-        # SN cadence). Hidden while it has no chips.
-        # @args: title - the band's small header
+        # SN cadence). Hidden while it has no chips. Interfaz 1.2: the
+        # variant picks the accent stripe (sky = blue, cadence = orange) and
+        # an optional right-side link button.
+        # @args: title - the band's small header; variant - "sky"|"cadence";
+        #        link - (text, slot) for a trailing link button, or None
         # @return: (the band QFrame, its chips QHBoxLayout)
         from PySide6.QtWidgets import (QFrame, QLabel, QHBoxLayout,
-                                       QVBoxLayout)
+                                       QVBoxLayout, QPushButton)
         band = QFrame()
-        band.setObjectName("home_band")
-        band.setStyleSheet(
-            "QFrame#home_band { background: %s; border: 1px solid %s;"
-            " border-radius: 8px; }" % (theme.C_BASE, theme.C_LINE))
+        band.setObjectName("skyBand" if variant == "sky" else "cadenceBand")
         lay = QVBoxLayout(band)
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(6)
+        headrow = QHBoxLayout()
         head = QLabel(title)
-        head.setStyleSheet(
-            "color: %s; font-size: 11px; font-weight: 700;"
-            " letter-spacing: 1px;" % theme.C_TEXT_DIM)
-        lay.addWidget(head)
+        head.setObjectName("bandHead")
+        head.setStyleSheet("color: %s;" % (
+            theme.C_ACCENT if variant == "sky" else theme.C_WARN))
+        headrow.addWidget(head)
+        headrow.addStretch(1)
+        if link is not None:
+            btn = QPushButton(link[0])
+            btn.setFlat(True)
+            btn.setStyleSheet(
+                "color: %s; text-align: right; padding: 0; border: none;"
+                % theme.C_ACCENT)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.clicked.connect(link[1])
+            headrow.addWidget(btn)
+        lay.addLayout(headrow)
         row = QHBoxLayout()
         row.setSpacing(8)
         row.addStretch(1)
@@ -1286,7 +1319,11 @@ class MainWindow(QMainWindow):
             sc.setContext(Qt.ApplicationShortcut)
             sc.activated.connect(fn)
         # paint the bar for the initial view
+        logo = theme.app_logo(20)
+        if not logo.isNull():
+            self._menus.lbl_nav_logo.setPixmap(logo)
         self._update_nav_bar()
+        self._update_vtab_visibility()
         self._install_mouse_nav()
 
     def _open_url(self, url):
@@ -2123,7 +2160,6 @@ class MainWindow(QMainWindow):
         self._update_night_header()
         self._build_suggestion_grid()
         self._fill_table()
-        self._show_cadence_hints()
         self._skyevent_chips()
         self.statusBar().showMessage(
             self.tr("%1 targets evaluated").replace("%1", str(len(all_scored))),
@@ -2191,62 +2227,6 @@ class MainWindow(QMainWindow):
         tip = (self.tr("Moon: %1% lit now, %2% by dawn")
                .replace("%1", f"{pct_now:.0f}").replace("%2", f"{pct_by_dawn:.0f}"))
         label.setToolTip(tip + "\n" + self._txt(why))
-
-    def _show_cadence_hints(self):
-        # B11: surface active SN projects that are due for a revisit ("hace
-        # N noches que no la visitas"). Reads the follow-up cadence from the
-        # project_sessions table. Interfaz 1.0: the chips live in Home's
-        # "Due for a revisit" band, part of the needs-your-attention story.
-        from ..core import followup as fu
-        # remove every previous cadence chip (several now, idempotent).
-        # Detach NOW (setParent(None)): deleteLater alone leaves the C++
-        # object findable until the event loop turns, so findChild would
-        # hand back a corpse on the next call.
-        for old in self.findChildren(QLabel, "ns_cadence_chip"):
-            parent = old.parentWidget()
-            if parent and parent.layout():
-                parent.layout().removeWidget(old)
-            old.setParent(None)
-            old.deleteLater()
-        threshold = int(config.get("sn_cadence_days", 3))
-        # campaign projects already surface in Tonight via the planner's
-        # "campaigns" phase (ADR-035, V-d): the chip only watches
-        # campaign-less SN projects
-        rows = db.execute(
-            "SELECT id, object_name FROM projects"
-            " WHERE status='active' AND kind='sn'"
-            " AND (campaign_id IS NULL)").fetchall()
-        hints = []
-        for pid, name in rows:
-            days = fu.days_since_last_session(db, pid)
-            if days is not None and days >= threshold:
-                hints.append((pid, name, days))
-        band = getattr(self, "_cadence_band", None)
-        if band is not None:
-            band.setVisible(bool(hints))
-        if not hints:
-            return
-        row = getattr(self, "_cadence_row", None)
-        if row is None:
-            parent = self.tonight.lbl_context.parentWidget()
-            row = parent.layout() if parent else None
-        if row is None or not hasattr(row, "insertWidget"):
-            return
-        for i, (pid, name, days) in enumerate(hints[:3]):
-            chip = _LinkChip(
-                self.tr("SN due: %1 (%2 d)").replace(
-                    "%1", name).replace("%2", str(days)),
-                "#e0c060",
-                self.tr("Due for a revisit: click to open its Follow-up"))
-            chip.setObjectName("ns_cadence_chip")
-            chip.clicked.connect(
-                lambda _p=pid: self._goto_project_followup(_p))
-            row.insertWidget(i, chip)
-        if len(hints) > 3:
-            more = QLabel(f"+{len(hints) - 3}")
-            more.setObjectName("ns_cadence_chip")
-            more.setStyleSheet(theme.chip_style("#e0c060"))
-            row.insertWidget(3, more)
 
     def _goto_project_followup(self, pid):
         # Opens the project on its Analysis tab (ADR-045). The cadence
@@ -2974,6 +2954,22 @@ class MainWindow(QMainWindow):
         elif index == VIEW_TONIGHT:
             # Interfaz 1.0: the new-project view computes tonight on demand
             self._maybe_compute_tonight()
+        # Interfaz 1.3: the drawer has no place on Home (the list is the
+        # screen); close it and hide its tab while Home is shown.
+        if index == VIEW_HOME and getattr(self, "_drawer", None) is not None \
+                and self._drawer.isVisible():
+            self._drawer_open(False)
+        self._update_vtab_visibility()
+
+    def _update_vtab_visibility(self):
+        # The vertical PROJECTS tab is shown everywhere EXCEPT Home, where
+        # the project list is already the screen (Interfaz 1.3). While an
+        # update gates the app it stays visible but disabled.
+        btn = getattr(self._menus, "btn_vtab", None)
+        if btn is None:
+            return
+        btn.setVisible(self._shell_stack().currentIndex() != VIEW_HOME)
+        btn.setEnabled(not getattr(self, "_welcome_gate", False))
 
     def _rebuild_campaign_filter(self):
         # Refills the hub's campaign combo, keeping the current selection.
@@ -3426,10 +3422,6 @@ class MainWindow(QMainWindow):
         if getattr(self, "_drawer_list", None) is not None \
                 and self._drawer.isVisible():
             self._refresh_drawer()
-        # Interfaz 1.0: the Home "Due for a revisit" band is local-only
-        # (it reads project_sessions), so it can refresh on every visit.
-        if getattr(self, "_cadence_band", None) is not None:
-            self._show_cadence_hints()
 
     # ---------------- UX-PC (U2): rich rows + dashboard ----------------
 
@@ -3619,133 +3611,11 @@ class MainWindow(QMainWindow):
         }
         return texts[act["key"]]
 
-    def _attention_text(self, e):
-        # @args: e - an attention_report entry
-        # @return: the full-sentence reason (the dashboard rows are plain
-        #          words, never codes)
-        name = e["object_name"]
-        if e["reason"] == "event":
-            ev = e["event"] or {}
-            word = self.tr("down") if ev.get("direction") == "drop" \
-                else self.tr("up")
-            return self.tr("⚡ %1 — %2 mag %3 in %4 — measure tonight") \
-                .replace("%1", name).replace("%2", str(ev.get("delta_mag"))) \
-                .replace("%3", word).replace("%4", str(ev.get("filter")))
-        if e["reason"] == "due":
-            return self.tr("⏳ %1 — %2 nights since the last visit") \
-                .replace("%1", name).replace("%2", str(e["overdue_days"]))
-        if e["reason"] == "never_visited":
-            return self.tr("⏳ %1 — the first measurement opens the "
-                           "series").replace("%1", name)
-        if e["reason"] == "extremum":
-            ex = e["extremum"] or {}
-            word = self.tr("maximum") if ex.get("kind") == "max" \
-                else self.tr("minimum")
-            return self.tr("⏳ %1 — %2 expected in ~%3 d") \
-                .replace("%1", name).replace("%2", word) \
-                .replace("%3", str(ex.get("days")))
-        text = self._next_action_text(
-            {"key": e["reason"], "overdue_days": None,
-             "never_visited": False})
-        return f"○ {name} — {text[0].lower() + text[1:] if text else ''}"
-
-    def _attention_card(self, e):
-        # @args: e - an attention_report entry
-        # @return: a QFrame card: urgency band + the reason in words + one
-        #          action button landing on the right section
-        colors = {"event": theme.C_EVENT, "due": theme.C_WARN,
-                  "info": theme.C_OK}
-        color = colors.get(e["urgency"], theme.C_OK)
-        card = QFrame()
-        card.setObjectName("attcard")
-        card.setStyleSheet(
-            f"QFrame#attcard {{ background: {theme.C_BASE};"
-            f" border-radius: 8px; border: 1px solid {theme.C_LINE}; }}")
-        lay = QHBoxLayout(card)
-        lay.setContentsMargins(0, 8, 10, 8)
-        lay.setSpacing(10)
-        band = QFrame()
-        band.setFixedWidth(4)
-        band.setStyleSheet(f"background: {color}; border-radius: 2px;")
-        lay.addWidget(band)
-        text = self._attention_text(e)
-        if e.get("campaign"):
-            text += "  ·  ⚑ " + e["campaign"]
-        lbl = QLabel(text)
-        lbl.setWordWrap(True)
-        lay.addWidget(lbl, 1)
-        btn = QPushButton(
-            self.tr("Measure →") if e.get("section") == "analysis"
-            else self.tr("Go →"))
-        btn.setCursor(Qt.PointingHandCursor)
-        btn.clicked.connect(lambda _=False, entry=e:
-                            self._dashboard_goto(entry))
-        lay.addWidget(btn, 0, Qt.AlignVCenter)
-        return card
-
-    def _dashboard_goto(self, e):
-        # A dashboard card button: open the project AND land on the
-        # section the reason calls for (the app speaks, then walks you).
-        # @args: e - the attention entry behind the card
-        if self._goto_project_by_id(e["project_id"]) and e.get("section"):
-            self._scroll_to_section(e["section"])
-
-    def _refresh_dashboard(self):
-        # Fills the dashboard page from the last attention report (UX-PC
-        # U2). Three states: no projects at all (a pointer to Tonight),
-        # nothing calling (calm), and the calling cards.
-        lay = self.projects.dash_container.layout()
-        self._wipe_layout(lay)
-        entries = getattr(self, "_attention", None)
-        if entries is None:
-            entries = attention.attention_report(db, config)
-        any_projects = bool(project.list_projects(db))
-        if not any_projects:
-            self.projects.lbl_dash_title.setText(
-                self.tr("Your projects live here"))
-            self.projects.lbl_dash_sub.setText(
-                self.tr("A project is one object with its three steps: "
-                        "capture, track, follow-up. Pick an object in "
-                        "Tonight and it becomes a project that guides "
-                        "you."))
-            box = QLabel(
-                self.tr("No projects yet — tonight's best objects are on "
-                        "the Tonight tab."))
-            box.setWordWrap(True)
-            box.setStyleSheet(f"color: {theme.C_TEXT_DIM}; padding: 12px;")
-            lay.addWidget(box)
-            btn = QPushButton(self.tr("Go to Tonight →"))
-            btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda: self.navigate(VIEW_TONIGHT))
-            lay.addWidget(btn, 0, Qt.AlignLeft)
-        elif not entries:
-            self.projects.lbl_dash_title.setText(
-                self.tr("Needs your attention"))
-            self.projects.lbl_dash_sub.setText(
-                self.tr("Your projects calling for action, most urgent "
-                        "first."))
-            box = QLabel(self.tr("✨ All quiet — nothing needs you "
-                                 "tonight. Clear skies!"))
-            box.setWordWrap(True)
-            box.setStyleSheet(f"color: {theme.C_TEXT_DIM}; padding: 12px;")
-            lay.addWidget(box)
-        else:
-            self.projects.lbl_dash_title.setText(
-                self.tr("Needs your attention"))
-            self.projects.lbl_dash_sub.setText(
-                self.tr("Your projects calling for action, most urgent "
-                        "first."))
-            for e in entries[:5]:
-                lay.addWidget(self._attention_card(e))
-        lay.addStretch()
-
-    def _show_dashboard(self):
-        # No selection: the attention dashboard (on Home) is refreshed. It
-        # only NAVIGATES to Home when the observer is already in the hub
-        # or in a project: at startup this is called from
-        # on_refresh_projects with no selection, and switching blindly
-        # would yank the user out of Welcome (the first-run / update view).
-        self._refresh_dashboard()
+    def _show_home(self):
+        # No selection: the hub (the list). It only NAVIGATES to Home when
+        # the observer is already in the hub or in a project: at startup
+        # this is called from on_refresh_projects with no selection, and
+        # switching blindly would yank the user out of Welcome.
         if self._shell_stack().currentIndex() in (VIEW_HOME, VIEW_DETAIL):
             self._goto_tab(VIEW_HOME)
 
@@ -4038,7 +3908,7 @@ class MainWindow(QMainWindow):
         lst.setCurrentItem(None)
         lst.clearSelection()
         lst.blockSignals(was_blocked)
-        self._show_dashboard()
+        self._show_home()
 
     def _render_project_header(self, p):
         # UX-i: the flat masthead — icon, name, kind chip, campaign
@@ -9549,26 +9419,17 @@ class MainWindow(QMainWindow):
         return self._ufe
 
     def _ufe_page(self):
-        # Fills the fixed workbench page (VIEW_UFE) with a thin host bar
-        # (a "back" affordance; chrome of the shell, never of the
-        # workbench) above the editor. Built once; the workbench's
-        # interior is the same widget as always.
+        # Fills the fixed workbench page (VIEW_UFE) with the editor only.
+        # Interfaz 1.3: the host "Back" bar is gone — the general
+        # navigation stack (the top bar, Alt+Left, the mouse) already
+        # returns to wherever the workbench was opened from. Built once;
+        # the workbench's interior is the same widget as always.
         if getattr(self, "_ufe_page_built", False):
             return self._ufe_page_widget
-        from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
-                                       QPushButton)
+        from PySide6.QtWidgets import QVBoxLayout
         lay = QVBoxLayout(self._ufe_page_widget)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
-        bar = QWidget()
-        bl = QHBoxLayout(bar)
-        bl.setContentsMargins(8, 6, 8, 6)
-        back = QPushButton(self.tr("← Back"))
-        back.setToolTip(self.tr("Leave the workbench and return"))
-        back.clicked.connect(self._ufe_back)
-        bl.addWidget(back)
-        bl.addStretch(1)
-        lay.addWidget(bar)
         lay.addWidget(self._ufe_build(), 1)
         self._ufe_page_built = True
         return self._ufe_page_widget

@@ -300,28 +300,22 @@ def test_header_badge_is_a_link(window):
     assert f"campaign://{cid}" in text and "Campaña enlace" in text
 
 
-def test_cadence_chip_navigates_to_followup(window):
+def test_followup_deep_link_opens_analysis(window):
+    # Interfaz 1.3: the cadence chips are gone (the row carries the due
+    # signal); the deep link they used is still alive.
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
     p = proj_mod.create(mw.db, "sn", "SN 2099zz", {"mag": 15.0})
     fu.create_session(mw.db, p["id"])
-    # age the session beyond the cadence threshold
-    old = 1_700_000_000
-    mw.db.execute("UPDATE project_sessions SET created=? WHERE project_id=?",
-                  (old, p["id"]))
-    mw.db.commit()
-    window._show_cadence_hints()
-    chips = window.findChildren(QLabel, "ns_cadence_chip")
-    assert chips, "no cadence chip was created"
     window._goto_project_followup(p["id"])
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
-    # ADR-041: the project hub is a lazy tab bar — "navigate to
-    # Follow-up" builds the follow-up tab and activates it.
-    assert "analysis" in window._tab_pages, "the Follow-up tab was not built"
+    # ADR-041: the project hub is a lazy tab bar — the deep link builds
+    # the Analysis tab and activates it.
+    assert "analysis" in window._tab_pages, "the Analysis tab was not built"
     assert not window._tab_pages["analysis"].isHidden(), \
-        "the Follow-up tab should be active"
+        "the Analysis tab should be active"
 
 
 # --- ADR-037 SC2: the signals console -------------------------------------

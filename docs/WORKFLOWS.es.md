@@ -1288,3 +1288,16 @@ el gate de actualización bloquea «Atrás»; `action_log` pasa a Ayuda.
 
 **Punto de entrada**: `navigate`/`back`/`forward`/`home`/`_apply_location`
 en `gui/main_window.py`; tests en `tests/unit/test_navigation_history.py`.
+
+### 7undecies. Los avisos se disuelven en el listado (2026-10-01, ADR-055 rev.)
+
+Motivación: el panel «Necesita tu atención» y la banda «Toca revisar» repetían
+lo que cada fila ya dice (próxima acción en palabras, tinte de urgencia, edad
+de la última visita). Se retiran ambos; Home queda cabecera + banda del cielo
++ lista + tira de campañas. Además, con la lista en pantalla el drawer lateral
+no aporta: la pestaña vertical `PROYECTOS` se oculta en Home y solo aparece en
+las demás vistas. Las flechas Atrás/Adelante de la barra ganan tamaño, y el
+botón «Volver» del UFE se retira (lo cubre la pila general).
+
+**Punto de entrada**: `gui/main_window.py` (`_build_shell`, `_update_vtab_visibility`,
+`_drawer_open`); tests en `tests/unit/test_shell_real_case.py` y `test_projects_hub.py`.

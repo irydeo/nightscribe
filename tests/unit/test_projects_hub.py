@@ -580,57 +580,6 @@ def test_dashboard_shown_without_selection(window):
     assert window._shell_stack().currentIndex() == VIEW_HOME
 
 
-def test_dashboard_empty_state_points_to_tonight(window):
-    # UX-PC (U2): with zero projects in the db the dashboard teaches where
-    # projects come from (the Tonight tab) instead of showing a blank.
-    import nightscribe.core.db as dbmod
-    rows = dbmod.db.execute("SELECT id FROM projects").fetchall()
-    for (pid,) in rows:
-        dbmod.db.execute("DELETE FROM projects WHERE id=?", (pid,))
-        dbmod.db.execute("DELETE FROM project_steps WHERE project_id=?",
-                         (pid,))
-    dbmod.db.commit()
-    window.on_refresh_projects()
-    from nightscribe.gui.main_window import VIEW_HOME
-    assert window._shell_stack().currentIndex() == VIEW_HOME
-    title = window.projects.lbl_dash_title.text()
-    assert title                                # "Your projects live here"
-    # the CTA button jumps to the Tonight tab
-    from PySide6.QtWidgets import QPushButton
-    btns = window.projects.dash_container.findChildren(QPushButton)
-    assert btns and "Tonight" in btns[0].text()
-    btns[0].click()
-    from nightscribe.gui.main_window import VIEW_TONIGHT
-    assert window._shell_stack().currentIndex() == VIEW_TONIGHT
-
-
-def test_dashboard_attention_card_lands_on_followup(window, panel):
-    # UX-PC (U2): a due SN produces a card whose button opens the project
-    # AND scrolls to its follow-up section.
-    import time
-    import nightscribe.core.db as dbmod
-    from nightscribe.core import followup, project
-    p = project.create(dbmod.db, "sn", "SN2099dash", {"kind": "sn"})
-    project.advance(dbmod.db, p["id"])
-    sid = followup.create_session(dbmod.db, p["id"])
-    dbmod.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
-                     (time.time() - 6 * 86400, sid))
-    dbmod.db.commit()
-    window.on_refresh_projects()
-    window.projects.lst_projects.clearSelection()
-    window._clear_project_detail()
-    from PySide6.QtWidgets import QPushButton
-    cards = [w for w in
-             window.projects.dash_container.findChildren(QPushButton)
-             if w.isEnabled()]
-    assert cards, "no attention cards rendered"
-    cards[0].click()
-    assert window._current_project is not None
-    from nightscribe.gui.main_window import VIEW_DETAIL
-    assert window._shell_stack().currentIndex() == VIEW_DETAIL
-    # ADR-045: the deep link ends on the analysis tab, built + active
-    assert "analysis" in window._tab_pages
-    assert not window._tab_pages["analysis"].isHidden()
 
 
 def test_rich_rows_carry_the_story(window, panel):
@@ -1522,51 +1471,7 @@ def test_fu_paste_dialog_parses(window, panel):
 
 # ---------------- B11: cadence hint in Tonight ----------------
 
-def test_cadence_hint_shows_for_stale_sn(window, panel):
-    # An active SN project with a session 3+ days ago should produce a cadence chip
-    from nightscribe.core import project, followup as fu
-    import nightscribe.core.db as dbmod
-    import datetime
-    p = _create_and_select(window, "sn", "SN2026cad", {"kind": "sn"})
-    sid = fu.create_session(dbmod.db, p["id"], "2026-09-01")
-    old = datetime.datetime.now().timestamp() - 5 * 86400
-    dbmod.db.execute(
-        "UPDATE project_sessions SET created=? WHERE id=?", (old, sid))
-    dbmod.db.commit()
-    window._tonight_all = []
-    window._show_cadence_hints()
-    from PySide6.QtWidgets import QLabel
-    chips = [c for c in window.findChildren(QLabel)
-             if c.objectName() == "ns_cadence_chip"]
-    assert len(chips) >= 1
 
-
-def test_cadence_hint_no_active_projects(window, panel):
-    # Clean up any projects left by previous tests in the module-scoped DB
-    import nightscribe.core.db as dbmod
-    dbmod.db.execute("DELETE FROM projects")
-    dbmod.db.commit()
-    window._tonight_all = []
-    window._show_cadence_hints()
-    from PySide6.QtWidgets import QLabel
-    # the stale-sn test may have left a chip; clean it explicitly
-    stale = window.findChild(QLabel, "ns_cadence_chip")
-    if stale is not None:
-        # deleteLater is async; the C++ object lingers. Force-remove.
-        stale.setParent(None)
-        stale.deleteLater()
-    # look only for the named cadence chip (not any label with "follow")
-    from PySide6.QtWidgets import QLabel
-    chip = window.findChild(QLabel, "ns_cadence_chip")
-    # the chip may still exist as a C++ object pending deleteLater;
-    # what matters is that it's no longer in the layout (parent = None)
-    if chip is not None:
-        chip.setParent(None)
-    assert window.findChild(QLabel, "ns_cadence_chip") is None or \
-        chip.parentWidget() is None
-
-
-# ---------------- gap fixes: orphaned B5/B6/B10 + B9 ----------------
 
 def test_fu_point_hook_saves_measure_point(window, panel):
     # ADR-044: the "Quick analysis" quick-look button is retired (it did
@@ -1924,32 +1829,6 @@ def test_variable_followup_drops_quicklook_hides_animation(window):
     assert "Generate animation" not in btns
     assert "Export annotated FITS" not in btns
 
-
-def test_cadence_chip_ignores_campaign_projects(window):
-    from nightscribe.core import campaign as camp_mod
-    from nightscribe.core import followup as fu
-    from nightscribe.core import project as proj_mod
-    from nightscribe.gui import main_window as mw
-    import time
-    from PySide6.QtWidgets import QLabel
-    # campaign-less stale SN -> chip
-    p1 = proj_mod.create(mw.db, "sn", "SN 2026zzz", {"mag": 14.0})
-    fu.create_session(mw.db, p1["id"])
-    # campaign SN equally stale -> NO chip (it surfaces in the list instead)
-    cid = camp_mod.create(mw.db, "Campaña SN")
-    p2 = proj_mod.create(mw.db, "sn", "SN 2026yyy", {"mag": 14.0},
-                         campaign_id=cid)
-    fu.create_session(mw.db, p2["id"])
-    for pid in (p1["id"], p2["id"]):
-        sid = fu.list_sessions(mw.db, pid)[0]["id"]
-        mw.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
-                      (time.time() - 9 * 86400, sid))
-        mw.db.commit()
-    window._show_cadence_hints()
-    chip = window.findChild(QLabel, "ns_cadence_chip")
-    assert chip is not None
-    assert "SN 2026zzz" in chip.text()
-    assert "SN 2026yyy" not in chip.text()
 
 
 def test_followup_event_advisor_label(window):
@@ -2724,3 +2603,31 @@ def test_the_row_thumbnail_is_the_latest_curve_in_the_charts_scale(window):
                        for i in range(10)])
     payload = window._project_row_payload(proj.get(db, p["id"]), None, {})
     assert source_label("measure") in payload["sparkline_text"]
+
+
+def test_home_new_project_tile_points_to_tonight(window):
+    # Interfaz 1.3: the header tile is the single new-project entry.
+    from PySide6.QtWidgets import QPushButton
+    from nightscribe.gui.main_window import VIEW_TONIGHT
+    tile = window.findChild(QPushButton, "newTile")
+    assert tile is not None and tile.isEnabled()
+    tile.click()
+    assert window._shell_stack().currentIndex() == VIEW_TONIGHT
+
+
+def test_due_project_row_carries_the_urgency(window, panel):
+    # Interfaz 1.3: the "needs you" / cadence signal lives in the row (the
+    # next action in words + the urgency tint), not in a separate panel.
+    import time
+    import nightscribe.core.db as dbmod
+    from nightscribe.core import followup, project as proj_mod
+    from nightscribe.gui import main_window as mw, theme
+    p = proj_mod.create(mw.db, "sn", "SN2099due", {"kind": "sn"})
+    proj_mod.advance(mw.db, p["id"])
+    sid = followup.create_session(mw.db, p["id"])
+    dbmod.db.execute("UPDATE project_sessions SET created=? WHERE id=?",
+                     (time.time() - 9 * 86400, sid))
+    dbmod.db.commit()
+    row = window._project_row_widget(proj_mod.get(mw.db, p["id"]),
+                                     {"urgency": "due"}, {})
+    assert theme.C_WARN in row.lbl_next.styleSheet()

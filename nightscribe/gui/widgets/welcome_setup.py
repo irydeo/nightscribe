@@ -31,8 +31,12 @@ from ..ui_loader import load_ui
 class WelcomeSetup(QWidget):
     # create_project: the CTA asks the host to open the new-project view.
     # finished: the Data step was acknowledged (the host seals app_version).
+    # open_guide/open_skycal: the onboarding cards ask the host for the
+    # documentation / the Sky calendar dialog.
     create_project = Signal()
     finished = Signal()
+    open_guide = Signal()
+    open_skycal = Signal()
 
     # @args: snapshot - the pre-migration backup dict (core/backup.backup)
     #        or None when there is no database yet; parent - the host
@@ -46,13 +50,27 @@ class WelcomeSetup(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.addWidget(self.ui)
         self._boxes = {}
+        self._brand()
         self._wire()
         self._fill_from_config()
         self.show_step("obs")
 
+    def _brand(self):
+        # The logo + the wordmark ("SCRIBE" in the accent), the only bits
+        # of the hero that are not plain text (Interfaz 1.2).
+        from .. import theme
+        u = self.ui
+        logo = theme.app_logo(96)
+        if not logo.isNull():
+            u.lbl_logo.setPixmap(logo)
+        u.welcomeWordmark.setText(
+            'NIGHT<span style="color:%s">SCRIBE</span>' % theme.C_ACCENT)
+
     def _wire(self):
         from .. import wizard as wz
         u = self.ui
+        u.btn_card2_guide.clicked.connect(self.open_guide.emit)
+        u.btn_card3_skycal.clicked.connect(self.open_skycal.emit)
         u.btn_detect.clicked.connect(lambda: wz._detect(u))
         u.btn_resolve.clicked.connect(lambda: wz._resolve_site(u))
         u.btn_step_obs.clicked.connect(lambda: self.show_step("obs"))
@@ -99,10 +117,14 @@ class WelcomeSetup(QWidget):
         # @args: key - "obs" | "kinds" | "data"
         idx = {"obs": 0, "kinds": 1, "data": 2}.get(key, 0)
         self.ui.setup_stack.setCurrentIndex(idx)
-        for btn, k in ((self.ui.btn_step_obs, "obs"),
-                       (self.ui.btn_step_kinds, "kinds"),
-                       (self.ui.btn_step_data, "data")):
-            btn.setChecked(k == key)
+        steps = ((self.ui.btn_step_obs, 0), (self.ui.btn_step_kinds, 1),
+                 (self.ui.btn_step_data, 2))
+        for btn, i in steps:
+            btn.setChecked(i == idx)
+            # steps already behind us read "done" (green) in the QSS
+            btn.setProperty("state", "done" if i < idx else "")
+            btn.style().unpolish(btn)
+            btn.style().polish(btn)
 
     def _obs_next(self):
         from .. import wizard as wz

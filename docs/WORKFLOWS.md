@@ -1038,3 +1038,13 @@ blocks "Back"; `action_log` moves to Help.
 
 **Entry point**: `navigate`/`back`/`forward`/`home`/`_apply_location` in
 `gui/main_window.py`; tests in `tests/unit/test_navigation_history.py`.
+
+### 7undecies. Alerts dissolve into the list (2026-10-01, ADR-055 rev.)
+
+Motivation: the "needs your attention" panel and the "due for a revisit" band
+repeated what every row already says (next action in words, urgency tint, days
+since the last visit). Both are retired; Home is header + sky band + list +
+campaigns strip. With the list on screen the side drawer adds nothing: the
+vertical `PROJECTS` tab hides on Home and only appears elsewhere. The
+back/forward arrows grow, and the UFE "Back" button is removed (the general
+stack covers it).

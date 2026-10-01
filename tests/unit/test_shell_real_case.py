@@ -65,9 +65,11 @@ def test_opens_on_home_without_welcome(window):
     assert window._welcome is None                 # nothing to set up
 
 
-def test_home_dashboard_is_visible(window):
-    # removeWidget() hid the page; it must be un-hidden on Home.
-    assert window.projects.page_dashboard.isVisible()
+def test_home_has_no_attention_panel(window):
+    # Interfaz 1.3: the "needs your attention" panel and the cadence band
+    # are gone; that info lives in the project rows.
+    assert not window.projects.page_dashboard.isVisible()
+    assert not hasattr(window, "_cadence_band")
 
 
 def test_detail_page_is_visible(window):
@@ -78,12 +80,44 @@ def test_detail_page_is_visible(window):
     assert window.projects.page_detail.isVisible()
 
 
+def test_home_matches_the_mock(window):
+    # Interfaz 1.2: header with the new-project tile and the sky band with
+    # its calendar link.
+    from PySide6.QtWidgets import QPushButton
+    tiles = [b for b in window.findChildren(QPushButton)
+             if b.objectName() == "newTile"]
+    assert tiles and tiles[0].isEnabled()
+    assert window._sky_band.objectName() == "skyBand"
+    # the sky band carries a "Sky calendar →" link
+    assert any("calendar" in b.text().lower()
+               for b in window._sky_band.findChildren(QPushButton))
+    # the app logo sits in the navigation bar
+    assert not window._menus.lbl_nav_logo.pixmap().isNull()
+
+
+def test_home_hides_the_drawer_and_its_tab(window):
+    # Interfaz 1.3: on Home the list IS the screen, so the vertical tab is
+    # hidden and the drawer does not open; both come back elsewhere.
+    from nightscribe.gui.main_window import VIEW_TONIGHT
+    assert not window._menus.btn_vtab.isVisible()
+    window._drawer_open(True)
+    assert not window._drawer.isVisible()
+    window.navigate(VIEW_TONIGHT)
+    assert window._menus.btn_vtab.isVisible()
+    window._drawer_open(True)
+    assert window._drawer.isVisible()
+    window._drawer_open(False)
+
+
 def test_drawer_shows_the_same_rich_rows_as_home(window):
     # Interfaz 1.1: the overlay drawer reuses ProjectRow, the SAME rich
     # rows as the hub list (not the plain "[SN] name" text it used to).
+    # Interfaz 1.3: it opens from a view other than Home.
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt
+    from nightscribe.gui.main_window import VIEW_TONIGHT
     from nightscribe.gui.widgets.project_row import ProjectRow
+    window.navigate(VIEW_TONIGHT)
     window._drawer_open(True)
     for _ in range(3):
         QApplication.processEvents()

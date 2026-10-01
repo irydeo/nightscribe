@@ -76,6 +76,15 @@ pestañas, así que los atajos Ctrl+1..3 pasan a Home · Tonight · Campañas.
 Los tests de navegación comprueban `_shell_stack().currentIndex()` en vez
 del `QTabWidget`.
 
+**Revisión (2026-10-01, Interfaz 1.3).** El panel «Necesita tu atención» y
+la banda «Toca revisar» se **disuelven en el listado**: la fila ya dice la
+próxima acción, la urgencia y la edad de la última visita, así que una
+segunda superficie era redundante. Home queda cabecera + banda del cielo +
+lista + tira de campañas. Con la lista en pantalla, el **drawer lateral no
+se muestra en Home** (la pestaña vertical `PROYECTOS` se oculta allí y solo
+aparece en las demás vistas). Las flechas Atrás/Adelante de la barra crecen,
+y el botón «Volver» del UFE se retira (lo cubre la pila general, ADR-056).
+
 **Correcciones (2026-10-01, tras la revisión del observador).** Dos
 escollos reales que la primera pasada no vio (y que los tests tapaban al
 forzar `is_configured=False`, que construía Bienvenida y hacía cuadrar los

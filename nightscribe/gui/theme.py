@@ -46,6 +46,23 @@ def asset(name):
     return _ASSETS / name
 
 
+def app_logo(size=64):
+    # The application logo (the quill + four-point star tile) as a scaled
+    # QPixmap for the Welcome hero and the navigation bar. Returns a null
+    # QPixmap when the asset is missing, so callers can just skip it.
+    # @args: size - the square edge in px
+    # @return: a QPixmap (may be null)
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QPixmap
+    png = _ASSETS / "appicon-256.png"
+    if not png.exists():
+        return QPixmap()
+    pm = QPixmap(str(png))
+    if pm.isNull():
+        return pm
+    return pm.scaled(size, size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+
+
 # Per-kind accent colors, shared by cards, icons and table names.
 # Eight well-separated hues on the wheel (0/24/100/140/185/216/268/320°),
 # none in the amber band (40-65°), all saturated, mid-value.
@@ -430,4 +447,71 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{ width: 0; }}
 QFrame {{ color: {C_TEXT}; }}
 QLabel {{ background: transparent; color: {C_TEXT}; }}
 QLabel:disabled {{ color: {C_TEXT_DIM}; }}
+
+/* ---- Interfaz 1.2: Welcome + Home looks (ADR-005, ADR-026) ------------- */
+QFrame#welcomeHero {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #1a2236, stop:1 {C_BASE});
+    border: 1px solid {C_LINE}; border-radius: 14px;
+}}
+QLabel#welcomeWordmark {{ font-size: 28px; font-weight: 800;
+                          letter-spacing: 8px; }}
+QLabel#welcomeTag {{ color: {C_TEXT_DIM}; }}
+QLabel#welcomeLead {{ color: #c7cbd9; }}
+
+QToolButton#btn_step_obs, QToolButton#btn_step_kinds,
+QToolButton#btn_step_data {{
+    background: {C_PANEL}; border: 1px solid {C_LINE}; border-radius: 14px;
+    padding: 5px 14px; color: {C_TEXT_DIM};
+}}
+QToolButton#btn_step_obs:hover, QToolButton#btn_step_kinds:hover,
+QToolButton#btn_step_data:hover {{ background: {C_HOVER}; }}
+QToolButton#btn_step_obs:checked, QToolButton#btn_step_kinds:checked,
+QToolButton#btn_step_data:checked {{
+    border-color: {C_ACCENT}; color: {C_TEXT}; background: {C_HOVER};
+}}
+QToolButton#btn_step_obs[state="done"], QToolButton#btn_step_kinds[state="done"],
+QToolButton#btn_step_data[state="done"] {{
+    border-color: {C_GOOD}; color: {C_TEXT};
+}}
+
+QFrame#panel_obs, QFrame#panel_kinds, QFrame#panel_data {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 10px;
+}}
+QFrame#wcard1, QFrame#wcard2, QFrame#wcard3 {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 8px;
+}}
+QPushButton#btn_create {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #2f6fd0, stop:1 #2559a8);
+    border: 1px solid #4d86e0; border-radius: 12px;
+    padding: 14px 30px; font-size: 15px; font-weight: 700; color: #ffffff;
+}}
+QPushButton#btn_create:hover {{ background: #3579dd; }}
+
+QFrame#homeHead {{ background: transparent; }}
+QLabel#homeTitle {{ font-size: 19px; font-weight: 700; }}
+QPushButton#newTile {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #2f6fd0, stop:1 #2559a8);
+    border: 1px solid #4d86e0; border-radius: 10px;
+    padding: 8px 18px; color: #ffffff; font-weight: 700;
+}}
+QPushButton#newTile:hover {{ background: #3579dd; }}
+QFrame#skyBand {{
+    background: {C_BASE}; border: 1px solid {C_LINE};
+    border-left: 3px solid {C_ACCENT}; border-radius: 8px;
+}}
+QFrame#cadenceBand {{
+    background: {C_BASE}; border: 1px solid {C_LINE};
+    border-left: 3px solid {C_WARN}; border-radius: 8px;
+}}
+QLabel#bandHead {{ font-size: 11px; font-weight: 700; letter-spacing: 1px; }}
+QFrame#campaignStrip {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 8px;
+}}
+QWidget#attentionBlock {{
+    background: {C_BASE}; border: 1px solid {C_LINE};
+    border-left: 3px solid {C_WARN}; border-radius: 8px;
+}}
 """

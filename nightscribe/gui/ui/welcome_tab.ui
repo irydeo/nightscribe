@@ -15,28 +15,33 @@
    <property name="rightMargin"><number>24</number></property>
    <property name="bottomMargin"><number>20</number></property>
    <item>
-    <widget class="QFrame" name="hero" native="true">
+    <widget class="QFrame" name="welcomeHero" native="true">
      <layout class="QVBoxLayout" name="heroLayout">
       <item>
-       <widget class="QLabel" name="lbl_wordmark">
-        <property name="text"><string>NIGHTSCRIBE</string></property>
+       <widget class="QLabel" name="lbl_logo">
         <property name="alignment"><set>Qt::AlignCenter</set></property>
-        <property name="styleSheet"><string notr="true">font-size: 26px; font-weight: 800; letter-spacing: 10px;</string></property>
+        <property name="minimumSize"><size><width>96</width><height>96</height></size></property>
+        <property name="maximumSize"><size><width>96</width><height>96</height></size></property>
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="lbl_tag">
+       <widget class="QLabel" name="welcomeWordmark">
+        <property name="text"><string>NIGHTSCRIBE</string></property>
+        <property name="textFormat"><enum>Qt::RichText</enum></property>
+        <property name="alignment"><set>Qt::AlignCenter</set></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="welcomeTag">
         <property name="text"><string>Plan, understand and report your observing night</string></property>
         <property name="alignment"><set>Qt::AlignCenter</set></property>
-        <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="lbl_lead">
+       <widget class="QLabel" name="welcomeLead">
         <property name="text"><string>Set up your observatory and your targets in three steps; then create your first project and the app guides you: record, capture, analysis and publishing.</string></property>
         <property name="alignment"><set>Qt::AlignCenter</set></property>
         <property name="wordWrap"><bool>true</bool></property>
-        <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
        </widget>
       </item>
      </layout>
@@ -86,7 +91,7 @@
    </item>
    <item>
     <widget class="QStackedWidget" name="setup_stack">
-     <widget class="QWidget" name="panel_obs">
+     <widget class="QFrame" name="panel_obs">
       <layout class="QVBoxLayout" name="obsLayout">
        <item>
         <widget class="QLabel" name="lbl_obs_title">
@@ -190,7 +195,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="panel_kinds">
+     <widget class="QFrame" name="panel_kinds">
       <layout class="QVBoxLayout" name="kindsLayout">
        <item>
         <widget class="QLabel" name="lbl_kinds_title">
@@ -237,7 +242,7 @@
        </item>
       </layout>
      </widget>
-     <widget class="QWidget" name="panel_data">
+     <widget class="QFrame" name="panel_data">
       <layout class="QVBoxLayout" name="dataLayout">
        <item>
         <widget class="QLabel" name="lbl_data_title">
@@ -299,15 +304,109 @@
        <property name="toolTip"><string>Pick among tonight's best objects</string></property>
       </widget>
      </item>
-     <item>
-      <spacer name="createSpacer2">
-       <property name="orientation"><enum>Qt::Horizontal</enum></property>
-      </spacer>
-     </item>
-    </layout>
-   </item>
-  </layout>
- </widget>
+      <item>
+       <spacer name="createSpacer2">
+        <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QHBoxLayout" name="cardsLayout">
+      <property name="spacing"><number>12</number></property>
+      <item>
+       <widget class="QFrame" name="wcard1">
+        <layout class="QVBoxLayout" name="wcard1Layout">
+         <item>
+          <widget class="QLabel" name="lbl_card1_title">
+           <property name="text"><string>What can you observe?</string></property>
+           <property name="styleSheet"><string notr="true">font-weight: bold;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_card1_body">
+           <property name="text"><string>Supernovae and transients
+Near-Earth objects and PCCP candidates
+Comets and exoplanet transits
+Variable stars and HADS</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="wcard1Spacer">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="wcard2">
+        <layout class="QVBoxLayout" name="wcard2Layout">
+         <item>
+          <widget class="QLabel" name="lbl_card2_title">
+           <property name="text"><string>How does it work?</string></property>
+           <property name="styleSheet"><string notr="true">font-weight: bold;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_card2_body">
+           <property name="text"><string>1 Card · 2 Capture · 3 Analysis · 4 Publishing</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_card2_guide">
+           <property name="text"><string>See the full guide →</string></property>
+           <property name="flat"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: #6ab0ff; text-align: left; padding: 0;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="wcard2Spacer">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QFrame" name="wcard3">
+        <layout class="QVBoxLayout" name="wcard3Layout">
+         <item>
+          <widget class="QLabel" name="lbl_card3_title">
+           <property name="text"><string>Explore the sky</string></property>
+           <property name="styleSheet"><string notr="true">font-weight: bold;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_card3_body">
+           <property name="text"><string>Sky calendar, observing journal and campaigns.</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_card3_skycal">
+           <property name="text"><string>Sky calendar →</string></property>
+           <property name="flat"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: #6ab0ff; text-align: left; padding: 0;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="wcard3Spacer">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
  <resources/>
  <connections/>
 </ui>

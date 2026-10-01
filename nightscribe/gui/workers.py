@@ -22,6 +22,12 @@ logger = logging.getLogger(__name__)
 # Each worker emits a single "finished" signal with its payload.
 
 
+class _Cancelled(Exception):
+    # Raised at a phase boundary when the worker was cancelled (never
+    # reaches the user: run() swallows it).
+    pass
+
+
 class TonightWorker(QThread):
     # Builds tonight's target list and scores it in the background.
     finished = Signal(list, list, str)  # top, all_scored, error message
@@ -33,12 +39,21 @@ class TonightWorker(QThread):
         self._db = db
         self._date = date
         self._top = top
+        self._cancelled = False
+
+    def cancel(self):
+        # Coarse cancel: the next phase boundary aborts the run. A phase
+        # already in flight (a network fetch) still has to return, which
+        # is why the host also waits a bounded time after cancel().
+        self._cancelled = True
 
     def _phase(self, key):
         # @args: key - one of core/PLANNER.PHASES (see planner.PHASES)
         # Emits a phase index/total pair. The human label is chosen by the
         # GUI from a literal self.tr() table (so lupdate picks it up, the way
         # CONTRIBUTING rule 5 demands).
+        if self._cancelled:
+            raise _Cancelled()
         from ..core import planner
         total = len(planner.PHASES)
         index = planner.PHASES.index(key) + 1
@@ -57,6 +72,8 @@ class TonightWorker(QThread):
             top, all_scored = suggest.top_n(targets, self._cfg, self._db,
                                             self._top)
             self.finished.emit(top, all_scored, "")
+        except _Cancelled:
+            return              # the app is closing: no signal, no error
         except Exception as err:  # never crash the GUI on data problems
             logger.exception("tonight worker failed: %s", err)
             self.finished.emit([], [], str(err))

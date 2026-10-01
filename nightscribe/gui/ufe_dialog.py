@@ -150,7 +150,10 @@ class UfeDialog(QWidget):
         self._build_ui()
         self._build_shortcuts()
         self.resize(1440, 960)
-        self.setMinimumSize(1000, 640)
+        # Interfaz 1.0: the workbench is a shell page now, so its minimum
+        # must not force the whole main window to be huge; a smaller floor
+        # keeps the shell shrinkable on modest screens.
+        self.setMinimumSize(860, 560)
         self.state.image_loaded.connect(self._on_image_loaded)
         self.state.wcs_changed.connect(self._sync_wcs_buttons)
         self.view.zoom_changed.connect(self._on_zoom_changed)

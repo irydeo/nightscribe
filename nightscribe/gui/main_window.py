@@ -521,18 +521,10 @@ class MainWindow(QMainWindow):
         # be opened until "Got it".
         if getattr(self, "_welcome_gate", False) and index != VIEW_WELCOME:
             return
-        stack = self._shell_stack()
-        # Leaving the embedded workbench shuts its workers down (the same
-        # cleanup its closeEvent runs); ADR-047 keeps the plate's state.
-        if stack.currentIndex() == VIEW_UFE and index != VIEW_UFE:
-            ufe = getattr(self, "_ufe", None)
-            stop = getattr(ufe, "shutdown", None)
-            if callable(stop):
-                try:
-                    stop()
-                except Exception as err:
-                    logger.warning("UFE shutdown on view change: %s", err)
-        stack.setCurrentIndex(index)
+        # The workbench stays alive when another view is opened (ADR-047:
+        # its plate and stretch survive); its workers are only shut down
+        # when the app itself closes (MainWindow.closeEvent -> ufe.close).
+        self._shell_stack().setCurrentIndex(index)
 
     # ---------------- shell construction (Interfaz 1.0, ADR-053) ----------
 
@@ -567,6 +559,9 @@ class MainWindow(QMainWindow):
         dash = proj.page_dashboard
         proj.stack_detail.removeWidget(dash)
         hl.addWidget(dash)
+        # removeWidget() HID the page (QStackedWidget semantics): adding it
+        # to a layout does not un-hide it, so the dashboard would be blank.
+        dash.show()
         self._cadence_band, self._cadence_row = self._chip_band(
             self.tr("Due for a revisit"))
         hl.addWidget(self._cadence_band)
@@ -593,11 +588,23 @@ class MainWindow(QMainWindow):
         page = proj.page_detail
         proj.stack_detail.removeWidget(page)
         dl.addWidget(page)
+        # same as the dashboard: removeWidget() hid it, un-hide it or the
+        # project detail would come up empty
+        page.show()
 
         stack.addWidget(home)            # VIEW_HOME
         stack.addWidget(self.tonight)    # VIEW_TONIGHT
         stack.addWidget(self.campaigns)  # VIEW_CAMPAIGNS
         stack.addWidget(detail)          # VIEW_DETAIL
+        # Fixed placeholder pages for the lazily built views: the stack
+        # ALWAYS has six pages, so VIEW_WELCOME (4) and VIEW_UFE (5) are
+        # valid whatever order the views are first opened in. Building them
+        # with addWidget() instead would append them at whatever free index
+        # and the constants would be wrong (the bug that hid the workbench).
+        self._welcome_page = QWidget()
+        stack.addWidget(self._welcome_page)      # VIEW_WELCOME
+        self._ufe_page_widget = QWidget()
+        stack.addWidget(self._ufe_page_widget)   # VIEW_UFE
         stack.setCurrentIndex(VIEW_HOME)
         # Interfaz 1.0: the new-project search bar sits at the top of the
         # Tonight view (the manual search moved out of Tools). Tonight's
@@ -655,7 +662,11 @@ class MainWindow(QMainWindow):
             self._welcome = WelcomeSetup(snapshot=self._snapshot)
             self._welcome.create_project.connect(self._welcome_create)
             self._welcome.finished.connect(self._welcome_finished)
-            self._shell_stack().addWidget(self._welcome)   # VIEW_WELCOME
+            # into its fixed placeholder page (VIEW_WELCOME)
+            from PySide6.QtWidgets import QVBoxLayout
+            lay = QVBoxLayout(self._welcome_page)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.addWidget(self._welcome)
         # The gate only makes sense on a real update (there is a database
         # to report on): a first run, and a test with no snapshot, stay
         # freely navigable.
@@ -778,7 +789,16 @@ class MainWindow(QMainWindow):
 
     def _drawer_new_project(self):
         self._drawer_open(False)
+        self._new_project_view()
+
+    def _new_project_view(self):
+        # Interfaz 1.0: the new-project view (Tonight on demand + the
+        # embedded search/manual form). The hub's "New project…" and the
+        # drawer both land here, focusing the search.
         self._goto_tab(VIEW_TONIGHT)
+        bar = getattr(self, "_newbar", None)
+        if bar is not None:
+            bar.edt_search.setFocus()
 
     def _chip_band(self, title):
         # A slim Home band that hosts a row of clickable chips (sky events,
@@ -865,7 +885,7 @@ class MainWindow(QMainWindow):
         # UX-c: one gesture language — double-click/Enter opens the
         # project at its current step, right-click offers every action,
         # the hand cursor advertises clickability.
-        p.btn_new_project.clicked.connect(self._tools_explore)
+        p.btn_new_project.clicked.connect(self._new_project_view)
         p.lst_projects.itemActivated.connect(
             self._project_open_activated)
         p.lst_projects.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -7742,16 +7762,6 @@ class MainWindow(QMainWindow):
             self.tr("Filters ▾") if checked else self.tr("Filters ▸"))
         config.set("projects_filters_open", checked)
 
-    def _toggle_project_list(self, visible):
-        # UX-i: the list column is a luxury, not the point — « folds it
-        # away so the project page gets the full width, » brings it back.
-        # The choice sticks for the next sessions.
-        # @args: visible - show or hide the list pane
-        # @return: None
-        self.projects.grp_list.setVisible(visible)
-        self.projects.btn_show_list.setVisible(not visible)
-        config.set("projects_list_hidden", int(not visible))
-
     def _rebuild_manage_menu(self):
         # UX-PC (U1): the ⋯ menu in the project header is the single home
         # of project management — tags, folder and the whole lifecycle.
@@ -9202,16 +9212,15 @@ class MainWindow(QMainWindow):
         return self._ufe
 
     def _ufe_page(self):
-        # The shell page that hosts the workbench: a thin host bar with a
-        # "back" affordance above the editor (chrome of the shell, never
-        # of the workbench). Built once; the workbench's interior is the
-        # same widget as always.
-        if getattr(self, "_ufe_page_widget", None) is not None:
+        # Fills the fixed workbench page (VIEW_UFE) with a thin host bar
+        # (a "back" affordance; chrome of the shell, never of the
+        # workbench) above the editor. Built once; the workbench's
+        # interior is the same widget as always.
+        if getattr(self, "_ufe_page_built", False):
             return self._ufe_page_widget
         from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
                                        QPushButton)
-        page = QWidget()
-        lay = QVBoxLayout(page)
+        lay = QVBoxLayout(self._ufe_page_widget)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
         bar = QWidget()
@@ -9224,9 +9233,8 @@ class MainWindow(QMainWindow):
         bl.addStretch(1)
         lay.addWidget(bar)
         lay.addWidget(self._ufe_build(), 1)
-        self._ufe_page_widget = page
-        self._shell_stack().addWidget(page)   # VIEW_UFE
-        return page
+        self._ufe_page_built = True
+        return self._ufe_page_widget
 
     def _ufe_back(self):
         # Leaves the workbench: back to the open project, or Home.

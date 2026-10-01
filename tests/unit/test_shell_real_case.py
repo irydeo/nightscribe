@@ -1,0 +1,92 @@
+############################################################
+# -*- coding: utf-8 -*-
+#
+# NightScribe - Shell regression tests: the real (configured) case
+# Python  v3.12
+#
+# Francisco José Calvo Fernández
+# (c) 2026
+#
+# Licence GPL v3
+#
+############################################################
+
+"""The bugs the first Interfaz 1.0 pass shipped were only visible in the
+REAL case: a configured observatory, a current version and at least one
+project, so Welcome is never built and the stack keeps its four main pages.
+The other tests forced `is_configured=False`, which built Welcome at index
+4 and made the appended indices line up by accident, hiding both the UFE
+index bug and the hidden dashboard/detail pages.
+
+These tests pin the real case: Home on start (no Welcome), the fixed view
+indices, and the reparented pages actually VISIBLE. No network: no project
+is selected (the detail visibility is checked through the view switch)."""
+
+import os
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+import pytest
+
+
+@pytest.fixture()
+def window(monkeypatch):
+    from PySide6.QtWidgets import QApplication
+    from nightscribe.gui import theme
+    from nightscribe.config import config
+    from nightscribe.core import project as proj_mod
+    from nightscribe.core.db import db
+    from nightscribe.version import base_version
+    from nightscribe.gui.main_window import MainWindow
+    app = QApplication.instance() or QApplication([])
+    theme.apply_theme(app)
+    # a configured site and the CURRENT version: Welcome is not due
+    config.set("lat", 40.0)
+    config.set("lon", -3.0)
+    config.set("app_version", base_version())
+    if not proj_mod.list_projects(db):
+        proj_mod.create(db, "sn", "SN shell", {"ra_deg": 10.0, "dec_deg": 20.0})
+    w = MainWindow()
+    w.resize(1400, 900)
+    w.show()
+    w._now_timer.stop()
+    w._blink_timer.stop()
+    w._blink_render_timer.stop()
+    for _ in range(6):
+        app.processEvents()
+    yield w
+    w.close()
+
+
+def test_opens_on_home_without_welcome(window):
+    from nightscribe.gui.main_window import VIEW_HOME
+    assert window._shell_stack().count() == 6      # 4 main + welcome + ufe
+    assert window._shell_stack().currentIndex() == VIEW_HOME
+    assert window._welcome is None                 # nothing to set up
+
+
+def test_home_dashboard_is_visible(window):
+    # removeWidget() hid the page; it must be un-hidden on Home.
+    assert window.projects.page_dashboard.isVisible()
+
+
+def test_detail_page_is_visible(window):
+    # same as the dashboard: the project page must not come up empty.
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    window._goto_tab(VIEW_DETAIL)
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
+    assert window.projects.page_detail.isVisible()
+
+
+def test_workbench_has_a_fixed_index_and_shows(window):
+    # the bug: with no Welcome the UFE was appended at index 4 while
+    # VIEW_UFE was 5, so it never showed.
+    from nightscribe.gui.main_window import VIEW_UFE
+    window._ufe_page()
+    window._goto_tab(VIEW_UFE)
+    assert window._shell_stack().currentIndex() == VIEW_UFE
+    assert window._ufe.isVisible()
+    # and leaving the view keeps it alive (its state survives, ADR-047)
+    from nightscribe.gui.main_window import VIEW_HOME
+    window._goto_tab(VIEW_HOME)
+    assert window._ufe is not None

@@ -98,11 +98,12 @@ def test_home_matches_the_mock(window):
 def test_home_hides_the_drawer_and_its_tab(window):
     # Interfaz 1.3: on Home the list IS the screen, so the vertical tab is
     # hidden and the drawer does not open; both come back elsewhere.
-    from nightscribe.gui.main_window import VIEW_TONIGHT
+    # Campaigns (not Tonight) so the test never triggers the network.
+    from nightscribe.gui.main_window import VIEW_CAMPAIGNS
     assert not window._menus.btn_vtab.isVisible()
     window._drawer_open(True)
     assert not window._drawer.isVisible()
-    window.navigate(VIEW_TONIGHT)
+    window.navigate(VIEW_CAMPAIGNS)
     assert window._menus.btn_vtab.isVisible()
     window._drawer_open(True)
     assert window._drawer.isVisible()
@@ -115,9 +116,9 @@ def test_drawer_shows_the_same_rich_rows_as_home(window):
     # Interfaz 1.3: it opens from a view other than Home.
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import Qt
-    from nightscribe.gui.main_window import VIEW_TONIGHT
+    from nightscribe.gui.main_window import VIEW_CAMPAIGNS
     from nightscribe.gui.widgets.project_row import ProjectRow
-    window.navigate(VIEW_TONIGHT)
+    window.navigate(VIEW_CAMPAIGNS)
     window._drawer_open(True)
     for _ in range(3):
         QApplication.processEvents()

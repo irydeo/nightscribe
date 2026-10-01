@@ -51,8 +51,15 @@ jobs:
       - name: Unit tests (a red suite publishes nothing)
         # Bounded on purpose: a test that stalls on the network must fail the
         # gate, not hang the runner. -v so a timeout log names the culprit.
-        timeout-minutes: 12
-        run: python -m pytest tests/unit -v
+        #
+        # Parallel, like the local command in AGENTS.md: the suite is 2400+
+        # tests now and serially it ran past the bound on the Windows runner
+        # (measured: 1886 tests in 12 minutes, killed with ~540 still to go,
+        # and the ones that never ran hid whatever came next). --dist
+        # loadfile because several files hold Qt windows in module-scoped
+        # fixtures.
+        timeout-minutes: 15
+        run: python -m pytest tests/unit -v -n auto --dist loadfile
 
       - name: Resolve the package version
         id: ver

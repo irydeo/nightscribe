@@ -1,0 +1,50 @@
+# NightScribe - Windows unit tests
+#
+# Why this exists: the only Windows run used to be the preview BUILD, which
+# triggers on main, takes ~13 minutes and publishes a release. So a pull
+# request could be reviewed, approved and merged with a suite that does not
+# even run on Windows, and the signal only arrived after the merge: that is
+# exactly what happened on 2026-10-01 (18 failures on main, all of them
+# platform-specific, merged from a green-looking PR).
+#
+# This one runs the suite alone, on every pull request, in a few minutes and
+# without touching the releases.
+
+name: Windows tests
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install the package and dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install .
+          pip install -r requirements-dev.txt
+
+      - name: Unit tests
+        # Bounded and parallel, like the gate in the preview build: a test
+        # that stalls on the network must fail here, not hang the runner.
+        # -v so a timeout log names the culprit.
+        timeout-minutes: 15
+        run: python -m pytest tests/unit -v -n auto --dist loadfile

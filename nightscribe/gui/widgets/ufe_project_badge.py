@@ -69,12 +69,16 @@ class UfeProjectBadge(QWidget):
                            self.sizePolicy().verticalPolicy())
         self.setVisible(False)
 
-    def set_badge(self, payload):
+    def set_badge(self, payload, show_next=True):
         # Shows the project this window belongs to.
         #
         # @args: payload - the kwargs of a project row (see
         #        MainWindow._project_row_payload), or None to hide it (the
-        #        Tools menu opens the workbench with no project behind it)
+        #        Tools menu opens the workbench with no project behind it);
+        #        show_next - whether the next action belongs here. In the
+        #        workbench it does (it says where you are and what is next);
+        #        in a window that is showing a finished reduction it does
+        #        not, so that window asks for the identity alone
         # @return: None
         if not payload:
             self.setVisible(False)
@@ -84,15 +88,17 @@ class UfeProjectBadge(QWidget):
         self.lbl_kind.setText(payload.get("kind_label") or "")
         self.lbl_kind.setStyleSheet(theme.chip_style(colour, font_size=10))
         self.lbl_name.setText(payload.get("name") or "")
-        self.lbl_next.setText(payload.get("next_text") or "")
-        self.lbl_next.setVisible(bool(payload.get("next_text")))
-        self.setToolTip(self._tooltip(payload))
+        next_text = payload.get("next_text") if show_next else None
+        self.lbl_next.setText(next_text or "")
+        self.lbl_next.setVisible(bool(next_text))
+        self.setToolTip(self._tooltip(payload, show_next=show_next))
         self.setVisible(True)
 
-    def _tooltip(self, payload):
+    def _tooltip(self, payload, show_next=True):
         # The whole identity, in the list's own words: what the badge has no
         # room for is not lost, it is one hover away.
-        # @args: payload - the project row's kwargs
+        # @args: payload - the project row's kwargs, show_next - include the
+        #        next action (see set_badge)
         # @return: the multi-line tooltip
         lines = [payload.get("name") or ""]
         head = [payload.get("kind_label") or ""]
@@ -106,6 +112,6 @@ class UfeProjectBadge(QWidget):
             lines.append(payload["activity_text"])
         if payload.get("window_text"):
             lines.append(payload["window_text"])
-        if payload.get("next_text"):
+        if show_next and payload.get("next_text"):
             lines.append(payload["next_text"])
         return "\n".join(line for line in lines if line)

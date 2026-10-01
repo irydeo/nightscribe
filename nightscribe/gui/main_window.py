@@ -6326,6 +6326,9 @@ class MainWindow(QMainWindow):
         return open_exotic_result(
             self, out_dir,
             params=params if params is not None else last.get("params"),
+            # the window's title is the project's identity, in the list's own
+            # language: the same payload the workbench's badge gets
+            badge=self._ufe_project_badge_payload(pid),
             title=p.get("object_name") or "",
             when=when or (datetime.datetime.fromtimestamp(last["created"])
                           if last.get("created") else None),

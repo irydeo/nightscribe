@@ -31,12 +31,13 @@ fills it and wires the buttons.
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import QSize, Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QPixmap
 from PySide6.QtWidgets import QDialog, QListWidgetItem
 
 from ..core import exotic_import
-from .ui_loader import adopt_ui
+from .ui_loader import adopt_ui, drop_in
+from .widgets.ufe_project_badge import UfeProjectBadge
 
 logger = logging.getLogger(__name__)
 
@@ -47,22 +48,31 @@ _GROUPS = ("curve", "field", "data")
 class ExoticResultDialog(QDialog):
     # @args: out_dir - EXOTIC's "Directory to Save Plots" (our work folder),
     #        params - exotic_import.load_params output (may be empty),
-    #        title - the object's name, when - a datetime or a short string
-    #        for the run, save_fn - callable() that registers the products
-    #        as resources of the visit (None: the button is hidden),
-    #        parent - the window that opened it
-    def __init__(self, out_dir, params=None, title="", when=None,
+    #        badge - the project's badge payload
+    #        (MainWindow._ufe_project_badge_payload) or None: the window's
+    #        title is the project's own identity, in the list's colours,
+    #        title - the object's name (the window bar), when - a datetime or
+    #        a short string for the run, save_fn - callable() that registers
+    #        the products as resources of the visit (None: the button is
+    #        hidden), parent - the window that opened it
+    def __init__(self, out_dir, params=None, badge=None, title="", when=None,
                  save_fn=None, parent=None):
         super().__init__(parent)
         self._out_dir = Path(out_dir)
         self._params = params or {}
         self._save_fn = save_fn
+        self._chart_pixmap = None       # the figure, before fitting
         self._ui = adopt_ui(self, "exotic_result_dialog")
-        self.setWindowTitle(self.tr("EXOTIC reduction"))
-        self.setModal(False)
-        self._ui.lbl_title.setText(
-            self.tr("EXOTIC reduction of {0}").format(title)
-            if title else self.tr("EXOTIC reduction"))
+        self.setWindowTitle(
+            self.tr("EXOTIC reduction of {0}").format(title) if title
+            else self.tr("EXOTIC reduction"))
+        # the project's identity, exactly as the workbench shows it (same
+        # widget, same payload builder, same colours): the window's title is
+        # WHO this is about. No next action here: this window is showing a
+        # finished reduction, so "what is next" belongs to the workbench
+        self.badge = UfeProjectBadge(self)
+        drop_in(self._ui.row_badge, self._ui.ph_badge, self.badge)
+        self.badge.set_badge(badge, show_next=False)
         self._ui.lbl_subtitle.setText(self._subtitle(when))
         self._ui.txt_params.setPlainText(self._params_text())
         self._ui.lst_files.itemDoubleClicked.connect(self._on_open_file)
@@ -72,9 +82,18 @@ class ExoticResultDialog(QDialog):
         self._ui.btn_close.clicked.connect(self.accept)
         self._fill_files()
         self._show_figure()
-        self.resize(960, 860)
+        self.setMinimumSize(720, 700)
+        self.resize(1020, 940)
 
     # ------------------------------------------------------------- filling
+
+    def resizeEvent(self, event):
+        # The chart follows the window: fitted once at load and again here,
+        # so it always fits its label (see _fit_chart).
+        # @args: event - the resize event
+        # @return: None
+        super().resizeEvent(event)
+        self._fit_chart()
 
     def _role(self, role):
         # What a file of a given role IS, and which group it belongs to.
@@ -109,12 +128,14 @@ class ExoticResultDialog(QDialog):
                 "data": self.tr("Data and report")}.get(group, group)
 
     def _subtitle(self, when):
-        # @return: where the run left its files and when it ran
+        # @return: what this window is, when it ran and where the files are
         stamp = when.isoformat(sep=" ", timespec="minutes") if when else None
         if stamp:
-            return self.tr("Run of {0}. Files in {1}").format(
-                stamp, str(self._out_dir))
-        return self.tr("Files in {0}").format(str(self._out_dir))
+            return self.tr(
+                "EXOTIC reduction · run of {0} · files in {1}").format(
+                    stamp, str(self._out_dir))
+        return self.tr("EXOTIC reduction · files in {0}").format(
+            str(self._out_dir))
 
     def _params_text(self):
         # @return: the fitted numbers, one per line; nothing when there are
@@ -202,9 +223,9 @@ class ExoticResultDialog(QDialog):
                 self._ui.lst_files.addItem(item)
 
     def _show_figure(self):
-        # The publishable light curve, scaled to the window; the other
-        # figures are one double click away (they are not all PNGs and
-        # some are A4 PDFs: a stack of them in here would be unusable).
+        # The publishable light curve, fitted to the label; the other figures
+        # are one double click away (they are not all PNGs and some are A4
+        # PDFs: a stack of them in here would be unusable).
         figures = [p for role, p in
                    exotic_import.find_products(self._out_dir)
                    if role == "figure" and p.lower().endswith(".png")]
@@ -215,10 +236,25 @@ class ExoticResultDialog(QDialog):
             return
         pix = QPixmap(figures[0])
         if pix.width() > 1:
-            self._ui.lbl_chart.setPixmap(pix.scaledToWidth(
-                min(pix.width(), 1100), Qt.SmoothTransformation))
+            self._chart_pixmap = pix
+            self._fit_chart()
         else:
             self._ui.lbl_chart.setText(Path(figures[0]).name)
+
+    def _fit_chart(self):
+        # The figure fits the label, never the other way round, and it is
+        # never blown up (a small one stays as it is). Scaling to a fixed
+        # width instead clipped it: measured, a 609x429 figure in a 960x412
+        # label lost its bottom 17 px.
+        # @return: None
+        if self._chart_pixmap is None:
+            return
+        box = self._ui.lbl_chart.size()
+        target = QSize(
+            min(self._chart_pixmap.width(), max(1, box.width())),
+            min(self._chart_pixmap.height(), max(1, box.height())))
+        self._ui.lbl_chart.setPixmap(self._chart_pixmap.scaled(
+            target, Qt.KeepAspectRatio, Qt.SmoothTransformation))
 
     # ------------------------------------------------------------- actions
 
@@ -247,14 +283,14 @@ class ExoticResultDialog(QDialog):
             "under Resources.").format(n))
 
 
-def open_exotic_result(parent, out_dir, params=None, title="", when=None,
-                       save_fn=None):
+def open_exotic_result(parent, out_dir, params=None, badge=None, title="",
+                       when=None, save_fn=None):
     # Opens the window non-modally (the observer keeps working while it is
     # open) and returns it.
     # @args: as ExoticResultDialog; parent - the window that opens it
     # @return: the ExoticResultDialog
-    dlg = ExoticResultDialog(out_dir, params=params, title=title, when=when,
-                             save_fn=save_fn, parent=parent)
+    dlg = ExoticResultDialog(out_dir, params=params, badge=badge, title=title,
+                             when=when, save_fn=save_fn, parent=parent)
     dlg.setAttribute(Qt.WA_DeleteOnClose, True)
     dlg.show()
     return dlg

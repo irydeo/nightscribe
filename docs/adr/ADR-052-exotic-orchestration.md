@@ -140,7 +140,13 @@ parámetros) se registran como **recursos de la visita** (ADR-045), así que
 aparecen en su ventana y se abren desde ahí, y el registro es idempotente
 (`project.add_file_once`), que de paso arregla el `inits.json` registrado cinco
 veces. La lista de recursos deja de enseñar el tipo crudo: un mapa de etiquetas
-la vuelve legible (`[figura EXOTIC]`, `[reporte AAVSO]`, `[placa]`). Y el
+la vuelve legible (`[figura EXOTIC]`, `[reporte AAVSO]`, `[placa]`). El título de
+la ventana es la **identidad del proyecto con el lenguaje de la lista** (el mismo
+widget y el mismo constructor de payload que el badge del editor: chip del tipo
+en su color y nombre, y sin la próxima acción, que no dice nada en una ventana
+que enseña una reducción terminada); la figura **encaja en su etiqueta** en vez
+de escalarse a un ancho fijo y quedar recortada (medido: 609×429 en una etiqueta
+de 960×412 perdía 17 px), y los márgenes son 11 px donde antes eran 0. Y el
 `exotic.log` de EXOTIC (26 MB de DEBUG por corrida, más su rotación diaria) se
 borra al empezar y al terminar, en un `finally`; se queda `exotic_run.log`, que
 es el que muestra la app y el que lee el aviso de fallo.
@@ -202,7 +208,13 @@ report and parameters) are registered as **resources of the visit** (ADR-045),
 so they show up in its window and open from there, and the registration is
 idempotent (`project.add_file_once`), which also fixes the `inits.json`
 registered five times. The resource list stops showing the raw kind: a label
-map makes it readable (`[EXOTIC figure]`, `[AAVSO report]`, `[plate]`). And
-EXOTIC's own `exotic.log` (26 MB of DEBUG per run, plus its daily rotation) is
-removed at the start and at the end, in a `finally`; `exotic_run.log` stays,
-because that is the one the app streams and the failure box reads.
+map makes it readable (`[EXOTIC figure]`, `[AAVSO report]`, `[plate]`). The
+window's title is the **project's identity in the list's own language** (the
+same widget and the same payload builder the workbench's badge uses: the kind's
+chip in its hue and the name, with no next action, which says nothing in a
+window showing a finished reduction); the figure **fits its label** instead of
+being scaled to a fixed width and clipped (measured: 609x429 in a 960x412 label
+lost 17 px), and the margins are 11 px where they were 0. And EXOTIC's own
+`exotic.log` (26 MB of DEBUG per run, plus its daily rotation) is removed at the
+start and at the end, in a `finally`; `exotic_run.log` stays, because that is
+the one the app streams and the failure box reads.

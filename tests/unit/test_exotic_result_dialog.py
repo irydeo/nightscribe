@@ -18,6 +18,7 @@ hide a file (the list is built from what is on disk). Offscreen, no
 network.
 """
 
+import datetime
 import os
 
 import pytest
@@ -40,14 +41,14 @@ _PARAMS = {"tmid": 2458107.7146, "tmid_err": 0.0011, "rprs": 0.1612,
            "aperture": 3.95, "annulus": 6.64, "best_comp": None}
 
 
-def _products(tmp_path, figure=True):
+def _products(tmp_path, figure=True, size=(200, 120)):
     # @return: a work folder shaped like a real reduction's (2026-10-01)
     out = tmp_path / "exotic"
     temp = out / "temp"
     temp.mkdir(parents=True)
     if figure:
         from PySide6.QtGui import QColor, QPixmap
-        pix = QPixmap(200, 120)
+        pix = QPixmap(*size)
         pix.fill(QColor("#202020"))
         pix.save(str(out / "FinalLightCurve_HAT-P-32 b_20-December-2017.png"))
     (temp / "FinalLightCurve_HAT-P-32 b_20-December-2017.csv").write_text("x")
@@ -56,6 +57,11 @@ def _products(tmp_path, figure=True):
         b"x")
     (out / "AAVSO_HAT-P-32 b_20-December-2017.txt").write_text("x")
     return out
+
+
+_BADGE = {"kind_label": "Transit", "kind_color": "#6ab0ff",
+          "name": "HAT-P-32 b", "next_text": "Publish the result",
+          "activity_text": "measured yesterday", "progress_text": "●●○"}
 
 
 def _rows(dlg):
@@ -189,5 +195,81 @@ def test_a_double_click_opens_the_file_with_the_system(qapp, tmp_path,
         # and the folder door opens the work folder itself
         dlg._ui.btn_folder.click()
         assert str(dlg._out_dir) in opened[-1]
+    finally:
+        dlg.close()
+
+
+# ---------------- breathing room and the title (2026-10-01) ----------------
+
+def test_the_controls_breathe_and_the_chart_fits(qapp, tmp_path):
+    # Reported: the chart barely fitted and the bottom buttons sat on the
+    # edge. Measured before: zero margins (the Close button ended at
+    # y=860 of a 860 window) and a 609x429 figure in a 960x412 label, its
+    # bottom 17 px cut off. The figure now fits its label, at any size.
+    from nightscribe.gui.exotic_result_dialog import ExoticResultDialog
+    dlg = ExoticResultDialog(_products(tmp_path, size=(1600, 1000)),
+                             params=_PARAMS, badge=_BADGE, title="X")
+    try:
+        for size in ((1020, 940), (720, 700)):
+            dlg.resize(*size)
+            dlg.show()
+            qapp.processEvents()
+            m = dlg.layout().contentsMargins()
+            assert (m.left(), m.top(), m.right(), m.bottom()) == (11,) * 4
+            btn = dlg._ui.btn_close.geometry()
+            assert dlg.height() - (btn.y() + btn.height()) == 11
+            pm = dlg._ui.lbl_chart.pixmap()
+            box = dlg._ui.lbl_chart.geometry()
+            assert pm.width() <= box.width() and pm.height() <= box.height()
+        # a small figure is never blown up: it stays as it is
+        dlg.close()
+        small = ExoticResultDialog(_products(tmp_path / "small",
+                                             size=(200, 120)),
+                                   params=_PARAMS, badge=_BADGE, title="X")
+        try:
+            small.resize(1020, 940)
+            small.show()
+            qapp.processEvents()
+            assert small._ui.lbl_chart.pixmap().size() == \
+                small._chart_pixmap.size()
+        finally:
+            small.close()
+    finally:
+        dlg.close()
+
+
+def test_the_title_is_the_projects_own_badge(qapp, tmp_path):
+    # The window's title is the project's identity in the list's own
+    # language (same widget and payload as the workbench's badge), and the
+    # next action stays out: this window shows a finished reduction, so
+    # "what is next" belongs to the workbench.
+    from nightscribe.gui.exotic_result_dialog import ExoticResultDialog
+    dlg = ExoticResultDialog(_products(tmp_path), params=_PARAMS,
+                             badge=_BADGE, title="HAT-P-32 b",
+                             when=datetime.datetime(2026, 10, 1, 4, 35))
+    try:
+        assert dlg.windowTitle() == \
+            dlg.tr("EXOTIC reduction of {0}").format("HAT-P-32 b")
+        assert dlg.badge.isVisibleTo(dlg)
+        assert dlg.badge.lbl_name.text() == "HAT-P-32 b"
+        assert dlg.badge.lbl_kind.text() == "Transit"
+        assert "#6ab0ff" in dlg.badge.lbl_kind.styleSheet()   # the kind's hue
+        assert not dlg.badge.lbl_next.isVisibleTo(dlg)
+        assert "Publish the result" not in dlg.badge.toolTip()
+        assert "Transit" in dlg.badge.toolTip()               # the identity stays
+        # the window says what it is, when it ran and where the files are
+        sub = dlg._ui.lbl_subtitle.text()
+        assert "EXOTIC reduction" in sub and "2026-10-01 04:35" in sub
+        assert str(dlg._out_dir) in sub
+    finally:
+        dlg.close()
+
+
+def test_without_a_project_the_badge_hides_itself(qapp, tmp_path):
+    from nightscribe.gui.exotic_result_dialog import ExoticResultDialog
+    dlg = ExoticResultDialog(_products(tmp_path), params=_PARAMS, badge=None)
+    try:
+        assert not dlg.badge.isVisibleTo(dlg)
+        assert dlg.windowTitle() == dlg.tr("EXOTIC reduction")
     finally:
         dlg.close()

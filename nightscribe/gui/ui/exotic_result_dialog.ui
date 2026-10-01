@@ -4,17 +4,25 @@
   curve and every file it wrote, so the observer does not have to go
   digging in the project's work folder. The structure lives in Designer,
   the behaviour in gui/exotic_result_dialog.py (ADR-005); the curve is a
-  PNG written by EXOTIC and shown in the placeholder label `lbl_chart`,
-  and the parameters and the file list are data, set in code.
+  PNG written by EXOTIC and shown in the placeholder label `lbl_chart`, the
+  project's badge is the custom widget in `ph_badge` (ADR-005: a custom
+  widget never enters a .ui), and the subtitle and the file list are data.
+  The margins are explicit: QUiLoader hands a loaded layout ZERO margins,
+  and without them the buttons sat on the window's edge (measured).
 -->
 <ui version="4.0">
  <class>ExoticResultDialog</class>
  <widget class="QWidget" name="ExoticWindow">
   <layout class="QVBoxLayout" name="vbox_exotic_result">
+   <property name="leftMargin"><number>11</number></property>
+   <property name="topMargin"><number>11</number></property>
+   <property name="rightMargin"><number>11</number></property>
+   <property name="bottomMargin"><number>11</number></property>
    <item>
-    <widget class="QLabel" name="lbl_title">
-     <property name="text"><string>EXOTIC reduction</string></property>
-    </widget>
+    <layout class="QHBoxLayout" name="row_badge">
+     <item><widget class="QWidget" name="ph_badge"/></item>
+     <item><spacer name="hsp_badge"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+    </layout>
    </item>
    <item>
     <widget class="QLabel" name="lbl_subtitle">
@@ -33,7 +41,8 @@
     <widget class="QLabel" name="lbl_chart">
      <property name="text"><string/></property>
      <property name="alignment"><set>Qt::AlignCenter</set></property>
-     <property name="minimumSize"><size><width>640</width><height>300</height></size></property>
+     <property name="minimumSize"><size><width>480</width><height>290</height></size></property>
+     <property name="sizePolicy"><sizepolicy hsizetype="Preferred" vsizetype="Expanding"><horstretch>0</horstretch><verstretch>1</verstretch></sizepolicy></property>
     </widget>
    </item>
    <item>
@@ -44,6 +53,7 @@
    <item>
     <widget class="QListWidget" name="lst_files">
      <property name="minimumSize"><size><width>0</width><height>120</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>200</height></size></property>
      <property name="toolTip"><string>The reduction's own files, grouped: the light curve, the field figures with the apertures and the comparison stars, the diagnostics and the data. Double click opens one with the system; «Open the folder» opens all of them at once</string></property>
     </widget>
    </item>

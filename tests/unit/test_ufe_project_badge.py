@@ -92,3 +92,26 @@ def test_the_workbench_shows_the_project_in_its_bar():
     d.set_project_badge(None)
     assert not d.badge.isVisible()
     d.close()
+
+
+def test_the_next_action_can_stay_out():
+    # The workbench's badge says what is next; a window that is showing a
+    # finished reduction asks for the identity alone (reported: the next
+    # action made no sense there), so it leaves the line and the tooltip
+    # out while keeping the chip, the name and the rest of the identity.
+    _app()
+    from nightscribe.gui.widgets.ufe_project_badge import UfeProjectBadge
+    badge = UfeProjectBadge()
+    badge.set_badge(_PAYLOAD, show_next=False)
+    assert badge.lbl_name.text() == "V0526 Per"
+    assert badge.lbl_kind.text() == "Variable"
+    assert not badge.lbl_next.isVisibleTo(badge)
+    tip = badge.toolTip()
+    assert "measure the series" not in tip
+    for part in ("V0526 Per", "Variable", "T CrB 2026", "last visit"):
+        assert part in tip, part
+    # and the default keeps it (the workbench)
+    badge.set_badge(_PAYLOAD)
+    assert badge.lbl_next.isVisibleTo(badge)
+    assert "measure the series" in badge.toolTip()
+    badge.deleteLater()

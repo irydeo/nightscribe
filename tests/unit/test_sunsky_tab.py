@@ -43,15 +43,15 @@ def window(qapp):
 
 
 def test_tab_is_renamed(window):
-    # SC2 (ADR-040): the Sun & sky content moved to the Tools menu as the
-    # "Sky calendar…" dialog; ADR-043 removed the Observatory tab, so the
-    # bar is down to three
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 3
-    titles = [tabs.tabText(i) for i in range(3)]
-    assert not any("sky" in t.lower() or "cielo" in t.lower()
-                   for t in titles)
+    # SC2 (ADR-040): the Sun & sky content lives in the Tools menu as the
+    # "Sky calendar…" dialog. Interfaz 1.0 replaced the tab bar with the
+    # shell's four views, none of them a Sun & sky page.
+    from nightscribe.gui.main_window import (VIEW_HOME, VIEW_TONIGHT,
+                                             VIEW_CAMPAIGNS, VIEW_DETAIL)
+    stack = window._shell_stack()
+    assert stack.count() == 4
+    assert stack.widget(VIEW_TONIGHT) is window.tonight
+    assert stack.widget(VIEW_CAMPAIGNS) is window.campaigns
 
 
 def test_skycal_dialog_opens_from_tools_menu(window):

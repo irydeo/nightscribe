@@ -1,28 +1,37 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interfaz 1.0: the app shell. A vertical "PROYECTOS" tab on the left always
+  visible, a QStackedWidget with the views (Home, Tonight, Campaigns,
+  Detail) and an overlay project drawer built in code (gui/main_window.py).
+  The old QTabWidget is gone; the same widgets are hosted here full-screen.
+-->
 <ui version="4.0">
  <class>MainWindow</class>
  <widget class="QMainWindow" name="MainWindow">
   <property name="geometry">
-   <rect><x>0</x><y>0</y><width>1200</width><height>800</height></rect>
+   <rect><x>0</x><y>0</y><width>1280</width><height>860</height></rect>
   </property>
   <property name="windowTitle">
    <string>NightScribe</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout">
+   <layout class="QHBoxLayout" name="shellLayout">
+    <property name="spacing"><number>0</number></property>
+    <property name="leftMargin"><number>0</number></property>
+    <property name="topMargin"><number>0</number></property>
+    <property name="rightMargin"><number>0</number></property>
+    <property name="bottomMargin"><number>0</number></property>
     <item>
-     <widget class="QTabWidget" name="tabs">
-      <property name="currentIndex"><number>0</number></property>
-      <widget class="QWidget" name="tab_tonight">
-       <attribute name="title"><string>Tonight</string></attribute>
-      </widget>
-      <widget class="QWidget" name="tab_projects">
-       <attribute name="title"><string>Projects</string></attribute>
-      </widget>
-      <widget class="QWidget" name="tab_campaigns">
-       <attribute name="title"><string>Campaigns</string></attribute>
-      </widget>
+     <widget class="QToolButton" name="btn_vtab">
+      <property name="text"><string>PROYECTOS</string></property>
+      <property name="toolTip"><string>Show or hide the project list</string></property>
+      <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+      <property name="maximumSize"><size><width>28</width><height>16777215</height></size></property>
+      <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
      </widget>
+    </item>
+    <item>
+     <widget class="QStackedWidget" name="stack"/>
     </item>
    </layout>
   </widget>

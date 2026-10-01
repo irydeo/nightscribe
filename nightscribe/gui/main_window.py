@@ -260,13 +260,16 @@ TABLE_COLS_DEFAULT = [("Object", "name"), ("Type", "kind"),
 # the kinds stay in the same order wherever they are shown.
 KIND_ORDER = list(kinds.ids())
 
-# Top-level tab indices (ui/main_window.ui order; ADR-036: History left
-# the bar for the Tools-menu journal dialog, J0): never use literals for
-# the main tabs.
-# UX-PC + SC2 (ADR-038/040): the Sun & sky content moved to the Tools
-# menu as the "Sky calendar…" dialog; ADR-043 folds the Observatory tab
-# into the project's Capture step, leaving three top-level tabs
-TAB_TONIGHT, TAB_PROJECTS, TAB_CAMPAIGNS = range(3)
+# Top-level view indices in the shell's QStackedWidget (Interfaz 1.0;
+# ADR-053). The old QTabWidget is gone: Home is the projects hub (the
+# start view), Tonight is the "new project" flow, Campaigns is the hub's
+# campaign section, and Detail is one project full-screen. The legacy
+# TAB_* names are kept as aliases so the deep links across the file
+# (project created -> hub, campaign badge -> campaigns) keep working.
+VIEW_HOME, VIEW_TONIGHT, VIEW_CAMPAIGNS, VIEW_DETAIL = range(4)
+TAB_PROJECTS = VIEW_HOME
+TAB_TONIGHT = VIEW_TONIGHT
+TAB_CAMPAIGNS = VIEW_CAMPAIGNS
 
 
 class _ClickableFrame(QFrame):
@@ -398,7 +401,7 @@ class MainWindow(QMainWindow):
         self._menus = win
         self._build_status_progress()
 
-        self._build_tabs()
+        self._build_shell()
         self._connect_menu()
         self._connect()
         # Projects are visible from the very first open: load the hub list
@@ -416,9 +419,10 @@ class MainWindow(QMainWindow):
             QTimer.singleShot(600, self._ccd_connect)
         self.statusBar().showMessage(
             f"NightScribe {full_version()} — "
-            + self.tr("Ready — press 'Compute tonight'"), 8000)
-        if config.is_configured():
-            QTimer.singleShot(400, self.on_compute_tonight)
+            + self.tr("Ready"), 8000)
+        # Interfaz 1.0: nothing is computed on start. Tonight is on demand,
+        # when the observer asks for a new project (the app opens fast and
+        # offline). See ADR-053.
         self._now_timer = QTimer(self)
         self._now_timer.timeout.connect(self._refresh_now_badges)
         self._now_timer.start(5 * 60 * 1000)
@@ -491,39 +495,61 @@ class MainWindow(QMainWindow):
         return QSize(max(int(g.width() * 0.9), 640),
                      max(int(g.height() * 0.9), 480))
 
+    def _shell_stack(self):
+        # @return: the shell's QStackedWidget that hosts every view
+        from PySide6.QtWidgets import QStackedWidget
+        return self.centralWidget().findChild(QStackedWidget, "stack")
+
     def _goto_tab(self, index):
-        from PySide6.QtWidgets import QTabWidget
-        self.centralWidget().findChild(QTabWidget, "tabs").setCurrentIndex(index)
+        # Switches the shell's view. The name is kept (Interfaz 1.0): every
+        # deep link in the file calls _goto_tab(TAB_*).
+        self._shell_stack().setCurrentIndex(index)
 
-    # ---------------- tab construction ----------------
+    # ---------------- shell construction (Interfaz 1.0, ADR-053) ----------
 
-    def _build_tabs(self):
-        from PySide6.QtWidgets import QTabWidget
-        tabs = self.centralWidget().findChild(QTabWidget, "tabs")
-        widgets = (self.tonight, self.projects, self.campaigns) = (
-            _load_ui("tonight_tab"), _load_ui("projects_tab"),
-            _load_ui("campaigns_tab"))
-        for i, w in enumerate(widgets):
-            title = tabs.tabText(i)
-            tabs.removeTab(i)
-            tabs.insertTab(i, w, title)
-        tabs.setCurrentIndex(0)
-        # UX-PC (plain-language rule): every tab explains itself in one
-        # line on hover — no concept is taken for granted
-        tabs.setTabToolTip(TAB_TONIGHT, self.tr(
-            "Tonight's best objects from your observatory"))
-        tabs.setTabToolTip(TAB_PROJECTS, self.tr(
-            "Your projects: one object with its three steps: capture, "
-            "track, follow-up — and what needs your attention"))
-        tabs.setTabToolTip(TAB_CAMPAIGNS, self.tr(
-            "Observing campaigns: several nights, several observatories, "
-            "one shared goal"))
-        # table starts collapsed
+    def _build_shell(self):
+        # The widgets are the SAME as before, re-hosted full-screen in a
+        # QStackedWidget. The projects_tab husk keeps its registered child
+        # attributes (self.projects.lst_projects and friends), so no other
+        # code had to move: its two halves are reparented into the Home
+        # view (attention dashboard + project list) and the Detail view
+        # (the project page). The old QTabWidget is gone.
+        from PySide6.QtWidgets import QWidget, QVBoxLayout
+        self.tonight = _load_ui("tonight_tab")
+        self.projects = _load_ui("projects_tab")
+        self.campaigns = _load_ui("campaigns_tab")
+        proj = self.projects
+        stack = self._shell_stack()
+
+        # Home: the attention dashboard on top, the project list below.
+        home = QWidget()
+        hl = QVBoxLayout(home)
+        hl.setContentsMargins(12, 12, 12, 12)
+        hl.setSpacing(10)
+        dash = proj.page_dashboard
+        proj.stack_detail.removeWidget(dash)
+        hl.addWidget(dash)
+        lst = proj.grp_list
+        proj.layout().removeWidget(lst)
+        hl.addWidget(lst, 1)
+
+        # Detail: the project page (masthead, tab bar, Next, sections).
+        detail = QWidget()
+        dl = QVBoxLayout(detail)
+        dl.setContentsMargins(12, 12, 12, 12)
+        page = proj.page_detail
+        proj.stack_detail.removeWidget(page)
+        dl.addWidget(page)
+
+        stack.addWidget(home)            # VIEW_HOME
+        stack.addWidget(self.tonight)    # VIEW_TONIGHT
+        stack.addWidget(self.campaigns)  # VIEW_CAMPAIGNS
+        stack.addWidget(detail)          # VIEW_DETAIL
+        stack.setCurrentIndex(VIEW_HOME)
+        # the Tonight full table starts collapsed
         self.tonight.grp_list.setVisible(False)
         self._prepare_table()
-        # remember and restore the Tonight kind filter (WORKFLOWS 7quater):
-        # the combo starts empty, so populate it from the enabled kinds and
-        # re-select last night's choice if it is still enabled
+        # remember and restore the Tonight kind filter (WORKFLOWS 7quater)
         self._rebuild_kind_filters()
         saved = config.get("tonight_kind", "") or None
         if saved and self.tonight.cmb_filter.findData(saved) >= 0:
@@ -533,16 +559,11 @@ class MainWindow(QMainWindow):
         # A3: restore the projects hub classification prefs
         self.projects.cmb_kind.setCurrentIndex(
             int(config.get("projects_filter_kind", 0)))
-        # UX-PC (U2): the sort combo gained "Needs you" at index 0 — a new
-        # config key keeps old prefs from pointing at the wrong order
         sort_idx = int(config.get("projects_filter_sort_v2", 0))
         sort_idx = max(0, min(sort_idx, self.projects.cmb_sort.count() - 1))
         self.projects.cmb_sort.setCurrentIndex(sort_idx)
         self.projects.chk_favorites.setChecked(
             bool(config.get("projects_filter_fav", False)))
-        # UX-PC (U2): the right pane starts on the dashboard (no selection)
-        self.projects.stack_detail.setCurrentWidget(
-            self.projects.page_dashboard)
         # UX-PC (U1): the advanced filters row starts collapsed; the toggle
         # restores the user's last choice
         filters_open = bool(config.get("projects_filters_open", False))
@@ -552,6 +573,94 @@ class MainWindow(QMainWindow):
         self.projects.btn_filters.setText(
             self.tr("Filters ▾") if filters_open else self.tr("Filters ▸"))
         self.projects.btn_filters.blockSignals(False)
+        self._build_drawer()
+
+    def _build_drawer(self):
+        # The overlay project drawer: a compact list summoned by the
+        # vertical tab from any view. A scrim dims the content behind it.
+        from PySide6.QtWidgets import (QFrame, QVBoxLayout, QHBoxLayout,
+                                       QLabel, QPushButton, QListWidget)
+        cw = self.centralWidget()
+        self._scrim = QFrame(cw)
+        self._scrim.setObjectName("shell_scrim")
+        self._scrim.setStyleSheet("background: rgba(7,8,13,150);")
+        self._scrim.hide()
+        self._scrim.mousePressEvent = lambda _e: self._drawer_open(False)
+        self._drawer = QFrame(cw)
+        self._drawer.setObjectName("shell_drawer")
+        self._drawer.setStyleSheet(
+            "QFrame#shell_drawer { background: %s;"
+            " border-right: 1px solid %s; }" % (theme.C_BASE, theme.C_LINE))
+        lay = QVBoxLayout(self._drawer)
+        lay.setContentsMargins(12, 12, 12, 12)
+        head = QHBoxLayout()
+        title = QLabel(self.tr("Projects"))
+        title.setStyleSheet("font-weight: 700; font-size: 14px;")
+        head.addWidget(title)
+        head.addStretch(1)
+        close = QPushButton("✕")
+        close.setFlat(True)
+        close.setFixedWidth(28)
+        close.clicked.connect(lambda: self._drawer_open(False))
+        head.addWidget(close)
+        lay.addLayout(head)
+        self._drawer_list = QListWidget()
+        self._drawer_list.setObjectName("drawer_list")
+        self._drawer_list.itemClicked.connect(self._drawer_row_clicked)
+        lay.addWidget(self._drawer_list, 1)
+        newp = QPushButton(self.tr("+ New project…"))
+        newp.clicked.connect(self._drawer_new_project)
+        lay.addWidget(newp)
+        self._drawer.hide()
+
+    def _drawer_open(self, on):
+        # @args: on - show (True) or hide (False) the overlay drawer
+        if on:
+            self._refresh_drawer()
+            self._position_overlay()
+            self._scrim.show()
+            self._scrim.raise_()
+            self._drawer.show()
+            self._drawer.raise_()
+        else:
+            self._drawer.hide()
+            self._scrim.hide()
+
+    def _position_overlay(self):
+        # Places the drawer and the scrim over the content area (right of
+        # the vertical tab). Called on open and on every resize.
+        cw = self.centralWidget()
+        vw = getattr(self._menus, "btn_vtab", None)
+        vw = vw.width() if vw is not None else 28
+        rect = cw.rect()
+        self._scrim.setGeometry(vw, 0, rect.width() - vw, rect.height())
+        self._drawer.setGeometry(vw, 0,
+                                 min(380, rect.width() - vw), rect.height())
+
+    def _refresh_drawer(self):
+        # Mirrors the hub list into the compact drawer (same rows, same
+        # project ids; section headers are skipped).
+        self._drawer_list.clear()
+        src = self.projects.lst_projects
+        for i in range(src.count()):
+            it = src.item(i)
+            pid = it.data(Qt.UserRole)
+            if pid is None:
+                continue
+            row = QListWidgetItem(it.text())
+            row.setData(Qt.UserRole, pid)
+            self._drawer_list.addItem(row)
+
+    def _drawer_row_clicked(self, item):
+        pid = item.data(Qt.UserRole)
+        self._drawer_open(False)
+        if pid is not None:
+            self._goto_tab(VIEW_HOME)
+            self._select_project_row(pid)
+
+    def _drawer_new_project(self):
+        self._drawer_open(False)
+        self._goto_tab(VIEW_TONIGHT)
 
     def _prepare_table(self):
         # One-time table setup (UX v3 phase C): the row is the unit, not the
@@ -582,10 +691,10 @@ class MainWindow(QMainWindow):
         # Refresh the Projects hub list every time the user enters that
         # tab, so it is always up to date (UX-PC U1: the manual Refresh
         # fallback button is gone — the list never goes stale).
-        from PySide6.QtWidgets import QTabWidget
-        self.centralWidget().findChild(
-            QTabWidget, "tabs").currentChanged.connect(
-                self._on_main_tab_changed)
+        self._shell_stack().currentChanged.connect(self._on_main_tab_changed)
+        # the vertical tab toggles the overlay project drawer from any view
+        self._menus.btn_vtab.clicked.connect(
+            lambda: self._drawer_open(not self._drawer.isVisible()))
         t.btn_compute.clicked.connect(self.on_compute_tonight)
         t.btn_show_all.toggled.connect(self._toggle_table)
         # one filter rules grid + table (WORKFLOWS 7quater): the header combo
@@ -638,14 +747,11 @@ class MainWindow(QMainWindow):
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(
                 lambda _=False, k=key: self._show_tab(k))
-        # UX-i: « / » — fold the list column away for more detail room
-        # (and bring it back); the choice is remembered across sessions
-        p.btn_hide_list.clicked.connect(
-            lambda: self._toggle_project_list(False))
-        p.btn_show_list.clicked.connect(
-            lambda: self._toggle_project_list(True))
-        if config.get("projects_list_hidden", 0):
-            self._toggle_project_list(False)
+        # Interfaz 1.0: the old list fold is retired. « goes back to Home
+        # (the list); » brings the list back from the Detail view as the
+        # overlay drawer.
+        p.btn_hide_list.clicked.connect(lambda: self._goto_tab(VIEW_HOME))
+        p.btn_show_list.clicked.connect(lambda: self._drawer_open(True))
         c = self.campaigns
         c.lst_campaigns.itemSelectionChanged.connect(
             self._campaign_selected)
@@ -721,8 +827,8 @@ class MainWindow(QMainWindow):
         # ADR-044: the Unified FITS Editor lives in the Tools menu too
         self._menus.action_ufe.triggered.connect(self._tools_ufe)
         from PySide6.QtGui import QKeySequence, QShortcut
-        for i, tab_idx in enumerate((TAB_TONIGHT, TAB_PROJECTS,
-                                     TAB_CAMPAIGNS)):
+        for i, tab_idx in enumerate((VIEW_HOME, VIEW_TONIGHT,
+                                     VIEW_CAMPAIGNS)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
             sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
@@ -2844,6 +2950,10 @@ class MainWindow(QMainWindow):
         # that mutate projects rebuild the page themselves.
         if lst.currentItem() is None:
             self._clear_project_detail()
+        # keep the overlay drawer in sync with the hub list
+        if getattr(self, "_drawer_list", None) is not None \
+                and self._drawer.isVisible():
+            self._refresh_drawer()
 
     # ---------------- UX-PC (U2): rich rows + dashboard ----------------
 
@@ -3136,10 +3246,9 @@ class MainWindow(QMainWindow):
         lay.addStretch()
 
     def _show_dashboard(self):
-        # Swaps the right pane to the dashboard (no selection) and fills it.
+        # No selection: back to Home (the list + attention dashboard).
         self._refresh_dashboard()
-        self.projects.stack_detail.setCurrentWidget(
-            self.projects.page_dashboard)
+        self._goto_tab(VIEW_HOME)
 
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()
@@ -3152,10 +3261,8 @@ class MainWindow(QMainWindow):
             self._clear_project_detail()
             return
         self._current_project = p
-        # UX-PC (U2): the right pane shows the project page when there is
-        # a selection, the dashboard when there is none
-        self.projects.stack_detail.setCurrentWidget(
-            self.projects.page_detail)
+        # Interfaz 1.0: one project is a full-screen view of its own
+        self._goto_tab(VIEW_DETAIL)
         self._render_project_header(p)
         self._build_project_page(p)
         panel = self._get_proj_panel()
@@ -3402,6 +3509,15 @@ class MainWindow(QMainWindow):
         mast.btn_files.setText(self.tr("Files (0)"))
         self.projects.lbl_context.setText("—")
         self.projects.lbl_advisor.setVisible(False)
+        # Interfaz 1.0: drop the list's current item too, or the refresh
+        # fired when we switch back to Home would re-select it and rebuild
+        # the detail we are clearing (re-entrancy).
+        lst = self.projects.lst_projects
+        was_blocked = lst.signalsBlocked()
+        lst.blockSignals(True)
+        lst.setCurrentItem(None)
+        lst.clearSelection()
+        lst.blockSignals(was_blocked)
         self._show_dashboard()
 
     def _render_project_header(self, p):
@@ -9773,6 +9889,15 @@ class MainWindow(QMainWindow):
     def _drop(self, worker):
         if worker in self._workers:
             self._workers.remove(worker)
+
+    def resizeEvent(self, event):
+        # Keeps the overlay drawer/scrim glued to the content area while
+        # the window grows or shrinks (Interfaz 1.0).
+        # @args: event - the QResizeEvent
+        super().resizeEvent(event)
+        if getattr(self, "_drawer", None) is not None \
+                and self._drawer.isVisible():
+            self._position_overlay()
 
     def closeEvent(self, event):
         # Quitting with live threads must not end in «QThread destroyed

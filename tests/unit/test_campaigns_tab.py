@@ -101,13 +101,13 @@ def window(_point_db_at_tmpdir):
 
 
 def test_campaigns_tab_exists(window):
-    from PySide6.QtWidgets import QTabWidget
     from nightscribe.gui.main_window import TAB_CAMPAIGNS
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 3      # ADR-036 J0 + ADR-040: History and the
-    # Sun & sky live in the Tools menu; ADR-043 removed the Observatory
-    # tab (its controls moved into the Capture step of each project)
-    assert tabs.widget(TAB_CAMPAIGNS) is window.campaigns
+    # Interfaz 1.0: the shell has four views (Home, Tonight, Campaigns,
+    # Detail); Campaigns keeps its own view (ADR-043 retired the
+    # Observatory view, its controls live in the Capture step).
+    stack = window._shell_stack()
+    assert stack.count() == 4
+    assert stack.widget(TAB_CAMPAIGNS) is window.campaigns
 
 
 def test_campaign_list_shows_health(window):
@@ -184,7 +184,7 @@ def test_member_double_click_jumps_to_project(window):
     from nightscribe.core import campaign as camp_mod
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from nightscribe.gui.main_window import TAB_PROJECTS
+    from nightscribe.gui.main_window import VIEW_DETAIL
     cid = camp_mod.create(mw.db, "Campaña salto")
     p = proj_mod.create(mw.db, "variable", "R CrB",
                         {"ra_deg": 1.0, "dec_deg": 2.0}, campaign_id=cid)
@@ -194,9 +194,7 @@ def test_member_double_click_jumps_to_project(window):
         if lst.item(i).data(Qt.UserRole) == cid:
             lst.setCurrentRow(i)
     window._campaign_member_opened(0, 0)
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == TAB_PROJECTS
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
 
@@ -208,9 +206,7 @@ def test_goto_campaigns_selects_the_campaign(window):
     from nightscribe.gui.main_window import TAB_CAMPAIGNS
     cid = camp_mod.create(mw.db, "Campaña destino")
     window._goto_campaigns(cid)
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == TAB_CAMPAIGNS
+    assert window._shell_stack().currentIndex() == TAB_CAMPAIGNS
     cur = window.campaigns.lst_campaigns.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == cid
 
@@ -487,7 +483,7 @@ def test_signal_double_click_opens_project(window):
     from nightscribe.core import followup as fu
     from nightscribe.core import project as proj_mod
     from nightscribe.gui import main_window as mw
-    from nightscribe.gui.main_window import TAB_PROJECTS
+    from nightscribe.gui.main_window import VIEW_DETAIL
     _wipe_campaigns()
     cid = camp_mod.create(mw.db, "Campaña doble clic")
     p = proj_mod.create(mw.db, "variable", "R Crl",
@@ -501,8 +497,7 @@ def test_signal_double_click_opens_project(window):
     item = next(lst.item(i) for i in range(lst.count())
                 if lst.item(i).data(Qt.UserRole) == p["id"])
     window._camp_signal_opened(item)
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == TAB_PROJECTS
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
     cur = window.projects.lst_projects.currentItem()
     assert cur is not None and cur.data(Qt.UserRole) == p["id"]
 

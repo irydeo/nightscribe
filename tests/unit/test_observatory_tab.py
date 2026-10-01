@@ -93,17 +93,17 @@ def _select_project(window, name="SN 2099obs"):
 
 def test_three_tabs_no_observatory(window):
     # ADR-043: the Observatory tab is gone; its control surface moved into
-    # the Capture step of each project page.
-    from PySide6.QtWidgets import QTabWidget
-    from nightscribe.gui.main_window import (TAB_TONIGHT, TAB_PROJECTS,
-                                             TAB_CAMPAIGNS)
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.count() == 3
-    assert tabs.widget(TAB_TONIGHT) is window.tonight
-    assert tabs.widget(TAB_PROJECTS) is window.projects
-    assert tabs.widget(TAB_CAMPAIGNS) is window.campaigns
-    titles = [tabs.tabText(i) for i in range(3)]
-    assert not any("Observatory" in t for t in titles)
+    # the Capture step of each project page. Interfaz 1.0: the shell has
+    # four views (Home, Tonight, Campaigns, Detail), none of them an
+    # Observatory page.
+    from nightscribe.gui.main_window import (VIEW_HOME, VIEW_TONIGHT,
+                                             VIEW_CAMPAIGNS, VIEW_DETAIL)
+    stack = window._shell_stack()
+    assert stack.count() == 4
+    assert stack.widget(VIEW_TONIGHT) is window.tonight
+    assert stack.widget(VIEW_CAMPAIGNS) is window.campaigns
+    assert stack.widget(VIEW_HOME) is not None
+    assert stack.widget(VIEW_DETAIL) is not None
 
 
 def test_ccd_block_lives_in_the_plan_page(window):

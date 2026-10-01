@@ -376,8 +376,8 @@ def test_no_projects_clears_state(window):
     assert window._current_project is None
     # UX-PC (U2): with no projects the right pane is the dashboard's empty
     # state (the "start from Tonight" pointer), not a stale detail
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_dashboard
+    from nightscribe.gui.main_window import VIEW_HOME
+    assert window._shell_stack().currentIndex() == VIEW_HOME
     assert window.projects.lbl_dash_title.text()
 
 
@@ -576,8 +576,8 @@ def test_dashboard_shown_without_selection(window):
     # UX-PC (U2): no selection -> the right pane is the dashboard.
     window.projects.lst_projects.clearSelection()
     window._clear_project_detail()
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_dashboard
+    from nightscribe.gui.main_window import VIEW_HOME
+    assert window._shell_stack().currentIndex() == VIEW_HOME
 
 
 def test_dashboard_empty_state_points_to_tonight(window):
@@ -591,8 +591,8 @@ def test_dashboard_empty_state_points_to_tonight(window):
                          (pid,))
     dbmod.db.commit()
     window.on_refresh_projects()
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_dashboard
+    from nightscribe.gui.main_window import VIEW_HOME
+    assert window._shell_stack().currentIndex() == VIEW_HOME
     title = window.projects.lbl_dash_title.text()
     assert title                                # "Your projects live here"
     # the CTA button jumps to the Tonight tab
@@ -600,9 +600,8 @@ def test_dashboard_empty_state_points_to_tonight(window):
     btns = window.projects.dash_container.findChildren(QPushButton)
     assert btns and "Tonight" in btns[0].text()
     btns[0].click()
-    from PySide6.QtWidgets import QTabWidget
-    tabs = window.centralWidget().findChild(QTabWidget, "tabs")
-    assert tabs.currentIndex() == 0             # TAB_TONIGHT
+    from nightscribe.gui.main_window import VIEW_TONIGHT
+    assert window._shell_stack().currentIndex() == VIEW_TONIGHT
 
 
 def test_dashboard_attention_card_lands_on_followup(window, panel):
@@ -627,8 +626,8 @@ def test_dashboard_attention_card_lands_on_followup(window, panel):
     assert cards, "no attention cards rendered"
     cards[0].click()
     assert window._current_project is not None
-    assert window.projects.stack_detail.currentWidget() is \
-        window.projects.page_detail
+    from nightscribe.gui.main_window import VIEW_DETAIL
+    assert window._shell_stack().currentIndex() == VIEW_DETAIL
     # ADR-045: the deep link ends on the analysis tab, built + active
     assert "analysis" in window._tab_pages
     assert not window._tab_pages["analysis"].isHidden()

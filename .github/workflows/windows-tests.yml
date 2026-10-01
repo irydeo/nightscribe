@@ -54,16 +54,17 @@ jobs:
           pip install -r requirements-dev.txt
 
       - name: Unit tests
-        # Bounded and parallel, like the gate in the preview build: a test
-        # that stalls on the network must fail here, not hang the runner.
-        # -v so a timeout log names the culprit.
+        # SERIAL, and bounded: measured on this runner (2026-10-01), the
+        # suite does 1886 tests in 12 minutes serially (0,38 s each, so
+        # 2400+ fit in ~16), while `-n auto` (8 workers for 2-4 cores) did
+        # not finish in 25: they thrash, and a crashing test leaves the
+        # survivors waiting on the dead one. -v so a timeout log names the
+        # culprit.
         #
         # The dispatch inputs are for chasing a Windows-only failure without
-        # paying for the whole suite. `only` runs one file, SERIAL on purpose:
-        # a crashing test kills the run at once, while under xdist the
-        # surviving workers wait on the dead one until the bound. `qpa` swaps
-        # QT_QPA_PLATFORM, which is how a bug in the offscreen platform
-        # plugin is told apart from a bug in the app.
+        # paying for the whole suite: `only` runs one or more files (also
+        # serial) and `qpa` swaps QT_QPA_PLATFORM, which is how a platform
+        # plugin's own bug is told apart from the app's.
         timeout-minutes: 25
         shell: pwsh
         run: |
@@ -71,6 +72,6 @@ jobs:
           if ($only) {
             python -m pytest $only.Split(" ") -v
           } else {
-            python -m pytest tests/unit -v -n auto --dist loadfile
+            python -m pytest tests/unit -v
           }
 

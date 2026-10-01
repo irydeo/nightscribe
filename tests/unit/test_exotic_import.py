@@ -15,6 +15,7 @@
 parameters a plain dict; a missing folder never raises. No network."""
 
 import json
+from pathlib import Path
 
 from nightscribe.core import exotic_import as ei
 from nightscribe.core.db import Database
@@ -91,7 +92,7 @@ def test_find_products_names_what_the_run_wrote(tmp_path):
         (temp / name).write_bytes(b"x")
     (out / "AAVSO_HAT-P-32 b_17-December-2017.txt").write_text("a")
     (out / "exotic_run.log").write_text("l")
-    roles = {p.rsplit("/", 1)[-1]: role for role, p in ei.find_products(out)}
+    roles = {Path(p).name: role for role, p in ei.find_products(out)}
     assert roles["FinalLightCurve_HAT-P-32 b_17-December-2017.png"] == "figure"
     assert roles["FinalLightCurve_HAT-P-32 b_17-December-2017.csv"] == "curve"
     assert roles["FOV_HAT-P-32 b_17-December-2017_LinearStretch.png"] == "field"

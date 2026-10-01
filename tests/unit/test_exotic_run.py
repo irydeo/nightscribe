@@ -26,10 +26,11 @@ from nightscribe.core import exotic_run
 
 
 def _fake(tmp_path, name, body):
-    script = tmp_path / name
-    script.write_text("#!/usr/bin/env python3\n" + body)
-    os.chmod(script, 0o755)
-    return script
+    # The stand-in "interpreter" the runner starts: on POSIX a shebang script
+    # with the executable bit, on Windows a .cmd that hands the body to this
+    # interpreter (a .py cannot be run there: WinError 193, measured in CI).
+    from fake_binary import make_fake_binary
+    return make_fake_binary(tmp_path, name, body)
 
 
 def _ok_script(tmp_path):

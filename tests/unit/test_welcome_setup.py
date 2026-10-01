@@ -61,6 +61,19 @@ def test_first_run_shows_welcome(make_window):
     assert w._welcome_gate is False
 
 
+def test_first_run_stays_on_welcome_after_the_startup_refresh(make_window):
+    # Regression: the deferred on_refresh_projects() found no selection and
+    # _clear_project_detail -> _show_dashboard used to switch to Home,
+    # yanking the observer out of Welcome on the very first frame.
+    from PySide6.QtWidgets import QApplication
+    from nightscribe.gui.main_window import VIEW_WELCOME
+    w = make_window(snapshot=None)
+    for _ in range(6):
+        QApplication.processEvents()
+    assert w._shell_stack().currentIndex() == VIEW_WELCOME
+    assert w._welcome is not None
+
+
 def test_update_is_a_gate_until_acknowledged(make_window):
     from nightscribe.gui.main_window import VIEW_WELCOME, VIEW_HOME
     snap = {"integrity": "ok", "file": Path("nightscribe-before.db"),

@@ -3434,9 +3434,14 @@ class MainWindow(QMainWindow):
         lay.addStretch()
 
     def _show_dashboard(self):
-        # No selection: back to Home (the list + attention dashboard).
+        # No selection: the attention dashboard (on Home) is refreshed. It
+        # only NAVIGATES to Home when the observer is already in the hub
+        # or in a project: at startup this is called from
+        # on_refresh_projects with no selection, and switching blindly
+        # would yank the user out of Welcome (the first-run / update view).
         self._refresh_dashboard()
-        self._goto_tab(VIEW_HOME)
+        if self._shell_stack().currentIndex() in (VIEW_HOME, VIEW_DETAIL):
+            self._goto_tab(VIEW_HOME)
 
     def _project_selected(self):
         items = self.projects.lst_projects.selectedItems()

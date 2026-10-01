@@ -89,7 +89,7 @@ def test_diag_band(dlg, qapp):
     qapp.processEvents()
 
     def probe(tag, widget=None):
-        img = (widget or dlg.view).grab().toImage()
+        img = (widget or dlg.view.viewport()).grab().toImage()
         h = int(getattr(dlg.view, "_title_h", 0) or 0)
         bits = bytes(img.bits())
         row = img.width() * 4

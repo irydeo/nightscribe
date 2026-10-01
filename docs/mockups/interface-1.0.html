@@ -175,6 +175,11 @@
   .attention .h{font-size:11px;letter-spacing:.06em;color:var(--warn);font-weight:700;text-transform:uppercase;margin-bottom:6px}
   .att-row{display:flex;align-items:center;gap:10px;padding:4px 0}
   .att-row .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:0 0 7px}
+  /* Banda de eventos del cielo (los chips que hoy caen al fondo de Tonight):
+     aquí tienen un hogar propio, bajo la cabecera de Home, siempre visible. */
+  .skyband{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--base);padding:8px 12px;margin-bottom:12px}
+  .skyband .h{font-size:11px;letter-spacing:.06em;color:var(--accent);font-weight:700;text-transform:uppercase;margin-bottom:6px}
+  .skyrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
   .filters{display:flex;gap:8px;align-items:center;margin:0 0 12px}
   .filters .search{max-width:320px;flex:0 0 320px}
   .select{background:var(--base);border:1px solid var(--edge);border-radius:4px;padding:6px 10px;color:var(--text)}
@@ -346,10 +351,22 @@
           <button class="newtile" data-goto="new"><b>+ NUEVO PROYECTO</b><small>desde esta noche</small></button>
         </div>
 
+        <div class="skyband">
+          <div class="h">Qué pasa en el cielo</div>
+          <div class="skyrow">
+            <span class="ev">Eclipse lunar · esta noche</span>
+            <span class="ev">Conjunción Luna–Júpiter</span>
+            <span class="ev">Tránsito de Io</span>
+            <span class="spacer"></span>
+            <button class="link">Calendario del cielo →</button>
+          </div>
+        </div>
+
         <div class="attention">
           <div class="h">Te necesita</div>
           <div class="att-row"><span class="dot"></span><b>SN 2026abc</b><span class="muted">captura pendiente, ventana hasta 02:40</span><span class="spacer"></span><button class="pact" data-goto="detail">Abrir →</button></div>
           <div class="att-row"><span class="dot"></span><b>V CrB</b><span class="muted">mínimo predicho esta noche</span><span class="spacer"></span><button class="pact" data-goto="detail">Abrir →</button></div>
+          <div class="att-row"><span class="dot" style="background:#e0c060"></span><b>SN due: SN 2026abc</b><span class="muted">(4 d) toca revisitarla, cadencia de 3 d</span><span class="spacer"></span><button class="pact" data-goto="detail">Revisitar →</button></div>
         </div>
 
         <div class="filters">
@@ -471,9 +488,6 @@
         </div>
 
         <button class="expand">▾ Ver la lista completa (tabla ordenable)</button>
-        <div class="events">
-          Eventos de hoy: <span class="ev">Conjunción Luna–Júpiter</span><span class="ev">Tránsito de Io</span>
-        </div>
       </section>
 
       <!-- ============ D. DETALLE ============ -->

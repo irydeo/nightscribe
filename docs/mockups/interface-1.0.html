@@ -1,0 +1,593 @@
+<!doctype html>
+<!--
+  NightScribe · Interfaz 1.0 — mockup navegable para validación.
+  Fichero único, autocontenido, sin dependencias. NO es código de la app:
+  reproduce la paleta real de gui/theme.py para validar el flujo y el aspecto
+  antes de tocar main_window.py / ufe_dialog.py.
+
+  Estados: Bienvenida · Home · Nuevo proyecto (drawer cerrado/abierto) ·
+           Detalle · UFE embebido.
+  Paleta: C_BG #0f121c · C_BASE #12141f · C_PANEL #171a26 · C_LINE #232736 ·
+          C_EDGE #3a4156 · C_SEL #2f4d80 · C_TEXT #e8eaf2 · C_TEXT_DIM #8a90a6 ·
+          C_ACCENT #6ab0ff · C_WARN #f76808 · C_GOOD #46a758
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NightScribe · Interfaz 1.0 (mockup)</title>
+<style>
+  :root{
+    --bg:#0f121c; --base:#12141f; --panel:#171a26; --line:#232736; --edge:#3a4156;
+    --sel:#2f4d80; --text:#e8eaf2; --dim:#8a90a6; --accent:#6ab0ff;
+    --warn:#f76808; --good:#46a758; --hover:#212739; --row-hover:#1a1f30;
+    --sn:#e5484d; --variable:#65cf30; --comet:#46a758; --neo:#4484ef;
+    --transit:#a06ee0; --hads:#e0549e; --pccp:#39c5cf; --alert:#f76808;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:var(--bg); color:var(--text);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Ubuntu,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font:inherit;color:inherit;cursor:pointer}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--edge)}
+
+  /* ---- barra de mockup (solo validación, no existe en la app) ---- */
+  .mockbar{
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    padding:6px 12px;background:#07080d;border-bottom:1px dashed #3a4156;
+    font-size:11px;color:var(--dim);
+  }
+  .mockbar b{color:var(--warn);letter-spacing:.08em}
+  .mockbar button{
+    background:var(--panel);border:1px solid var(--edge);border-radius:4px;
+    padding:3px 10px;font-size:11px;color:var(--text);
+  }
+  .mockbar button:hover{background:var(--hover)}
+  .mockbar button.on{border-color:var(--accent);color:var(--accent)}
+
+  /* ---- app shell ---- */
+  .app{display:flex;flex-direction:column;height:calc(100vh - 34px);min-height:560px}
+  .menubar{
+    display:flex;align-items:center;gap:16px;
+    padding:0 12px;height:36px;flex:0 0 36px;
+    background:var(--panel);border-bottom:1px solid var(--line);
+  }
+  .brand{font-weight:700;letter-spacing:.02em}
+  .brand .dot{color:var(--accent)}
+  .site{color:var(--dim);font-size:12px}
+  .menus{margin-left:auto;display:flex;gap:14px;color:var(--dim);font-size:12px}
+  .menus span:hover{color:var(--text);cursor:default}
+
+  .shell{display:flex;flex:1;position:relative;overflow:hidden}
+
+  /* pestaña vertical flotante */
+  .vtab{
+    flex:0 0 28px;width:28px;border:0;border-right:1px solid var(--line);
+    background:var(--panel);color:var(--dim);
+    writing-mode:vertical-rl;transform:rotate(180deg);
+    letter-spacing:.22em;font-size:11px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;gap:8px;
+  }
+  .vtab:hover{color:var(--accent);background:var(--hover)}
+  .vtab .chev{transform:rotate(90deg);font-size:10px}
+
+  /* drawer superpuesto */
+  .scrim{
+    position:absolute;inset:0;background:rgba(7,8,13,.55);
+    opacity:0;pointer-events:none;transition:opacity .18s;z-index:15;
+  }
+  .scrim.on{opacity:1;pointer-events:auto}
+  .drawer{
+    position:absolute;top:0;bottom:0;left:28px;width:340px;z-index:20;
+    background:var(--base);border-right:1px solid var(--line);
+    transform:translateX(-105%);transition:transform .18s ease;
+    display:flex;flex-direction:column;
+  }
+  .drawer.on{transform:translateX(0)}
+  .drawer-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .drawer-head h3{margin:0;font-size:13px;flex:1}
+  .x{background:transparent;border:0;color:var(--dim);font-size:15px;padding:2px 6px;border-radius:4px}
+  .x:hover{background:var(--hover);color:var(--text)}
+  .drawer-body{padding:10px 12px;overflow:auto;flex:1}
+
+  .content{flex:1;overflow:auto;position:relative}
+  .view{display:none;padding:20px 26px 40px;max-width:1180px;margin:0 auto}
+  .view.on{display:block}
+
+  /* ---- piezas comunes ---- */
+  .row{display:flex;align-items:center;gap:10px}
+  .spacer{flex:1}
+  .muted{color:var(--dim)}
+  .h1{font-size:19px;font-weight:700}
+  .h2{font-size:15px;font-weight:700;margin:0 0 8px}
+  .small{font-size:11px}
+  .cta{
+    background:linear-gradient(180deg,#2f6fd0,#2559a8);border:1px solid #4d86e0;
+    border-radius:8px;padding:10px 16px;font-weight:700;color:#fff;
+    box-shadow:0 6px 18px rgba(47,111,208,.25);
+  }
+  .cta:hover{filter:brightness(1.08)}
+  .ghost{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:6px 14px}
+  .ghost:hover{background:var(--hover)}
+  .chip{
+    display:inline-block;background:var(--panel);border:1px solid var(--line);
+    border-radius:999px;padding:2px 9px;font-size:11px;color:var(--dim);
+  }
+  .chip.k{border-color:transparent;color:#11141d;font-weight:700}
+  .badge{border-radius:4px;padding:1px 7px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .card{background:var(--base);border:1px solid var(--line);border-radius:8px;padding:14px}
+  .search{
+    flex:1;display:flex;align-items:center;gap:8px;background:var(--base);
+    border:1px solid var(--edge);border-radius:6px;padding:8px 12px;color:var(--dim);
+  }
+  .search input{flex:1;background:transparent;border:0;outline:0;color:var(--text);font:inherit}
+
+  /* ---- bienvenida ---- */
+  .hero{
+    background:
+      radial-gradient(900px 260px at 50% -40px,rgba(106,176,255,.14),transparent 70%),
+      var(--base);
+    border:1px solid var(--line);border-radius:14px;padding:34px 32px;text-align:center;
+  }
+  .hero .wordmark{font-size:26px;font-weight:800;letter-spacing:.32em;margin:0 0 6px}
+  .hero .wordmark span{color:var(--accent)}
+  .hero .tag{color:var(--dim);margin:0 0 18px}
+  .hero p.lead{max-width:640px;margin:0 auto 22px;color:#c7cbd9}
+  .bigcta{
+    display:inline-flex;flex-direction:column;gap:2px;align-items:center;
+    background:linear-gradient(180deg,#2f6fd0,#2559a8);
+    border:1px solid #4d86e0;border-radius:12px;padding:16px 34px;color:#fff;
+    box-shadow:0 10px 28px rgba(47,111,208,.30);
+  }
+  .bigcta b{font-size:15px;letter-spacing:.04em}
+  .bigcta small{color:#d7e5ff}
+  .bigcta:hover{filter:brightness(1.08)}
+  .infogrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:20px}
+  .infogrid h4{margin:0 0 8px;font-size:13px;color:var(--text)}
+  .infogrid ul{margin:0;padding-left:16px;color:#c7cbd9}
+  .infogrid li{margin:3px 0}
+  .link{color:var(--accent);text-decoration:none;background:none;border:0;padding:0;font-size:12px}
+  .link:hover{text-decoration:underline}
+  .steps{display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap}
+  .step{border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;color:var(--dim)}
+  .step b{color:var(--accent)}
+
+  /* ---- home ---- */
+  .home-head{display:flex;align-items:center;gap:14px;margin-bottom:12px}
+  .newtile{
+    display:flex;flex-direction:column;align-items:flex-start;gap:1px;
+    background:linear-gradient(180deg,#2f6fd0,#2559a8);border:1px solid #4d86e0;
+    border-radius:10px;padding:9px 18px;color:#fff;box-shadow:0 6px 18px rgba(47,111,208,.25);
+  }
+  .newtile b{font-size:13px;letter-spacing:.05em}
+  .newtile small{color:#d7e5ff;font-size:10px}
+  .newtile:hover{filter:brightness(1.08)}
+  .attention{border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:8px;background:var(--base);padding:8px 12px;margin-bottom:12px}
+  .attention .h{font-size:11px;letter-spacing:.06em;color:var(--warn);font-weight:700;text-transform:uppercase;margin-bottom:6px}
+  .att-row{display:flex;align-items:center;gap:10px;padding:4px 0}
+  .att-row .dot{width:7px;height:7px;border-radius:50%;background:var(--warn);flex:0 0 7px}
+  .filters{display:flex;gap:8px;align-items:center;margin:0 0 12px}
+  .filters .search{max-width:320px;flex:0 0 320px}
+  .select{background:var(--base);border:1px solid var(--edge);border-radius:4px;padding:6px 10px;color:var(--text)}
+  .plist{border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .prow{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--base);border-bottom:1px solid var(--line);cursor:pointer}
+  .prow:last-child{border-bottom:0}
+  .prow:hover{background:var(--row-hover)}
+  .prow .fav{color:var(--dim);font-size:14px;width:16px;text-align:center}
+  .prow .fav.on{color:#f0c040}
+  .prow .kind{width:6px;height:34px;border-radius:3px;flex:0 0 6px}
+  .prow .name{font-weight:700}
+  .prow .meta{color:var(--dim);font-size:12px}
+  .prow .score{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .spark{width:64px;height:22px}
+  .pct{font-weight:700;font-size:13px;min-width:34px;text-align:right}
+  .pact{background:var(--panel);border:1px solid var(--edge);border-radius:4px;padding:5px 12px;font-size:12px}
+  .pact:hover{background:var(--hover)}
+  .campstrip{margin-top:14px;display:flex;align-items:center;gap:10px;color:var(--dim);font-size:12px}
+  .campill{background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px 12px;color:var(--text)}
+
+  /* ---- nuevo proyecto / tonight ---- */
+  .ctx{display:flex;align-items:center;gap:12px;color:var(--dim);margin:6px 0 16px}
+  .manual{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px;margin-bottom:18px}
+  .manual .search{border-color:var(--accent)}
+  .manual .hint{color:var(--dim);font-size:11px;margin-top:7px}
+  .sugg{display:flex;flex-direction:column;gap:10px}
+  .scard{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px 14px}
+  .scard:hover{border-color:var(--edge)}
+  .scard .top{display:flex;align-items:center;gap:10px}
+  .scard .rank{color:var(--dim);font-weight:700;width:18px}
+  .scard .why{color:#c7cbd9;font-style:italic}
+  .scard .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .scard .go{margin-left:auto}
+  .expand{margin:10px 0;color:var(--accent);background:none;border:0;padding:4px 0;font-size:12px}
+  .events{display:flex;gap:8px;align-items:center;margin-top:8px;color:var(--dim);font-size:12px;flex-wrap:wrap}
+  .ev{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 10px;color:var(--text)}
+
+  /* ---- detalle ---- */
+  .mast{display:flex;align-items:center;gap:12px;margin-bottom:4px}
+  .mast .home{background:transparent;border:1px solid var(--edge);border-radius:4px;padding:4px 9px;color:var(--dim)}
+  .mast .home:hover{color:var(--text);background:var(--hover)}
+  .mast .name{font-size:16px;font-weight:700}
+  .tabbar{display:flex;align-items:center;gap:8px;margin:12px 0 14px;color:var(--dim)}
+  .tabbar .t{background:transparent;border:0;border-bottom:2px solid transparent;padding:5px 2px;color:var(--dim);font-size:13px}
+  .tabbar .t.on{color:var(--text);border-bottom-color:var(--accent);font-weight:700}
+  .tabbar .arrow{color:var(--dim);font-size:12px}
+  .next{border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:8px;background:var(--base);padding:10px 14px;display:flex;align-items:center;gap:12px;margin-bottom:16px}
+  .next b{font-weight:700}
+  .placeholder{border:1px dashed var(--line);border-radius:8px;padding:40px;text-align:center;color:var(--dim)}
+
+  /* ---- UFE ---- */
+  .ufe-top{display:flex;align-items:center;gap:12px;margin-bottom:10px}
+  .ufe-tabs{display:flex;gap:6px;align-items:center;margin-bottom:12px;color:var(--dim)}
+  .ufe-tabs .t{background:transparent;border:1px solid transparent;border-radius:5px;padding:5px 12px;color:var(--dim)}
+  .ufe-tabs .t.on{background:var(--panel);border-color:var(--edge);color:var(--text);font-weight:700}
+  .ufe-body{display:grid;grid-template-columns:1fr 300px;gap:12px;height:440px}
+  .plate{background:#05060a;border:1px solid var(--line);border-radius:8px;position:relative;overflow:hidden}
+  .plate .frame{position:absolute;inset:14px;background:radial-gradient(120px 80px at 42% 46%,#39405c,#0a0c14 70%),#0a0c14;border-radius:4px}
+  .plate .star{position:absolute;background:#e8eaf2;border-radius:50%}
+  .plate .tag{position:absolute;left:10px;bottom:8px;color:var(--dim);font-size:11px}
+  .side{display:flex;flex-direction:column;gap:12px}
+  .hist{height:110px;border:1px solid var(--line);border-radius:8px;background:var(--base);padding:10px;display:flex;align-items:flex-end;gap:3px}
+  .hist i{flex:1;background:linear-gradient(180deg,var(--accent),#2f4d80);border-radius:2px 2px 0 0;display:block}
+  .ctl{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px;color:var(--dim);font-size:12px}
+  .ctl .line{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .seg{display:flex;border:1px solid var(--edge);border-radius:4px;overflow:hidden}
+  .seg span{padding:3px 10px;font-size:11px}
+  .seg span.on{background:var(--sel);color:#fff}
+  .slider{height:6px;background:var(--line);border-radius:3px;flex:1;position:relative}
+  .slider b{position:absolute;top:-4px;width:14px;height:14px;border-radius:50%;background:var(--accent);border:2px solid var(--panel)}
+
+  .statusbar{height:24px;flex:0 0 24px;background:var(--base);border-top:1px solid var(--line);color:var(--dim);font-size:11px;display:flex;align-items:center;padding:0 12px;gap:16px}
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <b>MOCKUP</b> Interfaz 1.0 · estado:
+  <button data-state="welcome">Bienvenida</button>
+  <button data-state="home">Home</button>
+  <button data-state="new">Nuevo proyecto</button>
+  <button data-state="detail">Detalle</button>
+  <button data-state="ufe">UFE embebido</button>
+  <span class="muted">· la pestaña vertical «PROYECTOS» y los botones navegan de verdad ·</span>
+</div>
+
+<div class="app">
+  <div class="menubar">
+    <div class="brand">Night<span class="dot">Scribe</span></div>
+    <div class="site">Irydeo (MPC Z41) · sáb 3 oct · Luna 62%</div>
+    <div class="menus"><span>File</span><span>Tools</span><span>Help</span></div>
+  </div>
+
+  <div class="shell">
+    <button class="vtab" id="vtab" title="Mostrar / ocultar la lista de proyectos">PROYECTOS <span class="chev">›</span></button>
+    <div class="scrim" id="scrim"></div>
+
+    <aside class="drawer" id="drawer">
+      <div class="drawer-head">
+        <h3>Mis proyectos</h3>
+        <button class="x" id="drawerClose" title="Cerrar">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="search" style="margin-bottom:10px">⌕ <input placeholder="Buscar…" readonly></div>
+        <div class="plist" style="border-radius:6px">
+          <div class="prow" data-goto="detail" style="padding:9px 10px">
+            <span class="kind" style="background:var(--sn)"></span>
+            <div><div class="name small">SN 2026abc</div><div class="meta" style="font-size:11px">Supernova · activo</div></div>
+          </div>
+          <div class="prow" data-goto="detail" style="padding:9px 10px">
+            <span class="kind" style="background:var(--comet)"></span>
+            <div><div class="name small">C/2025 K1</div><div class="meta" style="font-size:11px">Cometa · activo</div></div>
+          </div>
+          <div class="prow" data-goto="detail" style="padding:9px 10px">
+            <span class="kind" style="background:var(--variable)"></span>
+            <div><div class="name small">V CrB</div><div class="meta" style="font-size:11px">Variable · activo</div></div>
+          </div>
+        </div>
+        <button class="newtile" data-goto="new" style="margin-top:10px;width:100%"><b>+ NUEVO PROYECTO</b><small>desde esta noche</small></button>
+      </div>
+    </aside>
+
+    <main class="content" id="content">
+
+      <!-- ============ A. BIENVENIDA ============ -->
+      <section class="view" id="view-welcome">
+        <div class="hero">
+          <h1 class="wordmark">NIGHT<span>SCRIBE</span></h1>
+          <p class="tag">Planifica · Comprende · Cuenta tu noche de observación</p>
+          <p class="lead">Aún no tienes proyectos. Un proyecto nace de un objeto que quieres observar
+            y guía todo lo demás: ficha, captura, análisis y publicación.</p>
+          <button class="bigcta" data-goto="new">
+            <b>✦ CREAR MI PRIMER PROYECTO</b>
+            <small>elige entre los mejores objetos de esta noche</small>
+          </button>
+        </div>
+
+        <div class="infogrid">
+          <div class="card">
+            <h4>Antes de empezar</h4>
+            <p class="muted small">Configura tu observatorio: lat/lon, horizonte real y equipo.</p>
+            <button class="link">Abrir ajustes →</button>
+          </div>
+          <div class="card">
+            <h4>¿Qué puedes observar?</h4>
+            <ul>
+              <li>Supernovas y transitorios</li>
+              <li>NEOs y candidatos PCCP</li>
+              <li>Cometas y tránsitos de exoplanetas</li>
+              <li>Variables y HADS</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h4>¿Cómo funciona?</h4>
+            <div class="steps"><span class="step"><b>1</b> Ficha</span><span class="step"><b>2</b> Captura</span><span class="step"><b>3</b> Análisis</span><span class="step"><b>4</b> Publicación</span></div>
+            <button class="link">Ver la guía completa →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ B. HOME ============ -->
+      <section class="view" id="view-home">
+        <div class="home-head">
+          <div class="h1">Mis proyectos</div>
+          <div class="spacer"></div>
+          <button class="newtile" data-goto="new"><b>+ NUEVO PROYECTO</b><small>desde esta noche</small></button>
+        </div>
+
+        <div class="attention">
+          <div class="h">Te necesita</div>
+          <div class="att-row"><span class="dot"></span><b>SN 2026abc</b><span class="muted">captura pendiente, ventana hasta 02:40</span><span class="spacer"></span><button class="pact" data-goto="detail">Abrir →</button></div>
+          <div class="att-row"><span class="dot"></span><b>V CrB</b><span class="muted">mínimo predicho esta noche</span><span class="spacer"></span><button class="pact" data-goto="detail">Abrir →</button></div>
+        </div>
+
+        <div class="filters">
+          <div class="search">⌕ <input placeholder="Buscar…" readonly></div>
+          <select class="select"><option>Activos</option><option>Todos</option><option>Hechos</option><option>Archivados</option></select>
+          <button class="ghost">Filtros ▸</button>
+          <label class="chip" style="cursor:pointer">★ Favoritos</label>
+        </div>
+
+        <div class="plist">
+          <div class="prow" data-goto="detail">
+            <span class="fav on">★</span>
+            <span class="kind" style="background:var(--sn)"></span>
+            <div><div class="name">SN 2026abc</div><div class="meta">Supernova · activo · NGC 1234 · mag 14.2 · hace 2 d</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,16 12,13 22,15 32,9 42,11 52,6 62,8" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--sn)">82%</span>
+              <button class="pact">Continuar →</button>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--comet)"></span>
+            <div><div class="name">C/2025 K1 (ATLAS)</div><div class="meta">Cometa · activo · mag 9.8 · ventana 21:10–03:20</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,18 12,15 22,16 32,12 42,14 52,10 62,11" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--comet)">64%</span>
+              <button class="pact">Continuar →</button>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--variable)"></span>
+            <div><div class="name">V CrB (variable)</div><div class="meta">Variable · activo · 5 visitas</div></div>
+            <div class="score">
+              <svg class="spark" viewBox="0 0 64 22"><polyline points="2,17 12,17 22,14 32,8 42,6 52,9 62,7" fill="none" stroke="#6ab0ff" stroke-width="2"/></svg>
+              <span class="pct" style="color:var(--variable)">71%</span>
+              <button class="pact">Continuar →</button>
+            </div>
+          </div>
+          <div class="prow" data-goto="detail">
+            <span class="fav">☆</span>
+            <span class="kind" style="background:var(--neo)"></span>
+            <div><div class="name">(NEO) 2026 XY</div><div class="meta">NEO · hecho · 3 visitas</div></div>
+            <div class="score">
+              <span class="muted small">reporte enviado</span>
+              <button class="pact">Ver →</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="campstrip">
+          Campañas: <span class="campill">HADS Cepheids · 4 proyectos</span>
+          <button class="link">→ ver todas</button>
+        </div>
+      </section>
+
+      <!-- ============ C. NUEVO PROYECTO / TONIGHT ============ -->
+      <section class="view" id="view-new">
+        <div class="row">
+          <button class="ghost" data-goto="home">← Proyectos</button>
+          <div class="h2" style="margin:0">Nuevo proyecto desde esta noche</div>
+        </div>
+        <div class="ctx">
+          <span>sáb 3 oct · Irydeo</span>
+          <select class="select"><option>Filtro: Todos</option><option>Solo supernovas</option><option>Solo cometas</option></select>
+          <span>☾ 62%</span>
+          <span class="spacer"></span>
+          <button class="ghost" title="Recalcular">↻</button>
+        </div>
+
+        <div class="manual">
+          <div class="search">⌕ <input placeholder="Buscar un objeto por nombre…" readonly></div>
+          <div class="row" style="margin-top:8px">
+            <span class="hint">¿No está en la lista? Búscalo aquí (VSX / SIMBAD) y crea el proyecto igualmente.</span>
+            <span class="spacer"></span>
+            <button class="cta" style="padding:7px 14px">Resolver</button>
+          </div>
+        </div>
+
+        <div class="h2">Los mejores de esta noche</div>
+        <div class="sugg">
+          <div class="scard">
+            <div class="top">
+              <span class="rank">1</span>
+              <span class="badge" style="background:var(--sn);color:#11141d">SN</span>
+              <b>SN 2026abc</b>
+              <span class="muted">★★★ 82</span>
+              <span class="why">«La más brillante y aún está alta»</span>
+              <button class="cta go" data-goto="detail" style="padding:6px 16px">Crear</button>
+            </div>
+            <div class="chips">
+              <span class="chip">mag 14.2</span><span class="chip">alt 58°</span>
+              <span class="chip">hasta 02:40</span><span class="chip">Luna 62%</span>
+            </div>
+          </div>
+          <div class="scard">
+            <div class="top">
+              <span class="rank">2</span>
+              <span class="badge" style="background:var(--variable);color:#11141d">Variable</span>
+              <b>V CrB</b>
+              <span class="muted">★★☆ 71</span>
+              <span class="why">«Mínimo predicho justo esta noche»</span>
+              <button class="cta go" data-goto="detail" style="padding:6px 16px">Crear</button>
+            </div>
+            <div class="chips"><span class="chip">mag 3.9</span><span class="chip">alt 41°</span><span class="chip">toda la noche</span></div>
+          </div>
+          <div class="scard">
+            <div class="top">
+              <span class="rank">3</span>
+              <span class="badge" style="background:var(--comet);color:#11141d">Cometa</span>
+              <b>C/2025 K1 (ATLAS)</b>
+              <span class="muted">★★☆ 64</span>
+              <span class="why">«Buen momento de observación»</span>
+              <button class="cta go" data-goto="detail" style="padding:6px 16px">Crear</button>
+            </div>
+            <div class="chips"><span class="chip">mag 9.8</span><span class="chip">alt 33°</span></div>
+          </div>
+        </div>
+
+        <button class="expand">▾ Ver la lista completa (tabla ordenable)</button>
+        <div class="events">
+          Eventos de hoy: <span class="ev">Conjunción Luna–Júpiter</span><span class="ev">Tránsito de Io</span>
+        </div>
+      </section>
+
+      <!-- ============ D. DETALLE ============ -->
+      <section class="view" id="view-detail">
+        <div class="mast">
+          <button class="home" data-goto="home" title="Volver a mis proyectos">⌂</button>
+          <span class="name">SN 2026abc</span>
+          <span class="badge" style="background:var(--sn);color:#11141d">Supernova</span>
+          <span class="spacer"></span>
+          <span class="muted small">Campaña: —</span>
+          <button class="ghost" data-goto="ufe" title="Abrir las placas en el editor">Archivos (3)</button>
+        </div>
+        <div class="tabbar">
+          <button class="t on">Detalles</button><span class="arrow">→</span>
+          <button class="t">Plan</button><span class="arrow">→</span>
+          <button class="t">Análisis</button><span class="arrow">→</span>
+          <button class="t">Publicación</button>
+        </div>
+        <div class="next">
+          <span>Próximo:</span><b>exportar la secuencia de captura</b>
+          <span class="spacer"></span>
+          <button class="cta" style="padding:6px 16px">Go →</button>
+          <button class="ghost">✔ hecho</button>
+        </div>
+        <div class="placeholder">
+          Contenido de la pestaña activa (ficha / plan / análisis con visitas / publicación).<br>
+          Pulsa «Archivos (3)» para abrir el UFE embebido.
+        </div>
+      </section>
+
+      <!-- ============ E. UFE EMBEBIDO ============ -->
+      <section class="view" id="view-ufe">
+        <div class="ufe-top">
+          <button class="ghost" data-goto="detail">← Volver al proyecto</button>
+          <b>NightScribe Image Workbench</b>
+          <span class="muted small">SN 2026abc · img_0142.fits</span>
+          <span class="spacer"></span>
+          <button class="ghost">Abrir</button>
+          <button class="ghost">Guardar</button>
+          <button class="ghost">⚙</button>
+        </div>
+        <div class="ufe-tabs">
+          <button class="t on">Blink</button>
+          <button class="t">Fotometría</button>
+          <button class="t">Anotar</button>
+          <span class="spacer"></span>
+          <span class="muted small">punto (—)</span>
+          <button class="ghost">reset</button>
+        </div>
+        <div class="ufe-body">
+          <div class="plate">
+            <div class="frame"></div>
+            <span class="star" style="left:30%;top:38%;width:5px;height:5px"></span>
+            <span class="star" style="left:48%;top:52%;width:3px;height:3px"></span>
+            <span class="star" style="left:62%;top:30%;width:4px;height:4px"></span>
+            <span class="star" style="left:70%;top:64%;width:3px;height:3px"></span>
+            <span class="star" style="left:38%;top:68%;width:3px;height:3px"></span>
+            <span class="tag">TAN · 0.63 ″/px · N up · E left</span>
+          </div>
+          <div class="side">
+            <div class="hist">
+              <i style="height:20%"></i><i style="height:38%"></i><i style="height:62%"></i>
+              <i style="height:88%"></i><i style="height:100%"></i><i style="height:72%"></i>
+              <i style="height:46%"></i><i style="height:26%"></i><i style="height:14%"></i>
+            </div>
+            <div class="ctl">
+              <div>Recorte</div>
+              <div class="line"><div class="slider"><b style="left:18%"></b></div></div>
+              <div style="margin-top:12px">Estiramiento</div>
+              <div class="line">
+                <div class="seg"><span class="on">lineal</span><span>gamma</span></div>
+                <div class="slider"><b style="left:55%"></b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="statusbar">
+    <span>Listo</span><span>proyectos: 4</span><span>red: sin actividad</span>
+  </div>
+</div>
+
+<script>
+  // Mockup: cambia de estado y gestiona el drawer. Nada de esto existe en la app.
+  const views = ["welcome","home","new","detail","ufe"];
+  const content = document.getElementById("content");
+  const drawer = document.getElementById("drawer");
+  const scrim = document.getElementById("scrim");
+
+  function show(state){
+    views.forEach(v=>{
+      document.getElementById("view-"+v).classList.toggle("on", v===state);
+    });
+    document.querySelectorAll(".mockbar button").forEach(b=>{
+      b.classList.toggle("on", b.dataset.state===state);
+    });
+    content.scrollTop = 0;
+  }
+
+  function drawerOpen(on){
+    drawer.classList.toggle("on", on);
+    scrim.classList.toggle("on", on);
+  }
+
+  document.getElementById("vtab").addEventListener("click", ()=>drawerOpen(!drawer.classList.contains("on")));
+  document.getElementById("drawerClose").addEventListener("click", ()=>drawerOpen(false));
+  scrim.addEventListener("click", ()=>drawerOpen(false));
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape") drawerOpen(false); });
+
+  document.querySelectorAll("[data-state]").forEach(b=>b.addEventListener("click", ()=>show(b.dataset.state)));
+  document.querySelectorAll("[data-goto]").forEach(b=>b.addEventListener("click", ()=>{
+    show(b.dataset.goto);
+    if(drawer.classList.contains("on")) drawerOpen(false);
+  }));
+
+  show("welcome");
+</script>
+</body>
+</html>

@@ -96,9 +96,12 @@
   .x:hover{background:var(--hover);color:var(--text)}
   .drawer-body{padding:10px 12px;overflow:auto;flex:1}
 
-  .content{flex:1;overflow:auto;position:relative}
-  .view{display:none;padding:20px 26px 40px;max-width:1180px;margin:0 auto}
-  .view.on{display:block}
+  /* El contenido llena TODO el área disponible (a la derecha de la pestaña
+     vertical). Cada vista estira a lo alto y lo ancho; las que tienen más
+     contenido que la ventana hacen scroll dentro, sin márgenes muertos. */
+  .content{flex:1;overflow:hidden;position:relative;display:flex}
+  .view{display:none;flex:1;min-width:0;padding:16px 20px;overflow:auto}
+  .view.on{display:flex;flex-direction:column}
 
   /* ---- piezas comunes ---- */
   .row{display:flex;align-items:center;gap:10px}
@@ -227,7 +230,10 @@
   .ufe-tabs{display:flex;gap:6px;align-items:center;margin-bottom:12px;color:var(--dim)}
   .ufe-tabs .t{background:transparent;border:1px solid transparent;border-radius:5px;padding:5px 12px;color:var(--dim)}
   .ufe-tabs .t.on{background:var(--panel);border-color:var(--edge);color:var(--text);font-weight:700}
-  .ufe-body{display:grid;grid-template-columns:1fr 300px;gap:12px;height:440px}
+  /* El cuerpo del UFE estira con la ventana: la placa se lleva el espacio y el
+     panel derecho (histograma/estiramiento) queda anclado a la derecha, como ya
+     hace el UFE actual. Aquí solo cambia el tamaño, no su diseño interno. */
+  .ufe-body{display:grid;grid-template-columns:1fr 300px;gap:12px;flex:1;min-height:0}
   .plate{background:#05060a;border:1px solid var(--line);border-radius:8px;position:relative;overflow:hidden}
   .plate .frame{position:absolute;inset:14px;background:radial-gradient(120px 80px at 42% 46%,#39405c,#0a0c14 70%),#0a0c14;border-radius:4px}
   .plate .star{position:absolute;background:#e8eaf2;border-radius:50%}
@@ -255,7 +261,7 @@
   <button data-state="new">Nuevo proyecto</button>
   <button data-state="detail">Detalle</button>
   <button data-state="ufe">UFE embebido</button>
-  <span class="muted">· la pestaña vertical «PROYECTOS» y los botones navegan de verdad ·</span>
+  <span class="muted">· cada vista ocupa toda el área de contenido · la pestaña vertical «PROYECTOS» abre el drawer · Tonight y UFE sin rediseño interno ·</span>
 </div>
 
 <div class="app">

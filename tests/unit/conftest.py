@@ -119,6 +119,25 @@ def _fake_solve_worker(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_modal_boxes(monkeypatch):
+    # A modal box waits for a click that a test run never gives. The Windows
+    # run of 2026-10-01 sat 45 minutes on
+    # test_ufe_compare_tab.py::test_generate_needs_a_wcs: the plate had no
+    # WCS, the CI has no ASTAP and no nova key, so the workbench told the
+    # observer about it with QMessageBox.information, and the test never came
+    # back (the faulthandler timer could not even dump: the box holds the
+    # event loop). A test that asserts on a box patches it on top, and
+    # test_exotic_run_report.py shows how.
+    from PySide6.QtWidgets import QMessageBox
+    silent = staticmethod(lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "information", silent)
+    monkeypatch.setattr(QMessageBox, "warning", silent)
+    monkeypatch.setattr(QMessageBox, "critical", silent)
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.StandardButton.No))
+
+
+@pytest.fixture(autouse=True)
 def _isolated_config_file(tmp_path, monkeypatch):
     # Config.save() writes the WHOLE in-memory _data to the real file. The
     # pins below plus any config.set() during a test (closing a chart

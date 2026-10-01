@@ -127,6 +127,23 @@ def _pid_alive(pid):
     # @args: pid - process id to probe
     # @return: True only if the pid still exists and is not a zombie
     #          (an unreaped zombie is already dead for our purposes)
+    if os.name == "nt":
+        # os.kill(pid, 0) is NOT a probe on Windows: it terminates the
+        # process with that exit code, and on a pid that is already gone it
+        # raises WinError 87 (measured in CI, 2026-10-01). Asking the kernel
+        # for its exit code is the probe.
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        handle = k32.OpenProcess(0x1000, False, int(pid))   # QUERY_LIMITED
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not k32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259                        # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

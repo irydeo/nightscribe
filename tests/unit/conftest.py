@@ -28,8 +28,11 @@ import pytest
 import requests
 
 # Every worker (and the plain run) creates a QApplication: offscreen keeps
-# it headless without depending on a display, set before any Qt import.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# it headless without depending on a display, set before any Qt import. An
+# EMPTY value counts as unset: the CI passes the platform through a dispatch
+# input, and an empty string there would leave Qt with no platform at all
+# (and the per-module setdefault below would keep it).
+os.environ["QT_QPA_PLATFORM"] = os.environ.get("QT_QPA_PLATFORM") or "offscreen"
 
 # Before any nightscribe module imports the `db`/`config` singletons, point
 # the per-OS paths at a throwaway tree: Config.save() and every Database

@@ -374,6 +374,12 @@ class MainWindow(QMainWindow):
         # view is first opened (never at start).
         self._tonight_loaded = False
         self._tonight_running = False
+        # Interfaz 1.1: navigation history (back/forward) over locations
+        # (view, project, tab, campaign). _navigating guards against
+        # recording the history replay itself.
+        self._nav_back = []
+        self._nav_fwd = []
+        self._navigating = False
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
@@ -526,6 +532,225 @@ class MainWindow(QMainWindow):
         # when the app itself closes (MainWindow.closeEvent -> ufe.close).
         self._shell_stack().setCurrentIndex(index)
 
+    # ---------------- navigation history (Interfaz 1.1, ADR-056) ---------
+
+    def _current_location(self):
+        # @return: the location the app is on right now, as a hashable
+        #          tuple (view, project id, tab key, campaign id)
+        pid = self._current_project["id"] if self._current_project else None
+        return (self._shell_stack().currentIndex(), pid,
+                getattr(self, "_active_tab", None), self._selected_campaign_id())
+
+    def navigate(self, view, pid=None, tab=None, cid=None, replace=False):
+        # The single entry for user navigation: records the current
+        # location on the back stack (unless replace), clears the forward
+        # stack and applies the new one. Applying never records.
+        # @args: view - a VIEW_* index; pid/tab/cid - the state to restore;
+        #        replace - drop the current location instead of stacking it
+        loc = (view, pid, tab, cid)
+        if getattr(self, "_navigating", False):
+            self._apply_location(loc)
+            return
+        cur = self._current_location()
+        if cur == loc:
+            return
+        if replace:
+            if self._nav_back and self._nav_back[-1] == cur:
+                self._nav_back.pop()
+        else:
+            self._nav_back.append(cur)
+        self._nav_fwd.clear()
+        self._navigating = True
+        try:
+            self._apply_location(loc)
+        finally:
+            self._navigating = False
+        self._update_nav_bar()
+
+    def _apply_location(self, loc):
+        # Restores a location WITHOUT recording it (used by navigate and by
+        # back/forward). A missing project is skipped to Home.
+        # @args: loc - (view, pid, tab, cid)
+        view, pid, tab, cid = loc
+        if view == VIEW_DETAIL and pid is not None:
+            self._goto_tab(VIEW_DETAIL)
+            if project.get(db, pid) is None:
+                # the project was deleted while it was in the history
+                self._goto_tab(VIEW_HOME)
+                return
+            if (self._current_project or {}).get("id") == pid:
+                # same project: a tab change is NOT a rebuild (only the
+                # page switches), or every click would wipe the pages
+                if tab:
+                    self._show_tab(tab)
+                return
+            # different project: keep the list highlight in sync WITHOUT
+            # re-entering _project_selected (signals blocked), open once
+            lst = self.projects.lst_projects
+            was_blocked = lst.signalsBlocked()
+            lst.blockSignals(True)
+            try:
+                self._select_project_row(pid)
+            finally:
+                lst.blockSignals(was_blocked)
+            if not self._open_project(pid):
+                # the project was deleted while it was in the history:
+                # fall back to the hub
+                self._goto_tab(VIEW_HOME)
+                return
+            if tab:
+                self._show_tab(tab)
+            return
+        if view == VIEW_CAMPAIGNS:
+            self._goto_tab(VIEW_CAMPAIGNS)
+            self._refresh_campaigns_tab()
+            if cid is not None:
+                lst = self.campaigns.lst_campaigns
+                for i in range(lst.count()):
+                    if lst.item(i).data(Qt.UserRole) == cid:
+                        lst.setCurrentRow(i)
+                        break
+            return
+        if view == VIEW_WELCOME:
+            self._ensure_welcome()
+        self._goto_tab(view)
+
+    def back(self):
+        # Goes to the previous location. Blocked while Welcome gates the
+        # app (an unacknowledged update). An open drawer closes first.
+        if getattr(self, "_welcome_gate", False):
+            return
+        if getattr(self, "_drawer", None) is not None and self._drawer.isVisible():
+            self._drawer_open(False)
+            return
+        if not self._nav_back:
+            return
+        cur = self._current_location()
+        loc = self._nav_back.pop()
+        self._nav_fwd.append(cur)
+        self._navigating = True
+        try:
+            self._apply_location(loc)
+        finally:
+            self._navigating = False
+        self._update_nav_bar()
+
+    def forward(self):
+        # Re-applies the location we just left with back().
+        if getattr(self, "_welcome_gate", False) or not self._nav_fwd:
+            return
+        cur = self._current_location()
+        loc = self._nav_fwd.pop()
+        self._nav_back.append(cur)
+        self._navigating = True
+        try:
+            self._apply_location(loc)
+        finally:
+            self._navigating = False
+        self._update_nav_bar()
+
+    def home(self):
+        # Back to the hub (the root of the app).
+        self.navigate(VIEW_HOME)
+
+    def _update_nav_bar(self):
+        # Paints the navigation bar (buttons + breadcrumb). Guarded so the
+        # history model works before the bar exists (early construction).
+        back = getattr(self._menus, "btn_nav_back", None)
+        if back is None:
+            return
+        gate = getattr(self, "_welcome_gate", False)
+        back.setEnabled(bool(self._nav_back) and not gate)
+        fwd = getattr(self._menus, "btn_nav_fwd", None)
+        if fwd is not None:
+            fwd.setEnabled(bool(self._nav_fwd) and not gate)
+        crumbs = getattr(self._menus, "lbl_crumbs", None)
+        if crumbs is not None:
+            crumbs.setText(self._crumbs_html())
+
+    def _breadcrumb(self):
+        # @return: [(label, view, pid, tab, cid)] from Home to here
+        loc = self._current_location()
+        view, pid, tab, _cid = loc
+        crumbs = []
+        if view == VIEW_WELCOME:
+            crumbs.append((self.tr("Welcome"), VIEW_WELCOME, None, None, None))
+            return crumbs
+        crumbs.append((self.tr("Home"), VIEW_HOME, None, None, None))
+        if view == VIEW_TONIGHT:
+            crumbs.append((self.tr("New project"), VIEW_TONIGHT,
+                           None, None, None))
+        elif view == VIEW_CAMPAIGNS:
+            crumbs.append((self.tr("Campaigns"), VIEW_CAMPAIGNS,
+                           None, None, None))
+        elif view in (VIEW_DETAIL, VIEW_UFE) and pid is not None:
+            p = project.get(db, pid) or self._current_project or {}
+            name = p.get("object_name") or "?"
+            crumbs.append((name, VIEW_DETAIL, pid, None, None))
+            if view == VIEW_DETAIL and tab:
+                crumbs.append((self._tab_label(tab), VIEW_DETAIL, pid, tab,
+                               None))
+            elif view == VIEW_UFE:
+                crumbs.append((self.tr("Image Workbench"), VIEW_UFE, pid,
+                               None, None))
+        return crumbs
+
+    def _crumb_href(self, view, pid, tab, cid):
+        # @return: the internal link a breadcrumb segment points at
+        if view == VIEW_HOME:
+            return "nav:home"
+        if view == VIEW_TONIGHT:
+            return "nav:tonight"
+        if view == VIEW_CAMPAIGNS:
+            return "nav:campaigns"
+        if view == VIEW_WELCOME:
+            return "nav:welcome"
+        if view == VIEW_UFE:
+            return f"nav:ufe:{pid}" if pid is not None else "nav:ufe"
+        if view == VIEW_DETAIL and pid is not None:
+            base = f"nav:project:{pid}"
+            return f"{base}:{tab}" if tab else base
+        return "nav:home"
+
+    def _crumbs_html(self):
+        # @return: the breadcrumb as rich text with clickable segments
+        import html as _html
+        items = self._breadcrumb()
+        parts = []
+        for i, (label, view, pid, tab, cid) in enumerate(items):
+            if i == len(items) - 1:
+                parts.append(
+                    '<span style="color:%s;font-weight:600">%s</span>'
+                    % (theme.C_TEXT, _html.escape(str(label))))
+            else:
+                parts.append(
+                    '<a href="%s" style="color:%s;text-decoration:none">%s</a>'
+                    % (self._crumb_href(view, pid, tab, cid), theme.C_ACCENT,
+                       _html.escape(str(label))))
+        sep = ' <span style="color:%s">›</span> ' % theme.C_LINE
+        return sep.join(parts)
+
+    def _crumb_clicked(self, url):
+        # @args: url - a nav:* link from the breadcrumb
+        if url == "nav:home":
+            self.home()
+        elif url == "nav:tonight":
+            self.navigate(VIEW_TONIGHT)
+        elif url == "nav:campaigns":
+            self.navigate(VIEW_CAMPAIGNS)
+        elif url == "nav:welcome":
+            self.navigate(VIEW_WELCOME)
+        elif url.startswith("nav:ufe"):
+            self.navigate(VIEW_UFE)
+        elif url.startswith("nav:project:"):
+            rest = url.split(":")[2:]
+            try:
+                pid = int(rest[0])
+            except (ValueError, IndexError):
+                return
+            tab = rest[1] if len(rest) > 1 else None
+            self.navigate(VIEW_DETAIL, pid=pid, tab=tab)
+
     # ---------------- shell construction (Interfaz 1.0, ADR-053) ----------
 
     def _build_shell(self):
@@ -653,56 +878,68 @@ class MainWindow(QMainWindow):
         else:
             self._goto_tab(VIEW_HOME)
 
-    def _show_welcome(self):
-        # Builds the Welcome view lazily (first run / update / no projects)
-        # and makes it the current view. An update is a blocking gate: the
-        # observer reads the data report before the app is usable.
+    def _ensure_welcome(self):
+        # Builds the Welcome view into its fixed page ONCE. Shared by the
+        # startup decision (_show_welcome) and the manual entry
+        # (navigate(VIEW_WELCOME)) so both build the same widget.
+        # @return: the WelcomeSetup
+        if self._welcome is not None:
+            return self._welcome
         from .widgets.welcome_setup import WelcomeSetup
-        if self._welcome is None:
-            self._welcome = WelcomeSetup(snapshot=self._snapshot)
-            self._welcome.create_project.connect(self._welcome_create)
-            self._welcome.finished.connect(self._welcome_finished)
-            # into its fixed placeholder page (VIEW_WELCOME)
-            from PySide6.QtWidgets import QVBoxLayout
-            lay = QVBoxLayout(self._welcome_page)
-            lay.setContentsMargins(0, 0, 0, 0)
-            lay.addWidget(self._welcome)
-        # The gate only makes sense on a real update (there is a database
-        # to report on): a first run, and a test with no snapshot, stay
-        # freely navigable.
+        from PySide6.QtWidgets import QVBoxLayout
+        self._welcome = WelcomeSetup(snapshot=self._snapshot)
+        self._welcome.create_project.connect(self._welcome_create)
+        self._welcome.finished.connect(self._welcome_finished)
+        lay = QVBoxLayout(self._welcome_page)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.addWidget(self._welcome)
+        return self._welcome
+
+    def _show_welcome(self):
+        # Startup decision (first run / update / no projects): builds
+        # Welcome and makes it current. An update is a blocking gate (the
+        # data report is read before the app is usable); a first run is not.
+        self._ensure_welcome()
         self._welcome_gate = bool(self._update_due
                                   and self._snapshot is not None)
         if self._update_due:
             self._welcome.show_step("data")
-        btn = getattr(self._menus, "btn_vtab", None)
-        if btn is not None:
-            btn.setEnabled(not self._welcome_gate)
+        self._set_vtab_enabled(not self._welcome_gate)
         self._shell_stack().setCurrentIndex(VIEW_WELCOME)
 
-    def _welcome_finished(self):
-        # The Data step was acknowledged: seal the version so the wizard
-        # does not run again, unlock navigation and land on Home.
-        if self._welcome is not None:
-            self._welcome.ack_data()
-        self._update_due = False
-        self._welcome_gate = False
+    def _set_vtab_enabled(self, on):
+        # @args: on - enable/disable the vertical PROJECTS tab (the gate
+        #        blocks it while an update is unacknowledged)
         btn = getattr(self._menus, "btn_vtab", None)
         if btn is not None:
-            btn.setEnabled(True)
-        self.on_refresh_projects()
-        self._goto_tab(VIEW_HOME)
+            btn.setEnabled(on)
+
+    def _welcome_finished(self):
+        # "Got it" on the Data step. Only a REAL update seals the version
+        # (and unlocks Home); a manual visit just goes back (Interfaz 1.1).
+        if self._update_due:
+            if self._welcome is not None:
+                self._welcome.ack_data()
+            self._update_due = False
+            self._welcome_gate = False
+            self._set_vtab_enabled(True)
+            self.on_refresh_projects()
+            self.navigate(VIEW_HOME, replace=True)
+            return
+        if self._nav_back:
+            self.back()
+        else:
+            self.navigate(VIEW_HOME, replace=True)
 
     def _welcome_create(self):
         # The CTA: persist the setup, acknowledge a pending update (the
-        # report was seen) and open the new-project view.
+        # report was seen) and open the new-project view, replacing Welcome.
         if self._update_due and self._welcome is not None:
             self._welcome.ack_data()
             self._update_due = False
             self._welcome_gate = False
-            btn = getattr(self._menus, "btn_vtab", None)
-            if btn is not None:
-                btn.setEnabled(True)
-        self._goto_tab(VIEW_TONIGHT)
+            self._set_vtab_enabled(True)
+        self.navigate(VIEW_TONIGHT, replace=True)
 
     def _build_drawer(self):
         # The overlay project drawer: a compact list summoned by the
@@ -733,6 +970,19 @@ class MainWindow(QMainWindow):
         close.clicked.connect(lambda: self._drawer_open(False))
         head.addWidget(close)
         lay.addLayout(head)
+        # Interfaz 1.1: Home and Welcome at the top of the switcher
+        navrow = QHBoxLayout()
+        home_btn = QPushButton(self.tr("⌂ Home"))
+        home_btn.setFlat(True)
+        home_btn.clicked.connect(self._drawer_home)
+        navrow.addWidget(home_btn)
+        welcome_btn = QPushButton(self.tr("ⓘ Welcome"))
+        welcome_btn.setFlat(True)
+        welcome_btn.setToolTip(self.tr("Setup guide and observatory"))
+        welcome_btn.clicked.connect(self._drawer_welcome)
+        navrow.addWidget(welcome_btn)
+        navrow.addStretch(1)
+        lay.addLayout(navrow)
         self._drawer_list = QListWidget()
         self._drawer_list.setObjectName("drawer_list")
         self._drawer_list.itemClicked.connect(self._drawer_row_clicked)
@@ -784,18 +1034,25 @@ class MainWindow(QMainWindow):
         pid = item.data(Qt.UserRole)
         self._drawer_open(False)
         if pid is not None:
-            self._goto_tab(VIEW_HOME)
-            self._select_project_row(pid)
+            self.navigate(VIEW_DETAIL, pid=pid)
 
     def _drawer_new_project(self):
         self._drawer_open(False)
         self._new_project_view()
 
+    def _drawer_home(self):
+        self._drawer_open(False)
+        self.home()
+
+    def _drawer_welcome(self):
+        self._drawer_open(False)
+        self.navigate(VIEW_WELCOME)
+
     def _new_project_view(self):
         # Interfaz 1.0: the new-project view (Tonight on demand + the
         # embedded search/manual form). The hub's "New project…" and the
         # drawer both land here, focusing the search.
-        self._goto_tab(VIEW_TONIGHT)
+        self.navigate(VIEW_TONIGHT)
         bar = getattr(self, "_newbar", None)
         if bar is not None:
             bar.edt_search.setFocus()
@@ -846,6 +1103,8 @@ class MainWindow(QMainWindow):
         self._menus.action_sources.triggered.connect(self.on_sources)
         self._menus.action_docs.triggered.connect(self.on_docs)
         self._menus.action_log.triggered.connect(self.on_open_log)
+        self._menus.action_welcome.triggered.connect(
+            lambda: self.navigate(VIEW_WELCOME))
         self._menus.action_explore.triggered.connect(self._tools_explore)
         self._menus.action_blink.triggered.connect(self._tools_blink)
         self._menus.action_campaigns.triggered.connect(
@@ -860,6 +1119,14 @@ class MainWindow(QMainWindow):
         # the vertical tab toggles the overlay project drawer from any view
         self._menus.btn_vtab.clicked.connect(
             lambda: self._drawer_open(not self._drawer.isVisible()))
+        # Interfaz 1.1: the navigation bar (back/forward/home/welcome and
+        # the clickable breadcrumb)
+        self._menus.btn_nav_back.clicked.connect(self.back)
+        self._menus.btn_nav_fwd.clicked.connect(self.forward)
+        self._menus.btn_nav_home.clicked.connect(self.home)
+        self._menus.btn_nav_welcome.clicked.connect(
+            lambda: self.navigate(VIEW_WELCOME))
+        self._menus.lbl_crumbs.linkActivated.connect(self._crumb_clicked)
         t.btn_compute.clicked.connect(self.on_compute_tonight)
         t.btn_show_all.toggled.connect(self._toggle_table)
         # one filter rules grid + table (WORKFLOWS 7quater): the header combo
@@ -911,11 +1178,11 @@ class MainWindow(QMainWindow):
             btn.setCheckable(True)
             btn.setCursor(Qt.PointingHandCursor)
             btn.clicked.connect(
-                lambda _=False, k=key: self._show_tab(k))
+                lambda _=False, k=key: self._show_tab(k, record=True))
         # Interfaz 1.0: the old list fold is retired. « goes back to Home
         # (the list); » brings the list back from the Detail view as the
         # overlay drawer.
-        p.btn_hide_list.clicked.connect(lambda: self._goto_tab(VIEW_HOME))
+        p.btn_hide_list.clicked.connect(self.home)
         p.btn_show_list.clicked.connect(lambda: self._drawer_open(True))
         c = self.campaigns
         c.lst_campaigns.itemSelectionChanged.connect(
@@ -996,7 +1263,17 @@ class MainWindow(QMainWindow):
                                      VIEW_CAMPAIGNS)):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.setContext(Qt.ApplicationShortcut)
-            sc.activated.connect(lambda idx=tab_idx: self._goto_tab(idx))
+            sc.activated.connect(lambda idx=tab_idx: self.navigate(idx))
+        # Interfaz 1.1: back/forward/home shortcuts
+        for seq, fn in (("Alt+Left", self.back),
+                        ("Alt+Right", self.forward),
+                        ("Alt+Home", self.home)):
+            sc = QShortcut(QKeySequence(seq), self)
+            sc.setContext(Qt.ApplicationShortcut)
+            sc.activated.connect(fn)
+        # paint the bar for the initial view
+        self._update_nav_bar()
+        self._install_mouse_nav()
 
     def _open_url(self, url):
         from PySide6.QtGui import QDesktopServices
@@ -1958,12 +2235,13 @@ class MainWindow(QMainWindow):
             row.insertWidget(3, more)
 
     def _goto_project_followup(self, pid):
-        # Opens the project's Follow-up tab (ADR-043: the multi-night
-        # journal keeps its "followup" key). The cadence chips land
-        # here (UX-d). ADR-045: lands on the Analysis tab.
-        if not self._goto_project_by_id(pid):
+        # Opens the project on its Analysis tab (ADR-045). The cadence
+        # chips land here (UX-d). Interfaz 1.1: one navigation that records
+        # the tab, so "back" returns to the chip's origin.
+        if not project.get(db, pid):
             return
-        self._scroll_to_section("analysis")
+        self.on_refresh_projects()
+        self.navigate(VIEW_DETAIL, pid=pid, tab="analysis")
 
     # ---------------- sky-event chips in the Tonight header (SC2) -------
 
@@ -3410,7 +3688,7 @@ class MainWindow(QMainWindow):
             lay.addWidget(box)
             btn = QPushButton(self.tr("Go to Tonight →"))
             btn.setCursor(Qt.PointingHandCursor)
-            btn.clicked.connect(lambda: self._goto_tab(TAB_TONIGHT))
+            btn.clicked.connect(lambda: self.navigate(VIEW_TONIGHT))
             lay.addWidget(btn, 0, Qt.AlignLeft)
         elif not entries:
             self.projects.lbl_dash_title.setText(
@@ -3449,12 +3727,30 @@ class MainWindow(QMainWindow):
             self._clear_project_detail()
             return
         pid = items[0].data(Qt.UserRole)
-        p = project.get(db, pid)
-        if not p:
+        if not project.get(db, pid):
             self._clear_project_detail()
             return
+        if getattr(self, "_navigating", False):
+            # history replay / programmatic selection: open without recording
+            self._open_project(pid)
+            return
+        if (self._current_project or {}).get("id") == pid:
+            # re-select of the SAME project (status change, reload): refresh
+            # in place, do not push a duplicate location
+            self._open_project(pid)
+            return
+        # a user pick is a navigation (Interfaz 1.1)
+        self.navigate(VIEW_DETAIL, pid=pid)
+
+    def _open_project(self, pid):
+        # Opens one project full screen: header, page and object panel. No
+        # history here (the callers decide whether it is a navigation).
+        # @args: pid - project id
+        # @return: True when the project existed and was opened
+        p = project.get(db, pid)
+        if not p:
+            return False
         self._current_project = p
-        # Interfaz 1.0: one project is a full-screen view of its own
         self._goto_tab(VIEW_DETAIL)
         self._render_project_header(p)
         self._build_project_page(p)
@@ -3464,6 +3760,7 @@ class MainWindow(QMainWindow):
         ctx = dict(p.get("context") or {})
         ctx.setdefault("project_id", p["id"])   # B4: light-curve injection
         panel.explore(p["object_name"], fallback_target=ctx, ctx=ctx)
+        return True
 
     def _project_open_activated(self, item):
         # Double-click / Enter on a project row (UX-c): jump straight to
@@ -3538,7 +3835,9 @@ class MainWindow(QMainWindow):
         #          already-selected project
         if item is not None and item.data(Qt.UserRole) == \
                 (self._current_project or {}).get("id"):
-            self._project_selected()
+            # clicking the already-selected row reloads the detail (no
+            # navigation: the location did not change)
+            self._open_project(item.data(Qt.UserRole))
 
     def _proj_files_build(self):
         # A4 (rewritten): the project files window (ADR-019, UX v3) is
@@ -3945,17 +4244,23 @@ class MainWindow(QMainWindow):
             return
         self._show_tab("details" if key == "files" else key)
 
-    def _show_tab(self, key):
+    def _show_tab(self, key, record=False):
         # ADR-041: activate one tab page — built on first open (lazy),
         # the other pages of this project get hidden, and the bar is
         # repainted so the active tab reads "you are here". ADR-045: the
         # retired "process"/"followup" keys alias to "analysis" forever,
         # so every old deep link keeps landing.
-        # @args: key - tab key ("details"|"plan"|"analysis"|"publish")
+        # @args: key - tab key ("details"|"plan"|"analysis"|"publish");
+        #        record - True for a user tab click (Interfaz 1.1: a tab
+        #        change is a navigation, so back returns to the old tab)
         # @return: None (a no-op when the page cannot exist here)
         if key is None or self._current_project is None:
             return
         key = {"process": "analysis", "followup": "analysis"}.get(key, key)
+        if record and not getattr(self, "_navigating", False):
+            self.navigate(VIEW_DETAIL, pid=self._current_project["id"],
+                          tab=key)
+            return
         self._ensure_tab_built(key)
         if key not in self._tab_pages:
             return
@@ -7907,8 +8212,11 @@ class MainWindow(QMainWindow):
         p = project.create(db, kind, name, ctx)
         if p:
             self.on_refresh_projects()
-            self._goto_tab(TAB_PROJECTS)
-            self._select_project_row(p["id"])
+            # Interfaz 1.1: the creation flow ends on the project. Coming
+            # from the new-project view, Tonight is REPLACED, so "back"
+            # returns to the hub, not to the search.
+            from_tonight = (self._shell_stack().currentIndex() == VIEW_TONIGHT)
+            self.navigate(VIEW_DETAIL, pid=p["id"], replace=from_tonight)
             self.statusBar().showMessage(
                 self.tr("Project created: %1").replace("%1", name), 8000)
         return p
@@ -7933,23 +8241,19 @@ class MainWindow(QMainWindow):
         return False
 
     def _goto_project_by_id(self, pid):
-        # Jumps to the Projects hub with this project selected (UX-d).
-        # @return: True when the project was found in the list
+        # Jumps to this project's full-screen view (UX-d). Interfaz 1.1:
+        # recorded as a navigation so "back" returns to where we came from.
+        # @return: True when the project exists
         self.on_refresh_projects()
-        self._goto_tab(TAB_PROJECTS)
-        return self._select_project_row(pid)
+        if not project.get(db, pid):
+            return False
+        self.navigate(VIEW_DETAIL, pid=pid)
+        return True
 
     def _goto_campaigns(self, cid=None):
-        # Jumps to the Campaigns tab, optionally selecting a campaign
+        # Jumps to the Campaigns view, optionally selecting a campaign
         # (the landing spot of every campaign link, UX-d).
-        self._goto_tab(TAB_CAMPAIGNS)
-        self._refresh_campaigns_tab()
-        if cid is not None:
-            lst = self.campaigns.lst_campaigns
-            for i in range(lst.count()):
-                if lst.item(i).data(Qt.UserRole) == cid:
-                    lst.setCurrentRow(i)
-                    break
+        self.navigate(VIEW_CAMPAIGNS, cid=cid)
 
     def _campaign_link_clicked(self, url):
         # The project header campaign badge is a link (UX-d).
@@ -8229,8 +8533,8 @@ class MainWindow(QMainWindow):
                       if p["object_name"] == c), None)
         if not match:
             return False
-        self._goto_tab(TAB_PROJECTS)
-        return self._select_project_row(match["id"])
+        self.navigate(VIEW_DETAIL, pid=match["id"])
+        return True
 
     # ---------------- Contextual dialogs (Explore / Post / Blink) --------
 
@@ -9175,7 +9479,7 @@ class MainWindow(QMainWindow):
         content.btn_sidc.clicked.connect(
             lambda: self._open_url("https://sidc.be/uset"))
         content.lbl_impact.linkActivated.connect(
-            lambda _u: self._goto_tab(TAB_TONIGHT))
+            lambda _u: self.navigate(VIEW_TONIGHT))
         content.btn_sun_post.clicked.connect(self.on_render_sun_post)
         content.btn_sky_post.clicked.connect(self.on_sky_post)
         self._skycal = dlg
@@ -9242,11 +9546,14 @@ class MainWindow(QMainWindow):
         return self._ufe_page_widget
 
     def _ufe_back(self):
-        # Leaves the workbench: back to the open project, or Home.
-        if self._current_project is not None:
-            self._goto_tab(VIEW_DETAIL)
+        # Leaves the workbench: back to where it was opened from (the
+        # project, or Home), or Home when there is no history.
+        if self._nav_back:
+            self.back()
+        elif self._current_project is not None:
+            self.navigate(VIEW_DETAIL, pid=self._current_project["id"])
         else:
-            self._goto_tab(VIEW_HOME)
+            self.navigate(VIEW_HOME)
 
     def _ufe_project_badge_payload(self, pid):
         # The badge's payload, built by the SAME function the project list
@@ -9274,7 +9581,7 @@ class MainWindow(QMainWindow):
         dlg.set_object(None)         # and no stale project object
         # Interfaz 1.0: the workbench is a page of the shell, full screen
         self._ufe_page()
-        self._goto_tab(VIEW_UFE)
+        self.navigate(VIEW_UFE)
 
     def _use_ufe(self):
         # @return: True when FITS work opens in the unified editor
@@ -9423,7 +9730,7 @@ class MainWindow(QMainWindow):
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
-        self._goto_tab(VIEW_UFE)
+        self.navigate(VIEW_UFE, pid=hook_pid)
         return dlg
 
     # (the object attaches via set_object at the end of _ufe_open; a
@@ -10113,6 +10420,30 @@ class MainWindow(QMainWindow):
     def _drop(self, worker):
         if worker in self._workers:
             self._workers.remove(worker)
+
+    def _install_mouse_nav(self):
+        # Interfaz 1.1: the mouse side buttons (back/forward) navigate too.
+        # An app-wide event filter is the only way to see them whatever
+        # widget is under the cursor.
+        from PySide6.QtCore import QObject, QEvent, Qt as _Qt
+        from PySide6.QtWidgets import QApplication
+        win = self
+
+        class _NavMouseFilter(QObject):
+            def eventFilter(self, obj, ev):
+                if ev.type() == QEvent.Type.MouseButtonPress:
+                    if ev.button() == _Qt.BackButton:
+                        win.back()
+                        return True
+                    if ev.button() == _Qt.ForwardButton:
+                        win.forward()
+                        return True
+                return False
+
+        self._nav_mouse_filter = _NavMouseFilter(self)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self._nav_mouse_filter)
 
     def resizeEvent(self, event):
         # Keeps the overlay drawer/scrim glued to the content area while

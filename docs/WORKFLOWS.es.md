@@ -1275,3 +1275,16 @@ el centro, sin tocar el interior de ningún widget.
 Pendiente de pulir: las campañas aún conservan su vista propia (la tira de
 Home solo enlaza); el resto de diálogos (Ajustes, Calendario del cielo,
 Diario) siguen siendo ventanas.
+
+### 7decies. Navegación con historial (2026-10-01, ADR-056)
+
+Motivación: tras Interfaz 1.0 no había «atrás» global; el usuario pidió
+regresar siempre al punto anterior. Se añade una **pila de ubicaciones**
+`(vista, proyecto, pestaña, campaña)`, una **barra de navegación** con
+migas (`gui/main_window.py` + `ui/main_window.ui`), atajos
+`Alt+←/→/Home`, botones laterales del ratón y una **entrada permanente a
+Bienvenida** (barra, Ayuda y drawer). Crear un proyecto reemplaza Tonight;
+el gate de actualización bloquea «Atrás»; `action_log` pasa a Ayuda.
+
+**Punto de entrada**: `navigate`/`back`/`forward`/`home`/`_apply_location`
+en `gui/main_window.py`; tests en `tests/unit/test_navigation_history.py`.

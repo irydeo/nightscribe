@@ -1026,3 +1026,15 @@ touching any widget's interior.
 `manual_object_panel.py`). Still to polish: campaigns keep their own view
 (the Home strip only links); the other dialogs (Settings, Sky calendar,
 Journal) are still windows.
+
+### 7decies. Navigation with history (2026-10-01, ADR-056)
+
+Motivation: after Interfaz 1.0 there was no global "back". A **stack of
+locations** `(view, project, tab, campaign)`, a **navigation bar** with
+breadcrumbs (`gui/main_window.py` + `ui/main_window.ui`), `Alt+←/→/Home`
+shortcuts, mouse side buttons and a **permanent Welcome entry** (bar, Help
+and drawer) are added. Creating a project replaces Tonight; the update gate
+blocks "Back"; `action_log` moves to Help.
+
+**Entry point**: `navigate`/`back`/`forward`/`home`/`_apply_location` in
+`gui/main_window.py`; tests in `tests/unit/test_navigation_history.py`.

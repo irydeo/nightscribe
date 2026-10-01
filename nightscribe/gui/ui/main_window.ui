@@ -15,23 +15,78 @@
    <string>NightScribe</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="shellLayout">
+   <layout class="QVBoxLayout" name="centralLayout">
     <property name="spacing"><number>0</number></property>
     <property name="leftMargin"><number>0</number></property>
     <property name="topMargin"><number>0</number></property>
     <property name="rightMargin"><number>0</number></property>
     <property name="bottomMargin"><number>0</number></property>
     <item>
-     <widget class="QToolButton" name="btn_vtab">
-      <property name="text"><string>PROYECTOS</string></property>
-      <property name="toolTip"><string>Show or hide the project list</string></property>
-      <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
-      <property name="maximumSize"><size><width>28</width><height>16777215</height></size></property>
-      <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+     <widget class="QFrame" name="nav_bar">
+      <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+      <layout class="QHBoxLayout" name="navLayout">
+       <property name="spacing"><number>6</number></property>
+       <property name="leftMargin"><number>8</number></property>
+       <property name="topMargin"><number>4</number></property>
+       <property name="rightMargin"><number>8</number></property>
+       <property name="bottomMargin"><number>4</number></property>
+       <item>
+        <widget class="QToolButton" name="btn_nav_back">
+         <property name="text"><string>←</string></property>
+         <property name="toolTip"><string>Back (Alt+Left)</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_fwd">
+         <property name="text"><string>→</string></property>
+         <property name="toolTip"><string>Forward (Alt+Right)</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_home">
+         <property name="text"><string>⌂</string></property>
+         <property name="toolTip"><string>Home (Alt+Home)</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QToolButton" name="btn_nav_welcome">
+         <property name="text"><string>ⓘ</string></property>
+         <property name="toolTip"><string>Welcome / setup guide</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_crumbs">
+         <property name="text"><string/></property>
+        </widget>
+       </item>
+       <item>
+        <spacer name="navSpacer">
+         <property name="orientation"><enum>Qt::Horizontal</enum></property>
+        </spacer>
+       </item>
+      </layout>
      </widget>
     </item>
     <item>
-     <widget class="QStackedWidget" name="stack"/>
+     <layout class="QHBoxLayout" name="shellLayout">
+      <property name="spacing"><number>0</number></property>
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <item>
+       <widget class="QToolButton" name="btn_vtab">
+        <property name="text"><string>PROYECTOS</string></property>
+        <property name="toolTip"><string>Show or hide the project list</string></property>
+        <property name="minimumSize"><size><width>28</width><height>0</height></size></property>
+        <property name="maximumSize"><size><width>28</width><height>16777215</height></size></property>
+        <property name="focusPolicy"><enum>Qt::NoFocus</enum></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QStackedWidget" name="stack"/>
+      </item>
+     </layout>
     </item>
    </layout>
   </widget>
@@ -57,10 +112,12 @@
        </widget>
     <widget class="QMenu" name="menu_help">
      <property name="title"><string>Help</string></property>
+     <addaction name="action_welcome"/>
      <addaction name="action_docs"/>
      <addaction name="separator_help"/>
      <addaction name="action_about"/>
      <addaction name="action_sources"/>
+     <addaction name="action_log"/>
     </widget>
     <addaction name="menu_file"/>
     <addaction name="menu_tools"/>
@@ -95,6 +152,10 @@
   </action>
   <action name="action_sources">
    <property name="text"><string>Data sources</string></property>
+  </action>
+  <action name="action_welcome">
+    <property name="text"><string>Welcome / setup guide</string></property>
+    <property name="toolTip"><string>Your observatory, your targets and the data report, at any time</string></property>
   </action>
   <action name="action_docs">
     <property name="text"><string>Technical Documentation</string></property>

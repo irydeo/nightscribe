@@ -27,16 +27,17 @@ import os
 import pytest
 import requests
 
-# Every worker (and the plain run) creates a QApplication, set before any Qt
-# import. Which platform, measured: on Linux it is offscreen (headless, no
-# display needed). On Windows the offscreen plugin CRASHES with an access
-# violation while the workbench builds its dropdown panels (2026-10-01: the
-# same tests run to the end with the real platform, so the app is fine and
-# the plugin is not), and the runner does have a desktop, so Windows gets
-# its own platform. An empty value counts as unset: the CI passes it through
-# a dispatch input.
-os.environ["QT_QPA_PLATFORM"] = os.environ.get("QT_QPA_PLATFORM") or (
-    "windows" if os.name == "nt" else "offscreen")
+# Every worker (and the plain run) creates a QApplication: offscreen keeps it
+# headless without depending on a display, set before any Qt import.
+#
+# Measured (2026-10-01) when choosing the platform for the Windows runner:
+# the real one is about three times slower there (85 % of the suite in 25
+# minutes, against ~8 for the whole thing offscreen), and the access
+# violations that looked like an offscreen-plugin bug were the workbench's
+# dropdown panels, which are now plain menus (gui/widgets/door_menu.py). So
+# offscreen it is, on every platform. An empty value counts as unset: the CI
+# passes the platform through a dispatch input.
+os.environ["QT_QPA_PLATFORM"] = os.environ.get("QT_QPA_PLATFORM") or "offscreen"
 
 # Before any nightscribe module imports the `db`/`config` singletons, point
 # the per-OS paths at a throwaway tree: Config.save() and every Database

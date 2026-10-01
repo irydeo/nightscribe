@@ -99,8 +99,25 @@ def test_diag_band(dlg, qapp):
             hashlib.sha1(bits[row * 200:row * 260]).hexdigest()[:8],
             hashlib.sha1(bits).hexdigest()[:8]), flush=True)
 
-    print("\nband: view %s | _title_h=%s" % (
-        dlg.view.size(), getattr(dlg.view, "_title_h", "?")), flush=True)
+    print("\nband: view %s | _title_h=%s | show_data=%s" % (
+        dlg.view.size(), getattr(dlg.view, "_title_h", "?"),
+        getattr(dlg.view, "show_data", "?")), flush=True)
+    from PySide6.QtGui import QFont, QFontMetricsF
+    band = dlg._chart_band()
+    f = QFont(dlg.view._label_font)
+    f.setPointSizeF((f.pointSizeF() or 9.0) + 1.0)
+    f.setBold(True)
+    fm = QFontMetricsF(f)
+    line = band["lines"][0]
+    sep = "   \u00b7   "
+    total = (sum(fm.horizontalAdvance(s["text"]) for s in line)
+             + fm.horizontalAdvance(sep) * (len(line) - 1))
+    print("   identidad: %.0f px | room: %.0f | cabe: %s" % (
+        total, dlg.view.width() - 16, total <= dlg.view.width() - 16),
+        flush=True)
+    for s in line:
+        print("      %-5s %6.0f px  %r" % (
+            s["field"], fm.horizontalAdvance(s["text"]), s["text"]), flush=True)
     probe("inicial")
     for mag in (17.1, 15.0):
         dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,

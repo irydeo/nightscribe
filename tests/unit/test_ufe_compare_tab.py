@@ -697,10 +697,17 @@ def test_a_crowded_field_shows_one_wait_until_it_lands(dlg, monkeypatch,
     tab.shutdown()
 
 
-def test_build_sequence_needs_a_wcs(dlg, tmp_path):
+def test_build_sequence_needs_a_wcs(dlg, tmp_path, monkeypatch):
     # ADR-051 rev: the automatic solve is queued and the auto-proposal
     # stands (it runs when the solution lands); no field worker yet.
+    #
+    # A solver has to EXIST for that to be the path: with none (the CI has
+    # neither ASTAP nor a nova key) the app says so in a box and the pending
+    # action fails on purpose, so the proposal does not stand. This machine
+    # has ASTAP, which is why the test passed here and not there (measured
+    # 2026-10-01).
     from test_fits_annotate import _make_fits
+    monkeypatch.setattr(dlg, "_nova_key_needed", lambda: False)
     dlg.state.load(_make_fits(tmp_path / "plain.fits"))
     tab = dlg.tab_compare
     tab.btn_auto.click()

@@ -532,6 +532,11 @@ def test_request_wcs_queues_and_drains_on_solve(dlg, tmp_path, monkeypatch):
     from PySide6.QtWidgets import QMessageBox
     from test_fits_annotate import _make_fits
     monkeypatch.setattr(QMessageBox, "warning", lambda *a, **k: None)
+    # the QUEUED path needs a solver to exist: with none (the CI has no
+    # ASTAP and no nova key) the pending action fails at once instead, which
+    # is right in production and not what this test is about (measured
+    # 2026-10-01)
+    monkeypatch.setattr(dlg, "_nova_key_needed", lambda: False)
     dlg.state.load(_make_fits(tmp_path / "plain.fits"))
     ran = []
     dlg.request_wcs(lambda: ran.append("after"),
@@ -999,24 +1004,36 @@ def test_the_band_colours_the_measurement_of_this_frame(dlg):
 
 # ---------------- the band reflects every change (asked) --------------
 
-def _band_strip(dlg):
-    # @return: a hash of the TOP STRIP of the painted plate: the band and
-    #          nothing else (the measurement's rings, the object's mark and
-    #          the compass all live below it), so a change here can only be
-    #          the band's own pixels.
-    #          The plate's render is COALESCED by a timer and the band is
-    #          painted on a repaint, so the window is given a moment to
-    #          arrive: measuring before that is measuring the old frame (the
-    #          first version of this test read the previous plate).
+def _band_strip(dlg, differ_from=None, budget_ms=1200):
+    # @args: dlg - the dialog, differ_from - a hash this one must differ from
+    #        (the band is painted on a coalesced repaint: waiting a FIXED 250
+    #        ms measured the old frame on a slow runner, where two different
+    #        magnitudes hashed the same, 2026-10-01), budget_ms - how long to
+    #        give the paint to arrive
+    # @return: a hash of the painted BAND: the band and nothing else (the
+    #          measurement's rings, the object's mark and the compass all live
+    #          below it), so a change here can only be the band's own pixels
     import hashlib
+    import time
     from PySide6.QtCore import QEventLoop, QTimer
-    loop = QEventLoop()
-    QTimer.singleShot(250, loop.quit)
-    loop.exec()
-    img = dlg.view.grab().toImage()
-    h = min(60, img.height())
-    return hashlib.sha1(bytes(img.copy(0, 0, img.width(), h).bits())
-                        ).hexdigest()
+    deadline = time.monotonic() + budget_ms / 1000.0
+    while True:
+        loop = QEventLoop()
+        QTimer.singleShot(120, loop.quit)
+        loop.exec()
+        img = dlg.view.grab().toImage()
+        # The crop is the BAND's own height, which the view keeps for the
+        # compass and the reticle that share the top (_title_h). A fixed 60 px
+        # left the band's text outside with a taller font; 60 stays as the
+        # fallback for a frame where nothing was painted.
+        band_h = int(getattr(dlg.view, "_title_h", 0) or 0) + 4
+        h = min(band_h if band_h > 4 else 60, img.height())
+        digest = hashlib.sha1(bytes(img.copy(0, 0, img.width(), h).bits())
+                              ).hexdigest()
+        if differ_from is None or digest != differ_from:
+            return digest
+        if time.monotonic() >= deadline:
+            return digest
 
 
 def _band_mag(dlg):
@@ -1025,12 +1042,77 @@ def _band_mag(dlg):
     return next(seg for seg in first if seg["field"] == "mag")
 
 
-def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
+def test_the_band_shows_every_source_of_the_magnitude(dlg, tmp_path):
     # Asked: "check that every time the object's magnitude changes, it shows
-    # in the band". The content is read WHEN IT PAINTS (no cache), so the
-    # only thing that can go wrong is a missing repaint, and that is
-    # invisible in the code: this compares the top strip of the painted plate
-    # for every source of the magnitude, through the app's own paths.
+    # in the band". The band's content is read WHEN IT PAINTS (no cache), so
+    # this walks every source of the magnitude through the app's own paths
+    # and reads what the paint would draw. The PIXELS are the other half of
+    # the same promise and live in
+    # test_the_band_repaints_whenever_the_magnitude_changes.
+    from nightscribe.core import fits_meta
+    from nightscribe.core.series_measure import SeriesPoint, SeriesResult
+    dlg.state.load(MONO)
+    tab = dlg.tab_measure
+    meta = fits_meta.meta_from_header(dlg.state.header or {})
+
+    # 1 · the object's magnitude (the catalogue's value, in white)
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 17.1})
+    assert _band_mag(dlg)["role"] == "mag-cat"
+    assert "17.10" in _band_mag(dlg)["text"]
+    dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
+                    "mag": 15.0})
+    assert "15.00" in _band_mag(dlg)["text"]
+
+    # 2 · a series measured HERE (what a run does when it lands)
+    point = SeriesPoint(index=0, path=str(MONO), mjd=meta["mjd"], mag=11.11,
+                        err=0.03, exptime=10.0, n_comps=6, filter="V",
+                        flags=[])
+    tab._series_result = SeriesResult(points=[point])
+    tab._draw_series([point])
+    assert "11.11" in _band_mag(dlg)["text"]
+
+    # 3 · the visit's curve loaded from the project (the same value, another
+    # way in): the band follows the payload
+    tab._series_result = None
+    tab._series_payload = []
+    tab.set_visit_curve_hooks(lambda: [{"mjd": meta["mjd"], "mag": 12.99,
+                                        "err": 0.05, "filter": "V",
+                                        "source": "measure", "comps": 5,
+                                        "flags": []}], None)
+    tab.load_visit_curve()
+    assert "12.99" in _band_mag(dlg)["text"]
+
+    # 4 · another plate (the same field, the same header): the visit's curve
+    # still answers for that frame by time, so the band follows it
+    import shutil
+    # the copy goes to tmp_path: writing it beside the fixture left a
+    # second_plate.fits inside the repository (found in the working tree)
+    second = tmp_path / "second_plate.fits"
+    shutil.copyfile(dlg.state.path, second)
+    dlg.open_plate(str(second))
+    assert "12.99" in _band_mag(dlg)["text"]
+
+    # 5 · and with nothing measured at all the catalogue comes back, in white
+    tab._series_payload = []
+    tab._curve_from_visit = False
+    dlg.view.viewport().update()
+    assert _band_mag(dlg)["role"] == "mag-cat"
+
+
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="the Windows offscreen backing store does not refresh grab() on "
+           "a widget-only repaint. Measured on the runner (2026-10-01) with "
+           "a spy on _paint_band: the paint DOES run with the new magnitude "
+           "('15.00 cat', w=869), and grab() returns the previous pixels "
+           "anyway, strip and full-image hash identical, with "
+           "viewport().repaint() changing nothing. The band is fine; the "
+           "measurement cannot see it there.")
+def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
+    # The pixel half of the promise above: the same five steps, comparing the
+    # top strip of the painted plate. A missing repaint is invisible in the
+    # code, and this is what catches it.
     from nightscribe.core import fits_meta
     from nightscribe.core.series_measure import SeriesPoint, SeriesResult
     dlg.state.load(MONO)
@@ -1042,11 +1124,11 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 17.1})
     assert _band_mag(dlg)["role"] == "mag-cat"
-    a = _band_strip(dlg)
+    a = _band_strip(dlg, differ_from=before)
     assert a != before                            # the band repainted
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 15.0})
-    b = _band_strip(dlg)
+    b = _band_strip(dlg, differ_from=a)
     assert b != a and "15.00" in _band_mag(dlg)["text"]
 
     # 2 · a series measured HERE (what a run does when it lands)
@@ -1055,7 +1137,7 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
                         flags=[])
     tab._series_result = SeriesResult(points=[point])
     tab._draw_series([point])
-    c = _band_strip(dlg)
+    c = _band_strip(dlg, differ_from=b)
     assert c != b and "11.11" in _band_mag(dlg)["text"]
 
     # 3 · the visit's curve loaded from the project (the same value, another
@@ -1067,7 +1149,7 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
                                         "source": "measure", "comps": 5,
                                         "flags": []}], None)
     tab.load_visit_curve()
-    d = _band_strip(dlg)
+    d = _band_strip(dlg, differ_from=c)
     assert d != c and "12.99" in _band_mag(dlg)["text"]
 
     # 4 · another plate (the same field, the same header): the visit's curve
@@ -1078,14 +1160,14 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
     second = tmp_path / "second_plate.fits"
     shutil.copyfile(dlg.state.path, second)
     dlg.open_plate(str(second))
-    e = _band_strip(dlg)
+    e = _band_strip(dlg, differ_from=d)
     assert e != d and "12.99" in _band_mag(dlg)["text"]
 
     # 5 · and with nothing measured at all the catalogue comes back, in white
     tab._series_payload = []
     tab._curve_from_visit = False
     dlg.view.viewport().update()
-    f = _band_strip(dlg)
+    f = _band_strip(dlg, differ_from=e)
     assert f != e and _band_mag(dlg)["role"] == "mag-cat"
 
 

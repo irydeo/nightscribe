@@ -63,3 +63,8 @@ testpaths = ["tests"]
 markers = [
     "network: tests that hit live external services",
 ]
+# A hung test must NAME itself instead of eating the gate's whole budget:
+# after two minutes pytest dumps the tracebacks of every thread, so the log
+# says where the process is stuck (the Windows run of 2026-10-01 sat at 81 %
+# for 45 minutes with nothing to point at).
+faulthandler_timeout = 120

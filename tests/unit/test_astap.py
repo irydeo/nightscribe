@@ -64,7 +64,6 @@ def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False,
     script = tmp_path / ("fake_astap_stdout.py" if to_stdout
                          else "fake_astap.py")
     lines = [
-        "#!/usr/bin/env python3",
         "import sys",
         "from pathlib import Path",
         "args = sys.argv[1:]",
@@ -109,8 +108,11 @@ def _fake_astap(tmp_path, to_stdout=False, honor_o=False, fail_first=False,
         else:
             lines.append("Path(f + '.wcs').write_text(data)")
     script.write_text("\n".join(lines) + "\n")
-    os.chmod(script, 0o755)
-    return script
+    # the executable the solver is pointed at: the script on POSIX, a .cmd
+    # that hands it to this interpreter on Windows (a .py is not runnable
+    # there: WinError 193, measured in CI)
+    from fake_binary import make_fake_binary
+    return make_fake_binary(tmp_path, script.name, "\n".join(lines) + "\n")
 
 
 def test_solve_reads_the_wcs_output(tmp_path, monkeypatch):
@@ -271,11 +273,12 @@ def test_cancel_kills_the_running_solver(tmp_path, monkeypatch):
     monkeypatch.setattr(astap, "db", _FakeCache())
     fits = _write_fits(tmp_path / "p.fits")
     script = tmp_path / "slow_astap.py"
-    script.write_text(
-        "#!/usr/bin/env python3\nimport sys, time\n"
+    from fake_binary import make_fake_binary
+    script = make_fake_binary(
+        tmp_path, "slow_astap.py",
+        "import sys, time\n"
         "open(sys.argv[sys.argv.index('-f')+1] + '.pid', 'w').write('x')\n"
         "time.sleep(30)\n")
-    os.chmod(script, 0o755)
     cancel = SolveCancel()
     out = {}
     t = threading.Thread(
@@ -460,8 +463,10 @@ def test_the_solver_warnings_do_reach_the_observer(tmp_path, monkeypatch):
     monkeypatch.setattr(astap, "db", _FakeCache())
     fits = _write_fits(tmp_path / "p.fits")
     script = tmp_path / "warn_astap.py"
-    script.write_text(
-        "#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\n"
+    from fake_binary import make_fake_binary
+    script = make_fake_binary(
+        tmp_path, "warn_astap.py",
+        "import sys\nfrom pathlib import Path\n"
         "f = sys.argv[sys.argv.index('-f') + 1]\n"
         "print('Warning scale was inaccurate! Set FOV=0.54d')\n"
         "print('Search 100, [1,2], position: 03:00 00+40d 00 00')\n"
@@ -473,7 +478,6 @@ def test_the_solver_warnings_do_reach_the_observer(tmp_path, monkeypatch):
         "cards += ' ' * ((2880 - len(cards) % 2880) % 2880)\n"
         "base = sys.argv[sys.argv.index('-o') + 1]\n"
         "Path(base + '.wcs').write_text(cards)\n")
-    os.chmod(script, 0o755)
     said = []
     astap.solve(fits, astap_path=str(script), progress=said.append)
     text = "\n".join(said)

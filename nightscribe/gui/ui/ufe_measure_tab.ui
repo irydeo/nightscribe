@@ -405,7 +405,7 @@
 
       <item>
        <layout class="QHBoxLayout" name="row_series_doors">
-        <item><widget class="QPushButton" name="btn_series_chart"><property name="toolTip"><string>How the curve is drawn (scale, error bars, binning, mean) and which points you leave out. Opens in its own window, so you can watch the curve while changing it</string></property><property name="text"><string>Chart and quality…</string></property></widget></item>
+        <item><widget class="QPushButton" name="btn_series_chart"><property name="toolTip"><string>How the curve is drawn (scale, error bars, binning, mean) and which points you leave out. Opens in its own window, so you can watch the curve while changing it</string></property><property name="text"><string>Chart…</string></property></widget></item>
         <item><widget class="QToolButton" name="btn_series_more"><property name="toolTip"><string>The occasional series actions: undo the last run, ExoClock, the night's figures, save the chart, period and phase, the guide</string></property><property name="text"><string>Series</string></property><property name="popupMode"><enum>QToolButton::InstantPopup</enum></property></widget></item>
         <item><spacer name="hsp_series_doors"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
        </layout>
@@ -542,6 +542,12 @@
           <property name="toolTip">
            <string>Which frames the series measures. THIS VISIT is the night you have open (the normal way). ALL THE VISITS measures every night of the project in ONE pass: each night's points are filed in its own visit, the whole pass is undone with one click, and the curve shows all the nights together (one pass per night). It needs a project with more than one visit with frames: with only one, this stays off and says why</string>
           </property>
+          <property name="sizeAdjustPolicy">
+           <enum>QComboBox::AdjustToMinimumContentsLengthWithIcon</enum>
+          </property>
+          <property name="minimumContentsLength">
+           <number>12</number>
+          </property>
           <property name="minimumSize">
            <size>
             <width>190</width>
@@ -575,12 +581,18 @@
           <property name="text">
            <string>Frames: 0</string>
           </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
          </widget>
         </item>
         <item>
          <widget class="QLabel" name="lbl_series_cadence">
           <property name="text">
            <string>group 1 · cadence from the frames</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
           </property>
          </widget>
         </item>

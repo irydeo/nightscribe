@@ -403,8 +403,11 @@ class UfeMeasureTab(QWidget):
         self.btn_series_restore = self._series_dlg.btn_series_restore
         self.btn_series_restore.clicked.connect(self._on_restore_all)
         self.lbl_series_selection = self._series_dlg.lbl_series_selection
-        # U6: two doors instead of the wall. "Chart and quality…" opens the
-        # window above; "Series ▾" holds the six occasional actions that
+        # U6: two doors instead of the wall. "Chart…" opens the window above
+        # (its label is short on purpose: the widest row of the block was
+        # this button plus the door, 571 px with a 1.5x font, and it set the
+        # block's floor; the tooltip and the window's title carry the rest);
+        # "Series ▾" holds the six occasional actions that
         # used to be six more buttons in the column (the row is MOVED into
         # the menu's panel, so the widgets, their texts and their names are
         # the same ones).
@@ -434,50 +437,35 @@ class UfeMeasureTab(QWidget):
                 self.lbl_series_scope.setVisible(False)
         row_out = getattr(self._ui, "row_series_out", None)
         if row_out is not None:
-            from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
-                                           QWidget, QWidgetAction)
-            panel = QWidget(self)
-            box = QVBoxLayout(panel)
-            box.setContentsMargins(6, 6, 6, 6)
-            # EVERY widget the row holds is moved, not a list of names:
-            # a hardcoded list forgot the button added later (the "discard
-            # the visit's curve" one), which then stayed inside the row
-            # while the row itself was removed from the panel: a widget with
-            # no layout to place it, floating over the rest of the form
+            from .widgets.door_menu import build_door
+            # EVERY widget the row holds goes into the door, not a list of
+            # names: a hardcoded list forgot the button added later (the
+            # "discard the visit's curve" one), which then stayed inside the
+            # row while the row itself was removed from the column: a widget
+            # with no layout to place it, floating over the rest of the form
             # (reported: "the delete button comes out broken and totally out
             # of place"). Reading the row means a new button in the Designer
             # file can never be orphaned again.
             #
-            # The widgets are moved one by one, not the layout: a layout
-            # removed from its parent is deleted by the binding, and the
-            # texts keep living in the Designer file where they belong
-            # (ADR-005).
-            moved = []
+            # The row is not dismantled: the buttons stay in it, hidden, and
+            # the door is a plain menu that triggers them (see
+            # gui/widgets/door_menu.py for why the panel of moved widgets is
+            # gone: it crashed Windows while the dialog was being built).
+            buttons = []
             for i in range(row_out.count()):
                 item = row_out.itemAt(i)
                 widget = item.widget() if item is not None else None
-                if widget is None:
-                    continue
-                moved.append(widget)
-            for widget in moved:
-                widget.setParent(panel)
-                box.addWidget(widget)
+                if widget is not None:
+                    buttons.append(widget)
             # and one that lives in the RUN row, not in this one: "undo the
             # last run" sits beside "Measure the sequence" in the Designer
             # file but belongs with the other occasional actions (it is not
             # what you press every night). It is named here, on purpose: it
             # is the only exception, and the test pins it.
-            undo = getattr(self._ui, "btn_series_undo", None)
-            if undo is not None:
-                undo.setParent(panel)
-                box.addWidget(undo)
-            action = QWidgetAction(self.btn_series_more)
-            action.setDefaultWidget(panel)
-            menu = QMenu(self.btn_series_more)
-            menu.addAction(action)
-            self.btn_series_more.setMenu(menu)
-            self.btn_series_more.setPopupMode(QToolButton.InstantPopup)
-            # the emptied row goes: nothing is left in it to keep
+            buttons.append(getattr(self._ui, "btn_series_undo", None))
+            build_door(self.btn_series_more, buttons)
+            # the row keeps its (hidden) buttons, so nothing is left floating
+            # and the names the code and the tests use are untouched
             section = getattr(self._ui, "vbox_series_actions", None)
             if section is not None:
                 try:
@@ -594,26 +582,16 @@ class UfeMeasureTab(QWidget):
     # ------------------------------------------- the ways out (U5)
 
     def _door(self, tool, widgets):
-        # Puts a set of existing buttons inside the dropdown panel hanging
-        # from a QToolButton (U5).
-        # @args: tool - the QToolButton, widgets - the widgets to move
+        # Puts a set of existing buttons inside the dropdown hanging from a
+        # QToolButton (U5): a plain menu whose items trigger those buttons
+        # (see gui/widgets/door_menu.py for why the panel of moved widgets
+        # is gone: it crashed Windows while the dialog was being built,
+        # 2026-10-01).
+        # @args: tool - the QToolButton, widgets - the buttons the door
+        #        opens onto
         # @return: None
-        from PySide6.QtWidgets import (QMenu, QToolButton, QVBoxLayout,
-                                       QWidget, QWidgetAction)
-        panel = QWidget(self)
-        box = QVBoxLayout(panel)
-        box.setContentsMargins(6, 6, 6, 6)
-        for w in widgets:
-            if w is None:
-                continue
-            w.setParent(panel)
-            box.addWidget(w)
-        action = QWidgetAction(tool)
-        action.setDefaultWidget(panel)
-        menu = QMenu(tool)
-        menu.addAction(action)
-        tool.setMenu(menu)
-        tool.setPopupMode(QToolButton.InstantPopup)
+        from .widgets.door_menu import build_door
+        build_door(tool, list(widgets))
 
     def _set_export_enabled(self, flag):
         # The CSV and the AAVSO EFF report are what the Export door opens
@@ -626,6 +604,9 @@ class UfeMeasureTab(QWidget):
         self.btn_csv.setEnabled(flag)
         self.btn_eff.setEnabled(flag)
         self.btn_export_more.setEnabled(flag)
+        # the door shows it at once, not only when it opens
+        from .widgets.door_menu import refresh_door
+        refresh_door(self.btn_export_more)
 
     # -------------------------------------------------- resets (ADR-047)
 
@@ -637,8 +618,15 @@ class UfeMeasureTab(QWidget):
         # the door goes with them: the row must not keep a Reset button
         # that opens onto nothing
         self.btn_reset_more.setVisible(bool(flag))
-        self.btn_reset_state.setVisible(bool(flag))
-        self.btn_reset_points.setVisible(bool(flag))
+        # The two resets live INSIDE the door: they stay hidden (the door is
+        # the way in) and what changes is whether their items are live, which
+        # the menu reads when it opens. Making them visible here put them
+        # floating over the window, and the door's own item made them look
+        # duplicated (reported 2026-10-01).
+        self.btn_reset_state.setEnabled(bool(flag))
+        self.btn_reset_points.setEnabled(bool(flag))
+        from .widgets.door_menu import refresh_door
+        refresh_door(self.btn_reset_more)
 
     def ui_defaults(self):
         # ADR-047: the recipe the .ui shipped with, for the state reset
@@ -1224,6 +1212,13 @@ class UfeMeasureTab(QWidget):
             # which scopes this project offers (one visit, or all of them)
             self._sync_series_scope()
             self._fit_series_hint()
+            # ... and once more when the layout has placed the block: the
+            # width the label has at this instant is the one it had while
+            # hidden, and a word-wrapped label asked for its height at the
+            # wrong width comes out cut (measured in CI, 2026-10-01: 58 px
+            # against the 118 its text needs).
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self._fit_series_hint)
             self._update_series_counter(self._series_context() or {})
         if not self._series_attached and self._series_worker is not None:
             self._series_worker.cancel()

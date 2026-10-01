@@ -38,14 +38,17 @@ import requests
 _HANG_S = float(os.environ.get("NIGHTSCRIBE_TEST_HANG_S") or 300)
 
 
-@pytest.hookimpl(hookwrapper=True)
+@pytest.hookimpl(wrapper=True)
 def pytest_runtest_protocol(item, nextitem):
     # @args: item - the test about to run, nextitem - pytest's own argument
-    # @return: nothing (the hook is a wrapper)
+    # @return: the hook's result, untouched (wrapper=True is the form pytest
+    #          9 keeps: with the old hookwrapper=True it silently does
+    #          nothing there, which is how the hang of 2026-10-01 went
+    #          unnamed)
     import faulthandler
     faulthandler.dump_traceback_later(_HANG_S, exit=True)
     try:
-        yield
+        return (yield)
     finally:
         faulthandler.cancel_dump_traceback_later()
 

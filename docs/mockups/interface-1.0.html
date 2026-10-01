@@ -102,6 +102,13 @@
   .content{flex:1;overflow:hidden;position:relative;display:flex}
   .view{display:none;flex:1;min-width:0;padding:16px 20px;overflow:auto}
   .view.on{display:flex;flex-direction:column}
+  /* Cada vista llena también el ALTO: el bloque principal (lista de proyectos,
+     sugerencias, contenido de la pestaña) absorbe el espacio sobrante y hace
+     scroll dentro; lo demás queda fijo arriba/abajo. Nada de height fijos. */
+  #view-home .plist{flex:1;min-height:0;overflow:auto}
+  #view-new .sugg{flex:1;min-height:0;overflow:auto}
+  #view-detail .placeholder{flex:1;display:flex;align-items:center;justify-content:center}
+  #view-welcome .hero{flex:1;display:flex;flex-direction:column;justify-content:center}
 
   /* ---- piezas comunes ---- */
   .row{display:flex;align-items:center;gap:10px}
@@ -205,6 +212,21 @@
   .manual{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px;margin-bottom:18px}
   .manual .search{border-color:var(--accent)}
   .manual .hint{color:var(--dim);font-size:11px;margin-top:7px}
+  /* Formulario de creación manual: se despliega en la propia vista (nada de
+     ventana emergente) cuando el buscador no localiza el objeto. */
+  .manualform{border:1px solid var(--accent);border-radius:8px;background:var(--base);padding:14px;margin-bottom:18px}
+  .manualform[hidden]{display:none}
+  .mf-head{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+  .mf-grid,.mf-type{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .mf-grid label,.mf-type label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--dim)}
+  .mf-grid input,.mf-grid select,.mf-type input,.mf-type select{
+    background:var(--bg);border:1px solid var(--edge);border-radius:4px;
+    padding:6px 8px;color:var(--text);font:inherit;font-size:12px}
+  .mf-grid input:focus,.mf-type input:focus{outline:0;border-color:var(--accent)}
+  .mf-type{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .mf-type.on{display:grid}
+  .mf-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+  .mf-toggle{margin-top:9px}
   .sugg{display:flex;flex-direction:column;gap:10px}
   .scard{border:1px solid var(--line);border-radius:8px;background:var(--base);padding:12px 14px}
   .scard:hover{border-color:var(--edge)}
@@ -445,6 +467,72 @@
             <span class="spacer"></span>
             <button class="cta" style="padding:7px 14px">Resolver</button>
           </div>
+          <button class="link mf-toggle" id="mfToggle">No lo encuentro: crear objeto a mano →</button>
+        </div>
+
+        <div class="manualform" id="manualForm" hidden>
+          <div class="mf-head">
+            <b>Crear objeto a mano</b>
+            <span class="muted small">No se ha localizado. Rellena sus datos y se creará el proyecto igual: ficha, captura, análisis y publicación.</span>
+          </div>
+          <div class="mf-grid">
+            <label>Nombre<input value=""></label>
+            <label>Tipo
+              <select id="mfKind">
+                <option value="sn">Supernova</option>
+                <option value="neo">NEO</option>
+                <option value="comet">Cometa</option>
+                <option value="pccp">PCCP</option>
+                <option value="transit">Tránsito</option>
+                <option value="variable">Variable</option>
+                <option value="hads">HADS</option>
+              </select>
+            </label>
+            <label>AR (grados)<input placeholder="ej. 210.12345"></label>
+            <label>Dec (grados)<input placeholder="ej. 12.34567"></label>
+            <label>Magnitud<input placeholder="opcional"></label>
+            <label>Notas / alias<input placeholder="opcional"></label>
+          </div>
+
+          <div class="mf-type" data-kind="sn">
+            <label>Fecha de descubrimiento<input type="date"></label>
+            <label>Tipo espectral
+              <select><option>Ia</option><option>Ib</option><option>Ic</option><option>II</option><option>IIn</option></select>
+            </label>
+            <label>Galaxia anfitriona<input placeholder="ej. NGC 1234"></label>
+          </div>
+          <div class="mf-type" data-kind="comet">
+            <label>Fecha de perihelio<input type="date"></label>
+            <label>Magnitud absoluta H<input placeholder="opcional"></label>
+            <label>Pendiente<input placeholder="opcional"></label>
+          </div>
+          <div class="mf-type" data-kind="neo">
+            <label>Ritmo aparente (″/min)<input placeholder="opcional"></label>
+            <label>H<input placeholder="opcional"></label>
+            <label>MOID (AU)<input placeholder="opcional"></label>
+          </div>
+          <div class="mf-type" data-kind="transit">
+            <label>Período (d)<input></label>
+            <label>Época T0 (JD)<input></label>
+            <label>Duración (h)<input></label>
+            <label>Profundidad (mmag)<input placeholder="opcional"></label>
+          </div>
+          <div class="mf-type" data-kind="variable">
+            <label>Período (d)<input></label>
+            <label>Amplitud (mag)<input></label>
+            <label>Época de máximo (JD)<input></label>
+            <label>Subtipo VSX<input placeholder="ej. RRAB"></label>
+          </div>
+          <div class="mf-type" data-kind="hads">
+            <label>Período (d)<input></label>
+            <label>Amplitud (mag)<input></label>
+            <label>Época (JD)<input></label>
+          </div>
+
+          <div class="mf-actions">
+            <button class="ghost" id="mfCancel">Cancelar</button>
+            <button class="cta" data-goto="detail">Crear proyecto</button>
+          </div>
         </div>
 
         <div class="h2">Los mejores de esta noche</div>
@@ -606,6 +694,25 @@
     show(b.dataset.goto);
     if(drawer.classList.contains("on")) drawerOpen(false);
   }));
+
+  // Formulario manual de objeto: se despliega en la vista y cambia sus campos
+  // según el tipo elegido (progressive disclosure). Solo maqueta.
+  const manualForm = document.getElementById("manualForm");
+  const mfKind = document.getElementById("mfKind");
+  function mfShowType(kind){
+    const key = kind === "pccp" ? "neo" : kind;
+    document.querySelectorAll(".mf-type").forEach(el=>{
+      el.classList.toggle("on", el.dataset.kind === key);
+    });
+  }
+  document.getElementById("mfToggle").addEventListener("click", ()=>{
+    manualForm.hidden = false;
+    mfShowType(mfKind.value);
+  });
+  document.getElementById("mfCancel").addEventListener("click", ()=>{
+    manualForm.hidden = true;
+  });
+  mfKind.addEventListener("change", ()=>mfShowType(mfKind.value));
 
   show("welcome");
 </script>

@@ -89,30 +89,41 @@ def test_diag_band(dlg, qapp):
     dlg.state.load(MONO)
     qapp.processEvents()
 
-    def strip():
+    def digest(img, y0, y1):
+        return hashlib.sha1(
+            bytes(img.copy(0, y0, img.width(), y1 - y0).bits())).hexdigest()
+
+    def probe(tag):
         img = dlg.view.grab().toImage()
         h = int(getattr(dlg.view, "_title_h", 0) or 0)
-        crop = min((h + 4) if h > 0 else 60, img.height())
-        return (h, crop, img.width(),
-                hashlib.sha1(bytes(img.copy(0, 0, img.width(), crop).bits())
-                             ).hexdigest())
+        colours = {img.pixel(x, y) for y in range(0, min(42, img.height()))
+                   for x in range(0, img.width(), 7)}
+        print("   %-12s size=%sx%s _title_h=%s strip=%s mid=%s full=%s "
+              "colours=%d" % (
+                  tag, img.width(), img.height(), h,
+                  digest(img, 0, 42)[:8],
+                  digest(img, 200, 260)[:8],
+                  digest(img, 0, img.height())[:8], len(colours)))
+        return img
 
-    print("\nband: _title_h=%s" % getattr(dlg.view, "_title_h", "?"))
+    print("\nband: view size %s | _title_h=%s | has_image=%s" % (
+        dlg.view.size(), getattr(dlg.view, "_title_h", "?"),
+        getattr(dlg.state, "has_image", "?")))
+    probe("inicial")
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 17.1})
-    a = strip()
-    time.sleep(0.5)
+    probe("17.1")
+    time.sleep(0.6)
     qapp.processEvents()
-    b = strip()
+    probe("17.1+0.6s")
+    dlg.view.repaint()
+    probe("17.1+repaint")
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 15.0})
-    c = strip()
-    time.sleep(0.5)
+    probe("15.0")
+    time.sleep(0.6)
     qapp.processEvents()
-    d = strip()
-    print("   tras 17.1:", a)
-    print("   +0.5 s  :", b)
-    print("   tras 15.0:", c)
-    print("   +0.5 s  :", d)
+    dlg.view.repaint()
+    probe("15.0+repaint")
     band = dlg._chart_band()["lines"][0]
     print("   band lines:", [(s["field"], s["text"]) for s in band])

@@ -403,8 +403,11 @@ class UfeMeasureTab(QWidget):
         self.btn_series_restore = self._series_dlg.btn_series_restore
         self.btn_series_restore.clicked.connect(self._on_restore_all)
         self.lbl_series_selection = self._series_dlg.lbl_series_selection
-        # U6: two doors instead of the wall. "Chart and quality…" opens the
-        # window above; "Series ▾" holds the six occasional actions that
+        # U6: two doors instead of the wall. "Chart…" opens the window above
+        # (its label is short on purpose: the widest row of the block was
+        # this button plus the door, 571 px with a 1.5x font, and it set the
+        # block's floor; the tooltip and the window's title carry the rest);
+        # "Series ▾" holds the six occasional actions that
         # used to be six more buttons in the column (the row is MOVED into
         # the menu's panel, so the widgets, their texts and their names are
         # the same ones).

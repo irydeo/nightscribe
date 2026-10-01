@@ -267,6 +267,9 @@ KIND_ORDER = list(kinds.ids())
 # TAB_* names are kept as aliases so the deep links across the file
 # (project created -> hub, campaign badge -> campaigns) keep working.
 VIEW_HOME, VIEW_TONIGHT, VIEW_CAMPAIGNS, VIEW_DETAIL = range(4)
+# The Welcome view is appended (built lazily only when it is needed) so the
+# indices the rest of the file already uses stay put.
+VIEW_WELCOME = 4
 TAB_PROJECTS = VIEW_HOME
 TAB_TONIGHT = VIEW_TONIGHT
 TAB_CAMPAIGNS = VIEW_CAMPAIGNS
@@ -358,8 +361,14 @@ class MainWindow(QMainWindow):
     # holds the Sky calendar, the observing journal, and the contextual
     # Explore/Post/Blink dialogs.
 
-    def __init__(self):
+    # @args: snapshot - the pre-migration backup dict from core/backup.py
+    #        (the Welcome view's data report), or None when there is no
+    #        database yet
+    def __init__(self, snapshot=None):
         super().__init__()
+        self._snapshot = snapshot
+        self._welcome = None
+        self._welcome_gate = False   # True while an update is unacknowledged
         self._tonight_top = []
         self._tonight_all = []
         self._workers = []
@@ -502,7 +511,11 @@ class MainWindow(QMainWindow):
 
     def _goto_tab(self, index):
         # Switches the shell's view. The name is kept (Interfaz 1.0): every
-        # deep link in the file calls _goto_tab(TAB_*).
+        # deep link in the file calls _goto_tab(TAB_*). While an update's
+        # Data step is unacknowledged, Welcome is a gate: nothing else can
+        # be opened until "Got it".
+        if getattr(self, "_welcome_gate", False) and index != VIEW_WELCOME:
+            return
         self._shell_stack().setCurrentIndex(index)
 
     # ---------------- shell construction (Interfaz 1.0, ADR-053) ----------
@@ -574,6 +587,64 @@ class MainWindow(QMainWindow):
             self.tr("Filters ▾") if filters_open else self.tr("Filters ▸"))
         self.projects.btn_filters.blockSignals(False)
         self._build_drawer()
+        # Interfaz 1.0 (ADR-053): Welcome only when it is needed: a first
+        # run (no observatory), a pending update (a newer version than the
+        # one last run) or no projects at all. Otherwise the app opens on
+        # Home, ready and offline.
+        from . import wizard as _wz
+        self._fresh = not config.is_configured()
+        self._update_due = _wz._wizard_needed(config.get("app_version") or "")
+        if self._fresh or self._update_due or not project.list_projects(db):
+            self._show_welcome()
+        else:
+            self._goto_tab(VIEW_HOME)
+
+    def _show_welcome(self):
+        # Builds the Welcome view lazily (first run / update / no projects)
+        # and makes it the current view. An update is a blocking gate: the
+        # observer reads the data report before the app is usable.
+        from .widgets.welcome_setup import WelcomeSetup
+        if self._welcome is None:
+            self._welcome = WelcomeSetup(snapshot=self._snapshot)
+            self._welcome.create_project.connect(self._welcome_create)
+            self._welcome.finished.connect(self._welcome_finished)
+            self._shell_stack().addWidget(self._welcome)   # VIEW_WELCOME
+        # The gate only makes sense on a real update (there is a database
+        # to report on): a first run, and a test with no snapshot, stay
+        # freely navigable.
+        self._welcome_gate = bool(self._update_due
+                                  and self._snapshot is not None)
+        if self._update_due:
+            self._welcome.show_step("data")
+        btn = getattr(self._menus, "btn_vtab", None)
+        if btn is not None:
+            btn.setEnabled(not self._welcome_gate)
+        self._shell_stack().setCurrentIndex(VIEW_WELCOME)
+
+    def _welcome_finished(self):
+        # The Data step was acknowledged: seal the version so the wizard
+        # does not run again, unlock navigation and land on Home.
+        if self._welcome is not None:
+            self._welcome.ack_data()
+        self._update_due = False
+        self._welcome_gate = False
+        btn = getattr(self._menus, "btn_vtab", None)
+        if btn is not None:
+            btn.setEnabled(True)
+        self.on_refresh_projects()
+        self._goto_tab(VIEW_HOME)
+
+    def _welcome_create(self):
+        # The CTA: persist the setup, acknowledge a pending update (the
+        # report was seen) and open the new-project view.
+        if self._update_due and self._welcome is not None:
+            self._welcome.ack_data()
+            self._update_due = False
+            self._welcome_gate = False
+            btn = getattr(self._menus, "btn_vtab", None)
+            if btn is not None:
+                btn.setEnabled(True)
+        self._goto_tab(VIEW_TONIGHT)
 
     def _build_drawer(self):
         # The overlay project drawer: a compact list summoned by the

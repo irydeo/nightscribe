@@ -1,0 +1,313 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interfaz 1.0 (ADR-053): the Welcome view. It hosts the first-run / update
+  wizard as an inline stepper (Observatory -> Targets -> Data) instead of the
+  old modal QWizard. The structure, texts and tooltips live here (ADR-005);
+  gui/widgets/welcome_setup.py wires the signals, fills the kinds list and
+  the migration report, and gates navigation on the update's Data step.
+-->
+<ui version="4.0">
+ <class>WelcomeTab</class>
+ <widget class="QWidget" name="WelcomeTab">
+  <layout class="QVBoxLayout" name="welcomeLayout">
+   <property name="leftMargin"><number>24</number></property>
+   <property name="topMargin"><number>20</number></property>
+   <property name="rightMargin"><number>24</number></property>
+   <property name="bottomMargin"><number>20</number></property>
+   <item>
+    <widget class="QFrame" name="hero" native="true">
+     <layout class="QVBoxLayout" name="heroLayout">
+      <item>
+       <widget class="QLabel" name="lbl_wordmark">
+        <property name="text"><string>NIGHTSCRIBE</string></property>
+        <property name="alignment"><set>Qt::AlignCenter</set></property>
+        <property name="styleSheet"><string notr="true">font-size: 26px; font-weight: 800; letter-spacing: 10px;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_tag">
+        <property name="text"><string>Plan, understand and report your observing night</string></property>
+        <property name="alignment"><set>Qt::AlignCenter</set></property>
+        <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="lbl_lead">
+        <property name="text"><string>Set up your observatory and your targets in three steps; then create your first project and the app guides you: record, capture, analysis and publishing.</string></property>
+        <property name="alignment"><set>Qt::AlignCenter</set></property>
+        <property name="wordWrap"><bool>true</bool></property>
+        <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="stepperLayout">
+     <item>
+      <widget class="QToolButton" name="btn_step_obs">
+       <property name="text"><string>1 · Your observatory</string></property>
+       <property name="toolTip"><string>Where you look at the sky from</string></property>
+       <property name="checkable"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lbl_sep1">
+       <property name="text"><string>→</string></property>
+       <property name="styleSheet"><string notr="true">color: #3a4156;</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btn_step_kinds">
+       <property name="text"><string>2 · Your targets</string></property>
+       <property name="toolTip"><string>The kinds of object you want to follow</string></property>
+       <property name="checkable"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="lbl_sep2">
+       <property name="text"><string>→</string></property>
+       <property name="styleSheet"><string notr="true">color: #3a4156;</string></property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QToolButton" name="btn_step_data">
+       <property name="text"><string>3 · Your data, safe</string></property>
+       <property name="toolTip"><string>Your database is copied and the changes are explained</string></property>
+       <property name="checkable"><bool>true</bool></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="stepperSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QStackedWidget" name="setup_stack">
+     <widget class="QWidget" name="panel_obs">
+      <layout class="QVBoxLayout" name="obsLayout">
+       <item>
+        <widget class="QLabel" name="lbl_obs_title">
+         <property name="text"><string>Your observatory</string></property>
+         <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_obs_sub">
+         <property name="text"><string>Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="detectRow">
+         <item>
+          <widget class="QPushButton" name="btn_detect">
+           <property name="text"><string>Find my location</string></property>
+           <property name="toolTip"><string>Uses your public IP to guess the city, only when you click</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_site_privacy">
+           <property name="text"><string>Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="detectSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="mpcRow">
+         <item>
+          <widget class="QLabel" name="lbl_mpc">
+           <property name="text"><string>Or with an MPC code:</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="edt_site_mpc">
+           <property name="maxLength"><number>3</number></property>
+           <property name="placeholderText"><string>e.g. Z41</string></property>
+           <property name="maximumWidth"><number>80</number></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_resolve">
+           <property name="text"><string>Resolve</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="mpcSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QFormLayout" name="siteForm">
+         <item row="0" column="0"><widget class="QLabel" name="lbl_site_name"><property name="text"><string>Name:</string></property></widget></item>
+         <item row="0" column="1"><widget class="QLineEdit" name="edt_site_name"/></item>
+         <item row="1" column="0"><widget class="QLabel" name="lbl_site_lat"><property name="text"><string>Latitude (degrees):</string></property></widget></item>
+         <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_site_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
+         <item row="2" column="0"><widget class="QLabel" name="lbl_site_lon"><property name="text"><string>Longitude (degrees east):</string></property></widget></item>
+         <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_site_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+         <item row="3" column="0"><widget class="QLabel" name="lbl_site_height"><property name="text"><string>Height (m):</string></property></widget></item>
+         <item row="3" column="1"><widget class="QSpinBox" name="spn_site_height"><property name="maximum"><number>9000</number></property></widget></item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_site_status">
+         <property name="text"><string/></property>
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="obsActions">
+         <item>
+          <spacer name="obsActionsSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_obs_next">
+           <property name="text"><string>Continue →</string></property>
+           <property name="toolTip"><string>Save the site and go to your targets</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <spacer name="obsBottom">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="panel_kinds">
+      <layout class="QVBoxLayout" name="kindsLayout">
+       <item>
+        <widget class="QLabel" name="lbl_kinds_title">
+         <property name="text"><string>Your targets</string></property>
+         <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_kinds_sub">
+         <property name="text"><string>Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="kinds_scroll">
+         <property name="widgetResizable"><bool>true</bool></property>
+         <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <widget class="QWidget" name="kinds_container">
+          <layout class="QVBoxLayout" name="kindsBoxLayout"/>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="kindsActions">
+         <item>
+          <widget class="QLabel" name="lbl_kinds_rule">
+           <property name="text"><string>Keep at least one kind checked.</string></property>
+           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="kindsActionsSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_kinds_next">
+           <property name="text"><string>Continue →</string></property>
+           <property name="toolTip"><string>Save your targets and continue</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="panel_data">
+      <layout class="QVBoxLayout" name="dataLayout">
+       <item>
+        <widget class="QLabel" name="lbl_data_title">
+         <property name="text"><string>Your data, safe</string></property>
+         <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="lbl_data_sub">
+         <property name="text"><string>Before touching anything, NightScribe copies your database and explains in plain words what this version changes.</string></property>
+         <property name="wordWrap"><bool>true</bool></property>
+         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="data_scroll">
+         <property name="widgetResizable"><bool>true</bool></property>
+         <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <widget class="QWidget" name="data_container">
+          <layout class="QVBoxLayout" name="dataBoxLayout"/>
+         </widget>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="dataActions">
+         <item>
+          <widget class="QLabel" name="lbl_data_rule">
+           <property name="text"><string>Required once per version.</string></property>
+           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="dataActionsSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_data_ack">
+           <property name="text"><string>Got it, continue</string></property>
+           <property name="toolTip"><string>Acknowledge the report and continue</string></property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="createRow">
+     <item>
+      <spacer name="createSpacer">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_create">
+       <property name="text"><string>Create my first project</string></property>
+       <property name="toolTip"><string>Pick among tonight's best objects</string></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="createSpacer2">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

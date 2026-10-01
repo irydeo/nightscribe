@@ -106,7 +106,7 @@ def test_campaigns_tab_exists(window):
     # Detail); Campaigns keeps its own view (ADR-043 retired the
     # Observatory view, its controls live in the Capture step).
     stack = window._shell_stack()
-    assert stack.count() == 4
+    assert stack.count() >= 4
     assert stack.widget(TAB_CAMPAIGNS) is window.campaigns
 
 

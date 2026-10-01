@@ -706,6 +706,35 @@ def test_exotic_block_hidden_off_transit(dlg, tmp_path):
     assert not dlg.visit_panel.grp_exotic.isVisible()
 
 
+def test_exotic_block_shows_the_last_reduction_and_opens_it(dlg, tmp_path):
+    # The result of a reduction comes back to where it was launched from:
+    # the line with the two numbers, and the whole result (figure, files)
+    # one click away. No reduction yet: an empty line and dead buttons,
+    # never zeros.
+    from test_fits_annotate import _make_fits
+    a = _make_fits(tmp_path / "a.fits")
+    calls = []
+    dlg.set_exotic_hooks(lambda: None, lambda: None,
+                         result_fn=lambda: calls.append("result"),
+                         folder_fn=lambda: calls.append("folder"),
+                         result_text="T_mid 2458107.7146 ± 0.0011")
+    dlg.set_series_hook(lambda: {"paths": [str(a)], "kind": "transit"})
+    assert dlg.visit_panel.lbl_exotic_result.text() == \
+        "T_mid 2458107.7146 ± 0.0011"
+    assert dlg.visit_panel.btn_exotic_result.isEnabled()
+    assert dlg.visit_panel.btn_exotic_folder.isEnabled()
+    dlg.visit_panel.btn_exotic_result.click()
+    dlg.visit_panel.btn_exotic_folder.click()
+    assert calls == ["result", "folder"]
+    # an empty summary (no reduction yet) disables both doors
+    dlg.set_exotic_hooks(lambda: None, lambda: None,
+                         result_fn=lambda: calls.append("result"),
+                         folder_fn=lambda: calls.append("folder"))
+    assert dlg.visit_panel.lbl_exotic_result.text() == ""
+    assert not dlg.visit_panel.btn_exotic_result.isEnabled()
+    assert not dlg.visit_panel.btn_exotic_folder.isEnabled()
+
+
 def test_cancelled_solve_shows_no_failure_box(dlg, monkeypatch):
     # the busy dialog's Cancel: the queued action gets its way out, never
     # the misleading "could not solve the plate"

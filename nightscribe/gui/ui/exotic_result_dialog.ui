@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  EXOTIC result window (ADR-052 rev): the reduction's numbers, its light
+  curve and every file it wrote, so the observer does not have to go
+  digging in the project's work folder. The structure lives in Designer,
+  the behaviour in gui/exotic_result_dialog.py (ADR-005); the curve is a
+  PNG written by EXOTIC and shown in the placeholder label `lbl_chart`,
+  and the parameters and the file list are data, set in code.
+-->
+<ui version="4.0">
+ <class>ExoticResultDialog</class>
+ <widget class="QWidget" name="ExoticWindow">
+  <layout class="QVBoxLayout" name="vbox_exotic_result">
+   <item>
+    <widget class="QLabel" name="lbl_title">
+     <property name="text"><string>EXOTIC reduction</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_subtitle">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPlainTextEdit" name="txt_params">
+     <property name="readOnly"><bool>true</bool></property>
+     <property name="maximumSize"><size><width>16777215</width><height>180</height></size></property>
+     <property name="toolTip"><string>What EXOTIC fitted and what it chose to fit it: the transit time and the radius ratio with their uncertainties, the depth, the inclination and the duration, plus the scatter of the residuals and the comparison star, aperture and annulus the search settled on</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_chart">
+     <property name="text"><string/></property>
+     <property name="alignment"><set>Qt::AlignCenter</set></property>
+     <property name="minimumSize"><size><width>640</width><height>300</height></size></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_files">
+     <property name="text"><string>What the reduction wrote (double click to open it with the system):</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QListWidget" name="lst_files">
+     <property name="minimumSize"><size><width>0</width><height>120</height></size></property>
+     <property name="toolTip"><string>The reduction's own files, grouped: the light curve, the field figures with the apertures and the comparison stars, the diagnostics and the data. Double click opens one with the system; «Open the folder» opens all of them at once</string></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="row_buttons">
+     <item><widget class="QPushButton" name="btn_folder"><property name="text"><string>Open the folder</string></property><property name="toolTip"><string>Open the project's EXOTIC work folder with the file manager</string></property></widget></item>
+     <item><widget class="QPushButton" name="btn_save"><property name="text"><string>Save the products in the visit</string></property><property name="toolTip"><string>Register the light curve, the AAVSO report and the parameters as resources of the visit: they show up in its window and open from there</string></property></widget></item>
+     <item><spacer name="hsp_buttons"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     <item><widget class="QPushButton" name="btn_close"><property name="text"><string>Close</string></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

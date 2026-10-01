@@ -39,6 +39,13 @@
      <layout class="QVBoxLayout" name="vbox_exotic">
       <item><widget class="QPushButton" name="btn_exotic_reduce"><property name="text"><string>Reduce and fit with EXOTIC…</string></property><property name="toolTip"><string>Generate the visit's inits.json, run EXOTIC headless and import its light curve and fitted parameters. Uses the open frame as the reference and the sequence built above</string></property></widget></item>
       <item><widget class="QPushButton" name="btn_exotic_export"><property name="text"><string>Export to EXOTIC (inits.json)…</string></property><property name="toolTip"><string>Pre-filled EXOTIC initialization file: planet, observatory, camera and filter</string></property></widget></item>
+      <item><widget class="QLabel" name="lbl_exotic_result"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="toolTip"><string>The last reduction of this visit: its transit time and radius ratio. «See the result» opens the numbers, the light curve and every file it wrote</string></property></widget></item>
+      <item>
+       <layout class="QHBoxLayout" name="row_exotic_result">
+        <item><widget class="QPushButton" name="btn_exotic_result"><property name="text"><string>See the result…</string></property><property name="toolTip"><string>The fitted parameters, the light curve EXOTIC drew and every file the reduction wrote (field figures, diagnostics, the AAVSO report), each one a double click from the system</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+        <item><widget class="QPushButton" name="btn_exotic_folder"><property name="text"><string>Open the folder</string></property><property name="toolTip"><string>Open the project's EXOTIC work folder with the file manager</string></property><property name="enabled"><bool>false</bool></property></widget></item>
+       </layout>
+      </item>
       <item><widget class="QLabel" name="lbl_exotic_status"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property></widget></item>
      </layout>
     </widget>

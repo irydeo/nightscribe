@@ -127,6 +127,24 @@ las tomas** (MJD-OBS, con DATE-OBS de respaldo): un set de diciembre de 2017 se
 entregaba fechado «hoy» (30-September-2026) y EXOTIC nombraba así todas las
 salidas, figuras y el reporte AAVSO.
 
+**Revisión (2026-10-01)**: el resultado vuelve a donde se lanzó y deja de
+perderse. Antes, el aviso decía T_mid una vez, la curva entraba en el proyecto y
+**nadie volvía a encontrar** las figuras, el reporte AAVSO ni los parámetros
+(vivían en `<proyecto>/exotic/`, que no se abre desde la app). Ahora el bloque
+EXOTIC del editor muestra la última reducción en una línea y abre su **ventana
+de resultado** (no modal, el patrón de la ventana de período): los números
+ajustados, la curva que dibujó EXOTIC y la lista de **todos** los ficheros de la
+corrida, cada uno a un doble clic del sistema, más «Abrir la carpeta»; la
+ventana se abre sola al terminar. Los productos (figura, reporte AAVSO y
+parámetros) se registran como **recursos de la visita** (ADR-045), así que
+aparecen en su ventana y se abren desde ahí, y el registro es idempotente
+(`project.add_file_once`), que de paso arregla el `inits.json` registrado cinco
+veces. La lista de recursos deja de enseñar el tipo crudo: un mapa de etiquetas
+la vuelve legible (`[figura EXOTIC]`, `[reporte AAVSO]`, `[placa]`). Y el
+`exotic.log` de EXOTIC (26 MB de DEBUG por corrida, más su rotación diaria) se
+borra al empezar y al terminar, en un `finally`; se queda `exotic_run.log`, que
+es el que muestra la app y el que lee el aviso de fallo.
+
 **Revision (2026-09-28)**: the reduction starts from the **Unified FITS Editor**,
 next to the sequence it needs (ADR-048 rev.), not from the Analysis tab. The editor
 carries a "Transit reduction (EXOTIC)" block for transit projects opened from a
@@ -170,3 +188,21 @@ search fits against 1289 with the uncertainties, and the final T_mid went from
 fallback): a December 2017 set was handed over dated "today"
 (30-September-2026) and EXOTIC named every output, figure and the AAVSO report
 that way.
+
+**Revision (2026-10-01)**: the result comes back to where it was launched from
+and stops getting lost. Before, the box said T_mid once, the curve landed in
+the project, and **nobody could find** the figures, the AAVSO report or the
+parameters again (they lived in `<project>/exotic/`, which the app never
+opens). Now the editor's EXOTIC block shows the last reduction in one line and
+opens its **result window** (non-modal, the period window's pattern): the
+fitted numbers, the light curve EXOTIC drew and the list of **every** file the
+run wrote, each one a double click from the system, plus "Open the folder"; the
+window opens by itself when the reduction lands. The products (figure, AAVSO
+report and parameters) are registered as **resources of the visit** (ADR-045),
+so they show up in its window and open from there, and the registration is
+idempotent (`project.add_file_once`), which also fixes the `inits.json`
+registered five times. The resource list stops showing the raw kind: a label
+map makes it readable (`[EXOTIC figure]`, `[AAVSO report]`, `[plate]`). And
+EXOTIC's own `exotic.log` (26 MB of DEBUG per run, plus its daily rotation) is
+removed at the start and at the end, in a `finally`; `exotic_run.log` stays,
+because that is the one the app streams and the failure box reads.

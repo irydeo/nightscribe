@@ -124,9 +124,12 @@ class UfeDialog(QDialog):
         # Measure tab asks instead of touching the database
         self._export_folder_hook = None
         # the EXOTIC reduction block (transit projects opened from a
-        # visit): the host arms both callables, ADR-048 follow-up
+        # visit): the host arms the callables, ADR-048 follow-up
         self._exotic_reduce_hook = None
         self._exotic_export_hook = None
+        self._exotic_result_hook = None
+        self._exotic_folder_hook = None
+        self._exotic_result_text = ""
         # the host keeps the comparison sequence in the project so
         # reopening does not rebuild it
         self._sequence_hook = None
@@ -946,6 +949,8 @@ class UfeDialog(QDialog):
         vp.btn_frame_first.clicked.connect(self._frame_first)
         vp.btn_exotic_reduce.clicked.connect(self._notify_exotic_reduce)
         vp.btn_exotic_export.clicked.connect(self._notify_exotic_export)
+        vp.btn_exotic_result.clicked.connect(self._notify_exotic_result)
+        vp.btn_exotic_folder.clicked.connect(self._notify_exotic_folder)
         self.tab_compare.sequence_changed.connect(self._sync_exotic_block)
         self._sync_frame_nav()
 
@@ -1195,13 +1200,21 @@ class UfeDialog(QDialog):
 
     # ------------------------------------------------ transit (EXOTIC)
 
-    def set_exotic_hooks(self, reduce_fn=None, export_fn=None):
+    def set_exotic_hooks(self, reduce_fn=None, export_fn=None,
+                         result_fn=None, folder_fn=None, result_text=""):
         # @args: reduce_fn - callable() that starts the host's EXOTIC
         #        reduction on the open frame and the loaded sequence, or
-        #        None; export_fn - callable() for the inits.json handoff.
+        #        None; export_fn - callable() for the inits.json handoff;
+        #        result_fn - callable() that opens the last reduction's
+        #        result window; folder_fn - callable() that opens the work
+        #        folder; result_text - the one-line summary of that last
+        #        reduction (empty: no result to show yet).
         #        Armed only for a transit project opened from a visit.
         self._exotic_reduce_hook = reduce_fn if callable(reduce_fn) else None
         self._exotic_export_hook = export_fn if callable(export_fn) else None
+        self._exotic_result_hook = result_fn if callable(result_fn) else None
+        self._exotic_folder_hook = folder_fn if callable(folder_fn) else None
+        self._exotic_result_text = result_text or ""
         self._sync_exotic_block()
 
     def sequence_entries(self):
@@ -1229,11 +1242,36 @@ class UfeDialog(QDialog):
         n = len(self.sequence_entries())
         self.visit_panel.btn_exotic_reduce.setEnabled(n > 0)
         self.visit_panel.btn_exotic_export.setEnabled(n > 0)
+        # the last reduction, if the visit has one: the numbers here and the
+        # whole result (figure, files) one click away. Nothing to show is
+        # said with an empty line and a disabled button, never with zeros.
+        self.visit_panel.lbl_exotic_result.setText(self._exotic_result_text)
+        has_result = bool(self._exotic_result_text)
+        self.visit_panel.btn_exotic_result.setEnabled(
+            has_result and self._exotic_result_hook is not None)
+        self.visit_panel.btn_exotic_folder.setEnabled(
+            has_result and self._exotic_folder_hook is not None)
         self.visit_panel.lbl_exotic_status.setText(
             self.tr("Uses the open frame and the sequence above.")
             if n else self.tr(
                 "Build the comparison sequence first (Photometry, "
                 "«Build the sequence…»)."))
+
+    def _notify_exotic_result(self):
+        if self._exotic_result_hook is None:
+            return
+        try:
+            self._exotic_result_hook()
+        except Exception as err:
+            logger.warning("exotic result hook failed: %s", err)
+
+    def _notify_exotic_folder(self):
+        if self._exotic_folder_hook is None:
+            return
+        try:
+            self._exotic_folder_hook()
+        except Exception as err:
+            logger.warning("exotic folder hook failed: %s", err)
 
     def _notify_exotic_reduce(self):
         if self._exotic_reduce_hook is None:

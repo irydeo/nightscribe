@@ -117,6 +117,16 @@ def load_params(path):
            if depth_err_pct is not None else None,
            "inc": inc, "inc_err": inc_err, "duration_d": dur,
            "duration_err": dur_err}
+    # What the reduction chose and how well it fitted: the result window
+    # shows them, and they are the first thing an observer asks about a
+    # light curve that came out of a black box.
+    scatter, _ = _pair(final.get("Scatter in the residuals of the lightcurve"
+                                 " fit is"))
+    aperture, _ = _pair(final.get("Optimal Aperture"))
+    annulus, _ = _pair(final.get("Optimal Annulus"))
+    out.update({"scatter_pct": scatter, "aperture": aperture,
+                "annulus": annulus,
+                "best_comp": final.get("Best Comparison Star")})
     return out
 
 
@@ -136,6 +146,45 @@ def load_result(out_dir):
         "figure_png": _find(folder, "FinalLightCurve_*.png"),
         "aavso_txt": _find(folder, "AAVSO_*.txt"),
     }
+
+
+def find_products(out_dir):
+    # What a finished reduction left on disk, as (role, path) pairs, so the
+    # result window can group and name the files without knowing EXOTIC's
+    # naming conventions (they are fixed here, verified against a real run:
+    # 2026-10-01, the HAT-P-32 b set).
+    # @args: out_dir - EXOTIC's "Directory to Save Plots" (our work folder)
+    # @return: [(role, path), ...] in role order, only what exists
+    from .exotic_run import LOG_NAME
+    patterns = (
+        ("figure", "", "FinalLightCurve_*.png"),
+        ("figure", "", "FinalLightCurve_*.pdf"),
+        ("field", "temp", "FOV_*_LinearStretch.png"),
+        ("field", "temp", "FOV_*_LogStretch.png"),
+        ("field", "temp", "FOV_*_SqrtStretch.png"),
+        ("field", "temp", "FOV_*_SquaredStretch.png"),
+        ("stats", "temp", "Observing_Statistics_comp*.png"),
+        ("centroid", "temp", "CentroidPositions&Distances_*.pdf"),
+        ("compflux", "temp", "CompRawFlux_*.pdf"),
+        ("curve", "temp", "FinalLightCurve_*.csv"),
+        ("curve", "temp", "NormalizedFluxTime_*.pdf"),
+        ("normalized", "temp", "NormalizedFlux_*.txt"),
+        ("params", "temp", "FinalParams_*.json"),
+        ("plate", "temp", "PlateStatus_*.csv"),
+        ("aavso", "", "AAVSO_*.txt"),
+        ("aavso", "", "AID_AAVSO_*.txt"),
+        ("inits", "", "inits*.json"),
+        ("log", "", LOG_NAME),
+    )
+    root = Path(out_dir)
+    out = []
+    for role, sub, pattern in patterns:
+        folder = root / sub if sub else root
+        if not folder.is_dir():
+            continue
+        for hit in sorted(folder.glob(pattern)):
+            out.append((role, str(hit)))
+    return out
 
 
 def persist(db, project_id, session_id, result, filter_name=None):

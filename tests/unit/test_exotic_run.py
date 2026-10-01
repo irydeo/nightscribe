@@ -100,6 +100,28 @@ time.sleep(30)
     assert res["timed_out"] and not res["cancelled"]
 
 
+def test_run_removes_exotics_own_log_but_keeps_ours(tmp_path):
+    # EXOTIC writes exotic.log (26 MB of DEBUG for one run) plus the files
+    # of its daily rotator; the app streams exotic_run.log, so EXOTIC's is
+    # dropped at the end and our merged log stays
+    script = _fake(tmp_path, "exotic_noisy.py", """
+import pathlib, sys
+print("EXOTIC fake: starting", flush=True)
+pathlib.Path("exotic.log").write_text("numba chatter\\n")
+pathlib.Path("exotic.log.2026-10-01").write_text("rotated\\n")
+print("EXOTIC fake: done", flush=True)
+sys.exit(0)
+""")
+    work = tmp_path / "w"
+    work.mkdir()
+    (work / "exotic.log").write_text("leftover from a killed run\n")
+    res = exotic_run.run(script, work, tmp_path / "inits.json")
+    assert res["ok"]
+    assert not list(work.glob("exotic.log*"))       # nothing left behind
+    assert (work / exotic_run.LOG_NAME).exists()    # ours is still there
+    assert "done" in (work / exotic_run.LOG_NAME).read_text()
+
+
 def _pid_alive(pid):
     # @args: pid - process id to probe
     # @return: True only if the pid still exists and is not a zombie

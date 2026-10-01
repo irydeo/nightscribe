@@ -104,8 +104,17 @@ is missing, the configured solver gets you one, ASTAP or nova):
 
 With the visit open, the left panel also carries the **frame navigator**
 (previous/next, `frame i/N`, "first frame": the open frame is the reference)
-and, in transit projects, the **EXOTIC** reduction buttons. The project's
-saved sequence loads by itself when the visit opens.
+and, in transit projects, the **Transit reduction (EXOTIC)** block: the two
+buttons (reduce, and export the `inits.json`), and under them the visit's
+**last reduction** in one line (`T_mid ... +/- ... · Rp/Rs ... +/- ...` and
+when it ran) with its two doors: **"See the result..."** and **"Open the
+folder"**. The result opens in its own non-modal window (the fitted numbers,
+the light curve EXOTIC drew and **every** file the run wrote: field figures
+with the apertures and the comparisons, diagnostics, CSV, JSON and the AAVSO
+report), each one a double click from the system; the window opens by itself
+when the reduction lands. With no reduction yet the line is empty and the
+buttons are off: never zeros.
+The project's saved sequence loads by itself when the visit opens.
 
 The **top bar** carries the two astrometries together, side by side: **Solve
 astrometry...** (this plate) and **Solve the visit...** (every frame of the

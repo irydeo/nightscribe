@@ -418,9 +418,15 @@ sequence and the EXOTIC environment prepared.
 4. **Reduce**: in the editor, **"Reduce and fit with EXOTIC..."** in the left
    panel (or Analysis → "Open the visit in the editor..."), and follow the log.
    It can take a while; do not close the app (you can cancel).
-5. **Result**: a message with **T_mid** and **Rp/Rs**; the "exotic" curve shows
-   in the chart; the `inits.json` and the report stay in the project, and the
-   `FinalLightCurve_*.png` figure in the work folder.
+5. **Result**: a message with **T_mid** and **Rp/Rs**, and the **result window**
+   opens by itself: the fitted numbers, the light curve EXOTIC drew and **every**
+   file the run wrote (field figures, diagnostics, CSV, JSON and the AAVSO
+   report), each one a double click; "Open the folder" opens them all at once.
+   The "exotic" curve also shows in the project's chart, and the figure, the
+   report and the parameters stay registered as **resources of the visit**
+   (Analysis → the visit → Resources), where they open without hunting for
+   anything. It can be reopened from the editor's EXOTIC block or from the
+   Analysis transit block ("See the last reduction...").
 6. **Verify**: T_mid within 3 sigma, Rp/Rs within 5 % and depth within 10 %
    against the reference. Then **"ExoClock..."** to submit the transit.
 

@@ -106,7 +106,16 @@ falta, la resuelve sola con el solver configurado, ASTAP o nova):
 
 Con la visita abierta, el panel izquierdo lleva además el **navegador de
 tomas** (anterior/siguiente, `toma i/N`, «primera toma»: la toma abierta es la
-referencia) y, en proyectos de tránsito, los botones de **reducción EXOTIC**.
+referencia) y, en proyectos de tránsito, el bloque **Reducción de tránsito
+(EXOTIC)**: los dos botones (reducir y exportar el `inits.json`), y debajo la
+**última reducción** de la visita en una línea (`T_mid … ± … · Rp/Rs … ± …` y
+cuándo corrió) con sus dos puertas: **«Ver el resultado…»** y **«Abrir la
+carpeta»**. El resultado abre en su propia ventana no modal (los números
+ajustados, la curva que dibujó EXOTIC y **todos** los ficheros de la corrida:
+figuras del campo con aperturas y comparadas, diagnósticos, CSV, JSON y el
+reporte AAVSO), cada uno a un doble clic del sistema; la ventana se abre sola
+al terminar la reducción. Sin reducción todavía, la línea está vacía y los
+botones apagados: nunca ceros.
 La secuencia ya guardada del proyecto se carga sola al abrir la visita.
 
 La **barra superior** lleva las dos astrometrías juntas, una al lado de la

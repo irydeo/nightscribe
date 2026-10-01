@@ -467,13 +467,40 @@ class VisitWindow(QDialog):
 
     # ------------------------------------------------------- resources
 
+    def _kind_label(self, kind):
+        # How a resource's kind reads in the list. The registry keeps a
+        # stable English key, and showing it raw ("[exotic_figure]") made the
+        # list unreadable exactly where a visit now carries the reduction's
+        # own products. Each label is a literal self.tr() so lupdate sees it;
+        # an unknown kind still shows its key, never nothing.
+        # @args: kind - the registry kind of the file
+        # @return: the label
+        labels = {
+            "fits": self.tr("plate"),
+            "image": self.tr("image"),
+            "chart": self.tr("chart"),
+            "report": self.tr("report"),
+            "sequence": self.tr("sequence"),
+            "ephemeris": self.tr("ephemeris"),
+            "motion_gif": self.tr("motion (GIF)"),
+            "motion_mp4": self.tr("motion (MP4)"),
+            "evo_gif": self.tr("evolution (GIF)"),
+            "evo_mp4": self.tr("evolution (MP4)"),
+            "exotic_inits": self.tr("EXOTIC handoff"),
+            "exotic_figure": self.tr("EXOTIC figure"),
+            "exotic_aavso": self.tr("AAVSO report"),
+            "exotic_params": self.tr("EXOTIC parameters"),
+        }
+        return labels.get(kind, kind)
+
     def _populate_resources(self):
         # Refills the visit's resource list from the registry.
         from ...core import project as proj_mod
         self.lst_res.clear()
         for f in proj_mod.files_for_session(self._db, self._sid):
             meta = f.get("meta") or {}
-            bits = [f"[{f['kind']}]", Path(f["path"]).name]
+            bits = [f"[{self._kind_label(f['kind'])}]",
+                    Path(f["path"]).name]
             if meta.get("filter"):
                 bits.append(f"({meta['filter']})")
             if meta.get("date_obs"):

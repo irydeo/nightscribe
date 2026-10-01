@@ -36,7 +36,11 @@ def _out_dir(tmp_path):
         "Ratio of Planet to Stellar Radius (Rp/R*)": "0.1569 +/- 0.0034",
         "Transit depth (Rp/Rs)^2": "2.46 +/- 0.11 [%]",
         "Orbital Inclination (inc)": "88.17 +/- 0.98 ",
-        "Transit Duration (day)": "0.1303 +/- 0.0012"}}
+        "Transit Duration (day)": "0.1303 +/- 0.0012",
+        "Scatter in the residuals of the lightcurve fit is": "0.6 %",
+        "Best Comparison Star": "None",
+        "Optimal Aperture": "3.95",
+        "Optimal Annulus": "6.64"}}
     (temp / "FinalParams_HAT-P-32 b_17-December-2017.json").write_text(
         json.dumps(params), encoding="utf-8")
     (out / "FinalLightCurve_HAT-P-32 b_17-December-2017.png").write_bytes(b"p")
@@ -62,6 +66,42 @@ def test_missing_folder_is_empty_not_an_error(tmp_path):
     res = ei.load_result(tmp_path / "nope")
     assert res["points"] == [] and res["params"] == {}
     assert res["curve_csv"] is None
+    assert ei.find_products(tmp_path / "nope") == []
+
+
+def test_params_carry_what_the_search_chose(tmp_path):
+    # the result window shows these: they are the first thing an observer
+    # asks about a curve that came out of a black box
+    par = ei.load_params(_out_dir(tmp_path) / "temp"
+                         / "FinalParams_HAT-P-32 b_17-December-2017.json")
+    assert par["scatter_pct"] == 0.6
+    assert par["aperture"] == 3.95 and par["annulus"] == 6.64
+    assert par["best_comp"] == "None"
+
+
+def test_find_products_names_what_the_run_wrote(tmp_path):
+    # the roles are fixed here so the window never has to know EXOTIC's file
+    # naming (verified against a real run: 2026-10-01)
+    out = _out_dir(tmp_path)
+    temp = out / "temp"
+    for name in ("FOV_HAT-P-32 b_17-December-2017_LinearStretch.png",
+                 "Observing_Statistics_comp1_17-December-2017.png",
+                 "CentroidPositions&Distances_HAT-P-32 b_17-December-2017.pdf",
+                 "CompRawFlux_HAT-P-32 b_17-December-2017.pdf"):
+        (temp / name).write_bytes(b"x")
+    (out / "AAVSO_HAT-P-32 b_17-December-2017.txt").write_text("a")
+    (out / "exotic_run.log").write_text("l")
+    roles = {p.rsplit("/", 1)[-1]: role for role, p in ei.find_products(out)}
+    assert roles["FinalLightCurve_HAT-P-32 b_17-December-2017.png"] == "figure"
+    assert roles["FinalLightCurve_HAT-P-32 b_17-December-2017.csv"] == "curve"
+    assert roles["FOV_HAT-P-32 b_17-December-2017_LinearStretch.png"] == "field"
+    assert roles["Observing_Statistics_comp1_17-December-2017.png"] == "stats"
+    assert roles["CentroidPositions&Distances_HAT-P-32 b_17-December-2017.pdf"] \
+        == "centroid"
+    assert roles["CompRawFlux_HAT-P-32 b_17-December-2017.pdf"] == "compflux"
+    assert roles["FinalParams_HAT-P-32 b_17-December-2017.json"] == "params"
+    assert roles["AAVSO_HAT-P-32 b_17-December-2017.txt"] == "aavso"
+    assert roles["exotic_run.log"] == "log"
 
 
 def test_persist_creates_a_run_and_points(tmp_path):

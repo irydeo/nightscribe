@@ -81,6 +81,22 @@ def _kill_tree(proc, hard=False):
         fallback()              # group already gone: parent-only signal
 
 
+def _drop_exotic_log(work_dir):
+    # EXOTIC keeps its own DEBUG log in its cwd (exotic.log): 26 MB for one
+    # 142-frame run, almost all of it numba and urllib3 chatter, plus the
+    # exotic.log.<date> files its daily rotator leaves behind. Our merged log
+    # (exotic_run.log) is the one the app streams, the one the failure box
+    # reads and the one worth keeping, so EXOTIC's is removed: before the run
+    # (a killed one leaves it behind) and after it.
+    # @args: work_dir - EXOTIC's working directory (its cwd)
+    # @return: nothing
+    for path in work_dir.glob("exotic.log*"):
+        try:
+            path.unlink()
+        except OSError:
+            pass
+
+
 def run(python, work_dir, inits_path, mode="red", override=True,
         progress=None, cancel=None, timeout_s=DEFAULT_TIMEOUT_S):
     # @args: python - the Python <=3.10 interpreter that has EXOTIC installed,
@@ -94,6 +110,7 @@ def run(python, work_dir, inits_path, mode="red", override=True,
     work_dir = Path(work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     log_path = work_dir / LOG_NAME
+    _drop_exotic_log(work_dir)         # a killed run leaves its own behind
     cmd = [str(python), "-c", _MAIN, f"-{mode}", str(inits_path)]
     if override:
         cmd.append("-ov")
@@ -164,6 +181,9 @@ def run(python, work_dir, inits_path, mode="red", override=True,
         return {"ok": False, "returncode": None, "log_path": str(log_path),
                 "out_dir": str(work_dir), "cancelled": False,
                 "timed_out": False}
+    finally:
+        # in every way out: done, failed, cancelled or timed out
+        _drop_exotic_log(work_dir)
     rc = proc.returncode if proc is not None else None
     logger.info("EXOTIC finished: rc=%s in %.1fs (cancelled=%s, timed_out=%s)",
                 rc, time.monotonic() - start, cancelled, timed_out)

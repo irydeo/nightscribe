@@ -4745,6 +4745,24 @@ class MainWindow(QMainWindow):
             "camera and filter — EXOTIC skips its wizard where it can"))
         btn_exotic.clicked.connect(lambda: self._transit_export_exotic(pid))
         layout.addWidget(btn_exotic)
+        # the last reduction, if there is one: its numbers here and the whole
+        # result (light curve + every file) one click away, so the door does
+        # not need the editor
+        last = self._exotic_result_text(pid)
+        if last:
+            lbl_last = QLabel(last)
+            lbl_last.setWordWrap(True)
+            lbl_last.setStyleSheet("color: #8a90a6; font-size: 12px;")
+            layout.addWidget(lbl_last)
+            btn_result = QPushButton(
+                self.tr("See the last reduction…"))
+            btn_result.setToolTip(self.tr(
+                "The fitted parameters, the light curve EXOTIC drew and "
+                "every file the reduction wrote, each one a double click "
+                "from the system"))
+            btn_result.clicked.connect(
+                lambda: self._open_exotic_result(pid))
+            layout.addWidget(btn_result)
         lbl_exotic = QLabel(self.tr(
             "After the reduction, upload EXOTIC's output file to "
             "ExoClock (exoclock.space) and/or the AAVSO Exoplanet "
@@ -5694,7 +5712,7 @@ class MainWindow(QMainWindow):
         inits = exotic.make_inits(ctx, e["data"], config, plan=plan,
                                   out_dir=str(Path(out).parent))
         path = exotic.export_inits(inits, out)
-        project.add_file(db, pid, path, "exotic_inits")
+        project.add_file_once(db, pid, path, "exotic_inits")
         self._populate_project_files(pid)
         self.statusBar().showMessage(
             self.tr("inits.json written — run EXOTIC in your Python ≤3.10 "
@@ -6029,8 +6047,8 @@ class MainWindow(QMainWindow):
             plan=plan, out_dir=str(work))
         inits_path = work / "inits.json"
         exotic.export_inits(inits, inits_path)
-        project.add_file(db, pid, str(inits_path), "exotic_inits",
-                         session_id=session_id)
+        project.add_file_once(db, pid, str(inits_path), "exotic_inits",
+                              session_id=session_id)
         self._populate_project_files(pid)
         self._exotic_pid = pid
         self._exotic_session = session_id
@@ -6170,9 +6188,13 @@ class MainWindow(QMainWindow):
                      or self.tr("(the log is empty)")))
             return
         result = exotic_import.load_result(res["out_dir"])
+        sid = getattr(self, "_exotic_session", None)
         _run_id, n = exotic_import.persist(
-            db, pid, getattr(self, "_exotic_session", None), result,
+            db, pid, sid, result,
             filter_name=getattr(self, "_exotic_filter", None))
+        # the products are the visit's resources from now on (they open from
+        # its window, ADR-045)
+        self._register_exotic_products(pid, sid, res["out_dir"])
         par = result.get("params") or {}
         msg = self.tr(
             "EXOTIC finished: {0} points imported.\n"
@@ -6184,6 +6206,130 @@ class MainWindow(QMainWindow):
                 if par.get("rprs") else "?")
         QMessageBox.information(self, self.tr("EXOTIC"), msg)
         self._project_selected()
+        # ... and the result itself lands on screen: the numbers, the light
+        # curve EXOTIC drew and every file it wrote, instead of a box that
+        # says them once and a folder nobody knows about
+        self._open_exotic_result(pid, sid, out_dir=res["out_dir"],
+                                 params=result.get("params"),
+                                 when=datetime.datetime.now())
+
+    def _exotic_last_run(self, pid, session_id=None):
+        # The newest EXOTIC reduction of a project (or of one visit), with
+        # what the result window needs: its fitted parameters and its work
+        # folder. The parameters live in the run (they were saved and nobody
+        # read them back); the folder is deterministic.
+        # @args: pid - the project, session_id - the visit, or None for any
+        # @return: {"params", "created", "session_id", "out_dir"} or None
+        from ..core import followup as fu
+        sessions = ([fu.get_session(db, session_id)] if session_id is not None
+                    else fu.list_sessions(db, pid))
+        runs = []
+        for s in sessions:
+            if not s:
+                continue
+            runs += fu.runs_for_session(db, s["id"], series_only=False)
+        exotic = [r for r in runs
+                  if (r.get("cfg") or {}).get("source") == "exotic"]
+        if not exotic:
+            return None
+        run = max(exotic, key=lambda r: r.get("created") or 0)
+        p = project.get(db, pid) or {}
+        return {"params": (run["cfg"] or {}).get("params") or {},
+                "created": run.get("created"),
+                "session_id": run.get("session_id"),
+                "out_dir": str(Path(project.storage_dir(p)) / "exotic")}
+
+    def _exotic_result_text(self, pid, session_id=None):
+        # The one line the editor's EXOTIC block shows about the last
+        # reduction: the two numbers an observer looks for first.
+        # @args: pid - the project, session_id - the visit, or None
+        # @return: the text, or "" when the visit has no reduction yet
+        last = self._exotic_last_run(pid, session_id)
+        if not last:
+            return ""
+        par = last.get("params") or {}
+        if par.get("tmid") is None:
+            return self.tr("EXOTIC ran, but left no fitted result.")
+        stamp = ""
+        if last.get("created"):
+            stamp = datetime.datetime.fromtimestamp(
+                last["created"]).strftime("%d %b %Y %H:%M")
+        bits = [self.tr("T_mid {0} ± {1}").format(
+                    f"{par['tmid']:.5f}", f"{par.get('tmid_err') or 0:.5f}")]
+        if par.get("rprs") is not None:
+            bits.append(self.tr("Rp/Rs {0} ± {1}").format(
+                f"{par['rprs']:.4f}", f"{par.get('rprs_err') or 0:.4f}"))
+        if stamp:
+            bits.append(stamp)
+        return " · ".join(bits)
+
+    def _register_exotic_products(self, pid, session_id, out_dir):
+        # The reduction's products become resources of the visit (ADR-045):
+        # the light curve, the AAVSO report and the parameters then show up
+        # in the visit's window and open from there, so nobody has to go
+        # digging in the work folder. One entry per path, however many times
+        # the result is imported or saved.
+        # @args: pid - the project, session_id - the visit, out_dir - the
+        #        work folder the reduction wrote into
+        # @return: how many were registered now (0 when they were there)
+        from ..core import exotic_import
+        kinds = {"figure": "exotic_figure", "aavso": "exotic_aavso",
+                 "params": "exotic_params"}
+        n = 0
+        for role, path in exotic_import.find_products(out_dir):
+            kind = kinds.get(role)
+            if kind is None or not path.lower().endswith((".png", ".txt",
+                                                          ".json")):
+                continue
+            _fid, created = project.add_file_once(
+                db, pid, path, kind, session_id=session_id)
+            if created:
+                n += 1
+        if n:
+            self._populate_project_files(pid)
+        return n
+
+    def _open_exotic_result(self, pid, session_id=None, out_dir=None,
+                            params=None, when=None):
+        # The result window: the numbers, the light curve EXOTIC drew and
+        # every file the reduction wrote. Non-modal, like the period window,
+        # so the observer keeps working with it open.
+        # @args: pid - the project, session_id - the visit, out_dir/params/
+        #        when - the run just finished (None: the last one on record)
+        # @return: the dialog, or None when there is nothing to show
+        from .exotic_result_dialog import open_exotic_result
+        last = self._exotic_last_run(pid, session_id) or {}
+        out_dir = out_dir or last.get("out_dir")
+        if not out_dir:
+            return None
+        sid = session_id or last.get("session_id")
+        p = project.get(db, pid) or {}
+        return open_exotic_result(
+            self, out_dir,
+            params=params if params is not None else last.get("params"),
+            title=p.get("object_name") or "",
+            when=when or (datetime.datetime.fromtimestamp(last["created"])
+                          if last.get("created") else None),
+            save_fn=(lambda: self._register_exotic_products(pid, sid,
+                                                            out_dir))
+            if sid is not None else None)
+
+    def _exotic_open_folder(self, pid):
+        # The reduction's work folder, with the file manager: opening it is
+        # the OS's job (the pattern of Help > Open the log), and the path
+        # lands in the status bar for whoever prefers a terminal.
+        # @args: pid - the project
+        # @return: nothing
+        from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
+        p = project.get(db, pid) or {}
+        folder = Path(project.storage_dir(p)) / "exotic"
+        if not folder.is_dir():
+            self.statusBar().showMessage(self.tr(
+                "No EXOTIC folder yet: run a reduction first."), 8000)
+            return
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
+        self.statusBar().showMessage(str(folder), 8000)
 
     def _build_publish_tab(self, p, kind, ctx):
         layout = self._step_section("publish")
@@ -8881,7 +9027,12 @@ class MainWindow(QMainWindow):
             if proj.get("kind") == "transit":
                 dlg.set_exotic_hooks(
                     lambda: self._ufe_exotic_reduce(hook_pid, session_id),
-                    lambda: self._ufe_exotic_export(hook_pid, session_id))
+                    lambda: self._ufe_exotic_export(hook_pid, session_id),
+                    result_fn=lambda: self._open_exotic_result(
+                        hook_pid, session_id),
+                    folder_fn=lambda: self._exotic_open_folder(hook_pid),
+                    result_text=self._exotic_result_text(hook_pid,
+                                                         session_id))
             else:
                 dlg.set_exotic_hooks(None, None)
         else:

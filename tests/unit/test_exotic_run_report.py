@@ -28,6 +28,7 @@ test_settings_exotic_prepare.py harness pattern).
 """
 
 import os
+from pathlib import Path
 
 import pytest
 
@@ -276,6 +277,68 @@ def test_timed_out_run_says_it_ran_past_the_limit(window, qapp, monkeypatch,
     assert "time limit" in shown[0]
     assert "did not finish" not in shown[0]
     assert window._exotic_worker is None
+
+
+def test_the_reduction_lands_as_visit_resources_and_a_result_window(
+        window, qapp, tmp_path):
+    # The reported gap (2026-10-01): the run finished, the box said T_mid
+    # once, and then nobody could find the figure, the report or the
+    # numbers. Now the products are resources of the visit (they open from
+    # its window) and the result window opens with the numbers and the
+    # curve.
+    from nightscribe.core import followup as fu
+    from nightscribe.core import project as proj
+    db = window_db(window)
+    p = proj.create(db, "transit", "HAT-P-32 b")
+    sid = fu.create_session(db, p["id"], obs_date="2017-12-20")
+    work = Path(proj.storage_dir(p)) / "exotic"
+    (work / "temp").mkdir(parents=True, exist_ok=True)
+    (work / "FinalLightCurve_HAT-P-32 b_20-December-2017.png").write_bytes(b"p")
+    (work / "FinalLightCurve_HAT-P-32 b_20-December-2017.pdf").write_bytes(b"p")
+    (work / "AAVSO_HAT-P-32 b_20-December-2017.txt").write_text("a")
+    (work / "temp" / "FinalParams_HAT-P-32 b_20-December-2017.json").write_text(
+        "{}")
+    fu.create_run(db, session_id=sid,
+                  cfg={"source": "exotic",
+                       "params": {"tmid": 2458107.7146, "tmid_err": 0.0011,
+                                  "rprs": 0.1612, "rprs_err": 0.0037}})
+    # the numbers come back to the editor's block
+    text = window._exotic_result_text(p["id"], sid)
+    assert "2458107.71460" in text and "0.1612" in text
+    assert window._exotic_last_run(p["id"], sid)["params"]["tmid"] == \
+        2458107.7146
+    # the products become the visit's resources, once each (png and pdf of
+    # the same figure, and the log, stay out)
+    assert window._register_exotic_products(p["id"], sid, str(work)) == 3
+    assert window._register_exotic_products(p["id"], sid, str(work)) == 0
+    kinds = {f["kind"] for f in proj.files_for_session(db, sid)}
+    assert kinds == {"exotic_figure", "exotic_aavso", "exotic_params"}
+    # ... and the result window opens with them listed
+    dlg = window._open_exotic_result(p["id"], sid)
+    try:
+        assert dlg is not None and not dlg.isModal()
+        names = [dlg._ui.lst_files.item(i).text()
+                 for i in range(dlg._ui.lst_files.count())]
+        assert any("AAVSO" in n for n in names)
+        assert any("FinalLightCurve" in n for n in names)
+    finally:
+        dlg.close()
+
+
+def test_the_block_and_the_window_without_a_reduction(window, qapp):
+    # a visit with no reduction: an empty line, dead buttons and no window
+    from nightscribe.core import project as proj
+    db = window_db(window)
+    p = proj.create(db, "transit", "HAT-P-32 b")
+    assert window._exotic_result_text(p["id"]) == ""
+    assert window._exotic_last_run(p["id"]) is None
+    assert window._open_exotic_result(p["id"]) is None
+
+
+def window_db(window):
+    # @return: the database the window fixture is bound to
+    from nightscribe.gui import main_window as mw
+    return mw.db
 
 
 def test_cancelled_run_reports_plainly_and_reaps_the_dialog(window, qapp,

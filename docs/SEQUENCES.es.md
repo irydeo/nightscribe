@@ -427,9 +427,15 @@ secuencia de comparación y el entorno EXOTIC preparado.
 4. **Reducir**: en el editor, **«Reduce and fit with EXOTIC…»** del panel
    izquierdo (o Análisis → «Abrir la visita en el editor…»), y sigue el log.
    Puede tardar; no cierres la app (puedes cancelar).
-5. **Resultado**: aviso con **T_mid** y **Rp/Rs**; la curva «exotic» aparece en
-   la gráfica; quedan el `inits.json` y el reporte en el proyecto, y la figura
-   `FinalLightCurve_*.png` en la carpeta de trabajo.
+5. **Resultado**: aviso con **T_mid** y **Rp/Rs**, y se abre sola la **ventana
+   del resultado**: los números ajustados, la curva que dibujó EXOTIC y **todos**
+   los ficheros de la corrida (figuras del campo, diagnósticos, CSV, JSON y el
+   reporte AAVSO), cada uno a un doble clic; «Abrir la carpeta» los abre todos a
+   la vez. La curva «exotic» aparece además en la gráfica del proyecto, y la
+   figura, el reporte y los parámetros quedan registrados como **recursos de la
+   visita** (Análisis → la visita → Resources), desde donde se abren sin buscar
+   nada. Se puede reabrir desde el bloque EXOTIC del editor o desde el bloque de
+   tránsito de Análisis («Ver la última reducción…»).
 6. **Verificar**: T_mid a 3σ, Rp/Rs al 5 % y profundidad al 10 % frente a la
    referencia. Después, **«ExoClock…»** para subir el tránsito.
 

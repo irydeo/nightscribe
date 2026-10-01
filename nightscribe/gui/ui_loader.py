@@ -63,6 +63,13 @@ def load_ui(name, parent=None):
         # surfacing as a mystery inside a feature.
         logger.warning("the %s load came back wrong for %s (attempt %d)",
                        name, wrong, attempt + 1)
+        # The wrong widget is UNPARENTED before it is deleted (2026-10-01):
+        # deleteLater only runs on the next event-loop pass, and until then
+        # it sat at (0, 0) of the host with its default 100x30 size, covering
+        # the first row. In a full test run that was the editor's top bar:
+        # "Load FITS" stopped answering because a stray widget was on top of
+        # it. Unparenting is immediate, so nothing can be covered in between.
+        widget.setParent(None)
         widget.deleteLater()
     raise RuntimeError(
         f"{name}.ui did not load cleanly: {wrong} did not resolve to widgets")

@@ -131,13 +131,23 @@ def test_diag_band(dlg, qapp):
     band = dlg._chart_band()["lines"][0]
     print("   band lines:", [(s["field"], s["text"]) for s in band],
           flush=True)
-    # ¿repintado? forzamos de tres maneras y volvemos a mirar
+    # espiamos lo que el pintado recibe de verdad
+    seen = []
+    orig = dlg.view._paint_band
+
+    def spy(painter, w, h, k=1.0):
+        try:
+            line = (dlg._chart_band() or {}).get("lines") or [[]]
+            seen.append((w, [s["text"] for s in line[0]]))
+        except Exception as err:      # noqa: BLE001
+            seen.append(("err", repr(err)))
+        return orig(painter, w, h, k)
+
+    dlg.view._paint_band = spy
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 15.0})
-    probe("15.00")
     dlg.view.viewport().repaint()
-    probe("+vp.repaint")
-    dlg.view.refresh_frame()
-    qapp.processEvents()
-    probe("+refresh_frame")
-    probe("viewport.grab", dlg.view.viewport())
+    print("   pintados:", seen[-3:], flush=True)
+    print("   _object:", dlg._object, flush=True)
+    print("   _chart_band mag:", dlg._chart_band()["lines"][0][-1], flush=True)
+    dlg.view._paint_band = orig

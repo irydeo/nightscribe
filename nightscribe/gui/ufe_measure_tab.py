@@ -601,6 +601,9 @@ class UfeMeasureTab(QWidget):
         self.btn_csv.setEnabled(flag)
         self.btn_eff.setEnabled(flag)
         self.btn_export_more.setEnabled(flag)
+        # the door shows it at once, not only when it opens
+        from .widgets.door_menu import refresh_door
+        refresh_door(self.btn_export_more)
 
     # -------------------------------------------------- resets (ADR-047)
 
@@ -612,8 +615,15 @@ class UfeMeasureTab(QWidget):
         # the door goes with them: the row must not keep a Reset button
         # that opens onto nothing
         self.btn_reset_more.setVisible(bool(flag))
-        self.btn_reset_state.setVisible(bool(flag))
-        self.btn_reset_points.setVisible(bool(flag))
+        # The two resets live INSIDE the door: they stay hidden (the door is
+        # the way in) and what changes is whether their items are live, which
+        # the menu reads when it opens. Making them visible here put them
+        # floating over the window, and the door's own item made them look
+        # duplicated (reported 2026-10-01).
+        self.btn_reset_state.setEnabled(bool(flag))
+        self.btn_reset_points.setEnabled(bool(flag))
+        from .widgets.door_menu import refresh_door
+        refresh_door(self.btn_reset_more)
 
     def ui_defaults(self):
         # ADR-047: the recipe the .ui shipped with, for the state reset

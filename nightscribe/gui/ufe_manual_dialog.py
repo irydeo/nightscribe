@@ -81,14 +81,17 @@ class UfeManualDialog(QDialog):
         # built with: on Windows the layout needs 8 px more than the floor
         # computed in __init__, so the window could squish its own buttons
         # (measured in CI, 2026-10-01: minimumHeight 147 against a hint of
-        # 155). The first show re-fits, once, so it does not fight a size the
+        # 155). The style is polished as the window is shown, so the re-fit
+        # is DEFERRED by one turn (the same trick the series block uses for
+        # its wrapped header) and runs once, so it does not fight a size the
         # observer chose.
         # @args: event - the show event
         # @return: None
         super().showEvent(event)
         if not self._fitted:
             self._fitted = True
-            self._fit_to_content()
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self._fit_to_content)
 
     def _fit_to_content(self):
         # The window takes the height its CONTENT really needs, at the width

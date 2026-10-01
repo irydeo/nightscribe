@@ -541,16 +541,28 @@ def test_the_result_row_keeps_two_doors_and_the_buttons_are_reachable():
 def test_the_reset_door_comes_and_goes_with_the_project():
     # The plate's two resets only make sense inside a project (ADR-047).
     # The door follows them: without the hooks the row must not keep a
-    # "Reset" that opens onto nothing, and with them it must be there.
+    # "Reset" that opens onto nothing, and with them it must be there and
+    # live. The two buttons live INSIDE the door, so what changes is whether
+    # their items are enabled, not whether the widgets show: showing them put
+    # them floating over the window (reported 2026-10-01).
     _app()
     d = _dialog(1500, 1000, _OBJECT)
     t = d.tab_measure
+    t.setEnabled(True)             # a plate is behind: the tab is live
     t.set_reset_attached(True)
     assert not t.btn_reset_more.isHidden()
-    assert not t.btn_reset_state.isHidden()
-    assert not t.btn_reset_points.isHidden()
+    # what the observer reads is the door: its two items are live
+    items = {a.data(): a for a in t.btn_reset_more.menu().actions()}
+    assert items["btn_reset_state"].isEnabled()
+    assert items["btn_reset_points"].isEnabled()
+    # and the buttons themselves can never show: they live inside the door's
+    # hidden holder, so the product's own setVisible(True) does not put them
+    # over the window (reported 2026-10-01: one came out floating and read as
+    # a duplicate)
+    assert not t.btn_reset_state.isVisible()
+    assert not t.btn_reset_points.isVisible()
     t.set_reset_attached(False)
     assert t.btn_reset_more.isHidden()
-    assert t.btn_reset_state.isHidden()
-    assert t.btn_reset_points.isHidden()
+    assert not items["btn_reset_state"].isEnabled()
+    assert not items["btn_reset_points"].isEnabled()
     d.close()

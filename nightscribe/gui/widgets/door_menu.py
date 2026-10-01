@@ -31,15 +31,15 @@ Designer file put it (ADR-005), hidden, and keeps its text, its tooltip, its
 checkable state and its slot: the door is a way in, not a second copy.
 """
 
-from PySide6.QtWidgets import QLayout, QMenu, QToolButton
+from PySide6.QtWidgets import (QLayout, QMenu, QToolButton, QVBoxLayout,
+                               QWidget)
 
 
 def _out_of_layout(widget):
     # A layout does NOT drop its item when the widget is reparented: Qt keeps
     # a QWidgetItem pointing at it and goes on setting geometry on a widget
-    # that now belongs elsewhere. Measured: the workbench's bar still held 22
-    # items after its eighteen buttons had been moved out of it, and with the
-    # old panel design the same widgets were laid out by two layouts at once.
+    # that now belongs elsewhere. Measured: the bar still held 22 items after
+    # its eighteen buttons had been moved out of it.
     # @args: widget - the widget about to be reparented
     # @return: None
     parent = widget.parentWidget()
@@ -58,6 +58,19 @@ def build_door(tool, buttons):
     # @return: the QMenu. Its items carry the button's objectName in data(),
     #          so a test (or a probe) can say which button each item drives
     menu = QMenu(tool)
+    # Where the buttons go: OUT of the row that held them (the door is where
+    # they live now, and the row is emptied) and into a HIDDEN holder, never
+    # into the window. The product switches their visibility by itself
+    # (setVisible(True) when a project is behind the editor), and a button
+    # with no layout and a visible parent came out floating over the window
+    # while the door's own item made it look duplicated (reported
+    # 2026-10-01). Inside a hidden holder it can never show, and its text,
+    # tooltip, state and slot are untouched.
+    holder = QWidget(tool)
+    holder.setObjectName("door_holder")
+    hold_box = QVBoxLayout(holder)
+    hold_box.setContentsMargins(0, 0, 0, 0)
+    holder.hide()
     items = []
     for btn in buttons:
         if btn is None:
@@ -75,22 +88,33 @@ def build_door(tool, buttons):
         # the icon-only skin must leave these ones their label: the item
         # shows it, and a riddle icon is not a menu entry
         btn.setProperty("in_panel", True)
-        # Out of the layout that held it and out of sight, but alive: the
-        # button keeps its slot and the .ui's own row does not keep a gap.
-        # Leaving it hidden in place would work on screen too, but the bar
-        # would still be carrying eighteen items, and "the bar is not a
-        # cockpit" is measured by counting them.
         _out_of_layout(btn)
-        btn.setParent(tool.window())
+        btn.setParent(holder)
+        hold_box.addWidget(btn)
         btn.setVisible(False)
         items.append((act, btn))
     # the plate decides whether the export and the resets are available, and
     # that changes after the door is built: reading the buttons again on
     # every opening is what keeps the door from lying
     menu.aboutToShow.connect(lambda: sync_door(items))
+    # the items are kept on the menu so the product can refresh the door the
+    # moment it changes what the buttons can do (a door that lies is worse
+    # than no door): refresh_door(tool) is that call
+    menu._door_items = items
     tool.setMenu(menu)
     tool.setPopupMode(QToolButton.InstantPopup)
     return menu
+
+
+def refresh_door(tool):
+    # Re-reads the buttons a door was built from, without waiting for it to
+    # open. For a change the observer must see at once (the plate's resets
+    # appearing, the export going live).
+    # @args: tool - the QToolButton the door hangs from
+    # @return: None
+    menu = tool.menu() if tool is not None else None
+    if menu is not None:
+        sync_door(getattr(menu, "_door_items", []))
 
 
 def sync_door(items):

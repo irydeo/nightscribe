@@ -1744,10 +1744,15 @@ def test_every_button_of_the_row_lands_in_the_series_menu(dlg, qapp):
     # and the door holds exactly those, nothing more and nothing less: the
     # invariant is about which button each item drives
     assert set(names) == set(from_row) | {"btn_series_undo"}
-    # the block keeps the doors and the action (the invariant is about where
-    # each button LIVES, not about whether it is on screen)
-    outside = {w.objectName() for w in tab.grp_series.findChildren(QPushButton)}
-    assert outside == {"btn_series_chart", "btn_series"}
+    # and none of them can reach the screen: the row that held them is gone
+    # (Qt deletes a layout removed from its parent) and they sit in the door's
+    # hidden holder, inside the block's subtree but out of every layout that
+    # shows. This is the reported bug: one came out floating over the window
+    # and read as a duplicate (2026-10-01).
+    for name in from_row:
+        btn = getattr(tab._ui, name, None) or getattr(tab, name, None)
+        if btn is not None:
+            assert not btn.isVisible(), name
 
 
 def test_the_trend_is_painted_when_the_curve_is_generated(dlg, qapp):

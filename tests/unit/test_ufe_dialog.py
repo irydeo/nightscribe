@@ -1004,30 +1004,36 @@ def test_the_band_colours_the_measurement_of_this_frame(dlg):
 
 # ---------------- the band reflects every change (asked) --------------
 
-def _band_strip(dlg):
-    # @return: a hash of the TOP STRIP of the painted plate: the band and
-    #          nothing else (the measurement's rings, the object's mark and
-    #          the compass all live below it), so a change here can only be
-    #          the band's own pixels.
-    #          The plate's render is COALESCED by a timer and the band is
-    #          painted on a repaint, so the window is given a moment to
-    #          arrive: measuring before that is measuring the old frame (the
-    #          first version of this test read the previous plate).
+def _band_strip(dlg, differ_from=None, budget_ms=1200):
+    # @args: dlg - the dialog, differ_from - a hash this one must differ from
+    #        (the band is painted on a coalesced repaint: waiting a FIXED 250
+    #        ms measured the old frame on a slow runner, where two different
+    #        magnitudes hashed the same, 2026-10-01), budget_ms - how long to
+    #        give the paint to arrive
+    # @return: a hash of the painted BAND: the band and nothing else (the
+    #          measurement's rings, the object's mark and the compass all live
+    #          below it), so a change here can only be the band's own pixels
     import hashlib
+    import time
     from PySide6.QtCore import QEventLoop, QTimer
-    loop = QEventLoop()
-    QTimer.singleShot(250, loop.quit)
-    loop.exec()
-    img = dlg.view.grab().toImage()
-    # The crop is the BAND's own height, which the view keeps for the compass
-    # and the reticle that share the top (_title_h). A fixed 60 px left the
-    # band's text outside with a taller font, so two different magnitudes
-    # hashed the same (measured in CI, 2026-10-01); 60 stays as the fallback
-    # for a frame where nothing was painted.
-    band_h = int(getattr(dlg.view, "_title_h", 0) or 0) + 4
-    h = min(band_h if band_h > 4 else 60, img.height())
-    return hashlib.sha1(bytes(img.copy(0, 0, img.width(), h).bits())
-                        ).hexdigest()
+    deadline = time.monotonic() + budget_ms / 1000.0
+    while True:
+        loop = QEventLoop()
+        QTimer.singleShot(120, loop.quit)
+        loop.exec()
+        img = dlg.view.grab().toImage()
+        # The crop is the BAND's own height, which the view keeps for the
+        # compass and the reticle that share the top (_title_h). A fixed 60 px
+        # left the band's text outside with a taller font; 60 stays as the
+        # fallback for a frame where nothing was painted.
+        band_h = int(getattr(dlg.view, "_title_h", 0) or 0) + 4
+        h = min(band_h if band_h > 4 else 60, img.height())
+        digest = hashlib.sha1(bytes(img.copy(0, 0, img.width(), h).bits())
+                              ).hexdigest()
+        if differ_from is None or digest != differ_from:
+            return digest
+        if time.monotonic() >= deadline:
+            return digest
 
 
 def _band_mag(dlg):
@@ -1053,11 +1059,11 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 17.1})
     assert _band_mag(dlg)["role"] == "mag-cat"
-    a = _band_strip(dlg)
+    a = _band_strip(dlg, differ_from=before)
     assert a != before                            # the band repainted
     dlg.set_object({"name": "AT 2026zji", "ra": 20.0, "dec": 62.0,
                     "mag": 15.0})
-    b = _band_strip(dlg)
+    b = _band_strip(dlg, differ_from=a)
     assert b != a and "15.00" in _band_mag(dlg)["text"]
 
     # 2 · a series measured HERE (what a run does when it lands)
@@ -1066,7 +1072,7 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
                         flags=[])
     tab._series_result = SeriesResult(points=[point])
     tab._draw_series([point])
-    c = _band_strip(dlg)
+    c = _band_strip(dlg, differ_from=b)
     assert c != b and "11.11" in _band_mag(dlg)["text"]
 
     # 3 · the visit's curve loaded from the project (the same value, another
@@ -1078,7 +1084,7 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
                                         "source": "measure", "comps": 5,
                                         "flags": []}], None)
     tab.load_visit_curve()
-    d = _band_strip(dlg)
+    d = _band_strip(dlg, differ_from=c)
     assert d != c and "12.99" in _band_mag(dlg)["text"]
 
     # 4 · another plate (the same field, the same header): the visit's curve
@@ -1089,14 +1095,14 @@ def test_the_band_repaints_whenever_the_magnitude_changes(dlg, tmp_path):
     second = tmp_path / "second_plate.fits"
     shutil.copyfile(dlg.state.path, second)
     dlg.open_plate(str(second))
-    e = _band_strip(dlg)
+    e = _band_strip(dlg, differ_from=d)
     assert e != d and "12.99" in _band_mag(dlg)["text"]
 
     # 5 · and with nothing measured at all the catalogue comes back, in white
     tab._series_payload = []
     tab._curve_from_visit = False
     dlg.view.viewport().update()
-    f = _band_strip(dlg)
+    f = _band_strip(dlg, differ_from=e)
     assert f != e and _band_mag(dlg)["role"] == "mag-cat"
 
 

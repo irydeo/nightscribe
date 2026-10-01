@@ -562,15 +562,23 @@ def test_params_table_rows_follow_window_resize(panel, qapp):
     qapp.processEvents()
     tbl = panel.tbl_params
     two_lines = 2 * tbl.fontMetrics().lineSpacing()
+    # The narrow width is the panel's OWN floor, and the wide one is well
+    # clear of it: with a wider font (Windows measures differently) asking
+    # for 500 came back as the minimum, the two widths were the same and the
+    # rows did not move at all (measured 2026-10-01).
+    narrow_w = max(500, panel.minimumSizeHint().width())
+    wide_w = narrow_w + 400
+    panel.resize(wide_w, 800)
+    qapp.processEvents()
     wide = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    panel.resize(500, 800)
+    panel.resize(narrow_w, 800)
     qapp.processEvents()
     narrow = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
     assert max(narrow) > max(wide), \
-        f"rows did not grow on shrink: {wide} -> {narrow}"
+        f"rows did not grow on shrink ({narrow_w} -> {wide_w}): {wide} -> {narrow}"
     assert max(narrow) > 3 * two_lines, \
         f"narrow table should wrap to several lines: {narrow}"
-    panel.resize(1200, 800)
+    panel.resize(wide_w + 400, 800)
     qapp.processEvents()
     wider = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
     assert max(wider) < max(narrow), \

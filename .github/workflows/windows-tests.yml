@@ -15,6 +15,15 @@ name: Windows tests
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      only:
+        description: "pytest target (default: the whole unit suite)"
+        required: false
+        default: ""
+      qpa:
+        description: "QT_QPA_PLATFORM (default: the tests' own, offscreen)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -27,6 +36,8 @@ jobs:
   unit:
     name: Unit tests (Windows)
     runs-on: windows-latest
+    env:
+      QT_QPA_PLATFORM: ${{ github.event.inputs.qpa }}
     steps:
       - uses: actions/checkout@v4
 
@@ -46,5 +57,11 @@ jobs:
         # Bounded and parallel, like the gate in the preview build: a test
         # that stalls on the network must fail here, not hang the runner.
         # -v so a timeout log names the culprit.
+        #
+        # The two dispatch inputs are for chasing a Windows-only failure
+        # without paying for the whole suite: `only` runs one file (or one
+        # test) and `qpa` swaps the Qt platform, which is how an offscreen
+        # platform plugin's own bug is told apart from the app's.
         timeout-minutes: 15
-        run: python -m pytest tests/unit -v -n auto --dist loadfile
+        run: python -m pytest tests/unit -v -n auto --dist loadfile ${{ github.event.inputs.only }}
+

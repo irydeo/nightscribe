@@ -31,7 +31,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QSize, QTimer
 from PySide6.QtGui import QFontMetrics, QIcon, QKeySequence, QShortcut
-from PySide6.QtWidgets import QDialog, QFileDialog, QMessageBox, QSizePolicy, \
+from PySide6.QtWidgets import QFileDialog, QMessageBox, QSizePolicy, \
     QProgressDialog, QVBoxLayout, QWidget
 
 from ..config import config
@@ -84,7 +84,12 @@ _ZOOM_ICONS = {"Fit": "ufe_zoom_fit", "50": "ufe_zoom_50",
                "400": "ufe_zoom_400"}
 
 
-class UfeDialog(QDialog):
+class UfeDialog(QWidget):
+    # Interfaz 1.0 (ADR-053): the workbench is now a plain QWidget hosted
+    # in the main window's shell (a page of its stack), not a floating
+    # QDialog. Its interior is untouched; the class name and the whole
+    # host-facing API (hooks, open_plate, show_tab, state) stay the same,
+    # so every call site and test keeps working.
     # @args: lang - "es" | "en" (feature tabs receive it), parent - widget
 
     def __init__(self, lang="es", parent=None):
@@ -139,11 +144,9 @@ class UfeDialog(QDialog):
         self.state = UfeImageState(self)
         self.view = UfeImageView(self.state)
         self.setWindowTitle(self.tr("NightScribe Image Workbench"))
-        # the workbench is meant to fill a big screen: give the window its
-        # maximize/minimize buttons (a plain QDialog lacks them on Windows)
-        self.setWindowFlags(self.windowFlags()
-                            | Qt.WindowMaximizeButtonHint
-                            | Qt.WindowMinimizeButtonHint)
+        # No window flags: the workbench is a page of the main window's
+        # shell now (Interfaz 1.0). Setting Window* hints on a child widget
+        # can detach it into its own window on some platforms.
         self._build_ui()
         self._build_shortcuts()
         self.resize(1440, 960)
@@ -622,19 +625,25 @@ class UfeDialog(QDialog):
         self.view.set_pick_cursor(
             bool(getattr(incoming, "pick_clicks", False)))
 
-    def closeEvent(self, event):
-        # The blink timer must not fire into a closing dialog, and the
-        # Measure tab's workers must not outlive it either: a series run
-        # or a Live watch left behind keeps measuring and writing runs
-        # into the DB forever (shutdown cancels both and waits).
-        self.tab_blink.shutdown()
-        stop = getattr(self.tab_compare, "shutdown", None)
+    def shutdown(self):
+        # The blink timer must not fire into a hidden/closing workbench,
+        # and the Measure tab's workers must not outlive it either: a
+        # series run or a Live watch left behind keeps measuring and
+        # writing runs into the DB forever (this cancels both and waits).
+        # Idempotent: the host calls it when leaving the UFE view, and
+        # closeEvent calls it too when the window itself goes away.
+        blink = getattr(self, "tab_blink", None)
+        if blink is not None:
+            blink.shutdown()
+        stop = getattr(getattr(self, "tab_compare", None), "shutdown", None)
         if callable(stop):
             stop()
-        try:
-            self.tab_measure.shutdown()
-        except Exception as err:      # a failed cleanup never blocks close
-            logger.warning("measure tab shutdown failed: %s", err)
+        measure = getattr(self, "tab_measure", None)
+        if measure is not None:
+            try:
+                measure.shutdown()
+            except Exception as err:  # a failed cleanup never blocks close
+                logger.warning("measure tab shutdown failed: %s", err)
         # and the visit's batch: a QThread destroyed while it runs aborts
         # the whole application (the same trap the tabs document)
         worker = getattr(self, "_visit_worker", None)
@@ -642,6 +651,9 @@ class UfeDialog(QDialog):
             worker.cancel()
             worker.wait(5000)
         self._visit_worker = None
+
+    def closeEvent(self, event):
+        self.shutdown()
         super().closeEvent(event)
 
     # -------------------------------------------------------- extension

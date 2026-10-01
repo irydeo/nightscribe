@@ -267,9 +267,10 @@ KIND_ORDER = list(kinds.ids())
 # TAB_* names are kept as aliases so the deep links across the file
 # (project created -> hub, campaign badge -> campaigns) keep working.
 VIEW_HOME, VIEW_TONIGHT, VIEW_CAMPAIGNS, VIEW_DETAIL = range(4)
-# The Welcome view is appended (built lazily only when it is needed) so the
-# indices the rest of the file already uses stay put.
+# Welcome and the embedded workbench are appended (built lazily only when
+# needed) so the indices the rest of the file already uses stay put.
 VIEW_WELCOME = 4
+VIEW_UFE = 5
 TAB_PROJECTS = VIEW_HOME
 TAB_TONIGHT = VIEW_TONIGHT
 TAB_CAMPAIGNS = VIEW_CAMPAIGNS
@@ -520,7 +521,18 @@ class MainWindow(QMainWindow):
         # be opened until "Got it".
         if getattr(self, "_welcome_gate", False) and index != VIEW_WELCOME:
             return
-        self._shell_stack().setCurrentIndex(index)
+        stack = self._shell_stack()
+        # Leaving the embedded workbench shuts its workers down (the same
+        # cleanup its closeEvent runs); ADR-047 keeps the plate's state.
+        if stack.currentIndex() == VIEW_UFE and index != VIEW_UFE:
+            ufe = getattr(self, "_ufe", None)
+            stop = getattr(ufe, "shutdown", None)
+            if callable(stop):
+                try:
+                    stop()
+                except Exception as err:
+                    logger.warning("UFE shutdown on view change: %s", err)
+        stack.setCurrentIndex(index)
 
     # ---------------- shell construction (Interfaz 1.0, ADR-053) ----------
 
@@ -9134,6 +9146,40 @@ class MainWindow(QMainWindow):
         self._ufe = UfeDialog(lang=self._lang(), parent=self)
         return self._ufe
 
+    def _ufe_page(self):
+        # The shell page that hosts the workbench: a thin host bar with a
+        # "back" affordance above the editor (chrome of the shell, never
+        # of the workbench). Built once; the workbench's interior is the
+        # same widget as always.
+        if getattr(self, "_ufe_page_widget", None) is not None:
+            return self._ufe_page_widget
+        from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout,
+                                       QPushButton)
+        page = QWidget()
+        lay = QVBoxLayout(page)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+        bar = QWidget()
+        bl = QHBoxLayout(bar)
+        bl.setContentsMargins(8, 6, 8, 6)
+        back = QPushButton(self.tr("← Back"))
+        back.setToolTip(self.tr("Leave the workbench and return"))
+        back.clicked.connect(self._ufe_back)
+        bl.addWidget(back)
+        bl.addStretch(1)
+        lay.addWidget(bar)
+        lay.addWidget(self._ufe_build(), 1)
+        self._ufe_page_widget = page
+        self._shell_stack().addWidget(page)   # VIEW_UFE
+        return page
+
+    def _ufe_back(self):
+        # Leaves the workbench: back to the open project, or Home.
+        if self._current_project is not None:
+            self._goto_tab(VIEW_DETAIL)
+        else:
+            self._goto_tab(VIEW_HOME)
+
     def _ufe_project_badge_payload(self, pid):
         # The badge's payload, built by the SAME function the project list
         # rows use (G): same kind chip, same hue, same words.
@@ -9158,9 +9204,9 @@ class MainWindow(QMainWindow):
         dlg.set_point_hook(None)     # and no project to save points to
         dlg.set_reset_hooks(None, None)   # and nothing to reset (ADR-047)
         dlg.set_object(None)         # and no stale project object
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        # Interfaz 1.0: the workbench is a page of the shell, full screen
+        self._ufe_page()
+        self._goto_tab(VIEW_UFE)
 
     def _use_ufe(self):
         # @return: True when FITS work opens in the unified editor
@@ -9305,12 +9351,11 @@ class MainWindow(QMainWindow):
             badge = getattr(dlg, "set_project_badge", None)
             if callable(badge):
                 badge(None)              # ad-hoc: no project behind it
+        self._ufe_page()
         dlg.show_tab({"blink": dlg.tab_blink, "compare": dlg.tab_compare,
                       "annotate": dlg.tab_annotate,
                       "measure": dlg.tab_measure}[tab])
-        dlg.show()
-        dlg.raise_()
-        dlg.activateWindow()
+        self._goto_tab(VIEW_UFE)
         return dlg
 
     # (the object attaches via set_object at the end of _ufe_open; a

@@ -743,12 +743,14 @@ def test_the_workbench_badge_speaks_the_project_list_s_language(window):
     window._ufe = dlg                          # keep the dialog alive here
     from PySide6.QtWidgets import QApplication
     QApplication.processEvents()
-    assert dlg.badge.isVisible()
+    # Interfaz 1.0: the workbench lives in the shell (the window is not
+    # shown in the test), so "shown" is isHidden(), not isVisible().
+    assert not dlg.badge.isHidden()
     assert dlg.badge.lbl_name.text() == expected["name"]
     assert dlg.badge.lbl_kind.text() == expected["kind_label"]
     assert expected["kind_color"] in dlg.badge.lbl_kind.styleSheet()
     assert expected["next_text"] in dlg.badge.toolTip()
     # and the ad-hoc open (Tools) has no project behind it
     dlg.set_project_badge(None)
-    assert not dlg.badge.isVisible()
+    assert dlg.badge.isHidden()
     dlg.close()

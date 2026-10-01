@@ -394,9 +394,12 @@ def test_prefill_mag_falls_back_to_the_saved_sequence(window, monkeypatch):
         def prefill(self, **kw):
             seen.append(kw)
 
-    class _Dlg:
+    from PySide6.QtWidgets import QWidget as _QWidget
+
+    class _Dlg(_QWidget):
         # the mapping in _ufe_open touches all four tabs; the object
-        # lands whole via set_object (the tabs prefill inside it)
+        # lands whole via set_object (the tabs prefill inside it).
+        # Interfaz 1.0: the workbench is a QWidget hosted in the shell.
         tab_blink = _Cmp()
         tab_compare = _Cmp()
         tab_annotate = _Cmp()
@@ -557,8 +560,11 @@ def test_files_window_opens_ufe_for_a_project_plate(window):
         fd.tbl.itemDoubleClicked.emit(fd.tbl.item(0, 0))
 
         # The editor opened on the plate, Annotate tab, object attached.
+        # Interfaz 1.0: "opened" means the shell is on the workbench view.
+        from nightscribe.gui.main_window import VIEW_UFE
         uf = window._ufe
-        assert uf is not None and uf.isVisible()
+        assert uf is not None
+        assert window._shell_stack().currentIndex() == VIEW_UFE
         assert uf.tabs.currentWidget() is uf.tab_annotate
         assert uf.state.has_image
         assert uf.state.path == str(MONO)

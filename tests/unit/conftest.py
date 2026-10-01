@@ -27,9 +27,42 @@ import os
 import pytest
 import requests
 
-# Every worker (and the plain run) creates a QApplication: offscreen keeps
-# it headless without depending on a display, set before any Qt import.
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# A hung test must NAME itself and stop, not eat the gate's whole budget: the
+# Windows run of 2026-10-01 sat at 81 % for 45 minutes with nothing in the
+# log to point at. pytest's own faulthandler_timeout dumps after two minutes
+# (see pyproject.toml) and this one, per test, dumps and EXITS after five,
+# which turns a hang into a three-minute failure with the traceback of every
+# thread in the log. Five minutes because the slowest test here (the live
+# session) is 30 s on this machine and that runner is about five times
+# slower.
+_HANG_S = float(os.environ.get("NIGHTSCRIBE_TEST_HANG_S") or 300)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_protocol(item, nextitem):
+    # @args: item - the test about to run, nextitem - pytest's own argument
+    # @return: the hook's result, untouched (wrapper=True is the form pytest
+    #          9 keeps: with the old hookwrapper=True it silently does
+    #          nothing there, which is how the hang of 2026-10-01 went
+    #          unnamed)
+    import faulthandler
+    faulthandler.dump_traceback_later(_HANG_S, exit=True)
+    try:
+        return (yield)
+    finally:
+        faulthandler.cancel_dump_traceback_later()
+
+# Every worker (and the plain run) creates a QApplication: offscreen keeps it
+# headless without depending on a display, set before any Qt import.
+#
+# Measured (2026-10-01) when choosing the platform for the Windows runner:
+# the real one is about three times slower there (85 % of the suite in 25
+# minutes, against ~8 for the whole thing offscreen), and the access
+# violations that looked like an offscreen-plugin bug were the workbench's
+# dropdown panels, which are now plain menus (gui/widgets/door_menu.py). So
+# offscreen it is, on every platform. An empty value counts as unset: the CI
+# passes the platform through a dispatch input.
+os.environ["QT_QPA_PLATFORM"] = os.environ.get("QT_QPA_PLATFORM") or "offscreen"
 
 # Before any nightscribe module imports the `db`/`config` singletons, point
 # the per-OS paths at a throwaway tree: Config.save() and every Database
@@ -83,6 +116,25 @@ def _fake_solve_worker(monkeypatch):
             return self._cancelled
 
     monkeypatch.setattr(workers, "UfeSolveWorker", _FakeSolveWorker)
+
+
+@pytest.fixture(autouse=True)
+def _no_modal_boxes(monkeypatch):
+    # A modal box waits for a click that a test run never gives. The Windows
+    # run of 2026-10-01 sat 45 minutes on
+    # test_ufe_compare_tab.py::test_generate_needs_a_wcs: the plate had no
+    # WCS, the CI has no ASTAP and no nova key, so the workbench told the
+    # observer about it with QMessageBox.information, and the test never came
+    # back (the faulthandler timer could not even dump: the box holds the
+    # event loop). A test that asserts on a box patches it on top, and
+    # test_exotic_run_report.py shows how.
+    from PySide6.QtWidgets import QMessageBox
+    silent = staticmethod(lambda *a, **k: None)
+    monkeypatch.setattr(QMessageBox, "information", silent)
+    monkeypatch.setattr(QMessageBox, "warning", silent)
+    monkeypatch.setattr(QMessageBox, "critical", silent)
+    monkeypatch.setattr(QMessageBox, "question",
+                        staticmethod(lambda *a, **k: QMessageBox.StandardButton.No))
 
 
 @pytest.fixture(autouse=True)

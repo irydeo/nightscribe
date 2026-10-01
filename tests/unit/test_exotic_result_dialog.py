@@ -192,9 +192,11 @@ def test_a_double_click_opens_the_file_with_the_system(qapp, tmp_path,
         dlg._ui.lst_files.itemDoubleClicked.emit(
             dlg._ui.lst_files.item(0))
         assert len(opened) == n
-        # and the folder door opens the work folder itself
+        # and the folder door opens the work folder itself (the URL, not the
+        # path: on Windows the two spell the same folder differently)
+        from PySide6.QtCore import QUrl
         dlg._ui.btn_folder.click()
-        assert str(dlg._out_dir) in opened[-1]
+        assert opened[-1] == QUrl.fromLocalFile(str(dlg._out_dir)).toString()
     finally:
         dlg.close()
 

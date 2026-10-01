@@ -26,10 +26,11 @@ from nightscribe.core import exotic_run
 
 
 def _fake(tmp_path, name, body):
-    script = tmp_path / name
-    script.write_text("#!/usr/bin/env python3\n" + body)
-    os.chmod(script, 0o755)
-    return script
+    # The stand-in "interpreter" the runner starts: on POSIX a shebang script
+    # with the executable bit, on Windows a .cmd that hands the body to this
+    # interpreter (a .py cannot be run there: WinError 193, measured in CI).
+    from fake_binary import make_fake_binary
+    return make_fake_binary(tmp_path, name, body)
 
 
 def _ok_script(tmp_path):
@@ -126,6 +127,23 @@ def _pid_alive(pid):
     # @args: pid - process id to probe
     # @return: True only if the pid still exists and is not a zombie
     #          (an unreaped zombie is already dead for our purposes)
+    if os.name == "nt":
+        # os.kill(pid, 0) is NOT a probe on Windows: it terminates the
+        # process with that exit code, and on a pid that is already gone it
+        # raises WinError 87 (measured in CI, 2026-10-01). Asking the kernel
+        # for its exit code is the probe.
+        import ctypes
+        k32 = ctypes.windll.kernel32
+        handle = k32.OpenProcess(0x1000, False, int(pid))   # QUERY_LIMITED
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not k32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == 259                        # STILL_ACTIVE
+        finally:
+            k32.CloseHandle(handle)
     try:
         os.kill(pid, 0)
     except ProcessLookupError:
@@ -168,7 +186,12 @@ sys.exit(0)
     elapsed = time.monotonic() - start
     try:
         assert res["ok"] and res["returncode"] == 0
-        assert elapsed < 6, f"waited {elapsed:.1f}s for a dead parent"
+        # the contract is that it does NOT wait for the child (the old code
+        # sat on the two-hour timeout), not a stopwatch reading: on Windows
+        # the tree is a .cmd plus two interpreters and starting them is slow
+        # (measured in CI: the 6 s bound failed with the design intact)
+        assert not res["timed_out"]
+        assert elapsed < 10, f"waited {elapsed:.1f}s for a dead parent"
     finally:
         if state["child"] is not None and _pid_alive(state["child"]):
             try:

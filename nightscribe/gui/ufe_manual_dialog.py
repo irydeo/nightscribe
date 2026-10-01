@@ -73,7 +73,26 @@ class UfeManualDialog(QDialog):
         # font, so 760 clears that and test_manual_window_cannot_squish_its_
         # buttons pins it. The HEIGHT now follows the content.
         self.setMinimumWidth(760)
+        self._fitted = False
         self._fit_to_content()
+
+    def _sync_floor(self):
+        # The metrics are the APPLIED font's, not the one the dialog was
+        # built with: by the time the window is on screen the style has been
+        # polished and the layout asks for a few pixels more, so the floor
+        # computed in __init__ left the window able to squish its own buttons
+        # (measured on the runner with Segoe UI, 2026-10-01: minimumHeight
+        # 147 against a minimumSizeHint of 155, with the layout's own
+        # minimumSize already at 155).
+        #
+        # This is deliberately NOT a second _fit_to_content: that one resizes
+        # the window to measure the rows, and doing it again on the first
+        # show would make the window jump. Raising the floor is all that is
+        # needed, and only upwards, so a size the observer chose stays.
+        # @return: None
+        need = int(self.minimumSizeHint().height())
+        if need > self.minimumHeight():
+            self.setMinimumHeight(need)
 
     def _fit_to_content(self):
         # The window takes the height its CONTENT really needs, at the width
@@ -85,28 +104,39 @@ class UfeManualDialog(QDialog):
         # while `sizeHint` said 177 and the layout's `heightForWidth` said
         # 161. The extra space is spread over the rows, so only the laid-out
         # geometry tells the truth.
+        #
+        # The sequence button is measured DRESSED with its live count (the
+        # longest form it may show): its bare label is shorter, and with a
+        # wider font the window came out 8 px under what the dressed row
+        # needs, so it could squish its own buttons (measured in CI,
+        # 2026-10-01: minimumHeight 147 against a hint of 155).
         # @return: None
         width = max(820, self.minimumWidth())
         layout = self.layout()
         if layout is None:
             return
-        self.resize(width, 600)             # room to lay the content out
-        layout.activate()
-        bottom = 0
-        for i in range(layout.count()):
-            item = layout.itemAt(i)
-            widget = item.widget() if item is not None else None
-            if widget is None or not widget.isVisible():
-                continue
-            bottom = max(bottom, widget.geometry().bottom() + 1)
-        margin = layout.contentsMargins().bottom()
-        if bottom <= 0:
-            bottom = self.sizeHint().height()
-        self.setMinimumHeight(int(self.minimumSizeHint().height()))
-        # the content plus a little air: flush against the frame looks
-        # broken, and the strip this replaces was 111 px of nothing
-        self.resize(width,
-                    max(int(bottom) + margin + 12, self.minimumHeight()))
+        bare = self.btn_seq_open.text()
+        self.btn_seq_open.setText(self.tr("Sequence (99)…"))
+        try:
+            self.resize(width, 600)         # room to lay the content out
+            layout.activate()
+            bottom = 0
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                widget = item.widget() if item is not None else None
+                if widget is None or not widget.isVisible():
+                    continue
+                bottom = max(bottom, widget.geometry().bottom() + 1)
+            margin = layout.contentsMargins().bottom()
+            if bottom <= 0:
+                bottom = self.sizeHint().height()
+            self.setMinimumHeight(int(self.minimumSizeHint().height()))
+            # the content plus a little air: flush against the frame looks
+            # broken, and the strip this replaces was 111 px of nothing
+            self.resize(width,
+                        max(int(bottom) + margin + 12, self.minimumHeight()))
+        finally:
+            self.btn_seq_open.setText(bare)
 
     def resizeEvent(self, ev):
         # A word-wrapped hint label does not always ask for the height its
@@ -125,6 +155,12 @@ class UfeManualDialog(QDialog):
         # @args: ev - the show event, passed on
         super().showEvent(ev)
         self.openStateChanged.emit(True)
+        # the floor is re-read once, one turn after the window is on screen,
+        # when the polished style has settled (_sync_floor says why)
+        if not self._fitted:
+            self._fitted = True
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, self._sync_floor)
 
     def hideEvent(self, ev):
         # the X button hides (a non-modal QDialog dies with host or X),

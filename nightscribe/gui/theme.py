@@ -254,6 +254,31 @@ def tab_state_style(state, kind_color, active=False):
             f" padding: 3px 12px; }}")
 
 
+def kpi_tile_style(accent=None):
+    # @args: accent - the hue for the tile's 3 px spine, or None for a
+    #          neutral tile
+    # @return: a stylesheet for ONE KPI tile of the object card's "tonight"
+    #          strip (ADR-057). The spine keeps the app's list grammar (the
+    #          hue carries the meaning); the fill stays the plain card base,
+    #          because a tinted wash over the dark card read muddy every
+    #          time we tried it (the same reason chip_style is solid).
+    spine = f" border-left: 3px solid {accent};" if accent else ""
+    return (f"QFrame#kpiTile {{ background: {C_BASE};"
+            f" border: 1px solid {C_LINE}; border-radius: 8px;{spine} }}")
+
+
+def section_card_style(accent):
+    # @args: accent - the object's kind hue, carried by the card's spine
+    # @return: a stylesheet for ONE parameter-section card of the object
+    #          card (ADR-057). Same panel voice as the KPI tiles, so the
+    #          dossier reads as one document; the spine is the quiet
+    #          composite (like an unselected kind card), not the raw hue.
+    return (f"QFrame#sectionCard {{ background: {C_BASE};"
+            f" border: 1px solid {C_LINE}; border-radius: 10px;"
+            f" border-left: 3px solid {composite(accent, '70', over=C_BASE)};"
+            f" }}")
+
+
 def kind_card_style(accent, selected=False):
     # @args: accent - the kind's KIND_COLORS hue; selected - whether the
     #          observer follows it right now

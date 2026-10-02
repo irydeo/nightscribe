@@ -49,6 +49,12 @@ Autor: Francisco José Calvo Fernández (Observatorio Irydeo, MPC Z41). Licencia
   los números medidos se escriben en el comentario (lo que se ganó, lo que costó), y
   nada se deja «porque sí». Un comentario que no enseña nada sobra, y una decisión que
   no se explica es una decisión que se perderá: el código es también documentación.
+- **Ningún código, clasificación o cifra sin explicación (regla permanente)**: al usuario
+  nunca se le enseña un tipo («SN Ia», «NR+ELL»), una clase espectral, un método de
+  descubrimiento ni una cifra (magnitud, MOID, profundidad, Kp) a secas: siempre va
+  acompañado de qué significa y por qué importa. Las taxonomías y las cifras se explican
+  una sola vez en `core/explain.py` (dos densidades: `short` para hooks/tooltips, `long`
+  para fichas y posts); ningún módulo duplica ese conocimiento. Ver ADR-058.
 - **Documentación en lenguaje natural**: nunca usar la raya «—»; escribimos con «:»,
   «,» y «;». La semirraya «–» queda reservada a los rangos numéricos (0–100).
 - **Mantenible por personas**: funciones cortas, dependencias mínimas, sin magia.
@@ -279,6 +285,12 @@ drafts + tweet + ready-to-attach PNG charts).
   nothing is left as "just because". A comment that teaches nothing is noise, and a
   decision that is not explained is a decision that will be lost: the code is
   documentation too.
+- **No code, classification or figure without an explanation (permanent rule)**: the user
+  is never shown a type ("SN Ia", "NR+ELL"), a spectral class, a discovery method or a
+  figure (magnitude, MOID, depth, Kp) on its own: it always comes with what it means and
+  why it matters. Taxonomies and figures are explained once in `core/explain.py` (two
+  densities: `short` for hooks/tooltips, `long` for cards and posts); no module
+  duplicates that knowledge. See ADR-058.
 - **Docs in natural language**: never use the em dash ("—"); we write with ":", ","
   and ";". The en dash ("–") stays reserved for numeric ranges (0–100).
 - **The interface is defined in `gui/ui/*.ui` (ADR-005)**: every window, dialog or tab

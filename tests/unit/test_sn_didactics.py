@@ -11,6 +11,7 @@
 #
 ############################################################
 
+from nightscribe.core import narrative
 from nightscribe.core.orbits import _sn_type_text, explain_transient
 
 
@@ -108,3 +109,23 @@ def test_explain_transient_no_type_no_didactic():
     rows = explain_transient(d)
     didactic = [r for r in rows if r["level"] == "didactic"]
     assert len(didactic) == 0
+
+
+# ---------------- ADR-058: prose never leaves a bare type ---------------
+
+def test_transient_facts_explain_the_type():
+    # the bullet names the type AND says what it means, not just «SN Ia»
+    e = {"type": "transient", "name": "2026ziz",
+         "data": {"simbad": {"otype": "SN Ia"}, "host": {"name": "NGC 1"}}}
+    joined = " ".join(b["es"] for b in narrative.fact_bullets(e))
+    assert "SN Ia" in joined
+    assert "enana blanca" in joined, joined
+
+
+def test_unconfirmed_sn_hook_explains_the_type():
+    e = {"type": "sn", "name": "AT2026yvy",
+         "data": {"unconfirmed": {"kind": "sn", "name": "AT2026yvy",
+                                  "sn_type": "II", "host": "NGC 5128"}}}
+    h = narrative.hook(e)["es"]
+    assert "tipo II" in h
+    assert "masiva" in h.lower() or "hidrógeno" in h.lower(), h

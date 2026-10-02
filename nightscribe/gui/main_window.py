@@ -2251,111 +2251,13 @@ class MainWindow(QMainWindow):
     def _type_pixmap(self, kind, size=28):
         # Draws a small geometric icon per object type with QPainter.
         # Fast (no matplotlib), guaranteed to render on any platform.
+        # The painter itself lives in widgets/kind_glyph.py (ADR-057): the
+        # object card's hero draws the same glyph at 44 px, and one grammar
+        # of shapes wants one home.
         # @args: kind - object kind string, size - icon px
         # @return: QPixmap with a transparent background
-        from PySide6.QtCore import QPointF, QRectF
-        from PySide6.QtGui import (QBrush, QColor, QPainter,
-                                    QPainterPath, QPen, QPixmap)
-        pix = QPixmap(size, size)
-        pix.fill(Qt.transparent)
-        p = QPainter(pix)
-        p.setRenderHint(QPainter.Antialiasing)
-        color = QColor(self._KIND_COLORS.get(kind, "#888888"))
-        cx = cy = size / 2.0
-        if kind == "sn":
-            # 4-point star (spark burst)
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 2))
-            path.lineTo(QPointF(cx + 4, cy - 4))
-            path.lineTo(QPointF(size - 2, cy))
-            path.lineTo(QPointF(cx + 4, cy + 4))
-            path.lineTo(QPointF(cx, size - 2))
-            path.lineTo(QPointF(cx - 4, cy + 4))
-            path.lineTo(QPointF(2, cy))
-            path.lineTo(QPointF(cx - 4, cy - 4))
-            path.closeSubpath()
-            p.drawPath(path)
-        elif kind == "neo":
-            # small ellipse (asteroid body)
-            p.setBrush(QBrush(color))
-            p.drawEllipse(QRectF(cx - 7, cy - 4, 14, 8))
-        elif kind == "comet":
-            # nucleus + tail
-            p.setBrush(QBrush(color))
-            p.drawEllipse(QRectF(cx - 4, cy - 4, 8, 8))
-            p.setPen(QPen(color, 1.5))
-            p.drawLine(QPointF(cx + 3, cy), QPointF(size - 2, cy + 4))
-            p.drawLine(QPointF(cx + 3, cy + 1), QPointF(size - 3, cy + 5))
-        elif kind == "pccp":
-            # dashed circle (uncertain identity)
-            pen = QPen(color, 2)
-            pen.setStyle(Qt.DashLine)
-            p.setPen(pen)
-            p.setBrush(Qt.NoBrush)
-            p.drawEllipse(QRectF(cx - 8, cy - 8, 16, 16))
-        elif kind == "transit":
-            # light curve with a dip
-            p.setPen(QPen(color, 2))
-            p.drawLine(QPointF(2, cy), QPointF(cx - 6, cy))
-            p.drawArc(QRectF(cx - 6, cy - 6, 12, 12), 0, -180 * 16)
-            p.drawLine(QPointF(cx + 6, cy), QPointF(size - 2, cy))
-        elif kind == "alert":
-            # warning triangle
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 3))
-            path.lineTo(QPointF(size - 2, size - 3))
-            path.lineTo(QPointF(2, size - 3))
-            path.closeSubpath()
-            p.drawPath(path)
-            p.setPen(QPen(QColor("#e8eaf2"), 1.5))
-            p.drawText(QRectF(0, 0, size, size), Qt.AlignCenter, "!")
-        elif kind == "hads":
-            # pulsating star: small 4-point star + a sine wave underneath
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 4))
-            path.lineTo(QPointF(cx + 3, cy - 5))
-            path.lineTo(QPointF(size - 4, cy - 5))
-            path.lineTo(QPointF(cx + 3, cy - 5 + 3))
-            path.lineTo(QPointF(cx, cy + 1))
-            path.lineTo(QPointF(cx - 3, cy - 2))
-            path.lineTo(QPointF(4, cy - 5))
-            path.lineTo(QPointF(cx - 3, cy - 5))
-            path.closeSubpath()
-            p.drawPath(path)
-            p.setPen(QPen(color, 1.5))
-            wave = QPainterPath()
-            wave.moveTo(QPointF(3, size - 6))
-            wave.cubicTo(QPointF(cx - 4, size - 6), QPointF(cx - 6, size - 11),
-                         QPointF(cx, size - 11))
-            wave.cubicTo(QPointF(cx + 6, size - 11), QPointF(cx + 4, size - 6),
-                         QPointF(size - 3, size - 6))
-            p.drawPath(wave)
-        elif kind == "variable":
-            # long-period variable: 4-point star + a slow wave underneath
-            p.setBrush(QBrush(color))
-            path = QPainterPath()
-            path.moveTo(QPointF(cx, 4))
-            path.lineTo(QPointF(cx + 3, cy - 5))
-            path.lineTo(QPointF(size - 4, cy - 5))
-            path.lineTo(QPointF(cx + 3, cy - 5 + 3))
-            path.lineTo(QPointF(cx, cy + 1))
-            path.lineTo(QPointF(cx - 3, cy - 2))
-            path.lineTo(QPointF(4, cy - 5))
-            path.lineTo(QPointF(cx - 3, cy - 5))
-            path.closeSubpath()
-            p.drawPath(path)
-            p.setPen(QPen(color, 1.5))
-            wave = QPainterPath()
-            wave.moveTo(QPointF(3, size - 8))
-            wave.cubicTo(QPointF(cx - 2, size - 2),
-                         QPointF(cx + 2, size - 12),
-                         QPointF(size - 3, size - 7))
-            p.drawPath(wave)
-        p.end()
-        return pix
+        from .widgets.kind_glyph import kind_glyph_pixmap
+        return kind_glyph_pixmap(kind, size)
 
     def on_compute_tonight(self):
         self._tonight_running = True
@@ -4884,12 +4786,13 @@ class MainWindow(QMainWindow):
                 project.update_context(db, p["id"],
                                        {k: v for k, v in sw.items()
                                         if v is not None})
-                # refresh the overview panel: the capture chips and the
-                # sky chart now carry the safe window
+                # refresh the overview panel: the KPI strip and the sky
+                # chart now carry the safe window (ADR-057)
                 panel = self._get_proj_panel()
                 if panel._e is not None:
                     panel._ctx = ctx
-                    panel._render_capture(panel._e)
+                    panel._render_kpis(panel._e)
+                    panel._render_flags(panel._e)
                     panel._render_charts(panel._e)
             # ADR-043: silent by design: the plan auto-saves from the
             # Capture step inputs; the project bar is the visible truth

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Object hero (ADR-057): the object card's identity block. Glyph, name,
+  kind chip (+ PHA flag), full designation, the narrative hook and the
+  "why tonight" phrase, with the 0-100 score ring on the right. Loaded by
+  gui/widgets/object_hero.py through gui/ui_loader.py. Every text is data
+  (set in code); the score ring is a custom widget and never enters this
+  file: the heroRingHost placeholder is swapped for it (ADR-005). The
+  hero's skin (gradient + spine in the kind hue) is applied in code
+  because the hue is data, not chrome.
+-->
+<ui version="4.0">
+ <class>ObjectHero</class>
+ <widget class="QFrame" name="ObjectHero">
+  <layout class="QHBoxLayout" name="hero_lay">
+   <property name="leftMargin"><number>14</number></property>
+   <property name="topMargin"><number>12</number></property>
+   <property name="rightMargin"><number>14</number></property>
+   <property name="bottomMargin"><number>12</number></property>
+   <property name="spacing"><number>12</number></property>
+   <item>
+    <widget class="QLabel" name="lbl_glyph">
+     <property name="text"><string/></property>
+     <property name="alignment"><set>Qt::AlignTop|Qt::AlignHCenter</set></property>
+    </widget>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="hero_mid">
+     <property name="spacing"><number>3</number></property>
+     <item>
+      <layout class="QHBoxLayout" name="hero_name_row">
+       <property name="spacing"><number>8</number></property>
+       <item><widget class="QLabel" name="lbl_name"><property name="text"><string/></property></widget></item>
+       <item><widget class="QLabel" name="lbl_kind"><property name="text"><string/></property></widget></item>
+       <item><widget class="QLabel" name="lbl_pha"><property name="text"><string>PHA</string></property><property name="toolTip"><string>Potentially hazardous asteroid: its orbit passes close to Earth's; not a known threat, one we watch closely</string></property><property name="visible"><bool>false</bool></property></widget></item>
+       <item><spacer name="hsp_hero"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+      </layout>
+     </item>
+     <item><widget class="QLabel" name="lbl_subtitle"><property name="text"><string/></property><property name="textInteractionFlags"><set>Qt::TextSelectableByMouse</set></property><property name="visible"><bool>false</bool></property></widget></item>
+     <item><widget class="QLabel" name="lbl_hook"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+     <item><widget class="QLabel" name="lbl_why"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QVBoxLayout" name="hero_score_col">
+     <property name="spacing"><number>2</number></property>
+     <item alignment="Qt::AlignHCenter">
+      <!-- the score ring (score_ring.py) takes this slot -->
+      <widget class="QWidget" name="heroRingHost"/>
+     </item>
+     <item><widget class="QLabel" name="lbl_score_cap"><property name="text"><string>Tonight</string></property><property name="alignment"><set>Qt::AlignHCenter</set></property><property name="visible"><bool>false</bool></property></widget></item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

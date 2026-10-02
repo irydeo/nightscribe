@@ -14,7 +14,7 @@
 import logging
 import re
 
-from . import hads, orbits
+from . import explain, hads, orbits
 
 logger = logging.getLogger(__name__)
 
@@ -44,11 +44,15 @@ def hook(e):
                            f"{ly:.0f} million years ago; last night we caught "
                            f"it from our observatory.")}
         if otype and host:
-            return {"es": f"Una supernova de tipo {otype} en {host}: seguimos su brillo noche a noche.",
-                    "en": f"A type-{otype} supernova in {host}: we track its brightness night after night."}
+            # name the type AND explain it: a bare "tipo Ia" is half a story
+            # (ADR-058). The short density keeps the hook a hook.
+            ex = explain.short(explain.sn_type(otype))
+            return {"es": f"En {host}, una supernova de tipo {otype}. {ex['es']}",
+                    "en": f"In {host}, a type-{otype} supernova. {ex['en']}"}
         if otype:
-            return {"es": f"Una explosión de tipo {otype} que seguimos desde nuestro observatorio.",
-                    "en": f"A {otype}-type explosion we track from our observatory."}
+            ex = explain.short(explain.sn_type(otype))
+            return {"es": f"Una explosión de tipo {otype}. {ex['es']}",
+                    "en": f"A type-{otype} explosion. {ex['en']}"}
         if host:
             return {"es": f"Un fenómeno explosivo en {host}, seguido desde nuestro observatorio.",
                     "en": f"An exploding object in {host}, tracked from our observatory."}
@@ -124,6 +128,11 @@ def hook(e):
             if sn_type:
                 es += f" de tipo {sn_type}"
                 en += f" of type {sn_type}"
+                # decode the code right here: the hook is the first thing
+                # read, and «tipo II» alone explains nothing (ADR-058)
+                ex = explain.short(explain.sn_type(sn_type))
+                es += f". {ex['es']}"
+                en += f". {ex['en']}"
             if host:
                 es += f" en {host}"
                 en += f" in {host}"
@@ -239,8 +248,10 @@ def _small_body_facts(d):
             txt_en += f", at {st['en']}"
         out.append({"es": txt_es + ".", "en": txt_en + "."})
     if d.get("mag_expected") is not None:
-        out.append({"es": f"Brillo esperado ahora: magnitud {d['mag_expected']:.1f} (ley cometaria M1/K1).",
-                    "en": f"Expected brightness now: magnitude {d['mag_expected']:.1f} (M1/K1 cometary law)."})
+        # the M1/K1 "law" is jargon: say what it means (ADR-058)
+        law = explain.short(explain.COMET_LAW)
+        out.append({"es": f"Brillo esperado ahora: magnitud {d['mag_expected']:.1f}. {law['es']}",
+                    "en": f"Expected brightness now: magnitude {d['mag_expected']:.1f}. {law['en']}"})
     per = els.get("per")
     if per:
         out.append({"es": f"Su «año» dura {per/365.25:.1f} años terrestres.",
@@ -260,8 +271,11 @@ def _unconfirmed_facts(t):
     out = []
     # --- ADR-027: context the planner had for a SN or a comet candidate ---
     if t.get("sn_type"):
-        out.append({"es": f"Tipo de evento: {t['sn_type']}.",
-                    "en": f"Event type: {t['sn_type']}."})
+        # name AND explain: the mini-dossier, so the bullet is not a bare
+        # code (ADR-058)
+        ex = explain.long(explain.sn_type(t["sn_type"]))
+        out.append({"es": f"Tipo de evento: {t['sn_type']}. {ex['es']}",
+                    "en": f"Event type: {t['sn_type']}. {ex['en']}"})
     host = t.get("host")
     if host and str(host).lower() not in ("none", "unknown"):
         out.append({"es": f"Galaxia anfitriona: {host}.",
@@ -311,8 +325,11 @@ def _transient_facts(d):
     sim = d.get("simbad") or {}
     otype = _transient_otype(d)
     if otype:
-        out.append({"es": f"Tipo de evento: {otype}.",
-                    "en": f"Event type: {otype}."})
+        # the mini-dossier (ADR-058): a type name without its meaning is a
+        # half-explanation
+        ex = explain.long(explain.sn_type(otype))
+        out.append({"es": f"Tipo de evento: {otype}. {ex['es']}",
+                    "en": f"Event type: {otype}. {ex['en']}"})
     host = (d.get("host") or {}).get("name")
     if host:
         out.append({"es": f"Galaxia anfitriona: {host}.",
@@ -500,8 +517,12 @@ def _variable_facts(d):
     # @return: bullet list ES/EN
     out = []
     v = d.get("variable") or {}
-    fam, _epoch_min = orbits._variable_family_text(v.get("var_type"))
-    out.append({"es": fam["es"], "en": fam["en"]})
+    # the mini-dossier, composite types included (ADR-058)
+    fam = explain.long(explain.variable_type(v.get("var_type")))
+    vt = (v.get("var_type") or "").strip()
+    label_es = f"Tipo {vt}: " if vt else ""
+    label_en = f"Type {vt}: " if vt else ""
+    out.append({"es": label_es + fam["es"], "en": label_en + fam["en"]})
     per, amp = v.get("period_d"), v.get("amp")
     if amp is None and v.get("max") is not None and v.get("min") is not None:
         amp = v["min"] - v["max"]
@@ -533,15 +554,20 @@ def _sun_facts(d):
                     "en": f"Numbered active regions today: {d['n_regions']}."})
     fl = d.get("flare_7d")
     if fl:
-        out.append({"es": f"Fulguración más intensa de la semana: clase {fl['class']}{fl['value']}.",
-                    "en": f"Strongest flare of the week: class {fl['class']}{fl['value']}."})
+        # the flare class is a code (C/M/X): decode it (ADR-058)
+        fc = explain.short(explain.flare_class(fl["class"]))
+        out.append({"es": f"Fulguración más intensa de la semana: clase "
+                          f"{fl['class']}{fl['value']}. {fc['es']}",
+                    "en": f"Strongest flare of the week: class "
+                          f"{fl['class']}{fl['value']}. {fc['en']}"})
     if d.get("kp") is not None:
         aur = {"possible": ("posibles auroras en latitudes medias",
                             "auroras possible at mid-latitudes"),
                "unlikely": ("sin auroras previstas en latitudes medias",
                             "no mid-latitude auroras expected")}.get(d.get("aurora"), ("", ""))
-        out.append({"es": f"Índice Kp {d['kp']:.1f}: {aur[0]}.",
-                    "en": f"Kp index {d['kp']:.1f}: {aur[1]}."})
+        kp = explain.short(explain.KP_INDEX)
+        out.append({"es": f"Índice Kp {d['kp']:.1f}: {aur[0]}. {kp['es']}",
+                    "en": f"Kp index {d['kp']:.1f}: {aur[1]}. {kp['en']}"})
     return out
 
 

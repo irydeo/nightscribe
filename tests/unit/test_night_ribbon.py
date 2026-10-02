@@ -60,11 +60,17 @@ def test_without_a_site_it_says_so(ribbon):
 
 
 def test_a_bare_night_has_the_window_and_the_moon(ribbon):
+    # The window is tonight's, so the test reads it back from the widget
+    # instead of hard-coding times (the old hard-coded pair only matched
+    # the date the test was written on: it failed on any other night).
+    from nightscribe.core import night_brief as nb
     ribbon.set_site(*MADRID)
     assert ribbon.has_night()
     text = ribbon.caption()
-    assert "19:30" in text and "04:40" in text
-    assert "9.2" in text                # hours of darkness
+    dusk, dawn = ribbon.window()
+    assert nb.local_hhmm(dusk) in text and nb.local_hhmm(dawn) in text
+    assert "Dark" in text
+    assert " h" in text                 # hours of darkness
     assert "%" in text                  # the Moon
     assert "up " not in text            # no object: no arc, no up-window
     ribbon.grab()

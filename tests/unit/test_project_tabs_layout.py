@@ -14,12 +14,12 @@
 """The Object card and the Analysis tabs, measured (the layout side:
 `test_project_tabs.py` covers the tab bar's behaviour).
 
-The acceptance criterion of Interfaz 1.7 (and, since Interfaz 1.8, of all
-four tabs) is written down here as a test: no tab may need a vertical
-scroll at 1360x940 (the usual desktop) nor at 1360x860 (a laptop), with a
-project that has a visit, its frames and a measured curve. That is what the
-slimmer chrome, the two-column Analysis, the chart's own sizeHint and the
-night band are for.
+The acceptance criterion of Interfaz 1.7/1.8 is written down here as a
+test: no WORKING tab may need a vertical scroll at 1360x940 (the usual
+desktop) nor at 1360x860 (a laptop), with a project that has a visit, its
+frames and a measured curve. ADR-057 carved the Object card out of that
+contract: it is a vertical dossier now (hero, KPI strip, section cards)
+and may scroll; Capture, Analysis and Publish keep the no-scroll rule.
 
 Interfaz 1.8 added the hardest case of all: the Capture tab **with CCDciel
 connected**, which is when the observatory status appears and used to land
@@ -145,12 +145,15 @@ def _open(window, tab):
 
 
 def test_neither_tab_scrolls(window):
+    # ADR-057: the Object card ("details") is a vertical dossier now and
+    # MAY scroll (its sections breathe); the no-scroll contract stays for
+    # the working tabs (Capture, Analysis, Publish).
     from PySide6.QtWidgets import QApplication
     for size in ((1360, 940), (1360, 860)):
         window.resize(*size)
         for _ in range(8):
             QApplication.processEvents()
-        for tab in ("details", "analysis"):
+        for tab in ("analysis",):
             _open(window, tab)
             page = window.projects.page_container
             viewport = window.projects.scroll_page.viewport().height()

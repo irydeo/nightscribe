@@ -45,6 +45,7 @@ FAKE_ELEMENT = {
             "sigmas": {"a": 0.0012, "e": 0.008, "i": 0.4},
             "n_resids": 21,
             "arc_days": 14,
+            "disc_date": "2026-08-19",
         },
         # same "h m s" / "+d m s" shape enrich.py emits via
         # coords.ra_deg_to_hms / dec_deg_to_dms (what build_charts parses)
@@ -106,20 +107,21 @@ def _texts(panel):
 
 def _param_cells(panel):
     # @return: the (param, value, meaning) strings of every visible row.
-    #   Interfaz 1.8: the meaning sits UNDER its value, spanning both
-    #   columns (a definition list: as a third column it wrapped to one
-    #   word per line in the half-width column the table lives in now), so
-    #   the table's rows come in pairs.
-    tbl = panel.tbl_params
+    #   ADR-057: the rows live in themed section cards now (definition
+    #   lists), not in the old two-column table; the cards keep the
+    #   (param, value, meaning) triples in rows_text.
     out = []
-    for r in range(0, tbl.rowCount(), 2):
-        name = tbl.item(r, 0)
-        value = tbl.item(r, 1)
-        meaning = tbl.item(r + 1, 0) if r + 1 < tbl.rowCount() else None
-        out.append((name.text() if name else "",
-                    value.text() if value else "",
-                    meaning.text() if meaning else ""))
+    for card in panel._section_cards:
+        out.extend(card.rows_text)
     return out
+
+
+def _tile_texts(panel):
+    # @return: the "value|caption" strings of the KPI strip's tiles
+    #   (ADR-057: the numbers of the old capture-chips row live here)
+    from nightscribe.gui.widgets.kpi_tile import KpiTile
+    return ["|".join(t.texts())
+            for t in panel.kpi_strip.findChildren(KpiTile)]
 
 
 # ---------------- states ----------------
@@ -143,22 +145,16 @@ def test_ready_state_hook_and_params_visible(panel, qapp):
         f"hook is not the narrative hook: {hook!r}"
 
 
-def test_the_band_goes_where_the_charts_are_not(panel, qapp):
-    # Interfaz 1.8: with charts, the band rides above them in the right
-    # column; without them, that column would be empty and the band spans
-    # the page (which is also what lets the table breathe).
+def test_the_band_spans_the_page(panel, qapp):
+    # ADR-057: the dossier is vertical; the band always spans the page,
+    # sitting between the coordinates row and the parameter sections.
     panel.show(FAKE_ELEMENT)
     qapp.processEvents()
     ribbon = panel._ribbon
     vbox = panel.layout()
-    # isHidden(), not isVisible(): an unshown panel reports every child as
-    # not visible, and what matters here is what the panel DECIDED
-    if not panel.grp_charts.isHidden():
-        assert panel._ui.colBodyLayout.indexOf(ribbon) >= 0
-        assert not panel._ui.col_body.isHidden()
-    else:
-        assert vbox.indexOf(ribbon) >= 0
-        assert panel._ui.col_body.isHidden()
+    assert vbox.indexOf(ribbon) >= 0
+    assert vbox.indexOf(ribbon) > vbox.indexOf(panel.row_coords)
+    assert vbox.indexOf(ribbon) < vbox.indexOf(panel.grp_params)
     # and it carries the night's numbers as its tooltip, because the
     # caption is elided in a narrow column
     assert "19:30" in ribbon.toolTip() or "observatory" in ribbon.toolTip()
@@ -188,16 +184,16 @@ def test_ready_params_table_has_meaningful_rows(panel):
 def test_in_depth_toggle_adds_deep_rows(panel):
     panel.show(FAKE_ELEMENT)
     panel.chk_deep.setChecked(False)
-    before = panel.tbl_params.rowCount()
+    before = len(_param_cells(panel))
     panel.chk_deep.setChecked(True)
-    after = panel.tbl_params.rowCount()
+    after = len(_param_cells(panel))
     assert after > before, "checking «in depth» did not add rows"
     params = [r[0].lower() for r in _param_cells(panel)]
     assert any("semi-major" in p or "semieje" in p for p in params), \
         f"deep row missing after toggle: {params}"
     # and un-checking goes back
     panel.chk_deep.setChecked(False)
-    assert panel.tbl_params.rowCount() == before
+    assert len(_param_cells(panel)) == before
 
 
 def test_unconfirmed_object_shows_neofixer_rows(panel):
@@ -538,92 +534,63 @@ def test_nearest_ephemeris_row_picks_closest_to_now():
     assert row["time"] == "2026-Sep-07 22:30"
 
 
-# ---------------- object-card plan, subplan 1: multi-line table ------
+# ---------------- ADR-057: parameter sections --------------------------
 #
-# The "What it means" column wraps and the rows grow to fit the whole
-# explanation (no more vertical clipping); Parameter/Value are capped
-# so a long value cannot starve the explanation column.
+# The single QTableWidget is gone: the rows live in themed section cards
+# (definition lists that wrap and size themselves). These tests pin the
+# grouping, the wrapped explanations and the "In depth" filtering.
 
-def _grow_table(panel, qapp):
-    # Shows the panel at a realistic size so the table lays out with real
-    # column widths — an unshown widget has an arbitrary viewport and the
-    # font metrics depend on which test module created the QApplication.
-    from PySide6.QtWidgets import QWidget
-    panel.resize(900, 800)
-    QWidget.show(panel)     # ObjectPanel.show(e) shadows QWidget.show()
-    qapp.processEvents()
-
-
-def test_params_table_wraps_long_explanations(panel, qapp):
-    _grow_table(panel, qapp)
+def test_params_grouped_in_titled_sections(panel):
+    # FAKE_ELEMENT is a small body: its rows land in the orbit / physical
+    # / provenance sections, in that order, with their translated titles.
     panel.show(FAKE_ELEMENT)
-    qapp.processEvents()
-    tbl = panel.tbl_params
-    assert tbl.wordWrap(), "word wrap must be on for the params table"
-    two_lines = 2 * tbl.fontMetrics().lineSpacing()
-    heights = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    assert max(heights) >= two_lines, \
-        f"no row grew for a long explanation: {heights}"
+    from nightscribe.core import orbits
+    lang = panel._lang()
+    titles = [c.lbl_title.text() for c in panel._section_cards]
+    expect = [orbits.SECTION_TITLES[g][lang]
+              for g in ("orbit", "physical", "provenance")]
+    assert titles == expect, f"section order/titles wrong: {titles!r}"
+    # every row landed somewhere, and no section is empty
+    assert sum(c.row_count() for c in panel._section_cards) \
+        == len(panel._rows)
+    assert all(c.row_count() > 0 for c in panel._section_cards)
 
 
-def test_params_table_column_width_capped(panel):
-    from nightscribe.gui.overview import _PARAM_COL_MAX_W
+def test_section_rows_carry_the_full_explanation(panel):
+    # the "what it means" sentence survives the move to cards, wrapped
     panel.show(FAKE_ELEMENT)
-    tbl = panel.tbl_params
-    for col in (0, 1):
-        assert tbl.columnWidth(col) <= _PARAM_COL_MAX_W, \
-            f"column {col} is {tbl.columnWidth(col)} > {_PARAM_COL_MAX_W}"
+    from PySide6.QtWidgets import QLabel
+    explanations = [r[2] for r in _param_cells(panel)]
+    assert all(len(t) > 40 for t in explanations), \
+        f"explanation too short: {explanations!r}"
+    # and the labels really wrap (no one-word-per-line columns)
+    wraps = [l for c in panel._section_cards
+             for l in c.findChildren(QLabel) if l.wordWrap()]
+    assert wraps, "no wrapped explanation label in the section cards"
 
 
-def test_params_table_rewraps_on_in_depth_toggle(panel, qapp):
-    # toggling «in depth» refills the table: the wrap/resize must run
-    # again so the longer deep explanations are not clipped either
-    _grow_table(panel, qapp)
+def test_in_depth_filters_every_section(panel):
+    # with the switch off, only basic rows survive, in every section
     panel.show(FAKE_ELEMENT)
-    panel.chk_deep.setChecked(True)
-    qapp.processEvents()
-    tbl = panel.tbl_params
-    two_lines = 2 * tbl.fontMetrics().lineSpacing()
-    heights = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    assert max(heights) >= two_lines, \
-        f"deep rows clipped after toggle: {heights}"
+    panel.chk_deep.setChecked(False)
+    basic = _param_cells(panel)
+    params = [r[0].lower() for r in basic]
+    assert any("family" in p or "familia" in p for p in params)
+    assert not any("semi-major" in p or "semieje" in p for p in params), \
+        "deep rows leaked into the basic view"
+    # a section whose rows are ALL deep disappears, it does not stay empty
+    assert all(c.row_count() > 0 for c in panel._section_cards)
 
 
-def test_params_table_rows_follow_window_resize(panel, qapp):
-    # The wrapped rows must re-fit when the window changes width: the
-    # stretch column follows the window and the rows follow the column
-    # (regression: sectionResized fires BEFORE columnWidth() updates,
-    # which used to leave the rows one resize behind).
-    _grow_table(panel, qapp)
+def test_new_provenance_rows(panel):
+    # ADR-057 shows what the card hid before: the discovery date (SBDB)
     panel.show(FAKE_ELEMENT)
-    qapp.processEvents()
-    tbl = panel.tbl_params
-    two_lines = 2 * tbl.fontMetrics().lineSpacing()
-    # The narrow width is the panel's OWN floor, and the wide one is well
-    # clear of it: with a wider font (Windows measures differently) asking
-    # for 500 came back as the minimum, the two widths were the same and the
-    # rows did not move at all (measured 2026-10-01).
-    # The panel's own floor grew with the two-column layout (the charts
-    # have a 300 px minimum), so the narrow width has to clear it: asking
-    # for less than the minimum leaves the widget at the minimum and the two
-    # measurements come back identical.
-    narrow_w = panel.minimumSizeHint().width() + 40
-    wide_w = narrow_w + 400
-    panel.resize(wide_w, 800)
-    qapp.processEvents()
-    wide = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    panel.resize(narrow_w, 800)
-    qapp.processEvents()
-    narrow = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    assert max(narrow) > max(wide), \
-        f"rows did not grow on shrink ({narrow_w} -> {wide_w}): {wide} -> {narrow}"
-    assert max(narrow) > 3 * two_lines, \
-        f"narrow table should wrap to several lines: {narrow}"
-    panel.resize(wide_w + 400, 800)
-    qapp.processEvents()
-    wider = [tbl.rowHeight(r) for r in range(tbl.rowCount())]
-    assert max(wider) < max(narrow), \
-        f"rows did not shrink back on grow: {narrow} -> {wider}"
+    rows = _param_cells(panel)
+    disc = next((r for r in rows
+                 if "discover" in r[0].lower() or "descub" in r[0].lower()),
+                None)
+    assert disc is not None, f"no discovery row: {[r[0] for r in rows]!r}"
+    assert "2026-08-19" in disc[1], f"discovery date missing: {disc[1]!r}"
 
 
 # ---------------- object-card plan, subplan 2: SN parameters table ---
@@ -846,22 +813,34 @@ def test_transit_table_without_event_shows_archive_only(panel):
 # from the enriched data, so they show even without a planner context.
 
 def test_capture_block_sn_type_and_freshness_chips(panel):
-    # SN card: event type + days-since-discovery chips from the data
+    # SN card: event type + days-since-discovery tiles from the data
     from nightscribe.core import orbits
     panel.show(_sn_full_fixture())
-    chips = _chip_texts(panel)
-    assert any("SN Ia" in c for c in chips), f"type chip missing: {chips!r}"
+    tiles = _tile_texts(panel)
+    assert any("SN Ia" in c for c in tiles), f"type tile missing: {tiles!r}"
     days = orbits.days_since("2026/08/30")
-    assert any(c == f"{days} d" for c in chips), \
-        f"freshness chip missing: {chips!r}"
+    assert any(c.startswith(f"{days} d|") for c in tiles), \
+        f"freshness tile missing: {tiles!r}"
+
+
+def test_sn_type_tile_tooltip_explains(panel):
+    # ADR-058: the "Event type" tile shows the code, and its tooltip
+    # explains what the code means, never just «Type of stellar explosion»
+    from nightscribe.gui.widgets.kpi_tile import KpiTile
+    panel.show(_sn_full_fixture())
+    tiles = panel.kpi_strip.findChildren(KpiTile)
+    ev = next(t for t in tiles
+              if t.texts()[1] in ("Event type", "Tipo de evento"))
+    tip = ev.toolTip().lower()
+    assert "enana blanca" in tip or "white dwarf" in tip, ev.toolTip()
 
 
 def test_capture_block_transit_depth_chip(panel):
-    # transit card: the star-dimming chip from the merged ExoClock event
+    # transit card: the star-dimming tile from the merged ExoClock event
     panel.show(_transit_fixture())
-    chips = _chip_texts(panel)
-    assert any("16.4 mmag" in c for c in chips), \
-        f"depth chip missing: {chips!r}"
+    tiles = _tile_texts(panel)
+    assert any("16.4" in c and "mmag" in c.lower() for c in tiles), \
+        f"depth tile missing: {tiles!r}"
 
 
 def _hads_fixture():
@@ -874,23 +853,27 @@ def _hads_fixture():
 
 
 def test_capture_block_hads_chips(panel):
-    # HADS card: period/amplitude/cycles + the programme flags (ADR-034)
+    # HADS card: period/amplitude/cycles tiles + the programme flag pills
+    # (ADR-034; ADR-057 split: numbers are tiles, alerts stay pills)
     panel.show(_hads_fixture())
+    tiles = _tile_texts(panel)
+    assert any("1.46 h" in c for c in tiles), f"period tile: {tiles!r}"
+    assert any("0.5 mag" in c for c in tiles), f"amp tile: {tiles!r}"
+    assert any("×4.2" in c for c in tiles), f"cycles tile: {tiles!r}"
     chips = _chip_texts(panel)
-    assert any("P 1.46 h" in c for c in chips), f"period chip: {chips!r}"
-    assert any("Δ 0.5 mag" in c for c in chips), f"amp chip: {chips!r}"
-    assert any("×4.2" in c for c in chips), f"cycles chip: {chips!r}"
     assert any("Period change" in c for c in chips), f"priority: {chips!r}"
     assert any("Multiperiodic" in c for c in chips), f"multi: {chips!r}"
 
 
 def test_capture_block_extras_omit_missing(panel):
-    # bare SN (host name only, no context): no invented chips — the row
-    # hides itself entirely, same «omit what is missing» rule
+    # bare SN (host name only, no context): no invented tiles or flags —
+    # both rows hide themselves, same «omit what is missing» rule
     panel.show(_sn_fixture())
     assert panel.state() == "ready"
     assert panel.row_capture.isHidden()
     assert _chip_texts(panel) == []
+    assert panel.kpi_strip.isHidden()
+    assert _tile_texts(panel) == []
 
 
 # ---------------- D3: capture / window block ----------------
@@ -903,7 +886,8 @@ def test_capture_block_extras_omit_missing(panel):
 # slot lines entirely offline.
 
 def _chip_texts(panel):
-    # @return: the visible chip labels, in order (skips the trailing stretch)
+    # @return: the visible flag-pill labels, in order (ADR-057: the flags
+    #   row keeps only alerts; the numbers moved to the KPI strip)
     from PySide6.QtWidgets import QLabel
     return [w.text() for w in panel.row_capture.findChildren(QLabel)
             if w.text().strip()]
@@ -924,7 +908,7 @@ def _sn_fixture():
 
 
 def test_capture_block_sn_no_rate_exposure(panel):
-    # An SN: mag + window apply, but the rate and max-exposure chips are
+    # An SN: mag + window apply, but the rate and max-exposure tiles are
     # gated to neo/pccp, so they are omitted — even when a rate is present in
     # the context (the "con sn: sin tasa/exposición" rule).
     ctx = {
@@ -937,16 +921,16 @@ def test_capture_block_sn_no_rate_exposure(panel):
     }
     panel.show(_sn_fixture(), ctx)
     assert panel.state() == "ready"
-    assert not panel.row_capture.isHidden()
-    chips = _chip_texts(panel)
-    assert any("14.2" in c for c in chips), f"mag chip missing: {chips!r}"
-    assert any("21:00" in c and "23:30" in c for c in chips), \
-        f"window chip missing: {chips!r}"
-    assert any("2.5 h" in c for c in chips), f"hours chip missing: {chips!r}"
-    assert not any("″/min" in c for c in chips), \
-        f"rate must be omitted for an SN: {chips!r}"
-    assert not any("max" in c.lower() for c in chips), \
-        f"exposure must be omitted for an SN: {chips!r}"
+    assert not panel.kpi_strip.isHidden()
+    tiles = _tile_texts(panel)
+    assert any("14.2" in c for c in tiles), f"mag tile missing: {tiles!r}"
+    assert any("21:00" in c and "23:30" in c for c in tiles), \
+        f"window tile missing: {tiles!r}"
+    assert any("2.5 h" in c for c in tiles), f"hours tile missing: {tiles!r}"
+    assert not any("″/min" in c for c in tiles), \
+        f"rate must be omitted for an SN: {tiles!r}"
+    assert not any("max exposure" in c.lower() for c in tiles), \
+        f"exposure must be omitted for an SN: {tiles!r}"
 
 
 def test_capture_block_full_neo_chips(panel):
@@ -961,22 +945,22 @@ def test_capture_block_full_neo_chips(panel):
     }
     panel.show(FAKE_ELEMENT, ctx)
     assert panel.state() == "ready"
-    assert not panel.row_capture.isHidden()
-    chips = _chip_texts(panel)
+    assert not panel.kpi_strip.isHidden()
+    tiles = _tile_texts(panel)
     # magnitude
-    assert any("19.5" in c for c in chips), f"mag chip missing: {chips!r}"
+    assert any("19.5" in c for c in tiles), f"mag tile missing: {tiles!r}"
     # rate ″/min
-    assert any("″/min" in c for c in chips), f"rate chip missing: {chips!r}"
+    assert any("″/min" in c for c in tiles), f"rate tile missing: {tiles!r}"
     # window HH:MM–HH:MM
-    assert any("21:00" in c and "23:30" in c for c in chips), \
-        f"window chip missing: {chips!r}"
+    assert any("21:00" in c and "23:30" in c for c in tiles), \
+        f"window tile missing: {tiles!r}"
     # hours above
-    assert any("2.5 h" in c for c in chips), f"hours chip missing: {chips!r}"
+    assert any("2.5 h" in c for c in tiles), f"hours tile missing: {tiles!r}"
 
 
 def test_capture_block_neo_max_exposure_present(panel):
     # A NEO with a rate and a complete camera profile gets a max no-trail
-    # exposure chip (the whole point of the camera profile for NEOs).
+    # exposure tile (the whole point of the camera profile for NEOs).
     from nightscribe.config import config
     saved = (config.get("pixel_um"), config.get("focal_mm"))
     config._data["pixel_um"] = 3.76
@@ -986,20 +970,24 @@ def test_capture_block_neo_max_exposure_present(panel):
                                   "rate_arcsec_min": 12.0})
     finally:
         config._data["pixel_um"], config._data["focal_mm"] = saved
-    chips = _chip_texts(panel)
-    assert any("max" in c.lower() for c in chips), \
-        f"max-exposure chip missing for a NEO with a rate: {chips!r}"
-    # and the rate chip is present alongside it
-    assert any("″/min" in c for c in chips), f"rate chip missing: {chips!r}"
+    tiles = _tile_texts(panel)
+    assert any("max exposure" in c.lower() for c in tiles), \
+        f"max-exposure tile missing for a NEO with a rate: {tiles!r}"
+    # and the rate tile is present alongside it
+    assert any("″/min" in c for c in tiles), f"rate tile missing: {tiles!r}"
 
 
 def test_capture_block_empty_ctx_does_not_break(panel):
-    # show() with a valid payload and an empty/None context: the block hides
-    # itself instead of raising, and the rest of the panel stays ready.
+    # show() with a valid payload and an empty/None context: no crash, the
+    # panel stays ready. ADR-057: the enriched dict's own magnitude still
+    # feeds a tile (the dossier shows what it knows), but there are no
+    # flags without a context.
     panel.show(FAKE_ELEMENT, {})
     assert panel.state() == "ready"
     assert panel.row_capture.isHidden()
     assert _chip_texts(panel) == []
+    assert any("19.8" in t for t in _tile_texts(panel)), \
+        "the enriched mag should feed the strip even without a context"
     # again with no context at all (the D3 «no rompe con ctx vacío» rule)
     panel.show(FAKE_ELEMENT, None)
     assert panel.state() == "ready"
@@ -1018,20 +1006,20 @@ def test_capture_block_pccp_omits_rate_when_missing(panel):
     }
     panel.show(FAKE_UNCONFIRMED, ctx)
     assert panel.state() == "ready"
-    assert not panel.row_capture.isHidden()
-    chips = _chip_texts(panel)
-    assert any("20.2" in c for c in chips), f"mag chip missing: {chips!r}"
-    assert any("20:00" in c and "22:00" in c for c in chips), \
-        f"window chip missing: {chips!r}"
-    assert any("2.0 h" in c for c in chips), f"hours chip missing: {chips!r}"
-    assert not any("″/min" in c for c in chips), \
-        f"rate must be omitted without a rate: {chips!r}"
-    assert not any("max" in c.lower() for c in chips), \
-        f"exposure must be omitted without a rate: {chips!r}"
+    assert not panel.kpi_strip.isHidden()
+    tiles = _tile_texts(panel)
+    assert any("20.2" in c for c in tiles), f"mag tile missing: {tiles!r}"
+    assert any("20:00" in c and "22:00" in c for c in tiles), \
+        f"window tile missing: {tiles!r}"
+    assert any("2.0 h" in c for c in tiles), f"hours tile missing: {tiles!r}"
+    assert not any("″/min" in c for c in tiles), \
+        f"rate must be omitted without a rate: {tiles!r}"
+    assert not any("max exposure" in c.lower() for c in tiles), \
+        f"exposure must be omitted without a rate: {tiles!r}"
 
 
 def test_capture_block_safe_window_chip(panel):
-    # (ADR-020) a saved capture plan computes a safe window: the chip shows
+    # (ADR-020) a saved capture plan computes a safe window: the tile shows
     # the safe span plus the latest-safe-start, and the red warning is absent.
     ctx = {
         "kind": "neo",
@@ -1043,19 +1031,19 @@ def test_capture_block_safe_window_chip(panel):
         "duration_s": 7200,
     }
     panel.show(FAKE_ELEMENT, ctx)
-    assert not panel.row_capture.isHidden()
-    chips = _chip_texts(panel)
-    assert any("02:00" in c and "04:00" in c for c in chips), \
-        f"safe window chip missing: {chips!r}"
-    assert any("≤ 02:30" in c for c in chips), \
-        f"latest-safe-start missing: {chips!r}"
-    assert not any("does not fit" in c.lower() for c in chips), \
-        f"must not warn when it fits: {chips!r}"
+    assert not panel.kpi_strip.isHidden()
+    tiles = _tile_texts(panel)
+    assert any("02:00" in c and "04:00" in c for c in tiles), \
+        f"safe window tile missing: {tiles!r}"
+    assert any("≤ 02:30" in c for c in tiles), \
+        f"latest-safe-start missing: {tiles!r}"
+    assert not any("does not fit" in c.lower() for c in tiles), \
+        f"must not warn when it fits: {tiles!r}"
 
 
 def test_capture_block_does_not_fit_red_chip(panel):
     # (ADR-020) a session is planned but it does not fit: the one red safety
-    # warning appears, and (because there is no safe span) no green chip.
+    # tile appears FIRST (it must never scroll off), and no green safe tile.
     ctx = {
         "kind": "neo",
         "mag": 19.5,
@@ -1064,17 +1052,20 @@ def test_capture_block_does_not_fit_red_chip(panel):
         "duration_s": 7200,
     }
     panel.show(FAKE_ELEMENT, ctx)
-    assert not panel.row_capture.isHidden()
-    chips = _chip_texts(panel)
-    assert any("does not fit" in c.lower() and "120 min" in c for c in chips), \
-        f"red 'does not fit' chip missing: {chips!r}"
-    assert not any("≤" in c for c in chips), \
-        f"no latest-safe-start when the session does not fit: {chips!r}"
+    assert not panel.kpi_strip.isHidden()
+    tiles = _tile_texts(panel)
+    assert any("does not fit" in c.lower() and "120 min" in c
+               for c in tiles), \
+        f"red 'does not fit' tile missing: {tiles!r}"
+    assert tiles[0].startswith("⚠"), \
+        f"the safety tile must lead the strip: {tiles!r}"
+    assert not any("≤" in c for c in tiles), \
+        f"no latest-safe-start when the session does not fit: {tiles!r}"
 
 
 def test_capture_block_no_plan_no_safe_chips(panel):
-    # (ADR-020) no capture plan saved: the safe-window and red chips are
-    # absent (the plain window/hours chips are the whole block).
+    # (ADR-020) no capture plan saved: the safe-window and red tiles are
+    # absent (the plain window/hours tiles are the whole block).
     ctx = {
         "kind": "neo",
         "mag": 19.5,
@@ -1082,11 +1073,11 @@ def test_capture_block_no_plan_no_safe_chips(panel):
         "window_end": "2026-08-26T23:30:00+02:00",
     }
     panel.show(FAKE_ELEMENT, ctx)
-    chips = _chip_texts(panel)
-    assert not any("≤" in c for c in chips), \
-        f"no latest-safe-start without a plan: {chips!r}"
-    assert not any("does not fit" in c.lower() for c in chips), \
-        f"no warning without a plan: {chips!r}"
+    tiles = _tile_texts(panel)
+    assert not any("≤" in c for c in tiles), \
+        f"no latest-safe-start without a plan: {tiles!r}"
+    assert not any("does not fit" in c.lower() for c in tiles), \
+        f"no warning without a plan: {tiles!r}"
 
 
 # ---------------- phase E (corrected 2026-09-02): the single CTA -------
@@ -1315,17 +1306,15 @@ def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
         assert p2.btn_project.toolTip() == (
             "Reanudar el proyecto activo de este objeto")
         p2.deleteLater()
-        # Interfaz 1.7: the block is a frame with its own header row
+        # Interfaz 1.7: the block keeps its own header row (ADR-057: the
+        # sections under it are cards now, not a table)
         assert p._ui.lbl_params_title.text() == "Parámetros"
         assert p.chk_deep.text() == "A fondo"
         assert p.grp_charts.title() == "Gráficos"
-        tbl = p.tbl_params
-        assert tbl.horizontalHeaderItem(0).text() == "Parámetro"
-        assert tbl.horizontalHeaderItem(1).text() == "Valor"
-        # Interfaz 1.8: two columns, and the explanation is the row BELOW
-        # its value (a third column wrapped to one word per line here)
-        assert tbl.columnCount() == 2
-        assert tbl.horizontalHeaderItem(2) is None
+        # ADR-057: the rows live in titled section cards, translated too
+        assert any(c.lbl_title.text() == "Órbita"
+                   for c in p._section_cards), \
+            f"section titles not translated: {[c.lbl_title.text() for c in p._section_cards]!r}"
         # capture chips (D3) come from the context; show() paints them
         p.show(FAKE_ELEMENT, {"kind": "neo", "mag": 20.1,
                               "rate_arcsec_min": 12.4,
@@ -1629,11 +1618,7 @@ FAKE_VARIABLE = {
 
 def test_variable_params_table(panel):
     panel.show(FAKE_VARIABLE)
-    texts = []
-    for r in range(panel.tbl_params.rowCount()):
-        p = panel.tbl_params.item(r, 0)
-        if p:
-            texts.append(p.text())
+    texts = [r[0] for r in _param_cells(panel)]
     assert any("Period" in t or "Periodo" in t for t in texts)
     assert any("Variable type" in t or "Tipo de variable" in t
                for t in texts)
@@ -1646,7 +1631,9 @@ def test_variable_chips(panel):
     # fallback: walk the whole panel for chip labels
     if not labels:
         labels = [l.text() for l in panel.findChildren(QLabel)]
-    assert any("P 227.6 d" in t for t in labels)
+    # ADR-057: the period is a KPI tile (value + "Period" caption), the
+    # campaign stays a flag pill
+    assert any("227.6 d" in t for t in labels)
     assert any("Campaña T CrB" in t for t in labels)
 
 

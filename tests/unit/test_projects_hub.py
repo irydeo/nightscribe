@@ -260,14 +260,15 @@ def test_select_project_drives_panel(window, panel):
 def test_panel_carries_project_context_chips(window, panel):
     _create_and_select(window, "neo", "chips-target", NEO_CTX)
     assert panel.state() == "ready"
-    assert not panel.row_capture.isHidden()
+    # ADR-057: the context numbers are KPI tiles now, not chips
+    assert not panel.kpi_strip.isHidden()
     from PySide6.QtWidgets import QLabel
-    chips = [w.text() for w in panel.row_capture.findChildren(QLabel)
+    tiles = [w.text() for w in panel.kpi_strip.findChildren(QLabel)
              if w.text().strip()]
-    assert any("19.5" in c for c in chips), f"mag chip missing: {chips!r}"
-    assert any("12.0" in c for c in chips), f"rate chip missing: {chips!r}"
-    assert any("21:00" in c and "23:30" in c for c in chips), \
-        f"window chip missing: {chips!r}"
+    assert any("19.5" in c for c in tiles), f"mag tile missing: {tiles!r}"
+    assert any("12.0" in c for c in tiles), f"rate tile missing: {tiles!r}"
+    assert any("21:00" in c and "23:30" in c for c in tiles), \
+        f"window tile missing: {tiles!r}"
 
 
 def test_select_missing_object_is_not_found(window):

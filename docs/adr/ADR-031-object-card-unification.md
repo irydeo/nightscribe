@@ -2,6 +2,13 @@
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-09-07
 
+> **Enmienda / Amendment (2026-10-02)**: la ficha se rediseña como dossier
+> en ADR-057 (hero con anillo de score, tira KPI, secciones temáticas);
+> la tabla única y la fila de chips de captura de esta ADR quedan
+> sustituidas. / The card is redesigned as a dossier in ADR-057 (hero
+> with score ring, KPI strip, themed sections); this ADR's single table
+> and capture-chips row are superseded.
+
 ## Español
 
 **Contexto**: la ficha de objeto (`gui/overview.py::ObjectPanel`, compartida por el

@@ -1,13 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
   Object panel (the project card's fixed object block, ADR-019; the
-  object-card unification): the state line, hook, coordinates row,
-  facts, capture chips row, parameters table and charts tabs, plus the
-  single CTA. Loaded by gui/overview.py through gui/ui_loader.py. Every
-  block starts hidden: the panel's states (empty/loading/missing/ready)
-  show them, in code. The block skins come from theme.py constants
-  (applied in code); the coords button's "⧉" glyph, the chips, the
-  table's rows and the chart tabs' contents are all data (ADR-005).
+  object-card unification, ADR-031; the dossier redesign, ADR-057): the
+  state line, the hero (identity + score), the facts line, the "tonight"
+  KPI strip, the alert-flags row, the coordinates row, the night ribbon,
+  the parameter sections (one card per theme) with the "In depth" toggle,
+  the charts tabs and the single CTA. Loaded by gui/overview.py through
+  gui/ui_loader.py. Every block starts hidden (or empty): the panel's
+  states (empty/loading/missing/ready) show them, in code. The hero, the
+  ribbon, the KPI tiles and the section cards are custom widgets and
+  never enter this file: placeholders mark their slots (ADR-005). Since
+  ADR-057 the panel is a vertical dossier and may scroll; the 4 px
+  no-scroll rhythm of Interfaz 1.8 is gone with the two-column layout.
 -->
 <ui version="4.0">
  <class>ObjectPanel</class>
@@ -17,12 +21,42 @@
    <property name="topMargin"><number>0</number></property>
    <property name="rightMargin"><number>0</number></property>
    <property name="bottomMargin"><number>0</number></property>
-   <!-- Interfaz 1.8: a 4 px rhythm, not the default 6. The card carries the
-        hook, the facts, the night band and a table now; two px between each
-        of them is the difference between fitting a 860 px window and not. -->
-   <property name="spacing"><number>4</number></property>
+   <!-- ADR-057: an 8 px breathing rhythm. The dossier scrolls when it has
+        to; it no longer fights for every pixel of a 860 px window. -->
+   <property name="spacing"><number>8</number></property>
    <item><widget class="QLabel" name="lbl_state"><property name="text"><string/></property><property name="visible"><bool>false</bool></property></widget></item>
-   <item><widget class="QLabel" name="lbl_hook"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+   <item>
+    <!-- the hero (identity + score ring, widgets/object_hero.py) -->
+    <widget class="QWidget" name="heroHost"/>
+   </item>
+   <item><widget class="QLabel" name="lbl_facts"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
+   <item>
+    <!-- the "tonight" strip: KPI tiles are data, added in code -->
+    <widget class="QFrame" name="kpi_strip">
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QHBoxLayout" name="kpi_lay">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>8</number></property>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <!-- alert flags (period change, campaign, does-not-fit...): data -->
+    <widget class="QFrame" name="row_capture">
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QHBoxLayout" name="chips">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>8</number></property>
+      <item><spacer name="hsp_chips"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+     </layout>
+    </widget>
+   </item>
    <item>
     <widget class="QFrame" name="row_coords">
      <property name="visible"><bool>false</bool></property>
@@ -38,128 +72,56 @@
     </widget>
    </item>
    <item>
-    <!-- Interfaz 1.8: the sentences and the numbers on ONE row. As
-         two stacked blocks they cost 82 px for 54 px of content, and
-         the card shares its height with a chart now. -->
-    <layout class="QHBoxLayout" name="row_facts">
-     <property name="spacing"><number>10</number></property>
-      <item><widget class="QLabel" name="lbl_facts"><property name="text"><string/></property><property name="wordWrap"><bool>true</bool></property><property name="visible"><bool>false</bool></property></widget></item>
-      <item>
-       <widget class="QFrame" name="row_capture">
-        <property name="visible"><bool>false</bool></property>
-        <layout class="QHBoxLayout" name="chips">
-         <property name="leftMargin"><number>10</number></property>
-         <property name="topMargin"><number>6</number></property>
-         <property name="rightMargin"><number>10</number></property>
-         <property name="bottomMargin"><number>6</number></property>
-         <property name="spacing"><number>8</number></property>
-         <item><spacer name="hsp_chips"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-        </layout>
-       </widget>
-      </item>
-    </layout>
+    <!-- the night of this object, drawn (night_ribbon.py), full width -->
+    <widget class="QWidget" name="ribbonHost"/>
    </item>
    <item>
-    <!-- Interfaz 1.8: the numbers and the pictures, side by side.
-         Stacked they asked for ~800 px in a 530 px page (the card
-         scrolled) and left the right half of a 780 px page empty;
-         together they fill it, and the chart takes the height the
-         table does not need. -->
-    <layout class="QHBoxLayout" name="row_body">
-     <property name="spacing"><number>10</number></property>
-     <item>
-          <widget class="QFrame" name="grp_params" native="true">
-           <property name="visible"><bool>false</bool></property>
-           <layout class="QVBoxLayout" name="vbox_params">
-            <property name="leftMargin"><number>9</number></property>
-            <property name="topMargin"><number>6</number></property>
-            <property name="rightMargin"><number>9</number></property>
-            <property name="bottomMargin"><number>6</number></property>
-            <property name="spacing"><number>4</number></property>
-            <item>
-             <layout class="QHBoxLayout" name="row_deep">
-              <item><widget class="QLabel" name="lbl_params_title"><property name="text"><string>Parameters</string></property></widget></item>
-              <item><spacer name="hsp_deep"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-              <item><widget class="QCheckBox" name="chk_deep"><property name="text"><string>In depth</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Show every derived parameter, not only the ones that decide the observation</string></property></widget></item>
-             </layout>
-            </item>
-            <item>
-             <widget class="QTableWidget" name="tbl_params">
-              <!-- Interfaz 1.8: TWO columns, not three. The table shares
-                   its row with the charts now, and a 180 px "what it
-                   means" column wraps a sentence to one word per line
-                   (measured on the real card). The explanation goes UNDER
-                   each value, spanning both columns: a definition list,
-                   which is what this is. -->
-              <property name="columnCount"><number>2</number></property>
-              <property name="editTriggers"><set>QAbstractItemView::NoEditTriggers</set></property>
-              <property name="selectionBehavior"><enum>QAbstractItemView::SelectRows</enum></property>
-              <property name="selectionMode"><enum>QAbstractItemView::SingleSelection</enum></property>
-              <property name="wordWrap"><bool>true</bool></property>
-              <property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Preferred"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property>
-              <attribute name="verticalHeaderVisible"><bool>false</bool></attribute>
-              <column><property name="text"><string>Parameter</string></property></column>
-              <column><property name="text"><string>Value</string></property></column>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-     </item>
-     <item>
-      <widget class="QWidget" name="col_body">
-       <layout class="QVBoxLayout" name="colBodyLayout">
-        <property name="leftMargin"><number>0</number></property>
-        <property name="topMargin"><number>0</number></property>
-        <property name="rightMargin"><number>0</number></property>
-        <property name="bottomMargin"><number>0</number></property>
-        <property name="spacing"><number>6</number></property>
-         <item>
-          <!-- the night of this object, drawn: the dark window, its
-               altitude arc and the Moon (night_ribbon.py) -->
-          <widget class="QWidget" name="ribbonHost"/>
-         </item>
-         <item>
-          <widget class="QGroupBox" name="grp_charts">
-           <property name="title"><string>Charts</string></property>
-           <property name="visible"><bool>false</bool></property>
-           <layout class="QVBoxLayout" name="vbox_charts">
-            <property name="leftMargin"><number>6</number></property>
-            <property name="topMargin"><number>4</number></property>
-            <property name="rightMargin"><number>6</number></property>
-            <property name="bottomMargin"><number>6</number></property>
-            <item>
-             <widget class="QTabWidget" name="tabs_charts">
-              <property name="tabBarAutoHide"><bool>true</bool></property>
-              <property name="documentMode"><bool>true</bool></property>
-              <!-- Interfaz 1.8: 300x240 instead of 480x340. The charts share
-                   their row with the parameters table now; a minimum that
-                   big forced the page wider than the window. -->
-              <property name="minimumSize"><size><width>300</width><height>240</height></size></property>
-             </widget>
-            </item>
-           </layout>
-          </widget>
-         </item>
-         <item>
-          <!-- Interfaz 1.8: the slack goes HERE, at the bottom of the right
-               column. Without it, a card whose charts are hidden (an object
-               with no data yet) left the band floating in the middle of the
-               column instead of sitting at the top, under the facts. -->
-          <spacer name="vsp_body">
-           <property name="orientation"><enum>Qt::Vertical</enum></property>
-           <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
-          </spacer>
-         </item>
-        </layout>
-      </widget>
-     </item>
-    </layout>
+    <!-- the parameters header: title + the "In depth" switch; the section
+         cards themselves are built in code under sectionsHost -->
+    <widget class="QWidget" name="grp_params" native="true">
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QHBoxLayout" name="row_deep">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <item><widget class="QLabel" name="lbl_params_title"><property name="text"><string>Parameters</string></property></widget></item>
+      <item><spacer name="hsp_deep"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+      <item><widget class="QCheckBox" name="chk_deep"><property name="text"><string>In depth</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Show every derived parameter, not only the ones that decide the observation</string></property></widget></item>
+     </layout>
+    </widget>
    </item>
-   <!-- Interfaz 1.7: EXPANDING, not Fixed. As a fixed 6 px spacer it did not
-        absorb the slack of a tall card, so the layout shared it out among
-        the labels (the hook grew to 147 px) and squeezed the parameters
-        table into its own scrollbar. -->
-    <item><spacer name="vsp_cta"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Expanding</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>6</height></size></property></spacer></item>
+   <item>
+    <widget class="QWidget" name="sectionsHost">
+     <layout class="QVBoxLayout" name="sections_lay">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <property name="spacing"><number>8</number></property>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="grp_charts">
+     <property name="title"><string>Charts</string></property>
+     <property name="visible"><bool>false</bool></property>
+     <layout class="QVBoxLayout" name="vbox_charts">
+      <property name="leftMargin"><number>6</number></property>
+      <property name="topMargin"><number>4</number></property>
+      <property name="rightMargin"><number>6</number></property>
+      <property name="bottomMargin"><number>6</number></property>
+      <item>
+       <widget class="QTabWidget" name="tabs_charts">
+        <property name="tabBarAutoHide"><bool>true</bool></property>
+        <property name="documentMode"><bool>true</bool></property>
+        <property name="minimumSize"><size><width>300</width><height>240</height></size></property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item><spacer name="vsp_cta"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Expanding</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>6</height></size></property></spacer></item>
    <item><widget class="QPushButton" name="btn_project"><property name="text"><string>Create project</string></property><property name="minimumSize"><size><width>0</width><height>46</height></size></property><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property><property name="visible"><bool>false</bool></property></widget></item>
   </layout>
  </widget>

@@ -71,3 +71,20 @@ class KpiTile(QFrame):
     def texts(self):
         # @return: (value, caption) — the test-facing readout
         return self.lbl_value.text(), self.lbl_caption.text()
+
+    def set_value(self, value):
+        # Live update of the big number (the plan strip recomputes on every
+        # spin change): a tile that cannot be updated would force a rebuild.
+        # @args: value - the new value text
+        self.lbl_value.setText(value)
+
+    def set_caption(self, caption):
+        # @args: caption - the new caption text
+        self.lbl_caption.setText(caption)
+
+    def set_accent(self, accent):
+        # Repaints the tile in another hue (the verdict flips green/amber):
+        # the spine and the value colour move together, as they do at birth.
+        # @args: accent - a hex hue, or None for the neutral text colour
+        self.setStyleSheet(theme.kpi_tile_style(accent))
+        self.lbl_value.setStyleSheet(f"color: {accent or theme.C_TEXT};")

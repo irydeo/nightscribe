@@ -29,6 +29,45 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout
 from .. import theme
 
 
+class PanelCard(QFrame):
+    # The generic sibling of SectionCard: a titled card whose body holds
+    # ARBITRARY content (forms, button rows, custom widgets), not only
+    # definition-list rows. Capture groups its control blocks in these
+    # (ADR-059) so the page reads as cards instead of a wall of QGroupBox
+    # chrome; the skin is the same, so the dossier and the console share
+    # one voice.
+
+    def __init__(self, title, accent, parent=None):
+        # @args: title - the card's translated title, accent - the project
+        #        kind hue (spine + title), parent - widget
+        super().__init__(parent)
+        self.setObjectName("sectionCard")
+        self.setStyleSheet(theme.section_card_style(accent))
+        self._accent = accent
+
+        lay = QVBoxLayout(self)
+        # Capture must stay scroll-free at 1360x860 with CCDciel connected
+        # (the Interfaz 1.8 contract): a 6/6/4 rhythm is what fits four
+        # cards plus the summary strip in that viewport (measured).
+        lay.setContentsMargins(12, 6, 12, 6)
+        lay.setSpacing(4)
+
+        self.lbl_title = QLabel(title)
+        font = QFont(self.font())
+        font.setPixelSize(11)
+        font.setBold(True)
+        font.setLetterSpacing(QFont.AbsoluteSpacing, 1.0)
+        self.lbl_title.setFont(font)
+        self.lbl_title.setStyleSheet(f"color: {accent};")
+        lay.addWidget(self.lbl_title)
+
+        # the caller adds its widgets/layouts here
+        self.body = QVBoxLayout()
+        self.body.setContentsMargins(0, 2, 0, 0)
+        self.body.setSpacing(5)
+        lay.addLayout(self.body)
+
+
 class SectionCard(QFrame):
     # A titled card holding one group of parameter rows.
 

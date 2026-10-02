@@ -208,6 +208,25 @@ def test_capture_fits_with_ccdciel_connected(window):
         f"{page.sizeHint().height()} px in {viewport}")
 
 
+def test_capture_summary_strip_reads_the_plan(window):
+    # ADR-059: the Capture console opens with a summary strip (integration,
+    # filter, dawn verdict) and its blocks live in titled PanelCards.
+    from nightscribe.gui.widgets.kpi_tile import KpiTile
+    from nightscribe.gui.widgets.section_card import PanelCard
+    _open(window, "capture")
+    page = window.projects.page_container
+    tiles = {t.texts()[1]: t
+             for t in page.findChildren(KpiTile)}
+    assert {"Integration", "Filter", "Before dawn"} <= set(tiles), tiles
+    # the default plan is 30 × 60 s: the strip must say so (not "—")
+    assert tiles["Integration"].texts()[0].endswith(("min", "h")), \
+        tiles["Integration"].texts()
+    assert tiles["Before dawn"].texts()[0] in ("fits", "does not fit", "—")
+    titles = [c.lbl_title.text() for c in page.findChildren(PanelCard)]
+    assert any("Exposure plan" in t for t in titles), titles
+    assert any("Telescope and camera" in t for t in titles), titles
+
+
 def test_the_project_chrome_is_three_rows(window):
     # the four small buttons and the context line live in the masthead row
     # now, and the "next" band is a plain frame (no group title)

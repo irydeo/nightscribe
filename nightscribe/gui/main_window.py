@@ -4565,14 +4565,34 @@ class MainWindow(QMainWindow):
         self._build_project_page(p)
 
     def _build_plan_tab(self, p, kind, ctx):
-        # Plan & Captura (ADR-030): the session plan (frames/exposure/filter),
-        # the calibration frames, the CCDciel/NINA/CSV export and the NEO
-        # ephemeris export all live in this single step.
+        # Plan & Captura (ADR-030), laid out as a mission console
+        # (ADR-059): a summary strip, the night drawn as a flight strip,
+        # and the plan grouped in cards (exposure, type block, sequence,
+        # telescope) so the page reads as cards instead of floating labels
+        # and QGroupBox chrome. Behaviour, widget keys and autosave are
+        # untouched.
+        from .widgets.section_card import PanelCard
         layout = self._step_section("plan")
-        # common: capture plan inputs
-        layout.addWidget(QLabel(self.tr("Capture plan")))
-        form = QFrame()
-        form_layout = QVBoxLayout(form)
+        accent = theme.KIND_COLORS.get(kind, theme.C_ACCENT)
+
+        # the summary strip: integration, filter and the dawn verdict, the
+        # three numbers the observer reads before touching anything
+        self._plan_summary_strip(layout, accent)
+
+        # Interfaz 1.8: the plan DRAWN on the night it happens in. The same
+        # band the Ficha uses for the object, here carrying the plan's own
+        # duration as a block inside the dark window and the verdict the
+        # observer actually asks ("does it fit before dawn?"). It is the
+        # Welcome hero's trick: a picture of YOUR night, with real numbers.
+        from .widgets.night_ribbon import NightRibbon
+        ribbon = NightRibbon()
+        layout.addWidget(ribbon)
+        self._project_widgets["plan_ribbon"] = ribbon
+
+        # --- card: exposure plan (frames / exposure / filter) -----------
+        card = PanelCard(self.tr("Exposure plan"), accent)
+        layout.addWidget(card)
+        body = card.body
         row = QHBoxLayout()
         row.addWidget(QLabel(self.tr("Frames:")))
         spn = PassiveSpinBox(); spn.setMinimum(1); spn.setMaximum(999); spn.setValue(30)
@@ -4586,22 +4606,14 @@ class MainWindow(QMainWindow):
         for f in ("L", "R", "G", "B", "Ha", "OIII", "SII"):
             cmb_f.addItem(f)
         row.addWidget(cmb_f)
-        form_layout.addLayout(row)
-        layout.addWidget(form)
-
-        # Interfaz 1.8: the plan DRAWN on the night it happens in. The same
-        # band the Ficha uses for the object, here carrying the plan's own
-        # duration as a block inside the dark window and the verdict the
-        # observer actually asks ("does it fit before dawn?"). It is the
-        # Welcome hero's trick: a picture of YOUR night, with real numbers.
-        from .widgets.night_ribbon import NightRibbon
-        ribbon = NightRibbon()
-        layout.addWidget(ribbon)
-        self._project_widgets["plan_ribbon"] = ribbon
+        body.addLayout(row)
         self._project_widgets["plan_spins"] = (spn, spn_exp, cmb_f)
         for widget in (spn, spn_exp):
             widget.valueChanged.connect(
                 lambda _v: self._plan_ribbon_refresh(p, ctx))
+        # the filter also feeds the summary strip
+        cmb_f.currentIndexChanged.connect(
+            lambda _i: self._plan_ribbon_refresh(p, ctx))
         self._plan_ribbon_refresh(p, ctx)
 
         # NEO: exposure calculator
@@ -4611,7 +4623,7 @@ class MainWindow(QMainWindow):
                                           config.get("focal_mm"))
             t_max = exposure.max_exposure_no_trail(ctx["rate_arcsec_min"], scale)
             if t_max:
-                layout.addWidget(QLabel(
+                body.addWidget(QLabel(
                     f"<small>{self.tr('Max exposure (no trail)')}: "
                     f"{t_max:.0f}s · {self.tr('plate scale')}: "
                     f"{scale:.2f}″/px · {self.tr('rate')}: "
@@ -4667,13 +4679,18 @@ class MainWindow(QMainWindow):
         self._project_widgets["spn_darks"] = spn_darks
         self._project_widgets["spn_darkexp"] = spn_darkexp
         self._project_widgets["spn_bias"] = spn_bias
+
+        # --- card: sequence (multi-filter rows + exports) ---------------
+        seq_card = PanelCard(self.tr("Sequence"), accent)
+        layout.addWidget(seq_card)
+        sbody = seq_card.body
         # B8/Track V: SN and variable exposure hint
         # by brightness + multi-filter step rows
         if kind in ("sn", "variable") and ctx.get("mag") is not None:
             from ..core import exposure
             sn_exp = exposure.recommended_sn_exposure(ctx["mag"])
             if sn_exp:
-                layout.addWidget(QLabel(
+                sbody.addWidget(QLabel(
                     f"<small>{self.tr('Recommended exposure')}: "
                     f"{sn_exp}s · {self.tr('mag')} {ctx['mag']:.1f}"
                     f" · {self.tr('guide, not SNR — confirm with a test shot')}"
@@ -4693,7 +4710,7 @@ class MainWindow(QMainWindow):
             btn_add_filt = QPushButton(self.tr("Add filter"))
             btn_add_filt.clicked.connect(lambda: self._sn_add_step_row(steps_vlay))
             filt_head.addWidget(btn_add_filt)
-            layout.addLayout(filt_head)
+            sbody.addLayout(filt_head)
             steps_container = QWidget()
             steps_vlay = QVBoxLayout(steps_container)
             steps_vlay.setContentsMargins(2, 2, 2, 2)
@@ -4708,7 +4725,7 @@ class MainWindow(QMainWindow):
                     default_filters = tuple(prot_filters)
             for filt in default_filters:
                 self._sn_add_step_row(steps_vlay, filt, 30, spn_exp.value())
-            layout.addWidget(steps_container)
+            sbody.addWidget(steps_container)
             self._project_widgets["sn_steps_container"] = steps_container
         # sequence export (all kinds): the format combo and the
         # right-aligned "Export sequence…" button share one row
@@ -4723,19 +4740,18 @@ class MainWindow(QMainWindow):
         btn_seq = QPushButton(self.tr("Export sequence…"))
         btn_seq.clicked.connect(self._project_export_sequence)
         seq_row.addWidget(btn_seq)
-        layout.addLayout(seq_row)
+        sbody.addLayout(seq_row)
         # NEO: also ephemeris export
         if kind in ("neo", "pccp"):
-            layout.addWidget(QLabel(""))
-            layout.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
+            sbody.addWidget(QLabel(self.tr("Export ephemeris for planetarium")))
             btn_eph = QPushButton(self.tr("Export ephemeris…"))
             btn_eph.clicked.connect(self._project_export_ephem)
-            layout.addWidget(btn_eph)
+            sbody.addWidget(btn_eph)
         self._project_widgets["cmb_seqfmt"] = cmb_fmt
         # ADR-043: the live CCDciel control lives in the Capture step
         # itself (the Observatory tab is gone): the hardware has one home,
         # and it is the step that plans its capture
-        self._build_capture_ccd_block(layout)
+        self._build_capture_ccd_block(layout, accent)
         # ADR-043: the plan auto-saves: every input writes the same payload
         # the "Save plan" button used to, silently (the project bar is the
         # visible truth). The connects sit after every build-time
@@ -4748,6 +4764,25 @@ class MainWindow(QMainWindow):
         spn_darkexp.valueChanged.connect(self._project_save_plan)
         spn_bias.valueChanged.connect(self._project_save_plan)
         layout.addStretch()
+
+    def _plan_summary_strip(self, layout, accent):
+        # The three numbers the observer reads before touching anything:
+        # total integration, filter and the "does it fit before dawn?"
+        # verdict. KpiTiles (ADR-057), updated live from the plan spins by
+        # _plan_ribbon_refresh, so the strip and the band never disagree.
+        # @args: layout - the Capture page layout, accent - the kind hue
+        from .widgets.kpi_tile import KpiTile
+        strip = QHBoxLayout()
+        strip.setSpacing(8)
+        t_int = KpiTile("—", self.tr("Integration"), accent)
+        t_fil = KpiTile("—", self.tr("Filter"))
+        t_ver = KpiTile("—", self.tr("Before dawn"))
+        for t in (t_int, t_fil, t_ver):
+            strip.addWidget(t)
+        strip.addStretch(1)
+        layout.addLayout(strip)
+        self._project_widgets["plan_kpis"] = {
+            "integration": t_int, "filter": t_fil, "verdict": t_ver}
 
     def _project_save_plan(self):
         if not self._current_project:
@@ -4799,7 +4834,7 @@ class MainWindow(QMainWindow):
 
     # -- CCDciel control (ADR-030) -----------------------------------------
 
-    def _build_capture_ccd_block(self, layout):
+    def _build_capture_ccd_block(self, layout, accent=None):
         # ADR-043: the Observatory tab is gone; this is its whole control
         # panel, rebuilt per project page inside the Capture step. Built
         # in code (not a .ui) because it is small and per-project now;
@@ -4809,17 +4844,15 @@ class MainWindow(QMainWindow):
         # had no purpose, so there is no target-selection combo (a
         # project that is not open is not what you are looking at that
         # night).
-        # Interfaz 1.8: ONE panel, not three group boxes. "CCDciel
-        # control", "Telescope" and "Live capture" were three frames for
-        # one control panel (74 + 74 + 119 px of chrome for 150 px of
-        # buttons), and the observatory status -- the reason the observer
-        # connects at all -- ended up 161 px BELOW the fold. Now: one box,
-        # four rows, and the status is a 2x2 grid instead of a four-row
-        # form (the same four values in half the height).
-        grp = QGroupBox(self.tr("Telescope and camera"))
-        gv = QVBoxLayout(grp)
-        gv.setContentsMargins(12, 9, 12, 9)
-        gv.setSpacing(6)
+        # ADR-059: the panel is a PanelCard now, the same card voice as the
+        # rest of the Capture console. One card, four rows, and the status
+        # is one row of four pairs (Interfaz 1.8 had already collapsed the
+        # old three group boxes).
+        # @args: layout - the Capture page layout, accent - the kind hue
+        from .widgets.section_card import PanelCard
+        grp = PanelCard(self.tr("Telescope and camera"),
+                        accent or theme.C_ACCENT)
+        gv = grp.body
 
         # row 1: the connection, with a colour that says which state it is
         row = QHBoxLayout()
@@ -5542,10 +5575,21 @@ class MainWindow(QMainWindow):
         n_frames = int(spins[0].value())
         exp_s = float(spins[1].value())
         total_min = n_frames * exp_s / 60.0
+        # the summary strip reads the same numbers as the band (ADR-059):
+        # integration and filter are known before the window is
+        kp = self._project_widgets.get("plan_kpis")
+        if kp:
+            kp["integration"].set_value(
+                f"{total_min / 60.0:.1f} h" if total_min >= 90
+                else f"{total_min:.0f} min")
+            kp["filter"].set_value(spins[2].currentText())
         window = ribbon.window()
         if window is None:
             ribbon.set_blocks([])
             ribbon.set_note("")
+            if kp:
+                kp["verdict"].set_accent(None)
+                kp["verdict"].set_value("—")
             return
         dusk, dawn = window
         end = min(dawn, dusk + _dt.timedelta(minutes=total_min))
@@ -5563,6 +5607,10 @@ class MainWindow(QMainWindow):
             if fits else
             self.tr("does not fit before dawn"),
             theme.C_GOOD if fits else theme.C_WARN)
+        if kp:
+            kp["verdict"].set_accent(theme.C_GOOD if fits else theme.C_WARN)
+            kp["verdict"].set_value(
+                self.tr("fits") if fits else self.tr("does not fit"))
 
     def _analysis_curve_block(self, p, pid):
         # The light curve of the Analysis tab: THE VISIT YOU SELECTED, with
@@ -6165,11 +6213,13 @@ class MainWindow(QMainWindow):
         #        the capture-plan exposure spin (preselected here)
         from ..core import coords, planner
         from .widgets.timeline_widget import TransitTimeline
+        from .widgets.section_card import PanelCard
         tr = ctx.get("transit") or {}
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
-        grp = QGroupBox(self.tr("Transit capture plan"))
-        gl = QVBoxLayout(grp)
+        grp = PanelCard(self.tr("Transit capture plan"),
+                        theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT))
+        gl = grp.body
 
         def _as_dt(v):
             # the context crosses the db as JSON: times come back as ISO
@@ -6373,11 +6423,13 @@ class MainWindow(QMainWindow):
         #        context (carries the "hads" snapshot + window keys),
         #        spn_exp - the capture-plan exposure spin (preselected here),
         #        spn_frames - the frames spin (defaulted to fill 2P)
+        from .widgets.section_card import PanelCard
         h = ctx.get("hads") or {}
         plan_data = next((s["data"] for s in p["steps"]
                           if s["step"] == "plan"), {})
-        grp = QGroupBox(self.tr("HADS capture plan"))
-        gl = QVBoxLayout(grp)
+        grp = PanelCard(self.tr("HADS capture plan"),
+                        theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT))
+        gl = grp.body
 
         def _hm(v):
             # @return: "HH:MM" UTC from an ISO string/datetime, or "—"
@@ -6521,9 +6573,11 @@ class MainWindow(QMainWindow):
         # saturation warning for bright stars (the T CrB lesson).
         # @args: layout - plan tab layout, p - project dict, ctx - context,
         #        spn_exp - the capture-plan exposure spin (preselected here)
+        from .widgets.section_card import PanelCard
         v = ctx.get("variable") or {}
-        grp = QGroupBox(self.tr("Variable star plan"))
-        gl = QVBoxLayout(grp)
+        grp = PanelCard(self.tr("Variable star plan"),
+                        theme.KIND_COLORS.get(p.get("kind"), theme.C_ACCENT))
+        gl = grp.body
         if p.get("campaign_id"):
             from ..core import campaign as _camp
             camp = _camp.get(db, p["campaign_id"])

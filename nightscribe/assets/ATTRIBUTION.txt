@@ -35,6 +35,36 @@ v1). Science reference for the feature:
 Kotysz, K. 2020, "Variability of HADS stars in TESS", PTA Proceedings 10,
 180-182, https://pta.edu.pl/proc/v10p180
 
+welcome_sky.svg: the night sky behind the Welcome hero (Interfaz 1.4,
+2026-10-01): gradient sky, Milky Way, a seeded starfield with a few
+diffraction spikes, two constellation joins, the rolling ground and the
+observatory silhouette. Original graphic drawn by the project (generated
+once with a fixed seed so the stars never change between runs); no
+third-party data. The Moon is NOT in the file: gui/widgets/welcome_sky.py
+paints tonight's real phase over it from core/ephem_minor.py, so the hero
+can never contradict the almanac. The ground, the dome and the slit carry a
+rim light; only linear/radial gradients and basic shapes are used, which is
+what QtSvg actually renders (no filters, masks or patterns).
+
+world_map.json: the coastlines and land borders the site picker paints
+(Interfaz 1.5, 2026-10-02). Source: Natural Earth, 1:110m Cultural Vectors
+and Physical Vectors (ne_110m_coastline and
+ne_110m_admin_0_boundary_lines_land), https://www.naturalearthdata.com.
+Natural Earth is in the **public domain**: no permission or attribution is
+required, and none of its terms restrict commercial use. Credited here
+because a map without its source is a rumour. The file is the two layers
+flattened to [lon, lat, lon, lat, ...] runs with 2-decimal coordinates
+(about 1 km, far finer than a click on a 700 px map), converted once with a
+one-off dev script.
+
+world_places.json: the 1251 cities used to NAME a point clicked on that
+map. Source: Natural Earth 1:50m Populated Places
+(ne_50m_populated_places_simple), same public-domain terms as above. Only
+name, country, longitude and latitude are kept (49 KB), rounded to 3
+decimals; the nearest city within 250 km gives the point its name, and
+beyond that the coordinates are written out instead, so the app never
+claims a city that is nowhere near.
+
 appicon.svg, appicon-*.png, appicon.ico, appicon.icns: the NightScribe
 application icon, "quill drawing a comet trail into a star" on a night-navy
 tile. Original graphic drawn by the project, 2026-09-21; no third-party data.

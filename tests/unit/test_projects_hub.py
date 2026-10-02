@@ -374,11 +374,13 @@ def test_no_projects_clears_state(window):
     dbmod.db.commit()
     window.on_refresh_projects()
     assert window._current_project is None
-    # UX-PC (U2): with no projects the right pane is the dashboard's empty
-    # state (the "start from Tonight" pointer), not a stale detail
+    # Interfaz 1.6: with no project selected the right pane shows the night
+    # panel (its own heading), not a stale detail
     from nightscribe.gui.main_window import VIEW_HOME
     assert window._shell_stack().currentIndex() == VIEW_HOME
-    assert window.projects.lbl_dash_title.text()
+    assert window.projects.stack_detail.currentWidget() is \
+        window.projects.page_night
+    assert window._night_panel.ui.lbl_night_head.text()
 
 
 # ---------------- D5 (corrected 2026-09-02): Explore dialog + CTA ----
@@ -739,7 +741,10 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
                 "ccd_push", "ccd_start"):
         assert not obs[key].isEnabled(), f"{key} should start disabled"
     assert not obs["cmb_ccd_filter"].isEnabled()
-    assert obs["ccd_status"].text() == window.tr("CCDciel: not connected")
+    # Interfaz 1.8: the state is a chip with a dot and a colour
+    assert obs["ccd_status"].text().endswith(
+        window.tr("CCDciel: not connected"))
+    assert obs["ccd_status"].text().startswith("\u25cf")
 
 
 def test_plan_tab_ccdciel_filter_fallback_list(window, panel):

@@ -205,15 +205,19 @@ def composite(color, alpha="18", over=C_BASE):
         int(round(x + a * (y - x))) for x, y in zip(b, c))
 
 
-def row_skin(name, bg, edge, radius=6):
+def row_skin(name, bg, edge, radius=6, spine=None):
     # @args: name - the row's objectName (anchors the QFrame#… selector);
     #        bg/edge - base fill and border ("transparent" for none);
-    #        radius - the corner radius in px
+    #        radius - the corner radius in px;
+    #        spine - a colour for a 3 px left edge, or None. The projects
+    #          list uses it to carry each row's kind hue, so the list reads
+    #          as a colour map instead of a block of one shade.
     # @return: a row-skin stylesheet (base + hover). Every list in the app —
     #          tonight, projects, campaigns — hovers in this one voice, so a
     #          new row can't drift to its own shade.
+    left = f" border-left: 3px solid {spine};" if spine else ""
     return (f"QFrame#{name} {{ background: {bg}; border-radius: {radius}px;"
-            f" border: 1px solid {edge}; }}"
+            f" border: 1px solid {edge};{left} }}"
             f"QFrame#{name}:hover {{ background: {C_ROW_HOVER}; }}")
 
 
@@ -248,6 +252,31 @@ def tab_state_style(state, kind_color, active=False):
     return (f"QPushButton {{ background: {bg}; color: {fg};"
             f" border: 1px solid {edge}; border-radius: 11px;"
             f" padding: 3px 12px; }}")
+
+
+def kind_card_style(accent, selected=False):
+    # @args: accent - the kind's KIND_COLORS hue; selected - whether the
+    #          observer follows it right now
+    # @return: a stylesheet for ONE card of the Welcome targets grid.
+    #   Every card keeps a spine in its kind's hue, so the grid reads as a
+    #   colour-coded map of the sky and not as a wall of checkboxes. The
+    #   selected card is washed in the hue and edged with it; the quiet
+    #   ones stay a hairline. The wash is a SOLID composite, never an
+    #   alpha: over the panel an alpha hue reads muddy (the same reason
+    #   chip_style is solid).
+    if selected:
+        bg = composite(accent, "24", over=C_BASE)
+        edge = accent
+        spine = accent
+    else:
+        bg = C_BASE
+        edge = C_LINE
+        spine = composite(accent, "70", over=C_BASE)
+    return (f"QFrame#kindCard {{ background: {bg}; border: 1px solid {edge};"
+            f" border-left: 3px solid {spine}; border-radius: 10px; }}"
+            f"QFrame#kindCard:hover {{ background: {C_ROW_HOVER};"
+            f" border: 1px solid {edge};"
+            f" border-left: 3px solid {accent}; }}")
 
 
 def apply_theme(app):
@@ -448,21 +477,53 @@ QFrame {{ color: {C_TEXT}; }}
 QLabel {{ background: transparent; color: {C_TEXT}; }}
 QLabel:disabled {{ color: {C_TEXT_DIM}; }}
 
-/* ---- Interfaz 1.2: Welcome + Home looks (ADR-005, ADR-026) ------------- */
+/* ---- Interfaz 1.4: Welcome, the painted hero (ADR-005, ADR-026) --------
+   The hero is a night sky: gui/widgets/welcome_sky.py paints the vector
+   sky and tonight's real Moon inside it, so the frame here only keeps the
+   border and a fill that matches the sky's top colour (the rounded
+   corners of the sky widget show this fill, not a lighter seam). */
 QFrame#welcomeHero {{
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #1a2236, stop:1 {C_BASE});
-    border: 1px solid {C_LINE}; border-radius: 14px;
+    background: #04060d; border: 1px solid {C_LINE}; border-radius: 14px;
 }}
-QLabel#welcomeWordmark {{ font-size: 28px; font-weight: 800;
+QLabel#welcomeWordmark {{ font-size: 30px; font-weight: 800;
                           letter-spacing: 8px; }}
-QLabel#welcomeTag {{ color: {C_TEXT_DIM}; }}
-QLabel#welcomeLead {{ color: #c7cbd9; }}
+QLabel#welcomeTag {{ color: #b9c2d6; font-size: 14px; }}
+QLabel#welcomeLead {{ color: #9aa3ba; }}
+/* The "this is a new version" badge, next to the report's title. */
+QLabel#lbl_data_badge {{
+    color: {C_ACCENT}; font-size: 10px; font-weight: 700;
+    letter-spacing: 1px; padding: 3px 10px; border-radius: 9px;
+    background: {composite(C_ACCENT, "3a", over="#0a1020")};
+}}
 
+/* The live "your night, now" panel that sits over the sky. A translucent
+   dark panel, not a solid one: the stars must stay visible through it or
+   the hero stops being a sky. */
+QFrame#nightStrip {{
+    background: rgba(9, 13, 24, 0.72);
+    border: 1px solid rgba(90, 110, 150, 0.35);
+    border-left: 3px solid {C_ACCENT}; border-radius: 10px;
+}}
+QLabel#lbl_night_icon {{ font-size: 22px; color: #cfd9ee; }}
+QLabel#lbl_night_title {{ font-size: 10px; font-weight: 700;
+                          letter-spacing: 1px; color: {C_ACCENT}; }}
+QLabel#lbl_night_window {{ color: #e2e7f2; }}
+QLabel#lbl_night_moon, QLabel#lbl_night_planets {{
+    color: #97a0b8; font-size: 12px;
+}}
+QPushButton#btn_night_set {{
+    background: rgba(106, 176, 255, 0.12); color: {C_ACCENT};
+    border: 1px solid rgba(106, 176, 255, 0.45); border-radius: 6px;
+    padding: 5px 12px;
+}}
+QPushButton#btn_night_set:hover {{ background: rgba(106, 176, 255, 0.22); }}
+
+/* The stepper as a rail: numbered nodes joined by a line that fills as you
+   advance (the code flips the [state] property; the colours live here). */
 QToolButton#btn_step_obs, QToolButton#btn_step_kinds,
 QToolButton#btn_step_data {{
-    background: {C_PANEL}; border: 1px solid {C_LINE}; border-radius: 14px;
-    padding: 5px 14px; color: {C_TEXT_DIM};
+    background: {C_PANEL}; border: 1px solid {C_LINE}; border-radius: 15px;
+    padding: 5px 16px; color: {C_TEXT_DIM};
 }}
 QToolButton#btn_step_obs:hover, QToolButton#btn_step_kinds:hover,
 QToolButton#btn_step_data:hover {{ background: {C_HOVER}; }}
@@ -470,26 +531,147 @@ QToolButton#btn_step_obs:checked, QToolButton#btn_step_kinds:checked,
 QToolButton#btn_step_data:checked {{
     border-color: {C_ACCENT}; color: {C_TEXT}; background: {C_HOVER};
 }}
-QToolButton#btn_step_obs[state="done"], QToolButton#btn_step_kinds[state="done"],
+QToolButton#btn_step_obs[state="done"],
+QToolButton#btn_step_kinds[state="done"],
 QToolButton#btn_step_data[state="done"] {{
     border-color: {C_GOOD}; color: {C_TEXT};
 }}
+QFrame#rail_sep1, QFrame#rail_sep2 {{
+    background: {C_LINE}; border: none; margin: 0 6px;
+}}
+QFrame#rail_sep1[state="done"], QFrame#rail_sep2[state="done"] {{
+    background: {C_GOOD};
+}}
 
 QFrame#panel_obs, QFrame#panel_kinds, QFrame#panel_data {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 12px;
+}}
+QLabel#lbl_obs_title, QLabel#lbl_kinds_title, QLabel#lbl_data_title {{
+    font-size: 16px; font-weight: 700;
+}}
+QLabel#lbl_obs_sub, QLabel#lbl_kinds_sub, QLabel#lbl_data_sub,
+QLabel#lbl_site_status, QLabel#lbl_site_privacy, QLabel#lbl_kinds_rule,
+QLabel#lbl_data_rule {{ color: {C_TEXT_DIM}; }}
+QLabel#lbl_site_privacy, QLabel#lbl_kinds_rule, QLabel#lbl_data_rule {{
+    font-size: 11px;
+}}
+QLabel#lbl_kinds_count {{
+    color: {C_ACCENT}; font-weight: 700; font-size: 11px;
+    background: {tint(C_ACCENT, "22")}; border-radius: 8px;
+    padding: 2px 9px;
+}}
+QLabel#lbl_data_icon {{ font-size: 26px; color: {C_GOOD}; }}
+
+/* The three doors at the bottom. */
+QFrame#wcard1, QFrame#wcard2, QFrame#wcard3 {{
     background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 10px;
 }}
-QFrame#wcard1, QFrame#wcard2, QFrame#wcard3 {{
-    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 8px;
+QFrame#wcard1:hover, QFrame#wcard2:hover, QFrame#wcard3:hover {{
+    background: {C_PANEL}; border: 1px solid {C_EDGE};
 }}
+QLabel#lbl_card1_icon, QLabel#lbl_card2_icon, QLabel#lbl_card3_icon {{
+    color: {C_ACCENT}; font-size: 15px;
+}}
+QLabel#lbl_card1_title, QLabel#lbl_card2_title, QLabel#lbl_card3_title {{
+    font-weight: 700;
+}}
+QLabel#lbl_card1_body, QLabel#lbl_card2_body, QLabel#lbl_card3_body {{
+    color: #c7cbd9;
+}}
+QPushButton#btn_card2_guide, QPushButton#btn_card3_skycal {{
+    color: {C_ACCENT}; text-align: left; padding: 0; border: none;
+    background: transparent;
+}}
+QPushButton#btn_card2_guide:hover, QPushButton#btn_card3_skycal:hover {{
+    color: #9ccbff;
+}}
+
 QPushButton#btn_create {{
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                 stop:0 #2f6fd0, stop:1 #2559a8);
     border: 1px solid #4d86e0; border-radius: 12px;
-    padding: 14px 30px; font-size: 15px; font-weight: 700; color: #ffffff;
+    padding: 12px 32px; font-size: 15px; font-weight: 700; color: #ffffff;
 }}
 QPushButton#btn_create:hover {{ background: #3579dd; }}
+QPushButton#btn_create:disabled {{
+    background: {C_DIM_FILL}; border: 1px solid {C_LINE};
+    color: {C_TEXT_DIM};
+}}
+/* THE action of a panel, whichever button happens to carry it today: on an
+   update the report's own "got it" is the one and only way forward, and a
+   default-sized button would undersell it. */
+QPushButton[primary="true"] {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #2f6fd0, stop:1 #2559a8);
+    border: 1px solid #4d86e0; border-radius: 12px;
+    padding: 11px 28px; font-size: 15px; font-weight: 700; color: #ffffff;
+}}
+QPushButton[primary="true"]:hover {{ background: #3579dd; }}
+QLabel#lbl_cta_sub {{ color: {C_TEXT_DIM}; }}
+/* The quiet escape hatch. border/background are set explicitly: Qt's
+   "flat" property is ignored the moment a stylesheet gives the button a
+   background, so the flat look has to be spelled out here. */
+QPushButton#btn_skip {{
+    background: transparent; border: none; color: {C_TEXT_DIM};
+    padding: 6px 8px;
+}}
+QPushButton#btn_skip:hover {{ color: {C_ACCENT}; background: transparent; }}
 
 QFrame#homeHead {{ background: transparent; }}
+/* Interfaz 1.7: the "next" action, as a slim band instead of a group box
+   (the frame and its title cost 20 px of a page that has none to spare) */
+/* the campaign summary: one wrapped sentence, so a labelled band and not
+   a group box with a title of its own */
+/* Interfaz 1.7: the parameters block of the object card (a frame now, not
+   a group box) and its table: the explanations wrap to two or three lines,
+   so the cell padding is what decides whether four rows fit or six. */
+QFrame#grp_params {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 8px;
+}}
+QLabel#lbl_params_title {{ font-weight: 700; }}
+QFrame#grp_params QTableWidget {{ border: none; }}
+QFrame#grp_params QTableWidget::item {{ padding: 2px 6px; }}
+QFrame#fu_campaign_summary {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 8px;
+}}
+QFrame#nextBand {{
+    background: {C_BASE}; border: 1px solid {C_LINE};
+    border-left: 3px solid {C_ACCENT}; border-radius: 8px;
+}}
+/* Interfaz 1.6: the two halves of the projects view. The list stops being
+   a QGroupBox (a bordered box inside the page was a box inside a box); it
+   is a panel now, and the splitter handle between the two is a hairline
+   that lights up under the cursor. */
+QGroupBox#projectsListPanel {{
+    background: {C_BASE}; border: 1px solid {C_LINE}; border-radius: 10px;
+    margin-top: 0; padding-top: 0;
+}}
+QGroupBox#projectsListPanel::title {{ padding: 0; }}
+QFrame#projectsDetailPanel {{ background: transparent; border: none; }}
+QSplitter#projectsSplit::handle {{ background: {C_LINE}; }}
+QSplitter#projectsSplit::handle:hover {{ background: {C_ACCENT}; }}
+/* the night panel's way in to a new project: quiet, because the resting
+   pane should not shout, but clearly a button */
+QLabel#nightHead {{
+    color: {C_ACCENT}; font-size: 10px; font-weight: 700;
+    letter-spacing: 1px;
+}}
+QLabel#nightLine {{ color: #c7cbd9; }}
+QPushButton#nightCta {{
+    background: rgba(106, 176, 255, 0.10); color: {C_ACCENT};
+    border: 1px solid rgba(106, 176, 255, 0.40); border-radius: 8px;
+    padding: 9px 16px; font-weight: 600;
+}}
+QPushButton#nightCta:hover {{ background: rgba(106, 176, 255, 0.20); }}
+/* the navigation sky bar: quiet by design (it is ambient information, not
+   a call to action) but the Moon is drawn, not glyphed */
+QLabel#skyMoon {{ color: #d7dce8; font-size: 12px; }}
+QLabel#skyWhen {{ color: #c7cbd9; font-size: 12px; }}
+QLabel#skyPlanets {{ color: {C_TEXT_DIM}; font-size: 12px; }}
+QPushButton#skyCalendar {{
+    color: {C_ACCENT}; background: transparent; border: none; padding: 2px 6px;
+}}
+QPushButton#skyCalendar:hover {{ color: #9ccbff; }}
 QLabel#homeTitle {{ font-size: 19px; font-weight: 700; }}
 QPushButton#newTile {{
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,

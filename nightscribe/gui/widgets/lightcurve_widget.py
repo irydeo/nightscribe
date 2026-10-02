@@ -66,8 +66,10 @@ _Z_LABEL = 4.0
 # reader actually sees, and _sync_geometry converts them.
 _FONT_TICK_PX = 12
 _FONT_LEGEND_PX = 11
-_LEGEND_SWATCH = 24.0     # the colour line that stands for a series
-_LEGEND_PITCH = 20.0      # vertical distance between legend rows
+# The legend's swatch length and row pitch are NOT constants any more:
+# they are derived from the legend's own font in _add_legend, because a
+# fixed pitch in scene units does not follow a font whose size is pinned to
+# pixels (the rows overlapped as soon as the panel got short).
 
 # Short month names, because strftime follows the SYSTEM locale: a chart in
 # an English interface would print "dic" for December on a Spanish machine,
@@ -84,14 +86,20 @@ _MONTHS = {
 # so the two axes always share one scale and an error bar stays an error bar.
 _HALF = 500.0
 
-# The room the labels need around the plot, in scene units. They are
-# generous on purpose (the observer asked for the texts to breathe) and the
-# bottom is the widest side, because a date like "20 Sep 2026" is a long
-# label under a tick.
-_PAD_LEFT = 124.0
-_PAD_RIGHT = 34.0
-_PAD_TOP = 66.0
-_PAD_BOTTOM = 108.0
+# The room the labels need around the plot, in PIXELS. They are generous on
+# purpose (the observer asked for the texts to breathe) and the bottom is
+# the widest side, because a date like "20 Sep 2026" is a long label under a
+# tick, with the axis note under it.
+#
+# Pixels, not scene units: the fonts are converted with _font_px so they
+# always render at their nominal size, and fixed scene paddings did not
+# follow. In a short panel the padding shrank while the text did not, and
+# the tick labels, the axis note and the legend ended up on top of each
+# other (seen in the Analysis tab at 1360x860).
+_PAD_LEFT_PX = 54.0
+_PAD_RIGHT_PX = 16.0
+_PAD_TOP_PX = 30.0
+_PAD_BOTTOM_PX = 86.0
 
 # Robust window (quality plan, phase A): the magnitude scale is set by the
 # CORE of the data (median ± K robust sigmas), never by min/max, so one
@@ -983,20 +991,32 @@ class LightCurveChart(ChartView):
         # proportions match the viewport's: the fit then fills the panel
         # exactly, with no letterboxing and no wasted side.
         #
-        # @return: True when the width changed (the scene must be rebuilt)
+        # @return: True when the scene must be rebuilt: not only when the
+        #          WIDTH changed, but also when the scale did. The label
+        #          offsets are expressed in pixels through _px(), so a
+        #          height-only resize (the panel getting shorter) moves them
+        #          and the scene has to be redrawn or the axis note ends up
+        #          past the bottom edge.
         vw = max(120, self.viewport().width())
         vh = max(120, self.viewport().height())
-        scene_h = 2 * _HALF + _PAD_TOP + _PAD_BOTTOM
-        want = ((vw / float(vh)) * scene_h - _PAD_LEFT - _PAD_RIGHT) / 2.0
+        was_scale = self._scale
+        # The plot keeps whatever is left after the labels' room, and THAT
+        # is what one scene unit is worth in pixels. Solving it this way
+        # (instead of dividing the whole scene into the viewport) is what
+        # keeps the paddings the size they claim to be at any panel height.
+        plot_px = max(60.0, vh / 1.04 - _PAD_TOP_PX - _PAD_BOTTOM_PX)
+        self._scale = plot_px / (2.0 * _HALF)
+        pad_l, pad_r = self._px(_PAD_LEFT_PX), self._px(_PAD_RIGHT_PX)
+        pad_t, pad_b = self._px(_PAD_TOP_PX), self._px(_PAD_BOTTOM_PX)
+        scene_h = 2 * _HALF + pad_t + pad_b
+        want = ((vw / float(vh)) * scene_h - pad_l - pad_r) / 2.0
         # sanity bounds: never narrower than a square, never absurdly long
         want = min(max(want, _HALF), _HALF * 8.0)
-        if abs(want - self._hx) < 1.0:
+        moved = abs(want - self._hx) >= 1.0
+        rescaled = abs(self._scale - was_scale) > was_scale * 0.01
+        if not moved and not rescaled:
             return False
         self._hx = want
-        # how many SCENE UNITS one pixel is worth, for the labels: the base
-        # fits the scene with a 2 % pad, so this is the honest conversion
-        # from the pixel sizes the reader sees to the units the items use
-        self._scale = vh / (scene_h * 1.04)
         return True
 
     def _do_fit(self):
@@ -1092,9 +1112,17 @@ class LightCurveChart(ChartView):
             # the window changes shape): the axis still has to exist
             self._compute_bounds()
         b = self._bounds
-        self.set_scene_rect(-self._hx - _PAD_LEFT, -_HALF - _PAD_BOTTOM,
-                            2 * self._hx + _PAD_LEFT + _PAD_RIGHT,
-                            2 * _HALF + _PAD_BOTTOM + _PAD_TOP)
+        # Scene y grows DOWN, so the rect's top carries the TOP padding.
+        # (The old call had the two swapped, which nobody noticed while
+        # both were fixed scene constants of a similar size; with the
+        # paddings in pixels it put 86 px at the top and 30 at the bottom
+        # and clipped the axis note.)
+        self.set_scene_rect(-self._hx - self._px(_PAD_LEFT_PX),
+                            -_HALF - self._px(_PAD_TOP_PX),
+                            2 * self._hx + self._px(_PAD_LEFT_PX)
+                            + self._px(_PAD_RIGHT_PX),
+                            2 * _HALF + self._px(_PAD_TOP_PX)
+                            + self._px(_PAD_BOTTOM_PX))
         # grid + axes
         self._draw_grid()
         # series linking (like the PNG export): solid line for the
@@ -1638,14 +1666,17 @@ class LightCurveChart(ChartView):
         rows = [(text, color, fm.horizontalAdvance(text))
                 for text, color in entries]
         text_w = max(row[2] for row in rows)
-        sw = _LEGEND_SWATCH          # swatch length
-        gap = 8                      # swatch -> text gap
-        pad = 8                      # backdrop padding
-        row_h = _LEGEND_PITCH        # vertical pitch between rows
-        right = self._hx - 10
+        # The legend's own geometry, derived from its font: with a fixed
+        # scene pitch the rows overlapped each other and the axis labels as
+        # soon as the panel got short.
+        sw = fm.height() * 1.6       # swatch length
+        gap = fm.height() * 0.5      # swatch -> text gap
+        pad = fm.height() * 0.5      # backdrop padding
+        row_h = fm.height() * 1.35   # vertical pitch between rows
+        right = self._hx - self._px(8)
         text_x = right - text_w
         sw_x = text_x - gap - sw
-        top = _HALF - 10 - row_h * len(entries)
+        top = _HALF - self._px(8) - row_h * len(entries)
         # a very faint backdrop, only as much as keeps the text readable
         # over a dense cloud of points
         bg = QGraphicsRectItem(sw_x - pad, top - pad,
@@ -1793,7 +1824,8 @@ class LightCurveChart(ChartView):
             mark.setZValue(_Z_GRID + 0.1)
             self.add_item(mark)
             if text:
-                self._tick_label(text, x, _HALF + 20, align="center")
+                self._tick_label(text, x, _HALF + self._px(7),
+                                 align="center")
         # Y grid lines (inverted axis: brighter on top)
         for tv, label in zip(y_plan["ticks"], y_plan["labels"]):
             if y_span <= 0.0:
@@ -1809,19 +1841,22 @@ class LightCurveChart(ChartView):
             self.add_item(mark)
             # right-aligned against the axis: a wall of numbers left of a
             # plot is exactly what "let the texts breathe" is about
-            self._tick_label(label, -self._hx - 12, y - 8, align="right")
+            self._tick_label(label, -self._hx - self._px(6),
+                             y - self._px(5), align="right")
         # the factored-out constant, said once (never hidden)
         if y_plan["offset_label"]:
-            self._tick_label(y_plan["offset_label"], -self._hx - 12,
-                             -_HALF - 30, align="right")
+            self._tick_label(y_plan["offset_label"],
+                             -self._hx - self._px(6),
+                             -_HALF - self._px(16), align="right")
         note_x = self._x_axis_note()
         if note_x:
             # the corner note: the civil date the night happened on and the
             # MJD a report would ask for. Nobody should convert by hand.
-            self._tick_label(note_x, -self._hx, _HALF + 44)
+            self._tick_label(note_x, -self._hx, _HALF + self._px(28))
         elif x_plan["offset_label"]:
-            self._tick_label(x_plan["offset_label"], self._hx - 60,
-                             _HALF + 44)
+            self._tick_label(x_plan["offset_label"],
+                             self._hx - self._px(34),
+                             _HALF + self._px(28))
         # WHAT the numbers are: the mode, and on a differential axis the
         # level they count from. A reader must never have to guess whether
         # 12.34 is a star's magnitude or a difference, and an axis that
@@ -1832,7 +1867,13 @@ class LightCurveChart(ChartView):
                     else self.tr("Δ magnitude"))
         else:
             note = self.tr("Calibrated magnitude")
-        self._tick_label(note, -self._hx, -_HALF - 34)
+        self._tick_label(note, -self._hx, -_HALF - self._px(18))
+
+    def _px(self, pixels):
+        # @args: pixels - a size the reader should see
+        # @return: that size in scene units (the inverse of _font_px), so a
+        #          padding can be expressed in the same language as a font
+        return pixels / max(self._scale, 1e-3)
 
     def _font_px(self, pixels):
         # A font size that RENDERS at `pixels` on this window: the scene is

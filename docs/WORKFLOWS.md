@@ -1039,6 +1039,125 @@ blocks "Back"; `action_log` moves to Help.
 **Entry point**: `navigate`/`back`/`forward`/`home`/`_apply_location` in
 `gui/main_window.py`; tests in `tests/unit/test_navigation_history.py`.
 
+### 7duodecies. Interfaz 1.4: the Welcome redesign (2026-10-01, ADR-055 rev.)
+
+Motivation: Welcome worked but did not convince. The hero was a gradient
+with half a panel of dead space, the targets step was a wall of checkboxes
+and the forms asked for a latitude without ever answering back, so nothing
+rewarded the first bit of input.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| Hero | `assets/welcome_sky.svg` (our own art) + `gui/widgets/welcome_sky.py`, which paints tonight's real Moon from `ephem_minor.moon(jd)` and twinkles a few stars | **Done** |
+| "Your night, now" | Live strip, 100% local (`coords.tonight_window`, `ephem_minor.moon`/`planet`): darkness window, Moon phase and set, planets at dusk; recomputed on every site change | **Done** |
+| Rail | The stepper connector fills and the steps behind you get a tick | **Done** |
+| Targets | Kind cards in `KIND_COLORS`, clickable as a whole, one-glance blurb with the full text in the tooltip (`_setup_kinds(..., card=True)`) | **Done** |
+| Data | Receipt with one mark per line | **Done** |
+| CTA | Subtitle plus "Explore first" (blocked while an update gates) | **Done** |
+| Motion | `ui_animations` preference (Settings ▸ Interface), one-shot fade, timer stopped when hidden | **Done** |
+
+**Entry point**: `gui/widgets/welcome_setup.py` (night strip, rail, cards,
+fade), `gui/widgets/welcome_sky.py` (the painted hero), `gui/wizard.py`
+(`_setup_kinds` card mode, `_setup_data` receipt), `gui/ui/welcome_tab.ui`
+and the Welcome block of `gui/theme.py`. A first run now lands on the
+observatory step; the page fits a 1280x860 window and one outer scroll
+covers short screens.
+
+### 7terdecies. Interfaz 1.5 bis: the site, on a map (2026-10-02, ADR-055 rev.)
+
+Motivation: the observatory step asked for a latitude from someone who
+knows where they live but not their coordinates, and on an update the
+screen still told a veteran to "set up your observatory in three steps".
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The map | `gui/widgets/site_map.py`: equirectangular, click to pick, wheel zoom, drag pan, live day/night terminator (local ephemeris), marker and cursor readout. **Cover** projection, so no side bands | **Done** |
+| Map data | `assets/world_map.json` (Natural Earth 110m coastlines + borders, public domain) | **Done** |
+| Naming a point | `core/places.py` + `assets/world_places.json` (1251 cities, Natural Earth 50m): nearest within 250 km, else the coordinates | **Done** |
+| Settings | "Pick on the map…" opens `gui/site_map_dialog.py`, sized to a share of the screen (it used to open at its sizeHint, a 300x150 map) | **Done** |
+| Names | Written every time, from the MPC code, from the geolocation and from a map click | **Done** |
+| Update notice | The version badge moves next to "Your data, safe"; the hero explains the update, the rail marks 1 and 2 as done and the single action lives with the report | **Done** |
+
+**Entry point**: `gui/widgets/site_map.py` (the map and its projection),
+`core/places.py` (naming), `gui/site_map_dialog.py` (the Settings dialog),
+`gui/widgets/welcome_setup.py` (`set_context`, `_map_picked`) and the
+Observatory step of `gui/ui/welcome_tab.ui`.
+
+### 7quaterdecies. Interfaz 1.6: the list and the project, together again (2026-10-02, ADR-055 rev.)
+
+Motivation: splitting the list and the project into two shell pages cost
+more than it bought. Opening a project threw the list away, switching
+projects was a round trip, and the list screen (74 px rows, mostly empty)
+said very little.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| One page | `VIEW_PROJECTS`: list + project side by side, `QSplitter` between them. `VIEW_HOME`/`VIEW_DETAIL` are two names of the same index; the history tells them apart by the `pid` | **Done** |
+| List width | Draggable and remembered (`projects_list_width`, 260–560), double click on the handle resets, `«` folds it | **Done** |
+| Dense rows | 54 px, kind hue as the row's left edge, selection tinted with the object's colour, context numbers on line 2, and the row drops what does not fit | **Done** |
+| Sky bar | `gui/widgets/sky_bar.py` in the navigation row: the Moon at its real phase, the darkness window, the planets and the event chips, in every view | **Done** |
+| Resting pane | `gui/widgets/night_panel.py`: the night (same painted sky as Welcome) and the way in to a new project | **Done** |
+| One source | `core/night_brief.py`: the numbers and the words of the night, shared by the three surfaces | **Done** |
+| Header | Campaigns becomes a header button; the ~105 px of the two bands return to the list | **Done** |
+
+**Entry point**: `_build_shell` (the splitter and the merged page),
+`_sync_projects_pane`, `_restore_list_width` / `_apply_list_width` in
+`gui/main_window.py`; `gui/widgets/project_row.py`, `sky_bar.py`,
+`night_panel.py` and `core/night_brief.py`.
+
+### 7quindecies. Interfaz 1.7: the project tabs stop scrolling (2026-10-02, ADR-041 rev.)
+
+Motivation: the Object card and Analysis had grown past the fold. With a
+project holding a visit, its frames and a measured curve, the card asked
+for 499 px and Analysis for 1058 in a 537 px viewport, and the curve's own
+legend printed on top of its axis labels.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| Chrome | The four small buttons and the context line move into the masthead; the "Next" box is a slim band; a page no longer repeats its tab's name (195 -> ~120 px in every tab) | **Done** |
+| Analysis | Visits and curve side by side (master-detail), the list sized to its content instead of a fixed box | **Done** |
+| Charts | `ChartView.sizeHint()` (640x260) instead of the scene's size, and the light curve's legend geometry derived from its own font | **Done** |
+| Object card | The parameters block carries its "In depth" switch in its header, the table is as tall as its rows, and the chips stop stretching | **Done** |
+| Criterion | `tests/unit/test_project_tabs_layout.py`: neither tab asks for more than the viewport at 1360x940 and 1360x860 | **Done** |
+
+**Entry point**: `_section_layout`, `_build_analysis_tab`,
+`_analysis_curve_block` in `gui/main_window.py`;
+`gui/widgets/base_chart.py`, `gui/widgets/lightcurve_widget.py`,
+`gui/widgets/visits_panel.py`, `gui/overview.py` and the masthead of
+`gui/ui/projects_tab.ui`.
+
+**Polish (2026-10-02, same day).** Two things the first pass got wrong:
+
+- **The visit window covered the workbench.** It is a non-modal dialog
+  with a parent, so the window manager keeps it above the main window; with
+  the UFE now being a PAGE, opening a plate from a visit left the editor
+  behind it. It now steps aside while the workbench is on screen and comes
+  back when it leaves (`_ufe_enter` / `_ufe_leave`). See ADR-045.
+- **The list could not show the curve.** The thumbnail lived in its own
+  right-hand column and stole 106 px from the line where the object's
+  numbers live, so at the default width the two never fitted together. It
+  rides on the first line now, next to the name; the numbers show when they
+  really fit (measured with the real font, never clipped) and the default
+  list width is 500, where the curve AND the numbers fit.
+
+### 7septendecies. Interfaz 1.8: the night, drawn in the project tabs (2026-10-02, ADR-041 rev.)
+
+Motivation: the three project tabs were correct and told you nothing at a
+glance, the same complaint the Welcome view had before Interfaz 1.4.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The band | `gui/widgets/night_ribbon.py`: dusk → dawn with the object's altitude arc, the Moon at its real phase, the "now" marker and coloured blocks on the timeline. One widget, three readings | **Done** |
+| Object card | Two columns (parameters 60% / band + charts 40%), the table as a definition list, the facts in one flowing line, "In depth" on by default | **Done** |
+| Capture | One "Telescope and camera" panel instead of three group boxes, the status in one row, and **the plan drawn on the night** with its verdict | **Done** |
+| Analysis | The visit's frames drawn on the night they happened, above the visits | **Done** |
+| Colour | The connection chip (green/amber) and the status values tinted by meaning | **Done** |
+| Criterion | All four tabs fit the viewport at 1360x940 and 1360x860, Capture included **with CCDciel connected** | **Done** |
+
+**Entry point**: `gui/widgets/night_ribbon.py` (the band),
+`_plan_ribbon_refresh` and `_analysis_ribbon_refresh` in
+`gui/main_window.py`, `_refresh_ribbon` in `gui/overview.py`.
+
 ### 7undecies. Alerts dissolve into the list (2026-10-01, ADR-055 rev.)
 
 Motivation: the "needs your attention" panel and the "due for a revisit" band

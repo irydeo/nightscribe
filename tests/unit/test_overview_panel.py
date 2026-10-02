@@ -105,10 +105,21 @@ def _texts(panel):
 
 
 def _param_cells(panel):
-    # @return: the (param, value, meaning) strings of every visible row
+    # @return: the (param, value, meaning) strings of every visible row.
+    #   Interfaz 1.8: the meaning sits UNDER its value, spanning both
+    #   columns (a definition list: as a third column it wrapped to one
+    #   word per line in the half-width column the table lives in now), so
+    #   the table's rows come in pairs.
     tbl = panel.tbl_params
-    return [(tbl.item(r, 0).text(), tbl.item(r, 1).text(),
-             tbl.item(r, 2).text()) for r in range(tbl.rowCount())]
+    out = []
+    for r in range(0, tbl.rowCount(), 2):
+        name = tbl.item(r, 0)
+        value = tbl.item(r, 1)
+        meaning = tbl.item(r + 1, 0) if r + 1 < tbl.rowCount() else None
+        out.append((name.text() if name else "",
+                    value.text() if value else "",
+                    meaning.text() if meaning else ""))
+    return out
 
 
 # ---------------- states ----------------
@@ -132,16 +143,41 @@ def test_ready_state_hook_and_params_visible(panel, qapp):
         f"hook is not the narrative hook: {hook!r}"
 
 
+def test_the_band_goes_where_the_charts_are_not(panel, qapp):
+    # Interfaz 1.8: with charts, the band rides above them in the right
+    # column; without them, that column would be empty and the band spans
+    # the page (which is also what lets the table breathe).
+    panel.show(FAKE_ELEMENT)
+    qapp.processEvents()
+    ribbon = panel._ribbon
+    vbox = panel.layout()
+    # isHidden(), not isVisible(): an unshown panel reports every child as
+    # not visible, and what matters here is what the panel DECIDED
+    if not panel.grp_charts.isHidden():
+        assert panel._ui.colBodyLayout.indexOf(ribbon) >= 0
+        assert not panel._ui.col_body.isHidden()
+    else:
+        assert vbox.indexOf(ribbon) >= 0
+        assert panel._ui.col_body.isHidden()
+    # and it carries the night's numbers as its tooltip, because the
+    # caption is elided in a narrow column
+    assert "19:30" in ribbon.toolTip() or "observatory" in ribbon.toolTip()
+
+
 def test_ready_params_table_has_meaningful_rows(panel):
     panel.show(FAKE_ELEMENT)
     assert not panel.grp_params.isHidden()
+    # Interfaz 1.8: "in depth" is ON by default (the observer asked for it),
+    # so this test reads the basic view by turning it OFF
+    assert panel.chk_deep.isChecked()
+    panel.chk_deep.setChecked(False)
     rows = _param_cells(panel)
     assert len(rows) >= 3, f"expected a few rows, got {len(rows)}"
     meaning = [r[2] for r in rows]
-    # the wide column: a real explanation, not an empty cell
+    # the explanation is a real sentence, not an empty cell
     assert all(len(m) > 40 for m in meaning), \
-        f"explanation column too short: {meaning!r}"
-    # the basic rows only, in-depth hidden
+        f"explanation too short: {meaning!r}"
+    # the basic rows only, in-depth off
     params = [r[0].lower() for r in rows]
     assert any("family" in p or "familia" in p for p in params)
     assert any("moid" in p for p in params)
@@ -151,6 +187,7 @@ def test_ready_params_table_has_meaningful_rows(panel):
 
 def test_in_depth_toggle_adds_deep_rows(panel):
     panel.show(FAKE_ELEMENT)
+    panel.chk_deep.setChecked(False)
     before = panel.tbl_params.rowCount()
     panel.chk_deep.setChecked(True)
     after = panel.tbl_params.rowCount()
@@ -566,7 +603,11 @@ def test_params_table_rows_follow_window_resize(panel, qapp):
     # clear of it: with a wider font (Windows measures differently) asking
     # for 500 came back as the minimum, the two widths were the same and the
     # rows did not move at all (measured 2026-10-01).
-    narrow_w = max(500, panel.minimumSizeHint().width())
+    # The panel's own floor grew with the two-column layout (the charts
+    # have a 300 px minimum), so the narrow width has to clear it: asking
+    # for less than the minimum leaves the widget at the minimum and the two
+    # measurements come back identical.
+    narrow_w = panel.minimumSizeHint().width() + 40
     wide_w = narrow_w + 400
     panel.resize(wide_w, 800)
     qapp.processEvents()
@@ -635,6 +676,7 @@ def test_sn_table_explains_the_event_type(panel):
 
 def test_sn_table_redshift_is_deep_only(panel):
     panel.show(_sn_full_fixture())
+    panel.chk_deep.setChecked(False)
     basic = [r[0].lower() for r in _param_cells(panel)]
     assert not any("redshift" in p or "corrimiento" in p for p in basic), \
         f"redshift leaked into the basic view: {basic}"
@@ -767,6 +809,9 @@ def test_transit_table_deep_rows(panel):
     # the planet's story lives under «in depth»: period, size, distance,
     # discovery and the O-C drift (why tonight's timing matters)
     panel.show(_transit_fixture())
+    # Interfaz 1.8: "in depth" is on by default, so the basic view is the
+    # one with it turned off
+    panel.chk_deep.setChecked(False)
     basic = [r[0].lower() for r in _param_cells(panel)]
     assert not any("o-c" in p or "deriva" in p for p in basic), basic
     panel.chk_deep.setChecked(True)
@@ -1270,13 +1315,17 @@ def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
         assert p2.btn_project.toolTip() == (
             "Reanudar el proyecto activo de este objeto")
         p2.deleteLater()
-        assert p.grp_params.title() == "Parámetros"
+        # Interfaz 1.7: the block is a frame with its own header row
+        assert p._ui.lbl_params_title.text() == "Parámetros"
         assert p.chk_deep.text() == "A fondo"
         assert p.grp_charts.title() == "Gráficos"
         tbl = p.tbl_params
         assert tbl.horizontalHeaderItem(0).text() == "Parámetro"
         assert tbl.horizontalHeaderItem(1).text() == "Valor"
-        assert tbl.horizontalHeaderItem(2).text() == "Qué significa"
+        # Interfaz 1.8: two columns, and the explanation is the row BELOW
+        # its value (a third column wrapped to one word per line here)
+        assert tbl.columnCount() == 2
+        assert tbl.horizontalHeaderItem(2) is None
         # capture chips (D3) come from the context; show() paints them
         p.show(FAKE_ELEMENT, {"kind": "neo", "mag": 20.1,
                               "rate_arcsec_min": 12.4,
@@ -1315,7 +1364,8 @@ def test_panel_strings_resolve_in_english(qapp, tmp_path):
         assert p.btn_project.text() == "\u25b6  Continue project"
         assert p.btn_project.toolTip() == (
             "Resume the active project for this object")
-        assert p.grp_params.title() == "Parameters"
+        # Interfaz 1.7: the block is a frame with its own header row
+        assert p._ui.lbl_params_title.text() == "Parameters"
         assert p.grp_charts.title() == "Charts"
         p.deleteLater()
     finally:

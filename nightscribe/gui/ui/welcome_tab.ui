@@ -1,47 +1,157 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Interfaz 1.0 (ADR-053): the Welcome view. It hosts the first-run / update
-  wizard as an inline stepper (Observatory -> Targets -> Data) instead of the
-  old modal QWizard. The structure, texts and tooltips live here (ADR-005);
-  gui/widgets/welcome_setup.py wires the signals, fills the kinds list and
+  Interfaz 1.4 (ADR-055 amendment): the Welcome view. It hosts the
+  first-run / update wizard as an inline stepper (Observatory -> Targets
+  -> Data) instead of the old modal QWizard, wrapped in a painted night
+  sky.
+
+  The structure, texts and tooltips live here (ADR-005). gui/widgets/
+  welcome_setup.py wires the signals, swaps skyHero for the real painted
+  hero (WelcomeSky), fills the "your night, now" strip, the kind cards and
   the migration report, and gates navigation on the update's Data step.
+
+  The whole page is compact on purpose: it has to fit the content area of
+  a 1280x860 window (~770 px) WITHOUT squeezing the forms, which is what
+  made the old layout collapse. The two lists that can grow without bound
+  (the kind cards, the migration report) keep their own scroll box with a
+  capped height; the host wraps the page in one outer scroll as a safety
+  net for short screens (gui/widgets/welcome_setup.py).
+
+  Two slots are placeholders for custom widgets and MUST stay QWidget:
+  skyHero (the painted sky) and card1Chips (the coloured kind chips).
 -->
 <ui version="4.0">
  <class>WelcomeTab</class>
  <widget class="QWidget" name="WelcomeTab">
   <layout class="QVBoxLayout" name="welcomeLayout">
-   <property name="leftMargin"><number>24</number></property>
-   <property name="topMargin"><number>20</number></property>
-   <property name="rightMargin"><number>24</number></property>
-   <property name="bottomMargin"><number>20</number></property>
+   <property name="leftMargin"><number>20</number></property>
+   <property name="topMargin"><number>10</number></property>
+   <property name="rightMargin"><number>20</number></property>
+   <property name="bottomMargin"><number>10</number></property>
+   <property name="spacing"><number>8</number></property>
    <item>
     <widget class="QFrame" name="welcomeHero" native="true">
-     <layout class="QVBoxLayout" name="heroLayout">
-      <item>
-       <widget class="QLabel" name="lbl_logo">
-        <property name="alignment"><set>Qt::AlignCenter</set></property>
-        <property name="minimumSize"><size><width>96</width><height>96</height></size></property>
-        <property name="maximumSize"><size><width>96</width><height>96</height></size></property>
+     <property name="minimumSize"><size><width>0</width><height>200</height></size></property>
+     <layout class="QGridLayout" name="heroGrid">
+      <property name="leftMargin"><number>0</number></property>
+      <property name="topMargin"><number>0</number></property>
+      <property name="rightMargin"><number>0</number></property>
+      <property name="bottomMargin"><number>0</number></property>
+      <item row="0" column="0">
+       <widget class="QWidget" name="skyHero">
+        <property name="minimumSize"><size><width>0</width><height>200</height></size></property>
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch><verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
        </widget>
       </item>
-      <item>
-       <widget class="QLabel" name="welcomeWordmark">
-        <property name="text"><string>NIGHTSCRIBE</string></property>
-        <property name="textFormat"><enum>Qt::RichText</enum></property>
-        <property name="alignment"><set>Qt::AlignCenter</set></property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="welcomeTag">
-        <property name="text"><string>Plan, understand and report your observing night</string></property>
-        <property name="alignment"><set>Qt::AlignCenter</set></property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QLabel" name="welcomeLead">
-        <property name="text"><string>Set up your observatory and your targets in three steps; then create your first project and the app guides you: record, capture, analysis and publishing.</string></property>
-        <property name="alignment"><set>Qt::AlignCenter</set></property>
-        <property name="wordWrap"><bool>true</bool></property>
+      <item row="0" column="0">
+       <widget class="QWidget" name="heroOverlay">
+        <layout class="QVBoxLayout" name="heroOverlayLayout">
+         <property name="leftMargin"><number>30</number></property>
+         <property name="topMargin"><number>14</number></property>
+         <property name="rightMargin"><number>30</number></property>
+         <property name="bottomMargin"><number>12</number></property>
+         <property name="spacing"><number>5</number></property>
+         <item>
+          <layout class="QHBoxLayout" name="heroBrandRow">
+           <property name="spacing"><number>14</number></property>
+           <item>
+            <widget class="QLabel" name="lbl_logo">
+             <property name="minimumSize"><size><width>52</width><height>52</height></size></property>
+             <property name="maximumSize"><size><width>52</width><height>52</height></size></property>
+            </widget>
+           </item>
+           <item>
+            <layout class="QVBoxLayout" name="heroBrandText">
+             <property name="spacing"><number>2</number></property>
+             <item>
+              <widget class="QLabel" name="welcomeWordmark">
+               <property name="text"><string>NIGHTSCRIBE</string></property>
+               <property name="textFormat"><enum>Qt::RichText</enum></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="welcomeTag">
+               <property name="text"><string>Plan, understand and report your observing night</string></property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <spacer name="heroBrandSpacer">
+             <property name="orientation"><enum>Qt::Horizontal</enum></property>
+            </spacer>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <widget class="QLabel" name="welcomeLead">
+           <property name="text"><string>Three steps, then the app walks you through every project: record, capture, analysis and publishing.</string></property>
+           <property name="wordWrap"><bool>true</bool></property>
+           <property name="maximumSize"><size><width>660</width><height>16777215</height></size></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QFrame" name="nightStrip" native="true">
+           <property name="maximumSize"><size><width>720</width><height>16777215</height></size></property>
+           <layout class="QHBoxLayout" name="nightStripLayout">
+            <property name="leftMargin"><number>14</number></property>
+            <property name="topMargin"><number>9</number></property>
+            <property name="rightMargin"><number>14</number></property>
+            <property name="bottomMargin"><number>9</number></property>
+            <property name="spacing"><number>12</number></property>
+            <item>
+             <widget class="QLabel" name="lbl_night_icon">
+              <property name="text"><string notr="true">☾</string></property>
+              <property name="alignment"><set>Qt::AlignTop|Qt::AlignHCenter</set></property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QVBoxLayout" name="nightTextLayout">
+              <property name="spacing"><number>1</number></property>
+              <item>
+               <widget class="QLabel" name="lbl_night_title">
+                <property name="text"><string>YOUR NIGHT, NOW</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="lbl_night_window">
+                <property name="text"><string>Astronomical night: set your observatory and this becomes your sky.</string></property>
+                <property name="wordWrap"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="lbl_night_moon">
+                <property name="text"><string/></property>
+                <property name="wordWrap"><bool>true</bool></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLabel" name="lbl_night_planets">
+                <property name="text"><string/></property>
+                <property name="wordWrap"><bool>true</bool></property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QPushButton" name="btn_night_set">
+              <property name="text"><string>Set up my site →</string></property>
+              <property name="toolTip"><string>Go to the observatory step and make this your night</string></property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <spacer name="heroBottom">
+           <property name="orientation"><enum>Qt::Vertical</enum></property>
+          </spacer>
+         </item>
+        </layout>
        </widget>
       </item>
      </layout>
@@ -49,6 +159,7 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="stepperLayout">
+     <property name="spacing"><number>0</number></property>
      <item>
       <widget class="QToolButton" name="btn_step_obs">
        <property name="text"><string>1 · Your observatory</string></property>
@@ -57,9 +168,10 @@
       </widget>
      </item>
      <item>
-      <widget class="QLabel" name="lbl_sep1">
-       <property name="text"><string>→</string></property>
-       <property name="styleSheet"><string notr="true">color: #3a4156;</string></property>
+      <widget class="QFrame" name="rail_sep1">
+       <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+       <property name="minimumSize"><size><width>24</width><height>2</height></size></property>
+       <property name="maximumSize"><size><width>16777215</width><height>2</height></size></property>
       </widget>
      </item>
      <item>
@@ -70,9 +182,10 @@
       </widget>
      </item>
      <item>
-      <widget class="QLabel" name="lbl_sep2">
-       <property name="text"><string>→</string></property>
-       <property name="styleSheet"><string notr="true">color: #3a4156;</string></property>
+      <widget class="QFrame" name="rail_sep2">
+       <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+       <property name="minimumSize"><size><width>24</width><height>2</height></size></property>
+       <property name="maximumSize"><size><width>16777215</width><height>2</height></size></property>
       </widget>
      </item>
      <item>
@@ -93,85 +206,117 @@
     <widget class="QStackedWidget" name="setup_stack">
      <widget class="QFrame" name="panel_obs">
       <layout class="QVBoxLayout" name="obsLayout">
+       <property name="leftMargin"><number>22</number></property>
+       <property name="topMargin"><number>12</number></property>
+       <property name="rightMargin"><number>22</number></property>
+       <property name="bottomMargin"><number>12</number></property>
+       <property name="spacing"><number>4</number></property>
        <item>
         <widget class="QLabel" name="lbl_obs_title">
          <property name="text"><string>Your observatory</string></property>
-         <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
         </widget>
        </item>
        <item>
         <widget class="QLabel" name="lbl_obs_sub">
-         <property name="text"><string>Tell us where you look at the sky from: NightScribe computes rise, set, airmass and visibility for that exact site.</string></property>
+         <property name="text"><string>Click the map to get close, then fine-tune the numbers: everything is computed for that exact site.</string></property>
          <property name="wordWrap"><bool>true</bool></property>
-         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
         </widget>
        </item>
        <item>
-        <layout class="QHBoxLayout" name="detectRow">
+        <layout class="QHBoxLayout" name="obsColumns">
+         <property name="spacing"><number>16</number></property>
          <item>
-          <widget class="QPushButton" name="btn_detect">
-           <property name="text"><string>Find my location</string></property>
-           <property name="toolTip"><string>Uses your public IP to guess the city, only when you click</string></property>
+          <widget class="QWidget" name="mapHost">
+           <property name="minimumSize"><size><width>0</width><height>180</height></size></property>
+           <property name="sizePolicy">
+            <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+             <horstretch>1</horstretch><verstretch>1</verstretch>
+            </sizepolicy>
+           </property>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="lbl_site_privacy">
-           <property name="text"><string>Only when you click: the lookup uses your public IP to guess the city and never sends anything else, and it never runs on its own.</string></property>
-           <property name="wordWrap"><bool>true</bool></property>
-           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
+          <widget class="QWidget" name="obsFormHost">
+           <property name="minimumSize"><size><width>330</width><height>0</height></size></property>
+           <property name="maximumSize"><size><width>400</width><height>16777215</height></size></property>
+           <layout class="QVBoxLayout" name="obsFormColumn">
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <property name="spacing"><number>6</number></property>
+            <item>
+             <!-- a direct child of the column, not a row with a spacer: in
+                  a QVBoxLayout the button stretches to the column width,
+                  the same as the fields below it -->
+             <widget class="QPushButton" name="btn_detect">
+              <property name="text"><string>Find my location</string></property>
+              <property name="toolTip"><string>Uses your public IP to guess the city, only when you click</string></property>
+             </widget>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="mpcRow">
+              <item>
+               <widget class="QLabel" name="lbl_mpc">
+                <property name="text"><string>MPC code:</string></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="edt_site_mpc">
+                <property name="maxLength"><number>3</number></property>
+                <property name="placeholderText"><string>e.g. Z41</string></property>
+                <property name="maximumWidth"><number>80</number></property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btn_resolve">
+                <property name="text"><string>Resolve</string></property>
+                <property name="toolTip"><string>Fills the coordinates and the name from the MPC observatory code</string></property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="mpcSpacer">
+                <property name="orientation"><enum>Qt::Horizontal</enum></property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QFormLayout" name="siteForm">
+              <property name="labelAlignment"><set>Qt::AlignRight|Qt::AlignVCenter</set></property>
+              <property name="horizontalSpacing"><number>10</number></property>
+              <property name="verticalSpacing"><number>4</number></property>
+              <item row="0" column="0"><widget class="QLabel" name="lbl_site_name"><property name="text"><string>Name:</string></property></widget></item>
+              <item row="0" column="1"><widget class="QLineEdit" name="edt_site_name"/></item>
+              <item row="1" column="0"><widget class="QLabel" name="lbl_site_lat"><property name="text"><string>Latitude (°):</string></property></widget></item>
+              <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_site_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
+              <item row="2" column="0"><widget class="QLabel" name="lbl_site_lon"><property name="text"><string>Longitude (° E):</string></property></widget></item>
+              <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_site_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
+              <item row="3" column="0"><widget class="QLabel" name="lbl_site_height"><property name="text"><string>Height (m):</string></property></widget></item>
+              <item row="3" column="1"><widget class="QSpinBox" name="spn_site_height"><property name="maximum"><number>9000</number></property></widget></item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLabel" name="lbl_site_status">
+              <property name="text"><string/></property>
+              <property name="wordWrap"><bool>true</bool></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lbl_site_privacy">
+              <property name="text"><string>Find my location only runs when you click it, and it guesses the city from your public IP: nothing else.</string></property>
+              <property name="wordWrap"><bool>true</bool></property>
+             </widget>
+            </item>
+            <item>
+             <spacer name="obsFormBottom">
+              <property name="orientation"><enum>Qt::Vertical</enum></property>
+             </spacer>
+            </item>
+           </layout>
           </widget>
-         </item>
-         <item>
-          <spacer name="detectSpacer">
-           <property name="orientation"><enum>Qt::Horizontal</enum></property>
-          </spacer>
          </item>
         </layout>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="mpcRow">
-         <item>
-          <widget class="QLabel" name="lbl_mpc">
-           <property name="text"><string>Or with an MPC code:</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="edt_site_mpc">
-           <property name="maxLength"><number>3</number></property>
-           <property name="placeholderText"><string>e.g. Z41</string></property>
-           <property name="maximumWidth"><number>80</number></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btn_resolve">
-           <property name="text"><string>Resolve</string></property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="mpcSpacer">
-           <property name="orientation"><enum>Qt::Horizontal</enum></property>
-          </spacer>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QFormLayout" name="siteForm">
-         <item row="0" column="0"><widget class="QLabel" name="lbl_site_name"><property name="text"><string>Name:</string></property></widget></item>
-         <item row="0" column="1"><widget class="QLineEdit" name="edt_site_name"/></item>
-         <item row="1" column="0"><widget class="QLabel" name="lbl_site_lat"><property name="text"><string>Latitude (degrees):</string></property></widget></item>
-         <item row="1" column="1"><widget class="QDoubleSpinBox" name="spn_site_lat"><property name="decimals"><number>5</number></property><property name="minimum"><double>-90.0</double></property><property name="maximum"><double>90.0</double></property></widget></item>
-         <item row="2" column="0"><widget class="QLabel" name="lbl_site_lon"><property name="text"><string>Longitude (degrees east):</string></property></widget></item>
-         <item row="2" column="1"><widget class="QDoubleSpinBox" name="spn_site_lon"><property name="decimals"><number>5</number></property><property name="minimum"><double>-180.0</double></property><property name="maximum"><double>180.0</double></property></widget></item>
-         <item row="3" column="0"><widget class="QLabel" name="lbl_site_height"><property name="text"><string>Height (m):</string></property></widget></item>
-         <item row="3" column="1"><widget class="QSpinBox" name="spn_site_height"><property name="maximum"><number>9000</number></property></widget></item>
-        </layout>
-       </item>
-       <item>
-        <widget class="QLabel" name="lbl_site_status">
-         <property name="text"><string/></property>
-         <property name="wordWrap"><bool>true</bool></property>
-         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
-        </widget>
        </item>
        <item>
         <layout class="QHBoxLayout" name="obsActions">
@@ -188,34 +333,54 @@
          </item>
         </layout>
        </item>
-       <item>
-        <spacer name="obsBottom">
-         <property name="orientation"><enum>Qt::Vertical</enum></property>
-        </spacer>
-       </item>
       </layout>
      </widget>
      <widget class="QFrame" name="panel_kinds">
       <layout class="QVBoxLayout" name="kindsLayout">
+       <property name="leftMargin"><number>22</number></property>
+       <property name="topMargin"><number>14</number></property>
+       <property name="rightMargin"><number>22</number></property>
+       <property name="bottomMargin"><number>14</number></property>
+       <property name="spacing"><number>6</number></property>
        <item>
-        <widget class="QLabel" name="lbl_kinds_title">
-         <property name="text"><string>Your targets</string></property>
-         <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
-        </widget>
+        <layout class="QHBoxLayout" name="kindsHead">
+         <item>
+          <widget class="QLabel" name="lbl_kinds_title">
+           <property name="text"><string>Your targets</string></property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="kindsHeadSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="lbl_kinds_count">
+           <property name="text"><string/></property>
+          </widget>
+         </item>
+        </layout>
        </item>
        <item>
         <widget class="QLabel" name="lbl_kinds_sub">
-         <property name="text"><string>Every kind below is a complete workflow in NightScribe. Keep the ones you want to follow: they drive the Tonight list, the projects and the reports.</string></property>
+         <property name="text"><string>Each kind is a complete workflow: keep the ones you want to follow.</string></property>
          <property name="wordWrap"><bool>true</bool></property>
-         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
         </widget>
        </item>
        <item>
         <widget class="QScrollArea" name="kinds_scroll">
          <property name="widgetResizable"><bool>true</bool></property>
          <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <property name="minimumSize"><size><width>0</width><height>150</height></size></property>
          <widget class="QWidget" name="kinds_container">
-          <layout class="QVBoxLayout" name="kindsBoxLayout"/>
+          <layout class="QGridLayout" name="kindsGrid">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <property name="horizontalSpacing"><number>10</number></property>
+           <property name="verticalSpacing"><number>10</number></property>
+          </layout>
          </widget>
         </widget>
        </item>
@@ -224,13 +389,24 @@
          <item>
           <widget class="QLabel" name="lbl_kinds_rule">
            <property name="text"><string>Keep at least one kind checked.</string></property>
-           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
           </widget>
          </item>
          <item>
           <spacer name="kindsActionsSpacer">
            <property name="orientation"><enum>Qt::Horizontal</enum></property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_kinds_all">
+           <property name="text"><string>All</string></property>
+           <property name="toolTip"><string>Follow every kind</string></property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_kinds_none">
+           <property name="text"><string>None</string></property>
+           <property name="toolTip"><string>Clear them all (keep at least one before continuing)</string></property>
+          </widget>
          </item>
          <item>
           <widget class="QPushButton" name="btn_kinds_next">
@@ -244,25 +420,72 @@
      </widget>
      <widget class="QFrame" name="panel_data">
       <layout class="QVBoxLayout" name="dataLayout">
+       <property name="leftMargin"><number>22</number></property>
+       <property name="topMargin"><number>14</number></property>
+       <property name="rightMargin"><number>22</number></property>
+       <property name="bottomMargin"><number>14</number></property>
+       <property name="spacing"><number>6</number></property>
        <item>
-        <widget class="QLabel" name="lbl_data_title">
-         <property name="text"><string>Your data, safe</string></property>
-         <property name="styleSheet"><string notr="true">font-size: 15px; font-weight: bold;</string></property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="lbl_data_sub">
-         <property name="text"><string>Before touching anything, NightScribe copies your database and explains in plain words what this version changes.</string></property>
-         <property name="wordWrap"><bool>true</bool></property>
-         <property name="styleSheet"><string notr="true">color: #8a90a6;</string></property>
-        </widget>
+        <layout class="QHBoxLayout" name="dataHead">
+         <property name="spacing"><number>12</number></property>
+         <item>
+          <widget class="QLabel" name="lbl_data_icon">
+           <property name="text"><string notr="true">⛨</string></property>
+           <property name="minimumSize"><size><width>34</width><height>0</height></size></property>
+           <property name="maximumSize"><size><width>34</width><height>16777215</height></size></property>
+           <property name="alignment"><set>Qt::AlignTop|Qt::AlignHCenter</set></property>
+          </widget>
+         </item>
+         <item>
+          <layout class="QVBoxLayout" name="dataHeadText">
+           <property name="spacing"><number>2</number></property>
+           <item>
+            <layout class="QHBoxLayout" name="dataTitleRow">
+             <property name="spacing"><number>10</number></property>
+             <item>
+              <widget class="QLabel" name="lbl_data_title">
+               <property name="text"><string>Your data, safe</string></property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLabel" name="lbl_data_badge">
+               <property name="text"><string/></property>
+               <property name="visible"><bool>false</bool></property>
+               <property name="alignment"><set>Qt::AlignCenter</set></property>
+              </widget>
+             </item>
+             <item>
+              <spacer name="dataTitleSpacer">
+               <property name="orientation"><enum>Qt::Horizontal</enum></property>
+              </spacer>
+             </item>
+            </layout>
+           </item>
+           <item>
+            <widget class="QLabel" name="lbl_data_sub">
+             <property name="text"><string>Before touching anything, NightScribe copies your database and explains in plain words what this version changes.</string></property>
+             <property name="wordWrap"><bool>true</bool></property>
+            </widget>
+           </item>
+          </layout>
+         </item>
+         <item>
+          <spacer name="dataHeadSpacer">
+           <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          </spacer>
+         </item>
+        </layout>
        </item>
        <item>
         <widget class="QScrollArea" name="data_scroll">
          <property name="widgetResizable"><bool>true</bool></property>
          <property name="frameShape"><enum>QFrame::NoFrame</enum></property>
+         <property name="minimumSize"><size><width>0</width><height>120</height></size></property>
+         <property name="maximumSize"><size><width>16777215</width><height>280</height></size></property>
          <widget class="QWidget" name="data_container">
-          <layout class="QVBoxLayout" name="dataBoxLayout"/>
+          <layout class="QVBoxLayout" name="dataBoxLayout">
+           <property name="spacing"><number>6</number></property>
+          </layout>
          </widget>
         </widget>
        </item>
@@ -271,7 +494,6 @@
          <item>
           <widget class="QLabel" name="lbl_data_rule">
            <property name="text"><string>Required once per version.</string></property>
-           <property name="styleSheet"><string notr="true">color: #8a90a6; font-size: 11px;</string></property>
           </widget>
          </item>
          <item>
@@ -293,6 +515,7 @@
    </item>
    <item>
     <layout class="QHBoxLayout" name="createRow">
+     <property name="spacing"><number>14</number></property>
      <item>
       <spacer name="createSpacer">
        <property name="orientation"><enum>Qt::Horizontal</enum></property>
@@ -304,109 +527,175 @@
        <property name="toolTip"><string>Pick among tonight's best objects</string></property>
       </widget>
      </item>
-      <item>
-       <spacer name="createSpacer2">
-        <property name="orientation"><enum>Qt::Horizontal</enum></property>
-       </spacer>
-      </item>
-     </layout>
-    </item>
-    <item>
-     <layout class="QHBoxLayout" name="cardsLayout">
-      <property name="spacing"><number>12</number></property>
-      <item>
-       <widget class="QFrame" name="wcard1">
-        <layout class="QVBoxLayout" name="wcard1Layout">
-         <item>
-          <widget class="QLabel" name="lbl_card1_title">
-           <property name="text"><string>What can you observe?</string></property>
-           <property name="styleSheet"><string notr="true">font-weight: bold;</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="lbl_card1_body">
-           <property name="text"><string>Supernovae and transients
-Near-Earth objects and PCCP candidates
-Comets and exoplanet transits
-Variable stars and HADS</string></property>
-           <property name="wordWrap"><bool>true</bool></property>
-           <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="wcard1Spacer">
-           <property name="orientation"><enum>Qt::Vertical</enum></property>
-          </spacer>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QFrame" name="wcard2">
-        <layout class="QVBoxLayout" name="wcard2Layout">
-         <item>
-          <widget class="QLabel" name="lbl_card2_title">
-           <property name="text"><string>How does it work?</string></property>
-           <property name="styleSheet"><string notr="true">font-weight: bold;</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="lbl_card2_body">
-           <property name="text"><string>1 Card · 2 Capture · 3 Analysis · 4 Publishing</string></property>
-           <property name="wordWrap"><bool>true</bool></property>
-           <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btn_card2_guide">
-           <property name="text"><string>See the full guide →</string></property>
-           <property name="flat"><bool>true</bool></property>
-           <property name="styleSheet"><string notr="true">color: #6ab0ff; text-align: left; padding: 0;</string></property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="wcard2Spacer">
-           <property name="orientation"><enum>Qt::Vertical</enum></property>
-          </spacer>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
-       <widget class="QFrame" name="wcard3">
-        <layout class="QVBoxLayout" name="wcard3Layout">
-         <item>
-          <widget class="QLabel" name="lbl_card3_title">
-           <property name="text"><string>Explore the sky</string></property>
-           <property name="styleSheet"><string notr="true">font-weight: bold;</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="lbl_card3_body">
-           <property name="text"><string>Sky calendar, observing journal and campaigns.</string></property>
-           <property name="wordWrap"><bool>true</bool></property>
-           <property name="styleSheet"><string notr="true">color: #c7cbd9;</string></property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btn_card3_skycal">
-           <property name="text"><string>Sky calendar →</string></property>
-           <property name="flat"><bool>true</bool></property>
-           <property name="styleSheet"><string notr="true">color: #6ab0ff; text-align: left; padding: 0;</string></property>
-          </widget>
-         </item>
-         <item>
-          <spacer name="wcard3Spacer">
-           <property name="orientation"><enum>Qt::Vertical</enum></property>
-          </spacer>
-         </item>
-        </layout>
-       </widget>
-      </item>
-     </layout>
-    </item>
-   </layout>
-  </widget>
+     <item>
+      <widget class="QLabel" name="lbl_cta_sub">
+       <property name="text"><string>Tonight's best objects, with the app walking you through.</string></property>
+       <property name="wordWrap"><bool>true</bool></property>
+       <property name="maximumSize"><size><width>340</width><height>16777215</height></size></property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="createSpacer2">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="btn_skip">
+       <property name="text"><string>Explore first →</string></property>
+       <property name="toolTip"><string>Go to your projects without creating one now</string></property>
+       <property name="flat"><bool>true</bool></property>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <layout class="QHBoxLayout" name="cardsLayout">
+     <property name="spacing"><number>12</number></property>
+     <item>
+      <widget class="QFrame" name="wcard1">
+       <layout class="QVBoxLayout" name="wcard1Layout">
+        <property name="leftMargin"><number>16</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>16</number></property>
+        <property name="bottomMargin"><number>12</number></property>
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="wcard1Head">
+          <item>
+           <widget class="QLabel" name="lbl_card1_icon">
+            <property name="text"><string notr="true">✦</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lbl_card1_title">
+            <property name="text"><string>What can you observe?</string></property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="wcard1HeadSpacer">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QWidget" name="card1Chips">
+          <layout class="QGridLayout" name="card1ChipsGrid">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <property name="horizontalSpacing"><number>6</number></property>
+           <property name="verticalSpacing"><number>6</number></property>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="wcard1Spacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="wcard2">
+       <layout class="QVBoxLayout" name="wcard2Layout">
+        <property name="leftMargin"><number>16</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>16</number></property>
+        <property name="bottomMargin"><number>12</number></property>
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="wcard2Head">
+          <item>
+           <widget class="QLabel" name="lbl_card2_icon">
+            <property name="text"><string notr="true">➜</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lbl_card2_title">
+            <property name="text"><string>How does it work?</string></property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="wcard2HeadSpacer">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QLabel" name="lbl_card2_body">
+          <property name="text"><string>1 Card · 2 Capture · 3 Analysis · 4 Publishing</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btn_card2_guide">
+          <property name="text"><string>See the full guide →</string></property>
+          <property name="flat"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="wcard2Spacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QFrame" name="wcard3">
+       <layout class="QVBoxLayout" name="wcard3Layout">
+        <property name="leftMargin"><number>16</number></property>
+        <property name="topMargin"><number>12</number></property>
+        <property name="rightMargin"><number>16</number></property>
+        <property name="bottomMargin"><number>12</number></property>
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <layout class="QHBoxLayout" name="wcard3Head">
+          <item>
+           <widget class="QLabel" name="lbl_card3_icon">
+            <property name="text"><string notr="true">☄</string></property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QLabel" name="lbl_card3_title">
+            <property name="text"><string>Explore the sky</string></property>
+           </widget>
+          </item>
+          <item>
+           <spacer name="wcard3HeadSpacer">
+            <property name="orientation"><enum>Qt::Horizontal</enum></property>
+           </spacer>
+          </item>
+         </layout>
+        </item>
+        <item>
+         <widget class="QLabel" name="lbl_card3_body">
+          <property name="text"><string>Sky calendar, observing journal and campaigns.</string></property>
+          <property name="wordWrap"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="btn_card3_skycal">
+          <property name="text"><string>Sky calendar →</string></property>
+          <property name="flat"><bool>true</bool></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="wcard3Spacer">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
+   </item>
+  </layout>
+ </widget>
  <resources/>
  <connections/>
 </ui>

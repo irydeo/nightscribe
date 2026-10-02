@@ -2,7 +2,12 @@
 
 **Estado / Status**: Accepted · **Fecha / Date**: 2026-09-19 · **ejecutado /
 executed**: 2026-09-19 (`test_project_tabs.py` 25 + `test_projects_hub.py` 97
-+ suite unitaria 1391 green)
++ suite unitaria 1391 green) · **Enmendado / Amended**: 2026-10-02
+(Interfaz 1.7: el cromo del proyecto baja de cinco filas a tres, las
+páginas dejan de repetir el nombre de su pestaña, Análisis pone las
+visitas y la curva una al lado de la otra, y las gráficas declaran su
+tamaño; `test_project_tabs_layout.py` fija el criterio: **ninguna de las
+dos pestañas hace scroll** a 1360x940 ni a 1360x860)
 
 **Ver / See**: ADR-019 (hub de proyectos — enmendado dos veces: wizard →
 página única plegable (Track UX) → esta barra) · ADR-038 (prominencia y
@@ -141,3 +146,93 @@ kind). The retired `process` and `followup` keys stay as permanent
 aliases of `analysis` for deep links. The bar remains a row of flat
 buttons in `projects_tab.ui`, one page visible at a time, lazy build,
 and the deep-link contract holds.
+
+**Amendment (2026-10-02, Interfaz 1.7: the tabs stop scrolling).** The
+pages had grown past the fold: with a project holding a visit, its frames
+and a measured curve, the Object card asked for 499 px and Analysis for
+1058 in a 537 px viewport. Four changes, all of them measured:
+
+1. **The project chrome drops from five rows to three** (~75 px in every
+   tab): the four small buttons (`»`, `⌂`, `☆`, `⋯`) and the context line
+   (`mag · RA · Dec`) move into the masthead row, and the "Next" box stops
+   being a `QGroupBox` (a slim band keeps the action and its two buttons).
+2. **A page no longer repeats its tab's name.** `_section_layout` drew a
+   bold title above the content that said exactly what the active tab
+   already said: 25 px spent twice. The state chip stays, in a slim row.
+3. **Analysis puts the visits and the curve side by side.** Stacked they
+   asked for ~800 px; as a master-detail pair (visits left, curve right)
+   they fit in ~330, and the reading is better: pick the visit, read its
+   curve. The visits list grows with its content (capped) instead of
+   reserving a fixed 180 px box.
+4. **Charts declare their size.** `QGraphicsView` has no `sizeHint` of its
+   own and answers with the SCENE's, which is whatever the data spans (a
+   light curve asked for 520 px). `ChartView.sizeHint()` is 640x260, and
+   the layout's stretch still grows them where there is room.
+
+Along the way, three real bugs surfaced: the chips of the object card
+stretched into slabs (a trailing stretch lost on every refill), the
+parameters table clipped its last row (a `QTableWidget`'s sizeHint uses
+the DEFAULT row height, so wrapped explanations did not count), and the
+light curve printed its legend on top of its axis labels (the legend's
+geometry was in fixed scene units while its font is pinned to pixels).
+
+**The criterion is a test** (`tests/unit/test_project_tabs_layout.py`):
+with a project that has a visit, its frames and a curve, **neither the
+Object card nor Analysis may ask for more than the scroll viewport** at
+1360x940 and at 1360x860.
+
+**Amendment (2026-10-02, Interfaz 1.8: the night, drawn).** The three
+project tabs (Object card, Capture, Analysis) had the same problem the
+Welcome view had before Interfaz 1.4: they were correct and told you
+nothing at a glance. The fix is the same trick, applied to ONE object: a
+painted night with real numbers.
+
+1. **`gui/widgets/night_ribbon.py`**, a band ~58 px tall (30 px of sky, 16
+   of caption, 12 of padding): the twilight → night → twilight gradient,
+   the astronomical window, the object's altitude arc, the Moon at its real
+   phase, a marker for "now", any number of coloured blocks on the timeline
+   and a caption of numbers, elided rather than cut. Local (`core/coords` +
+   `core/night_brief` + `gui/moon_icon`), no network, and tolerant: no
+   site, no coordinates, no astronomical night or an object that never
+   rises all draw something honest ("never rises tonight", "max 12°: too
+   low"). Its height is FIXED: a band that stretches is how a 58 px strip
+   becomes a 200 px empty box.
+2. **One widget, three readings**: the Object card draws the object's
+   night; Capture drops the PLAN on it as a block with the verdict ("fits:
+   30 min of 9.2 h" in green, "does not fit before dawn" in amber);
+   Analysis drops the selected VISIT's frames on the night they happened.
+3. **The Object card goes two-column**: the parameters table (left, 60%)
+   and the band + the charts (right, 40%). Stacked they asked for 836 px
+   in a 631 px page; together, 520. The table became a **definition list**
+   (two columns: the value, and its explanation UNDER it across both):
+   as a third column in a half-width card it wrapped to one word per line,
+   and the explanation row is measured by hand because Qt sizes a spanned
+   cell against the first column's width only.
+   With **no charts yet** (a brand new project) the right column would be
+   empty, so the band moves to the full width, above the table: the card
+   fills the page and the explanations stop wrapping. That case asks 549 px
+   in a 551 px viewport at 1360x860, which is the tightest number in the
+   whole design.
+4. **"In depth" is on by default** (the observer asked for it).
+5. **Capture is one control panel, not three group boxes** ("Telescope and
+   camera": the connection, the status, the pointing and the live capture
+   in four rows), and the observatory status is a single row of four pairs
+   instead of a four-row form. With CCDciel connected the page asked for
+   712 px in a 551 px viewport, which put the status (the reason you
+   connect at all) 161 px BELOW the fold.
+6. **Colour with meaning**: the connection is a chip (green `● CCDciel:
+   127.0.0.1:3277 · 0.9.9` / amber `● CCDciel: not connected`), and the
+   status values are tinted by what they say (tracking green, stopped
+   amber, slewing blue, idle grey). No decorative colour.
+
+**The criterion holds and grew**: with a project that has a visit, its
+frames and a curve, **all four tabs fit the viewport** at 1360x940 and at
+1360x860 (Object card 520, Capture 509, Analysis 532, Publish 95, against
+631 and 551), and the Capture tab also fits **with CCDciel connected**
+(533). The Ficha with no charts yet fits at 549, and below 1360x860 the
+card scrolls: the two-column layout needs the width and there is a point
+where the honest answer is a scrollbar.
+
+`tests/unit/test_project_tabs_layout.py` holds the criterion, including
+the connected case, and `tests/unit/test_night_ribbon.py` holds the band's
+honesty in every state it can be put in.

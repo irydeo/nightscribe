@@ -1289,6 +1289,126 @@ el gate de actualización bloquea «Atrás»; `action_log` pasa a Ayuda.
 **Punto de entrada**: `navigate`/`back`/`forward`/`home`/`_apply_location`
 en `gui/main_window.py`; tests en `tests/unit/test_navigation_history.py`.
 
+### 7duodecies. Interfaz 1.4: el rediseño de Bienvenida (2026-10-01, ADR-055 rev.)
+
+Motivación: Bienvenida funcionaba pero no convencía. El héroe era un
+degradado con medio panel vacío, el paso de objetivos un muro de casillas y
+los formularios pedían una latitud sin devolver nunca nada, así que escribir
+el primer dato no tenía recompensa.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| Héroe | `assets/welcome_sky.svg` (dibujo propio) + `gui/widgets/welcome_sky.py`, que pinta la Luna real de esta noche desde `ephem_minor.moon(jd)` y hace parpadear unas estrellas | **Hecho** |
+| «Tu noche, ahora mismo» | Banda viva, 100 % local (`coords.tonight_window`, `ephem_minor.moon`/`planet`): ventana de oscuridad, fase y puesta de Luna, planetas al anochecer; se recalcula con cada cambio de sitio | **Hecho** |
+| Rail | El conector del stepper se rellena y los pasos hechos llevan marca | **Hecho** |
+| Objetivos | Tarjetas por tipo con `KIND_COLORS`, clicables enteras, resumen a un vistazo y el texto completo en el tooltip (`_setup_kinds(..., card=True)`) | **Hecho** |
+| Datos | Recibo con una marca por línea | **Hecho** |
+| CTA | Subtítulo y «Explorar primero» (bloqueado mientras una actualización esté sin confirmar) | **Hecho** |
+| Movimiento | Preferencia `ui_animations` (Ajustes ▸ Interfaz), fundido de entrada y temporizador parado cuando no se ve | **Hecho** |
+
+**Punto de entrada**: `gui/widgets/welcome_setup.py` (banda de noche, rail,
+tarjetas, fundido), `gui/widgets/welcome_sky.py` (el héroe pintado),
+`gui/wizard.py` (modo tarjeta de `_setup_kinds`, recibo de `_setup_data`),
+`gui/ui/welcome_tab.ui` y el bloque de Bienvenida de `gui/theme.py`. Una
+primera ejecución aterriza ahora en el paso del observatorio; la página cabe
+en una ventana de 1280x860 y un scroll exterior cubre las pantallas cortas.
+
+### 7terdecies. Interfaz 1.5 bis: el sitio, en el mapa (2026-10-02, ADR-055 rev.)
+
+Motivación: el paso del observatorio pedía una latitud a quien sabe dónde
+vive pero no sus coordenadas, y en una actualización la pantalla seguía
+diciendo «configura tu observatorio en tres pasos» a un veterano.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| El mapa | `gui/widgets/site_map.py`: equirectangular, clic para fijar, rueda para acercar, arrastre para moverse, terminador día/noche en vivo (efemérides locales), marcador y lectura bajo el cursor. Proyección **cover**, sin bandas laterales | **Hecho** |
+| Datos del mapa | `assets/world_map.json` (costas y fronteras Natural Earth 110m, dominio público) | **Hecho** |
+| Nombrar el punto | `core/places.py` + `assets/world_places.json` (1251 ciudades, Natural Earth 50m): la más cercana a menos de 250 km; si no, las coordenadas | **Hecho** |
+| Ajustes | «Elegir en el mapa…» abre `gui/site_map_dialog.py`, dimensionado a una porción de la pantalla (antes abría a su `sizeHint`, un mapa de 300x150) | **Hecho** |
+| Nombres | Se escriben siempre: al resolver un MPC, al detectar la ubicación y al clicar el mapa | **Hecho** |
+| Aviso de versión | La insignia pasa junto a «Tus datos, a salvo»; el héroe explica la actualización, el rail marca 1 y 2 como hechos y la única acción vive con el informe | **Hecho** |
+
+**Punto de entrada**: `gui/widgets/site_map.py` (el mapa y su proyección),
+`core/places.py` (nombrar), `gui/site_map_dialog.py` (el diálogo de
+Ajustes), `gui/widgets/welcome_setup.py` (`set_context`, `_map_picked`) y el
+paso del observatorio de `gui/ui/welcome_tab.ui`.
+
+### 7quaterdecies. Interfaz 1.6: la lista y el proyecto, juntos otra vez (2026-10-02, ADR-055 rev.)
+
+Motivación: separar la lista y el proyecto en dos páginas de la pila costó
+más de lo que aportó. Abrir un proyecto se llevaba por delante la lista,
+cambiar de proyecto era una ida y vuelta, y la pantalla de la lista (filas
+de 74 px, casi vacías) no decía gran cosa.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| Una página | `VIEW_PROJECTS`: lista y proyecto lado a lado con un `QSplitter`. `VIEW_HOME`/`VIEW_DETAIL` son dos nombres del mismo índice; el historial los distingue por el `pid` | **Hecho** |
+| Ancho de la lista | Arrastrable y recordado (`projects_list_width`, 260–560); doble clic en el separador lo restablece y `«` la pliega | **Hecho** |
+| Filas densas | 54 px, el color del tipo como borde izquierdo, selección teñida con el color del objeto, los números del objeto en la segunda línea, y la fila suelta lo que no cabe | **Hecho** |
+| Barra del cielo | `gui/widgets/sky_bar.py` en la fila de navegación: la Luna con su fase real, la ventana de oscuridad, los planetas y los chips de eventos, en todas las vistas | **Hecho** |
+| Panel en reposo | `gui/widgets/night_panel.py`: la noche (mismo cielo pintado que Bienvenida) y el camino a un proyecto nuevo | **Hecho** |
+| Una sola fuente | `core/night_brief.py`: los números y las frases de la noche, compartidos por las tres superficies | **Hecho** |
+| Encabezado | Campañas pasa a botón del encabezado; los ~105 px de las dos franjas vuelven a la lista | **Hecho** |
+
+**Punto de entrada**: `_build_shell` (el separador y la página fusionada),
+`_sync_projects_pane`, `_restore_list_width` / `_apply_list_width` en
+`gui/main_window.py`; `gui/widgets/project_row.py`, `sky_bar.py`,
+`night_panel.py` y `core/night_brief.py`.
+
+### 7quindecies. Interfaz 1.7: las pestañas del proyecto dejan de hacer scroll (2026-10-02, ADR-041 rev.)
+
+Motivación: la Ficha y Análisis se habían salido de la pantalla. Con un
+proyecto con una visita, sus tomas y una curva medida, la ficha pedía
+499 px y Análisis 1058 en un viewport de 537, y la leyenda de la curva se
+imprimía encima de las etiquetas del eje.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| Cromo | Los cuatro botones pequeños y la línea de contexto suben al masthead; la caja "Siguiente" es una banda fina; una página ya no repite el nombre de su pestaña (195 -> ~120 px en las cuatro) | **Hecho** |
+| Análisis | Visitas y curva una al lado de la otra (maestro-detalle), con la lista ajustada a su contenido en vez de una caja fija | **Hecho** |
+| Gráficas | `ChartView.sizeHint()` (640x260) en vez del tamaño de la escena, y la geometría de la leyenda de la curva derivada de su propia fuente | **Hecho** |
+| Ficha | El bloque de parámetros lleva su "A fondo" en la cabecera, la tabla mide lo que miden sus filas y los chips dejan de estirarse | **Hecho** |
+| Criterio | `tests/unit/test_project_tabs_layout.py`: ninguna de las dos pestañas pide más que el viewport a 1360x940 y 1360x860 | **Hecho** |
+
+**Punto de entrada**: `_section_layout`, `_build_analysis_tab`,
+`_analysis_curve_block` en `gui/main_window.py`;
+`gui/widgets/base_chart.py`, `gui/widgets/lightcurve_widget.py`,
+`gui/widgets/visits_panel.py`, `gui/overview.py` y el masthead de
+`gui/ui/projects_tab.ui`.
+
+**Pulido (2026-10-02, mismo día).** Dos cosas que la primera pasada hizo mal:
+
+- **La ventana de visita tapaba el taller.** Es un diálogo no modal con
+  padre, así que el gestor de ventanas la mantiene por encima de la ventana
+  principal; con el UFE ya como página, abrir una placa desde una visita
+  dejaba el editor detrás. Ahora se aparta mientras el taller está en
+  pantalla y vuelve al salir (`_ufe_enter` / `_ufe_leave`). Ver ADR-045.
+- **El listado no podía mostrar la curva.** La miniatura vivía en su propia
+  columna a la derecha y le robaba 106 px a la línea donde van los números
+  del objeto, así que con el ancho por defecto no cabían juntos. Ahora va en
+  la primera línea, junto al nombre; los números aparecen cuando caben de
+  verdad (medidos con la fuente real, nunca recortados) y el ancho por
+  defecto de la lista es 500, donde caben la curva y los números.
+
+### 7septendecies. Interfaz 1.8: la noche, dibujada en las pestañas del proyecto (2026-10-02, ADR-041 rev.)
+
+Motivación: las tres pestañas del proyecto eran correctas y no contaban
+nada de un vistazo, la misma queja que tenía Bienvenida antes de la
+Interfaz 1.4.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| La banda | `gui/widgets/night_ribbon.py`: crepúsculo → amanecer con el arco de altura del objeto, la Luna con su fase real, el marcador de "ahora" y bloques de color sobre la línea de tiempo. Un widget, tres lecturas | **Hecho** |
+| Ficha | Dos columnas (parámetros 60% / banda + gráficos 40%), la tabla como lista de definición, los hechos en una línea y "A fondo" activado por defecto | **Hecho** |
+| Captura | Un panel "Telescopio y cámara" en vez de tres cajas, el estado en una fila y **el plan dibujado sobre la noche** con su veredicto | **Hecho** |
+| Análisis | Las tomas de la visita dibujadas en la noche en que se hicieron, encima de las visitas | **Hecho** |
+| Color | El chip de conexión (verde/ámbar) y los valores de estado tintados por lo que significan | **Hecho** |
+| Criterio | Las cuatro pestañas caben en el viewport a 1360x940 y 1360x860, Captura incluida **con CCDciel conectado** | **Hecho** |
+
+**Punto de entrada**: `gui/widgets/night_ribbon.py` (la banda),
+`_plan_ribbon_refresh` y `_analysis_ribbon_refresh` en
+`gui/main_window.py`, `_refresh_ribbon` en `gui/overview.py`.
+
 ### 7undecies. Los avisos se disuelven en el listado (2026-10-01, ADR-055 rev.)
 
 Motivación: el panel «Necesita tu atención» y la banda «Toca revisar» repetían

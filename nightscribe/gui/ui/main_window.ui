@@ -79,6 +79,13 @@
          <property name="orientation"><enum>Qt::Horizontal</enum></property>
         </spacer>
        </item>
+       <item>
+        <!-- Interfaz 1.6: the night, always in sight. The real widget
+             (gui/widgets/sky_bar.py) replaces this placeholder: the Moon
+             at tonight's phase, the darkness window, the planets at dusk
+             and the sky-event chips, visible from every view. -->
+        <widget class="QWidget" name="skyHost"/>
+       </item>
       </layout>
      </widget>
     </item>

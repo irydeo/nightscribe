@@ -58,26 +58,37 @@ def window(monkeypatch):
     w.close()
 
 
-def test_opens_on_home_without_welcome(window):
+def test_opens_on_projects_without_welcome(window):
     from nightscribe.gui.main_window import VIEW_HOME
-    assert window._shell_stack().count() == 6      # 4 main + welcome + ufe
+    # Interfaz 1.6: the projects view holds the list AND the project, so
+    # the shell has 3 main pages + welcome + ufe
+    assert window._shell_stack().count() == 5
     assert window._shell_stack().currentIndex() == VIEW_HOME
     assert window._welcome is None                 # nothing to set up
 
 
-def test_home_has_no_attention_panel(window):
-    # Interfaz 1.3: the "needs your attention" panel and the cadence band
-    # are gone; that info lives in the project rows.
-    assert not window.projects.page_dashboard.isVisible()
+def test_the_resting_pane_is_the_night(window):
+    # Interfaz 1.6: with no project selected the right pane shows the night
+    # (the retired "needs your attention" dashboard is gone).
+    assert window.projects.stack_detail.currentWidget() is \
+        window.projects.page_night
+    assert window._night_panel is not None
     assert not hasattr(window, "_cadence_band")
 
 
-def test_detail_page_is_visible(window):
-    # same as the dashboard: the project page must not come up empty.
+def test_opening_a_project_shows_it_beside_the_list(window):
+    # The whole point of the merge: the project comes up WITHOUT the list
+    # going away, in the same shell page.
+    from nightscribe.core import db as _db
+    from nightscribe.core import project as _project
     from nightscribe.gui.main_window import VIEW_DETAIL
-    window._goto_tab(VIEW_DETAIL)
+    p = _project.create(_db.db, "sn", "2026test",
+                        {"ra_deg": 10.0, "dec_deg": 20.0, "mag": 15.0})
+    window.on_refresh_projects()
+    window.navigate(VIEW_DETAIL, pid=p["id"])
     assert window._shell_stack().currentIndex() == VIEW_DETAIL
     assert window.projects.page_detail.isVisible()
+    assert window.projects.lst_projects.isVisible()
 
 
 def test_home_matches_the_mock(window):
@@ -87,10 +98,10 @@ def test_home_matches_the_mock(window):
     tiles = [b for b in window.findChildren(QPushButton)
              if b.objectName() == "newTile"]
     assert tiles and tiles[0].isEnabled()
-    assert window._sky_band.objectName() == "skyBand"
-    # the sky band carries a "Sky calendar →" link
+    # Interfaz 1.6: the sky moved to the navigation row
+    assert window._sky_bar is not None
     assert any("calendar" in b.text().lower()
-               for b in window._sky_band.findChildren(QPushButton))
+               for b in window._sky_bar.findChildren(QPushButton))
     # the app logo sits in the navigation bar
     assert not window._menus.lbl_nav_logo.pixmap().isNull()
 

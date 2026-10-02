@@ -47,6 +47,7 @@
             <item><widget class="QLabel" name="lbl_mpc"><property name="text"><string>MPC code:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
             <item><widget class="QLineEdit" name="edt_mpc_code"><property name="maxLength"><number>3</number></property><property name="maximumSize"><size><width>80</width><height>16777215</height></size></property></widget></item>
             <item><widget class="QPushButton" name="btn_resolve"><property name="text"><string>Resolve coordinates</string></property></widget></item>
+            <item><widget class="QPushButton" name="btn_map_pick"><property name="text"><string>Pick on the map…</string></property><property name="toolTip"><string>Choose the observatory on a world map, with the night side shown as it is right now</string></property></widget></item>
             <item><spacer name="hsp_mpc"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
            </layout>
           </item>
@@ -600,6 +601,34 @@
        </item>
        </layout>
       </widget>
+      <widget class="QWidget" name="tab_interface">
+      <attribute name="title"><string>Interface</string></attribute>
+      <layout class="QVBoxLayout" name="vbox_interface">
+       <item>
+        <widget class="QGroupBox" name="grp_motion">
+         <property name="title"><string>Motion</string></property>
+         <layout class="QVBoxLayout" name="vbox_motion">
+          <item>
+           <layout class="QHBoxLayout" name="row_animations">
+            <item><widget class="QLabel" name="lbl_animations"><property name="text"><string>Animated sky on Welcome:</string></property><property name="minimumSize"><size><width>150</width><height>0</height></size></property></widget></item>
+            <item><widget class="QCheckBox" name="chk_animations"/></item>
+            <item><spacer name="hsp_animations"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           </layout>
+          </item>
+          <item><widget class="QLabel" name="lblH_animations"><property name="text"><string>On: the Welcome sky breathes (a few stars twinkle) and the screen fades in once. Off: everything stays perfectly still. The Moon is drawn at tonight's real phase either way; applies at once, no restart needed.</string></property><property name="wordWrap"><bool>true</bool></property><property name="alignment"><set>Qt::AlignLeft|Qt::AlignTop</set></property></widget></item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <spacer name="vspacer_interface">
+         <property name="orientation"><enum>Qt::Vertical</enum></property>
+         <property name="sizeHint" stdset="0">
+          <size><width>20</width><height>40</height></size>
+         </property>
+        </spacer>
+       </item>
+      </layout>
+     </widget>
       <widget class="QWidget" name="tab_dev">
       <attribute name="title"><string>Development</string></attribute>
       <layout class="QVBoxLayout" name="vbox_dev">

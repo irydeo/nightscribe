@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Interfaz 1.6: the resting page of the projects detail pane.
+
+  When no project is selected the right pane shows the night instead of an
+  empty box: the same painted sky as the Welcome hero (with tonight's real
+  Moon), the darkness window, the planets at dusk and the way in to a new
+  project. The structure, texts and tooltips live here (ADR-005); the code
+  (gui/widgets/night_panel.py) swaps nightSkyHost for the painted sky and
+  fills the lines from core/night_brief.
+-->
+<ui version="4.0">
+ <class>NightPanel</class>
+ <widget class="QWidget" name="NightPanel">
+  <layout class="QVBoxLayout" name="nightPanelLayout">
+   <property name="leftMargin"><number>0</number></property>
+   <property name="topMargin"><number>0</number></property>
+   <property name="rightMargin"><number>0</number></property>
+   <property name="bottomMargin"><number>0</number></property>
+   <property name="spacing"><number>10</number></property>
+   <item>
+    <spacer name="nightPanelTop">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+    </spacer>
+   </item>
+   <item>
+    <widget class="QWidget" name="nightSkyHost">
+     <property name="minimumSize"><size><width>0</width><height>170</height></size></property>
+     <property name="maximumSize"><size><width>16777215</width><height>300</height></size></property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+       <horstretch>0</horstretch><verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_night_head">
+     <property name="text"><string>TONIGHT FROM YOUR OBSERVATORY</string></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_night_when">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_night_moon">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="lbl_night_planets">
+     <property name="text"><string/></property>
+     <property name="wordWrap"><bool>true</bool></property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="btn_night_new">
+     <property name="text"><string>Create a project from tonight's targets</string></property>
+     <property name="toolTip"><string>Open the target search and pick an object to work on</string></property>
+    </widget>
+   </item>
+   <item>
+    <spacer name="nightPanelSpacer">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

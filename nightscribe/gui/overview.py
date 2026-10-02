@@ -37,14 +37,15 @@ import datetime
 
 from PySide6.QtCore import (QEvent, QObject, QT_TRANSLATE_NOOP, Qt,
                             Signal)
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QLabel, QHeaderView, QTableWidgetItem,
-                               QWidget)
+from PySide6.QtGui import (QBrush, QColor, QFont, QFontMetrics,
+                           QPixmap)
+from PySide6.QtWidgets import (QLabel, QHeaderView, QSizePolicy,
+                               QTableWidgetItem, QWidget)
 
 from ..core import exposure, narrative, orbits
 from .. import paths
 from . import theme
-from .ui_loader import adopt_ui
+from .ui_loader import adopt_ui, drop_in
 
 # Viewer / slot titles, translated at the point of use (tr() at the tab
 # site; QT_TRANSLATE_NOOP marks them here so lupdate can see them).
@@ -70,6 +71,10 @@ def _chip(text, color, tip=""):
     # @return: a small pill label, the same idiom the Tonight rows use
     lbl = QLabel(text)
     lbl.setStyleSheet(theme.chip_style(color))
+    # A pill is sized by its text. Without this the vertical policy lets the
+    # layout stretch it into a slab when the panel has room to spare (seen
+    # on the object card: three chips 80 px tall).
+    lbl.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
     if tip:
         lbl.setToolTip(tip)
     return lbl
@@ -90,6 +95,7 @@ _DLG_CHROME = 60      # title bar / frame / margins headroom (px)
 # Width cap for the Parameter/Value columns (object-card plan, subplan
 # 1): without it a long value steals the room the multi-line
 # "What it means" column needs.
+_PARAMS_MAX_H = 430    # the parameters table's own scroll takes over here
 _PARAM_COL_MAX_W = 280
 
 
@@ -237,26 +243,58 @@ class ObjectPanel(QWidget):
 
         # capture/window block (D3): the chips are data, added in code
         self.row_capture = self._ui.row_capture
+        # a row of pills keeps its height: with a Preferred policy the
+        # layout stretched it into an 80 px band when the card had room
+        self.row_capture.setSizePolicy(QSizePolicy.Preferred,
+                                       QSizePolicy.Maximum)
         self.row_capture.setStyleSheet(
             f"background: {theme.C_BASE}; border-radius: 8px;"
             f" border: 1px solid {theme.C_LINE};")
+        lay_cap = self.row_capture.layout()
+        if lay_cap is not None:
+            lay_cap.setContentsMargins(10, 4, 10, 4)
         self._chips = self.row_capture.layout()
+
+        # Interfaz 1.8: the night of THIS object, drawn (the same trick as
+        # the Welcome hero: a painted sky with real numbers). It sits above
+        # the charts, in the right column, and tells you whether the object
+        # is worth the trip before you read a single parameter.
+        from .widgets.night_ribbon import NightRibbon
+        self._ribbon = NightRibbon()
+        drop_in(self._ui.ribbonHost.parentWidget().layout(),
+                self._ui.ribbonHost, self._ribbon)
+        # The numbers on the left, the pictures on the right. 60/40, NOT the
+        # other way round: the parameters table carries a column of
+        # explanations and at 350 px it wraps to ONE WORD PER LINE (measured
+        # on the real card), while a light curve still reads fine at 345. The
+        # table is the one that breaks first, so it gets the room.
+        row = self._ui.row_body
+        row.setStretch(0, 13)
+        row.setStretch(1, 9)
+        self._place_ribbon(False)
 
         # parameters table
         self.grp_params = self._ui.grp_params
+        # it keeps its own height: the CHART is what should grow into the
+        # slack of a tall card, not a table with four rows
+        self.grp_params.setSizePolicy(QSizePolicy.Preferred,
+                                      QSizePolicy.Maximum)
         self.chk_deep = self._ui.chk_deep
         self.chk_deep.toggled.connect(lambda: self._refill_params())
         self.tbl_params = self._ui.tbl_params
         hdr = self.tbl_params.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.Interactive)
-        hdr.setSectionResizeMode(1, QHeaderView.Interactive)
-        hdr.setSectionResizeMode(2, QHeaderView.Stretch)
+        hdr.setSectionResizeMode(1, QHeaderView.Stretch)
         # multi-line rows must follow the stretch column when the window
         # resizes: re-fit them every time the explanation column changes
         # width (the header stretches AFTER the viewport's Resize event,
         # so watching the section itself is the reliable hook)
         self._rows_busy = False
         hdr.sectionResized.connect(self._param_section_resized)
+        # and on every real resize of the table itself: the header's signal
+        # is the first hook, this one is the net under it (a widget resized
+        # without a section change still has to re-wrap its sentences)
+        self.tbl_params.installEventFilter(self)
 
         # charts tabs (D2): each produced chart gets its own tab labelled
         # with the chart's title; with a single chart the tab bar hides and
@@ -295,6 +333,11 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         self.grp_charts.hide()
         self.btn_project.hide()
+        # nothing beside the band while it loads: full width, and the
+        # previous object's arc dropped (a bare night is honest; the last
+        # object's curve over a "Loading" line is not)
+        self._refresh_ribbon(None, None)
+        self._place_ribbon(False)
 
     def _state_missing(self, name=None):
         # @args: name - identifier, shown when given
@@ -310,6 +353,7 @@ class ObjectPanel(QWidget):
         self.row_capture.hide()
         self.grp_params.hide()
         self.grp_charts.hide()
+        self._place_ribbon(False)
         self._refresh_cta()
 
     def _state_ready(self, e):
@@ -322,8 +366,11 @@ class ObjectPanel(QWidget):
 
         bullets = [b for b in (narrative.fact_bullets(e) or []) if self._txt(b)]
         if bullets:
+            # One flowing line, not four bullets: the card shares its height
+            # with a chart now, and four separate lines cost 36 px for the
+            # same four sentences.
             self.lbl_facts.setText(
-                "\n".join("•  " + self._txt(b) for b in bullets))
+                "   ·   ".join(self._txt(b) for b in bullets))
             self.lbl_facts.show()
         else:
             self.lbl_facts.hide()
@@ -335,6 +382,7 @@ class ObjectPanel(QWidget):
         else:
             self.row_coords.hide()
             self._coords_clip = ""
+        self._refresh_ribbon(ra, dec)
 
         self._rows = self._orbit_rows(e)
         self.grp_params.setVisible(bool(self._rows))
@@ -482,6 +530,7 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         self.grp_charts.hide()
         self.btn_project.hide()
+        self._place_ribbon(False)
 
     def _worker_done(self, w, e):
         # @args: w - the worker that finished, e - its enriched payload
@@ -693,7 +742,42 @@ class ObjectPanel(QWidget):
 
         # "approach" is purely vector: the group must stay visible even
         # when build_charts produced no PNG (elements without an ephemeris).
-        self.grp_charts.setVisible(bool(charts) or bool(self._slot_data))
+        has_charts = bool(charts) or bool(self._slot_data)
+        self.grp_charts.setVisible(has_charts)
+        self._place_ribbon(has_charts)
+
+    def _place_ribbon(self, with_charts):
+        # @args: with_charts - True keeps the band in the right column,
+        #        above the charts; False moves it across the full width
+        # @return: None.
+        #
+        # An object with no charts yet (a brand new project, a supernova
+        # with no follow-up) left the right column EMPTY, and a 400 px band
+        # floating at the top of an empty column is the "the card looks
+        # empty" complaint all over again. With nothing beside it the band
+        # spans the page and the parameters table gets the whole width,
+        # which is also what stops its explanations wrapping to four lines.
+        ribbon = getattr(self, "_ribbon", None)
+        col = getattr(self._ui, "col_body", None)
+        col_lay = getattr(self._ui, "colBodyLayout", None)
+        row = getattr(self._ui, "row_body", None)
+        vbox = self.layout()
+        if ribbon is None or col is None or col_lay is None or row is None \
+                or vbox is None:
+            return
+        col.setVisible(with_charts)
+        if with_charts:
+            if col_lay.indexOf(ribbon) < 0:
+                vbox.removeWidget(ribbon)
+                col_lay.insertWidget(0, ribbon)
+            row.setStretch(0, 13)
+            row.setStretch(1, 9)
+        else:
+            if vbox.indexOf(ribbon) < 0:
+                col_lay.removeWidget(ribbon)
+                vbox.insertWidget(max(0, vbox.indexOf(row)), ribbon)
+            row.setStretch(0, 1)
+            row.setStretch(1, 0)
 
     def _empty_tabs(self):
         # Removes every chart tab and clears the slot state.
@@ -1118,9 +1202,27 @@ class ObjectPanel(QWidget):
             self.row_capture.hide()
             return
         for text, color, tip in chips:
-            self._chips.insertWidget(self._chips.count() - 1,
-                                     _chip(text, color, tip))
+            self._chips.addWidget(_chip(text, color, tip))
+        # The pills sit at the LEFT and the row keeps the rest. The trailing
+        # stretch has to be re-added on every fill: _clear_chips() takes
+        # every item away, spacer included, and without it three chips
+        # spread themselves across the whole width.
+        self._chips.addStretch(1)
         self.row_capture.show()
+
+    def eventFilter(self, obj, event):
+        # The parameters table re-measures its explanation rows whenever it
+        # changes size: the row heights depend on the width the sentence is
+        # wrapped in, and Qt does not track that for a spanned cell.
+        if (obj is getattr(self, "tbl_params", None)
+                and event.type() == QEvent.Resize
+                and not getattr(self, "_rows_busy", True)):
+            self._rows_busy = True
+            try:
+                self._fit_params_height()
+            finally:
+                self._rows_busy = False
+        return super().eventFilter(obj, event)
 
     def _param_section_resized(self, index, _old, new):
         # Re-fits the wrapped rows after the explanation column changed
@@ -1129,14 +1231,33 @@ class ObjectPanel(QWidget):
         # to `new` first (a no-op for the header, which is already
         # setting it); _rows_busy breaks the recursion (new row heights
         # can toggle the scrollbar, which resizes the sections again).
-        if index != 2 or self._rows_busy:
+        if index != 1 or self._rows_busy:
             return
         self._rows_busy = True
         try:
-            self.tbl_params.setColumnWidth(2, new)
-            self.tbl_params.resizeRowsToContents()
+            self._fit_params_height()
         finally:
             self._rows_busy = False
+
+    def _refresh_ribbon(self, ra=None, dec=None):
+        # @args: ra, dec - the object in degrees, or None for a bare night
+        # @return: None. The site comes from the settings, so the band
+        #          answers for THIS observatory.
+        ribbon = getattr(self, "_ribbon", None)
+        if ribbon is None:
+            return
+        from ..config import config
+        try:
+            lat = float(config.get("lat") or 0.0)
+            lon = float(config.get("lon") or 0.0)
+        except (TypeError, ValueError):
+            lat = lon = 0.0
+        if not (lat or lon):
+            lat = lon = None
+        ribbon.set_site(lat, lon)
+        ribbon.set_object(ra, dec, self._name or "")
+        kind = (self._ctx or {}).get("kind")
+        ribbon.set_accent(theme.KIND_COLORS.get(kind, theme.C_ACCENT))
 
     def _refill_params(self):
         # Fills the parameters table from the cached rows.
@@ -1146,20 +1267,77 @@ class ObjectPanel(QWidget):
         tbl = self.tbl_params
         tbl.setRowCount(0)
         for r in rows:
-            row = tbl.rowCount()
-            tbl.insertRow(row)
             param = self._txt(r["param"]) if isinstance(r["param"], dict) \
                 else str(r["param"])
+            # the name and the value on one line...
+            row = tbl.rowCount()
+            tbl.insertRow(row)
             tbl.setItem(row, 0, QTableWidgetItem(param))
             tbl.setItem(row, 1, QTableWidgetItem(str(r["value"])))
-            tbl.setItem(row, 2, QTableWidgetItem(self._txt(r)))
+            # ... and what it means UNDER it, across both columns. It is the
+            # only shape in which a full sentence reads in a half-width
+            # column: as a third column it wrapped to one word per line.
+            exp = tbl.rowCount()
+            tbl.insertRow(exp)
+            item = QTableWidgetItem(self._txt(r))
+            item.setForeground(QBrush(QColor(theme.C_TEXT_DIM)))
+            # a note, not a headline: 11 px is what makes a full sentence
+            # fit in two lines instead of four (and the card fit at 860)
+            font = QFont(tbl.font())
+            font.setPixelSize(11)
+            item.setFont(font)
+            tbl.setItem(exp, 0, item)
+            tbl.setSpan(exp, 0, 1, 2)
         # Fit Parameter/Value to their content, capped so the explanation
         # keeps its air; NEVER resizeToContents on the stretch column —
         # with word wrap the hint is the full one-line width and the
         # column would balloon past the viewport. The stretch column
         # takes what is left; _RowResizer re-fits rows on real resizes.
-        for col in (0, 1):
-            tbl.resizeColumnToContents(col)
-            if tbl.columnWidth(col) > _PARAM_COL_MAX_W:
-                tbl.setColumnWidth(col, _PARAM_COL_MAX_W)
-        tbl.resizeRowsToContents()
+        tbl.resizeColumnToContents(0)
+        if tbl.columnWidth(0) > _PARAM_COL_MAX_W:
+            tbl.setColumnWidth(0, _PARAM_COL_MAX_W)
+        self._fit_params_height()
+
+    def _fit_params_height(self):
+        # @return: None. The table is as tall as its rows, up to a cap.
+        #
+        # The explanation rows are measured HERE, by hand, and not left to
+        # resizeRowsToContents(): that call computes a spanned cell's height
+        # against the FIRST column's width (it does not know about the
+        # span), so the sentence was laid out for a 280 px box while being
+        # painted across 500 and the row heights never followed the window.
+        # With the real span width and the real font, they do.
+        #
+        # Past the cap the table scrolls itself instead of pushing the whole
+        # card down (that is what "In depth" can do).
+        tbl = self.tbl_params
+        # The width the rows are wrapped in, measured from the TABLE and not
+        # from its viewport: this runs on the table's Resize event, and at
+        # that instant the viewport still reports the old size (measured:
+        # 496 px for a 199 px table).
+        available = max(160, tbl.width() - 18)
+        # The name column follows that width, capped. Left at its content
+        # width it never gave ground: the two columns together came out
+        # wider than a narrow table (496 px of columns inside 199) and the
+        # explanation kept the width of a card three times as wide.
+        tbl.setColumnWidth(0, min(_PARAM_COL_MAX_W, max(80,
+                                                        int(available * 0.42))))
+        span = max(120, available - 2)
+        font = QFont(tbl.font())
+        font.setPixelSize(11)
+        fm = QFontMetrics(font)
+        for row in range(tbl.rowCount()):
+            if row % 2 == 0:
+                # the name and the value: one line each, at 13 px
+                tbl.setRowHeight(row, 24)
+                continue
+            item = tbl.item(row, 0)
+            if item is None:
+                continue
+            box = fm.boundingRect(0, 0, max(60, span - 14), 1000,
+                                  int(Qt.TextWordWrap), item.text())
+            tbl.setRowHeight(row, max(22, box.height() + 4))
+        height = tbl.horizontalHeader().height() + 2 * tbl.frameWidth() + 2
+        for row in range(tbl.rowCount()):
+            height += tbl.rowHeight(row)
+        tbl.setFixedHeight(min(height, _PARAMS_MAX_H))

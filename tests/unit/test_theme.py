@@ -248,3 +248,40 @@ def test_the_app_icon_speaks_the_brand_palette():
         assert s < 0.30 or 190.0 <= hue <= 285.0, (
             f"#{c} is off the brand's palette (hue {hue:.0f}, "
             f"saturation {s:.2f}): the logo is navy and the accent blue")
+
+
+def test_apply_theme_does_not_reapply_the_same_stylesheet(monkeypatch, qapp):
+    # Applying an app stylesheet re-polishes EVERY live widget, and doing it
+    # again with the very same one is worse than the first time: measured
+    # with 3880 widgets alive, 0.75 s then 5.4 s (plus ~0.37 s of setStyle
+    # and setPalette). The unit tests theme the app once per fixture, 57
+    # times per run, with the windows of the previous ones still alive; on
+    # the Windows runner (one process, no xdist) the call grew past
+    # pytest-timeout's two minutes eleven times in a row and the job died.
+    #
+    # This test must NOT apply the real sheet itself: by the time this file
+    # runs there are thousands of live widgets and one application costs
+    # minutes there. The first version did, and worse, it left the app
+    # carrying a patched sheet, so every later file paid for the real one
+    # again. The app is already themed (the first fixture of the run did it)
+    # and that is exactly the state under test.
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    original = type(qapp).setStyleSheet
+    applied = []
+
+    def spy(self, css):
+        applied.append(css)
+        return original(self, css)
+
+    monkeypatch.setattr(type(qapp), "setStyleSheet", spy)
+    theme.apply_theme(qapp)
+    theme.apply_theme(qapp)
+    assert applied == [], \
+        "the theme was re-applied to an app that already carries it"
+    # the guard's other half, read without touching the app: a missing
+    # marker or a replaced sheet means "theme me again"
+    assert theme._is_themed(qapp)
+    qapp._nightscribe_themed = False
+    assert not theme._is_themed(qapp)
+    qapp._nightscribe_themed = True
+    assert theme._is_themed(qapp)

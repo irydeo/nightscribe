@@ -108,6 +108,11 @@ def test_cta_needs_a_site(make_window):
     w = make_window(snapshot=None)
     ws = w._welcome
     u = ws.ui
+    # The CTA has two faces: with projects to go back to it is always live
+    # ("My projects →"), and this test is about the OTHER one. Pin the
+    # precondition instead of inheriting whatever the database of the runner
+    # happens to hold (it held projects in the serial Windows run).
+    ws._has_projects = False
     u.spn_site_lat.setValue(0.0)
     u.spn_site_lon.setValue(0.0)
     u.edt_site_mpc.setText("")
@@ -405,11 +410,22 @@ def test_the_data_report_rows_are_not_stretched(make_window):
     lay = u.dataBoxLayout
     assert lay.count() > 1
     assert lay.stretch(lay.count() - 1) == 1        # the stretch is last
-    rows = 0
+    # The point of the test is what happens when there IS spare height, and
+    # how much the rows need is a font-metric number: with a wider font the
+    # same paragraphs are taller (that is how it failed on the Windows
+    # runner, with a fixed 800 px window). Ask for the room they need plus
+    # slack, so the scenario under test is the one being measured.
+    need = 0
     for i in range(lay.count() - 1):
         item = lay.itemAt(i)
         assert item.widget() is not None
-        rows += item.widget().height()
+        need += item.widget().sizeHint().height()
+    ws.resize(1200, need + 160)
+    QApplication.processEvents()
+    lay.activate()
+    rows = 0
+    for i in range(lay.count() - 1):
+        rows += lay.itemAt(i).widget().height()
     # the rows keep their natural height and the slack sits BELOW them
     # instead of being spread across the paragraph
     assert rows < u.data_container.height() - 20

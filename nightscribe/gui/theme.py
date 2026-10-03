@@ -304,14 +304,40 @@ def kind_card_style(accent, selected=False):
             f" border-left: 3px solid {accent}; }}")
 
 
+def _is_themed(app):
+    # @args: app - the QApplication
+    # @return: True when it already carries this theme. The marker lives on
+    #          the app itself: comparing against a freshly built QPalette
+    #          does not work (Qt resolves the roles on the way in, so the
+    #          two never match) and neither does asking the style its name
+    #          (a QStyle has none). The stylesheet is checked too, so an app
+    #          whose sheet was replaced gets the theme back.
+    return bool(getattr(app, "_nightscribe_themed", False)) \
+        and app.styleSheet() == _QSS
+
+
 def apply_theme(app):
     # Applies the NightScribe dark theme to a live QApplication:
     # Fusion base style, dark palette, and the global stylesheet.
     # Call once, right after the QApplication is created (app.py).
+    #
+    # It is IDEMPOTENT on purpose. Applying an app stylesheet re-polishes
+    # EVERY live widget, and re-applying the very same one is far worse
+    # than the first time: measured with 3880 widgets alive, the first
+    # setStyleSheet() takes 0.75 s and the second 5.4 s (setStyle and
+    # setPalette add ~0.37 s together). The unit tests theme the app once
+    # per fixture, 57 times per run, with the windows of the previous ones
+    # still alive; on the Windows runner (a single process, no xdist) that
+    # grew past pytest-timeout's two minutes eleven times in a row and the
+    # whole job died. Nothing to redo when the app already carries it.
     # @args: app - the QApplication
+    # @return: None
+    if _is_themed(app):
+        return
     app.setStyle("Fusion")
     app.setPalette(_palette())
     app.setStyleSheet(_QSS)
+    app._nightscribe_themed = True
 
 
 _QSS = f"""

@@ -39,6 +39,11 @@ def dlg(qapp):
     from nightscribe.gui.project_files_dialog import ProjectFilesDialog
     d = ProjectFilesDialog()
     d.show()
+    # The empty-state test asks isVisible(), and a widget is only visible once
+    # the window has been MAPPED: on a loaded machine the suite went red on
+    # that race (it passed on three consecutive runs afterwards). Pump the
+    # events here so every test of this file starts from the same state.
+    qapp.processEvents()
     yield d
     d.deleteLater()
 

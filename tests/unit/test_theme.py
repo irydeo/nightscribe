@@ -258,17 +258,15 @@ def test_apply_theme_does_not_reapply_the_same_stylesheet(monkeypatch, qapp):
     # times per run, with the windows of the previous ones still alive; on
     # the Windows runner (one process, no xdist) the call grew past
     # pytest-timeout's two minutes eleven times in a row and the job died.
+    #
+    # This test must NOT apply the real sheet itself: by the time this file
+    # runs there are thousands of live widgets and one application costs
+    # minutes there. The first version did, and worse, it left the app
+    # carrying a patched sheet, so every later file paid for the real one
+    # again. The app is already themed (the first fixture of the run did it)
+    # and that is exactly the state under test.
     theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
     original = type(qapp).setStyleSheet
-    # The test has to apply SOMETHING, and applying the real sheet here is
-    # what made it hang for two minutes on the Windows runner: by the time
-    # this file runs there are thousands of live widgets from the previous
-    # ones. A three-line sheet exercises the same guard and costs nothing.
-    monkeypatch.setattr(theme, "_QSS", "QLabel { color: #abcdef; }")
-    # the other tests of this file share the app and have already themed it:
-    # start from an app that carries nothing
-    qapp._nightscribe_themed = False
-    original(qapp, "")
     applied = []
 
     def spy(self, css):
@@ -277,14 +275,13 @@ def test_apply_theme_does_not_reapply_the_same_stylesheet(monkeypatch, qapp):
 
     monkeypatch.setattr(type(qapp), "setStyleSheet", spy)
     theme.apply_theme(qapp)
-    assert applied, "the first call must really apply the theme"
-    assert qapp.styleSheet() == theme._QSS
-    applied.clear()
-    theme.apply_theme(qapp)
     theme.apply_theme(qapp)
     assert applied == [], \
         "the theme was re-applied to an app that already carries it"
-    # ... and an app whose stylesheet was replaced does get it back
-    original(qapp, "")
-    theme.apply_theme(qapp)
-    assert qapp.styleSheet() == theme._QSS
+    # the guard's other half, read without touching the app: a missing
+    # marker or a replaced sheet means "theme me again"
+    assert theme._is_themed(qapp)
+    qapp._nightscribe_themed = False
+    assert not theme._is_themed(qapp)
+    qapp._nightscribe_themed = True
+    assert theme._is_themed(qapp)

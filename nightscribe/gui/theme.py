@@ -304,6 +304,18 @@ def kind_card_style(accent, selected=False):
             f" border-left: 3px solid {accent}; }}")
 
 
+def _is_themed(app):
+    # @args: app - the QApplication
+    # @return: True when it already carries this theme. The marker lives on
+    #          the app itself: comparing against a freshly built QPalette
+    #          does not work (Qt resolves the roles on the way in, so the
+    #          two never match) and neither does asking the style its name
+    #          (a QStyle has none). The stylesheet is checked too, so an app
+    #          whose sheet was replaced gets the theme back.
+    return bool(getattr(app, "_nightscribe_themed", False)) \
+        and app.styleSheet() == _QSS
+
+
 def apply_theme(app):
     # Applies the NightScribe dark theme to a live QApplication:
     # Fusion base style, dark palette, and the global stylesheet.
@@ -320,13 +332,7 @@ def apply_theme(app):
     # whole job died. Nothing to redo when the app already carries it.
     # @args: app - the QApplication
     # @return: None
-    # The marker lives on the app itself: comparing against a freshly built
-    # QPalette does not work (Qt resolves the roles on the way in, so the
-    # two never match) and neither does asking the style its name (a QStyle
-    # has none). The stylesheet is still checked, so an app that had it
-    # replaced gets the theme back.
-    if getattr(app, "_nightscribe_themed", False) \
-            and app.styleSheet() == _QSS:
+    if _is_themed(app):
         return
     app.setStyle("Fusion")
     app.setPalette(_palette())

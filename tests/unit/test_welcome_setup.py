@@ -410,11 +410,22 @@ def test_the_data_report_rows_are_not_stretched(make_window):
     lay = u.dataBoxLayout
     assert lay.count() > 1
     assert lay.stretch(lay.count() - 1) == 1        # the stretch is last
-    rows = 0
+    # The point of the test is what happens when there IS spare height, and
+    # how much the rows need is a font-metric number: with a wider font the
+    # same paragraphs are taller (that is how it failed on the Windows
+    # runner, with a fixed 800 px window). Ask for the room they need plus
+    # slack, so the scenario under test is the one being measured.
+    need = 0
     for i in range(lay.count() - 1):
         item = lay.itemAt(i)
         assert item.widget() is not None
-        rows += item.widget().height()
+        need += item.widget().sizeHint().height()
+    ws.resize(1200, need + 160)
+    QApplication.processEvents()
+    lay.activate()
+    rows = 0
+    for i in range(lay.count() - 1):
+        rows += lay.itemAt(i).widget().height()
     # the rows keep their natural height and the slack sits BELOW them
     # instead of being spread across the paragraph
     assert rows < u.data_container.height() - 20

@@ -248,3 +248,38 @@ def test_the_app_icon_speaks_the_brand_palette():
         assert s < 0.30 or 190.0 <= hue <= 285.0, (
             f"#{c} is off the brand's palette (hue {hue:.0f}, "
             f"saturation {s:.2f}): the logo is navy and the accent blue")
+
+
+def test_apply_theme_does_not_reapply_the_same_stylesheet(monkeypatch, qapp):
+    # Applying an app stylesheet re-polishes EVERY live widget, and doing it
+    # again with the very same one is worse than the first time: measured
+    # with 3880 widgets alive, 0.75 s then 5.4 s (plus ~0.37 s of setStyle
+    # and setPalette). The unit tests theme the app once per fixture, 57
+    # times per run, with the windows of the previous ones still alive; on
+    # the Windows runner (one process, no xdist) the call grew past
+    # pytest-timeout's two minutes eleven times in a row and the job died.
+    theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
+    original = type(qapp).setStyleSheet
+    # the other tests of this file share the app and have already themed it:
+    # start from an app that carries nothing
+    qapp._nightscribe_themed = False
+    original(qapp, "")
+    applied = []
+
+    def spy(self, css):
+        applied.append(css)
+        return original(self, css)
+
+    monkeypatch.setattr(type(qapp), "setStyleSheet", spy)
+    theme.apply_theme(qapp)
+    assert applied, "the first call must really apply the theme"
+    assert qapp.styleSheet() == theme._QSS
+    applied.clear()
+    theme.apply_theme(qapp)
+    theme.apply_theme(qapp)
+    assert applied == [], \
+        "the theme was re-applied to an app that already carries it"
+    # ... and an app whose stylesheet was replaced does get it back
+    original(qapp, "")
+    theme.apply_theme(qapp)
+    assert qapp.styleSheet() == theme._QSS

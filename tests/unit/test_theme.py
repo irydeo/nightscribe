@@ -260,6 +260,11 @@ def test_apply_theme_does_not_reapply_the_same_stylesheet(monkeypatch, qapp):
     # pytest-timeout's two minutes eleven times in a row and the job died.
     theme = __import__("nightscribe.gui.theme", fromlist=["theme"])
     original = type(qapp).setStyleSheet
+    # The test has to apply SOMETHING, and applying the real sheet here is
+    # what made it hang for two minutes on the Windows runner: by the time
+    # this file runs there are thousands of live widgets from the previous
+    # ones. A three-line sheet exercises the same guard and costs nothing.
+    monkeypatch.setattr(theme, "_QSS", "QLabel { color: #abcdef; }")
     # the other tests of this file share the app and have already themed it:
     # start from an app that carries nothing
     qapp._nightscribe_themed = False

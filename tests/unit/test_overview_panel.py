@@ -1325,13 +1325,22 @@ def test_cta_reset_on_blank(qapp, tmp_path):
 
 # ---------------- i18n (D6) ----------------
 
-def test_panel_strings_resolve_in_spanish(qapp, tmp_path):
+def test_panel_strings_resolve_in_spanish(qapp, tmp_path, monkeypatch):
     # the compiled .qm (nightscribe_es.qm) must carry every string the
     # panel shows: install it, check the labels, remove it after.
     # ADR-014: base language in code is English; Spanish is a translation.
     from pathlib import Path
     from PySide6.QtCore import QTranslator
     from PySide6.QtWidgets import QLabel
+    from nightscribe.config import config
+
+    # The section cards do NOT go through the .qm: they pick their language
+    # from the config, and under pytest the config file is the throwaway one
+    # (no "language" key), so it falls back to "system" = the HOST locale.
+    # This test says "Spanish", so it must ask for Spanish: it passed on the
+    # author's es_ES machine and failed on the en-US Windows runner with
+    # "section titles not translated: ['Orbit', ...]".
+    monkeypatch.setitem(config._data, "language", "es")
 
     qm = (Path(__file__).parents[2] / "nightscribe" / "gui" / "i18n"
           / "nightscribe_es.qm")
@@ -1534,8 +1543,10 @@ def test_resize_keeps_full_panel_visible(qapp):
     # viewport it was given, this screen cannot show it whole and the
     # assertions below would fail with the design intact (measured
     # 2026-10-01 on the 1024x768 Windows runner).
-    if p.sizeHint().height() > area.viewport().height():
-        pytest.skip("this screen cannot show the whole ready panel")
+    need = max(p.sizeHint().height(), p.minimumSizeHint().height())
+    if need > area.viewport().height():
+        pytest.skip(f"this screen cannot show the whole ready panel: "
+                    f"{need} px needed, {area.viewport().height()} px given")
     # the CTA is not hidden, and the panel foot fits the visible viewport
     assert not p.btn_project.isHidden(), "CTA must be shown for for_post"
     vp_h = area.viewport().height()

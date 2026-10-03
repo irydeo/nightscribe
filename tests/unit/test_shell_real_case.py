@@ -44,7 +44,10 @@ def window(monkeypatch):
     config.set("lat", 40.0)
     config.set("lon", -3.0)
     config.set("app_version", base_version())
-    if not proj_mod.list_projects(db):
+    # the test looks for THIS project by name, so make sure it is there:
+    # "only if the database is empty" left it out on any machine (or serial
+    # run) that already had projects, and the drawer test then failed
+    if "SN shell" not in {p["object_name"] for p in proj_mod.list_projects(db)}:
         proj_mod.create(db, "sn", "SN shell", {"ra_deg": 10.0, "dec_deg": 20.0})
     w = MainWindow()
     w.resize(1400, 900)

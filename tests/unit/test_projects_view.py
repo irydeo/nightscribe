@@ -248,7 +248,11 @@ def test_a_narrow_row_drops_the_least_important_bits(window):
     row.resize(320, 54)
     assert not row.lbl_detail.isVisible()       # too narrow for the numbers
     assert not row.lbl_camp.isVisible()
-    row.resize(500, 54)
+    # The numbers come back as soon as they REALLY fit, and "really" is
+    # measured with the running font: a fixed 500 is a Linux number and this
+    # assertion failed on the Windows runner, where the same text is wider.
+    fits = next(w for w in range(320, 1200, 10) if row._detail_fits(w))
+    row.resize(fits, 54)
     assert row.lbl_detail.isVisible()
 
 
@@ -274,8 +278,10 @@ def test_the_curve_wins_the_room_at_the_default_width(window):
     assert not row.lbl_detail.isVisible()   # ... and the numbers gave way
     assert row.toolTip()                    # but they are one hover away
     assert row.lbl_detail.text() in row.toolTip()
-    # widening the list brings both back
-    row.resize(520, 54)
+    # widening the list brings both back; the width is measured, not
+    # guessed (the numbers' threshold depends on the running font)
+    fits = next(w for w in range(392, 1400, 10) if row._detail_fits(w))
+    row.resize(fits, 54)
     assert row.lbl_spark.isVisible()
     assert row.lbl_detail.isVisible()
     assert not row.toolTip()

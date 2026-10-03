@@ -108,6 +108,11 @@ def test_cta_needs_a_site(make_window):
     w = make_window(snapshot=None)
     ws = w._welcome
     u = ws.ui
+    # The CTA has two faces: with projects to go back to it is always live
+    # ("My projects →"), and this test is about the OTHER one. Pin the
+    # precondition instead of inheriting whatever the database of the runner
+    # happens to hold (it held projects in the serial Windows run).
+    ws._has_projects = False
     u.spn_site_lat.setValue(0.0)
     u.spn_site_lon.setValue(0.0)
     u.edt_site_mpc.setText("")

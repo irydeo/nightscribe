@@ -155,6 +155,27 @@ def test_the_night_panel_fills_the_empty_pane(window):
     assert panel.ui.lbl_night_moon.text() == nb.moon_line(b)
 
 
+def test_the_invitation_is_painted_on_the_resting_sky(window):
+    # ADR-055: the resting pane says what to do ON the drawing, not only
+    # under it. The overlay sits on the LEFT half (the SVG darkens it for
+    # text) and must not eat the clicks meant for what is under it.
+    from PySide6.QtCore import Qt
+    panel = window._night_panel
+    u = panel.ui
+    assert u.lbl_resting_head.text()
+    assert u.lbl_resting_hint.text()
+    assert u.lbl_resting_head.objectName() == "restingHead"
+    assert u.lbl_resting_hint.objectName() == "restingHint"
+    assert u.nightOverlay.testAttribute(Qt.WA_TransparentForMouseEvents)
+    # it is ON the sky, and it stays on the left
+    sky = panel._sky
+    assert sky.geometry().intersects(u.nightOverlay.geometry())
+    assert u.lbl_resting_head.x() + u.lbl_resting_head.width() \
+        <= sky.width() * 0.7
+    # the way in to a new project is still the button below
+    assert u.btn_night_new.text()
+
+
 def test_the_list_width_is_the_observers_and_is_remembered(window):
     from nightscribe.config import config
     from nightscribe.gui.main_window import _LIST_W_DEFAULT, _LIST_W_MAX

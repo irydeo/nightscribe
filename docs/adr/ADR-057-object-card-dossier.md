@@ -71,6 +71,38 @@ según corresponda. i18n: 26 cadenas nuevas (ObjectHero + ObjectPanel),
 .ts/.qm regenerados. El score se calcula sin db (sin feedback de
 novedad): en la ficha de un proyecto activo eso es lo honesto.
 
+**Enmienda (2026-10-02, los parámetros y los gráficos, en una fila).** El
+dosier apilaba los parámetros y, debajo, los gráficos. El observador pidió
+que compartan fila, uno a la izquierda y otro a la derecha.
+
+1. **Una fila, 50/50** (`row_body` en `object_panel.ui`): a la izquierda la
+   columna de parámetros (la cabecera con «A fondo» y las `SectionCard`), a
+   la derecha la columna de gráficos. La banda de la noche sigue a todo el
+   ancho por encima y el CTA por debajo.
+2. **Las columnas son widgets**, no layouts sueltos, y su visibilidad la
+   manda el bloque que contienen (`_sync_body_columns`): un bloque oculto
+   dentro de una columna visible dejaría la columna en pie ocupando su
+   mitad para nada. Con los gráficos ocultos, los parámetros se quedan con
+   todo el ancho, y al revés.
+3. **Apilado por debajo de 660 px** de panel (`_BODY_STACK_W`): dos
+   columnas de 390 px no caben en un panel estrecho y los gráficos tienen
+   300 px de mínimo, así que se recortarían en vez de encogerse.
+4. **Los gráficos arriba y el aire debajo**: cada columna termina en un
+   espaciador expansivo. Medido con «A fondo»: un SN queda 384/384 con
+   894 px de fila (los gráficos piden 689) y un NEO con 15 filas deja
+   1244 px de columna para 529 de gráfico; el aire es el precio de no
+   apilar dos bloques de altura muy distinta.
+5. **Las etiquetas de las tarjetas envuelven** (`section_card.py`): el
+   mínimo de un `QGridLayout` es la SUMA de los mínimos de sus columnas, y
+   una etiqueta sin envolver mide su texto entero: «MOID (mínimo
+   acercamiento de órbitas)» junto a un valor largo ponía el suelo de la
+   ficha en 448 px, que es lo que impedía el 50/50.
+
+**Consecuencias.** La ficha sigue pudiendo hacer scroll (el contrato de
+ADR-057 no cambia) y sale más corta: un NEO con «A fondo» pedía 1785 px
+apilado y pide 1377 en dos columnas. Los tests de la ficha leen la fila
+(`row_body`), el colapso de una columna sola y el apilado por umbral.
+
 ## English
 
 **Context.** The unified object card (ADR-031) was a form: a hook line, a
@@ -125,3 +157,35 @@ alerts in their own row: tests that read chips now read tiles or flags
 accordingly. i18n: 26 new strings (ObjectHero + ObjectPanel), .ts/.qm
 regenerated. The score is computed without db (no novelty feedback): on
 an active project's card, that is the honest number.
+
+**Amendment (2026-10-02, the parameters and the charts, in one row).** The
+dossier stacked the parameters and, under them, the charts. The observer
+asked for them to share a row, one left and one right.
+
+1. **One row, 50/50** (`row_body` in `object_panel.ui`): on the left the
+   parameters column (the header with "In depth" and the `SectionCard`s),
+   on the right the charts column. The night band stays full width above
+   and the CTA below.
+2. **The columns are widgets**, not bare layouts, and the block inside
+   decides whether they show (`_sync_body_columns`): a hidden block inside
+   a visible column would leave the column standing, taking half the row
+   for nothing. With the charts hidden the parameters get the whole width,
+   and the other way round.
+3. **It stacks below 660 px** of panel width (`_BODY_STACK_W`): two 390 px
+   columns do not fit a narrow pane and the charts have a 300 px floor, so
+   they would clip instead of shrinking.
+4. **Charts at the top, air below**: each column ends in an expanding
+   spacer. Measured with "In depth" on: a SN comes out 384/384 in an 894 px
+   row (the charts ask for 689) and a NEO with 15 rows leaves a 1244 px
+   column for a 529 px chart; the air is the price of not stacking two
+   blocks of very different heights.
+5. **The card labels wrap** (`section_card.py`): a `QGridLayout`'s minimum
+   is the SUM of its columns' minimums, and an unwrapped label measures its
+   whole text: "MOID (minimum orbit intersection distance)" next to a long
+   value put the card's floor at 448 px, which is what kept the row from
+   being the 50/50 it is meant to be.
+
+**Consequences.** The card may still scroll (ADR-057's contract is
+unchanged) and it comes out shorter: a NEO with "In depth" asked for
+1785 px stacked and asks for 1377 in two columns. The card's tests read the
+row (`row_body`), the single-column collapse and the stacking threshold.

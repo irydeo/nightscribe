@@ -97,6 +97,12 @@ def _chip(text, color, tip=""):
 # resize() sizes the WHOLE window (title bar + frame + layout margins),
 # so the panel's full height needs a little headroom to fit without a
 # vertical scrollbar.
+# Below this panel width the parameters/charts row stacks vertically
+# (ADR-057 rev.). The charts' own floor is 300 px (the tab widget) plus the
+# group's margins, and the section cards need ~300 to read; 660 leaves both
+# their minimum and a little air.
+_BODY_STACK_W = 660
+
 _MIN_READ_W = 780     # comfortable reading width (px)
 _MIN_READ_H = 640     # minimum usable height (px)
 _DLG_CHROME = 60      # title bar / frame / margins headroom (px)
@@ -286,6 +292,18 @@ class ObjectPanel(QWidget):
         self._sections_lay = self._ui.sections_lay
         self._section_cards = []
 
+        # ADR-057 rev.: the parameters and the charts share one row, 50/50.
+        # The columns are WIDGETS so that hiding one gives the other the
+        # whole width (a hidden widget takes no space in a layout; a hidden
+        # child inside a visible column would leave the column standing).
+        self.col_params = self._ui.col_params
+        self.col_charts = self._ui.col_charts
+        self._row_body = self._ui.row_body
+        self._row_body.setStretch(0, 1)
+        self._row_body.setStretch(1, 1)
+        self._body_direction = None      # what the row is laid out as now
+        self._apply_body_direction()
+
         # charts tabs (D2): each produced chart gets its own tab labelled
         # with the chart's title; with a single chart the tab bar hides and
         # the chart stands alone. orbit/sky/approach are vector widgets;
@@ -303,7 +321,55 @@ class ObjectPanel(QWidget):
         self._action = "create"
         self.btn_project.clicked.connect(self._cta_clicked)
 
+        # the panel is born empty: the blocks are hidden by the .ui and the
+        # columns follow them, so an untouched panel shows no empty row
+        self._sync_body_columns()
+
     # ---------------- states ----------------
+
+    def _sync_body_columns(self):
+        # @return: None. A column is shown only when its block is.
+        #
+        # The block's own hidden flag stays the single source of truth (the
+        # .ui starts both hidden, the states and _render_charts toggle them,
+        # the tests read them). The COLUMN has to follow, and that is the
+        # whole point of the widget: a hidden block inside a visible column
+        # still leaves the column standing, taking its half of the row and
+        # squeezing the other one for nothing.
+        self.col_params.setVisible(not self.grp_params.isHidden())
+        self.col_charts.setVisible(not self.grp_charts.isHidden())
+
+    def _apply_body_direction(self):
+        # @return: None. Below _BODY_STACK_W the row turns vertical.
+        #
+        # Two 390 px columns do not fit a narrow pane, and the charts carry
+        # a 300 px floor: squeezed past it the row clips instead of
+        # shrinking. Stacked, the parameters keep their full width (their
+        # explanations wrap less) and the charts get the page, which is
+        # what the card did before the row existed.
+        row = getattr(self, "_row_body", None)
+        if row is None:
+            return
+        from PySide6.QtWidgets import QBoxLayout
+        stacked = self.width() < _BODY_STACK_W
+        want = QBoxLayout.TopToBottom if stacked else QBoxLayout.LeftToRight
+        if want == self._body_direction:
+            return
+        self._body_direction = want
+        row.setDirection(want)
+
+    def resizeEvent(self, event):
+        # @args: event - the QResizeEvent
+        super().resizeEvent(event)
+        self._apply_body_direction()
+
+    def showEvent(self, event):
+        # @args: event - the QShowEvent
+        # A widget is born 640 px wide (Qt's default) and the real width
+        # only arrives with the layout: without this the first paint of a
+        # wide panel could come out stacked.
+        super().showEvent(event)
+        self._apply_body_direction()
 
     def state(self):
         # @return: "empty" | "loading" | "missing" | "ready"
@@ -325,6 +391,7 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         self._clear_sections()
         self.grp_charts.hide()
+        self._sync_body_columns()
         self.btn_project.hide()
         # the previous object's arc is dropped while it loads (a bare
         # night is honest; the last object's curve over a "Loading" line
@@ -348,6 +415,7 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         self._clear_sections()
         self.grp_charts.hide()
+        self._sync_body_columns()
         self._refresh_cta()
 
     def _state_ready(self, e):
@@ -387,6 +455,7 @@ class ObjectPanel(QWidget):
         self.grp_params.setVisible(bool(self._rows))
         self._refill_sections()
         self._render_charts(e)
+        self._sync_body_columns()
         self._render_kpis(e)
         self._render_flags(e)
         self._refresh_cta()
@@ -533,6 +602,7 @@ class ObjectPanel(QWidget):
         self.grp_params.hide()
         self._clear_sections()
         self.grp_charts.hide()
+        self._sync_body_columns()
         self.btn_project.hide()
 
     def _worker_done(self, w, e):
@@ -868,6 +938,7 @@ class ObjectPanel(QWidget):
         # when build_charts produced no PNG (elements without an ephemeris).
         has_charts = bool(charts) or bool(self._slot_data)
         self.grp_charts.setVisible(has_charts)
+        self._sync_body_columns()
 
     def _empty_tabs(self):
         # Removes every chart tab and clears the slot state.

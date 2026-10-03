@@ -19,9 +19,9 @@ a multi-night journal). One page is visible at a time, each page
 builds lazily on first open, and a rebuild (project change or step
 action) wipes all of them:
 
-  * lazy build + cache: a selection yields {"details", next-action
-    tab}; the rest build on first open and are cached in
-    `window._tab_pages`
+  * lazy build + cache: a selection yields {"details"} and nothing
+    else (ADR-041 rev.: the object card is the landing page); the rest
+    build on first open and are cached in `window._tab_pages`
   * exactly one page visible at a time (object card included); the
     tab bar buttons mirror the active page
   * "Mark done" lives once, on the global Next card; the only step
@@ -183,17 +183,33 @@ def _mk_project(window, kind="sn", name="SN 2099pg"):
 
 
 def test_pages_build_lazily_per_selection(window, panel):
-    # ADR-041: on selection the page is wiped and rebuilt with the
-    # Object card (eager) plus the next-action tab auto-opened; the
-    # rest of the tab bar waits for its first click.
+    # ADR-041 rev.: on selection the page is wiped and rebuilt with the
+    # Object card (eager), and that is ALL that gets built: the steps wait
+    # for their first click (or for the Next card's Go).
     _mk_project(window)
     assert hasattr(window.projects, "scroll_page")
     assert window.projects.scroll_page.widget() is \
         window.projects.page_container
     for key in ("details", "plan", "analysis", "publish", "analysis"):
         assert hasattr(window.projects, f"btn_tab_{key}")
-    assert set(window._tab_pages) == {"details", "plan"}
+    assert set(window._tab_pages) == {"details"}
+    assert window._active_tab == "details"
+
+
+def test_an_in_place_rebuild_keeps_the_tab(window, panel):
+    # ADR-041 rev.: only OPENING a project lands on the object card. A
+    # refresh in place (a survey landing, the curve after a measurement,
+    # re-selecting the same project) must leave the observer on the page
+    # they are reading.
+    _mk_project(window)
+    window.projects.btn_tab_plan.click()
     assert window._active_tab == "plan"
+    window._build_project_page(window._current_project, land="keep")
+    assert window._active_tab == "plan"
+    # and the step machine still moves forward: "Mark done" lands on the
+    # step it advanced to, not back on the card
+    window._step_done("plan")
+    assert window._active_tab == "analysis"
 
 
 def test_page_is_scroll_wrapped(window, panel):
@@ -266,12 +282,16 @@ def test_step_reopen(window, panel):
     assert steps["analysis"] == "pending"
 
 
-def test_next_card_lands_on_next_action_tab(window, panel):
-    # ADR-041: a fresh project's Next card points at Plan, and the Plan
-    # tab is the one open — the Object card hides behind the bar.
+def test_the_next_card_go_opens_the_next_action_tab(window, panel):
+    # ADR-041 rev.: a fresh project's Next card points at Plan and its Go
+    # button opens it, but the LANDING page is the object card.
     _mk_project(window)
     assert "Plan" in window.projects.lbl_next.text() or \
         "Planifica" in window.projects.lbl_next.text()
+    assert window._active_tab == "details"
+    assert not window._tab_pages["details"].isHidden()
+    assert "plan" not in window._tab_pages      # lazy: nobody asked yet
+    window.projects.btn_next_go.click()
     assert window._active_tab == "plan"
     assert not window._tab_pages["plan"].isHidden()
     assert window._tab_pages["details"].isHidden()
@@ -289,6 +309,9 @@ def test_next_card_followup_when_cadence_due(window, panel):
     window._build_project_page(window._current_project)
     assert "Measure" in window.projects.lbl_next.text() or \
         "Mide" in window.projects.lbl_next.text()
+    # the landing is still the object card; the cadence call is what Go does
+    assert window._active_tab == "details"
+    window.projects.btn_next_go.click()
     assert window._active_tab == "analysis"
     assert not window._tab_pages["analysis"].isHidden()
     # UX-PC (U3): follow-up is not a step — the Next card hides "Mark done"
@@ -378,6 +401,7 @@ def test_calibration_and_products_start_collapsed(window, panel):
     from nightscribe.gui.widgets.collapsible_section import \
         CollapsibleSection
     _mk_project(window, kind="neo", name="2099 Coll")
+    window._show_tab("plan")      # the Calibration block lives in Capture
     window._show_tab("analysis")  # the Process page builds on first open
     secs = window.projects.page_container.findChildren(CollapsibleSection)
     titles = {s._btn.text(): s for s in secs}
@@ -407,8 +431,10 @@ def test_activating_a_tab_hides_the_others(window, panel):
     # Opening any tab page hides the rest (one landing spot, no matter
     # which button the user clicks).
     _mk_project(window)
+    window.projects.btn_tab_plan.click()   # a step is what this test needs
     pages = window._tab_pages
     assert not pages["plan"].isHidden()
+    assert pages["details"].isHidden()
     window.projects.btn_tab_analysis.click()
     assert not pages["analysis"].isHidden()
     for key in ("plan", "details"):
@@ -425,6 +451,7 @@ def test_opening_object_card_hides_open_step(window, panel):
     # The Object card is a tab like the steps: clicking it while a step
     # is active lands on the card and hides the step.
     _mk_project(window)
+    window.projects.btn_tab_plan.click()
     assert window._active_tab == "plan"
     window.projects.btn_tab_details.click()
     assert window._active_tab == "details"
@@ -439,12 +466,12 @@ def test_tab_bar_buttons_mirror_the_active_tab(window, panel):
     btns = {key: getattr(window.projects, f"btn_tab_{key}")
             for key in ("details", "plan", "analysis", "publish",
                         "analysis")}
-    assert btns["plan"].isChecked()
-    for key in ("details", "analysis", "publish", "analysis"):
+    assert btns["details"].isChecked()          # ADR-041 rev.: the card
+    for key in ("plan", "analysis", "publish"):
         assert not btns[key].isChecked()
-    window.projects.btn_tab_details.click()
-    assert btns["details"].isChecked()
-    assert not btns["plan"].isChecked()
+    window.projects.btn_tab_plan.click()
+    assert btns["plan"].isChecked()
+    assert not btns["details"].isChecked()
 
 
 def test_analysis_deep_link_lands_on_analysis(window, panel):
@@ -457,8 +484,8 @@ def test_analysis_deep_link_lands_on_analysis(window, panel):
     window._goto_project_followup(p["id"])
     assert window._active_tab == "analysis"
     assert not window._tab_pages["analysis"].isHidden()
-    for key in ("plan", "details"):
-        assert window._tab_pages[key].isHidden()
+    assert window._tab_pages["details"].isHidden()
+    assert "plan" not in window._tab_pages     # lazy: never opened
     assert "publish" not in window._tab_pages  # lazy: never opened
 
 
@@ -563,7 +590,7 @@ def test_chips_fresh_project(window, panel):
     # pending on the three real step pages, nothing on the object card
     # (ADR-045: Analysis is a step now, so it carries the chip).
     _mk_project(window)
-    for key in ("analysis", "publish", "analysis"):
+    for key in ("plan", "analysis", "publish"):
         window._show_tab(key)  # the pages build on first open
     pages = window._tab_pages
     for key in ("plan", "analysis", "publish"):

@@ -37,12 +37,12 @@ ella.
    (`theme.py`): normal / hover / checked con el color del kind.
 2. **Una pestaña visible a la vez; las páginas se construyen perezosas**
    (`main_window.py`): `self._tab_pages` (key → QWidget) y
-   `self._active_tab`. Solo se construye el que se abre — el primero y el
-   objetivo de la tarjeta «Siguiente» al seleccionar un proyecto
-   (`_build_project_page` → `_show_tab(next target)`), el resto al primer
-   clic. Cada builder (`_build_{plan,process,publish,followup}_tab`) se
-   ejecuta una sola vez por selección; el mapa se limpia en
-   `_clear_project_page`.
+   `self._active_tab`. Al seleccionar un proyecto se abre la ficha del
+   objeto y **solo** se construye esa (`_build_project_page` →
+   `_show_tab("details")`); el resto al primer clic o cuando el botón «Ir»
+   de la tarjeta «Siguiente» salta a su paso. Cada builder
+   (`_build_{plan,process,publish,followup}_tab`) se ejecuta una sola vez
+   por selección; el mapa se limpia en `_clear_project_page`.
 3. **El follow-up sigue gateado por kind** (`FOLLOWUP_KINDS` =
    sn/hads/variable, `core/project.py` L37): la pestaña se oculta en la
    barra para los demás kinds y un deep-link a ella es un **no-op seguro**
@@ -103,12 +103,12 @@ the navigation should now look like it.
    `theme.tab_state_style` (`theme.py`): normal / hover / checked with the
    project's kind colour.
 2. **One visible tab at a time; pages build lazily** (`main_window.py`):
-   `self._tab_pages` (key → QWidget) and `self._active_tab`. Only what is
-   opened gets built — the first one plus the "Next" card's target when a
-   project is selected (`_build_project_page` → `_show_tab(next
-   target)`), the rest on first click. Each builder
-   (`_build_{plan,process,publish,followup}_tab`) runs once per selection;
-   the map is wiped in `_clear_project_page`.
+   `self._tab_pages` (key → QWidget) and `self._active_tab`. Selecting a
+   project opens the object card and builds **only** that
+   (`_build_project_page` → `_show_tab("details")`); the rest on first
+   click or when the "Next" card's Go button jumps to its step. Each
+   builder (`_build_{plan,process,publish,followup}_tab`) runs once per
+   selection; the map is wiped in `_clear_project_page`.
 3. **Follow-up stays kind-gated** (`FOLLOWUP_KINDS` = sn/hads/variable,
    `core/project.py` L37): the tab is hidden on the bar for other kinds,
    and a deep link to it is a **safe no-op**
@@ -236,3 +236,29 @@ where the honest answer is a scrollbar.
 `tests/unit/test_project_tabs_layout.py` holds the criterion, including
 the connected case, and `tests/unit/test_night_ribbon.py` holds the band's
 honesty in every state it can be put in.
+
+**Amendment (2026-10-02, the landing page).** A project used to open on the
+Next card's target: a fresh one landed on **Capture**, in the middle of a
+workflow, before the observer had seen what the object is. It now opens on
+the **object card**, always.
+
+1. `_build_project_page` calls `_show_tab("details")`. The Next card still
+   says what to do next and its **Go** still jumps to that step (decision 4
+   is untouched); a **double click** on a list row still jumps straight to
+   the work (`_project_open_activated`), which is the gesture that means
+   "take me to it".
+2. The lazy build gets lighter: selecting a project builds the card and
+   nothing else. The step pages build on the first click or when Go lands
+   on them.
+3. **The landing is only for opening.** `_build_project_page` takes which
+   tab to open: `"details"` (the default, opening a project), `"keep"`
+   (whatever tab was open) and `"next"` (the Next card's target). An
+   IN-PLACE refresh asks for `"keep"`: a survey landing, the curve after a
+   measurement and re-selecting the same project must not throw the
+   observer out of the page they are reading. The step machine asks for
+   `"next"`, so "✔ Mark done" still moves you forward to the step it
+   advanced to.
+4. Cost, said out loud: the card is the page that triggers the object
+   lookup, so an uncached object shows its "Loading…" line for a moment
+   where it used to happen out of sight. The lookup was already running on
+   selection either way.

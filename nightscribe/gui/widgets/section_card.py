@@ -110,7 +110,15 @@ class SectionCard(QFrame):
         row = self._grid.rowCount()
         lbl_param = QLabel(param)
         lbl_param.setStyleSheet(f"color: {theme.C_TEXT_DIM};")
+        # Both wrap. A QGridLayout's minimum width is the SUM of its
+        # columns' minimums, and an unwrapped label's minimum is its whole
+        # text: one long name ("MOID (minimo acercamiento de orbitas)") next
+        # to one long value pushed the card's floor to 448 px, which is what
+        # kept the parameters/charts row from being the 50/50 it is meant to
+        # be (ADR-057 rev.). Wrapping drops the floor to the longest word.
+        lbl_param.setWordWrap(True)
         lbl_value = QLabel(str(value))
+        lbl_value.setWordWrap(True)
         lbl_value.setTextInteractionFlags(Qt.TextSelectableByMouse)
         # a definition list reads top-aligned: a tall explanation must not
         # push the next name/value pair off its own baseline

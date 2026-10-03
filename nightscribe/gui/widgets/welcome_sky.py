@@ -133,6 +133,9 @@ class WelcomeSky(QWidget):
             self._paint_moon(p, rect)
         if self._animations:
             self._paint_glints(p, rect)
+        # the silhouette goes LAST: a twinkling glint must never land on
+        # top of the dome
+        self._paint_observatory(p, rect)
         p.end()
 
     def _paint_background(self, p, rect):
@@ -250,6 +253,104 @@ class WelcomeSky(QWidget):
         path.arcTo(QRectF(cx - rx, cy - r, 2 * rx, 2 * r), 270.0, sweep)
         path.closeSubpath()
         return path
+
+    def _observatory_geometry(self, rect):
+        # @args: rect - the hero's rect
+        # @return: the silhouette's geometry in px, as a dict. It lives
+        #          apart from the painting so a test can ask WHERE the dome
+        #          is (and check it never runs into the Moon) without
+        #          reading pixels.
+        h = float(rect.height())
+        w = float(rect.width())
+        ground = rect.top() + h * 0.945      # the hill line it stands on
+        rd = h * 0.150                       # dome radius
+        cx = rect.left() + w * 0.855         # dome centre, right of frame
+        body_h = h * 0.085
+        return {
+            "ground": ground,
+            "cx": cx,
+            "rd": rd,
+            # the body is as wide as the dome it carries (a dome wider than
+            # its drum reads as a mushroom), with a low annex to its left
+            "body": QRectF(cx - rd, ground - body_h, 2.0 * rd, body_h),
+            "annex": QRectF(cx - h * 0.420, ground - h * 0.050,
+                            h * 0.260, h * 0.050),
+            "dome_centre": QPointF(cx, ground - body_h),
+            "tube": QRectF(cx - rd * 0.30 - h * 0.012,
+                           ground - body_h - rd * 1.18,
+                           max(2.0, h * 0.024), rd * 1.18),
+            "light": QPointF(cx - rd * 0.30,
+                             ground - body_h - rd * 0.55),
+            "light_r": max(1.6, h * 0.013),
+        }
+
+    def _paint_observatory(self, p, rect):
+        # The dome on its hill, bottom right, under the Moon: the observer's
+        # own observatory, in the app's night palette (the same #03050a
+        # silhouette, the same #45608a rim light and the same warm #ffcf7a
+        # lamp the vector used to carry).
+        #
+        # It is painted HERE and not left to welcome_sky.svg on purpose. The
+        # hero is a 4.8:1 to 6.3:1 strip against an asset of 2.86:1, so the
+        # "cover" fit crops the scene's bottom away: the vector's dome
+        # started at y=352 of 560 and its base sat at y=470, while the
+        # visible band ends at 408 (Welcome, 1290x206) or 446 (the resting
+        # pane, 820x170), so only the top of the dome survived and it read
+        # as a black bump cut off by the frame. Sized from the widget it is
+        # whole in every hero, and it keeps clear of the Moon (which sits at
+        # 0.30 h with a radius of at most 0.115 h).
+        # @args: p - the painter, rect - the hero's rect
+        # @return: None
+        g = self._observatory_geometry(rect)
+        h = float(rect.height())
+        ground, cx, rd = g["ground"], g["cx"], g["rd"]
+
+        # the hill: a shallow line across the whole width, so the silhouette
+        # is planted on something and the hero has a horizon again
+        ridge = QPainterPath()
+        ridge.moveTo(rect.left(), ground + h * 0.012)
+        ridge.quadTo(rect.center().x(), ground - h * 0.026,
+                     rect.right(), ground + h * 0.004)
+        hill = QPainterPath(ridge)
+        hill.lineTo(rect.right(), rect.bottom())
+        hill.lineTo(rect.left(), rect.bottom())
+        hill.closeSubpath()
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor("#03050a"))
+        p.drawPath(hill)
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(43, 61, 94, 130), 1.0))
+        p.drawPath(ridge)
+
+        # the annex (a low room) and the body of the building
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor("#05080f"))
+        p.drawRect(g["annex"])
+        p.setBrush(QColor("#03050a"))
+        p.drawRect(g["body"])
+
+        # the dome: a half circle on the body, one thin rim light on top of
+        # it so the silhouette has an edge against the sky
+        p.setBrush(QColor("#05080f"))
+        p.drawPie(QRectF(cx - rd, g["dome_centre"].y() - rd,
+                         2.0 * rd, 2.0 * rd), 0, 180 * 16)
+        p.setBrush(Qt.NoBrush)
+        p.setPen(QPen(QColor(69, 96, 138, 150), max(1.0, h * 0.006)))
+        p.drawArc(QRectF(cx - rd, g["dome_centre"].y() - rd,
+                         2.0 * rd, 2.0 * rd), 0, 180 * 16)
+
+        # the slit: the tube pokes out of it, and the lamp is what tells you
+        # somebody is in there tonight
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor("#0e1728"))
+        p.drawRoundedRect(g["tube"], max(1.0, h * 0.008), max(1.0, h * 0.008))
+        glow = QRadialGradient(g["light"], g["light_r"] * 4.0)
+        glow.setColorAt(0.0, QColor(255, 207, 122, 90))
+        glow.setColorAt(1.0, QColor(255, 207, 122, 0))
+        p.setBrush(QBrush(glow))
+        p.drawEllipse(g["light"], g["light_r"] * 4.0, g["light_r"] * 4.0)
+        p.setBrush(QColor(255, 207, 122, 230))
+        p.drawEllipse(g["light"], g["light_r"], g["light_r"])
 
     def _paint_glints(self, p, rect):
         # Small soft dots over a few fixed stars. Each one breathes with

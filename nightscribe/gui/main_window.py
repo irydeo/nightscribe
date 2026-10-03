@@ -3868,16 +3868,18 @@ class MainWindow(QMainWindow):
             return
         if (self._current_project or {}).get("id") == pid:
             # re-select of the SAME project (status change, reload): refresh
-            # in place, do not push a duplicate location
-            self._open_project(pid)
+            # in place, do not push a duplicate location and do not move the
+            # observer off the tab they are on
+            self._open_project(pid, land="keep")
             return
         # a user pick is a navigation (Interfaz 1.1)
         self.navigate(VIEW_DETAIL, pid=pid)
 
-    def _open_project(self, pid):
+    def _open_project(self, pid, land="details"):
         # Opens one project full screen: header, page and object panel. No
         # history here (the callers decide whether it is a navigation).
-        # @args: pid - project id
+        # @args: pid - project id; land - the tab to open, as
+        #        _build_project_page reads it ("details" by default)
         # @return: True when the project existed and was opened
         p = project.get(db, pid)
         if not p:
@@ -3886,7 +3888,7 @@ class MainWindow(QMainWindow):
         self._goto_tab(VIEW_DETAIL)
         self._sync_projects_pane()
         self._render_project_header(p)
-        self._build_project_page(p)
+        self._build_project_page(p, land=land)
         panel = self._get_proj_panel()
         if panel._worker is not None:
             panel.cancel()   # switching projects: drop the in-flight load
@@ -3969,8 +3971,8 @@ class MainWindow(QMainWindow):
         if item is not None and item.data(Qt.UserRole) == \
                 (self._current_project or {}).get("id"):
             # clicking the already-selected row reloads the detail (no
-            # navigation: the location did not change)
-            self._open_project(item.data(Qt.UserRole))
+            # navigation: the location did not change, nor does the tab)
+            self._open_project(item.data(Qt.UserRole), land="keep")
 
     def _proj_files_build(self):
         # A4 (rewritten): the project files window (ADR-019, UX v3) is
@@ -4431,25 +4433,49 @@ class MainWindow(QMainWindow):
             self._tab_pages[key].layout().addLayout(
                 self._step_footer(p, key))
 
-    def _build_project_page(self, p):
+    def _build_project_page(self, p, land="details"):
         # The project detail (ADR-041): the object card, the steps and
         # follow-up are TAB PAGES under one scroll — one visible at a
         # time (the tab bar in the masthead decides). The object card
         # is the light page, so it builds eagerly; the step pages build
-        # lazily on first open and are cached in _tab_pages. The Next
-        # card still decides where you land.
+        # lazily on first open and are cached in _tab_pages.
+        #
+        # ADR-041 rev.: opening a project lands on the OBJECT CARD. It used
+        # to land on the Next card's target (a fresh project opened on
+        # Capture), which meant you landed in the middle of a workflow
+        # before seeing what the object is. The Next card still says what
+        # to do next and its Go button still jumps to that step; a double
+        # click on a row still jumps straight to the work
+        # (_project_open_activated).
+        #
+        # @args: p - the project dict
+        #        land - which tab to open after the rebuild:
+        #          "details" (default): the object card, the landing page
+        #          "keep": whatever tab was open. An IN-PLACE refresh (a
+        #                  survey landing, the curve after a measurement, a
+        #                  reload of the same project) must not throw the
+        #                  observer out of the page they are reading.
+        #          "next": the Next card's target. The step machine asks
+        #                  for it when a step is marked done or reopened,
+        #                  so "✔ Mark done" keeps moving you forward.
+        # the tab to keep, read BEFORE the wipe: _clear_project_page()
+        # resets _active_tab to None
+        keep = getattr(self, "_active_tab", None)
         self._clear_project_page()
-        kind, ctx = p["kind"], p["context"]
         # page 0: the object card + project files (not a step)
         det = self._section_layout("details")
         panel = self._get_proj_panel()
         det.addWidget(panel)
         self._populate_project_files(p["id"])
-        # the Next card fills itself AND tells us which page starts
-        # active (a finished project — no target — lands on the object
-        # card); the other pages build on first click
+        # the Next card fills itself (its Go button and the "Mark done"
+        # chip need a target); the landing tab comes from the caller
         self._refresh_next_card(p)
-        self._show_tab(self._next_target or "details")
+        if land == "next":
+            self._show_tab(self._next_target or "details")
+        elif land == "keep":
+            self._show_tab(keep or "details")
+        else:
+            self._show_tab("details")
 
     def _step_section(self, key):
         # Builds one tab page with its state chip in the header
@@ -4546,7 +4572,8 @@ class MainWindow(QMainWindow):
         p = project.get(db, p["id"])
         self._current_project = p
         self.on_refresh_projects()
-        self._build_project_page(p)
+        # the step machine advances: land on the step it moved to
+        self._build_project_page(p, land="next")
         self._render_project_header(p)
         if p["status"] != project.STATUS_ACTIVE:
             ans = QMessageBox.question(
@@ -4562,7 +4589,7 @@ class MainWindow(QMainWindow):
         project.reopen_step(db, self._current_project["id"], key)
         p = project.get(db, self._current_project["id"])
         self._current_project = p
-        self._build_project_page(p)
+        self._build_project_page(p, land="next")
 
     def _build_plan_tab(self, p, kind, ctx):
         # Plan & Captura (ADR-030), laid out as a mission console
@@ -8194,7 +8221,7 @@ class MainWindow(QMainWindow):
             if extra:
                 msg += " — " + str(extra)
             self.statusBar().showMessage(msg, 10000)
-            self._build_project_page(project.get(db, pid))
+            self._build_project_page(project.get(db, pid), land="keep")
             return
         if not pts:
             self.statusBar().showMessage(
@@ -8219,8 +8246,9 @@ class MainWindow(QMainWindow):
                .replace("%6", f"{max(mjds):.1f}")
                .replace("%7", ", ".join(bands)))
         self.statusBar().showMessage(msg, 15000)
-        # rebuild the page so the curve/points update in place
-        self._build_project_page(project.get(db, pid))
+        # rebuild the page so the curve/points update in place, without
+        # moving the observer off the tab they are reading
+        self._build_project_page(project.get(db, pid), land="keep")
 
     def _sn_add_step_row(self, layout, filt="Clear", n=30, exp=60.0):
         # B8: add a filter×N×exp row to the SN multi-filter step list.

@@ -158,6 +158,93 @@ def test_hero_paints_tonight_moon(make_window):
     assert isinstance(info["waxing"], bool)
 
 
+def test_hero_paints_an_observatory(make_window):
+    # The hero's own drawing: a dome on its hill, bottom right, under the
+    # Moon. It used to be vector inside welcome_sky.svg and the "cover" fit
+    # cropped the scene's bottom away (of the dome's y=352..470 only the top
+    # survived in a 820x170 or 1290x206 hero), so it is painted from the
+    # widget's own size now and is whole in every hero.
+    from PySide6.QtCore import QRectF
+    from PySide6.QtWidgets import QApplication, QWidget
+    from nightscribe.gui.widgets.welcome_sky import WelcomeSky
+    for w, h in ((820, 170), (1290, 206)):
+        sky = WelcomeSky()
+        QWidget.show(sky)          # a widget with no size has no geometry
+        sky.resize(w, h)
+        for _ in range(4):
+            QApplication.processEvents()
+        # the widget has a floor of its own (minimumHeight 190), and a
+        # squeezed layout can take it below that: what matters is that the
+        # geometry follows the size the widget REALLY has
+        rect = QRectF(sky.rect())
+        w, h = rect.width(), rect.height()
+        g = sky._observatory_geometry(rect)
+        assert 0 < g["cx"] < w and g["ground"] < h
+        assert g["body"].right() <= w and g["annex"].left() >= 0
+        # clear of the Moon: it sits at 0.30 h with a radius of at most
+        # 0.115 h (welcome_sky._paint_moon)
+        moon_bottom = h * 0.30 + max(13.0, min(h * 0.115, 38.0))
+        dome_top = g["dome_centre"].y() - g["rd"]
+        assert dome_top > moon_bottom, \
+            f"at {w}x{h} the dome runs into the Moon ({dome_top} vs " \
+            f"{moon_bottom})"
+        # and it is really painted: the lamp's warm light is on the pixmap
+        img = sky.grab().toImage()
+        c = img.pixel(int(g["light"].x()), int(g["light"].y()))
+        assert (c >> 16) & 0xFF > 200 and (c >> 8) & 0xFF > 140, \
+            f"no warm light at the slit of the {w}x{h} hero: {c:#010x}"
+        sky.deleteLater()
+
+
+def _hero_star_positions():
+    # @return: [(x, y)] of every star in welcome_sky.svg, in the canvas'
+    #          own coordinates (the groups' rotation applied). Reading the
+    #          raw attributes is not enough: the granulation is written in
+    #          the BAND's rotated frame, which is exactly how it is placed.
+    import math
+    import re
+    from pathlib import Path
+    from nightscribe.gui.widgets.welcome_sky import ASSET
+    svg = Path(ASSET).read_text()
+    groups = [(m.group(0), m.end(), svg.index("</g>", m.end()))
+              for m in re.finditer(r"<g[^>]*>", svg)]
+    th = math.radians(-31.0)
+    out = []
+    for m in re.finditer(r'<circle cx="([\d.]+)" cy="([\d.]+)"', svg):
+        x, y = float(m.group(1)), float(m.group(2))
+        tag = next((g[0] for g in groups if g[1] <= m.start() < g[2]), "")
+        if "rotate(-31 1010 190)" in tag:
+            dx, dy = x - 1010.0, y - 190.0
+            x = 1010.0 + dx * math.cos(th) - dy * math.sin(th)
+            y = 190.0 + dx * math.sin(th) + dy * math.cos(th)
+        out.append((x, y))
+    return out
+
+
+def test_the_milky_way_is_a_band_and_not_a_haze():
+    # ADR-055: the band was five hard-edged ellipses (you could count the
+    # steps) with the SAME star density as the empty sky: 19% of the stars
+    # over 20% of the canvas, and three of them in its core. It is a galaxy
+    # now: the stars crowd its spine, and the dust rift is drawn along it.
+    import math
+    from pathlib import Path
+    from nightscribe.gui.widgets.welcome_sky import ASSET
+    svg = Path(ASSET).read_text()
+    assert "<filter" not in svg, \
+        "a blurred group costs 13.6 ms per size: gradients only"
+    assert svg.count("url(#mwdust)") >= 8, "the Great Rift is not drawn"
+    th = math.radians(-31.0)
+    pts = _hero_star_positions()
+    strip = sum(1 for x, y in pts
+                if abs(-(x - 1010.0) * math.sin(th)
+                       + (y - 190.0) * math.cos(th)) <= 60.0)
+    inside = strip / len(pts)
+    # the +-60 strip is 120 of the canvas' 560 px: 21%
+    assert inside / (120.0 / 560.0) > 2.0, (
+        f"the stars are not crowding the band: {inside:.0%} of them inside "
+        f"a strip that is 21% of the canvas")
+
+
 def test_night_strip_answers_with_a_site(make_window):
     # The hook of the redesign: typing a site makes the strip answer, and
     # it is pure local maths (no network, no cache).

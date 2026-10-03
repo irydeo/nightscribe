@@ -108,6 +108,9 @@ def _build(window, p):
         window._proj_panel_loader = (lambda name, fallback_target=None:
                                      FakeWorker(FAKE_ELEMENT))
         window._build_project_page(p)
+        # ADR-041 rev.: the landing page is the object card, so the Capture
+        # step (where these blocks live) has to be opened explicitly
+        window._show_tab("plan")
     finally:
         window._proj_panel, window._proj_panel_loader = orig_panel, orig_loader
 

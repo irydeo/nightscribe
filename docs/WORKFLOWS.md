@@ -1158,6 +1158,52 @@ glance, the same complaint the Welcome view had before Interfaz 1.4.
 `_plan_ribbon_refresh` and `_analysis_ribbon_refresh` in
 `gui/main_window.py`, `_refresh_ribbon` in `gui/overview.py`.
 
+### 7duodevicies. The card in two columns, and the card as the landing page (2026-10-02, ADR-057 rev. + ADR-041 rev.)
+
+Motivation: the dossier stacked the parameters and, under them, the charts,
+and opening a project landed on Capture (the Next card's target) instead of
+on the card that says what the object is.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The row | Parameters left, charts right, 50/50 (`row_body`); the night band stays full width above and the CTA below | **Done** |
+| The collapse | The columns are widgets and follow their block: with no charts the parameters take the whole width, and the other way round | **Done** |
+| The stack | Below 660 px of panel the row turns vertical (the charts have a 300 px floor) | **Done** |
+| The 50/50 | The `SectionCard` labels wrap: the grid's minimum fell from 448 to ~180 px, which is what the equal split needed | **Done** |
+| The landing | Opening a project always lands on the card; the Next card's Go still jumps to the step and a double click still goes straight to the work. An in-place refresh (`land="keep"`) and the step machine (`land="next"`) keep their own behaviour | **Done** |
+
+**Entry point**: `gui/ui/object_panel.ui` (`row_body`), `_sync_body_columns`
+and `_apply_body_direction` in `gui/overview.py`, `_build_project_page` in
+`gui/main_window.py`.
+
+### 7undevicies. The hero's Moon, and an observatory you can see (2026-10-02, ADR-055 rev.)
+
+Motivation: the observer reported that the Moon phase looked wrong on
+Welcome and on the projects view, and asked for the drawing to include an
+observatory.
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The Moon | `gui/moon_icon.py` had the sign convention inverted, so the sky bar, the night ribbon, Tonight and the sky calendar drew every phase MIRRORED while the hero's own painter drew it right: two Moons on one screen. Fixed, and a new test compares both painters at the same elongation | **Done** |
+| The crescents | The bundled photo is a full moon with a dark left limb and the maria on that side: a waning crescent came out ~5x dimmer than a waxing one (0.7% vs 2.5% of the disc at -30/+30). A flat wash over the lit area evens them out | **Done** |
+| The observatory | It was vector in `welcome_sky.svg` and the "cover" fit cropped it away (only the dome's edge survived in an 820x170 or 1290x206 hero). The SVG is a pure sky now and the dome is painted by `welcome_sky._paint_observatory`, sized from the hero, bottom right under the Moon, with the warm lamp in its slit | **Done** |
+
+**Entry point**: `gui/moon_icon.py` (the sign and the wash),
+`gui/widgets/welcome_sky.py` (`_observatory_geometry`,
+`_paint_observatory`), `assets/welcome_sky.svg` (no observatory, no ground).
+
+### 7vicies. The galaxy, the icon and the invitation (2026-10-03, ADR-026 rev. + ADR-055 rev.)
+
+| Piece | Deliverable | Status |
+|---|---|---|
+| The galaxy | The band was five hard-edged ellipses (steps) with the same star density as the empty sky (19% of the stars over 20% of the canvas, three in its core). Now: a radial-gradient glow, the Great Rift as a chain of soft dark ellipses, star clouds and 600 granulation stars in the band's frame (3x the density outside). No SVG filters: a blurred group cost 13.6 ms of 15, gradients cost 2.8 | **Done** |
+| The icon | `appicon.svg` was gold on the navy tile, off the palette (the clash showed next to the blue wordmark on Welcome). Repainted in the accent blue with a near-white star core, and all ten rasters + the `.ico` + the `.icns` regenerated with QtSvg + Pillow. Guard: every colour in the icon is neutral or cold | **Done** |
+| The invitation | The resting pane says it on the drawing: "Select a project" / "You will see its card, its plan and its curve. Or create a new one.", painted on the left half of the sky, click-through, with the create button still below | **Done** |
+
+**Entry point**: `assets/welcome_sky.svg` (the band),
+`assets/appicon.svg` + `installer/` (the icon),
+`gui/ui/night_panel.ui` + `gui/widgets/night_panel.py` (the invitation).
+
 ### 7undecies. Alerts dissolve into the list (2026-10-01, ADR-055 rev.)
 
 Motivation: the "needs your attention" panel and the "due for a revisit" band

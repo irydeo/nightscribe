@@ -55,6 +55,17 @@ class NightPanel(QWidget):
         for name in ("lbl_night_when", "lbl_night_moon",
                      "lbl_night_planets"):
             getattr(u, name).setObjectName("nightLine")
+        # the invitation is painted ON the sky (ADR-055): it must not eat
+        # the clicks meant for what is under it, and it is text, not a
+        # control (the call to action is the button below)
+        u.nightOverlay.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        # drop_in() replaces the placeholder, and the replacement lands on
+        # TOP of its siblings: without this the sky paints over the
+        # invitation (the Welcome hero raises its own overlay for the same
+        # reason)
+        u.nightOverlay.raise_()
+        u.lbl_resting_head.setObjectName("restingHead")
+        u.lbl_resting_hint.setObjectName("restingHint")
         self.refresh()
 
     def refresh(self):

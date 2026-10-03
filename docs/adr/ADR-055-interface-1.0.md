@@ -162,6 +162,59 @@ en vez de enviar un SVG (nuestro vector propio se mantiene mejor y no
 engorda el instalador). Meter una foto (peso, licencia, y contradiría la
 Luna que calculamos).
 
+**Corrección (2026-10-02, la Luna del héroe y el observatorio).** Dos cosas
+del héroe de la Interfaz 1.4 que estaban mal:
+
+1. **La Luna del icono estaba espejada.** `gui/moon_icon.py` tenía la
+   convención de signo al revés: pintaba como creciente lo que era
+   menguante. Lo que decide el lado es `elong = lon_luna - lon_sol`
+   (`core/ephem_minor`): **positivo = al este del Sol = creciente =
+   iluminada por la derecha** en el hemisferio norte, que es lo que ya
+   decían el comentario de `night_brief` y el pintor propio del héroe
+   (`welcome_sky._lit_path`). Como el héroe y el icono convivían en la
+   misma pantalla (el héroe dibuja su Luna, la barra del cielo usa el
+   icono), se veían **dos lunas contradiciéndose**. Corregido el signo y la
+   cabecera del módulo, y añadida la guarda que faltaba: un test compara
+   los dos pintores para la misma elongación, que es lo que habría cazado
+   el fallo.
+2. **La foto dejaba invisibles los crecientes menguantes.** Es una luna
+   llena: su limbo está viñeteado y su mitad izquierda carga casi todos
+   los mares, así que un creciente menguante (el arco iluminado cae en ese
+   limbo oscuro) salía hasta 5 veces más apagado que el creciente creciente
+   (medido: 0,7% de píxeles claros a elongación -30 frente a 2,5% a +30).
+   Un lavado plano sobre la zona iluminada los iguala sin borrar los
+   cráteres.
+3. **El observatorio no se veía.** Estaba en `welcome_sky.svg` (base,
+   cuerpo, cúpula, ranura, tubo y lámpara), pero el héroe es una franja de
+   4,8:1 a 6,3:1 contra un vector de 2,86:1 y el encaje «cover» recorta
+   centrado: con el héroe a 820x170 o 1290x206 la banda visible del SVG
+   termina en y=446 o 408, y la cúpula empieza en y=352 con su base en
+   y=470, así que solo sobrevivía el canto de la cúpula. El SVG se queda
+   como cielo puro (gradiente, estrellas, Vía Láctea y el velo del texto)
+   y el observatorio pasa al pintor del widget
+   (`welcome_sky._paint_observatory`), dimensionado con el héroe: siempre
+   entero, en las dos pantallas, con la silueta, el filo de la cúpula y la
+   luz cálida de la ranura.
+4. **La galaxia era un montón de elipses.** La banda de la Vía Láctea eran
+   cinco elipses concéntricas de borde duro (se contaban los escalones), el
+   degradado `mwdust` estaba definido y **sin usar** (la Gran Grieta nunca
+   se dibujó) y las estrellas eran uniformes: la banda ocupaba el 20% del
+   lienzo y tenía el **19%** de las estrellas, con **tres** en su núcleo.
+   Ahora el brillo sale de un degradado radial (sin filtro: un grupo con
+   `feGaussianBlur` costaba 13,6 ms de los 15 ms que tarda el asset entero
+   en rasterizarse a 1290x206, y el héroe es lo primero que se pinta al
+   arrancar), la grieta es una cadena de elipses oscuras y hay **600
+   estrellas de granulación** en el sistema girado de la banda: el 65% cae
+   a menos de 60 unidades del eje, una franja que es el 21% del lienzo, o
+   sea **3 veces la densidad** de fuera. Coste final: 2,8 ms.
+5. **La invitación, sobre el dibujo.** El panel en reposo decía qué hacer
+   solo debajo del cielo; ahora lleva dos líneas pintadas **encima**, en la
+   mitad izquierda (que es donde el SVG ya oscurece para el texto; la
+   derecha la ocupan la Luna y el observatorio): «Selecciona un proyecto» y
+   «Verás su ficha, su plan y su curva. O crea uno nuevo.». La
+   superposición no come clics (`WA_TransparentForMouseEvents`) y el botón
+   de crear sigue debajo.
+
 **Revisión (2026-10-02, Interfaz 1.5 bis: el sitio, en el mapa).** El paso
 del observatorio pedía una latitud a quien sabe dónde vive pero no sus
 coordenadas, y en una actualización la pantalla seguía diciendo «configura
@@ -377,6 +430,57 @@ sky tool has to be the sky). Painting everything in code instead of
 shipping an SVG (our own vector is easier to maintain and does not bloat
 the installer). Embedding a photo (weight, licence, and it would contradict
 the Moon we compute).
+
+**Correction (2026-10-02, the hero's Moon and the observatory).** Two things
+in the Interfaz 1.4 hero were wrong:
+
+1. **The icon's Moon was mirrored.** `gui/moon_icon.py` had the sign
+   convention the wrong way round: it drew a waning Moon as if it were
+   waxing. What decides the side is `elong = lon_moon - lon_sun`
+   (`core/ephem_minor`): **positive means east of the Sun, waxing, lit on
+   the right** in the northern hemisphere, which is what `night_brief`'s
+   own comment and the hero's own painter (`welcome_sky._lit_path`)
+   already said. Since the hero and the icon share one screen (the hero
+   paints its Moon, the sky bar uses the icon), the observer saw **two
+   Moons contradicting each other**. The sign and the module header are
+   fixed, and the missing guard is in: a test compares both painters at the
+   same elongation, which is what would have caught it.
+2. **The photograph made waning crescents invisible.** It is a full moon:
+   its limb is vignetted and its left half carries most of the maria, so a
+   waning crescent (whose lit arc sits on that dark limb) came out up to 5
+   times dimmer than a waxing one (measured: 0.7% of the disc bright at
+   elongation -30 against 2.5% at +30). A flat wash over the lit area evens
+   them out without erasing the craters.
+3. **The observatory could not be seen.** It was in `welcome_sky.svg`
+   (base, body, dome, slit, tube and lamp), but the hero is a 4.8:1 to
+   6.3:1 strip against a 2.86:1 vector and the "cover" fit crops it from
+   the centre: with the hero at 820x170 or 1290x206 the visible band of the
+   SVG ends at y=446 or 408, while the dome starts at y=352 with its base
+   at y=470, so only the edge of the dome survived. The SVG is a pure sky
+   now (gradient, stars, Milky Way and the text scrim) and the observatory
+   moved into the widget's painter
+   (`welcome_sky._paint_observatory`), sized from the hero: whole in both
+   screens, with the silhouette, the dome's rim light and the warm lamp in
+   the slit.
+4. **The galaxy was a pile of ellipses.** The Milky Way band was five
+   concentric hard-edged ellipses (you could count the steps), the
+   `mwdust` gradient was defined and **never used** (the Great Rift was
+   never drawn) and the stars were uniform: the band held 20% of the canvas
+   and **19%** of the stars, with **three** in its core. The glow is a
+   radial gradient now (no filter: one `feGaussianBlur` group cost 13.6 ms
+   of the 15 ms the whole asset took to rasterise at 1290x206, and the hero
+   is the first thing painted at startup), the rift is a chain of dark
+   ellipses and there are **600 granulation stars** in the band's rotated
+   frame: 65% of them fall within 60 units of its spine, a strip that is
+   21% of the canvas, i.e. **three times the density** outside. Final cost:
+   2.8 ms.
+5. **The invitation, on the drawing.** The resting pane said what to do
+   only under the sky; it now carries two lines painted **on** it, on the
+   left half (where the SVG already darkens for text; the right half is
+   taken by the Moon and the observatory): "Select a project" and "You will
+   see its card, its plan and its curve. Or create a new one.". The overlay
+   does not eat clicks (`WA_TransparentForMouseEvents`) and the create
+   button stays below.
 
 **Revision (2026-10-02, Interfaz 1.5 bis: the site, on a map).** The
 observatory step asked for a latitude from someone who knows where they

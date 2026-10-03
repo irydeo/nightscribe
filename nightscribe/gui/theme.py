@@ -682,6 +682,10 @@ QLabel#nightHead {{
     letter-spacing: 1px;
 }}
 QLabel#nightLine {{ color: #c7cbd9; }}
+/* the invitation painted on the resting sky (ADR-055): a headline and a
+   dim hint, both readable because the SVG already darkens that half */
+QLabel#restingHead {{ color: {C_TEXT}; font-size: 15px; font-weight: 600; }}
+QLabel#restingHint {{ color: {C_TEXT_DIM}; font-size: 12px; }}
 QPushButton#nightCta {{
     background: rgba(106, 176, 255, 0.10); color: {C_ACCENT};
     border: 1px solid rgba(106, 176, 255, 0.40); border-radius: 8px;

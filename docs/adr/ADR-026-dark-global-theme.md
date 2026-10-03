@@ -50,6 +50,31 @@ pantalla de inicio). El rediseño de la propia pantalla de «Esta noche»
 (filas amplias con el «por qué» visible) y la tabla completa son fases
 separadas; ver `docs/WORKFLOWS.es.md` para el punto de entrada.
 
+**Enmienda (2026-10-03, el icono sigue la paleta).** El icono de la
+aplicación (`assets/appicon.svg`: una pluma dibujando la cola de un cometa
+hacia una estrella de cuatro puntas sobre una teja azul noche) estaba
+pintado en **oro y ámbar** (`#ecc15f`, `#dfa04f`, `#c98d7e`, `#c4755a`,
+`#d69b63`, `#f5dc8f`, `#fff5cf`, `#f3dd98`, `#f7e0a0`, `#fff3c9`), fuera de
+la paleta de esta ADR, y el desajuste se veía en el héroe de Bienvenida,
+donde el logo queda justo al lado de la marca en azul.
+
+1. **Mismo dibujo, paleta fría**: la pluma y la estrella toman el acento
+   (`#6ab0ff`) con sus escalones (`#8fc4ff`, `#a9d1ff`, `#5f9ee8`,
+   `#4484ef`, `#dcebff`), la cola del cometa va del azul profundo al pálido
+   y las estrellitas pasan al blanco azulado (`#d8e6ff`). La teja
+   (`#1b2134` → `#0e1119`) ya era de la familia del tema.
+2. **La estrella conserva el núcleo casi blanco** (`#f4f9ff`): a 16 px el
+   oro destaca más que el azul sobre una teja oscura, y sin ese núcleo el
+   icono se leía como una mancha.
+3. **Regeneradas las diez medidas** (`appicon-{16,24,32,48,64,128,256,512}`,
+   `.ico` de siete tamaños y `.icns`) rasterizando con **QtSvg**, el mismo
+   motor que dibuja el logo en la app, y montando los contenedores con
+   Pillow.
+4. **Guarda**: `tests/unit/test_theme.py` comprueba que **todos** los
+   colores del icono son neutros o del lado frío del círculo (tono
+   190-285°). Los tonos cálidos son de los OBJETOS (`KIND_COLORS`), no del
+   logo.
+
 ## English
 
 **Context**: the application had no global stylesheet. The dark look was
@@ -97,3 +122,27 @@ was a literal in its own module).
 screen redesign). The redesign of the «Tonight» screen itself (wider rows
 showing the "why tonight" text) and of the full table are separate phases;
 see `docs/WORKFLOWS.es.md` for the entry point.
+
+**Amendment (2026-10-03, the icon follows the palette).** The application
+icon (`assets/appicon.svg`: a quill drawing a comet trail into a four-point
+star on a night-navy tile) was painted in **gold and amber** (`#ecc15f`,
+`#dfa04f`, `#c98d7e`, `#c4755a`, `#d69b63`, `#f5dc8f`, `#fff5cf`,
+`#f3dd98`, `#f7e0a0`, `#fff3c9`), off this ADR's palette, and the clash
+showed on the Welcome hero, where the logo sits right next to the blue
+wordmark.
+
+1. **Same drawing, cold palette**: the quill and the star take the accent
+   (`#6ab0ff`) with its steps (`#8fc4ff`, `#a9d1ff`, `#5f9ee8`, `#4484ef`,
+   `#dcebff`), the comet trail runs from the deep blue to the pale one, and
+   the small stars turn blue-white (`#d8e6ff`). The tile (`#1b2134` →
+   `#0e1119`) was already the theme's family.
+2. **The star keeps its near-white core** (`#f4f9ff`): at 16 px gold pops
+   more than blue on a dark tile, and without that core the icon read as a
+   smudge.
+3. **All ten rasters regenerated** (`appicon-{16,24,32,48,64,128,256,512}`,
+   a seven-size `.ico` and the `.icns`) rasterising with **QtSvg**, the
+   very engine that draws the logo in the app, and mounting the containers
+   with Pillow.
+4. **Guard**: `tests/unit/test_theme.py` checks that **every** colour in
+   the icon is neutral or on the cold side of the wheel (hue 190-285°).
+   The warm tones belong to the OBJECTS (`KIND_COLORS`), not to the logo.

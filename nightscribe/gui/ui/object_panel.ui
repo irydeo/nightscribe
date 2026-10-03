@@ -3,14 +3,14 @@
   Object panel (the project card's fixed object block, ADR-019; the
   object-card unification, ADR-031; the dossier redesign, ADR-057): the
   state line, the hero (identity + score), the facts line, the "tonight"
-  KPI strip, the alert-flags row, the coordinates row, the night ribbon,
-  the parameter sections (one card per theme) with the "In depth" toggle,
-  the charts tabs and the single CTA. Loaded by gui/overview.py through
-  gui/ui_loader.py. Every block starts hidden (or empty): the panel's
-  states (empty/loading/missing/ready) show them, in code. The hero, the
-  ribbon, the KPI tiles and the section cards are custom widgets and
-  never enter this file: placeholders mark their slots (ADR-005). Since
-  ADR-057 the panel is a vertical dossier and may scroll; the 4 px
+  KPI strip, the alert-flags row, the coordinates row, the night ribbon
+  and the parameters/charts row (parameters left, charts right, ADR-057
+  rev.), with the single CTA at the bottom. Loaded by gui/overview.py
+  through gui/ui_loader.py. Every block starts hidden (or empty): the
+  panel's states (empty/loading/missing/ready) show them, in code. The
+  hero, the ribbon, the KPI tiles and the section cards are custom
+  widgets and never enter this file: placeholders mark their slots
+  (ADR-005). Since ADR-057 the panel is a dossier and may scroll; the 4 px
   no-scroll rhythm of Interfaz 1.8 is gone with the two-column layout.
 -->
 <ui version="4.0">
@@ -76,50 +76,99 @@
     <widget class="QWidget" name="ribbonHost"/>
    </item>
    <item>
-    <!-- the parameters header: title + the "In depth" switch; the section
-         cards themselves are built in code under sectionsHost -->
-    <widget class="QWidget" name="grp_params" native="true">
-     <property name="visible"><bool>false</bool></property>
-     <layout class="QHBoxLayout" name="row_deep">
-      <property name="leftMargin"><number>0</number></property>
-      <property name="topMargin"><number>0</number></property>
-      <property name="rightMargin"><number>0</number></property>
-      <property name="bottomMargin"><number>0</number></property>
-      <item><widget class="QLabel" name="lbl_params_title"><property name="text"><string>Parameters</string></property></widget></item>
-      <item><spacer name="hsp_deep"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
-      <item><widget class="QCheckBox" name="chk_deep"><property name="text"><string>In depth</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Show every derived parameter, not only the ones that decide the observation</string></property></widget></item>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QWidget" name="sectionsHost">
-     <layout class="QVBoxLayout" name="sections_lay">
-      <property name="leftMargin"><number>0</number></property>
-      <property name="topMargin"><number>0</number></property>
-      <property name="rightMargin"><number>0</number></property>
-      <property name="bottomMargin"><number>0</number></property>
-      <property name="spacing"><number>8</number></property>
-     </layout>
-    </widget>
-   </item>
-   <item>
-    <widget class="QGroupBox" name="grp_charts">
-     <property name="title"><string>Charts</string></property>
-     <property name="visible"><bool>false</bool></property>
-     <layout class="QVBoxLayout" name="vbox_charts">
-      <property name="leftMargin"><number>6</number></property>
-      <property name="topMargin"><number>4</number></property>
-      <property name="rightMargin"><number>6</number></property>
-      <property name="bottomMargin"><number>6</number></property>
-      <item>
-       <widget class="QTabWidget" name="tabs_charts">
-        <property name="tabBarAutoHide"><bool>true</bool></property>
-        <property name="documentMode"><bool>true</bool></property>
-        <property name="minimumSize"><size><width>300</width><height>240</height></size></property>
-       </widget>
-      </item>
-     </layout>
-    </widget>
+    <!-- ADR-057 rev.: the parameters and the charts share ONE row, 50/50,
+         instead of stacking. The two columns are widgets (not bare
+         layouts) because a hidden column must take NO space: with the
+         parameters gone the charts get the full width, and the other way
+         round. Each column ends in an expanding spacer so both start at
+         the top: the charts never float in the middle of a tall column.
+         Below _BODY_STACK_W (overview.py) the row turns vertical: two
+         390 px columns do not fit a narrow pane and the charts have a
+         300 px floor. -->
+    <layout class="QHBoxLayout" name="row_body">
+     <property name="spacing"><number>12</number></property>
+     <item>
+      <widget class="QWidget" name="col_params">
+       <layout class="QVBoxLayout" name="colParamsLay">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <!-- the parameters header: title + the "In depth" switch; the
+              section cards themselves are built in code under
+              sectionsHost -->
+         <widget class="QWidget" name="grp_params" native="true">
+          <property name="visible"><bool>false</bool></property>
+          <layout class="QHBoxLayout" name="row_deep">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <item><widget class="QLabel" name="lbl_params_title"><property name="text"><string>Parameters</string></property></widget></item>
+           <item><spacer name="hsp_deep"><property name="orientation"><enum>Qt::Horizontal</enum></property><property name="sizeHint" stdset="0"><size><width>40</width><height>20</height></size></property></spacer></item>
+           <item><widget class="QCheckBox" name="chk_deep"><property name="text"><string>In depth</string></property><property name="checked"><bool>true</bool></property><property name="toolTip"><string>Show every derived parameter, not only the ones that decide the observation</string></property></widget></item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QWidget" name="sectionsHost">
+          <layout class="QVBoxLayout" name="sections_lay">
+           <property name="leftMargin"><number>0</number></property>
+           <property name="topMargin"><number>0</number></property>
+           <property name="rightMargin"><number>0</number></property>
+           <property name="bottomMargin"><number>0</number></property>
+           <property name="spacing"><number>8</number></property>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="vsp_params">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </item>
+     <item>
+      <widget class="QWidget" name="col_charts">
+       <layout class="QVBoxLayout" name="colChartsLay">
+        <property name="leftMargin"><number>0</number></property>
+        <property name="topMargin"><number>0</number></property>
+        <property name="rightMargin"><number>0</number></property>
+        <property name="bottomMargin"><number>0</number></property>
+        <property name="spacing"><number>8</number></property>
+        <item>
+         <widget class="QGroupBox" name="grp_charts">
+          <property name="title"><string>Charts</string></property>
+          <property name="visible"><bool>false</bool></property>
+          <layout class="QVBoxLayout" name="vbox_charts">
+           <property name="leftMargin"><number>6</number></property>
+           <property name="topMargin"><number>4</number></property>
+           <property name="rightMargin"><number>6</number></property>
+           <property name="bottomMargin"><number>6</number></property>
+           <item>
+            <widget class="QTabWidget" name="tabs_charts">
+             <property name="tabBarAutoHide"><bool>true</bool></property>
+             <property name="documentMode"><bool>true</bool></property>
+             <property name="minimumSize"><size><width>300</width><height>240</height></size></property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <spacer name="vsp_charts">
+          <property name="orientation"><enum>Qt::Vertical</enum></property>
+          <property name="sizeHint" stdset="0"><size><width>0</width><height>0</height></size></property>
+         </spacer>
+        </item>
+       </layout>
+      </widget>
+     </item>
+    </layout>
    </item>
    <item><spacer name="vsp_cta"><property name="orientation"><enum>Qt::Vertical</enum></property><property name="sizeType"><enum>QSizePolicy::Expanding</enum></property><property name="sizeHint" stdset="0"><size><width>20</width><height>6</height></size></property></spacer></item>
    <item><widget class="QPushButton" name="btn_project"><property name="text"><string>Create project</string></property><property name="minimumSize"><size><width>0</width><height>46</height></size></property><property name="sizePolicy"><sizepolicy hsizetype="Expanding" vsizetype="Fixed"><horstretch>0</horstretch><verstretch>0</verstretch></sizepolicy></property><property name="cursor"><cursorShape>PointingHandCursor</cursorShape></property><property name="visible"><bool>false</bool></property></widget></item>

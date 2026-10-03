@@ -146,18 +146,68 @@ def test_ready_state_hook_and_params_visible(panel, qapp):
 
 
 def test_the_band_spans_the_page(panel, qapp):
-    # ADR-057: the dossier is vertical; the band always spans the page,
-    # sitting between the coordinates row and the parameter sections.
+    # ADR-057: the band always spans the page, between the coordinates row
+    # and the parameters/charts row (it is not inside either column).
     panel.show(FAKE_ELEMENT)
     qapp.processEvents()
     ribbon = panel._ribbon
     vbox = panel.layout()
     assert vbox.indexOf(ribbon) >= 0
     assert vbox.indexOf(ribbon) > vbox.indexOf(panel.row_coords)
-    assert vbox.indexOf(ribbon) < vbox.indexOf(panel.grp_params)
+    assert vbox.indexOf(ribbon) < vbox.indexOf(panel._ui.row_body)
     # and it carries the night's numbers as its tooltip, because the
     # caption is elided in a narrow column
     assert "19:30" in ribbon.toolTip() or "observatory" in ribbon.toolTip()
+
+
+def test_parameters_and_charts_share_the_row(panel, qapp):
+    # ADR-057 rev.: one row, parameters left and charts right. The columns
+    # are widgets so that hiding one hands the width to the other.
+    panel.show(FAKE_ELEMENT)
+    qapp.processEvents()
+    row = panel._row_body
+    assert row.indexOf(panel.col_params) == 0
+    assert row.indexOf(panel.col_charts) == 1
+    assert row.stretch(0) == row.stretch(1) == 1        # 50/50
+    # the blocks live inside their column, not loose in the dossier
+    assert panel._ui.colParamsLay.indexOf(panel.grp_params) >= 0
+    assert panel._ui.colParamsLay.indexOf(panel._ui.sectionsHost) >= 0
+    assert panel._ui.colChartsLay.indexOf(panel.grp_charts) >= 0
+    assert panel.layout().indexOf(panel.grp_charts) < 0
+
+
+def test_a_column_without_its_block_gives_the_width_to_the_other(panel, qapp):
+    # A hidden block inside a VISIBLE column would leave the column
+    # standing and squeeze the other one for nothing: the column follows.
+    panel.show(FAKE_ELEMENT)
+    qapp.processEvents()
+    panel.grp_charts.hide()
+    panel._sync_body_columns()
+    assert panel.col_charts.isHidden()
+    assert not panel.col_params.isHidden()
+    panel.grp_params.hide()
+    panel._sync_body_columns()
+    assert panel.col_params.isHidden()
+    # and the dossier is never left with an empty row
+    assert panel.col_params.isHidden() and panel.col_charts.isHidden()
+
+
+def test_the_row_stacks_in_a_narrow_pane(panel, qapp):
+    # Below _BODY_STACK_W two 390 px columns do not fit and the charts
+    # (300 px floor) would clip instead of shrinking.
+    from PySide6.QtWidgets import QBoxLayout, QWidget
+    from nightscribe.gui.overview import _BODY_STACK_W
+    QWidget.show(panel)     # ObjectPanel.show(e) shadows QWidget.show()
+    qapp.processEvents()
+    panel.resize(_BODY_STACK_W + 200, 900)
+    qapp.processEvents()
+    assert panel._row_body.direction() == QBoxLayout.LeftToRight
+    panel.resize(_BODY_STACK_W - 100, 900)
+    qapp.processEvents()
+    assert panel._row_body.direction() == QBoxLayout.TopToBottom
+    panel.resize(_BODY_STACK_W + 200, 900)
+    qapp.processEvents()
+    assert panel._row_body.direction() == QBoxLayout.LeftToRight
 
 
 def test_ready_params_table_has_meaningful_rows(panel):

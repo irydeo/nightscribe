@@ -1409,6 +1409,52 @@ Interfaz 1.4.
 `_plan_ribbon_refresh` y `_analysis_ribbon_refresh` en
 `gui/main_window.py`, `_refresh_ribbon` en `gui/overview.py`.
 
+### 7duodevicies. La ficha en dos columnas y la ficha como aterrizaje (2026-10-02, ADR-057 rev. + ADR-041 rev.)
+
+Motivación: el dosier apilaba los parámetros y, debajo, los gráficos; y
+abrir un proyecto aterrizaba en Captura (el objetivo de la tarjeta
+Siguiente) en vez de en la ficha que dice qué es el objeto.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| La fila | Parámetros a la izquierda y gráficos a la derecha, 50/50 (`row_body`); la banda de la noche sigue a todo el ancho encima y el CTA debajo | **Hecho** |
+| El colapso | Las columnas son widgets y siguen a su bloque: sin gráficos los parámetros ocupan todo el ancho, y al revés | **Hecho** |
+| El apilado | Por debajo de 660 px de panel la fila se vuelve vertical (los gráficos tienen 300 px de mínimo) | **Hecho** |
+| El 50/50 | Las etiquetas de las `SectionCard` envuelven: el mínimo del grid baja de 448 a ~180 px, que es lo que el reparto igual necesitaba | **Hecho** |
+| El aterrizaje | Abrir un proyecto aterriza siempre en la ficha; el botón «Ir» sigue saltando al paso y el doble clic sigue yendo al trabajo. El refresco en sitio (`land="keep"`) y la máquina de pasos (`land="next"`) conservan lo suyo | **Hecho** |
+
+**Punto de entrada**: `gui/ui/object_panel.ui` (`row_body`),
+`_sync_body_columns` y `_apply_body_direction` en `gui/overview.py`,
+`_build_project_page` en `gui/main_window.py`.
+
+### 7undevicies. La Luna del héroe, y un observatorio que se ve (2026-10-02, ADR-055 rev.)
+
+Motivación: el observador avisó de que la fase de la Luna se veía mal en
+Bienvenida y en Mis proyectos, y pidió que el dibujo incluyera un
+observatorio.
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| La Luna | `gui/moon_icon.py` tenía la convención de signo invertida, así que la barra del cielo, la banda de la noche, Tonight y el calendario pintaban **la fase espejada** mientras el pintor del héroe la pintaba bien: dos lunas en una pantalla. Corregido, y un test nuevo compara los dos pintores a la misma elongación | **Hecho** |
+| Los crecientes | La foto empaquetada es una luna llena con el limbo izquierdo oscuro y los mares de ese lado: un creciente menguante salía ~5 veces más apagado que uno creciente (0,7% frente a 2,5% del disco a -30/+30). Un lavado plano sobre la zona iluminada los iguala | **Hecho** |
+| El observatorio | Estaba en vector en `welcome_sky.svg` y el encaje «cover» se lo comía (solo sobrevivía el canto de la cúpula en un héroe de 820x170 o 1290x206). El SVG es cielo puro ahora y la cúpula la pinta `welcome_sky._paint_observatory`, dimensionada con el héroe, abajo a la derecha bajo la Luna y con la lámpara cálida en la ranura | **Hecho** |
+
+**Punto de entrada**: `gui/moon_icon.py` (el signo y el lavado),
+`gui/widgets/welcome_sky.py` (`_observatory_geometry`,
+`_paint_observatory`), `assets/welcome_sky.svg` (sin observatorio ni suelo).
+
+### 7vicies. La galaxia, el icono y la invitación (2026-10-03, ADR-026 rev. + ADR-055 rev.)
+
+| Pieza | Entrega | Estado |
+|---|---|---|
+| La galaxia | La banda eran cinco elipses de borde duro (escalones) con la misma densidad de estrellas que el cielo vacío (19% de las estrellas en el 20% del lienzo, tres en su núcleo). Ahora: brillo por degradado radial, la Gran Grieta como cadena de elipses oscuras, nubes estelares y 600 estrellas de granulación en el sistema de la banda (3x la densidad de fuera). Sin filtros SVG: un grupo desenfocado costaba 13,6 ms de 15; con degradados, 2,8 | **Hecho** |
+| El icono | `appicon.svg` era oro sobre la teja azul, fuera de la paleta (el choque se veía junto a la marca azul de Bienvenida). Repintado con el azul de acento y núcleo casi blanco en la estrella, y regeneradas las diez medidas + el `.ico` + el `.icns` con QtSvg + Pillow. Guarda: todo color del icono es neutro o frío | **Hecho** |
+| La invitación | El panel en reposo lo dice sobre el dibujo: «Selecciona un proyecto» / «Verás su ficha, su plan y su curva. O crea uno nuevo.», pintado en la mitad izquierda del cielo, sin comer clics, con el botón de crear debajo | **Hecho** |
+
+**Punto de entrada**: `assets/welcome_sky.svg` (la banda),
+`assets/appicon.svg` + `installer/` (el icono),
+`gui/ui/night_panel.ui` + `gui/widgets/night_panel.py` (la invitación).
+
 ### 7undecies. Los avisos se disuelven en el listado (2026-10-01, ADR-055 rev.)
 
 Motivación: el panel «Necesita tu atención» y la banda «Toca revisar» repetían

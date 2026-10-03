@@ -240,16 +240,17 @@ def test_select_project_drives_panel(window, panel):
     # (no follow-up for a NEO), lazy-built per click; the object card
     # carries the nested "Project files" block, and the Next card took
     # over the old wizard buttons
-    assert set(window._tab_pages) == {"details", "plan"}  # rest lazy
+    assert set(window._tab_pages) == {"details"}   # the rest lazy
     # the masthead "Files (0)" button is the single entry to the
     # project files (the old in-card section is retired); a fresh
     # project has none registered, so it reads zero and stays off
     assert not window.projects.btn_files.isEnabled()
     assert window.projects.btn_files.text() == window.tr("Files (0)")
-    # a fresh project opens on its next-action tab (a fresh project is
-    # at "plan"); the object card stays hidden until the user opens it
-    assert not window._tab_pages["plan"].isHidden()
-    assert window._tab_pages["details"].isHidden()
+    # ADR-041 rev.: a fresh project opens on the OBJECT CARD. The Next
+    # card still says what to do next (a fresh project sits at "plan") and
+    # its Go button jumps there; the Capture page is not built until asked.
+    assert not window._tab_pages["details"].isHidden()
+    assert "plan" not in window._tab_pages
     assert window._next_target == "plan"
     assert not window.projects.btn_next_go.isHidden()
     assert window.projects.lbl_next.text()
@@ -689,7 +690,8 @@ def test_plan_tab_calibration_and_ccdciel_export(window, panel, tmp_path,
     ctx.update({"ra_deg": 9.36667, "dec_deg": 72.3475,
                 "safe_window": "2026-09-06T16:52:02+00:00|"
                                "2026-09-07T12:53:15+00:00"})
-    _create_and_select(window, "neo", "seq-capture-target", ctx)
+    p = _create_and_select(window, "neo", "seq-capture-target", ctx)
+    _open_tab(window, p, "plan")     # the Capture step builds on first open
     w = window._project_widgets
     assert w["spn_darks"].value() == 25   # calibration group defaults
     assert w["spn_bias"].value() == 100
@@ -733,8 +735,9 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
     # line says so; the connect button is the one enabled thing.
     # ADR-043: the controls live in the Capture step of the project page
     # (window._obs_widgets), there is no Observatory tab any more.
-    _create_and_select(window, "neo", "ccd-section-target",
-                       {"kind": "neo", "mag": 19.0})
+    p = _create_and_select(window, "neo", "ccd-section-target",
+                           {"kind": "neo", "mag": 19.0})
+    _open_tab(window, p, "plan")       # the Capture step builds on first open
     obs = window._obs_widgets          # connection + mount + live capture
     assert obs["ccd_connect"].isEnabled()
     assert window._ccd_connected is False
@@ -751,8 +754,9 @@ def test_plan_tab_ccdciel_section_disabled_when_disconnected(window, panel):
 def test_plan_tab_ccdciel_filter_fallback_list(window, panel):
     # The wheel combo carries a sane static fallback until CCDciel answers
     # (UX-PC U3: the combo is the Observatory tab's, window-owned).
-    _create_and_select(window, "neo", "ccd-filter-target",
-                       {"kind": "neo", "mag": 19.0})
+    p = _create_and_select(window, "neo", "ccd-filter-target",
+                           {"kind": "neo", "mag": 19.0})
+    _open_tab(window, p, "plan")
     cmb = window._obs_widgets["cmb_ccd_filter"]
     items = [cmb.itemText(i) for i in range(cmb.count())]
     assert "L" in items and "Ha" in items and "OIII" in items
@@ -766,8 +770,9 @@ def test_plan_tab_ccdciel_fills_filters_from_wheel(window, panel):
     window._ccd_client = ccdciel.Client()
     window._ccd_connected = True
     try:
-        _create_and_select(window, "neo", "ccd-wheel-target",
-                           {"kind": "neo", "mag": 19.0})
+        p = _create_and_select(window, "neo", "ccd-wheel-target",
+                               {"kind": "neo", "mag": 19.0})
+        _open_tab(window, p, "plan")
         cmb = window._obs_widgets["cmb_ccd_filter"]
         items = [cmb.itemText(i) for i in range(cmb.count())]
         assert items == ["Red", "Green", "Blue"]
@@ -783,6 +788,7 @@ def test_send_plan_uses_the_targets_saved_plan(window, panel, monkeypatch):
     import nightscribe.core.db as dbmod
     from nightscribe.core import project
     p = _create_and_select(window, "sn", "SN2099send", {"kind": "sn"})
+    _open_tab(window, p, "plan")
     project.update_step_data(dbmod.db, p["id"], "plan",
                              {"n_frames": 12, "exp_s": 45.0,
                               "filter": "R"})
@@ -924,7 +930,8 @@ def test_apply_position_updates_context_and_label(window, panel):
     # shows the new epoch.
     ctx = {"id": "2026AB", "ra_deg": 10.0, "dec_deg": 20.0, "kind": "neo",
            "rate_arcsec_min": 4.0}
-    _create_and_select(window, "neo", "2026AB", ctx)
+    p = _create_and_select(window, "neo", "2026AB", ctx)
+    _open_tab(window, p, "plan")
     window._ccd_apply_position(
         {"ra_deg": 123.45, "dec_deg": -12.0, "rate_arcsec_min": 5.0,
          "epoch_iso": "2026-09-07 22:30:00", "source": "horizons",
@@ -1895,6 +1902,7 @@ def test_variable_plan_prefills_protocol_filters(window):
     p = proj_mod.create(mw.db, "variable", "T CrB", {"mag": 10.1},
                         campaign_id=cid)
     _build_page(window, proj_mod.get(mw.db, p["id"]))
+    _open_tab(window, proj_mod.get(mw.db, p["id"]), "plan")
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["B", "V"]
 
@@ -1904,6 +1912,7 @@ def test_variable_without_campaign_keeps_clear_default(window):
     from nightscribe.gui import main_window as mw
     p = proj_mod.create(mw.db, "variable", "V1490 Cyg", {"mag": 12.0})
     _build_page(window, proj_mod.get(mw.db, p["id"]))
+    _open_tab(window, proj_mod.get(mw.db, p["id"]), "plan")
     filters = [e["cmb"].currentText() for e in window._sn_steps]
     assert filters == ["Clear"]
 
@@ -2331,7 +2340,8 @@ def test_detail_spins_are_wheel_passive(window, panel):
     from PySide6.QtCore import QCoreApplication
     from nightscribe.gui.widgets.passive_wheel import (
         PassiveDoubleSpinBox, PassiveSpinBox)
-    _create_and_select(window, "neo", "wheel-passive-spin", dict(NEO_CTX))
+    p = _create_and_select(window, "neo", "wheel-passive-spin", dict(NEO_CTX))
+    _open_tab(window, p, "plan")
     for key, cls in (("spn_darks", PassiveSpinBox),
                      ("spn_darkexp", PassiveDoubleSpinBox)):
         w = window._project_widgets[key]
@@ -2346,7 +2356,8 @@ def test_detail_spins_are_wheel_passive(window, panel):
 def test_detail_spins_fine_tune_on_ctrl_wheel(window, panel):
     # Ctrl+wheel is the deliberate fine-tune gesture and must still work.
     from PySide6.QtCore import QCoreApplication, Qt
-    _create_and_select(window, "neo", "wheel-ctrl-spin", dict(NEO_CTX))
+    p = _create_and_select(window, "neo", "wheel-ctrl-spin", dict(NEO_CTX))
+    _open_tab(window, p, "plan")
     spn = window._project_widgets["spn_darks"]
     spn.setValue(50)
     e = _wheel_event(modifiers=Qt.ControlModifier)

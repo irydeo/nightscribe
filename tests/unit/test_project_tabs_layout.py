@@ -187,7 +187,10 @@ def test_capture_fits_with_ccdciel_connected(window):
         host = "127.0.0.1"
         port = 3277
 
-    _open(window, "capture")
+    # "plan" is the Capture step's tab key ("capture" is not a key at all:
+    # this used to be a no-op that only worked because the landing page
+    # built Capture for it)
+    _open(window, "plan")
     window._ccd_client = _Client()
     window._ccd_on_connect({"version": "1.0", "filters": ["L"],
                             "dashboard": {"camera": {"temperature": -10.0,
@@ -213,7 +216,9 @@ def test_capture_summary_strip_reads_the_plan(window):
     # filter, dawn verdict) and its blocks live in titled PanelCards.
     from nightscribe.gui.widgets.kpi_tile import KpiTile
     from nightscribe.gui.widgets.section_card import PanelCard
-    _open(window, "capture")
+    # "plan" is the Capture step's tab key ("capture" is not a key at all:
+    # it worked only while the landing page built Capture by itself)
+    _open(window, "plan")
     page = window.projects.page_container
     tiles = {t.texts()[1]: t
              for t in page.findChildren(KpiTile)}

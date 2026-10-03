@@ -224,3 +224,27 @@ def test_compact_button_glyph_survives_the_small_width(qapp):
         "the compact glyph button paints no glyph"
     btn.close()
     btn.deleteLater()
+
+
+def test_the_app_icon_speaks_the_brand_palette():
+    # ADR-026: the icon was GOLD on the night tile while the app's line is
+    # navy + the #6ab0ff accent, and the two meet on the Welcome hero (the
+    # logo sits right next to the blue wordmark). This is the guard: every
+    # colour in appicon.svg is either neutral or on the cold side of the
+    # wheel. The warm hues belong to the OBJECTS (KIND_COLORS), not to the
+    # logo.
+    import colorsys
+    import re
+    from pathlib import Path
+    import nightscribe
+    svg = Path(nightscribe.__file__).parent / "assets" / "appicon.svg"
+    assert svg.exists(), "the icon's source is gone"
+    cols = set(re.findall(r"#([0-9a-fA-F]{6})", svg.read_text()))
+    assert len(cols) >= 8, f"unexpectedly few colours: {cols}"
+    for c in cols:
+        r, g, b = (int(c[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+        h, _l, s = colorsys.rgb_to_hls(r, g, b)
+        hue = h * 360.0
+        assert s < 0.30 or 190.0 <= hue <= 285.0, (
+            f"#{c} is off the brand's palette (hue {hue:.0f}, "
+            f"saturation {s:.2f}): the logo is navy and the accent blue")
